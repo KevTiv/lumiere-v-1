@@ -23,6 +23,7 @@ import {
   Lock,
   Building,
   Sparkles,
+  KeyRound,
 } from "lucide-react"
 import { UserManagement } from "./user-management"
 import { RoleManagement } from "./role-management"
@@ -32,6 +33,7 @@ import { UnifiedFormConfigSettings } from "./unified-form-config-settings"
 import { UserCustomFields } from "./user-custom-fields"
 import { OrganizationSettings } from "./organization-settings"
 import { AiSettings } from "./ai-settings"
+import { SsoSettings } from "./sso-settings"
 
 const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   user: User,
@@ -44,6 +46,7 @@ const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   bookmarked: BookMarked,
   building: Building,
   sparkles: Sparkles,
+  keyround: KeyRound,
 }
 
 const settingsGroups = [
@@ -57,7 +60,7 @@ const settingsGroups = [
     id: "organization",
     title: "Organization",
     description: "Company configuration and user access.",
-    sectionIds: ["organization", "users", "roles"],
+    sectionIds: ["organization", "users", "roles", "sso"],
   },
   {
     id: "platform",
@@ -88,6 +91,8 @@ export function SettingsModule({ className }: SettingsModuleProps) {
         return <UserManagement />
       case "roles":
         return <RoleManagement />
+      case "sso":
+        return <SsoSettings />
       case "audit":
         return <AuditLog />
       case "profile":

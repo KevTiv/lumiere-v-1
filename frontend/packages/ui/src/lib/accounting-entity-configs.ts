@@ -101,6 +101,53 @@ export const fixedAssetsTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+export const depreciationLinesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "depreciation-lines-table",
+  title: t("accounting.entities.depreciationSchedule.title"),
+  description: t("accounting.entities.depreciationSchedule.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("accounting.entities.depreciationSchedule.searchPlaceholder"),
+    searchKeys: ["name"],
+    columns: [
+      {
+        key: "depreciationDate",
+        label: t("accounting.entities.depreciationSchedule.columns.date"),
+        type: "date",
+        width: "min-w-28",
+      },
+      { key: "name", label: t("accounting.entities.depreciationSchedule.columns.name"), width: "min-w-36" },
+      {
+        key: "amount",
+        label: t("accounting.entities.depreciationSchedule.columns.amount"),
+        type: "currency",
+        align: "right",
+      },
+      {
+        key: "remainingValue",
+        label: t("accounting.entities.depreciationSchedule.columns.remainingValue"),
+        type: "currency",
+        align: "right",
+      },
+      {
+        key: "depreciatedValue",
+        label: t("accounting.entities.depreciationSchedule.columns.depreciatedValue"),
+        type: "currency",
+        align: "right",
+      },
+      {
+        key: "movePostedCheck",
+        label: t("accounting.entities.depreciationSchedule.columns.movePosted"),
+        type: "boolean",
+        align: "center",
+      },
+    ],
+    emptyMessage: t("accounting.entities.depreciationSchedule.empty"),
+  },
+})
+
 const paymentStateBadges = (t: TFunction) => ({
   badgeVariants: {
     NotPaid: "secondary",
@@ -473,6 +520,7 @@ export const accountingEntityConfigs = (t: TFunction): Record<string, EntityView
   "fiscal-years-table": fiscalYearsTableConfig(t),
   "account-periods-table": accountPeriodsTableConfig(t),
   "fixed-assets-table": fixedAssetsTableConfig(t),
+  "depreciation-lines-table": depreciationLinesTableConfig(t),
   "account-payments-table": accountPaymentsTableConfig(t),
   "payment-terms-table": paymentTermsTableConfig(t),
   "payment-term-lines-table": paymentTermLinesTableConfig(t),

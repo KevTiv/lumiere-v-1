@@ -19,6 +19,7 @@ import { useRBAC } from "@/lib/rbac-context"
 import { formRegistry } from "../forms/config/registry"
 import type { FormRegistryEntry, FormModuleMetadata, FieldType, ParsedFormField } from "../forms/config/types"
 import { generateCustomFieldId, parseRoleConfig } from "../forms/config/types"
+import { toCreateRoleConfigParams, toCreateUserCustomFieldParams } from "@lumiere/erp-shared/forms-create-params"
 import { useFormConfiguration } from "../forms/hooks/use-form-config"
 import { ConfigurableForm } from "../forms/components/configurable-form"
 import { pushRegistryFormToDatabase } from "../forms/utils/push-registry-form"
@@ -502,12 +503,14 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
           fieldRequired && !parsed.requiredFields.includes(fieldId)
             ? [...parsed.requiredFields, fieldId]
             : parsed.requiredFields
-        await setFormRoleConfig(BigInt(organizationId), BigInt(dbConfigurationId), {
+        const roleParams = toCreateRoleConfigParams({
           roleId: rc.roleId,
           enabledFields: enabled,
           requiredFields: required,
           defaultPrompts: parsed.defaultPrompts,
         })
+        if (!roleParams) continue
+        await setFormRoleConfig(BigInt(organizationId), BigInt(dbConfigurationId), roleParams)
       }
 
       toast.success(t("settings.formConfig.customFieldAdded"))

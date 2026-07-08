@@ -298,10 +298,10 @@ export const newDeferredRevenueScheduleForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "number",
+          type: "select",
           label: t("subscriptions.forms.deferredSchedule.fields.currencyId"),
-          placeholder: "1",
           width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "totalAmount",
@@ -421,10 +421,10 @@ export const newRevenueRecognitionRuleForm = (t: TFunction): FormConfig => ({
         {
           id: "expenseAccountId",
           name: "expenseAccountId",
-          type: "number",
+          type: "select",
           label: t("subscriptions.forms.recognitionRule.fields.expenseAccountId"),
-          placeholder: t("subscriptions.forms.recognitionRule.fields.expenseAccountIdPlaceholder"),
           width: "1/2",
+          options: [{ value: "", label: "—" }],
         },
         {
           id: "productCategoryIds",
@@ -505,10 +505,11 @@ export const closeSubscriptionForm = (t: TFunction): FormConfig => ({
         {
           id: "closeReasonId",
           name: "closeReasonId",
-          type: "text",
+          type: "select",
           label: t("subscriptions.forms.closeSubscription.fields.closeReasonId"),
           placeholder: t("subscriptions.forms.closeSubscription.fields.closeReasonIdPlaceholder"),
           width: "full",
+          options: [{ value: "", label: "—" }],
         },
         {
           id: "notes",
@@ -557,18 +558,20 @@ export const recognizeDeferredRevenueLineForm = (t: TFunction): FormConfig => ({
         {
           id: "moveId",
           name: "moveId",
-          type: "number",
+          type: "select",
           label: t("subscriptions.forms.recognizeLine.fields.moveId"),
           required: true,
           width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "moveLineId",
           name: "moveLineId",
-          type: "number",
+          type: "select",
           label: t("subscriptions.forms.recognizeLine.fields.moveLineId"),
           required: true,
           width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
         },
       ],
     },

@@ -10,6 +10,7 @@ import {
   subscribeToRecordForm,
   unsubscribeFromRecordForm,
   MissingOrganization,
+  mergeSelectOptionsForFields,
 } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { messagesModuleConfig } from "@/lib/module-dashboard-configs"
@@ -22,6 +23,7 @@ import {
   useUnsubscribeFromRecord,
 } from "@lumiere/query-hooks/hooks/messages"
 import { optionalBigIntU64 } from "@/lib/form-coercion"
+import { mailMessageRowsToSelectOptions } from "@/lib/form-lookup"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface MessagesClientProps {
@@ -89,6 +91,19 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
   const subscribeToRecord = useSubscribeToRecord(orgId)
   const unsubscribeFromRecord = useUnsubscribeFromRecord(orgId)
 
+  const parentMessageOptions = useMemo(
+    () => mailMessageRowsToSelectOptions(messages as Record<string, unknown>[]),
+    [messages],
+  )
+
+  const mailMessageFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newMailMessageForm(t), {
+        parentId: parentMessageOptions,
+      }),
+    [t, parentMessageOptions],
+  )
+
   const myNotifications = useMemo(() => {
     if (!identity) return []
     const me = identity.toLowerCase()
@@ -133,7 +148,7 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            new_message: () => setQuickActionForm({ form: newMailMessageForm(t), action: "createMessage" }),
+            new_message: () => setQuickActionForm({ form: mailMessageFormConfig, action: "createMessage" }),
             subscribe_record: () =>
               setQuickActionForm({ form: subscribeToRecordForm(t), action: "subscribeToRecord" }),
             unsubscribe_record: () =>
@@ -150,16 +165,20 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
         return w
       }),
     }))
-  }, [messages, myNotifications.length, moduleConfig, t])
+  }, [messages, myNotifications.length, moduleConfig, t, mailMessageFormConfig])
 
   const config = useMemo(
     () => ({
       ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) =>
-        tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab,
-      ),
+      tabs: moduleConfig.tabs.map((tab) => {
+        if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+        if (tab.id === "messages" && tab.type === "entity") {
+          return { ...tab, createForm: mailMessageFormConfig }
+        }
+        return tab
+      }),
     }),
-    [liveSections, moduleConfig],
+    [liveSections, moduleConfig, mailMessageFormConfig],
   )
 
   const data = useMemo(
@@ -236,7 +255,7 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? newMailMessageForm(t)}
+        config={quickActionForm?.form ?? mailMessageFormConfig}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {

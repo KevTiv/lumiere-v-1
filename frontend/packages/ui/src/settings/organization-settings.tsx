@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { toCreateCompanyParams } from "@lumiere/erp-shared/settings-create-params"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -523,24 +524,19 @@ export function OrganizationSettings() {
                         if (!cid) return
                         const row = companies.find((c) => String(c.id) === cid)
                         const cur = row?.currencyId != null ? BigInt(String(row.currencyId)) : 1n
-                        const nm = String(data.name ?? "").trim()
-                        if (!nm) return
-                        const codeRaw = String(data.code ?? "").trim()
-                        await createCompany.mutateAsync({
-                          name: nm,
-                          code: (codeRaw || nm.slice(0, 12)).toUpperCase(),
-                          currencyId: cur,
-                          fiscalYearEndMonth: 12,
-                          fiscalYearEndDay: 31,
-                          isParent: false,
-                          parentId: BigInt(cid),
-                          taxId: "",
-                          companyRegistry: "",
-                          addressStreet: "",
-                          addressCity: "",
-                          addressZip: "",
-                          addressCountryCode: "",
-                        })
+                        const params = toCreateCompanyParams(
+                          {
+                            ...data,
+                            parentId: cid,
+                            currencyId: cur,
+                            fiscalYearEndMonth: 12,
+                            fiscalYearEndDay: 31,
+                            isParent: false,
+                          },
+                          { currencyId: cur },
+                        )
+                        if (!params) return
+                        await createCompany.mutateAsync(params as unknown as Record<string, unknown>)
                         toast({ title: t("settings.organization.company.createSuccess") })
                       }}
                     />

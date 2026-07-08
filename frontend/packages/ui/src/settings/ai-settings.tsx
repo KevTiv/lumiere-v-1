@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
+import {
+  toCreateAiAgentParams,
+  toCreateAiInsightParams,
+  toCreateAiTeamMemberParams,
+} from "@lumiere/erp-shared/ai-create-params"
 import { FormModal, mergeFieldDefaultValues } from "@lumiere/ui"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -114,31 +119,6 @@ function optU32(v: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function buildCreateAiAgentParams(data: Record<string, unknown>): Record<string, unknown> {
-  return {
-    name: String(data.name ?? "").trim() || "Unnamed agent",
-    model: String(data.model ?? "").trim(),
-    provider: String(data.provider ?? "").trim(),
-    temperature: numFromForm(data.temperature),
-    maxTokens: u32FromForm(data.maxTokens),
-    rateLimitPerMinute: u32FromForm(data.rateLimitPerMinute),
-    costPer1KTokens: numFromForm(data.costPer1KTokens),
-    contextWindow: u32FromForm(data.contextWindow),
-    topP: numFromForm(data.topP),
-    frequencyPenalty: numFromForm(data.frequencyPenalty),
-    presencePenalty: numFromForm(data.presencePenalty),
-    isActive: true,
-    isDefault: false,
-    allowedModels: [] as string[],
-    allowedActions: [] as string[],
-    description: strOrNull(data.description),
-    apiKeyReference: null,
-    systemPrompt: strOrNull(data.systemPrompt),
-    monthlyBudget: optF64(data.monthlyBudget),
-    metadata: null,
-  }
-}
-
 function buildUpdateAiAgentParams(data: Record<string, unknown>): Record<string, unknown> {
   return {
     temperature: numFromForm(data.temperature),
@@ -163,10 +143,6 @@ function severityLabel(v: unknown): string {
     if (keys.length === 1) return keys[0] ?? ""
   }
   return String(v)
-}
-
-function insightSeverityJson(tag: string): Record<string, unknown> {
-  return { [tag]: [] }
 }
 
 async function fetchQuery(resource: string): Promise<Row[]> {
@@ -321,26 +297,20 @@ export function AiSettings() {
       return
     }
     try {
-      const params = {
+      const params = toCreateAiTeamMemberParams({
         name: newMember.name.trim() || "Member",
         aiAgentId: aid,
         role: newMember.role.trim(),
         responseStyle: newMember.responseStyle.trim(),
         isActive: true,
-        responsibilities: newMember.responsibilities
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-        expertiseAreas: newMember.expertiseAreas
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-        avatarUrl: null,
-        greetingMessage: null,
-        personality: null,
-        metadata: null,
-      }
-      await createTeamMemberMutation.mutateAsync({ companyId: null, params })
+        responsibilities: newMember.responsibilities,
+        expertiseAreas: newMember.expertiseAreas,
+      })
+      if (!params) throw new Error(t("common.paramsMapper.invalidTeamMember"))
+      await createTeamMemberMutation.mutateAsync({
+        companyId: null,
+        params: params as unknown as Record<string, unknown>,
+      })
       toast({ title: t("settings.ai.memberCreated") })
       setCreateMemberOpen(false)
       setNewMember({
@@ -378,21 +348,17 @@ export function AiSettings() {
 
   const handleCreateSampleInsight = async () => {
     try {
-      const params = {
-        severity: insightSeverityJson(sampleSeverity),
+      const params = toCreateAiInsightParams({
+        severity: sampleSeverity,
         title: sampleTitle.trim() || t("settings.ai.sampleInsightDefaultTitle"),
         description: sampleDescription.trim() || t("settings.ai.sampleInsightDefaultDescription"),
-        recommendations: [] as string[],
         relatedModel: "settings",
         confidence: 0.85,
-        tags: ["ui", "sample"] as string[],
-        relatedId: null,
-        generatedBy: null,
-        impactScore: null,
-        priority: null,
-        metadata: null,
-      }
-      await createInsightMutation.mutateAsync({ companyId: null, params })
+        tags: "ui, sample",
+        recommendations: "",
+      })
+      if (!params) throw new Error(t("common.paramsMapper.invalidInsight"))
+      await createInsightMutation.mutateAsync({ companyId: null, params: params as unknown as Record<string, unknown> })
       toast({ title: t("settings.ai.insightCreated") })
       setSampleInsightOpen(false)
       setSampleTitle("")
@@ -1007,7 +973,9 @@ export function AiSettings() {
           setCreateAgentError(null)
           if (!orgId) return
           try {
-            await createAgentMutation.mutateAsync(buildCreateAiAgentParams(data))
+            const params = toCreateAiAgentParams(data)
+            if (!params) throw new Error(t("common.paramsMapper.invalidAgent"))
+            await createAgentMutation.mutateAsync(params as unknown as Record<string, unknown>)
             toast({ title: t("settings.ai.agentCreated") })
             setCreateAgentOpen(false)
           } catch (e) {

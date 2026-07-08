@@ -58,7 +58,7 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useSaleOrders, usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
-import { useAccountJournals, useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting"
+import { useAccountJournals, useAccountAccounts, useAccountMoves, useAccountMoveLines } from "@lumiere/query-hooks/hooks/accounting"
 import {
   saleOrderRowsToSelectOptions,
   subscriptionPlanRowsToSelectOptions,
@@ -66,6 +66,8 @@ import {
   productRowsToSelectOptions,
   accountJournalRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
+  accountMoveRowsToSelectOptions,
+  accountMoveLineRowsToSelectOptions,
 } from "@/lib/form-lookup"
 
 function isSubscriptionActiveForMetrics(row: Record<string, unknown>): boolean {
@@ -127,6 +129,7 @@ function SubscriptionsClientLoaded({
   const [closeTargetId, setCloseTargetId] = useState<number | null>(null)
   const [generateTargetId, setGenerateTargetId] = useState<number | null>(null)
   const [recognizeLineId, setRecognizeLineId] = useState<number | null>(null)
+  const [recognizeMoveId, setRecognizeMoveId] = useState("")
 
   const { data: subscriptions = [] } = useSubscriptions(orgId, initialSubscriptions)
   const { data: plans = [] } = useSubscriptionPlans(orgId, initialPlans)
@@ -138,19 +141,21 @@ function SubscriptionsClientLoaded({
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: journals = [] } = useAccountJournals(orgId, { initialData: initialJournals })
   const { data: accounts = [] } = useAccountAccounts(orgId, { initialData: initialAccounts })
+  const { data: accountMoves = [] } = useAccountMoves(orgId)
+  const { data: accountMoveLines = [] } = useAccountMoveLines(orgId)
 
-  const createSubscription = useCreateSubscription(orgId, orgId)
-  const createPlan = useCreateSubscriptionPlan(orgId, orgId)
-  const activateSubscription = useActivateSubscription(orgId, orgId)
-  const closeSubscription = useCloseSubscription(orgId, orgId)
-  const generateInvoice = useGenerateSubscriptionInvoice(orgId, orgId)
-  const createDeferredSchedule = useCreateDeferredRevenueSchedule(orgId, orgId)
-  const recognizeDeferred = useRecognizeDeferredRevenue(orgId, orgId)
-  const createRecognitionRule = useCreateRevenueRecognitionRule(orgId, orgId)
-  const activateRule = useActivateRevenueRecognitionRule(orgId, orgId)
-  const deactivateRule = useDeactivateRevenueRecognitionRule(orgId, orgId)
-  const importPlanCsv = useImportSubscriptionPlanCsv(orgId, orgId)
-  const importSubscriptionCsv = useImportSubscriptionCsv(orgId, orgId)
+  const createSubscription = useCreateSubscription(orgId, operatingCompanyId)
+  const createPlan = useCreateSubscriptionPlan(orgId, operatingCompanyId)
+  const activateSubscription = useActivateSubscription(orgId, operatingCompanyId)
+  const closeSubscription = useCloseSubscription(orgId, operatingCompanyId)
+  const generateInvoice = useGenerateSubscriptionInvoice(orgId, operatingCompanyId)
+  const createDeferredSchedule = useCreateDeferredRevenueSchedule(orgId, operatingCompanyId)
+  const recognizeDeferred = useRecognizeDeferredRevenue(orgId, operatingCompanyId)
+  const createRecognitionRule = useCreateRevenueRecognitionRule(orgId, operatingCompanyId)
+  const activateRule = useActivateRevenueRecognitionRule(orgId, operatingCompanyId)
+  const deactivateRule = useDeactivateRevenueRecognitionRule(orgId, operatingCompanyId)
+  const importPlanCsv = useImportSubscriptionPlanCsv(orgId, operatingCompanyId)
+  const importSubscriptionCsv = useImportSubscriptionCsv(orgId, operatingCompanyId)
 
   const isFormMutationPending =
     createSubscription.isPending ||
@@ -202,6 +207,38 @@ function SubscriptionsClientLoaded({
     return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
   }, [accounts, t])
 
+  const currencyFieldOptions = useMemo(() => {
+    const ids = new Set<string>(["1"])
+    for (const j of journals as Record<string, unknown>[]) {
+      if (j.currencyId != null) ids.add(String(j.currencyId))
+    }
+    return [...ids].map((id) => ({ value: id, label: `Currency ${id}` }))
+  }, [journals])
+
+  const recognizeMoveSelectOptions = useMemo(() => {
+    const posted = (accountMoves as Record<string, unknown>[]).filter((m) => {
+      const state = m.state
+      const tag =
+        state != null && typeof state === "object" && "tag" in state
+          ? String((state as { tag: string }).tag)
+          : String(state ?? "")
+      return tag === "Posted"
+    })
+    const fromApi = accountMoveRowsToSelectOptions(posted)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
+  }, [accountMoves, t])
+
+  const recognizeMoveLineSelectOptions = useMemo(() => {
+    const lines = (accountMoveLines as Record<string, unknown>[]).filter((line) => {
+      if (!recognizeMoveId) return true
+      return String(line.moveId ?? line.move_id ?? "") === recognizeMoveId
+    })
+    const fromApi = accountMoveLineRowsToSelectOptions(lines)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
+  }, [accountMoveLines, recognizeMoveId, t])
+
   const subscriptionFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newSubscriptionForm(t), {
@@ -227,8 +264,9 @@ function SubscriptionsClientLoaded({
         journalId: journalFieldOptions,
         accountId: accountFieldOptions,
         deferredAccountId: accountFieldOptions,
+        currencyId: currencyFieldOptions,
       }),
-    [t, journalFieldOptions, accountFieldOptions],
+    [t, journalFieldOptions, accountFieldOptions, currencyFieldOptions],
   )
 
   const recognitionRuleFormConfig = useMemo(
@@ -236,6 +274,7 @@ function SubscriptionsClientLoaded({
       mergeSelectOptionsForFields(newRevenueRecognitionRuleForm(t), {
         recognitionAccountId: accountFieldOptions,
         deferredAccountId: accountFieldOptions,
+        expenseAccountId: [{ value: "", label: "—" }, ...accountFieldOptions.filter((o) => o.value !== "")],
       }),
     [t, accountFieldOptions],
   )
@@ -482,7 +521,14 @@ function SubscriptionsClientLoaded({
 
   const closeForm = useMemo(() => closeSubscriptionForm(t), [t])
   const generateForm = useMemo(() => generateSubscriptionInvoiceForm(t), [t])
-  const recognizeForm = useMemo(() => recognizeDeferredRevenueLineForm(t), [t])
+  const recognizeForm = useMemo(
+    () =>
+      mergeSelectOptionsForFields(recognizeDeferredRevenueLineForm(t), {
+        moveId: recognizeMoveSelectOptions,
+        moveLineId: recognizeMoveLineSelectOptions,
+      }),
+    [t, recognizeMoveSelectOptions, recognizeMoveLineSelectOptions],
+  )
 
   return (
     <>
@@ -530,9 +576,19 @@ function SubscriptionsClientLoaded({
         }}
       />
       <FormModal
+        key={recognizeLineId != null ? `recognize-${recognizeMoveId || "new"}` : "recognize-closed"}
         open={recognizeLineId !== null}
-        onOpenChange={(open) => !open && setRecognizeLineId(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRecognizeLineId(null)
+            setRecognizeMoveId("")
+          }
+        }}
         config={recognizeForm}
+        onValuesChange={(values) => {
+          const moveId = String(values.moveId ?? "")
+          if (moveId !== recognizeMoveId) setRecognizeMoveId(moveId)
+        }}
         onSubmit={(formData) => {
           if (recognizeLineId == null) return
           const moveId = formData.moveId

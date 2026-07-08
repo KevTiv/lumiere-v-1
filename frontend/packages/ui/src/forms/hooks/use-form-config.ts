@@ -3,6 +3,7 @@
 //! React hooks for accessing and managing form configurations from SpacetimeDB.
 
 import { useEffect, useMemo, useReducer, useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import {
@@ -36,6 +37,7 @@ import {
 } from "../config/types"
 import { getDefaultFormConfig } from "../config/registry"
 import { formOptionsToStdb, formValidationToStdb } from "../utils/stdb-field-params"
+import { toCreateUserCustomFieldParams } from "@lumiere/erp-shared/forms-create-params"
 
 // ═════════════════════════════════════════════════════════════════════════════
 // STATE REDUCERS
@@ -708,6 +710,7 @@ export function useUserCustomFields(
   removeCustomField: (fieldId: string) => Promise<void>
   isLoading: boolean
 } {
+  const { t } = useTranslation()
   const [customFields, setCustomFields] = useReducer(listReducer<ParsedFormField>, [])
   const [isLoading, setIsLoading] = useState(true)
   const [reloadNonce, setReloadNonce] = useState(0)
@@ -795,20 +798,31 @@ export function useUserCustomFields(
       throw new Error("Custom field IDs must start with 'custom:'")
     }
     if (!sessionOrgId) throw new Error("No organization")
-    await addUserCustomField(BigInt(sessionOrgId), {
-      configurationId: BigInt(configurationId),
-      fieldId: field.fieldId,
-      name: field.name,
-      label: field.label,
-      fieldType: { tag: field.fieldType } as StdbFieldType,
-      description: field.description,
-      placeholder: field.placeholder,
-      defaultValue: field.defaultValue,
-      options: formOptionsToStdb(field.options),
-      validation: formValidationToStdb(field.validation ?? { required: false }),
-      order: field.order,
-      width: { tag: field.width } as StdbFieldWidth,
-    })
+    const params = toCreateUserCustomFieldParams(
+      {
+        configurationId,
+        fieldId: field.fieldId,
+        name: field.name,
+        label: field.label,
+        fieldType:
+          typeof field.fieldType === "object" && field.fieldType && "tag" in field.fieldType
+            ? (field.fieldType as { tag: string }).tag
+            : field.fieldType,
+        description: field.description,
+        placeholder: field.placeholder,
+        defaultValue: field.defaultValue,
+        options: field.options,
+        validation: field.validation,
+        order: field.order,
+        width:
+          typeof field.width === "object" && field.width && "tag" in field.width
+            ? (field.width as { tag: string }).tag
+            : field.width,
+      },
+      { configurationId: BigInt(configurationId) },
+    )
+    if (!params) throw new Error(t("common.paramsMapper.invalidCustomField"))
+    await addUserCustomField(BigInt(sessionOrgId), params)
     setReloadNonce(n => n + 1)
   }
 

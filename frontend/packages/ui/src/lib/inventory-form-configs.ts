@@ -1556,18 +1556,20 @@ export const newProductSupplierLineForm = (t: TFunction): FormConfig => ({
         {
           id: "productTmplId",
           name: "productTmplId",
-          type: "number",
+          type: "select",
           label: t("inventory.forms.newProductSupplierLine.fields.productTmplId"),
           description: t("inventory.forms.newProductSupplierLine.fields.productTmplIdHint"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "partnerId",
           name: "partnerId",
-          type: "number",
+          type: "select",
           label: t("inventory.forms.newProductSupplierLine.fields.partnerId"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "minQty",
@@ -1770,10 +1772,11 @@ export const newTraceabilityRecordForm = (t: TFunction): FormConfig => ({
         {
           id: "productId",
           name: "productId",
-          type: "text",
+          type: "select",
           label: t("inventory.forms.newTraceabilityRecord.fields.productId"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "documentType",
@@ -1787,10 +1790,11 @@ export const newTraceabilityRecordForm = (t: TFunction): FormConfig => ({
         {
           id: "documentId",
           name: "documentId",
-          type: "text",
+          type: "select",
           label: t("inventory.forms.newTraceabilityRecord.fields.documentId"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "quantity",
@@ -1820,16 +1824,18 @@ export const newTraceabilityRecordForm = (t: TFunction): FormConfig => ({
         {
           id: "serialId",
           name: "serialId",
-          type: "text",
+          type: "select",
           label: t("inventory.forms.newTraceabilityRecord.fields.serialId"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "lotId",
           name: "lotId",
-          type: "text",
+          type: "select",
           label: t("inventory.forms.newTraceabilityRecord.fields.lotId"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "documentLineId",
@@ -1841,16 +1847,18 @@ export const newTraceabilityRecordForm = (t: TFunction): FormConfig => ({
         {
           id: "moveId",
           name: "moveId",
-          type: "text",
+          type: "select",
           label: t("inventory.forms.newTraceabilityRecord.fields.moveId"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "partnerId",
           name: "partnerId",
-          type: "text",
+          type: "select",
           label: t("inventory.forms.newTraceabilityRecord.fields.partnerId"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "origin",

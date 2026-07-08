@@ -1,7 +1,9 @@
 "use client"
 
 import { aiChatBffPost } from "@lumiere/stdb/commands"
+import { toCreateAiChatSessionParams } from "@lumiere/erp-shared/ai-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { i18n } from "@lumiere/i18n"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import type { AiUiContext } from "../ai-ui-context"
@@ -199,18 +201,22 @@ export function useCreateAiChatSession(organizationId: number, companyId: number
       if (companyId == null || companyId <= 0) {
         throw new Error("companyId is required")
       }
+      const mapped = toCreateAiChatSessionParams({
+        sessionKey: params.session_key,
+        session_key: params.session_key,
+        title: params.title,
+        route: params.route,
+        module: params.module,
+        activeTab: params.active_tab,
+        active_tab: params.active_tab,
+        archived: params.archived,
+        metadata: params.metadata,
+      })
+      if (!mapped) throw new Error(i18n.t("common.paramsMapper.invalidAiChatSession"))
       const { urlPath, init } = aiChatBffPost("create_ai_chat_session", [
         organizationId,
         companyId,
-        stdbParamsToJson({
-          ...params,
-          archived: params.archived ?? false,
-          title: params.title ?? null,
-          route: params.route ?? null,
-          module: params.module ?? null,
-          active_tab: params.active_tab ?? null,
-          metadata: params.metadata ?? null,
-        }),
+        stdbParamsToJson(mapped as object),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))

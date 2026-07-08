@@ -269,6 +269,23 @@ export function pickingTypeOptionsFromTransfers(
   return [...map.entries()].map(([value, label]) => ({ value, label }))
 }
 
+export function accountMoveRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => {
+    const id = row.id
+    const ref = String(row.ref ?? row.name ?? "").trim()
+    const moveType = row.moveType
+    const typeTag =
+      moveType != null && typeof moveType === "object" && "tag" in moveType
+        ? String((moveType as { tag: string }).tag)
+        : ""
+    const suffix = typeTag ? ` (${typeTag})` : ""
+    const label = ref ? `${ref}${suffix}` : `Move #${String(id ?? "")}${suffix}`
+    return { value: String(id), label }
+  })
+}
+
 export function saleOrderRowsToSelectOptions(
   rows: Record<string, unknown>[],
 ): Array<{ value: string; label: string }> {
@@ -521,6 +538,78 @@ export function fleetVehicleRowsToSelectOptions(
   }))
 }
 
+export function paymentTermRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ""),
+    label: String(row.name ?? row.id ?? ""),
+  }))
+}
+
+export function contactTagRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ""),
+    label: String(row.name ?? row.color ?? row.id ?? ""),
+  }))
+}
+
+export function contactSegmentRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ""),
+    label: String(row.name ?? row.id ?? ""),
+  }))
+}
+
+export function companyRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ""),
+    label: String(row.name ?? row.id ?? ""),
+  }))
+}
+
+export function consolidationJournalRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => {
+    const name = String(row.name ?? "").trim()
+    const period = String(row.periodName ?? row.period_name ?? "").trim()
+    const label =
+      name && period ? `${name} (${period})` : name || period || `Journal #${String(row.id ?? "")}`
+    return { value: String(row.id ?? ""), label }
+  })
+}
+
+export function consolidationAccountRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => {
+    const code = String(row.code ?? "").trim()
+    const name = String(row.name ?? "").trim()
+    const label = code && name ? `${code} — ${name}` : name || code || `#${String(row.id ?? "")}`
+    return { value: String(row.id ?? ""), label }
+  })
+}
+
+export function accountMoveLineRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => {
+    const id = row.id
+    const name = String(row.name ?? "").trim()
+    const moveId = row.moveId ?? row.move_id
+    const suffix = moveId != null ? ` · move ${String(moveId)}` : ""
+    const label = name ? `${name} (#${String(id ?? "")}${suffix})` : `Line #${String(id ?? "")}${suffix}`
+    return { value: String(id ?? ""), label }
+  })
+}
+
 /** Draft expense reports only; optionally filter to the same employee as the expense line. */
 export function expenseSheetRowsToDraftSelectOptions(
   rows: Record<string, unknown>[],
@@ -535,5 +624,165 @@ export function expenseSheetRowsToDraftSelectOptions(
   return list.map((row) => ({
     value: String(row.id),
     label: String(row.name ?? row.id),
+  }))
+}
+
+/** Distinct currency IDs from row sets (pricelists, journals, accounts, etc.). */
+export function currencyOptionsFromRows(
+  rowSets: Record<string, unknown>[][],
+  opts?: { fallbackId?: string; field?: string },
+): Array<{ value: string; label: string }> {
+  const field = opts?.field ?? 'currencyId'
+  const fallbackId = opts?.fallbackId ?? '1'
+  const ids = new Set<string>([fallbackId])
+  for (const rows of rowSets) {
+    for (const row of rows) {
+      const v = row[field] ?? (row as { currency_id?: unknown }).currency_id
+      if (v != null && String(v) !== '') ids.add(String(v))
+    }
+  }
+  return [...ids]
+    .sort((a, b) => Number(a) - Number(b))
+    .map((id) => ({ value: id, label: `Currency ${id}` }))
+}
+
+export function documentFolderRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: String(row.name ?? row.id ?? ''),
+  }))
+}
+
+export function knowledgeCategoryRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: String(row.name ?? row.id ?? ''),
+  }))
+}
+
+export function knowledgeArticleRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: String(row.name ?? row.id ?? ''),
+  }))
+}
+
+export function financialReportRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: String(row.name ?? row.ref ?? `Report ${String(row.id ?? '')}`),
+  }))
+}
+
+export function mailMessageRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => {
+    const body = String(row.body ?? row.subject ?? '').replace(/\s+/g, ' ').trim()
+    const preview = body.length > 60 ? `${body.slice(0, 57)}…` : body
+    return {
+      value: String(row.id ?? ''),
+      label: preview || `Message #${String(row.id ?? '')}`,
+    }
+  })
+}
+
+export function casbinRuleRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: `#${String(row.id ?? '')} · ${String(row.ptype ?? '')} ${String(row.v0 ?? '')}/${String(row.v1 ?? '')}`,
+  }))
+}
+
+export function orgMemberRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? row.userOrgId ?? ''),
+    label: String(
+      row.userName ?? row.name ?? row.userIdentity ?? row.jobTitle ?? `Member #${String(row.id ?? '')}`,
+    ),
+  }))
+}
+
+export function stockLocationRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: String(row.completeName ?? row.name ?? row.id ?? ''),
+  }))
+}
+
+export function stockLotRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: String(row.name ?? row.id ?? ''),
+  }))
+}
+
+export function stockSerialRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: String(row.name ?? row.id ?? ''),
+  }))
+}
+
+export function productTemplateRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: String(row.name ?? row.defaultCode ?? row.id ?? ''),
+  }))
+}
+
+export function aiAgentRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: String(row.name ?? row.slug ?? row.id ?? ''),
+  }))
+}
+
+export function documentRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: String(row.name ?? row.fileName ?? row.id ?? ''),
+  }))
+}
+
+export function stockMoveRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: `Move #${String(row.id ?? '')}${row.productId != null ? ` · product ${String(row.productId)}` : ''}`,
+  }))
+}
+
+export function opportunityStageRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ''),
+    label: String(row.name ?? row.id ?? ''),
   }))
 }

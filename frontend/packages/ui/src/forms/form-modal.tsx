@@ -48,6 +48,8 @@ interface FormModalProps {
   isPending?: boolean
   /** Forwarded to {@link ModularForm} to enable advisory AI form fill. */
   aiAssist?: AiFormAssistConfig
+  /** Forwarded to {@link ModularForm} — e.g. swap dependent select options when a field changes. */
+  onValuesChange?: (values: Record<string, unknown>) => void
 }
 
 export function FormModal({
@@ -63,6 +65,7 @@ export function FormModal({
   formLeadingActions,
   isPending,
   aiAssist,
+  onValuesChange,
 }: FormModalProps) {
   const { t } = useTranslation()
 
@@ -138,6 +141,7 @@ export function FormModal({
             leadingActions={formLeadingActions}
             isPending={isPending}
             aiAssist={aiAssist}
+            onValuesChange={onValuesChange}
           />
         </div>
       </DialogContent>

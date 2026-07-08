@@ -33,7 +33,7 @@ const RUST_STRUCT_RE = /pub struct (Create\w+Params)/g
 const TS_MAPPER_RE =
   /export function (toCreate\w+Params(?:From\w+)?|\w+ParamsFromForm|buildCreate\w+Params)/g
 
-const TARGET_COVERAGE_PCT = 70
+const TARGET_COVERAGE_PCT = 100
 
 interface CoverageReport {
   totalStructs: number

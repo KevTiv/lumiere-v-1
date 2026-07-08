@@ -34,6 +34,8 @@ export const ACCOUNTING_WORKSPACE_RESOURCE_KEYS = [
   "fixed-assets",
   "intercompany-rules",
   "intercompany-transactions",
+  "sale-orders",
+  "contacts",
   "tax-deadlines",
   "tax-groups",
   "tax-jurisdictions",

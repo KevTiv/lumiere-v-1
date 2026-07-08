@@ -100,7 +100,7 @@ import {
   useDeletePartnerBank,
 } from "@lumiere/query-hooks/hooks/purchasing"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
-import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
+import { useAccountAccounts, useAccountJournals, useAccountPaymentTerms } from "@lumiere/query-hooks/hooks/accounting"
 import { useProducts, useUoms, useStockPickings } from "@lumiere/query-hooks/hooks/inventory"
 import { useDepartments } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -125,6 +125,8 @@ import {
   departmentRowsToSelectOptions,
   accountJournalRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
+  paymentTermRowsToSelectOptions,
+  currencyOptionsFromRows,
 } from "@/lib/form-lookup"
 import {
   toAddLandedCostLineParams,
@@ -402,6 +404,7 @@ function PurchasingClientLoaded({
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
+  const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId)
 
   const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId: operatingCompanyId ?? undefined })
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId: operatingCompanyId ?? undefined })
@@ -562,6 +565,12 @@ function PurchasingClientLoaded({
     return [{ value: "", label: t("common.lookup.noUoms"), disabled: true }]
   }, [uoms, t])
 
+  const paymentTermFieldOptions = useMemo(() => {
+    const fromApi = paymentTermRowsToSelectOptions(paymentTerms as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: "—" }]
+  }, [paymentTerms])
+
   const draftPoOptions = useMemo(
     () => purchaseOrderRowsToSelectOptions(orders as Record<string, unknown>[], { draftOnly: true }),
     [orders],
@@ -582,8 +591,9 @@ function PurchasingClientLoaded({
       mergeSelectOptionsForFields(newPurchaseOrderForm(t), {
         partnerId: vendorFieldOptions,
         pricelistId: pricelistFieldOptions,
+        paymentTermId: paymentTermFieldOptions,
       }),
-    [t, vendorFieldOptions, pricelistFieldOptions],
+    [t, vendorFieldOptions, pricelistFieldOptions, paymentTermFieldOptions],
   )
 
   const purchaseRequisitionFormConfig = useMemo(
@@ -636,12 +646,26 @@ function PurchasingClientLoaded({
     [t, editLineOptions, productFieldOptions, uomFieldOptions],
   )
 
+  const defaultCurrencyId = useMemo(() => {
+    const pl = pricelists.find((p) => p.currencyId != null)
+    return pl?.currencyId != null ? Number(pl.currencyId) : 1
+  }, [pricelists])
+
+  const currencyFieldOptions = useMemo(
+    () => currencyOptionsFromRows([pricelists as Record<string, unknown>[]]),
+    [pricelists],
+  )
+
   const partnerBankFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newPartnerBankForm(t), {
-        partnerId: vendorFieldOptions,
-      }),
-    [t, vendorFieldOptions],
+      mergeFieldDefaultValues(
+        mergeSelectOptionsForFields(newPartnerBankForm(t), {
+          partnerId: vendorFieldOptions,
+          currencyId: currencyFieldOptions,
+        }),
+        { currencyId: String(defaultCurrencyId) },
+      ),
+    [t, vendorFieldOptions, currencyFieldOptions, defaultCurrencyId],
   )
 
   const partnerBankEditOptions = useMemo(
@@ -656,11 +680,6 @@ function PurchasingClientLoaded({
       }),
     [t, partnerBankEditOptions],
   )
-
-  const defaultCurrencyId = useMemo(() => {
-    const pl = pricelists.find((p) => p.currencyId != null)
-    return pl?.currencyId != null ? Number(pl.currencyId) : 1
-  }, [pricelists])
 
   const stockPickingFieldOptions = useMemo(() => {
     const fromApi = stockPickingRowsToSelectOptions(stockPickings as Record<string, unknown>[])
@@ -691,18 +710,20 @@ function PurchasingClientLoaded({
       mergeFieldDefaultValues(
         mergeSelectOptionsForFields(newLandedCostForm(t), {
           pickingId: stockPickingFieldOptions,
+          currencyId: currencyFieldOptions,
         }),
-        { currencyId: defaultCurrencyId },
+        { currencyId: String(defaultCurrencyId) },
       ),
-    [t, stockPickingFieldOptions, defaultCurrencyId],
+    [t, stockPickingFieldOptions, currencyFieldOptions, defaultCurrencyId],
   )
 
   const editLandedCostFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(editLandedCostForm(t), {
         landedCostId: draftLandedCostOptions,
+        currencyId: currencyFieldOptions,
       }),
-    [t, draftLandedCostOptions],
+    [t, draftLandedCostOptions, currencyFieldOptions],
   )
 
   const addLandedCostLineFormConfig = useMemo(
@@ -711,10 +732,11 @@ function PurchasingClientLoaded({
         mergeSelectOptionsForFields(addLandedCostLineForm(t), {
           landedCostId: draftLandedCostOptions,
           productId: productFieldOptions,
+          currencyId: currencyFieldOptions,
         }),
-        { currencyId: defaultCurrencyId },
+        { currencyId: String(defaultCurrencyId) },
       ),
-    [t, draftLandedCostOptions, productFieldOptions, defaultCurrencyId],
+    [t, draftLandedCostOptions, productFieldOptions, currencyFieldOptions, defaultCurrencyId],
   )
 
   const removeLandedCostLineFormConfig = useMemo(

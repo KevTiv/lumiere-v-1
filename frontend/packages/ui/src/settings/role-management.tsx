@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRBAC } from "@/lib/rbac-context"
 import { resourceGroups } from "@/lib/rbac-defaults"
 import {
@@ -49,6 +49,8 @@ import { useTranslation } from "@lumiere/i18n"
 import { rolePillClassForColor, roleSwatchClass } from "@/lib/theme-colors"
 import { FormModal } from "../forms/form-modal"
 import { addCasbinRuleForm, removeCasbinRuleForm } from "../lib/settings-platform-form-configs"
+import { FieldPermissionsEditor } from "./field-permissions-editor"
+import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 
 const roleColors = [
   { value: "blue", label: "Blue", class: roleSwatchClass.blue },
@@ -75,11 +77,42 @@ export function RoleManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [casbinModal, setCasbinModal] = useState<"add" | "remove" | null>(null)
   const [casbinError, setCasbinError] = useState<string | null>(null)
+  const [casbinRules, setCasbinRules] = useState<Record<string, unknown>[]>([])
   const [selectedPermissions, setSelectedPermissions] = useState<Map<string, Set<Action>>>(new Map())
   const [selectedColor, setSelectedColor] = useState<Role["color"]>("blue")
   const [isSaving, setIsSaving] = useState(false)
 
   const canEdit = checkPermission("admin:roles", "update").allowed
+
+  useEffect(() => {
+    if (!orgReady) {
+      setCasbinRules([])
+      return
+    }
+    void (async () => {
+      try {
+        const list = (await stdbBrowserQuery("casbin-rule")) as Record<string, unknown>[]
+        setCasbinRules(list)
+      } catch {
+        setCasbinRules([])
+      }
+    })()
+  }, [orgReady])
+
+  const casbinRuleOptions = useMemo(
+    () =>
+      casbinRules.map((row) => ({
+        value: String(row.id ?? ""),
+        label: `#${String(row.id ?? "")} · ${String(row.ptype ?? "")} ${String(row.v0 ?? "")}/${String(row.v1 ?? "")}`,
+      })),
+    [casbinRules],
+  )
+
+  const removeCasbinRuleFormConfig = useMemo(
+    () => removeCasbinRuleForm(t, casbinRuleOptions),
+    [t, casbinRuleOptions],
+  )
+
   const canDelete = checkPermission("admin:roles", "delete").allowed
   const canCreate = checkPermission("admin:roles", "create").allowed
   const canManagePolicies = checkPermission("admin:permissions", "manage").allowed
@@ -468,6 +501,15 @@ export function RoleManagement() {
               </Card>
             </div>
 
+            {editingRole && canManagePolicies && orgReady ? (
+              <FieldPermissionsEditor
+                organizationId={organizationId}
+                roleId={editingRole.id}
+                roleName={editingRole.name}
+                canEdit={canEdit}
+              />
+            ) : null}
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                 {t("common.cancel")}
@@ -489,7 +531,7 @@ export function RoleManagement() {
               setCasbinError(null)
             }
           }}
-          config={casbinModal === "add" ? addCasbinRuleForm(t) : removeCasbinRuleForm(t)}
+          config={casbinModal === "add" ? addCasbinRuleForm(t) : removeCasbinRuleFormConfig}
           isPending={addCasbinRule.isPending || removeCasbinRule.isPending}
           closeOnSubmit={false}
           submitError={casbinError}

@@ -1,4 +1,6 @@
 import type { ManufacturingMutations } from "@lumiere/query-hooks/hooks/manufacturing"
+import { i18n } from "@lumiere/i18n"
+import { toCreateWorkcenterProductivityParams } from "@lumiere/erp-shared/manufacturing-create-params"
 
 /** Coverage tracker: manufacturing reducers reachable via row actions + create/import forms. */
 export const MANUFACTURING_UI_REDUCERS = [
@@ -180,14 +182,16 @@ export async function submitManufacturingRowAction(
       case "log_productivity": {
         const woid = String(values.logWorkorderId ?? "")
         if (!woid) throw new Error("Work order ID is required")
+        const params = toCreateWorkcenterProductivityParams({
+          logWorkorderId: woid,
+          logLossId: values.logLossId,
+          logDuration: values.logDuration,
+          logDescription: values.logDescription,
+        })
+        if (!params) throw new Error(i18n.t("common.paramsMapper.invalidProductivityLog"))
         await m.logProductivity.mutateAsync({
           workcenterId: wcId,
-          params: {
-            workorderId: Number(woid),
-            lossId: num(values.logLossId, 0),
-            duration: num(values.logDuration, 0),
-            description: trimOpt(values.logDescription),
-          },
+          params: params as unknown as Record<string, unknown>,
         })
         return
       }

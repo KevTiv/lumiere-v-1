@@ -1,4 +1,5 @@
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
+import { toCreateRoleConfigParams } from "@lumiere/erp-shared/forms-create-params"
 import {
   addFormField,
   createFormConfiguration,
@@ -84,12 +85,14 @@ export async function pushRegistryFormToDatabase(
 
   if (def.roleConfigs) {
     for (const rc of Object.values(def.roleConfigs)) {
-      await setFormRoleConfig(BigInt(organizationId), configurationId, {
+      const params = toCreateRoleConfigParams({
         roleId: rc.roleId,
         enabledFields: rc.enabledFields,
         requiredFields: rc.requiredFields,
         defaultPrompts: rc.defaultPrompts,
       })
+      if (!params) continue
+      await setFormRoleConfig(BigInt(organizationId), configurationId, params)
     }
   }
 }

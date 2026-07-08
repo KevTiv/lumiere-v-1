@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
+const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
+
 export const newFinancialReportForm = (t: TFunction): FormConfig => ({
   id: "new-financial-report",
   title: t("reports.forms.generateReport.title"),
@@ -91,11 +93,11 @@ export const newFinancialReportForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "text",
+          type: "select",
           label: t("reports.forms.generateReport.fields.currencyId"),
           placeholder: t("reports.forms.generateReport.fields.currencyIdPlaceholder"),
           width: "1/2",
-          defaultValue: "1",
+          options: emptySelect,
         },
         {
           id: "hierarchyLevel",
@@ -275,10 +277,11 @@ export const newReportTemplateForm = (t: TFunction): FormConfig => ({
         {
           id: "companyId",
           name: "companyId",
-          type: "text",
+          type: "select",
           label: t("reports.forms.dashboard.fields.companyId"),
           placeholder: t("reports.forms.dashboard.fields.companyIdPlaceholder"),
           width: "full",
+          options: emptySelect,
         },
       ],
     },
@@ -374,10 +377,11 @@ export const newScheduledReportForm = (t: TFunction): FormConfig => ({
         {
           id: "companyId",
           name: "companyId",
-          type: "text",
+          type: "select",
           label: t("reports.forms.dashboard.fields.companyId"),
           placeholder: t("reports.forms.dashboard.fields.companyIdPlaceholder"),
           width: "full",
+          options: emptySelect,
         },
       ],
     },
@@ -487,10 +491,11 @@ export const newAnalyticsMetricForm = (t: TFunction): FormConfig => ({
         {
           id: "companyId",
           name: "companyId",
-          type: "text",
+          type: "select",
           label: t("reports.forms.dashboard.fields.companyId"),
           placeholder: t("reports.forms.dashboard.fields.companyIdPlaceholder"),
           width: "full",
+          options: emptySelect,
         },
       ],
     },
@@ -601,18 +606,20 @@ export const newTrialBalanceEntryForm = (t: TFunction): FormConfig => ({
         {
           id: "reportId",
           name: "reportId",
-          type: "text",
+          type: "select",
           label: t("reports.forms.trialBalanceEntry.fields.reportId"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "accountId",
           name: "accountId",
-          type: "text",
+          type: "select",
           label: t("reports.forms.trialBalanceEntry.fields.accountId"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "accountCode",
@@ -665,10 +672,10 @@ export const newTrialBalanceEntryForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "text",
+          type: "select",
           label: t("reports.forms.trialBalanceEntry.fields.currencyId"),
           width: "1/3",
-          defaultValue: "1",
+          options: emptySelect,
         },
         {
           id: "level",
@@ -728,10 +735,11 @@ export const newDashboardForm = (t: TFunction): FormConfig => ({
         {
           id: "companyId",
           name: "companyId",
-          type: "text",
+          type: "select",
           label: t("reports.forms.dashboard.fields.companyId"),
           placeholder: t("reports.forms.dashboard.fields.companyIdPlaceholder"),
           width: "1/2",
+          options: emptySelect,
         },
       ],
     },
@@ -785,10 +793,11 @@ export const newDashboardWidgetForm = (t: TFunction): FormConfig => ({
         {
           id: "companyId",
           name: "companyId",
-          type: "text",
+          type: "select",
           label: t("reports.forms.dashboardWidget.fields.companyId"),
           placeholder: t("reports.forms.dashboardWidget.fields.companyIdPlaceholder"),
           width: "full",
+          options: emptySelect,
         },
       ],
     },

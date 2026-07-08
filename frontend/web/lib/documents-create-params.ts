@@ -6,8 +6,10 @@ import type {
   CreateDocumentParams,
   CreateDocumentFolderParams,
   CreateDocumentProcessingJobParams,
+  CreateDocumentTemplateParams,
   CreateKnowledgeArticleParams,
   CreateKnowledgeCategoryParams,
+  CreateMailTemplateParams,
 } from "@lumiere/stdb/types"
 
 import { optionalBigIntU64, u64IdArrayFromForm } from "@/lib/form-coercion"
@@ -131,6 +133,50 @@ export function toCreateDocumentProcessingJobParams(
     jobType: String(formData.jobType ?? formData.job_type ?? ""),
     aiAgentId: optionalBigIntU64(formData.aiAgentId ?? formData.ai_agent_id),
     inputData: optionalTrimmedString(formData.inputData ?? formData.input_data),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toCreateDocumentTemplateParams(
+  formData: Record<string, unknown>,
+): CreateDocumentTemplateParams | null {
+  const name = requiredTrimmedString(formData.name)
+  const model = requiredTrimmedString(formData.model)
+  const bodyHtml = requiredTrimmedString(formData.bodyHtml ?? formData.body_html)
+  if (!name || !model || !bodyHtml) return null
+  return {
+    name,
+    model,
+    reportType: String(formData.reportType ?? formData.report_type ?? "qweb-pdf"),
+    bodyHtml,
+    headerHtml: optionalTrimmedString(formData.headerHtml ?? formData.header_html),
+    footerHtml: optionalTrimmedString(formData.footerHtml ?? formData.footer_html),
+    variableBindingsJson: optionalTrimmedString(
+      formData.variableBindingsJson ?? formData.variable_bindings_json,
+    ),
+    isDefault: formData.isDefault === true || formData.is_default === true,
+    isActive: formData.isActive !== false && formData.is_active !== false,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toCreateMailTemplateParams(
+  formData: Record<string, unknown>,
+): CreateMailTemplateParams | null {
+  const name = requiredTrimmedString(formData.name)
+  const model = requiredTrimmedString(formData.model)
+  const subject = requiredTrimmedString(formData.subject)
+  const bodyHtml = requiredTrimmedString(formData.bodyHtml ?? formData.body_html)
+  if (!name || !model || !subject || !bodyHtml) return null
+  return {
+    name,
+    model,
+    subject,
+    bodyHtml,
+    documentTemplateId: optionalBigIntU64(formData.documentTemplateId ?? formData.document_template_id),
+    attachDocument: formData.attachDocument === true || formData.attach_document === true,
+    isDefault: formData.isDefault === true || formData.is_default === true,
+    isActive: formData.isActive !== false && formData.is_active !== false,
     metadata: optionalTrimmedString(formData.metadata),
   }
 }

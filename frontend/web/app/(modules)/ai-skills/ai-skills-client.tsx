@@ -1,6 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
+import { toCreateAiSkillParams } from "@lumiere/erp-shared/ai-create-params"
 import { DashboardHeader, FormModal, MissingOrganization, type FormConfig } from "@lumiere/ui"
 import {
   useAiSkills,
@@ -261,6 +263,7 @@ export function AiSkillsClient({ organizationId }: { organizationId?: number }) 
 }
 
 function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
+  const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyId(organizationId)
   const { data: skills = [], isLoading, error } = useAiSkills()
@@ -347,24 +350,9 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
     setSubmitError(null)
     try {
       if (modal === "create") {
-        await createSkill.mutateAsync({
-          skillKey: String(formData.skillKey ?? "").trim(),
-          name: String(formData.name ?? "").trim(),
-          description: String(formData.description ?? "").trim() || undefined,
-          category: String(formData.category ?? "custom").trim(),
-          promptTemplate: String(formData.promptTemplate ?? ""),
-          requiredTools: csvList(formData.requiredTools),
-          optionalTools: csvList(formData.optionalTools),
-          defaultMaxSteps: Number(formData.defaultMaxSteps ?? 8),
-          defaultMaxToolCalls: Number(formData.defaultMaxToolCalls ?? 16),
-          outputSchema: undefined,
-          configSchema: undefined,
-          datasetSpecs: undefined,
-          allowedActionDrafts: [],
-          isActive: Boolean(formData.isActive),
-          isSystem: false,
-          metadata: undefined,
-        })
+        const params = toCreateAiSkillParams(formData)
+        if (!params) throw new Error(t("common.paramsMapper.invalidSkill"))
+        await createSkill.mutateAsync(params)
         setModal(null)
       } else if (modal === "config" && configSkill) {
         const configRaw = String(formData.configJson ?? "{}").trim()

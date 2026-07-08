@@ -51,14 +51,16 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useContacts, useUsers } from "@lumiere/query-hooks/hooks/crm"
+import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
 import {
   pricelistRowsToSelectOptions,
   contactRowsToPartnerSelectOptions,
   projectRowsToSelectOptions,
   taskRowsToSelectOptions,
   taskStagePairOptionsFromTasks,
-  employeeRowsToSelectOptions,
   userRowsToSelectOptions,
+  accountJournalRowsToSelectOptions,
+  accountAccountRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import { ProjectGanttPanel, ResourceAllocationPanel } from "./projects-panels"
 
@@ -151,21 +153,27 @@ const assignUsersForm = (userOptions: Array<{ value: string; label: string }>): 
   ],
 })
 
-const billTimesheetsForm: FormConfig = {
-  id: "projects-bill-timesheets",
-  title: "Bill Timesheets",
-  submitLabel: "Bill timesheets",
-  sections: [
-    {
-      id: "billing",
-      fields: [
-        { id: "journal", type: "number", name: "journalId", label: "Journal ID", required: true, width: "1/3" },
-        { id: "income-account", type: "number", name: "incomeAccountId", label: "Income account ID", required: true, width: "1/3" },
-        { id: "partner", type: "number", name: "partnerId", label: "Partner ID", required: true, width: "1/3" },
-        { id: "invoice-date", type: "date", name: "invoiceDate", label: "Invoice date", width: "1/2" },
-      ],
-    },
-  ],
+function buildBillTimesheetsForm(
+  journalOptions: Array<{ value: string; label: string; disabled?: boolean }>,
+  accountOptions: Array<{ value: string; label: string; disabled?: boolean }>,
+  partnerOptions: Array<{ value: string; label: string; disabled?: boolean }>,
+): FormConfig {
+  return {
+    id: "projects-bill-timesheets",
+    title: "Bill Timesheets",
+    submitLabel: "Bill timesheets",
+    sections: [
+      {
+        id: "billing",
+        fields: [
+          { id: "journal", type: "select", name: "journalId", label: "Journal", required: true, width: "1/3", options: journalOptions },
+          { id: "income-account", type: "select", name: "incomeAccountId", label: "Income account", required: true, width: "1/3", options: accountOptions },
+          { id: "partner", type: "select", name: "partnerId", label: "Partner", required: true, width: "1/3", options: partnerOptions },
+          { id: "invoice-date", type: "date", name: "invoiceDate", label: "Invoice date", width: "1/2" },
+        ],
+      },
+    ],
+  }
 }
 
 function taskParentForm(taskOptions: Array<{ value: string; label: string; disabled?: boolean }>): FormConfig {
@@ -236,6 +244,8 @@ function ProjectsClientLoaded({
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: contacts = [] } = useContacts(orgId, initialContacts)
   const { data: users = [] } = useUsers(orgId)
+  const { data: accountJournals = [] } = useAccountJournals(orgId)
+  const { data: accountAccounts = [] } = useAccountAccounts(orgId)
 
   const createProject = useCreateProject(orgId, operatingCompanyId)
   const createTask = useCreateTask(orgId, operatingCompanyId)
@@ -287,6 +297,23 @@ function ProjectsClientLoaded({
     return [{ value: "", label: t("common.lookup.noPartners"), disabled: true }]
   }, [contacts, t])
 
+  const journalFieldOptions = useMemo(() => {
+    const fromApi = accountJournalRowsToSelectOptions(accountJournals as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noJournals"), disabled: true }]
+  }, [accountJournals, t])
+
+  const incomeAccountFieldOptions = useMemo(() => {
+    const fromApi = accountAccountRowsToSelectOptions(accountAccounts as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
+  }, [accountAccounts, t])
+
+  const billTimesheetsFormConfig = useMemo(
+    () => buildBillTimesheetsForm(journalFieldOptions, incomeAccountFieldOptions, partnerFieldOptions),
+    [journalFieldOptions, incomeAccountFieldOptions, partnerFieldOptions],
+  )
+
   const projectFieldOptions = useMemo(() => {
     const fromApi = projectRowsToSelectOptions(projects)
     if (fromApi.length > 0) return fromApi
@@ -299,12 +326,6 @@ function ProjectsClientLoaded({
     if (fromApi.length > 0) return [optional, ...fromApi]
     return [{ value: "", label: t("common.lookup.noTasks"), disabled: true }]
   }, [tasks, t])
-
-  const employeeFieldOptions = useMemo(() => {
-    const fromApi = employeeRowsToSelectOptions(employees)
-    if (fromApi.length > 0) return fromApi
-    return [{ value: "", label: t("common.lookup.noEmployees"), disabled: true }]
-  }, [employees, t])
 
   const userFieldOptions = useMemo(() => {
     const fromApi = userRowsToSelectOptions(users as Record<string, unknown>[])
@@ -671,7 +692,7 @@ function ProjectsClientLoaded({
                   requiresSelection: true,
                   onClick: (rows) => {
                     setLifecycleError(null)
-                    setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsForm })
+                    setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsFormConfig })
                   },
                 },
               ]),
@@ -697,6 +718,7 @@ function ProjectsClientLoaded({
       setProjectActive,
       taskParentFormConfig,
       assignUsersFormConfig,
+      billTimesheetsFormConfig,
       stopTimer,
       validateTimesheets,
       operatingCompanyId,

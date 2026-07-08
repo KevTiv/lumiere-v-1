@@ -796,11 +796,11 @@ export const newAccountPaymentForm = (t: TFunction): FormConfig => ({
         {
           id: "partnerId",
           name: "partnerId",
-          type: "text",
+          type: "select",
           label: t("accounting.forms.newAccountPayment.fields.partnerId"),
           required: true,
           width: "1/2",
-          placeholder: "1",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "amount",
@@ -815,11 +815,11 @@ export const newAccountPaymentForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "text",
+          type: "select",
           label: t("accounting.forms.newAccountPayment.fields.currencyId"),
           required: true,
           width: "1/2",
-          placeholder: "1",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "journalId",
@@ -1114,6 +1114,418 @@ export const editAccountJournalForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newDepreciationLineForm = (t: TFunction): FormConfig => ({
+  id: "new-depreciation-line",
+  title: t("accounting.forms.newDepreciationLine.title"),
+  description: t("accounting.forms.newDepreciationLine.description"),
+  submitLabel: t("accounting.forms.newDepreciationLine.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "line",
+      title: t("accounting.forms.newDepreciationLine.sections.line"),
+      fields: [
+        {
+          id: "assetId",
+          name: "assetId",
+          type: "select",
+          label: t("accounting.forms.newDepreciationLine.fields.assetId"),
+          required: true,
+          width: "full",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("accounting.forms.newDepreciationLine.fields.name"),
+          width: "full",
+        },
+        {
+          id: "depreciationDate",
+          name: "depreciationDate",
+          type: "date",
+          label: t("accounting.forms.newDepreciationLine.fields.depreciationDate"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "amount",
+          name: "amount",
+          type: "number",
+          label: t("accounting.forms.newDepreciationLine.fields.amount"),
+          required: true,
+          width: "1/2",
+          step: 0.01,
+          min: 0,
+        },
+        {
+          id: "moveId",
+          name: "moveId",
+          type: "select",
+          label: t("accounting.forms.newDepreciationLine.fields.moveId"),
+          width: "full",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+      ],
+    },
+  ],
+})
+
+export const newIntercompanyRuleForm = (t: TFunction): FormConfig => ({
+  id: "new-intercompany-rule",
+  title: t("accounting.forms.newIntercompanyRule.title"),
+  description: t("accounting.forms.newIntercompanyRule.description"),
+  submitLabel: t("accounting.forms.newIntercompanyRule.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "main",
+      title: t("accounting.forms.newIntercompanyRule.sections.main"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("accounting.forms.newIntercompanyRule.fields.name"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "ruleType",
+          name: "ruleType",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyRule.fields.ruleType"),
+          required: true,
+          width: "1/2",
+          options: [
+            { value: "Sale", label: t("accounting.entities.intercompanyRules.filters.ruleType.options.Sale") },
+            { value: "Purchase", label: t("accounting.entities.intercompanyRules.filters.ruleType.options.Purchase") },
+            { value: "Transfer", label: t("accounting.entities.intercompanyRules.filters.ruleType.options.Transfer") },
+            { value: "Service", label: t("accounting.entities.intercompanyRules.filters.ruleType.options.Service") },
+          ],
+        },
+        {
+          id: "sourceCompanyId",
+          name: "sourceCompanyId",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyRule.fields.sourceCompanyId"),
+          required: true,
+          width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "destinationCompanyId",
+          name: "destinationCompanyId",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyRule.fields.destinationCompanyId"),
+          required: true,
+          width: "full",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "journalId",
+          name: "journalId",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyRule.fields.journalId"),
+          width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "accountId",
+          name: "accountId",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyRule.fields.accountId"),
+          width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "autoValidation",
+          name: "autoValidation",
+          type: "checkbox",
+          label: t("accounting.forms.newIntercompanyRule.fields.autoValidation"),
+          width: "1/2",
+        },
+        {
+          id: "autoGenerateInvoice",
+          name: "autoGenerateInvoice",
+          type: "checkbox",
+          label: t("accounting.forms.newIntercompanyRule.fields.autoGenerateInvoice"),
+          width: "1/2",
+        },
+        {
+          id: "autoGenerateBill",
+          name: "autoGenerateBill",
+          type: "checkbox",
+          label: t("accounting.forms.newIntercompanyRule.fields.autoGenerateBill"),
+          width: "1/2",
+        },
+        {
+          id: "isActive",
+          name: "isActive",
+          type: "checkbox",
+          label: t("accounting.forms.newIntercompanyRule.fields.isActive"),
+          width: "1/2",
+          defaultValue: true,
+        },
+      ],
+    },
+  ],
+})
+
+export const editIntercompanyRuleForm = (t: TFunction): FormConfig => ({
+  id: "edit-intercompany-rule",
+  title: t("accounting.forms.editIntercompanyRule.title"),
+  description: t("accounting.forms.editIntercompanyRule.description"),
+  submitLabel: t("accounting.forms.editIntercompanyRule.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "main",
+      title: t("accounting.forms.editIntercompanyRule.sections.main"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("accounting.forms.newIntercompanyRule.fields.name"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "sequence",
+          name: "sequence",
+          type: "number",
+          label: t("accounting.forms.editIntercompanyRule.fields.sequence"),
+          width: "1/3",
+        },
+        {
+          id: "journalId",
+          name: "journalId",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyRule.fields.journalId"),
+          width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "accountId",
+          name: "accountId",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyRule.fields.accountId"),
+          width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "autoValidation",
+          name: "autoValidation",
+          type: "checkbox",
+          label: t("accounting.forms.newIntercompanyRule.fields.autoValidation"),
+          width: "1/3",
+        },
+        {
+          id: "autoGenerateInvoice",
+          name: "autoGenerateInvoice",
+          type: "checkbox",
+          label: t("accounting.forms.newIntercompanyRule.fields.autoGenerateInvoice"),
+          width: "1/3",
+        },
+        {
+          id: "autoGenerateBill",
+          name: "autoGenerateBill",
+          type: "checkbox",
+          label: t("accounting.forms.newIntercompanyRule.fields.autoGenerateBill"),
+          width: "1/3",
+        },
+        {
+          id: "isActive",
+          name: "isActive",
+          type: "checkbox",
+          label: t("accounting.forms.newIntercompanyRule.fields.isActive"),
+          width: "1/3",
+        },
+        {
+          id: "notes",
+          name: "notes",
+          type: "textarea",
+          label: t("accounting.forms.editIntercompanyRule.fields.notes"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const newIntercompanyTransactionForm = (t: TFunction): FormConfig => ({
+  id: "new-intercompany-transaction",
+  title: t("accounting.forms.newIntercompanyTransaction.title"),
+  description: t("accounting.forms.newIntercompanyTransaction.description"),
+  submitLabel: t("accounting.forms.newIntercompanyTransaction.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "main",
+      title: t("accounting.forms.newIntercompanyTransaction.sections.main"),
+      fields: [
+        {
+          id: "originDocumentModel",
+          name: "originDocumentModel",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyTransaction.fields.originDocumentModel"),
+          required: true,
+          width: "1/2",
+          defaultValue: "account.move",
+          options: [
+            {
+              value: "account.move",
+              label: t("accounting.forms.newIntercompanyTransaction.fields.originDocumentModels.accountMove"),
+            },
+            {
+              value: "sale.order",
+              label: t("accounting.forms.newIntercompanyTransaction.fields.originDocumentModels.saleOrder"),
+            },
+          ],
+        },
+        {
+          id: "originDocumentId",
+          name: "originDocumentId",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyTransaction.fields.originDocumentId"),
+          required: true,
+          width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "destinationCompanyId",
+          name: "destinationCompanyId",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyTransaction.fields.destinationCompanyId"),
+          required: true,
+          width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "transactionType",
+          name: "transactionType",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyTransaction.fields.transactionType"),
+          required: true,
+          width: "1/2",
+          options: [
+            { value: "Sale", label: t("accounting.entities.intercompanyRules.filters.ruleType.options.Sale") },
+            { value: "Purchase", label: t("accounting.entities.intercompanyRules.filters.ruleType.options.Purchase") },
+            { value: "Transfer", label: t("accounting.entities.intercompanyRules.filters.ruleType.options.Transfer") },
+            { value: "Service", label: t("accounting.entities.intercompanyRules.filters.ruleType.options.Service") },
+          ],
+        },
+        {
+          id: "amount",
+          name: "amount",
+          type: "number",
+          label: t("accounting.forms.newIntercompanyTransaction.fields.amount"),
+          required: true,
+          width: "1/3",
+          step: 0.01,
+          min: 0,
+        },
+        {
+          id: "currencyId",
+          name: "currencyId",
+          type: "select",
+          label: t("accounting.forms.newIntercompanyTransaction.fields.currencyId"),
+          required: true,
+          width: "1/3",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "requiresApproval",
+          name: "requiresApproval",
+          type: "checkbox",
+          label: t("accounting.forms.newIntercompanyTransaction.fields.requiresApproval"),
+          width: "1/3",
+          defaultValue: true,
+        },
+        {
+          id: "autoProcess",
+          name: "autoProcess",
+          type: "checkbox",
+          label: t("accounting.forms.newIntercompanyTransaction.fields.autoProcess"),
+          width: "1/2",
+        },
+        {
+          id: "notes",
+          name: "notes",
+          type: "textarea",
+          label: t("accounting.forms.newIntercompanyTransaction.fields.notes"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const markIntercompanyTransactionErrorForm = (t: TFunction): FormConfig => ({
+  id: "mark-intercompany-transaction-error",
+  title: t("accounting.forms.markIntercompanyTransactionError.title"),
+  description: t("accounting.forms.markIntercompanyTransactionError.description"),
+  submitLabel: t("accounting.forms.markIntercompanyTransactionError.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "main",
+      title: t("accounting.forms.markIntercompanyTransactionError.sections.main"),
+      fields: [
+        {
+          id: "errorMessage",
+          name: "errorMessage",
+          type: "textarea",
+          label: t("accounting.forms.markIntercompanyTransactionError.fields.errorMessage"),
+          required: true,
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const editAccountMoveLineForm = (t: TFunction): FormConfig => ({
+  id: "edit-account-move-line",
+  title: t("accounting.forms.editAccountMoveLine.title"),
+  description: t("accounting.forms.editAccountMoveLine.description"),
+  submitLabel: t("accounting.forms.editAccountMoveLine.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "line",
+      title: t("accounting.forms.editAccountMoveLine.sections.line"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("accounting.forms.addAccountMoveLine.fields.name"),
+          width: "full",
+        },
+        {
+          id: "debit",
+          name: "debit",
+          type: "number",
+          label: t("accounting.forms.addAccountMoveLine.fields.debit"),
+          width: "1/2",
+          step: 0.01,
+        },
+        {
+          id: "credit",
+          name: "credit",
+          type: "number",
+          label: t("accounting.forms.addAccountMoveLine.fields.credit"),
+          width: "1/2",
+          step: 0.01,
+        },
+      ],
+    },
+  ],
+})
+
 export const addAccountMoveLineForm = (t: TFunction): FormConfig => ({
   id: "add-account-move-line",
   title: t("accounting.forms.addAccountMoveLine.title"),
@@ -1238,12 +1650,11 @@ export const registerPaymentInvoicesForm = (t: TFunction): FormConfig => ({
         {
           id: "invoiceIds",
           name: "invoiceIds",
-          type: "textarea",
+          type: "select",
           label: t("accounting.forms.registerPaymentInvoices.fields.invoiceIds"),
           required: true,
           width: "full",
-          rows: 2,
-          placeholder: "101, 102",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "isBill",
@@ -1271,18 +1682,20 @@ export const reconcilePaymentInvoiceForm = (t: TFunction): FormConfig => ({
         {
           id: "paymentMoveId",
           name: "paymentMoveId",
-          type: "number",
+          type: "select",
           label: t("accounting.forms.reconcilePaymentInvoice.fields.paymentMoveId"),
           required: true,
           width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "invoiceMoveId",
           name: "invoiceMoveId",
-          type: "number",
+          type: "select",
           label: t("accounting.forms.reconcilePaymentInvoice.fields.invoiceMoveId"),
           required: true,
           width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
         },
       ],
     },
@@ -1318,11 +1731,11 @@ export const newAnalyticAccountForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "number",
+          type: "select",
           label: t("accounting.forms.analyticAccount.fields.currencyId"),
           required: true,
           width: "1/2",
-          defaultValue: 1,
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "active",
@@ -1634,12 +2047,12 @@ export function newBankStatementLineForm(t: TFunction, p: NewBankStatementLineFo
             width: "1/2",
           },
           {
-            type: "text",
+            type: "select",
             id: "partnerId",
             name: "partnerId",
             label: t("accounting.forms.bankStatementLine.fields.partnerId"),
-            placeholder: t("accounting.forms.bankStatementLine.fields.partnerIdPlaceholder"),
             width: "1/2",
+            options: [{ value: "", label: "—" }],
           },
           {
             type: "text",
@@ -1763,12 +2176,12 @@ export function newReconciliationWidgetForm(t: TFunction): FormConfig {
             options: [{ value: "", label: t("common.noData"), disabled: true }],
           },
           {
-            type: "text",
+            type: "select",
             id: "partnerId",
             name: "partnerId",
             label: t("accounting.forms.reconciliationWidget.fields.partnerId"),
-            placeholder: t("accounting.forms.reconciliationWidget.fields.partnerIdPlaceholder"),
             width: "1/2",
+            options: [{ value: "", label: "—" }],
           },
           {
             type: "text",
@@ -1842,13 +2255,13 @@ export function editReconciliationWidgetForm(t: TFunction, p: EditReconciliation
             options: [{ value: "", label: t("common.noData"), disabled: true }],
           },
           {
-            type: "text",
+            type: "select",
             id: "partnerId",
             name: "partnerId",
             label: t("accounting.forms.reconciliationWidget.fields.partnerId"),
             defaultValue: p.partnerId,
-            placeholder: t("accounting.forms.reconciliationWidget.fields.partnerIdPlaceholder"),
             width: "1/2",
+            options: [{ value: "", label: "—" }],
           },
           {
             type: "text",
@@ -2026,10 +2439,11 @@ export const newConsolidationAccountForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "number",
+          type: "select",
           label: t("accounting.consolidation.forms.newAccount.fields.currencyId"),
           required: true,
           width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "eliminationMethod",
@@ -2237,10 +2651,11 @@ export const newConsolidationJournalForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "number",
+          type: "select",
           label: t("accounting.consolidation.forms.newJournal.fields.currencyId"),
           required: true,
           width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "exchangeRate",
@@ -2278,10 +2693,11 @@ export const newEliminationEntryForm = (t: TFunction): FormConfig => ({
         {
           id: "journalId",
           name: "journalId",
-          type: "number",
+          type: "select",
           label: t("accounting.consolidation.forms.newElimination.fields.journalId"),
           required: true,
           width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "name",
@@ -2294,10 +2710,11 @@ export const newEliminationEntryForm = (t: TFunction): FormConfig => ({
         {
           id: "accountId",
           name: "accountId",
-          type: "number",
+          type: "select",
           label: t("accounting.consolidation.forms.newElimination.fields.accountId"),
           required: true,
           width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "accountCode",
@@ -2318,10 +2735,11 @@ export const newEliminationEntryForm = (t: TFunction): FormConfig => ({
         {
           id: "companyId",
           name: "companyId",
-          type: "number",
+          type: "select",
           label: t("accounting.consolidation.forms.newElimination.fields.companyId"),
           required: true,
           width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "debit",
@@ -2346,10 +2764,11 @@ export const newEliminationEntryForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "number",
+          type: "select",
           label: t("accounting.consolidation.forms.newElimination.fields.currencyId"),
           required: true,
           width: "1/2",
+          options: [{ value: "", label: "—", disabled: true }],
         },
         {
           id: "eliminationType",

@@ -9,6 +9,7 @@ import {
   useCreateUserSession,
   useLogAuditEvent,
 } from "@lumiere/query-hooks/hooks/auth"
+import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -36,6 +37,7 @@ import { cn } from "@/lib/utils"
 import { auditActionPillClass } from "@/lib/theme-colors"
 import { FormModal } from "../forms/form-modal"
 import { createUserSessionForm, logAuditEventForm } from "../lib/settings-platform-form-configs"
+import { mergeSelectOptionsForFields } from "../lib/form-config-merge"
 
 const actionIcons: Record<string, React.ReactNode> = {
   CREATE: <FileText className="h-4 w-4" />,
@@ -109,8 +111,26 @@ export function AuditLog() {
   const auditQuery = useAuditLog(orgBigInt)
   const logAuditEvent = useLogAuditEvent(orgBigInt)
   const createUserSession = useCreateUserSession(orgBigInt)
+  const { data: companies = [] } = useCompanies(organizationId ?? 0, orgReady)
   const { checkPermission } = useRBAC()
   const canManageAudit = checkPermission("admin:audit-log", "manage").allowed
+
+  const companySelectOptions = useMemo(
+    () =>
+      companies.map((company) => ({
+        value: String(company.id),
+        label: String(company.name ?? company.id),
+      })),
+    [companies],
+  )
+
+  const logAuditFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(logAuditEventForm(t), {
+        companyId: companySelectOptions,
+      }),
+    [t, companySelectOptions],
+  )
 
   const [searchQuery, setSearchQuery] = useState("")
   const [actionFilter, setActionFilter] = useState<string>("all")
@@ -311,7 +331,7 @@ export function AuditLog() {
               setAdminError(null)
             }
           }}
-          config={adminModal === "log" ? logAuditEventForm(t) : createUserSessionForm(t)}
+          config={adminModal === "log" ? logAuditFormConfig : createUserSessionForm(t)}
           isPending={logAuditEvent.isPending || createUserSession.isPending}
           closeOnSubmit={false}
           submitError={adminError}

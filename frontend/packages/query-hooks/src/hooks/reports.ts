@@ -13,9 +13,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { reportsBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { i18n } from "@lumiere/i18n"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import { downloadDocumentExport } from "./templates"
-import { toCreateFinancialReportParams } from "@lumiere/erp-shared/reports-create-params"
+import { toCreateFinancialReportParams, toCreateTrialBalanceEntryParams } from "@lumiere/erp-shared/reports-create-params"
 import { toCreateReportTemplateParams } from "@lumiere/erp-shared/reports-template-params"
 import { toCreateScheduledReportParams } from "@lumiere/erp-shared/reports-scheduled-params"
 import { toCreateSavedReportParams } from "@lumiere/erp-shared/reports-saved-params"
@@ -527,23 +528,12 @@ export function useCreateTrialBalanceEntry(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
-      const params = {
-        reportId: Number(formData.reportId),
-        accountId: Number(formData.accountId),
-        accountCode: String(formData.accountCode ?? ''),
-        accountName: String(formData.accountName ?? ''),
-        openingDebit: Number(formData.openingDebit ?? 0),
-        openingCredit: Number(formData.openingCredit ?? 0),
-        periodDebit: Number(formData.periodDebit ?? 0),
-        periodCredit: Number(formData.periodCredit ?? 0),
-        currencyId: Number(formData.currencyId ?? 1),
-        parentId: formData.parentId != null && String(formData.parentId).trim() !== ''
-          ? Number(formData.parentId)
-          : null,
-        level: Number(formData.level ?? 1),
-        isLeaf: Boolean(formData.isLeaf),
-      }
-      const { urlPath, init } = reportsBffPost("create_trial_balance_entry", [stdbParamsToJson(params)])
+      const params =
+        toCreateTrialBalanceEntryParams(formData) ??
+        (() => {
+          throw new Error(i18n.t("common.paramsMapper.invalidTrialBalanceEntry"))
+        })()
+      const { urlPath, init } = reportsBffPost("create_trial_balance_entry", [stdbParamsToJson(params as object)])
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create trial balance entry')

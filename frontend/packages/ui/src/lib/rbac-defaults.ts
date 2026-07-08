@@ -596,6 +596,14 @@ export const settingsSections: SettingsSection[] = [
     requiredPermission: "admin:roles",
     requiredAction: "read"
   },
+  {
+    id: "sso",
+    title: "SSO",
+    description: "Single sign-on status and WorkOS account linking",
+    icon: "keyround",
+    requiredPermission: "admin:roles",
+    requiredAction: "read"
+  },
     {
     id: "form-config",
     title: "Form Configuration",

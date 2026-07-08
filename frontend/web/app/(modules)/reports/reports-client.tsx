@@ -21,6 +21,7 @@ import {
   updateFinancialReportForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
+  mergeFieldDefaultValues,
   financialReportsTableConfig,
   reportTemplatesTableConfig,
   analyticsMetricsTableConfig,
@@ -32,6 +33,7 @@ import {
 } from "@lumiere/ui"
 import type { EntityTableConfig, EntityViewConfig, FormConfig } from "@lumiere/ui"
 import { reportsModuleConfig } from "@/lib/module-dashboard-configs"
+import { useReportsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { AiResultPanel } from "@/lib/ai-result-panel"
 import {
   useFinancialReports,
@@ -62,6 +64,7 @@ import {
   useDashboardWidgets,
 } from "@lumiere/query-hooks/hooks/reports"
 import { reportStateTag } from "@/lib/reports-create-params"
+import { toCreateTrialBalanceEntryParams } from "@lumiere/erp-shared/reports-create-params"
 import {
   toCreateAnalyticsMetricPayload,
   toCreateDashboardPayload,
@@ -69,11 +72,18 @@ import {
   toCreateFinancialReportPayload,
   toCreateReportTemplatePayload,
   toCreateScheduledReportPayload,
-  toCreateTrialBalanceEntryPayload,
   toUpdateFinancialReportFormPayload,
 } from "@/lib/reports-module-form-payloads"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting"
+import {
+  companyRowsToSelectOptions,
+  accountAccountRowsToSelectOptions,
+  currencyOptionsFromRows,
+  financialReportRowsToSelectOptions,
+} from "@/lib/form-lookup"
 import {
   Archive,
   FileDown,
@@ -222,6 +232,7 @@ function ReportsClientLoaded({
   initialDashboardWidgets,
   organizationId,
 }: ReportsClientLoadedProps) {
+  useReportsModuleSubscription()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => reportsModuleConfig(t), [t])
   /** BigInt organization id for React Query keys (matches `@lumiere/query-hooks` `organizationId` param). */
@@ -263,6 +274,8 @@ function ReportsClientLoaded({
   const { data: analyticsMetrics = [] } = useAnalyticsMetrics(orgId, initialAnalyticsMetrics)
   const { data: dashboards = [] } = useDashboards(orgId, initialDashboards)
   const { data: dashboardWidgets = [] } = useDashboardWidgets(orgId, initialDashboardWidgets)
+  const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
+  const { data: accountAccounts = [] } = useAccountAccounts(orgId)
 
   const reports = useMemo(
     () =>
@@ -330,12 +343,103 @@ function ReportsClientLoaded({
     [t, widgetSelectOptions],
   )
 
+  const companySelectOptions = useMemo(
+    () => companyRowsToSelectOptions(companies as Record<string, unknown>[]),
+    [companies],
+  )
+
+  const accountSelectOptions = useMemo(
+    () => accountAccountRowsToSelectOptions(accountAccounts as Record<string, unknown>[]),
+    [accountAccounts],
+  )
+
+  const currencySelectOptions = useMemo(
+    () =>
+      currencyOptionsFromRows([
+        reports as Record<string, unknown>[],
+        trialBalances as Record<string, unknown>[],
+        accountAccounts as Record<string, unknown>[],
+      ]),
+    [reports, trialBalances, accountAccounts],
+  )
+
+  const financialReportSelectOptions = useMemo(
+    () => financialReportRowsToSelectOptions(reports as Record<string, unknown>[]),
+    [reports],
+  )
+
   const scheduledReportFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newScheduledReportForm(t), {
-        reportTemplateId: templateSelectOptions,
+      mergeFieldDefaultValues(
+        mergeSelectOptionsForFields(newScheduledReportForm(t), {
+          reportTemplateId: templateSelectOptions,
+          companyId: companySelectOptions,
+        }),
+        { companyId: String(operatingCompanyId) },
+      ),
+    [t, templateSelectOptions, companySelectOptions, operatingCompanyId],
+  )
+
+  const financialReportFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newFinancialReportForm(t), {
+        currencyId: currencySelectOptions,
       }),
-    [t, templateSelectOptions],
+    [t, currencySelectOptions],
+  )
+
+  const reportTemplateFormConfig = useMemo(
+    () =>
+      mergeFieldDefaultValues(
+        mergeSelectOptionsForFields(newReportTemplateForm(t), {
+          companyId: companySelectOptions,
+        }),
+        { companyId: String(operatingCompanyId) },
+      ),
+    [t, companySelectOptions, operatingCompanyId],
+  )
+
+  const analyticsMetricFormConfig = useMemo(
+    () =>
+      mergeFieldDefaultValues(
+        mergeSelectOptionsForFields(newAnalyticsMetricForm(t), {
+          companyId: companySelectOptions,
+        }),
+        { companyId: String(operatingCompanyId) },
+      ),
+    [t, companySelectOptions, operatingCompanyId],
+  )
+
+  const dashboardFormConfig = useMemo(
+    () =>
+      mergeFieldDefaultValues(
+        mergeSelectOptionsForFields(newDashboardForm(t), {
+          companyId: companySelectOptions,
+        }),
+        { companyId: String(operatingCompanyId) },
+      ),
+    [t, companySelectOptions, operatingCompanyId],
+  )
+
+  const dashboardWidgetFormConfig = useMemo(
+    () =>
+      mergeFieldDefaultValues(
+        mergeSelectOptionsForFields(newDashboardWidgetForm(t), {
+          companyId: companySelectOptions,
+        }),
+        { companyId: String(operatingCompanyId) },
+      ),
+    [t, companySelectOptions, operatingCompanyId],
+  )
+
+  const trialBalanceEntryFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newTrialBalanceEntryForm(t), {
+        reportId: financialReportSelectOptions,
+        accountId: accountSelectOptions,
+        currencyId: currencySelectOptions,
+      }),
+    [t, financialReportSelectOptions, accountSelectOptions, currencySelectOptions],
   )
 
   const filteredTrialBalances = useMemo(() => {
@@ -594,8 +698,6 @@ function ReportsClientLoaded({
     }
   }, [moduleConfig.tabs, t])
 
-  const trialBalanceEntryFormConfig = useMemo(() => newTrialBalanceEntryForm(t), [t])
-
   const trialBalanceEntityConfig = useMemo((): EntityViewConfig => {
     const base = trialBalancesTableConfig(t)
     return {
@@ -725,16 +827,16 @@ function ReportsClientLoaded({
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
             generate_report: () =>
-              setQuickActionForm({ form: newFinancialReportForm(t), action: "generateReport" }),
+              setQuickActionForm({ form: financialReportFormConfig, action: "generateReport" }),
             new_template: () =>
-              setQuickActionForm({ form: newReportTemplateForm(t), action: "createReportTemplate" }),
+              setQuickActionForm({ form: reportTemplateFormConfig, action: "createReportTemplate" }),
             schedule_report: () =>
               setQuickActionForm({
                 form: scheduledReportFormConfig,
                 action: "createScheduledReport",
               }),
             new_metric: () =>
-              setQuickActionForm({ form: newAnalyticsMetricForm(t), action: "createAnalyticsMetric" }),
+              setQuickActionForm({ form: analyticsMetricFormConfig, action: "createAnalyticsMetric" }),
             new_dashboard: () => setCreateDashboardOpen(true),
             new_widget: () => setCreateWidgetOpen(true),
           }
@@ -758,6 +860,9 @@ function ReportsClientLoaded({
     moduleConfig,
     t,
     scheduledReportFormConfig,
+    financialReportFormConfig,
+    reportTemplateFormConfig,
+    analyticsMetricFormConfig,
   ])
 
   const config = useMemo(
@@ -767,8 +872,8 @@ function ReportsClientLoaded({
         if (tab.id === "dashboard") return { ...tab, sections: liveSections }
         if (tab.id === "reports") return { ...tab, entityConfig: financialReportsEntityConfig }
         if (tab.id === "trial-balance") return { ...tab, entityConfig: trialBalanceEntityConfig, createForm: trialBalanceEntryFormConfig, createAction: "createTrialBalanceEntry", createLabel: t("reports.trialBalance.createEntryLabel") }
-        if (tab.id === "report-templates") return { ...tab, entityConfig: reportTemplatesEntityConfig }
-        if (tab.id === "analytics-metrics") return { ...tab, entityConfig: analyticsMetricsEntityConfig }
+        if (tab.id === "report-templates") return { ...tab, entityConfig: reportTemplatesEntityConfig, createForm: reportTemplateFormConfig }
+        if (tab.id === "analytics-metrics") return { ...tab, entityConfig: analyticsMetricsEntityConfig, createForm: analyticsMetricFormConfig }
         if (tab.id === "scheduled-reports") {
           return {
             ...tab,
@@ -818,6 +923,8 @@ function ReportsClientLoaded({
       dashboardsEntityConfig,
       dashboardWidgetsEntityConfig,
       scheduledReportFormConfig,
+      reportTemplateFormConfig,
+      analyticsMetricFormConfig,
       reports,
       trialBalances,
       orgId,
@@ -852,7 +959,9 @@ function ReportsClientLoaded({
     } else if (action === "createAnalyticsMetric") {
       await createAnalyticsMetric.mutateAsync(toCreateAnalyticsMetricPayload(formData))
     } else if (action === "createTrialBalanceEntry") {
-      await createTrialBalanceEntry.mutateAsync(toCreateTrialBalanceEntryPayload(formData))
+      const params = toCreateTrialBalanceEntryParams(formData)
+      if (!params) throw new Error(t("common.paramsMapper.invalidTrialBalanceEntry"))
+      await createTrialBalanceEntry.mutateAsync(params as unknown as Record<string, unknown>)
     } else if (action === "createDashboard") {
       await createDashboard.mutateAsync(toCreateDashboardPayload(formData))
       setCreateDashboardOpen(false)
@@ -920,7 +1029,7 @@ function ReportsClientLoaded({
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? newFinancialReportForm(t)}
+        config={quickActionForm?.form ?? financialReportFormConfig}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {
@@ -1148,7 +1257,7 @@ function ReportsClientLoaded({
       <FormModal
         open={createDashboardOpen}
         onOpenChange={(open) => !open && setCreateDashboardOpen(false)}
-        config={newDashboardForm(t)}
+        config={dashboardFormConfig}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           await handleFormSubmit("dashboard", "createDashboard", formData)
@@ -1159,7 +1268,7 @@ function ReportsClientLoaded({
       <FormModal
         open={createWidgetOpen}
         onOpenChange={(open) => !open && setCreateWidgetOpen(false)}
-        config={newDashboardWidgetForm(t)}
+        config={dashboardWidgetFormConfig}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           await handleFormSubmit("dashboard", "createDashboardWidget", formData)

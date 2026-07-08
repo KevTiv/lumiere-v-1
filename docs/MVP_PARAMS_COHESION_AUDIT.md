@@ -67,7 +67,7 @@ cat frontend/web/reducer-coverage-report.json
 | `REDUCER_PARAM_STRUCTS` (E2E helper) | **40+** | `stdb-params-json.ts` |
 | Form field definitions (UI configs) | **~1,500+** | 23 `*-form-configs.ts` modules |
 | `as unknown as Create*` in web clients | **8** | calendar, documents, subscriptions (+ others TBD) |
-| **Mapper coverage (automated)** | **73.5%** | 125 / 170 — `scripts/check-params-mapper-coverage.ts` (Phase 4 [params-cohesion-v2]) |
+| **Mapper coverage (automated)** | **100%** | 170 / 170 — `scripts/check-params-mapper-coverage.ts` (Phase 4 complete) |
 
 ---
 
@@ -309,12 +309,12 @@ cd frontend/web && pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts -
 }
 ```
 
-**CI:** `.github/workflows/params-cohesion.yml` runs on PR/push when Rust or mapper paths change. Floor **70%** (2026-07-05 Phase 4 baseline); `--warn-coverage 70` aligned with floor.
+**CI:** `.github/workflows/params-cohesion.yml` runs on PR/push when Rust or mapper paths change. Floor **100%** (2026-07-08); `--warn-coverage 100` aligned with floor.
 
 **Thresholds ([params-cohesion-v2 mission](../.cursor/plans/params-cohesion-v2-mission.md)):**
 
 | Level | Coverage | CI behavior |
 |-------|----------|-------------|
-| Floor | **70%** | `exit 1` on PR |
-| Target | 70% | met (Phase 4) |
-| Stretch | 85% | backlog |
+| Floor | **100%** | `exit 1` on PR |
+| Target | 100% | met |
+| Stretch | — | complete |

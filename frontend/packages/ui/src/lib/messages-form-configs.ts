@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
+const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
+
 export const newMailMessageForm = (t: TFunction): FormConfig => ({
   id: "new-mail-message",
   title: t("messages.forms.newMessage.title"),
@@ -41,10 +43,11 @@ export const newMailMessageForm = (t: TFunction): FormConfig => ({
         {
           id: "parentId",
           name: "parentId",
-          type: "text",
+          type: "select",
           label: t("messages.forms.newMessage.fields.parentId"),
           placeholder: t("messages.forms.newMessage.fields.parentIdHint"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "subtype",

@@ -1,8 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { DashboardHeader, FormModal, MissingOrganization, SettingsModule, type FormConfig } from "@lumiere/ui"
+import {
+  toCreateCompanyParams,
+  toCreateWhatsAppBusinessAccountParams,
+} from "@lumiere/erp-shared/settings-create-params"
 import {
   archiveAiChatSession,
   createGoogleDriveConnection,
@@ -50,6 +54,7 @@ import {
   useUpdateCompanyHierarchy,
 } from "@lumiere/query-hooks/hooks/organization-company"
 import { GuidedImportWizard } from "@/lib/guided-import-wizard"
+import { useSettingsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 type SettingsAction =
@@ -799,6 +804,7 @@ function SettingsLoaded({
   title: string
   description: string
 }) {
+  useSettingsModuleSubscription()
   const { orgId } = orgBigInts(organizationId)
   const [activeAction, setActiveAction] = useState<SettingsAction | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -954,28 +960,9 @@ function SettingsLoaded({
           String(formData.integrationType ?? "GoogleDrive") as "GoogleDrive" | "WhatsAppBusiness",
         )
       } else if (activeAction === "createWhatsappBusinessAccount") {
-        await createWhatsAppBusinessAccount(orgId, {
-          name: String(formData.name ?? ""),
-          phoneNumber: String(formData.phoneNumber ?? ""),
-          phoneNumberId: String(formData.phoneNumberId ?? ""),
-          businessAccountId: String(formData.businessAccountId ?? ""),
-          displayName: String(formData.displayName ?? ""),
-          credentialsReference: String(formData.credentialsReference ?? ""),
-          webhookSecretReference: String(formData.webhookSecretReference ?? ""),
-          messagingEnabled: Boolean(formData.messagingEnabled),
-          notificationsEnabled: Boolean(formData.notificationsEnabled),
-          templateMessagingEnabled: Boolean(formData.templateMessagingEnabled),
-          interactiveMessagingEnabled: Boolean(formData.interactiveMessagingEnabled),
-          defaultLanguage: String(formData.defaultLanguage ?? "en"),
-          webhookEnabled: Boolean(formData.webhookEnabled),
-          webhookUrl: optionalText(formData.webhookUrl),
-          subscribedWebhookEvents: csvList(formData.subscribedWebhookEvents),
-          dailyMessageLimit: Number(formData.dailyMessageLimit ?? 1000),
-          isPrimary: Boolean(formData.isPrimary),
-          templateNamespace: optionalText(formData.templateNamespace),
-          mediaProvider: optionalText(formData.mediaProvider),
-          metadata: optionalText(formData.metadata),
-        })
+        const params = toCreateWhatsAppBusinessAccountParams(formData)
+        if (!params) throw new Error(i18n.t("common.paramsMapper.invalidWhatsappAccount"))
+        await createWhatsAppBusinessAccount(orgId, params)
       } else if (activeAction === "updateWhatsappBusinessAccount") {
         const events = csvList(formData.subscribedWebhookEvents)
         await updateWhatsAppBusinessAccount(orgId, toBigIntId(formData.accountId, "Account ID"), {
@@ -1030,7 +1017,14 @@ function SettingsLoaded({
           Boolean(formData.archived),
         )
       } else if (activeAction === "createCompany") {
-        await createCompany.mutateAsync(compactParams(formData, ["name", "code", "currencyId", "addressCountryCode"]))
+        const currencyRaw = formData.currencyId
+        const currencyId =
+          currencyRaw != null && String(currencyRaw).trim() !== ""
+            ? BigInt(String(currencyRaw))
+            : undefined
+        const params = toCreateCompanyParams(formData, currencyId ? { currencyId } : undefined)
+        if (!params) throw new Error(i18n.t("common.paramsMapper.invalidCompany"))
+        await createCompany.mutateAsync(params as unknown as Record<string, unknown>)
       } else if (activeAction === "updateCompany") {
         await updateCompany.mutateAsync({
           companyId: toBigIntId(formData.companyId, "Company ID"),

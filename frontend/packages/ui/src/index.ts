@@ -205,6 +205,8 @@ export * from "./settings/profile-settings";
 export * from "./settings/user-switcher";
 export * from "./settings/company-switcher";
 export * from "./settings/audit-log";
+export * from "./settings/field-permissions-editor";
+export * from "./settings/sso-settings";
 export * from "./settings/form-config-settings";
 export * from "./settings/user-custom-fields";
 

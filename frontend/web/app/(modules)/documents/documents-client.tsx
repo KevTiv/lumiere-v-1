@@ -7,7 +7,11 @@ import {
   FormModal,
   newDocumentForm,
   newKnowledgeArticleForm,
+  newKnowledgeCategoryForm,
+  newDocumentFolderForm,
+  newDocumentProcessingJobForm,
   MissingOrganization,
+  mergeSelectOptionsForFields,
   csvImportForm,
   completeDocumentProcessingJobForm,
   acknowledgeDocumentInsightForm,
@@ -51,6 +55,13 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import type { QueryRows } from "@/lib/query-fetch"
 import { useRunAiSkill } from "@lumiere/query-hooks/hooks/ai-skills"
+import { useAiAgents } from "@lumiere/query-hooks/hooks/ai-agents"
+import {
+  documentFolderRowsToSelectOptions,
+  knowledgeCategoryRowsToSelectOptions,
+  knowledgeArticleRowsToSelectOptions,
+  aiAgentRowsToSelectOptions,
+} from "@/lib/form-lookup"
 
 export { DOCUMENTS_UI_REDUCERS } from "@/lib/documents-ui-reducers"
 
@@ -242,6 +253,7 @@ function DocumentsClientLoaded({
   const { data: folders = [] } = useDocumentFolders(orgId, initialFolders as QueryRows | undefined)
   const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs as QueryRows | undefined)
   const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights as QueryRows | undefined)
+  const { data: aiAgents = [] } = useAiAgents(organizationId, organizationId > 0)
   const createDocument = useCreateDocument(orgId, operatingCompanyId)
   const updateDocument = useUpdateDocument(orgId)
   const deleteDocument = useDeleteDocument(orgId)
@@ -281,6 +293,78 @@ function DocumentsClientLoaded({
     }
   }
 
+  const csvFormConfig = useMemo(() => {
+    if (!csvKind) return null
+    if (csvKind === "knowledge_category") {
+      return csvImportForm(t, t("documents.csvImport.categoryTitle"))
+    }
+    return csvImportForm(t, t("documents.csvImport.articleTitle"))
+  }, [csvKind, t])
+
+  const completeFormConfig = useMemo(() => completeDocumentProcessingJobForm(t), [t])
+  const acknowledgeFormConfig = useMemo(() => acknowledgeDocumentInsightForm(t), [t])
+
+  const folderSelectOptions = useMemo(
+    () => documentFolderRowsToSelectOptions(folders as Record<string, unknown>[]),
+    [folders],
+  )
+
+  const categorySelectOptions = useMemo(
+    () => knowledgeCategoryRowsToSelectOptions(categories as Record<string, unknown>[]),
+    [categories],
+  )
+
+  const articleSelectOptions = useMemo(
+    () => knowledgeArticleRowsToSelectOptions(articles as Record<string, unknown>[]),
+    [articles],
+  )
+
+  const aiAgentSelectOptions = useMemo(
+    () => aiAgentRowsToSelectOptions(aiAgents as Record<string, unknown>[]),
+    [aiAgents],
+  )
+
+  const documentFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newDocumentForm(t), {
+        folderId: folderSelectOptions,
+      }),
+    [t, folderSelectOptions],
+  )
+
+  const knowledgeArticleFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newKnowledgeArticleForm(t), {
+        parentId: articleSelectOptions,
+        categoryId: categorySelectOptions,
+      }),
+    [t, articleSelectOptions, categorySelectOptions],
+  )
+
+  const knowledgeCategoryFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newKnowledgeCategoryForm(t), {
+        parentId: categorySelectOptions,
+      }),
+    [t, categorySelectOptions],
+  )
+
+  const documentFolderFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newDocumentFolderForm(t), {
+        parentId: folderSelectOptions,
+      }),
+    [t, folderSelectOptions],
+  )
+
+  const processingJobFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newDocumentProcessingJobForm(t), {
+        aiAgentId: aiAgentSelectOptions,
+      }),
+    [t, aiAgentSelectOptions],
+  )
+
   const liveSections = useMemo(() => {
     const shared = documents.filter((d) => d.isShared).length
     const favorites = documents.filter((d) => d.isFavorite).length
@@ -307,9 +391,9 @@ function DocumentsClientLoaded({
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            upload_document: () => setQuickActionForm({ form: newDocumentForm(t), action: "uploadDocument" }),
-            new_article: () => setQuickActionForm({ form: newKnowledgeArticleForm(t), action: "createArticle" }),
-            create_article: () => setQuickActionForm({ form: newKnowledgeArticleForm(t), action: "createArticle" }),
+            upload_document: () => setQuickActionForm({ form: documentFormConfig, action: "uploadDocument" }),
+            new_article: () => setQuickActionForm({ form: knowledgeArticleFormConfig, action: "createArticle" }),
+            create_article: () => setQuickActionForm({ form: knowledgeArticleFormConfig, action: "createArticle" }),
           }
           return {
             ...w,
@@ -322,18 +406,7 @@ function DocumentsClientLoaded({
         return w
       }),
     }))
-  }, [documents, articles, moduleConfig, t])
-
-  const csvFormConfig = useMemo(() => {
-    if (!csvKind) return null
-    if (csvKind === "knowledge_category") {
-      return csvImportForm(t, t("documents.csvImport.categoryTitle"))
-    }
-    return csvImportForm(t, t("documents.csvImport.articleTitle"))
-  }, [csvKind, t])
-
-  const completeFormConfig = useMemo(() => completeDocumentProcessingJobForm(t), [t])
-  const acknowledgeFormConfig = useMemo(() => acknowledgeDocumentInsightForm(t), [t])
+  }, [documents, articles, moduleConfig, t, documentFormConfig, knowledgeArticleFormConfig])
 
   const config = useMemo(
     () => ({
@@ -343,6 +416,7 @@ function DocumentsClientLoaded({
         if (tab.id === "documents" && tab.entityConfig) {
           return {
             ...tab,
+            createForm: documentFormConfig,
             entityConfig: withTableActions(
               tab.entityConfig,
               [
@@ -424,6 +498,7 @@ function DocumentsClientLoaded({
         if (tab.id === "knowledge-base" && tab.entityConfig) {
           return {
             ...tab,
+            createForm: knowledgeArticleFormConfig,
             entityConfig: addCsvToolbar(tab.entityConfig, [
               {
                 id: "csv-kb-category",
@@ -441,6 +516,7 @@ function DocumentsClientLoaded({
         if (tab.id === "knowledge-categories" && tab.entityConfig) {
           return {
             ...tab,
+            createForm: knowledgeCategoryFormConfig,
             entityConfig: addCsvToolbar(tab.entityConfig, [
               {
                 id: "csv-kb-category-tab",
@@ -450,9 +526,16 @@ function DocumentsClientLoaded({
             ]),
           }
         }
+        if (tab.id === "document-folders" && tab.entityConfig) {
+          return {
+            ...tab,
+            createForm: documentFolderFormConfig,
+          }
+        }
         if (tab.id === "document-processing" && tab.entityConfig) {
           return {
             ...tab,
+            createForm: processingJobFormConfig,
             entityConfig: withTableActions(
               tab.entityConfig,
               [
@@ -548,6 +631,11 @@ function DocumentsClientLoaded({
       recordDocumentView,
       unlockDocument,
       runInsightsScan,
+      documentFormConfig,
+      knowledgeArticleFormConfig,
+      knowledgeCategoryFormConfig,
+      documentFolderFormConfig,
+      processingJobFormConfig,
     ],
   )
 
@@ -640,7 +728,7 @@ function DocumentsClientLoaded({
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? newDocumentForm(t)}
+        config={quickActionForm?.form ?? documentFormConfig}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {

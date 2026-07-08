@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test"
 import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
+  chooseSelectOptionByValue,
   assertMoveLinesBalanced,
   expectNoAppError,
   expectOverviewDashboardLive,
@@ -295,7 +296,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await waitForEntityActionEnabled(page, "entity-action-pay-link")
     await page.getByTestId("entity-action-pay-link").click()
     await expect(page.getByTestId("form-modal-register-payment-invoices")).toBeVisible()
-    await fillField(page, "invoiceIds", String(moveId))
+    await chooseSelectOptionByValue(page, "invoiceIds", moveId)
     const [registerRes] = await Promise.all([
       page.waitForResponse(
         (res) => res.url().includes("/api/call/register_payment_on_invoice") && res.ok(),

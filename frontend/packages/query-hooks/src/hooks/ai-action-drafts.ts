@@ -1,7 +1,9 @@
 "use client"
 
 import { resolveActionDraftRecordHref } from "@lumiere/erp-shared/action-draft-links"
+import { toCreateAiActionDraftParams } from "@lumiere/erp-shared/ai-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { i18n } from "@lumiere/i18n"
 import { aiActionDraftsBffPost } from "@lumiere/stdb/commands"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -245,22 +247,13 @@ export function useCreateAiActionDraft(organizationId: number, companyId: number
       sourceQuery?: string
       uiContextJson?: string | null
     }) => {
+      const params = toCreateAiActionDraftParams(args.gateway, {
+        sourceQuery: args.sourceQuery,
+        uiContextJson: args.uiContextJson,
+      })
+      if (!params) throw new Error(i18n.t("common.paramsMapper.invalidAiActionDraft"))
       const { urlPath, init } = aiActionDraftsBffPost("create_ai_action_draft", [
-        stdbParamsToJson({
-          reducer_name: args.gateway.reducer_name,
-          params_json: JSON.stringify(args.gateway.params_json),
-          summary: args.gateway.summary,
-          confidence: args.gateway.confidence,
-          elevated: args.gateway.elevated,
-          warnings_json:
-            args.gateway.warnings.length > 0
-              ? JSON.stringify(args.gateway.warnings)
-              : null,
-          source_query: args.sourceQuery ?? null,
-          ui_context_json: args.uiContextJson ?? null,
-          expires_at: null,
-          metadata: null,
-        }, "CreateAiActionDraftParams"),
+        stdbParamsToJson(params, "CreateAiActionDraftParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))

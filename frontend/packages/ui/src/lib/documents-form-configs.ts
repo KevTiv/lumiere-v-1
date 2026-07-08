@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
+const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
+
 export const newDocumentForm = (t: TFunction): FormConfig => ({
   id: "new-document",
   title: t("documents.forms.newDocument.title"),
@@ -69,10 +71,11 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
         {
           id: "folderId",
           name: "folderId",
-          type: "text",
+          type: "select",
           label: t("documents.forms.newDocument.fields.folderId"),
           placeholder: t("documents.forms.newDocument.fields.folderIdHint"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "tagIds",
@@ -133,18 +136,20 @@ export const newKnowledgeArticleForm = (t: TFunction): FormConfig => ({
         {
           id: "parentId",
           name: "parentId",
-          type: "text",
+          type: "select",
           label: t("documents.forms.newArticle.fields.parentId"),
           placeholder: t("documents.forms.newArticle.fields.parentIdHint"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "categoryId",
           name: "categoryId",
-          type: "text",
+          type: "select",
           label: t("documents.forms.newArticle.fields.categoryId"),
           placeholder: t("documents.forms.newArticle.fields.categoryIdHint"),
           width: "1/2",
+          options: emptySelect,
         },
       ],
     },
@@ -179,9 +184,10 @@ export const newKnowledgeCategoryForm = (t: TFunction): FormConfig => ({
         {
           id: "parentId",
           name: "parentId",
-          type: "text",
+          type: "select",
           label: t("documents.forms.newCategory.fields.parentId"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "sequence",
@@ -234,9 +240,10 @@ export const newDocumentFolderForm = (t: TFunction): FormConfig => ({
         {
           id: "parentId",
           name: "parentId",
-          type: "text",
+          type: "select",
           label: t("documents.forms.newFolder.fields.parentId"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "sequence",
@@ -295,10 +302,11 @@ export const newDocumentProcessingJobForm = (t: TFunction): FormConfig => ({
         {
           id: "aiAgentId",
           name: "aiAgentId",
-          type: "text",
+          type: "select",
           label: t("documents.forms.newProcessingJob.fields.aiAgentId"),
           placeholder: t("documents.forms.newProcessingJob.fields.aiAgentIdPlaceholder"),
           width: "full",
+          options: emptySelect,
         },
         {
           id: "inputData",

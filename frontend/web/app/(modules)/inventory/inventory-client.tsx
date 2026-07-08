@@ -205,6 +205,8 @@ import {
   useUpdateWhatsappQualityScore,
 } from "@lumiere/query-hooks/hooks/inventory"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { useContacts } from "@lumiere/query-hooks/hooks/crm"
+import { useDocuments } from "@lumiere/query-hooks/hooks/documents"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 
@@ -286,7 +288,13 @@ import {
   locationOptionsFromQuantsAndTransfers,
   productRowsToSelectOptions,
   productCategoryRowsToSelectOptions,
+  productTemplateRowsToSelectOptions,
   uomRowsToSelectOptions,
+  contactRowsToVendorSelectOptions,
+  documentRowsToSelectOptions,
+  stockSerialRowsToSelectOptions,
+  stockLotRowsToSelectOptions,
+  stockMoveRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
   CheckCircle, ListChecks, Pencil, Plus, Trash2, UserCircle2, UserPlus, XCircle,
@@ -378,8 +386,6 @@ function InventoryClientLoaded({
   const [variantProductId, setVariantProductId] = useState<ScalarId | null>(null)
   const [editWarehouseRow, setEditWarehouseRow] = useState<Record<string, unknown> | null>(null)
   const [assignPickingId, setAssignPickingId] = useState<ScalarId | null>(null)
-  const [editQualityCheckId, setEditQualityCheckId] = useState<ScalarId | null>(null)
-  const [editQualityAlertId, setEditQualityAlertId] = useState<ScalarId | null>(null)
   const [assignQualityAlertId, setAssignQualityAlertId] = useState<ScalarId | null>(null)
   const [solveQualityAlertId, setSolveQualityAlertId] = useState<ScalarId | null>(null)
   const [selectedSerialRow, setSelectedSerialRow] = useState<Record<string, unknown> | null>(null)
@@ -389,11 +395,6 @@ function InventoryClientLoaded({
   const [wizardCycleCountId, setWizardCycleCountId] = useState<ScalarId | "">("")
   const [stockLocationFilter, setStockLocationFilter] = useState<string | null>(null)
   const [createQualityAlertOpen, setCreateQualityAlertOpen] = useState(false)
-  const [editReplenishmentRuleId, setEditReplenishmentRuleId] = useState<ScalarId | null>(null)
-  const [editPickingWaveId, setEditPickingWaveId] = useState<ScalarId | null>(null)
-  const [editProductCategoryId, setEditProductCategoryId] = useState<ScalarId | null>(null)
-  const [editStockRouteId, setEditStockRouteId] = useState<ScalarId | null>(null)
-  const [editStockRuleId, setEditStockRuleId] = useState<ScalarId | null>(null)
   const [supplierLineProductId, setSupplierLineProductId] = useState<ScalarId | null>(null)
   const [packagingProductId, setPackagingProductId] = useState<ScalarId | null>(null)
   const [csvKind, setCsvKind] = useState<InventoryCsvImportKind | null>(null)
@@ -430,6 +431,8 @@ function InventoryClientLoaded({
   const { data: stockTraceabilityReports = [] } = useStockTraceabilityReports(orgId)
   const { data: orgUsers = [] } = useOrgUsers()
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
+  const { data: contacts = [] } = useContacts(orgId)
+  const { data: erpDocuments = [] } = useDocuments(orgId)
   const csvImports = {
     importUomCategory: useImportUomCategoryCsv(orgId),
     importUom: useImportUomCsv(orgId),
@@ -489,12 +492,64 @@ function InventoryClientLoaded({
     ]
   }, [uoms, t])
 
+  const productSelectOptions = useMemo(() => {
+    const fromApi = productRowsToSelectOptions(products)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noProducts"), disabled: true }]
+  }, [products, t])
+
+  const productTemplateSelectOptions = useMemo(
+    () => productTemplateRowsToSelectOptions(products as Record<string, unknown>[]),
+    [products],
+  )
+
+  const vendorSelectOptions = useMemo(() => {
+    const fromApi = contactRowsToVendorSelectOptions(contacts as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noVendors"), disabled: true }]
+  }, [contacts, t])
+
+  const documentSelectOptions = useMemo(
+    () => documentRowsToSelectOptions(erpDocuments as Record<string, unknown>[]),
+    [erpDocuments],
+  )
+
+  const serialSelectOptions = useMemo(
+    () => stockSerialRowsToSelectOptions(serials as Record<string, unknown>[]),
+    [serials],
+  )
+
+  const lotSelectOptions = useMemo(
+    () => stockLotRowsToSelectOptions(lots as Record<string, unknown>[]),
+    [lots],
+  )
+
+  const stockMoveSelectOptions = useMemo(
+    () => stockMoveRowsToSelectOptions(stockMoves as Record<string, unknown>[]),
+    [stockMoves],
+  )
+
   const traceRecordFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newTraceabilityRecordForm(t), {
+        productId: productSelectOptions,
+        documentId: documentSelectOptions,
         uomId: uomFieldOptions,
+        serialId: serialSelectOptions,
+        lotId: lotSelectOptions,
+        moveId: stockMoveSelectOptions,
+        partnerId: vendorSelectOptions,
       }),
-    [t, uomFieldOptions],
+    [
+      t,
+      productSelectOptions,
+      documentSelectOptions,
+      uomFieldOptions,
+      serialSelectOptions,
+      lotSelectOptions,
+      stockMoveSelectOptions,
+      vendorSelectOptions,
+    ],
   )
 
   const productFormConfig = useMemo(
@@ -904,9 +959,11 @@ function InventoryClientLoaded({
   const productSupplierLineFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newProductSupplierLineForm(t), {
+        productTmplId: productTemplateSelectOptions,
+        partnerId: vendorSelectOptions,
         currencyId: currencyIdFromPricelistsOptions,
       }),
-    [t, currencyIdFromPricelistsOptions],
+    [t, productTemplateSelectOptions, vendorSelectOptions, currencyIdFromPricelistsOptions],
   )
 
   const productPackagingFormConfig = useMemo(

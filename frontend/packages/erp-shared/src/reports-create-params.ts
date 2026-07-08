@@ -4,6 +4,7 @@
 
 import type {
   CreateFinancialReportParams,
+  CreateTrialBalanceEntryParams,
   ReportType,
 } from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
@@ -120,4 +121,52 @@ export function reportStateTag(state: unknown): string {
     if (keys.length === 1) return keys[0]!.toLowerCase()
   }
   return String(state).toLowerCase()
+}
+
+function field(formData: Record<string, unknown>, camel: string, snake: string): unknown {
+  return formData[camel] ?? formData[snake]
+}
+
+function num(v: unknown, fallback = 0): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : fallback
+}
+
+export function toCreateTrialBalanceEntryParams(
+  formData: Record<string, unknown>,
+): CreateTrialBalanceEntryParams | null {
+  const reportId = parseU64(field(formData, 'reportId', 'report_id'), 0n)
+  const accountId = parseU64(field(formData, 'accountId', 'account_id'), 0n)
+  const accountCode = String(field(formData, 'accountCode', 'account_code') ?? '').trim()
+  const accountName = String(field(formData, 'accountName', 'account_name') ?? '').trim()
+  const currencyId = parseU64(field(formData, 'currencyId', 'currency_id'), 0n)
+  if (reportId === 0n || accountId === 0n || !accountCode || !accountName || currencyId === 0n) {
+    return null
+  }
+
+  const levelRaw = field(formData, 'level', 'level')
+  const level =
+    levelRaw == null || levelRaw === ''
+      ? 0
+      : Math.min(255, Math.max(0, Math.trunc(num(levelRaw))))
+
+  return {
+    reportId,
+    accountId,
+    accountCode,
+    accountName,
+    openingDebit: num(field(formData, 'openingDebit', 'opening_debit'), 0),
+    openingCredit: num(field(formData, 'openingCredit', 'opening_credit'), 0),
+    periodDebit: num(field(formData, 'periodDebit', 'period_debit'), 0),
+    periodCredit: num(field(formData, 'periodCredit', 'period_credit'), 0),
+    currencyId,
+    parentId: (() => {
+      const raw = field(formData, 'parentId', 'parent_id')
+      if (raw == null || String(raw).trim() === '') return undefined
+      const id = parseU64(raw, 0n)
+      return id === 0n ? undefined : id
+    })(),
+    level,
+    isLeaf: field(formData, 'isLeaf', 'is_leaf') === true,
+  }
 }

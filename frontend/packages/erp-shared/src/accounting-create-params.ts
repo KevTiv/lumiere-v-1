@@ -3,8 +3,10 @@
  */
 
 import type {
+  AssetType,
   CreateAccountAccountParams,
   CreateAccountAccountTypeParams,
+  CreateAccountAssetParams,
   CreateAccountBankStatementLineParams,
   CreateAccountBankStatementParams,
   CreateAccountGroupParams,
@@ -15,16 +17,20 @@ import type {
   CreateAccountTaxParams,
   CreateAnalyticAccountParams,
   CreateAnalyticDistributionModelParams,
+  CreateConsolidationAccountParams,
+  CreateConsolidationJournalParams,
   CreateCreditNoteParams,
   CreateCrossoveredBudgetLineParams,
   CreateAnalyticLineParams,
   CreateBudgetPostParams,
   CreateCrossoveredBudgetParams,
   CreateCurrencyRateParams,
+  CreateEliminationEntryParams,
   CreateFiscalYearParams,
   CreatePaymentParams,
   CreatePaymentTermLineParams,
   CreatePaymentTermParams,
+  DepreciationMethod,
   UpdateAccountAccountTypeParams,
   UpdateAccountGroupParams,
   UpdateAnalyticAccountParams,
@@ -1201,6 +1207,61 @@ export function intercompanyRuleParamsToJson(params: CreateIntercompanyRuleParam
   return stdbParamsToJson(params)
 }
 
+import type { UpdateIntercompanyRuleParams } from '@lumiere/stdb/types'
+
+/** `Option<Option<T>>` update field: omit → no change; empty select → no change; value → set. */
+function optionalNestedU64FromForm(
+  formData: Record<string, unknown>,
+  key: string,
+): bigint | undefined {
+  if (!(key in formData)) return undefined
+  const raw = formData[key]
+  if (raw === '' || raw == null) return undefined
+  return optionalBigIntU64(raw)
+}
+
+function optionalNestedStringFromForm(
+  formData: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  if (!(key in formData)) return undefined
+  const raw = formData[key]
+  if (raw === '' || raw == null) return undefined
+  return optionalTrimmedString(raw)
+}
+
+export function toUpdateIntercompanyRuleParams(
+  formData: Record<string, unknown>,
+): UpdateIntercompanyRuleParams {
+  return {
+    name: optionalTrimmedString(formData.name),
+    autoValidation:
+      formData.autoValidation === undefined ? undefined : formData.autoValidation === true,
+    autoGenerateInvoice:
+      formData.autoGenerateInvoice === undefined
+        ? undefined
+        : formData.autoGenerateInvoice === true,
+    autoGenerateBill:
+      formData.autoGenerateBill === undefined ? undefined : formData.autoGenerateBill === true,
+    journalId: optionalNestedU64FromForm(formData, 'journalId'),
+    accountId: optionalNestedU64FromForm(formData, 'accountId'),
+    pricelistId: optionalNestedU64FromForm(formData, 'pricelistId'),
+    sequence:
+      formData.sequence === '' || formData.sequence == null
+        ? undefined
+        : Number(formData.sequence),
+    isActive: formData.isActive === undefined ? undefined : formData.isActive === true,
+    notes: optionalNestedStringFromForm(formData, 'notes'),
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function intercompanyRuleUpdateParamsToJson(
+  params: UpdateIntercompanyRuleParams,
+): Record<string, unknown> {
+  return stdbParamsToJson(params)
+}
+
 export function toCreateIntercompanyTransactionParams(
   formData: Record<string, unknown>,
 ): CreateIntercompanyTransactionParams | null {
@@ -1661,5 +1722,265 @@ export function toCreateCreditNoteParams(
   return {
     lineIds,
     reason,
+  }
+}
+
+function field(formData: Record<string, unknown>, camel: string, snake: string): unknown {
+  return formData[camel] ?? formData[snake]
+}
+
+function num(v: unknown, fallback = 0): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function requiredTrimmedString(v: unknown): string | null {
+  if (v == null) return null
+  const s = String(v).trim()
+  return s === '' ? null : s
+}
+
+function assetTypeFromForm(raw: unknown): AssetType {
+  const tag = capitalizeTag(String(raw ?? 'Purchase'))
+  if (tag === 'Sale') return { tag: 'Sale' }
+  return { tag: 'Purchase' }
+}
+
+function depreciationMethodFromForm(raw: unknown): DepreciationMethod {
+  const tag = String(raw ?? 'Linear')
+  switch (tag) {
+    case 'Degressive':
+    case 'DegressiveThenLinear':
+      return { tag }
+    default:
+      return { tag: 'Linear' }
+  }
+}
+
+export type AccountAssetMapperContext = {
+  currencyId: bigint
+  accountAssetId: bigint
+  accountDepreciationId: bigint
+  accountDepreciationExpenseId: bigint
+  journalId: bigint
+}
+
+/** Maps fixed-asset form data; GL account IDs come from context. */
+export function toCreateAccountAssetParams(
+  formData: Record<string, unknown>,
+  context: AccountAssetMapperContext,
+): CreateAccountAssetParams | null {
+  const code = requiredTrimmedString(field(formData, 'code', 'code'))
+  const name = requiredTrimmedString(field(formData, 'name', 'name'))
+  if (!code || !name) return null
+
+  return {
+    code,
+    name,
+    active: field(formData, 'active', 'active') !== false,
+    assetType: assetTypeFromForm(field(formData, 'assetType', 'asset_type')),
+    currencyId: optionalBigIntU64(field(formData, 'currencyId', 'currency_id')) ?? context.currencyId,
+    originalValue: num(field(formData, 'originalValue', 'original_value'), 0),
+    salvageValue: num(field(formData, 'salvageValue', 'salvage_value'), 0),
+    method: depreciationMethodFromForm(field(formData, 'method', 'method')),
+    methodNumber: Math.trunc(num(field(formData, 'methodNumber', 'method_number'), 5)),
+    methodPeriod: Math.trunc(num(field(formData, 'methodPeriod', 'method_period'), 12)),
+    methodProgressFactor: num(field(formData, 'methodProgressFactor', 'method_progress_factor'), 0),
+    prorata: field(formData, 'prorata', 'prorata') === true,
+    prorataDate: optionalTimestampFromFormDate(field(formData, 'prorataDate', 'prorata_date')),
+    accountAssetId:
+      optionalBigIntU64(field(formData, 'accountAssetId', 'account_asset_id')) ?? context.accountAssetId,
+    accountDepreciationId:
+      optionalBigIntU64(field(formData, 'accountDepreciationId', 'account_depreciation_id')) ??
+      context.accountDepreciationId,
+    accountDepreciationExpenseId:
+      optionalBigIntU64(
+        field(formData, 'accountDepreciationExpenseId', 'account_depreciation_expense_id'),
+      ) ?? context.accountDepreciationExpenseId,
+    journalId: optionalBigIntU64(field(formData, 'journalId', 'journal_id')) ?? context.journalId,
+    acquisitionDate: timestampFromFormDate(
+      field(formData, 'acquisitionDate', 'acquisition_date'),
+      new Date(),
+    ),
+    accountAnalyticId: optionalBigIntU64(field(formData, 'accountAnalyticId', 'account_analytic_id')),
+    parentId: optionalBigIntU64(field(formData, 'parentId', 'parent_id')),
+    gainAccountId: optionalBigIntU64(field(formData, 'gainAccountId', 'gain_account_id')),
+    lossAccountId: optionalBigIntU64(field(formData, 'lossAccountId', 'loss_account_id')),
+    accountDisposalId: optionalBigIntU64(field(formData, 'accountDisposalId', 'account_disposal_id')),
+    firstDepreciationDate: optionalTimestampFromFormDate(
+      field(formData, 'firstDepreciationDate', 'first_depreciation_date'),
+    ),
+    firstDepreciationDateManual: optionalTimestampFromFormDate(
+      field(formData, 'firstDepreciationDateManual', 'first_depreciation_date_manual'),
+    ),
+    alreadyDepreciatedAmountImport: num(
+      field(formData, 'alreadyDepreciatedAmountImport', 'already_depreciated_amount_import'),
+      0,
+    ),
+    originalMoveLineIds: u64IdArrayFromForm(
+      field(formData, 'originalMoveLineIds', 'original_move_line_ids'),
+    ),
+    isImported: field(formData, 'isImported', 'is_imported') === true,
+    accountAnalyticTagIds: u64IdArrayFromForm(
+      field(formData, 'accountAnalyticTagIds', 'account_analytic_tag_ids'),
+    ),
+    childrenIds: u64IdArrayFromForm(field(formData, 'childrenIds', 'children_ids')),
+    analyticLineIds: u64IdArrayFromForm(field(formData, 'analyticLineIds', 'analytic_line_ids')),
+    depreciationMoveIds: u64IdArrayFromForm(
+      field(formData, 'depreciationMoveIds', 'depreciation_move_ids'),
+    ),
+    assetLifetimeDays: Math.trunc(num(field(formData, 'assetLifetimeDays', 'asset_lifetime_days'), 0)),
+    assetPausedDays: Math.trunc(num(field(formData, 'assetPausedDays', 'asset_paused_days'), 0)),
+    depreciationSequence: Math.trunc(
+      num(field(formData, 'depreciationSequence', 'depreciation_sequence'), 0),
+    ),
+    salvageMoveId: optionalBigIntU64(field(formData, 'salvageMoveId', 'salvage_move_id')),
+    depreciationSchedule: optionalTrimmedString(
+      field(formData, 'depreciationSchedule', 'depreciation_schedule'),
+    ),
+    depreciationBoardIds: u64IdArrayFromForm(
+      field(formData, 'depreciationBoardIds', 'depreciation_board_ids'),
+    ),
+    modificationIds: u64IdArrayFromForm(field(formData, 'modificationIds', 'modification_ids')),
+    activityIds: u64IdArrayFromForm(field(formData, 'activityIds', 'activity_ids')),
+    messageFollowerIds: u64IdArrayFromForm(
+      field(formData, 'messageFollowerIds', 'message_follower_ids'),
+    ),
+    messageIds: u64IdArrayFromForm(field(formData, 'messageIds', 'message_ids')),
+    metadata: optionalTrimmedString(field(formData, 'metadata', 'metadata')),
+  }
+}
+
+export type ConsolidationAccountMapperContext = {
+  companyIds: bigint[]
+  eliminationAccountId?: bigint
+}
+
+export function toCreateConsolidationAccountParams(
+  formData: Record<string, unknown>,
+  context?: ConsolidationAccountMapperContext,
+): CreateConsolidationAccountParams | null {
+  const name = requiredTrimmedString(field(formData, 'name', 'name'))
+  const code = requiredTrimmedString(field(formData, 'code', 'code'))
+  const accountType = requiredTrimmedString(field(formData, 'accountType', 'account_type'))
+  const currencyId = requiredBigIntU64(field(formData, 'currencyId', 'currency_id'))
+  if (!name || !code || !accountType || currencyId === null) return null
+
+  const companyIds =
+    u64IdArrayFromForm(field(formData, 'companyIds', 'company_ids')).length > 0
+      ? u64IdArrayFromForm(field(formData, 'companyIds', 'company_ids'))
+      : (context?.companyIds ?? [])
+
+  const eliminationMethodRaw = optionalTrimmedString(
+    field(formData, 'eliminationMethod', 'elimination_method'),
+  )
+
+  return {
+    name,
+    code,
+    accountType,
+    companyIds,
+    consolidationRate: num(field(formData, 'consolidationRate', 'consolidation_rate'), 100),
+    currencyId,
+    eliminationAccountId:
+      optionalBigIntU64(field(formData, 'eliminationAccountId', 'elimination_account_id')) ??
+      context?.eliminationAccountId,
+    isIntercompany: field(formData, 'isIntercompany', 'is_intercompany') === true,
+    eliminationMethod: eliminationMethodRaw,
+    notes: optionalTrimmedString(field(formData, 'notes', 'notes')),
+    isActive: field(formData, 'isActive', 'is_active') !== false,
+    metadata: optionalTrimmedString(field(formData, 'metadata', 'metadata')),
+  }
+}
+
+export type ConsolidationJournalMapperContext = {
+  periodId: bigint
+  companyIds: bigint[]
+}
+
+export function toCreateConsolidationJournalParams(
+  formData: Record<string, unknown>,
+  context?: ConsolidationJournalMapperContext,
+): CreateConsolidationJournalParams | null {
+  const name = requiredTrimmedString(field(formData, 'name', 'name'))
+  const periodName = requiredTrimmedString(field(formData, 'periodName', 'period_name'))
+  const currencyId = requiredBigIntU64(field(formData, 'currencyId', 'currency_id'))
+  const periodId =
+    optionalBigIntU64(field(formData, 'periodId', 'period_id')) ?? context?.periodId
+  if (!name || !periodName || currencyId === null || periodId === undefined) return null
+
+  const companyIds =
+    u64IdArrayFromForm(field(formData, 'companyIds', 'company_ids')).length > 0
+      ? u64IdArrayFromForm(field(formData, 'companyIds', 'company_ids'))
+      : (context?.companyIds ?? [])
+
+  return {
+    name,
+    periodId,
+    periodName,
+    dateFrom: timestampFromFormDate(field(formData, 'dateFrom', 'date_from'), new Date()),
+    dateTo: timestampFromFormDate(field(formData, 'dateTo', 'date_to'), new Date()),
+    companyIds,
+    currencyId,
+    exchangeRate: num(field(formData, 'exchangeRate', 'exchange_rate'), 1),
+    exchangeRateDate: optionalTimestampFromFormDate(
+      field(formData, 'exchangeRateDate', 'exchange_rate_date'),
+    ),
+    notes: optionalTrimmedString(field(formData, 'notes', 'notes')),
+    metadata: optionalTrimmedString(field(formData, 'metadata', 'metadata')),
+  }
+}
+
+export function toCreateEliminationEntryParams(
+  formData: Record<string, unknown>,
+): CreateEliminationEntryParams | null {
+  const journalId = requiredBigIntU64(field(formData, 'journalId', 'journal_id'))
+  const name = requiredTrimmedString(field(formData, 'name', 'name'))
+  const accountId = requiredBigIntU64(field(formData, 'accountId', 'account_id'))
+  const accountCode = requiredTrimmedString(field(formData, 'accountCode', 'account_code'))
+  const accountName = requiredTrimmedString(field(formData, 'accountName', 'account_name'))
+  const companyId = requiredBigIntU64(field(formData, 'companyId', 'company_id'))
+  const currencyId = requiredBigIntU64(field(formData, 'currencyId', 'currency_id'))
+  const eliminationType = requiredTrimmedString(
+    field(formData, 'eliminationType', 'elimination_type'),
+  )
+  if (
+    journalId === null ||
+    !name ||
+    accountId === null ||
+    !accountCode ||
+    !accountName ||
+    companyId === null ||
+    currencyId === null ||
+    !eliminationType
+  ) {
+    return null
+  }
+
+  const debit = num(field(formData, 'debit', 'debit'), 0)
+  const credit = num(field(formData, 'credit', 'credit'), 0)
+  const amountCurrency = num(
+    field(formData, 'amountCurrency', 'amount_currency'),
+    Math.max(debit, credit),
+  )
+
+  return {
+    journalId,
+    name,
+    accountId,
+    accountCode,
+    accountName,
+    companyId,
+    counterpartyCompanyId: optionalBigIntU64(
+      field(formData, 'counterpartyCompanyId', 'counterparty_company_id'),
+    ),
+    debit,
+    credit,
+    currencyId,
+    amountCurrency,
+    eliminationType,
+    reference: optionalTrimmedString(field(formData, 'reference', 'reference')),
+    notes: optionalTrimmedString(field(formData, 'notes', 'notes')),
+    metadata: optionalTrimmedString(field(formData, 'metadata', 'metadata')),
   }
 }

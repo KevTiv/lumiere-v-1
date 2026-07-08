@@ -294,6 +294,9 @@ importers:
       '@lumiere/erp-shared':
         specifier: workspace:*
         version: link:../erp-shared
+      '@lumiere/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@lumiere/stdb':
         specifier: workspace:*
         version: link:../stdb

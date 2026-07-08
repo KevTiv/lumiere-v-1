@@ -4,15 +4,26 @@
 
 import type {
   CreateBarcodeNomenclatureParams,
+  CreateCycleCountPlanParams,
   CreateProductPackagingParams,
   CreateProductSupplierInfoParams,
   CreateProductVariantParams,
+  CreateQualityAlertParams,
+  CreateQualityAlertReasonParams,
+  CreateQualityCheckParams,
+  CreateQualityPointParams,
+  CreateQualityTeamParams,
   CreateReplenishmentRuleParams,
   CreateStockInventoryLineParams,
   CreateStockInventoryParams,
+  CreateStockProductionLotParams,
+  CreateStockProductionSerialParams,
+  CreateStockRouteParams,
+  CreateStockRuleParams,
   CreateUomCategoryParams,
   CreateUomConversionParams,
   CreateUomParams,
+  CreateWarehouseTaskParams,
 } from "@lumiere/stdb/types"
 
 import { optionalBigIntU64, u64IdArrayFromForm } from "./form-coercion"
@@ -265,6 +276,322 @@ export function toCreateReplenishmentRuleParams(
     active: field(formData, "active", "active") !== false,
     lastRun: undefined,
     nextRun: undefined,
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateQualityCheckParams(
+  formData: Record<string, unknown>,
+): CreateQualityCheckParams | null {
+  const productRaw = field(formData, "productId", "product_id")
+  if (productRaw === "" || productRaw == null) return null
+  const name = String(field(formData, "name", "name") ?? "Quality Check").trim()
+  const qtyTested = num(field(formData, "qtyTested", "qty_tested"), 0)
+  return {
+    name,
+    testType: String(field(formData, "testType", "test_type") ?? "measure"),
+    productId: optionalBigIntU64(productRaw),
+    productVariantId: optionalBigIntU64(field(formData, "productVariantId", "product_variant_id")),
+    pickingId: optionalBigIntU64(field(formData, "pickingId", "picking_id")),
+    moveLineId: optionalBigIntU64(field(formData, "moveLineId", "move_line_id")),
+    lotId: optionalBigIntU64(field(formData, "lotId", "lot_id")),
+    teamId: optionalBigIntU64(field(formData, "teamId", "team_id")),
+    userId: undefined,
+    controlPointId: optionalBigIntU64(
+      field(formData, "pointId", "point_id") ?? field(formData, "controlPointId", "control_point_id"),
+    ),
+    qtyTested: Number.isFinite(qtyTested) ? qtyTested : 0,
+    toleranceMin: (() => {
+      const v = field(formData, "toleranceMin", "tolerance_min")
+      return v == null || v === "" ? undefined : num(v)
+    })(),
+    toleranceMax: (() => {
+      const v = field(formData, "toleranceMax", "tolerance_max")
+      return v == null || v === "" ? undefined : num(v)
+    })(),
+    normUnit: optionalTrimmedString(field(formData, "normUnit", "norm_unit")),
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateQualityAlertParams(
+  formData: Record<string, unknown>,
+): CreateQualityAlertParams | null {
+  const title = String(field(formData, "name", "name") ?? field(formData, "title", "title") ?? "").trim()
+  if (!title) return null
+  const priorityKey = String(field(formData, "priority", "priority") ?? "2")
+  const priorityByValue: Record<string, string> = {
+    "0": "normal",
+    "1": "low",
+    "2": "high",
+    "3": "critical",
+  }
+  return {
+    title,
+    priority: priorityByValue[priorityKey] ?? String(field(formData, "priority", "priority") ?? "high"),
+    productId: optionalBigIntU64(field(formData, "productId", "product_id")),
+    productVariantId: optionalBigIntU64(field(formData, "productVariantId", "product_variant_id")),
+    lotId: optionalBigIntU64(field(formData, "lotId", "lot_id")),
+    reasonId: optionalBigIntU64(field(formData, "reasonId", "reason_id")),
+    workcenterId: optionalBigIntU64(field(formData, "workcenterId", "workcenter_id")),
+    description: optionalTrimmedString(field(formData, "description", "description")),
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateQualityAlertReasonParams(
+  formData: Record<string, unknown>,
+): CreateQualityAlertReasonParams | null {
+  const name = String(field(formData, "name", "name") ?? "").trim()
+  if (!name) return null
+  return {
+    name,
+    description: optionalTrimmedString(field(formData, "description", "description")),
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateQualityPointParams(
+  formData: Record<string, unknown>,
+): CreateQualityPointParams | null {
+  const name = String(field(formData, "name", "name") ?? "").trim()
+  if (!name) return null
+  return {
+    name,
+    testType: String(field(formData, "testType", "test_type") ?? "measure"),
+    controlType: String(field(formData, "controlType", "control_type") ?? "product"),
+    sequence: Math.trunc(num(field(formData, "sequence", "sequence"), 10)),
+    teamId: optionalBigIntU64(field(formData, "teamId", "team_id")),
+    userId: undefined,
+    note: optionalTrimmedString(field(formData, "note", "note")),
+    productIds: u64IdArrayFromForm(field(formData, "productIds", "product_ids")),
+    productCategoryIds: u64IdArrayFromForm(field(formData, "productCategoryIds", "product_category_ids")),
+    pickingTypeId: optionalBigIntU64(field(formData, "pickingTypeId", "picking_type_id")),
+    toleranceMin: (() => {
+      const v = field(formData, "toleranceMin", "tolerance_min")
+      return v == null || v === "" ? undefined : num(v)
+    })(),
+    toleranceMax: (() => {
+      const v = field(formData, "toleranceMax", "tolerance_max")
+      return v == null || v === "" ? undefined : num(v)
+    })(),
+    normUnit: optionalTrimmedString(field(formData, "normUnit", "norm_unit")),
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateQualityTeamParams(
+  formData: Record<string, unknown>,
+): CreateQualityTeamParams | null {
+  const name = String(field(formData, "name", "name") ?? "").trim()
+  if (!name) return null
+  return {
+    name,
+    description: optionalTrimmedString(field(formData, "description", "description")),
+    email: optionalTrimmedString(field(formData, "email", "email")),
+    phone: optionalTrimmedString(field(formData, "phone", "phone")),
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateStockRouteParams(
+  formData: Record<string, unknown>,
+  companyId?: bigint,
+): CreateStockRouteParams | null {
+  const name = String(field(formData, "name", "name") ?? "").trim()
+  if (!name) return null
+  return {
+    name,
+    sequence: Math.trunc(num(field(formData, "sequence", "sequence"), 10)),
+    active: field(formData, "active", "active") !== false,
+    productSelectable: field(formData, "productSelectable", "product_selectable") === true,
+    productCategSelectable: field(formData, "productCategSelectable", "product_categ_selectable") === true,
+    warehouseSelectable: field(formData, "warehouseSelectable", "warehouse_selectable") === true,
+    shippingSelectable: field(formData, "shippingSelectable", "shipping_selectable") === true,
+    saleSelectable: field(formData, "saleSelectable", "sale_selectable") === true,
+    manufactureSelectable: field(formData, "manufactureSelectable", "manufacture_selectable") === true,
+    purchaseSelectable: field(formData, "purchaseSelectable", "purchase_selectable") === true,
+    mtoSelectable: field(formData, "mtoSelectable", "mto_selectable") === true,
+    ruleIds: u64IdArrayFromForm(field(formData, "ruleIds", "rule_ids")),
+    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? companyId,
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateStockRuleParams(
+  formData: Record<string, unknown>,
+  companyId?: bigint,
+): CreateStockRuleParams | null {
+  const name = String(field(formData, "name", "name") ?? "").trim()
+  const locationDestId = requiredBigIntU64(field(formData, "locationDestId", "location_dest_id"))
+  const pickingTypeId = requiredBigIntU64(field(formData, "pickingTypeId", "picking_type_id"))
+  if (!name || locationDestId === null || pickingTypeId === null) return null
+  return {
+    name,
+    action: String(field(formData, "action", "action") ?? "pull"),
+    locationDestId,
+    pickingTypeId,
+    procureMethod: String(field(formData, "procureMethod", "procure_method") ?? "make_to_stock"),
+    auto: String(field(formData, "auto", "auto") ?? "manual"),
+    groupPropagationOption: String(
+      field(formData, "groupPropagationOption", "group_propagation_option") ?? "none",
+    ),
+    active: field(formData, "active", "active") !== false,
+    propagateCancel: field(formData, "propagateCancel", "propagate_cancel") === true,
+    notifyStock: field(formData, "notifyStock", "notify_stock") === true,
+    sequence: Math.trunc(num(field(formData, "sequence", "sequence"), 10)),
+    routeSequence: Math.trunc(num(field(formData, "routeSequence", "route_sequence"), 10)),
+    delay: Math.trunc(num(field(formData, "delay", "delay"), 0)),
+    routeId: optionalBigIntU64(field(formData, "routeId", "route_id")),
+    locationSrcId: optionalBigIntU64(field(formData, "locationSrcId", "location_src_id")),
+    locationId: optionalBigIntU64(field(formData, "locationId", "location_id")),
+    groupId: optionalBigIntU64(field(formData, "groupId", "group_id")),
+    warehouseId: optionalBigIntU64(field(formData, "warehouseId", "warehouse_id")),
+    propagateWarehouseId: optionalBigIntU64(field(formData, "propagateWarehouseId", "propagate_warehouse_id")),
+    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? companyId,
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateCycleCountPlanParams(
+  formData: Record<string, unknown>,
+): CreateCycleCountPlanParams | null {
+  return {
+    name: optionalTrimmedString(field(formData, "name", "name")),
+    countBy: String(field(formData, "countBy", "count_by") ?? "location"),
+    frequency: String(field(formData, "frequency", "frequency") ?? "monthly"),
+    tolerancePercentage: num(field(formData, "tolerancePercentage", "tolerance_percentage"), 0),
+    toleranceValue: num(field(formData, "toleranceValue", "tolerance_value"), 0),
+    nextCountDate: (() => {
+      const raw = field(formData, "nextCountDate", "next_count_date")
+      if (raw == null || String(raw).trim() === "") return undefined
+      const d = new Date(String(raw))
+      return Number.isNaN(d.getTime()) ? undefined : stbTimestampFromDate(d)
+    })(),
+    userId: undefined,
+    teamId: optionalBigIntU64(field(formData, "teamId", "team_id")),
+    productIds: u64IdArrayFromForm(field(formData, "productIds", "product_ids")),
+    productCategoryIds: u64IdArrayFromForm(field(formData, "productCategoryIds", "product_category_ids")),
+    reason: optionalTrimmedString(field(formData, "reason", "reason")),
+    notes: optionalTrimmedString(field(formData, "notes", "notes")),
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateStockProductionLotParams(
+  formData: Record<string, unknown>,
+  companyId?: bigint,
+): CreateStockProductionLotParams | null {
+  const name = String(field(formData, "name", "name") ?? "").trim()
+  const productId = requiredBigIntU64(field(formData, "productId", "product_id"))
+  if (!name || productId === null) return null
+  const ts = (camel: string, snake: string) => {
+    const raw = field(formData, camel, snake)
+    if (raw == null || String(raw).trim() === "") return undefined
+    const d = new Date(String(raw))
+    return Number.isNaN(d.getTime()) ? undefined : stbTimestampFromDate(d)
+  }
+  return {
+    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? companyId,
+    name,
+    productId,
+    productVariantId: optionalBigIntU64(field(formData, "productVariantId", "product_variant_id")),
+    ref: optionalTrimmedString(field(formData, "ref", "ref_") ?? field(formData, "ref", "ref")),
+    note: optionalTrimmedString(field(formData, "note", "note")),
+    expirationDate: ts("expirationDate", "expiration_date"),
+    useDate: ts("useDate", "use_date"),
+    removalDate: ts("removalDate", "removal_date"),
+    alertDate: ts("alertDate", "alert_date"),
+    productQty: num(field(formData, "productQty", "product_qty"), 0),
+    locationId: optionalBigIntU64(field(formData, "locationId", "location_id")),
+    packageId: optionalBigIntU64(field(formData, "packageId", "package_id")),
+    ownerId: optionalBigIntU64(field(formData, "ownerId", "owner_id")),
+    isScrap: field(formData, "isScrap", "is_scrap") === true,
+    isLocked: field(formData, "isLocked", "is_locked") === true,
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateStockProductionSerialParams(
+  formData: Record<string, unknown>,
+  companyId?: bigint,
+): CreateStockProductionSerialParams | null {
+  const name = String(field(formData, "name", "name") ?? "").trim()
+  const productId = requiredBigIntU64(field(formData, "productId", "product_id"))
+  if (!name || productId === null) return null
+  const ts = (camel: string, snake: string) => {
+    const raw = field(formData, camel, snake)
+    if (raw == null || String(raw).trim() === "") return undefined
+    const d = new Date(String(raw))
+    return Number.isNaN(d.getTime()) ? undefined : stbTimestampFromDate(d)
+  }
+  return {
+    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? companyId,
+    name,
+    productId,
+    productVariantId: optionalBigIntU64(field(formData, "productVariantId", "product_variant_id")),
+    lotId: optionalBigIntU64(field(formData, "lotId", "lot_id")),
+    ref: optionalTrimmedString(field(formData, "ref", "ref_") ?? field(formData, "ref", "ref")),
+    note: optionalTrimmedString(field(formData, "note", "note")),
+    expirationDate: ts("expirationDate", "expiration_date"),
+    useDate: ts("useDate", "use_date"),
+    removalDate: ts("removalDate", "removal_date"),
+    alertDate: ts("alertDate", "alert_date"),
+    productQty: num(field(formData, "productQty", "product_qty"), 1),
+    locationId: optionalBigIntU64(field(formData, "locationId", "location_id")),
+    packageId: optionalBigIntU64(field(formData, "packageId", "package_id")),
+    ownerId: optionalBigIntU64(field(formData, "ownerId", "owner_id")),
+    state: String(field(formData, "state", "state") ?? "draft"),
+    isScrap: field(formData, "isScrap", "is_scrap") === true,
+    isLocked: field(formData, "isLocked", "is_locked") === true,
+    warrantyExpiration: ts("warrantyExpiration", "warranty_expiration"),
+    warrantyStart: ts("warrantyStart", "warranty_start"),
+    lastMaintenance: ts("lastMaintenance", "last_maintenance"),
+    nextMaintenance: ts("nextMaintenance", "next_maintenance"),
+    maintenanceCount: Math.trunc(num(field(formData, "maintenanceCount", "maintenance_count"), 0)),
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateWarehouseTaskParams(
+  formData: Record<string, unknown>,
+): CreateWarehouseTaskParams | null {
+  const name = String(field(formData, "name", "name") ?? "").trim()
+  if (!name) return null
+  const ts = (camel: string, snake: string) => {
+    const raw = field(formData, camel, snake)
+    if (raw == null || String(raw).trim() === "") return undefined
+    const d = new Date(String(raw))
+    return Number.isNaN(d.getTime()) ? undefined : stbTimestampFromDate(d)
+  }
+  return {
+    name,
+    taskType: String(field(formData, "taskType", "task_type") ?? "pick"),
+    state: String(field(formData, "state", "state") ?? "draft"),
+    priority: String(field(formData, "priority", "priority") ?? "normal"),
+    quantity: num(field(formData, "quantity", "quantity"), 0),
+    userId: undefined,
+    pickingId: optionalBigIntU64(field(formData, "pickingId", "picking_id")),
+    moveId: optionalBigIntU64(field(formData, "moveId", "move_id")),
+    moveLineId: optionalBigIntU64(field(formData, "moveLineId", "move_line_id")),
+    locationId: optionalBigIntU64(field(formData, "locationId", "location_id")),
+    locationDestId: optionalBigIntU64(field(formData, "locationDestId", "location_dest_id")),
+    productId: optionalBigIntU64(field(formData, "productId", "product_id")),
+    lotId: optionalBigIntU64(field(formData, "lotId", "lot_id")),
+    packageId: optionalBigIntU64(field(formData, "packageId", "package_id")),
+    uomId: optionalBigIntU64(field(formData, "uomId", "uom_id")),
+    dateScheduled: ts("dateScheduled", "date_scheduled"),
+    dateStarted: ts("dateStarted", "date_started"),
+    dateFinished: ts("dateFinished", "date_finished"),
+    durationExpected: (() => {
+      const v = field(formData, "durationExpected", "duration_expected")
+      return v == null || v === "" ? undefined : num(v)
+    })(),
+    durationReal: (() => {
+      const v = field(formData, "durationReal", "duration_real")
+      return v == null || v === "" ? undefined : num(v)
+    })(),
+    notes: optionalTrimmedString(field(formData, "notes", "notes")),
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }

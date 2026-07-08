@@ -74,6 +74,24 @@
       "failed": "Submit failed",
       "saved": "Saved successfully."
     },
+    "paramsMapper": {
+      "invalidConsolidationAccount": "Could not build consolidation account parameters. Check required fields.",
+      "invalidConsolidationJournal": "Could not build consolidation journal parameters. Check required fields.",
+      "invalidEliminationEntry": "Could not build elimination entry parameters. Check required fields.",
+      "periodNotFound": "No fiscal period matches that period name.",
+      "invalidTrialBalanceEntry": "Could not build trial balance entry parameters. Check required fields.",
+      "invalidCompany": "Could not build company parameters. Check required fields.",
+      "invalidWhatsappAccount": "Could not build WhatsApp account parameters. Check required fields.",
+      "invalidSkill": "Could not build skill parameters. Check required fields.",
+      "invalidAgent": "Could not build agent parameters. Check required fields.",
+      "invalidTeamMember": "Could not build team member parameters. Check required fields.",
+      "invalidInsight": "Could not build insight parameters. Check required fields.",
+      "invalidProductivityLog": "Could not build productivity log parameters. Check required fields.",
+      "invalidCustomField": "Could not build custom field parameters. Check required fields.",
+      "invalidAiActionDraft": "Could not build AI action draft parameters.",
+      "invalidAiChatSession": "Could not build AI chat session parameters.",
+      "invalidIotAction": "Could not build IoT action parameters."
+    },
     "csvImport": {
       "description": "Choose a UTF-8 CSV file. Headers must match the template expected by SpacetimeDB.",
       "submit": "Import",
@@ -1265,9 +1283,24 @@
           "confirmSelected": "Confirm Selected",
           "closeSelected": "Close Selected",
           "computeDepreciation": "Compute Depreciation",
+          "addDepreciationLine": "Add depreciation line",
           "deleteSelected": "Delete Selected",
           "activateSelected": "Set active",
           "deactivateSelected": "Set inactive"
+        }
+      },
+      "depreciationSchedule": {
+        "title": "Depreciation schedule",
+        "description": "Depreciation lines for the selected fixed asset",
+        "searchPlaceholder": "Search by label…",
+        "empty": "No depreciation lines for this asset. Compute the board or add a line manually.",
+        "columns": {
+          "date": "Date",
+          "name": "Label",
+          "amount": "Amount",
+          "remainingValue": "Remaining",
+          "depreciatedValue": "Depreciated",
+          "movePosted": "Posted"
         }
       },
       "payments": {
@@ -1960,6 +1993,96 @@
           "noDraftMoves": "No draft journal entries — create a journal entry first."
         }
       },
+      "editAccountMoveLine": {
+        "title": "Edit journal line",
+        "description": "Update label, debit, or credit on this move line.",
+        "submitLabel": "Save changes",
+        "sections": {
+          "line": "Line"
+        }
+      },
+      "newDepreciationLine": {
+        "title": "Add depreciation line",
+        "description": "Record a depreciation amount for a fixed asset.",
+        "submitLabel": "Add line",
+        "sections": {
+          "line": "Depreciation"
+        },
+        "fields": {
+          "assetId": "Fixed asset",
+          "name": "Label",
+          "depreciationDate": "Depreciation date",
+          "amount": "Amount",
+          "moveId": "Journal entry (optional)"
+        }
+      },
+      "newIntercompanyRule": {
+        "title": "New intercompany rule",
+        "description": "Define how transactions flow between companies.",
+        "submitLabel": "Create rule",
+        "sections": {
+          "main": "Rule"
+        },
+        "fields": {
+          "name": "Rule name",
+          "ruleType": "Type",
+          "sourceCompanyId": "Source company",
+          "destinationCompanyId": "Destination company",
+          "autoValidation": "Auto-validate",
+          "autoGenerateInvoice": "Auto-generate invoice",
+          "autoGenerateBill": "Auto-generate bill",
+          "isActive": "Active",
+          "journalId": "Journal",
+          "accountId": "GL account"
+        }
+      },
+      "editIntercompanyRule": {
+        "title": "Edit intercompany rule",
+        "description": "Update rule settings.",
+        "submitLabel": "Save changes",
+        "sections": {
+          "main": "Rule"
+        },
+        "fields": {
+          "sequence": "Sequence",
+          "notes": "Notes"
+        }
+      },
+      "newIntercompanyTransaction": {
+        "title": "New intercompany transaction",
+        "description": "Create a cross-company transaction from a source document.",
+        "submitLabel": "Create transaction",
+        "sections": {
+          "main": "Transaction"
+        },
+        "fields": {
+          "originDocumentId": "Origin document",
+          "originDocumentModel": "Document type",
+          "originDocumentModels": {
+            "accountMove": "Journal entry",
+            "saleOrder": "Sales order"
+          },
+          "noOriginDocuments": "No documents available for this type",
+          "destinationCompanyId": "Destination company",
+          "transactionType": "Type",
+          "amount": "Amount",
+          "currencyId": "Currency ID",
+          "requiresApproval": "Requires approval",
+          "autoProcess": "Auto-process",
+          "notes": "Notes"
+        }
+      },
+      "markIntercompanyTransactionError": {
+        "title": "Mark transaction as error",
+        "description": "Record an error message for the selected intercompany transaction.",
+        "submitLabel": "Mark error",
+        "sections": {
+          "main": "Error"
+        },
+        "fields": {
+          "errorMessage": "Error message"
+        }
+      },
       "newCurrencyRate": {
         "title": "New currency rate",
         "description": "Record an exchange rate for this organization.",
@@ -1994,8 +2117,10 @@
           "main": "Posted moves"
         },
         "fields": {
-          "paymentMoveId": "Payment move ID",
-          "invoiceMoveId": "Invoice move ID"
+          "paymentMoveId": "Payment journal entry",
+          "invoiceMoveId": "Invoice / bill",
+          "noPaymentMoves": "No posted payment entries — post a payment journal entry first.",
+          "noInvoiceMoves": "No open posted invoices/bills with a residual balance."
         }
       },
       "analyticAccount": {
@@ -2232,15 +2357,35 @@
       "sourcePlaceholder": "Source name"
     },
     "chatter": {
-      "dialogTitle": "Notes & followers",
+      "dialogTitle": "Notes, activities & followers",
       "needOrg": "Select an organization to use chatter.",
       "needConnection": "Connect to the database to use chatter.",
       "follow": "Follow",
       "unfollow": "Unfollow",
       "notePlaceholder": "Write an internal note…",
       "postNote": "Post note",
-      "timeline": "Activity",
-      "noMessages": "No messages on this record yet."
+      "attachmentIdsPlaceholder": "Attachment document IDs (comma-separated, optional)",
+      "attachmentIdsInvalid": "Attachment IDs must be numeric document IDs.",
+      "logActivity": "Schedule activity",
+      "activitySummary": "Summary",
+      "activitySummaryPlaceholder": "Call with client…",
+      "activityType": "Type",
+      "activityDeadline": "Due date",
+      "activityNote": "Notes",
+      "activityNotePlaceholder": "Additional details…",
+      "scheduleActivity": "Schedule activity",
+      "timeline": "Timeline",
+      "noTimeline": "No notes or activities on this record yet.",
+      "noMessages": "No messages on this record yet.",
+      "activityDone": "Done",
+      "activityPlanned": "Planned",
+      "markDone": "Mark done",
+      "activityTypes": {
+        "call": "Call",
+        "email": "Email",
+        "meeting": "Meeting",
+        "todo": "To-do"
+      }
     },
     "csvImport": {
       "contactsTitle": "Import contacts (CSV)",
@@ -2561,11 +2706,8 @@
         "fields": {
           "summary": "Summary",
           "summaryPlaceholder": "Call with client…",
-          "activityTypeId": "Activity Type",
-          "activityTypePlaceholder": "Type ID",
+          "activityType": "Activity type",
           "dateDeadline": "Due Date",
-          "userId": "Assigned To",
-          "userIdPlaceholder": "User ID",
           "note": "Notes",
           "notePlaceholder": "Additional details…"
         }
@@ -8466,7 +8608,35 @@
       "saveChanges": "Save Changes",
       "systemCannotDelete": "System roles cannot be deleted",
       "deleteConfirm": "Are you sure you want to delete this role?",
-      "fieldPolicyHint": "API row field access: store a Casbin policy (ptype p) with v0 = role id or identity hex, v1 = organization id, v2 = resource key (e.g. products) or table name (product), v3 = read, and metadata JSON {\"fields\":[\"id\",\"name\",\"list_price\"]}. Superusers and roles with permission *:* receive full columns. Use the Casbin policy tools below to persist policies."
+      "fieldPolicyHint": "Use the field permissions editor when editing a role to restrict which API columns each role can read. Superusers and roles with permission *:* receive full columns."
+    },
+    "fieldPermissions": {
+      "title": "Field permissions",
+      "description": "Restrict which database columns this role can read via the API for each resource.",
+      "resource": "Resource",
+      "noneConfigured": "No field restrictions configured for this role yet.",
+      "save": "Save field policy",
+      "clear": "Remove restriction",
+      "noFieldsSelected": "Select at least one column."
+    },
+    "sso": {
+      "title": "Single sign-on",
+      "description": "WorkOS AuthKit status and manual account linking for administrators.",
+      "statusTitle": "Provider status",
+      "provider": "WorkOS AuthKit",
+      "enabled": "Configured",
+      "disabled": "Not configured",
+      "enabledHint": "Users can sign in with WorkOS. Set WORKOS_CLIENT_ID and NEXT_PUBLIC_WORKOS_REDIRECT_URI in your deployment environment.",
+      "disabledHint": "Password sign-in is active. Configure WorkOS environment variables to enable SSO.",
+      "openSignIn": "Open sign-in page",
+      "currentSession": "Your session",
+      "currentSessionHint": "SpacetimeDB identity for the active browser session.",
+      "linkTitle": "Link WorkOS user",
+      "linkDescription": "Superuser only. Attach a WorkOS user id to an existing SpacetimeDB identity (same email).",
+      "targetIdentity": "Target identity (hex)",
+      "workosUserId": "WorkOS user ID",
+      "linkSubmit": "Link account",
+      "linkSuccess": "WorkOS user linked successfully."
     },
     "adminOps": {
       "sectionTitle": "Platform admin operations",

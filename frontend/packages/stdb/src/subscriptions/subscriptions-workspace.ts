@@ -5,6 +5,8 @@ import type { SubscriptionQueryContext } from "../queries/erp-subscriptions";
  * Compose with session workspace keys (`auth` bundle via `SESSION_WORKSPACE_RESOURCE_KEYS`).
  */
 export const SUBSCRIPTIONS_WORKSPACE_RESOURCE_KEYS = [
+  "account-move-lines",
+  "account-moves",
   "deferred-revenue-lines",
   "deferred-revenue-schedules",
   "revenue-recognition-rules",

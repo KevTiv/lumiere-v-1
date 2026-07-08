@@ -23,6 +23,8 @@ import {
   openOpportunityRowsToSelectOptions,
   productRowsToSelectOptions,
   uomRowsToSelectOptions,
+  contactTagRowsToSelectOptions,
+  contactSegmentRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
   timestampToDateInputValue,
@@ -378,6 +380,29 @@ function CrmClientLoaded({
     [contacts],
   )
 
+  const contactTagSelectOptions = useMemo(() => {
+    const fromApi = contactTagRowsToSelectOptions(contactTags as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("crm.contactTags.emptyMessage"), disabled: true }]
+  }, [contactTags, t])
+
+  const contactSegmentSelectOptions = useMemo(() => {
+    const fromApi = contactSegmentRowsToSelectOptions(contactSegments as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("crm.contactSegments.emptyMessage"), disabled: true }]
+  }, [contactSegments, t])
+
+  const assignTagFormConfig = useMemo(
+    () => mergeSelectOptionsByFieldName(assignTagToContactForm(t), "tagId", contactTagSelectOptions),
+    [t, contactTagSelectOptions],
+  )
+
+  const addContactToSegmentFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsByFieldName(addContactToSegmentForm(t), "segmentId", contactSegmentSelectOptions),
+    [t, contactSegmentSelectOptions],
+  )
+
   const wonStageId = useMemo(() => {
     const stage = opportunityStages.find(
       (s) => (s as Record<string, unknown>).isWon === true,
@@ -561,10 +586,10 @@ function CrmClientLoaded({
       setWorkflowModal({
         kind: "assignTag",
         contactId: rowIdBigInt(row),
-        form: assignTagToContactForm(t),
+        form: assignTagFormConfig,
       })
     },
-    [t],
+    [assignTagFormConfig],
   )
 
   const openAddSegmentModal = useCallback(
@@ -574,10 +599,10 @@ function CrmClientLoaded({
       setWorkflowModal({
         kind: "addSegment",
         contactId: rowIdBigInt(row),
-        form: addContactToSegmentForm(t),
+        form: addContactToSegmentFormConfig,
       })
     },
-    [t],
+    [addContactToSegmentFormConfig],
   )
 
   const openChangeStageModal = useCallback(

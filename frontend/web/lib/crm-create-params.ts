@@ -133,33 +133,43 @@ export function toCreateContactParams(formData: Record<string, unknown>): Partia
 }
 
 /** Defaults (activityType, priority, state, flags) merged in `useCreateActivity`. */
+const ACTIVITY_TYPE_VALUES = new Set(["call", "email", "meeting", "todo"])
+
+function resolveActivityType(formData: Record<string, unknown>): string | null {
+  const raw = formData.activityType ?? formData.activityTypeId
+  const s = String(raw ?? "").trim().toLowerCase()
+  if (ACTIVITY_TYPE_VALUES.has(s)) return s
+  const n = Number(raw)
+  if (Number.isFinite(n) && n > 0) return "todo"
+  return null
+}
+
 export function toCreateActivityParams(formData: Record<string, unknown>): Partial<CreateActivityParams> | null {
   const summary = optionalTrimmedString(formData.summary)
   if (!summary) return null
 
-  const typeRaw = formData.activityTypeId
-  const activityTypeNum = Number(typeRaw)
-  if (!Number.isFinite(activityTypeNum) || activityTypeNum <= 0) return null
+  const activityType = resolveActivityType(formData)
+  if (!activityType) return null
 
   const rawDeadline = formData.dateDeadline
   if (rawDeadline == null || String(rawDeadline).trim() === "") return null
   const d = new Date(String(rawDeadline))
   if (Number.isNaN(d.getTime())) return null
 
-  const userRaw = formData.userId
-  const userIdNum =
-    userRaw != null && String(userRaw).trim() !== "" && Number.isFinite(Number(userRaw)) && Number(userRaw) > 0
-      ? Number(userRaw)
-      : null
+  const resModel = optionalTrimmedString(formData.resModel)
+  const resIdRaw = formData.resId
+  const resIdNum =
+    resIdRaw != null && String(resIdRaw).trim() !== "" && Number.isFinite(Number(resIdRaw)) && Number(resIdRaw) > 0
+      ? BigInt(String(resIdRaw))
+      : undefined
 
   return {
+    activityType,
     summary,
     note: optionalTrimmedString(formData.note),
     dateDeadline: stbTimestampFromDate(d),
-    metadata: JSON.stringify({
-      activityTypeId: activityTypeNum,
-      userId: userIdNum,
-    }),
+    resModel: resModel ?? undefined,
+    resId: resIdNum,
   }
 }
 

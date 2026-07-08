@@ -3,12 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
+import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import {
   subscribeToRecord,
   unsubscribeFromRecord,
 } from "@lumiere/stdb/client-ui-bridge"
 import { usePostMessage } from "@lumiere/query-hooks/hooks/messages"
+import {
+  useCompleteActivity,
+  useCreateActivity,
+} from "@lumiere/query-hooks/hooks/crm"
+import { finalizeCreateActivityParams } from "@lumiere/query-hooks/hooks/crm-params-merge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -18,9 +24,26 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import {
+  formatTimelineDate,
+  mergeRecordTimeline,
+  type TimelineEntry,
+} from "./crm-record-timeline"
 
 const FOLLOW_SUBTYPES = ["comment", "note"] as const
+
+const ACTIVITY_TYPES = ["call", "email", "meeting", "todo"] as const
 
 function identityHex(v: unknown): string {
   if (v == null) return ""
@@ -69,12 +92,29 @@ export function CrmRecordChatter({
   const { identity } = useErpSession()
   const org = BigInt(organizationId)
   const postMessage = usePostMessage(org)
+  const createActivity = useCreateActivity(org)
+  const completeActivity = useCompleteActivity(org)
 
   const [noteBody, setNoteBody] = useState("")
   const [attachmentIdsRaw, setAttachmentIdsRaw] = useState("")
+  const [activitySummary, setActivitySummary] = useState("")
+  const [activityType, setActivityType] = useState<(typeof ACTIVITY_TYPES)[number]>("todo")
+  const [activityDeadline, setActivityDeadline] = useState("")
+  const [activityNote, setActivityNote] = useState("")
   const [busy, setBusy] = useState(false)
   const [messages, setMessages] = useState<
     Array<{ id: bigint; body: string; messageType: unknown; date: unknown }>
+  >([])
+  const [activities, setActivities] = useState<
+    Array<{
+      id: bigint
+      summary: string
+      note: string | null | undefined
+      activityType: string
+      isDone: boolean
+      createdAt: unknown
+      dateDeadline: unknown
+    }>
   >([])
   const [following, setFollowing] = useState(false)
 
@@ -86,7 +126,7 @@ export function CrmRecordChatter({
     ;(async () => {
       try {
         const list = await stdbBrowserQuery("mail-messages")
-        const filtered = list.filter(m => {
+        const filtered = list.filter((m) => {
           const row = m as { organizationId: unknown; model: string; resId: unknown }
           return (
             Number(row.organizationId) === organizationId &&
@@ -95,7 +135,7 @@ export function CrmRecordChatter({
           )
         })
         const mapped = filtered
-          .map(m => {
+          .map((m) => {
             const row = m as { id: unknown; body: string; messageType: unknown; date: unknown }
             return {
               id: BigInt(String(row.id ?? 0)),
@@ -112,6 +152,53 @@ export function CrmRecordChatter({
     })()
   }, [organizationId, resModel, resId])
 
+  const reloadActivities = useCallback(() => {
+    if (!organizationId || !resModel) {
+      setActivities([])
+      return
+    }
+    ;(async () => {
+      try {
+        const list = await stdbBrowserQuery("activities")
+        const filtered = list.filter((a) => {
+          const row = a as {
+            organizationId: unknown
+            resModel: string | null | undefined
+            resId: unknown
+          }
+          return (
+            Number(row.organizationId) === organizationId &&
+            row.resModel === resModel &&
+            BigInt(String(row.resId ?? 0)) === resId
+          )
+        })
+        const mapped = filtered.map((a) => {
+          const row = a as {
+            id: unknown
+            summary: string
+            note: string | null | undefined
+            activityType: string
+            isDone: boolean
+            createdAt: unknown
+            dateDeadline: unknown
+          }
+          return {
+            id: BigInt(String(row.id ?? 0)),
+            summary: row.summary,
+            note: row.note,
+            activityType: row.activityType,
+            isDone: Boolean(row.isDone),
+            createdAt: row.createdAt,
+            dateDeadline: row.dateDeadline,
+          }
+        })
+        setActivities(mapped)
+      } catch {
+        setActivities([])
+      }
+    })()
+  }, [organizationId, resModel, resId])
+
   const reloadFollower = useCallback(() => {
     if (!identity || !organizationId || !resModel) {
       setFollowing(false)
@@ -121,7 +208,7 @@ export function CrmRecordChatter({
       try {
         const list = await stdbBrowserQuery("mail-followers")
         const me = identity.toLowerCase()
-        const found = list.some(f => {
+        const found = list.some((f) => {
           const row = f as {
             organizationId: unknown
             resModel: string
@@ -144,8 +231,14 @@ export function CrmRecordChatter({
 
   useEffect(() => {
     reloadMessages()
+    reloadActivities()
     reloadFollower()
-  }, [reloadMessages, reloadFollower])
+  }, [reloadMessages, reloadActivities, reloadFollower])
+
+  const timeline = useMemo(
+    () => mergeRecordTimeline(messages, activities),
+    [messages, activities],
+  )
 
   const postNote = async () => {
     const body = noteBody.trim()
@@ -155,7 +248,7 @@ export function CrmRecordChatter({
       try {
         attachmentIds = parseAttachmentIds(attachmentIdsRaw)
       } catch {
-        window.alert("Attachment IDs must be numeric document IDs.")
+        window.alert(t("crm.chatter.attachmentIdsInvalid"))
         return
       }
     }
@@ -172,6 +265,46 @@ export function CrmRecordChatter({
       setNoteBody("")
       setAttachmentIdsRaw("")
       reloadMessages()
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const logActivity = async () => {
+    const summary = activitySummary.trim()
+    if (!summary || !activityDeadline) return
+    const d = new Date(activityDeadline)
+    if (Number.isNaN(d.getTime())) return
+    try {
+      setBusy(true)
+      const params = finalizeCreateActivityParams({
+        activityType,
+        summary,
+        note: activityNote.trim() || undefined,
+        dateDeadline: stbTimestampFromDate(d),
+        resModel,
+        resId,
+      })
+      await createActivity.mutateAsync(params)
+      setActivitySummary("")
+      setActivityNote("")
+      setActivityDeadline("")
+      setActivityType("todo")
+      reloadActivities()
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const markActivityDone = async (activityId: bigint) => {
+    try {
+      setBusy(true)
+      await completeActivity.mutateAsync(activityId)
+      reloadActivities()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     } finally {
@@ -236,7 +369,7 @@ export function CrmRecordChatter({
         />
         <input
           className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-          placeholder="Attachment document IDs (comma-separated, optional)"
+          placeholder={t("crm.chatter.attachmentIdsPlaceholder")}
           value={attachmentIdsRaw}
           onChange={(e) => setAttachmentIdsRaw(e.target.value)}
         />
@@ -251,26 +384,157 @@ export function CrmRecordChatter({
         </Button>
       </div>
 
-      <div className="border-t pt-3 space-y-2 max-h-64 overflow-y-auto">
+      <div className="space-y-3 rounded-md border p-3 bg-muted/20">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          {t("crm.chatter.logActivity")}
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="space-y-1 sm:col-span-2">
+            <Label htmlFor="chatter-activity-summary">{t("crm.chatter.activitySummary")}</Label>
+            <Input
+              id="chatter-activity-summary"
+              value={activitySummary}
+              onChange={(e) => setActivitySummary(e.target.value)}
+              placeholder={t("crm.chatter.activitySummaryPlaceholder")}
+              data-testid="record-chatter-activity-summary"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>{t("crm.chatter.activityType")}</Label>
+            <Select value={activityType} onValueChange={(v) => setActivityType(v as typeof activityType)}>
+              <SelectTrigger data-testid="record-chatter-activity-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ACTIVITY_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {t(`crm.chatter.activityTypes.${type}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="chatter-activity-deadline">{t("crm.chatter.activityDeadline")}</Label>
+            <Input
+              id="chatter-activity-deadline"
+              type="date"
+              value={activityDeadline}
+              onChange={(e) => setActivityDeadline(e.target.value)}
+              data-testid="record-chatter-activity-deadline"
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label htmlFor="chatter-activity-note">{t("crm.chatter.activityNote")}</Label>
+            <Textarea
+              id="chatter-activity-note"
+              value={activityNote}
+              onChange={(e) => setActivityNote(e.target.value)}
+              rows={2}
+              placeholder={t("crm.chatter.activityNotePlaceholder")}
+            />
+          </div>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busy || !activitySummary.trim() || !activityDeadline}
+          data-testid="record-chatter-log-activity"
+          onClick={() => void logActivity()}
+        >
+          {t("crm.chatter.scheduleActivity")}
+        </Button>
+      </div>
+
+      <div className="border-t pt-3 space-y-2 max-h-72 overflow-y-auto">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           {t("crm.chatter.timeline")}
         </p>
-        {messages.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("crm.chatter.noMessages")}</p>
+        {timeline.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("crm.chatter.noTimeline")}</p>
         ) : (
           <ul className="space-y-2">
-            {messages.map((m) => (
-              <li key={String(m.id)} className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground mb-1">
-                  <span className="uppercase">{messageTypeLabel(m.messageType)}</span>
-                </div>
-                <p className="whitespace-pre-wrap break-words">{m.body}</p>
-              </li>
+            {timeline.map((entry) => (
+              <TimelineItem
+                key={entry.kind === "message" ? entry.id : `act-${entry.id.toString()}`}
+                entry={entry}
+                busy={busy}
+                onComplete={(id) => void markActivityDone(id)}
+                t={t}
+              />
             ))}
           </ul>
         )}
       </div>
     </div>
+  )
+}
+
+function TimelineItem({
+  entry,
+  busy,
+  onComplete,
+  t,
+}: {
+  entry: TimelineEntry
+  busy: boolean
+  onComplete: (id: bigint) => void
+  t: (key: string) => string
+}) {
+  if (entry.kind === "message") {
+    return (
+      <li className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground mb-1">
+          <span className="uppercase">{messageTypeLabel(entry.messageType)}</span>
+        </div>
+        <p className="whitespace-pre-wrap break-words">{entry.body}</p>
+      </li>
+    )
+  }
+
+  return (
+    <li
+      className="rounded-md border bg-background px-3 py-2 text-sm"
+      data-testid={`record-chatter-activity-${entry.id.toString()}`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground mb-1">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="uppercase text-[10px]">
+            {t(`crm.chatter.activityTypes.${entry.activityType}`) || entry.activityType}
+          </Badge>
+          {entry.isDone ? (
+            <Badge variant="secondary" className="text-[10px]">
+              {t("crm.chatter.activityDone")}
+            </Badge>
+          ) : (
+            <Badge variant="default" className="text-[10px]">
+              {t("crm.chatter.activityPlanned")}
+            </Badge>
+          )}
+        </div>
+        {entry.dateDeadline ? (
+          <span>{formatTimelineDate(entry.dateDeadline)}</span>
+        ) : null}
+      </div>
+      <p className="font-medium">{entry.summary}</p>
+      {entry.note ? (
+        <p className="text-muted-foreground whitespace-pre-wrap break-words mt-1">{entry.note}</p>
+      ) : null}
+      {!entry.isDone ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="mt-2 h-7 text-xs"
+          disabled={busy}
+          data-testid={`record-chatter-complete-${entry.id.toString()}`}
+          onClick={() => onComplete(entry.id)}
+        >
+          {t("crm.chatter.markDone")}
+        </Button>
+      ) : null}
+    </li>
   )
 }
 

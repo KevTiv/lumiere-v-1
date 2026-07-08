@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRBAC } from "@/lib/rbac-context"
 import {
   useAssignRole,
@@ -16,6 +16,7 @@ import {
   useUpdateUserOrganizationStatus,
   type SettingsUserRecord,
 } from "@lumiere/query-hooks/hooks/auth"
+import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
 import { useErpSession } from "@lumiere/erp-session"
 import { hasValidOrganizationId } from "@/lib/org-scoped"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -96,6 +97,27 @@ export function UserManagement() {
   const [isSaving, setIsSaving] = useState(false)
   const [memberModal, setMemberModal] = useState<"addByName" | "addById" | "updateDetails" | "updateRole" | null>(null)
   const [memberError, setMemberError] = useState<string | null>(null)
+  const { data: employees = [] } = useEmployees(orgBigInt)
+
+  const memberSelectOptions = useMemo(
+    () =>
+      users
+        .filter((user) => user.userOrgId != null)
+        .map((user) => ({
+          value: String(user.userOrgId),
+          label: String(user.name ?? user.email ?? user.userOrgId),
+        })),
+    [users],
+  )
+
+  const employeeSelectOptions = useMemo(
+    () =>
+      (employees as Record<string, unknown>[]).map((row) => ({
+        value: String(row.id ?? ""),
+        label: String(row.name ?? row.id ?? ""),
+      })),
+    [employees],
+  )
 
   const canEdit = checkPermission("admin:users", "update").allowed
   const canDelete = checkPermission("admin:users", "delete").allowed
@@ -513,8 +535,8 @@ export function UserManagement() {
               : memberModal === "addById"
                 ? addUserToOrganizationForm(t, roleOptions)
                 : memberModal === "updateRole"
-                  ? updateOrgMemberRoleForm(t, roleNameOptions)
-                  : updateOrgMemberDetailsForm(t)
+                  ? updateOrgMemberRoleForm(t, roleNameOptions, memberSelectOptions)
+                  : updateOrgMemberDetailsForm(t, memberSelectOptions, employeeSelectOptions)
           }
           isPending={
             addOrgMember.isPending ||

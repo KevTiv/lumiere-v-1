@@ -30,6 +30,7 @@ import {
   mergeFieldDefaultValues,
   bankStatementsTableConfig,
   fixedAssetsTableConfig,
+  depreciationLinesTableConfig,
   accountPaymentsTableConfig,
   paymentTermsTableConfig,
   paymentTermLinesTableConfig,
@@ -41,9 +42,16 @@ import {
   newAccountJournalForm,
   editAccountJournalForm,
   addAccountMoveLineForm,
+  editAccountMoveLineForm,
+  newDepreciationLineForm,
+  newIntercompanyRuleForm,
+  editIntercompanyRuleForm,
+  newIntercompanyTransactionForm,
+  markIntercompanyTransactionErrorForm,
   newCurrencyRateForm,
   registerPaymentInvoicesForm,
   reconcilePaymentInvoiceForm,
+  newAnalyticAccountForm,
   createCreditNoteForm,
   intercompanyRulesTableConfig,
   intercompanyTransactionsTableConfig,
@@ -101,8 +109,12 @@ import {
   toUpdateAccountPeriodParams,
   toCreateIntercompanyRuleParams,
   intercompanyRuleParamsToJson,
+  toUpdateIntercompanyRuleParams,
+  intercompanyRuleUpdateParamsToJson,
   toCreateIntercompanyTransactionParams,
   intercompanyTransactionParamsToJson,
+  toCreateDepreciationLineParams,
+  depreciationLineParamsToJson,
   toUpdateAccountMoveLineParams,
   updateAccountMoveLineParamsToJson,
   toCreatePaymentParamsFromManualForm,
@@ -118,6 +130,7 @@ import type {
   UpdateAccountJournalParams,
 } from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
+import { useAccountingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import {
   useAccountAccounts,
@@ -253,7 +266,15 @@ import {
   useSetAccountAssetActive,
 } from "@lumiere/query-hooks/hooks/accounting"
 import { useFinancialReports } from "@lumiere/query-hooks/hooks/reports"
-import { accountJournalRowsToSelectOptions } from "@/lib/form-lookup"
+import {
+  accountJournalRowsToSelectOptions,
+  accountMoveRowsToSelectOptions,
+  saleOrderRowsToSelectOptions,
+  contactRowsToPartnerSelectOptions,
+  companyRowsToSelectOptions,
+  consolidationJournalRowsToSelectOptions,
+  consolidationAccountRowsToSelectOptions,
+} from "@/lib/form-lookup"
 import { useToast } from "@/hooks/use-toast"
 import type { AccountMove } from "@lumiere/query-hooks/hooks/accounting"
 import {
@@ -272,6 +293,9 @@ import {
 } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
+import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import {
   downloadDocumentPdf,
   useDispatchQueuedMail,
@@ -525,6 +549,7 @@ function AccountingClientLoaded({
   initialAccountPeriods,
   organizationId,
 }: AccountingClientLoadedProps) {
+  useAccountingModuleSubscription()
   const { t } = useTranslation()
   const { toast } = useToast()
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
@@ -564,6 +589,13 @@ function AccountingClientLoaded({
   const [reconcilePaymentError, setReconcilePaymentError] = useState<string | null>(null)
   const [journalEdit, setJournalEdit] = useState<Record<string, unknown> | null>(null)
   const [paymentTermLineEdit, setPaymentTermLineEdit] = useState<Record<string, unknown> | null>(null)
+  const [selectedFixedAsset, setSelectedFixedAsset] = useState<Record<string, unknown> | null>(null)
+  const [depreciationLineCreateOpen, setDepreciationLineCreateOpen] = useState(false)
+  const [intercompanyRuleEdit, setIntercompanyRuleEdit] = useState<Record<string, unknown> | null>(null)
+  const [intercompanyTxCreateOpen, setIntercompanyTxCreateOpen] = useState(false)
+  const [intercompanyTxCreateModel, setIntercompanyTxCreateModel] = useState("account.move")
+  const [intercompanyTxError, setIntercompanyTxError] = useState<Record<string, unknown> | null>(null)
+  const [moveLineEdit, setMoveLineEdit] = useState<Record<string, unknown> | null>(null)
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
   const [glDrilldownAccount, setGlDrilldownAccount] = useState<AccountAccount | null>(null)
   const [accountingActiveTab, setAccountingActiveTab] = useState<string>("dashboard")
@@ -602,10 +634,13 @@ function AccountingClientLoaded({
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId, { enabled: organizationId > 0 })
   const { data: paymentTermLines = [] } = useAccountPaymentTermLines(orgId, { enabled: organizationId > 0 })
   const { data: depreciationLines = [] } = useDepreciationLines(orgId, { enabled: organizationId > 0 })
+  const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
   const { data: intercompanyRules = [] } = useIntercompanyRules(orgId, { enabled: organizationId > 0 })
   const { data: intercompanyTransactions = [] } = useIntercompanyTransactions(orgId, {
     enabled: organizationId > 0,
   })
+  const { data: saleOrders = [] } = useSaleOrders(orgId)
+  const { data: contacts = [] } = useContacts(orgId)
   const { data: journals = [] } = useAccountJournals(orgId, { enabled: organizationId > 0 })
   const { data: accountTypes = [] } = useAccountAccountTypes(orgId, { enabled: organizationId > 0 })
   const { data: accountGroups = [] } = useAccountGroups(orgId, { enabled: organizationId > 0 })
@@ -702,6 +737,20 @@ function AccountingClientLoaded({
     [t, fiscalYearSelectOptionsForPeriods],
   )
 
+  const resolveConsolidationPeriodId = useCallback(
+    (periodName: string): bigint | undefined => {
+      const name = periodName.trim()
+      if (!name) return undefined
+      for (const row of accountPeriodsRaw as Record<string, unknown>[]) {
+        if (String(row.name ?? "").trim() === name && row.id != null) {
+          return BigInt(String(row.id))
+        }
+      }
+      return undefined
+    },
+    [accountPeriodsRaw],
+  )
+
   const journalRowsAsSelectOptions = useMemo(
     () => accountJournalRowsToSelectOptions(journals),
     [journals],
@@ -753,14 +802,35 @@ function AccountingClientLoaded({
     }))
   }, [paymentTerms, t])
 
+  const currencySelectOptions = useMemo(() => {
+    const ids = new Set<string>()
+    ids.add(String(defaultCurrencyId))
+    for (const j of journals as Record<string, unknown>[]) {
+      const cid = j.currencyId
+      if (cid != null) ids.add(String(cid))
+    }
+    return [...ids].map((id) => ({ value: id, label: `Currency ${id}` }))
+  }, [journals, defaultCurrencyId])
+
+  const companySelectOptions = useMemo(
+    () => companyRowsToSelectOptions(companies as Record<string, unknown>[]),
+    [companies],
+  )
+
+  const partnerSelectOptions = useMemo(() => {
+    const fromApi = contactRowsToPartnerSelectOptions(contacts as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noPartners"), disabled: true }]
+  }, [contacts, t])
+
   const accountPaymentFormConfig = useMemo(() => {
-    const merged = mergeSelectOptionsByFieldName(
-      newAccountPaymentForm(t),
-      "journalId",
-      journalFieldOptionsForModularForm,
-    )
+    const merged = mergeSelectOptionsForFields(newAccountPaymentForm(t), {
+      partnerId: partnerSelectOptions,
+      currencyId: currencySelectOptions,
+      journalId: journalFieldOptionsForModularForm,
+    })
     return mergeFieldDefaultValues(merged, { currencyId: String(defaultCurrencyId) })
-  }, [t, journalFieldOptionsForModularForm, defaultCurrencyId])
+  }, [t, partnerSelectOptions, currencySelectOptions, journalFieldOptionsForModularForm, defaultCurrencyId])
 
   const paymentTermLineFormConfig = useMemo(
     () =>
@@ -783,6 +853,23 @@ function AccountingClientLoaded({
     }))
   }, [allMoves, t])
 
+  const accountMoveSelectOptions = useMemo(() => {
+    const fromApi = accountMoveRowsToSelectOptions(allMoves as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [
+      {
+        value: "",
+        label: t("accounting.forms.newIntercompanyTransaction.fields.noOriginDocuments"),
+        disabled: true,
+      },
+    ]
+  }, [allMoves, t])
+
+  const optionalMoveSelectOptions = useMemo(
+    () => [{ value: "", label: "—" }, ...draftMoveSelectOptions.filter((o) => o.value !== "")],
+    [draftMoveSelectOptions],
+  )
+
   const accountSelectOptionsForMoveLine = useMemo(() => {
     const rows = accounts as Record<string, unknown>[]
     if (rows.length === 0) {
@@ -802,6 +889,203 @@ function AccountingClientLoaded({
       }),
     [t, draftMoveSelectOptions, accountSelectOptionsForMoveLine],
   )
+
+  const optionalPartnerSelectOptions = useMemo(
+    () => [{ value: "", label: "—" }, ...partnerSelectOptions.filter((o) => o.value !== "")],
+    [partnerSelectOptions],
+  )
+
+  const consolidationJournalSelectOptions = useMemo(() => {
+    const fromApi = consolidationJournalRowsToSelectOptions(
+      consolidationJournals as Record<string, unknown>[],
+    )
+    if (fromApi.length > 0) return fromApi
+    return [
+      {
+        value: "",
+        label: t("accounting.consolidation.journals.empty"),
+        disabled: true,
+      },
+    ]
+  }, [consolidationJournals, t])
+
+  const consolidationAccountSelectOptions = useMemo(() => {
+    const fromApi = consolidationAccountRowsToSelectOptions(
+      consolidationAccounts as Record<string, unknown>[],
+    )
+    if (fromApi.length > 0) return fromApi
+    return [
+      {
+        value: "",
+        label: t("accounting.consolidation.accounts.empty"),
+        disabled: true,
+      },
+    ]
+  }, [consolidationAccounts, t])
+
+  const postedPaymentMoveSelectOptions = useMemo(() => {
+    const posted = (allMoves as Record<string, unknown>[]).filter(
+      (m) => moveStateStr(m) === "Posted" && moveTypeTag(m) === "Entry",
+    )
+    const fromApi = accountMoveRowsToSelectOptions(posted)
+    if (fromApi.length > 0) return fromApi
+    return [
+      {
+        value: "",
+        label: t("accounting.forms.reconcilePaymentInvoice.fields.noPaymentMoves"),
+        disabled: true,
+      },
+    ]
+  }, [allMoves, t])
+
+  const openInvoiceMoveSelectOptions = useMemo(() => {
+    const open = (allMoves as Record<string, unknown>[]).filter((m) => {
+      const mt = moveTypeTag(m)
+      if (mt !== "OutInvoice" && mt !== "InInvoice") return false
+      if (moveStateStr(m) !== "Posted") return false
+      return Number(m.amountResidual ?? 0) > 0.001
+    })
+    const fromApi = accountMoveRowsToSelectOptions(open)
+    if (fromApi.length > 0) return fromApi
+    return [
+      {
+        value: "",
+        label: t("accounting.forms.reconcilePaymentInvoice.fields.noInvoiceMoves"),
+        disabled: true,
+      },
+    ]
+  }, [allMoves, t])
+
+  const reconcilePaymentInvoiceFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(reconcilePaymentInvoiceForm(t), {
+        paymentMoveId: postedPaymentMoveSelectOptions,
+        invoiceMoveId: openInvoiceMoveSelectOptions,
+      }),
+    [t, postedPaymentMoveSelectOptions, openInvoiceMoveSelectOptions],
+  )
+
+  const registerPaymentInvoicesFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(registerPaymentInvoicesForm(t), {
+        invoiceIds: openInvoiceMoveSelectOptions,
+      }),
+    [t, openInvoiceMoveSelectOptions],
+  )
+
+  const newAnalyticAccountFormConfig = useMemo(
+    () =>
+      mergeFieldDefaultValues(
+        mergeSelectOptionsForFields(newAnalyticAccountForm(t), {
+          currencyId: currencySelectOptions,
+        }),
+        { currencyId: String(defaultCurrencyId) },
+      ),
+    [t, currencySelectOptions, defaultCurrencyId],
+  )
+
+  const fixedAssetSelectOptions = useMemo(
+    () =>
+      (fixedAssets as Record<string, unknown>[]).map((a) => ({
+        value: String(a.id ?? ""),
+        label: `${String(a.name ?? a.id ?? "")}${a.originalValue != null ? ` (${Number(a.originalValue).toLocaleString()})` : ""}`,
+      })),
+    [fixedAssets],
+  )
+
+  const depreciationLineCreateFormConfig = useMemo(() => {
+    const base = mergeSelectOptionsForFields(newDepreciationLineForm(t), {
+      assetId:
+        fixedAssetSelectOptions.length > 0
+          ? fixedAssetSelectOptions
+          : [{ value: "", label: t("accounting.entities.fixedAssets.emptyMessage"), disabled: true }],
+      moveId: optionalMoveSelectOptions,
+    })
+    if (!selectedFixedAsset?.id) return base
+    return mergeFieldDefaultValues(base, { assetId: String(selectedFixedAsset.id) })
+  }, [t, fixedAssetSelectOptions, optionalMoveSelectOptions, selectedFixedAsset])
+
+  const intercompanyRuleCreateFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newIntercompanyRuleForm(t), {
+        sourceCompanyId: companySelectOptions,
+        destinationCompanyId: companySelectOptions,
+        journalId: [{ value: "", label: "—" }, ...journalRowsAsSelectOptions],
+        accountId: [{ value: "", label: "—" }, ...accountSelectOptionsForMoveLine],
+      }),
+    [t, companySelectOptions, journalRowsAsSelectOptions, accountSelectOptionsForMoveLine],
+  )
+
+  const intercompanyOriginDocumentOptions = useMemo(() => {
+    if (intercompanyTxCreateModel === "sale.order") {
+      const fromApi = saleOrderRowsToSelectOptions(saleOrders as Record<string, unknown>[])
+      if (fromApi.length > 0) return fromApi
+      return [{ value: "", label: t("common.lookup.noSaleOrders"), disabled: true }]
+    }
+    return accountMoveSelectOptions
+  }, [intercompanyTxCreateModel, saleOrders, accountMoveSelectOptions, t])
+
+  const intercompanyTransactionCreateFormConfig = useMemo(() => {
+    const base = mergeSelectOptionsForFields(newIntercompanyTransactionForm(t), {
+      originDocumentId: intercompanyOriginDocumentOptions,
+      destinationCompanyId: companySelectOptions,
+      currencyId: currencySelectOptions,
+    })
+    return mergeFieldDefaultValues(base, {
+      currencyId: defaultCurrencyId.toString(),
+      originDocumentModel: intercompanyTxCreateModel,
+    })
+  }, [
+    t,
+    intercompanyOriginDocumentOptions,
+    companySelectOptions,
+    currencySelectOptions,
+    defaultCurrencyId,
+    intercompanyTxCreateModel,
+  ])
+
+  const intercompanyRuleEditFormConfig = useMemo(() => {
+    const base = mergeSelectOptionsForFields(editIntercompanyRuleForm(t), {
+      journalId: [{ value: "", label: "—" }, ...journalRowsAsSelectOptions],
+      accountId: [{ value: "", label: "—" }, ...accountSelectOptionsForMoveLine],
+    })
+    if (!intercompanyRuleEdit) return base
+    return mergeFieldDefaultValues(base, {
+      name: String(intercompanyRuleEdit.name ?? ""),
+      sequence: Number(intercompanyRuleEdit.sequence ?? 0),
+      journalId:
+        intercompanyRuleEdit.journalId != null ? String(intercompanyRuleEdit.journalId) : "",
+      accountId:
+        intercompanyRuleEdit.accountId != null ? String(intercompanyRuleEdit.accountId) : "",
+      autoValidation: Boolean(intercompanyRuleEdit.autoValidation),
+      autoGenerateInvoice: Boolean(intercompanyRuleEdit.autoGenerateInvoice),
+      autoGenerateBill: Boolean(intercompanyRuleEdit.autoGenerateBill),
+      isActive: Boolean(intercompanyRuleEdit.isActive),
+      notes: intercompanyRuleEdit.notes != null ? String(intercompanyRuleEdit.notes) : "",
+    })
+  }, [intercompanyRuleEdit, t, journalRowsAsSelectOptions, accountSelectOptionsForMoveLine])
+
+  const depreciationLinesEntityConfig = useMemo(() => depreciationLinesTableConfig(t), [t])
+
+  const intercompanyTxErrorFormConfig = useMemo(() => markIntercompanyTransactionErrorForm(t), [t])
+
+  const moveLineEditFormConfig = useMemo(() => {
+    const base = editAccountMoveLineForm(t)
+    if (!moveLineEdit) return base
+    return mergeFieldDefaultValues(base, {
+      name: String(moveLineEdit.name ?? ""),
+      debit: Number(moveLineEdit.debit ?? 0),
+      credit: Number(moveLineEdit.credit ?? 0),
+    })
+  }, [moveLineEdit, t])
+
+  const depreciationLinesForSelectedAsset = useMemo(() => {
+    if (!selectedFixedAsset?.id) return []
+    const aid = String(selectedFixedAsset.id)
+    return (depreciationLines as Record<string, unknown>[]).filter(
+      (line) => String(line.assetId) === aid,
+    )
+  }, [selectedFixedAsset, depreciationLines])
 
   const journalEditFormConfig = useMemo(() => {
     const base = editAccountJournalForm(t)
@@ -1035,25 +1319,28 @@ function AccountingClientLoaded({
   }, [bankStatementDetail])
 
   const newBankStatementLineFormConfig = useMemo(() => {
-    if (!bankStatementDetail?.id) {
-      return newBankStatementLineForm(t, { statementId: "", defaultCurrencyId: "1" })
-    }
-    const stCur =
-      bankStatementDetail.currencyId != null
-        ? String(bankStatementDetail.currencyId)
-        : defaultCurrencyId.toString()
-    return newBankStatementLineForm(t, {
-      statementId: String(bankStatementDetail.id),
-      defaultCurrencyId: stCur,
+    const base = !bankStatementDetail?.id
+      ? newBankStatementLineForm(t, { statementId: "", defaultCurrencyId: "1" })
+      : newBankStatementLineForm(t, {
+          statementId: String(bankStatementDetail.id),
+          defaultCurrencyId:
+            bankStatementDetail.currencyId != null
+              ? String(bankStatementDetail.currencyId)
+              : defaultCurrencyId.toString(),
+        })
+    return mergeSelectOptionsForFields(base, {
+      partnerId: optionalPartnerSelectOptions,
     })
-  }, [bankStatementDetail, defaultCurrencyId, t])
+  }, [bankStatementDetail, defaultCurrencyId, t, optionalPartnerSelectOptions])
 
   const reconciliationWidgetCreateFormConfig = useMemo(
-    () => mergeSelectOptionsByFieldName(newReconciliationWidgetForm(t), "accountId", glAccountFieldOptions),
-    [t, glAccountFieldOptions],
+    () =>
+      mergeSelectOptionsForFields(newReconciliationWidgetForm(t), {
+        accountId: glAccountFieldOptions,
+        partnerId: optionalPartnerSelectOptions,
+      }),
+    [t, glAccountFieldOptions, optionalPartnerSelectOptions],
   )
-
-  const reconciliationWidgetsEntityConfig = useMemo(() => reconciliationWidgetsTableConfig(t), [t])
 
   const reconciliationWidgetEditFormConfig = useMemo(() => {
     const empty: Parameters<typeof editReconciliationWidgetForm>[1] = {
@@ -1064,10 +1351,15 @@ function AccountingClientLoaded({
       moveLineIds: "",
       toCheck: false,
     }
-    if (!reconciliationWidgetEdit) return editReconciliationWidgetForm(t, empty)
+    if (!reconciliationWidgetEdit) {
+      return mergeSelectOptionsForFields(editReconciliationWidgetForm(t, empty), {
+        accountId: glAccountFieldOptions,
+        partnerId: optionalPartnerSelectOptions,
+      })
+    }
     const ml = reconciliationWidgetEdit.moveLineIds
     const moveLineIds = Array.isArray(ml) ? ml.map((x) => String(x)).join(", ") : ""
-    return mergeSelectOptionsByFieldName(
+    return mergeSelectOptionsForFields(
       editReconciliationWidgetForm(t, {
         widgetId: String(reconciliationWidgetEdit.id ?? ""),
         accountId: String(reconciliationWidgetEdit.accountId ?? ""),
@@ -1077,10 +1369,12 @@ function AccountingClientLoaded({
         moveLineIds,
         toCheck: Boolean(reconciliationWidgetEdit.toCheck),
       }),
-      "accountId",
-      glAccountFieldOptions,
+      {
+        accountId: glAccountFieldOptions,
+        partnerId: optionalPartnerSelectOptions,
+      },
     )
-  }, [reconciliationWidgetEdit, t, glAccountFieldOptions])
+  }, [reconciliationWidgetEdit, t, glAccountFieldOptions, optionalPartnerSelectOptions])
 
   const matchCandidatesForFocusedLine = useMemo(() => {
     if (!bankLineMatchFocus?.id) return []
@@ -1856,6 +2150,16 @@ function AccountingClientLoaded({
               }
             },
           },
+          {
+            id: "ic-tx-error",
+            label: t("accounting.entities.intercompanyTransactions.actions.errorSelected"),
+            requiresSelection: true,
+            variant: "destructive",
+            onClick: (rows) => {
+              const row = rows[0] as Record<string, unknown> | undefined
+              if (row) setIntercompanyTxError(row)
+            },
+          },
         ],
       },
     }
@@ -2204,6 +2508,28 @@ function AccountingClientLoaded({
     } else if (action === "createCurrencyRate") {
       const p = toCreateCurrencyRateParamsFromForm(formData)
       if (p) await createCurrencyRate.mutateAsync(p)
+    } else if (action === "createDepreciationLine") {
+      const p = toCreateDepreciationLineParams(formData)
+      if (p) await createDepreciationLine.mutateAsync(depreciationLineParamsToJson(p))
+    } else if (action === "createIntercompanyRule") {
+      const sourceCompanyId = optionalBigIntU64(formData.sourceCompanyId)
+      const destinationCompanyId = optionalBigIntU64(formData.destinationCompanyId)
+      const p = toCreateIntercompanyRuleParams(formData)
+      if (p && sourceCompanyId != null && destinationCompanyId != null) {
+        await createIntercompanyRule.mutateAsync({
+          sourceCompanyId,
+          destinationCompanyId,
+          params: intercompanyRuleParamsToJson(p),
+        })
+      }
+    } else if (action === "createIntercompanyTransaction") {
+      const p = toCreateIntercompanyTransactionParams(formData)
+      if (p && operatingCompanyId > 0n) {
+        await createIntercompanyTransaction.mutateAsync({
+          originCompanyId: operatingCompanyId,
+          params: intercompanyTransactionParamsToJson(p),
+        })
+      }
     }
   }
 
@@ -2251,6 +2577,9 @@ function AccountingClientLoaded({
           const mapped = moduleConfigBase.tabs.map((tab) => {
             if (tab.id === "analytic-lines") {
               return { ...tab, createForm: analyticLineFormConfig }
+            }
+            if (tab.id === "analytic") {
+              return { ...tab, createForm: newAnalyticAccountFormConfig }
             }
             if (tab.id === "analytic-distribution") {
               return { ...tab, createForm: analyticDistFormConfig }
@@ -2460,7 +2789,49 @@ function AccountingClientLoaded({
               }
             }
             if (tab.id === "fixed-assets") {
-              return { ...tab, entityConfig: fixedAssetsEntityConfig }
+              return {
+                ...tab,
+                type: "custom" as const,
+                customContent: (
+                  <div className="space-y-4">
+                    <EntityView
+                      config={fixedAssetsEntityConfig}
+                      data={fixedAssets as unknown as Record<string, unknown>[]}
+                      onRowClick={(row) => setSelectedFixedAsset(row)}
+                    />
+                    {selectedFixedAsset ? (
+                      <div className="rounded-lg border p-4 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm text-muted-foreground">
+                            {t("accounting.entities.depreciationSchedule.title")}
+                            {" — "}
+                            <span className="font-medium text-foreground">
+                              {String(selectedFixedAsset.name ?? selectedFixedAsset.id ?? "")}
+                            </span>
+                          </p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDepreciationLineCreateOpen(true)}
+                          >
+                            {t("accounting.entities.fixedAssets.actions.addDepreciationLine")}
+                          </Button>
+                        </div>
+                        <EntityView
+                          useCard={false}
+                          config={{
+                            ...depreciationLinesEntityConfig,
+                            title: "",
+                            description: undefined,
+                          }}
+                          data={depreciationLinesForSelectedAsset}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ),
+              }
             }
             if (tab.id === "payments") {
               return {
@@ -2480,10 +2851,38 @@ function AccountingClientLoaded({
               }
             }
             if (tab.id === "intercompany-rules") {
-              return { ...tab, entityConfig: intercompanyRulesEntityConfig }
+              return {
+                ...tab,
+                entityConfig: intercompanyRulesEntityConfig,
+                createForm: intercompanyRuleCreateFormConfig,
+                createLabel: t("accounting.forms.newIntercompanyRule.title"),
+                createAction: "createIntercompanyRule",
+              }
             }
             if (tab.id === "intercompany-transactions") {
-              return { ...tab, entityConfig: intercompanyTransactionsEntityConfig }
+              return {
+                ...tab,
+                type: "custom" as const,
+                customContent: (
+                  <div className="space-y-3">
+                    <div className="flex justify-end">
+                      <Button
+                        size="lg"
+                        onClick={() => {
+                          setIntercompanyTxCreateModel("account.move")
+                          setIntercompanyTxCreateOpen(true)
+                        }}
+                      >
+                        {t("accounting.forms.newIntercompanyTransaction.title")}
+                      </Button>
+                    </div>
+                    <EntityView
+                      config={intercompanyTransactionsEntityConfig}
+                      data={intercompanyTransactions as unknown as Record<string, unknown>[]}
+                    />
+                  </div>
+                ),
+              }
             }
             if (tab.id === "bank-statements") {
               return {
@@ -2515,6 +2914,14 @@ function AccountingClientLoaded({
                     consolidationAccounts={consolidationAccounts as unknown as Record<string, unknown>[]}
                     consolidationJournals={consolidationJournals as unknown as Record<string, unknown>[]}
                     eliminationEntries={eliminationEntries as unknown as Record<string, unknown>[]}
+                    consolidationCompanyIds={
+                      operatingCompanyId > 0n ? [operatingCompanyId] : []
+                    }
+                    resolveConsolidationPeriodId={resolveConsolidationPeriodId}
+                    companySelectOptions={companySelectOptions}
+                    currencySelectOptions={currencySelectOptions}
+                    consolidationJournalSelectOptions={consolidationJournalSelectOptions}
+                    consolidationAccountSelectOptions={consolidationAccountSelectOptions}
                     onCreateConsolidationAccount={(params) =>
                       createConsolidationAccount.mutateAsync(params)
                     }
@@ -2636,6 +3043,12 @@ function AccountingClientLoaded({
       accountPeriodsEntityConfig,
       accountPeriodCreateFormConfig,
       fixedAssetsEntityConfig,
+      fixedAssets,
+      depreciationLinesForSelectedAsset,
+      selectedFixedAsset,
+      depreciationLinesEntityConfig,
+      intercompanyRuleCreateFormConfig,
+      intercompanyTransactions,
       accountPaymentFormConfig,
       accountPaymentsEntityConfig,
       paymentTermsEntityConfig,
@@ -2651,6 +3064,7 @@ function AccountingClientLoaded({
       scheduleTaxDeadlineUpdates.mutateAsync,
       postDraft,
       analyticLineFormConfig,
+      newAnalyticAccountFormConfig,
       analyticDistFormConfig,
       reconciliationWidgetCreateFormConfig,
       consolidationAccounts,
@@ -2671,6 +3085,7 @@ function AccountingClientLoaded({
       addCsvToolbar,
       computeInvoiceTotals.isPending,
       operatingCompanyId,
+      resolveConsolidationPeriodId,
       fiscalYearsRaw,
       accountPeriodsRaw,
       bankStatementLines,
@@ -2738,6 +3153,10 @@ function AccountingClientLoaded({
       setPaymentTermLineEdit(row)
     } else if (tabId === "account-journals") {
       setJournalEdit(row)
+    } else if (tabId === "intercompany-rules") {
+      setIntercompanyRuleEdit(row)
+    } else if (tabId === "move-lines") {
+      setMoveLineEdit(row)
     }
   }, [])
 
@@ -2813,12 +3232,16 @@ function AccountingClientLoaded({
               setRegisterPaymentError(null)
             }
           }}
-          config={registerPaymentInvoicesForm(t)}
+          config={registerPaymentInvoicesFormConfig}
           closeOnSubmit={false}
           submitError={registerPaymentError}
           onSubmit={async (fd) => {
             setRegisterPaymentError(null)
-            const ids = parseCommaSeparatedBigInts(fd.invoiceIds)
+            const raw = fd.invoiceIds
+            const ids =
+              raw != null && String(raw).trim() !== ""
+                ? [BigInt(String(raw))]
+                : []
             if (ids.length === 0) {
               setRegisterPaymentError(t("common.validation.required"))
               return
@@ -2848,7 +3271,7 @@ function AccountingClientLoaded({
               setReconcilePaymentError(null)
             }
           }}
-          config={reconcilePaymentInvoiceForm(t)}
+          config={reconcilePaymentInvoiceFormConfig}
           closeOnSubmit={false}
           submitError={reconcilePaymentError}
           onSubmit={async (fd) => {
@@ -3117,6 +3540,97 @@ function AccountingClientLoaded({
             sequence: Math.trunc(Number(formData.sequence ?? 0)),
           })
           setPaymentTermLineEdit(null)
+        }}
+      />
+
+      <FormModal
+        key={depreciationLineCreateOpen ? `dep-line-${String(selectedFixedAsset?.id ?? "new")}` : "dep-line-closed"}
+        open={depreciationLineCreateOpen}
+        onOpenChange={(open) => {
+          if (!open) setDepreciationLineCreateOpen(false)
+        }}
+        config={depreciationLineCreateFormConfig}
+        onSubmit={async (formData) => {
+          await handleFormSubmit("fixed-assets", "createDepreciationLine", formData)
+          setDepreciationLineCreateOpen(false)
+        }}
+      />
+
+      <FormModal
+        key={intercompanyRuleEdit ? `ic-rule-${String(intercompanyRuleEdit.id)}` : "ic-rule-closed"}
+        open={!!intercompanyRuleEdit}
+        onOpenChange={(open) => {
+          if (!open) setIntercompanyRuleEdit(null)
+        }}
+        config={intercompanyRuleEditFormConfig}
+        onSubmit={async (formData) => {
+          if (!intercompanyRuleEdit?.id) return
+          await updateIntercompanyRule.mutateAsync({
+            ruleId: BigInt(String(intercompanyRuleEdit.id)),
+            params: intercompanyRuleUpdateParamsToJson(toUpdateIntercompanyRuleParams(formData)),
+          })
+          setIntercompanyRuleEdit(null)
+        }}
+      />
+
+      <FormModal
+        key={intercompanyTxError ? `ic-tx-err-${String(intercompanyTxError.id)}` : "ic-tx-err-closed"}
+        open={!!intercompanyTxError}
+        onOpenChange={(open) => {
+          if (!open) setIntercompanyTxError(null)
+        }}
+        config={intercompanyTxErrorFormConfig}
+        onSubmit={async (formData) => {
+          if (!intercompanyTxError?.id) return
+          const errorMessage = String(formData.errorMessage ?? "").trim()
+          if (!errorMessage) return
+          await errorIntercompanyTransaction.mutateAsync({
+            transactionId: BigInt(String(intercompanyTxError.id)),
+            errorMessage,
+          })
+          setIntercompanyTxError(null)
+        }}
+      />
+
+      <FormModal
+        key={
+          intercompanyTxCreateOpen
+            ? `ic-tx-create-${intercompanyTxCreateModel}`
+            : "ic-tx-create-closed"
+        }
+        open={intercompanyTxCreateOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIntercompanyTxCreateOpen(false)
+            setIntercompanyTxCreateModel("account.move")
+          }
+        }}
+        config={intercompanyTransactionCreateFormConfig}
+        onValuesChange={(values) => {
+          const model = String(values.originDocumentModel ?? "account.move")
+          if (model !== intercompanyTxCreateModel) setIntercompanyTxCreateModel(model)
+        }}
+        onSubmit={async (formData) => {
+          await handleFormSubmit("intercompany-transactions", "createIntercompanyTransaction", formData)
+          setIntercompanyTxCreateOpen(false)
+          setIntercompanyTxCreateModel("account.move")
+        }}
+      />
+
+      <FormModal
+        key={moveLineEdit ? `move-line-${String(moveLineEdit.id)}` : "move-line-closed"}
+        open={!!moveLineEdit}
+        onOpenChange={(open) => {
+          if (!open) setMoveLineEdit(null)
+        }}
+        config={moveLineEditFormConfig}
+        onSubmit={async (formData) => {
+          if (!moveLineEdit?.id) return
+          await updateAccountMoveLine.mutateAsync({
+            lineId: BigInt(String(moveLineEdit.id)),
+            params: updateAccountMoveLineParamsToJson(toUpdateAccountMoveLineParams(formData)),
+          })
+          setMoveLineEdit(null)
         }}
       />
 

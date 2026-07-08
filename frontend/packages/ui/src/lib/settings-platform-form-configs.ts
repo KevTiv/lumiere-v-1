@@ -44,7 +44,10 @@ export function addCasbinRuleForm(t: TFunction): FormConfig {
   }
 }
 
-export function removeCasbinRuleForm(t: TFunction): FormConfig {
+export function removeCasbinRuleForm(
+  t: TFunction,
+  ruleOptions: { value: string; label: string }[] = [],
+): FormConfig {
   return {
     id: "settings-remove-casbin-rule",
     title: t("settings.adminOps.casbin.removeTitle"),
@@ -56,10 +59,11 @@ export function removeCasbinRuleForm(t: TFunction): FormConfig {
           {
             id: "ruleId",
             name: "ruleId",
-            type: "number",
+            type: "select",
             label: t("settings.adminOps.casbin.ruleId"),
             required: true,
             width: "full",
+            options: ruleOptions.length > 0 ? ruleOptions : [{ value: "", label: "—", disabled: true }],
           },
         ],
       },
@@ -180,7 +184,11 @@ export function addUserToOrganizationForm(
   }
 }
 
-export function updateOrgMemberDetailsForm(t: TFunction): FormConfig {
+export function updateOrgMemberDetailsForm(
+  t: TFunction,
+  memberOptions: { value: string; label: string }[] = [],
+  employeeOptions: { value: string; label: string }[] = [],
+): FormConfig {
   return {
     id: "settings-update-org-member-details",
     title: t("settings.adminOps.members.updateDetailsTitle"),
@@ -192,10 +200,11 @@ export function updateOrgMemberDetailsForm(t: TFunction): FormConfig {
           {
             id: "userOrgId",
             name: "userOrgId",
-            type: "number",
+            type: "select",
             label: t("settings.adminOps.members.userOrgId"),
             required: true,
             width: "full",
+            options: memberOptions.length > 0 ? memberOptions : [{ value: "", label: "—", disabled: true }],
           },
           {
             id: "jobTitle",
@@ -207,9 +216,10 @@ export function updateOrgMemberDetailsForm(t: TFunction): FormConfig {
           {
             id: "employeeId",
             name: "employeeId",
-            type: "text",
+            type: "select",
             label: t("settings.adminOps.members.employeeId"),
             width: "1/2",
+            options: employeeOptions.length > 0 ? employeeOptions : [{ value: "", label: "—", disabled: true }],
           },
         ],
       },
@@ -217,7 +227,11 @@ export function updateOrgMemberDetailsForm(t: TFunction): FormConfig {
   }
 }
 
-export function updateOrgMemberRoleForm(t: TFunction, roleOptions: { value: string; label: string }[]): FormConfig {
+export function updateOrgMemberRoleForm(
+  t: TFunction,
+  roleOptions: { value: string; label: string }[],
+  memberOptions: { value: string; label: string }[] = [],
+): FormConfig {
   return {
     id: "settings-update-org-member-role",
     title: t("settings.adminOps.members.updateRoleTitle"),
@@ -229,10 +243,11 @@ export function updateOrgMemberRoleForm(t: TFunction, roleOptions: { value: stri
           {
             id: "userOrgId",
             name: "userOrgId",
-            type: "number",
+            type: "select",
             label: t("settings.adminOps.members.userOrgId"),
             required: true,
             width: "1/2",
+            options: memberOptions.length > 0 ? memberOptions : [{ value: "", label: "—", disabled: true }],
           },
           {
             id: "roleName",
@@ -331,7 +346,7 @@ export function logAuditEventForm(t: TFunction): FormConfig {
           { id: "tableName", name: "tableName", type: "text", label: t("settings.adminOps.audit.tableName"), required: true, width: "1/2" },
           { id: "recordId", name: "recordId", type: "number", label: t("settings.adminOps.audit.recordId"), required: true, width: "1/2" },
           { id: "action", name: "action", type: "text", label: t("settings.adminOps.audit.action"), required: true, width: "1/2" },
-          { id: "companyId", name: "companyId", type: "number", label: t("settings.adminOps.audit.companyId"), width: "1/2" },
+          { id: "companyId", name: "companyId", type: "select", label: t("settings.adminOps.audit.companyId"), width: "1/2", options: [{ value: "", label: "—" }] },
           { id: "oldValues", name: "oldValues", type: "textarea", label: t("settings.adminOps.audit.oldValues"), rows: 2, width: "full" },
           { id: "newValues", name: "newValues", type: "textarea", label: t("settings.adminOps.audit.newValues"), rows: 2, width: "full" },
           { id: "changedFields", name: "changedFields", type: "text", label: t("settings.adminOps.audit.changedFields"), width: "full" },

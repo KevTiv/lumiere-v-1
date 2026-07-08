@@ -22,6 +22,7 @@
     "@lumiere/api-client": "workspace:*",
     "@lumiere/erp-session": "workspace:*",
     "@lumiere/erp-shared": "workspace:*",
+    "@lumiere/i18n": "workspace:*",
     "@lumiere/stdb": "workspace:*",
     "@tanstack/react-query": "5.96.2",
     "react": "^19.2.4"

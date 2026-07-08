@@ -16,7 +16,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { iotBffPost } from "@lumiere/stdb/commands"
+import { toCreateActionParams } from "@lumiere/erp-shared/iot-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { i18n } from "@lumiere/i18n"
 
 type ScalarId = bigint | number | string
 
@@ -385,7 +387,15 @@ export function useCreateIotAction(organizationId: bigint) {
     }
   >({
     mutationFn: async (body) => {
-      const { deviceId, ...params } = body
+      const { deviceId, action_type, payload, triggered_by } = body
+      const params = toCreateActionParams({
+        actionType: action_type,
+        action_type,
+        payload,
+        triggeredBy: triggered_by,
+        triggered_by,
+      })
+      if (!params) throw new Error(i18n.t("common.paramsMapper.invalidIotAction"))
       const { urlPath, init } = iotBffPost("create_iot_action", [
         organizationId,
         deviceId,

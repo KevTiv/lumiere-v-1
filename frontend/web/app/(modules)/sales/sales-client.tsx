@@ -14,6 +14,10 @@ import {
   newPricelistItemForm,
   newPickingBatchForm,
   newLoyaltyCardForm,
+  newDeliveryCarrierForm,
+  newShippingMethodForm,
+  newPosPaymentMethodForm,
+  newLoyaltyProgramForm,
   newReturnOrderForm,
   addSaleOrderLineForm,
   createInvoiceFromSaleOrderForm,
@@ -124,6 +128,7 @@ import {
   useAccountMoves,
   useAccountJournals,
   useAccountAccounts,
+  useAccountPaymentTerms,
   useComputeInvoiceTotals,
   type AccountMove,
 } from '@lumiere/query-hooks/hooks/accounting';
@@ -137,7 +142,7 @@ import {
   useDoneStockMove,
 } from '@lumiere/query-hooks/hooks/inventory';
 import { useContacts, useUsers } from '@lumiere/query-hooks/hooks/crm';
-import { useWarehouses, useProducts, useUoms } from '@lumiere/query-hooks/hooks/inventory';
+import { useWarehouses, useProducts, useUoms, useProductCategories } from '@lumiere/query-hooks/hooks/inventory';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { useRuntimeListConfig } from '@lumiere/ui/forms';
 import {
@@ -158,6 +163,9 @@ import {
   productRowsToSelectOptions,
   uomRowsToSelectOptions,
   saleOrderRowsToSelectOptions,
+  paymentTermRowsToSelectOptions,
+  productCategoryRowsToSelectOptions,
+  currencyOptionsFromRows,
 } from '@/lib/form-lookup';
 import { enumTag } from '@/lib/accounting-post-draft';
 
@@ -350,10 +358,12 @@ function SalesClientLoaded({
   const { data: users = [] } = useUsers(orgId);
   const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
   const { data: products = [] } = useProducts(orgId);
+  const { data: productCategories = [] } = useProductCategories(orgId);
   const { data: uoms = [] } = useUoms(orgId);
   const { data: accountMoves = [] } = useAccountMoves(orgId, { initialData: initialAccountMoves });
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
+  const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
   const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
   const { data: stockMoves = [] } = useStockMoves(orgId);
   const { data: returnOrders = [] } = useReturnOrders(orgId, initialReturnOrders);
@@ -443,6 +453,12 @@ function SalesClientLoaded({
     ];
   }, [warehouses, t]);
 
+  const paymentTermFieldOptions = useMemo(() => {
+    const fromApi = paymentTermRowsToSelectOptions(paymentTerms as Record<string, unknown>[]);
+    if (fromApi.length > 0) return fromApi;
+    return [{ value: '', label: '—' }];
+  }, [paymentTerms]);
+
   const productFieldOptions = useMemo(() => {
     const fromApi = productRowsToSelectOptions(products);
     if (fromApi.length > 0) return fromApi;
@@ -454,6 +470,81 @@ function SalesClientLoaded({
     if (fromApi.length > 0) return fromApi;
     return [{ value: '', label: t('common.lookup.noUoms'), disabled: true }];
   }, [uoms, t]);
+
+  const currencyFieldOptions = useMemo(() => {
+    const fromApi = currencyOptionsFromRows([
+      pricelists as Record<string, unknown>[],
+      accountJournals as Record<string, unknown>[],
+      accountAccounts as Record<string, unknown>[],
+    ]);
+    if (fromApi.length > 0) return fromApi;
+    return [{ value: '1', label: 'Currency 1' }];
+  }, [pricelists, accountJournals, accountAccounts]);
+
+  const productCategoryFieldOptions = useMemo(() => {
+    const fromApi = productCategoryRowsToSelectOptions(productCategories as Record<string, unknown>[]);
+    if (fromApi.length > 0) return fromApi;
+    return [{ value: '', label: t('common.lookup.noCategories'), disabled: true }];
+  }, [productCategories, t]);
+
+  const journalFieldOptions = useMemo(() => {
+    const fromApi = accountJournalRowsToSelectOptions(accountJournals as Record<string, unknown>[]);
+    if (fromApi.length > 0) return fromApi;
+    return [{ value: '', label: t('common.lookup.noJournals'), disabled: true }];
+  }, [accountJournals, t]);
+
+  const glAccountFieldOptions = useMemo(() => {
+    const fromApi = accountAccountRowsToSelectOptions(accountAccounts as Record<string, unknown>[]);
+    if (fromApi.length > 0) return fromApi;
+    return [{ value: '', label: t('common.lookup.noAccounts'), disabled: true }];
+  }, [accountAccounts, t]);
+
+  const pricelistFormConfig = useMemo(
+    () =>
+      mergeFieldDefaultValues(
+        mergeSelectOptionsForFields(newPricelistForm(t), {
+          currencyId: currencyFieldOptions,
+        }),
+        { currencyId: currencyFieldOptions[0]?.value ?? '1' },
+      ),
+    [t, currencyFieldOptions],
+  );
+
+  const deliveryCarrierFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newDeliveryCarrierForm(t), {
+        productId: productFieldOptions,
+        currencyId: currencyFieldOptions,
+      }),
+    [t, productFieldOptions, currencyFieldOptions],
+  );
+
+  const shippingMethodFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newShippingMethodForm(t), {
+        productId: productFieldOptions,
+      }),
+    [t, productFieldOptions],
+  );
+
+  const posPaymentMethodFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newPosPaymentMethodForm(t), {
+        receivableAccountId: glAccountFieldOptions,
+        outstandingAccountId: glAccountFieldOptions,
+        journalId: journalFieldOptions,
+        cashJournalId: journalFieldOptions,
+      }),
+    [t, glAccountFieldOptions, journalFieldOptions],
+  );
+
+  const loyaltyProgramFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newLoyaltyProgramForm(t), {
+        currencyId: currencyFieldOptions,
+      }),
+    [t, currencyFieldOptions],
+  );
 
   const draftSaleOrderOptions = useMemo(() => {
     const draft = (orders as Record<string, unknown>[]).filter(
@@ -511,8 +602,10 @@ function SalesClientLoaded({
     () =>
       mergeSelectOptionsForFields(newPricelistItemForm(t), {
         pricelistId: pricelistFieldOptions,
+        productId: productFieldOptions,
+        categId: productCategoryFieldOptions,
       }),
-    [t, pricelistFieldOptions],
+    [t, pricelistFieldOptions, productFieldOptions, productCategoryFieldOptions],
   );
 
   const salesRepLabelByIdentity = useMemo(() => {
@@ -532,8 +625,9 @@ function SalesClientLoaded({
         partnerId: partnerFieldOptions,
         pricelistId: pricelistFieldOptions,
         warehouseId: warehouseFieldOptions,
+        paymentTermId: paymentTermFieldOptions,
       }),
-    [t, partnerFieldOptions, pricelistFieldOptions, warehouseFieldOptions],
+    [t, partnerFieldOptions, pricelistFieldOptions, warehouseFieldOptions, paymentTermFieldOptions],
   );
 
   const pickingBatchFormConfig = useMemo(() => newPickingBatchForm(t), [t]);
@@ -554,8 +648,9 @@ function SalesClientLoaded({
     () =>
       mergeSelectOptionsForFields(newLoyaltyCardForm(t), {
         programId: loyaltyProgramFieldOptions,
+        partnerId: partnerFieldOptions,
       }),
-    [t, loyaltyProgramFieldOptions],
+    [t, loyaltyProgramFieldOptions, partnerFieldOptions],
   );
 
   const salesInvoices = useMemo(
@@ -586,16 +681,6 @@ function SalesClientLoaded({
     () => returnOrderLinesTableConfig(t),
     [t],
   );
-
-  const journalFieldOptions = useMemo(() => {
-    const fromApi = accountJournalRowsToSelectOptions(
-      accountJournals as Record<string, unknown>[],
-    );
-    if (fromApi.length > 0) return fromApi;
-    return [
-      { value: '', label: t('sales.forms.createInvoiceFromOrder.noJournals'), disabled: true },
-    ];
-  }, [accountJournals, t]);
 
   const incomeAccountFieldOptions = useMemo(() => {
     const fromApi = accountAccountRowsToSelectOptions(
@@ -1152,7 +1237,7 @@ function SalesClientLoaded({
               }),
             create_pricelist: () =>
               setQuickActionForm({
-                form: newPricelistForm(t),
+                form: pricelistFormConfig,
                 action: 'createPricelist',
               }),
             new_delivery: () =>
@@ -1287,7 +1372,7 @@ function SalesClientLoaded({
             };
           }
           if (tab.id === 'pricelists' && tab.type === 'entity') {
-            return { ...tab, entityConfig: pricelistsEntityConfig };
+            return { ...tab, entityConfig: pricelistsEntityConfig, createForm: pricelistFormConfig };
           }
           if (tab.id === 'pricelist-items' && tab.type === 'entity') {
             return {
@@ -1360,6 +1445,18 @@ function SalesClientLoaded({
           if (tab.id === 'loyalty-cards' && tab.type === 'entity') {
             return { ...tab, createForm: loyaltyCardFormConfig };
           }
+          if (tab.id === 'delivery-carriers' && tab.type === 'entity') {
+            return { ...tab, createForm: deliveryCarrierFormConfig };
+          }
+          if (tab.id === 'shipping-methods' && tab.type === 'entity') {
+            return { ...tab, createForm: shippingMethodFormConfig };
+          }
+          if (tab.id === 'pos-payment-methods' && tab.type === 'entity') {
+            return { ...tab, createForm: posPaymentMethodFormConfig };
+          }
+          if (tab.id === 'loyalty-programs' && tab.type === 'entity') {
+            return { ...tab, createForm: loyaltyProgramFormConfig };
+          }
           return tab;
         }),
       }) as ModuleConfig,
@@ -1372,6 +1469,11 @@ function SalesClientLoaded({
       pricelistsEntityConfig,
       pricelistItemsEntityConfig,
       pricelistItemFormConfig,
+      pricelistFormConfig,
+      deliveryCarrierFormConfig,
+      shippingMethodFormConfig,
+      posPaymentMethodFormConfig,
+      loyaltyProgramFormConfig,
       deliveriesEntityConfig,
       fulfillmentEntityConfig,
       returnsEntityConfig,

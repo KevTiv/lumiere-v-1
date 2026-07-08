@@ -1191,6 +1191,27 @@ export function useStoreSsoUserCredential(organizationId: bigint) {
   })
 }
 
+export function useLinkWorkosUser(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { targetIdentity: string; workosUserId: string }
+  >({
+    mutationFn: async ({ targetIdentity, workosUserId }) => {
+      const { urlPath, init } = stdbBffPost("link_workos_user", [
+        identityForReducer(targetIdentity),
+        workosUserId.trim(),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to link WorkOS user")
+    },
+    onSuccess: async () => {
+      await invalidateAuthModule(qc, organizationId)
+    },
+  })
+}
+
 // ── Types (re-exported so client components import from one place) ─────────────
 export type {
   CreateRoleParams,

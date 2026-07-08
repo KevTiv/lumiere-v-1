@@ -42,4 +42,4 @@ jobs:
 
       - name: Params mapper coverage
         working-directory: frontend/web
-        run: pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts --min-coverage 70 --warn-coverage 70
+        run: pnpm exec tsx ../../scripts/check-params-mapper-coverage.ts --min-coverage 100 --warn-coverage 100

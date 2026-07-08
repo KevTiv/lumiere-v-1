@@ -20,7 +20,12 @@ import {
   newConsolidationJournalForm,
   newEliminationEntryForm,
 } from "@/lib/accounting-form-configs"
-import { mergeFieldDefaultValues } from "@/lib/form-config-merge"
+import { mergeFieldDefaultValues, mergeSelectOptionsForFields } from "@/lib/form-config-merge"
+import {
+  toCreateConsolidationAccountParams,
+  toCreateConsolidationJournalParams,
+  toCreateEliminationEntryParams,
+} from "@lumiere/erp-shared/accounting-create-params"
 
 function consolidationStateTag(row: Record<string, unknown>): string {
   const v = row.state
@@ -62,6 +67,15 @@ export interface ConsolidationWorkspaceProps {
   processConsolidationPending?: boolean
   validateConsolidationPending?: boolean
   cancelConsolidationPending?: boolean
+  /** Companies included in new consolidation accounts/journals when the form omits companyIds. */
+  consolidationCompanyIds?: bigint[]
+  /** Resolve fiscal period id from period name on the journal form. */
+  resolveConsolidationPeriodId?: (periodName: string) => bigint | undefined
+  /** Select options merged into consolidation create/edit forms. */
+  companySelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
+  currencySelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
+  consolidationJournalSelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
+  consolidationAccountSelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
 }
 
 export function ConsolidationWorkspace({
@@ -80,6 +94,12 @@ export function ConsolidationWorkspace({
   processConsolidationPending,
   validateConsolidationPending,
   cancelConsolidationPending,
+  consolidationCompanyIds = [],
+  resolveConsolidationPeriodId,
+  companySelectOptions = [],
+  currencySelectOptions = [],
+  consolidationJournalSelectOptions = [],
+  consolidationAccountSelectOptions = [],
 }: ConsolidationWorkspaceProps) {
   const { t } = useTranslation()
 
@@ -131,11 +151,39 @@ export function ConsolidationWorkspace({
     [selectedJournal],
   )
 
+  const newConsolidationAccountFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newConsolidationAccountForm(t), {
+        currencyId: currencySelectOptions,
+      }),
+    [t, currencySelectOptions],
+  )
+
+  const newConsolidationJournalFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newConsolidationJournalForm(t), {
+        currencyId: currencySelectOptions,
+      }),
+    [t, currencySelectOptions],
+  )
+
   const newEliminationFormWithJournal = useMemo(() => {
-    const base = newEliminationEntryForm(t)
+    const base = mergeSelectOptionsForFields(newEliminationEntryForm(t), {
+      journalId: consolidationJournalSelectOptions,
+      accountId: consolidationAccountSelectOptions,
+      companyId: companySelectOptions,
+      currencyId: currencySelectOptions,
+    })
     if (!selectedJournal?.id) return base
     return mergeFieldDefaultValues(base, { journalId: String(selectedJournal.id) })
-  }, [selectedJournal, t])
+  }, [
+    selectedJournal,
+    t,
+    consolidationJournalSelectOptions,
+    consolidationAccountSelectOptions,
+    companySelectOptions,
+    currencySelectOptions,
+  ])
 
   return (
     <div className="space-y-6">
@@ -442,9 +490,13 @@ export function ConsolidationWorkspace({
         onOpenChange={(open) => {
           if (!open) setShowNewAccount(false)
         }}
-        config={newConsolidationAccountForm(t)}
+        config={newConsolidationAccountFormConfig}
         onSubmit={async (fd) => {
-          await onCreateConsolidationAccount(fd)
+          const params = toCreateConsolidationAccountParams(fd, {
+            companyIds: consolidationCompanyIds,
+          })
+          if (!params) throw new Error(t("common.paramsMapper.invalidConsolidationAccount"))
+          await onCreateConsolidationAccount(params as unknown as Record<string, unknown>)
           setShowNewAccount(false)
         }}
       />
@@ -470,9 +522,22 @@ export function ConsolidationWorkspace({
         onOpenChange={(open) => {
           if (!open) setShowNewJournal(false)
         }}
-        config={newConsolidationJournalForm(t)}
+        config={newConsolidationJournalFormConfig}
         onSubmit={async (fd) => {
-          await onCreateConsolidationJournal(fd)
+          const periodName = String(fd.periodName ?? "").trim()
+          const periodId =
+            (fd.periodId != null && String(fd.periodId).trim() !== ""
+              ? BigInt(String(fd.periodId))
+              : undefined) ?? resolveConsolidationPeriodId?.(periodName)
+          if (periodId === undefined) {
+            throw new Error(t("common.paramsMapper.periodNotFound"))
+          }
+          const params = toCreateConsolidationJournalParams(fd, {
+            periodId,
+            companyIds: consolidationCompanyIds,
+          })
+          if (!params) throw new Error(t("common.paramsMapper.invalidConsolidationJournal"))
+          await onCreateConsolidationJournal(params as unknown as Record<string, unknown>)
           setShowNewJournal(false)
         }}
       />
@@ -484,7 +549,9 @@ export function ConsolidationWorkspace({
         }}
         config={newEliminationFormWithJournal}
         onSubmit={async (fd) => {
-          await onCreateEliminationEntry(fd)
+          const params = toCreateEliminationEntryParams(fd)
+          if (!params) throw new Error(t("common.paramsMapper.invalidEliminationEntry"))
+          await onCreateEliminationEntry(params as unknown as Record<string, unknown>)
           setShowNewElimination(false)
         }}
       />

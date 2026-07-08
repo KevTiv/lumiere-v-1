@@ -69,20 +69,26 @@ export function toCreateAnalyticsMetricPayload(formData: Record<string, unknown>
   }
 }
 
+import { toCreateTrialBalanceEntryParams } from "@lumiere/erp-shared/reports-create-params"
+
 export function toCreateTrialBalanceEntryPayload(formData: Record<string, unknown>): Record<string, unknown> {
-  return {
-    reportId: formData.reportId,
-    accountId: formData.accountId,
-    accountCode: formData.accountCode,
-    accountName: formData.accountName,
-    openingDebit: formData.openingDebit,
-    openingCredit: formData.openingCredit,
-    periodDebit: formData.periodDebit,
-    periodCredit: formData.periodCredit,
-    currencyId: formData.currencyId,
-    level: formData.level,
-    isLeaf: formData.isLeaf,
+  const params = toCreateTrialBalanceEntryParams(formData)
+  if (!params) {
+    return {
+      reportId: formData.reportId,
+      accountId: formData.accountId,
+      accountCode: formData.accountCode,
+      accountName: formData.accountName,
+      openingDebit: formData.openingDebit,
+      openingCredit: formData.openingCredit,
+      periodDebit: formData.periodDebit,
+      periodCredit: formData.periodCredit,
+      currencyId: formData.currencyId,
+      level: formData.level,
+      isLeaf: formData.isLeaf,
+    }
   }
+  return params as unknown as Record<string, unknown>
 }
 
 export function toCreateDashboardPayload(formData: Record<string, unknown>): Record<string, unknown> {

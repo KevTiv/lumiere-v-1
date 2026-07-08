@@ -64,10 +64,10 @@ export const newPurchaseOrderForm = (t: TFunction): FormConfig => ({
         {
           id: "paymentTermId",
           name: "paymentTermId",
-          type: "number",
+          type: "select",
           label: t("purchasing.forms.newPurchaseOrder.fields.paymentTermId"),
-          placeholder: t("purchasing.forms.newPurchaseOrder.fields.paymentTermPlaceholder"),
           width: "1/2",
+          options: [{ value: "", label: "—" }],
         },
       ],
     },
@@ -392,9 +392,10 @@ export const newPartnerBankForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "number",
+          type: "select",
           label: t("purchasing.forms.newPartnerBank.fields.currencyId"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "allowOutPayment",
@@ -503,10 +504,11 @@ export const newLandedCostForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "number",
+          type: "select",
           label: t("purchasing.forms.newLandedCost.fields.currencyId"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "amountTotal",
@@ -570,9 +572,10 @@ export const editLandedCostForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "number",
+          type: "select",
           label: t("purchasing.forms.editLandedCost.fields.currencyId"),
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "amountTotal",
@@ -638,10 +641,11 @@ export const addLandedCostLineForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "number",
+          type: "select",
           label: t("purchasing.forms.landedCostLine.fields.currencyId"),
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "priceUnit",
@@ -678,11 +682,12 @@ export const removeLandedCostLineForm = (t: TFunction): FormConfig => ({
         {
           id: "lineId",
           name: "lineId",
-          type: "number",
+          type: "select",
           label: t("purchasing.forms.landedCostLine.fields.lineId"),
           placeholder: t("purchasing.forms.landedCostLine.fields.lineIdPlaceholder"),
           required: true,
           width: "full",
+          options: emptySelect,
         },
       ],
     },
