@@ -463,7 +463,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "contact",
     aliases: ["contacts", "contact"],
     defaultRestricted: ["name", "email", "phone", "parent_id", "company_id"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "deleted_at", "merge_target_id"],
   },
   "contracts": {
     table: "hr_contract",
@@ -901,7 +901,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "product",
     aliases: ["products", "product"],
     defaultRestricted: ["name", "display_name", "code", "default_code", "active", "categ_id", "list_price", "public_price", "type", "barcode"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "uom_id", "uom_po_id"],
   },
   "projects": {
     table: "project_project",
