@@ -1605,6 +1605,19 @@
     "assigned_by",
     "metadata"
   ],
+  "ContactCommunicationPreference": [
+    "id",
+    "organization_id",
+    "company_id",
+    "contact_id",
+    "channel",
+    "opted_in",
+    "quiet_hours_start",
+    "quiet_hours_end",
+    "updated_at",
+    "updated_by",
+    "metadata"
+  ],
   "ContactDuplicateCandidate": [
     "id",
     "organization_id",
@@ -2957,6 +2970,27 @@
     "is_active",
     "metadata"
   ],
+  "CreateMessageBatchParams": [
+    "company_id",
+    "template_id",
+    "channel",
+    "subject_model",
+    "subject_query",
+    "candidate_contact_ids",
+    "metadata"
+  ],
+  "CreateMessageTemplateParams": [
+    "company_id",
+    "key",
+    "name",
+    "locale",
+    "subject",
+    "body_template",
+    "allowed_variables",
+    "applicable_channels",
+    "retention_classification",
+    "metadata"
+  ],
   "CreateMrpProductionParams": [
     "company_id",
     "product_id",
@@ -2989,6 +3023,20 @@
     "date_deadline",
     "origin",
     "responsible_user_id",
+    "metadata"
+  ],
+  "CreateOperationalMessageParams": [
+    "company_id",
+    "template_id",
+    "contact_id",
+    "phone_identity_id",
+    "channel",
+    "subject_model",
+    "subject_id",
+    "rendered_subject",
+    "rendered_body",
+    "variables",
+    "status",
     "metadata"
   ],
   "CreateOpportunityLineParams": [
@@ -5817,6 +5865,51 @@
   "MergeContactsParams": [
     "target_contact_id"
   ],
+  "MessageBatch": [
+    "id",
+    "organization_id",
+    "company_id",
+    "template_id",
+    "channel",
+    "status",
+    "subject_model",
+    "subject_query",
+    "recipient_count",
+    "excluded_count",
+    "preview_sample_ids",
+    "approved_by",
+    "approved_at",
+    "rejected_by",
+    "rejected_at",
+    "rejection_reason",
+    "created_at",
+    "created_by",
+    "metadata"
+  ],
+  "MessageTemplate": [
+    "id",
+    "organization_id",
+    "company_id",
+    "key",
+    "name",
+    "locale",
+    "subject",
+    "body_template",
+    "allowed_variables",
+    "applicable_channels",
+    "active",
+    "review_state",
+    "retention_classification",
+    "created_at",
+    "updated_at",
+    "created_by",
+    "updated_by",
+    "metadata"
+  ],
+  "MessageTemplateVariable": [
+    "key",
+    "value"
+  ],
   "ModuleConfigInput": [
     "module_account",
     "module_invoice",
@@ -6087,6 +6180,30 @@
     "create_date",
     "write_uid",
     "write_date",
+    "metadata"
+  ],
+  "OperationalMessage": [
+    "id",
+    "organization_id",
+    "company_id",
+    "message_batch_id",
+    "template_id",
+    "contact_id",
+    "phone_identity_id",
+    "channel",
+    "status",
+    "subject_model",
+    "subject_id",
+    "rendered_subject",
+    "rendered_body",
+    "variable_hash",
+    "copied_at",
+    "queued_at",
+    "sent_at",
+    "failed_at",
+    "failure_reason",
+    "created_at",
+    "created_by",
     "metadata"
   ],
   "OppStage": [
@@ -7670,6 +7787,10 @@
     "company_id",
     "reason",
     "metadata"
+  ],
+  "ReviewMessageBatchParams": [
+    "approved",
+    "reason"
   ],
   "Role": [
     "id",
@@ -9556,6 +9677,16 @@
     "attach_document",
     "is_default",
     "is_active",
+    "metadata"
+  ],
+  "UpdateMessageTemplateParams": [
+    "name",
+    "subject",
+    "body_template",
+    "allowed_variables",
+    "applicable_channels",
+    "active",
+    "review_state",
     "metadata"
   ],
   "UpdateMetricValuesParams": [

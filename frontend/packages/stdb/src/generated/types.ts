@@ -1955,6 +1955,23 @@ export const ContactCategoryAssignment = __t.object("ContactCategoryAssignment",
 });
 export type ContactCategoryAssignment = __Infer<typeof ContactCategoryAssignment>;
 
+export const ContactCommunicationPreference = __t.object("ContactCommunicationPreference", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  contactId: __t.u64(),
+  get channel() {
+    return MessageChannel;
+  },
+  optedIn: __t.bool(),
+  quietHoursStart: __t.option(__t.string()),
+  quietHoursEnd: __t.option(__t.string()),
+  updatedAt: __t.timestamp(),
+  updatedBy: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type ContactCommunicationPreference = __Infer<typeof ContactCommunicationPreference>;
+
 export const ContactDuplicateCandidate = __t.object("ContactDuplicateCandidate", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -3604,6 +3621,35 @@ export const CreateMailTemplateParams = __t.object("CreateMailTemplateParams", {
 });
 export type CreateMailTemplateParams = __Infer<typeof CreateMailTemplateParams>;
 
+export const CreateMessageBatchParams = __t.object("CreateMessageBatchParams", {
+  companyId: __t.option(__t.u64()),
+  templateId: __t.u64(),
+  get channel() {
+    return MessageChannel;
+  },
+  subjectModel: __t.string(),
+  subjectQuery: __t.option(__t.string()),
+  candidateContactIds: __t.array(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateMessageBatchParams = __Infer<typeof CreateMessageBatchParams>;
+
+export const CreateMessageTemplateParams = __t.object("CreateMessageTemplateParams", {
+  companyId: __t.option(__t.u64()),
+  key: __t.string(),
+  name: __t.string(),
+  locale: __t.string(),
+  subject: __t.option(__t.string()),
+  bodyTemplate: __t.string(),
+  allowedVariables: __t.array(__t.string()),
+  get applicableChannels() {
+    return __t.array(MessageChannel);
+  },
+  retentionClassification: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateMessageTemplateParams = __Infer<typeof CreateMessageTemplateParams>;
+
 export const CreateMrpProductionParams = __t.object("CreateMrpProductionParams", {
   companyId: __t.option(__t.u64()),
   productId: __t.u64(),
@@ -3641,6 +3687,28 @@ export const CreateMrpProductionParams = __t.object("CreateMrpProductionParams",
   metadata: __t.option(__t.string()),
 });
 export type CreateMrpProductionParams = __Infer<typeof CreateMrpProductionParams>;
+
+export const CreateOperationalMessageParams = __t.object("CreateOperationalMessageParams", {
+  companyId: __t.option(__t.u64()),
+  templateId: __t.u64(),
+  contactId: __t.u64(),
+  phoneIdentityId: __t.u64(),
+  get channel() {
+    return MessageChannel;
+  },
+  subjectModel: __t.string(),
+  subjectId: __t.u64(),
+  renderedSubject: __t.option(__t.string()),
+  renderedBody: __t.string(),
+  get variables() {
+    return __t.array(MessageTemplateVariable);
+  },
+  get status() {
+    return OperationalMessageStatus;
+  },
+  metadata: __t.option(__t.string()),
+});
+export type CreateOperationalMessageParams = __Infer<typeof CreateOperationalMessageParams>;
 
 export const CreateOpportunityLineParams = __t.object("CreateOpportunityLineParams", {
   productId: __t.u64(),
@@ -6988,6 +7056,84 @@ export const MergeContactsParams = __t.object("MergeContactsParams", {
 });
 export type MergeContactsParams = __Infer<typeof MergeContactsParams>;
 
+export const MessageBatch = __t.object("MessageBatch", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  templateId: __t.u64(),
+  get channel() {
+    return MessageChannel;
+  },
+  get status() {
+    return MessageBatchStatus;
+  },
+  subjectModel: __t.string(),
+  subjectQuery: __t.option(__t.string()),
+  recipientCount: __t.u64(),
+  excludedCount: __t.u64(),
+  previewSampleIds: __t.array(__t.u64()),
+  approvedBy: __t.option(__t.identity()),
+  approvedAt: __t.option(__t.timestamp()),
+  rejectedBy: __t.option(__t.identity()),
+  rejectedAt: __t.option(__t.timestamp()),
+  rejectionReason: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type MessageBatch = __Infer<typeof MessageBatch>;
+
+// The tagged union or sum type for the algebraic type `MessageBatchStatus`.
+export const MessageBatchStatus = __t.enum("MessageBatchStatus", {
+  Draft: __t.unit(),
+  PendingApproval: __t.unit(),
+  Approved: __t.unit(),
+  Rejected: __t.unit(),
+  Partial: __t.unit(),
+  Completed: __t.unit(),
+  Cancelled: __t.unit(),
+});
+export type MessageBatchStatus = __Infer<typeof MessageBatchStatus>;
+
+// The tagged union or sum type for the algebraic type `MessageChannel`.
+export const MessageChannel = __t.enum("MessageChannel", {
+  Sms: __t.unit(),
+  WhatsApp: __t.unit(),
+  Email: __t.unit(),
+  InApp: __t.unit(),
+});
+export type MessageChannel = __Infer<typeof MessageChannel>;
+
+export const MessageTemplate = __t.object("MessageTemplate", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  key: __t.string(),
+  name: __t.string(),
+  locale: __t.string(),
+  subject: __t.option(__t.string()),
+  bodyTemplate: __t.string(),
+  allowedVariables: __t.array(__t.string()),
+  get applicableChannels() {
+    return __t.array(MessageChannel);
+  },
+  active: __t.bool(),
+  reviewState: __t.string(),
+  retentionClassification: __t.string(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  updatedBy: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type MessageTemplate = __Infer<typeof MessageTemplate>;
+
+export const MessageTemplateVariable = __t.object("MessageTemplateVariable", {
+  key: __t.string(),
+  value: __t.string(),
+});
+export type MessageTemplateVariable = __Infer<typeof MessageTemplateVariable>;
+
 // The tagged union or sum type for the algebraic type `MoState`.
 export const MoState = __t.enum("MoState", {
   Draft: __t.unit(),
@@ -7306,6 +7452,48 @@ export const MrpWorkorder = __t.object("MrpWorkorder", {
   metadata: __t.option(__t.string()),
 });
 export type MrpWorkorder = __Infer<typeof MrpWorkorder>;
+
+export const OperationalMessage = __t.object("OperationalMessage", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  messageBatchId: __t.u64(),
+  templateId: __t.u64(),
+  contactId: __t.u64(),
+  phoneIdentityId: __t.u64(),
+  get channel() {
+    return MessageChannel;
+  },
+  get status() {
+    return OperationalMessageStatus;
+  },
+  subjectModel: __t.string(),
+  subjectId: __t.u64(),
+  renderedSubject: __t.option(__t.string()),
+  renderedBody: __t.string(),
+  variableHash: __t.string(),
+  copiedAt: __t.option(__t.timestamp()),
+  queuedAt: __t.option(__t.timestamp()),
+  sentAt: __t.option(__t.timestamp()),
+  failedAt: __t.option(__t.timestamp()),
+  failureReason: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type OperationalMessage = __Infer<typeof OperationalMessage>;
+
+// The tagged union or sum type for the algebraic type `OperationalMessageStatus`.
+export const OperationalMessageStatus = __t.enum("OperationalMessageStatus", {
+  Draft: __t.unit(),
+  Copied: __t.unit(),
+  Queued: __t.unit(),
+  Sent: __t.unit(),
+  Delivered: __t.unit(),
+  Failed: __t.unit(),
+  Cancelled: __t.unit(),
+});
+export type OperationalMessageStatus = __Infer<typeof OperationalMessageStatus>;
 
 export const Opportunity = __t.object("Opportunity", {
   id: __t.u64(),
@@ -9310,6 +9498,12 @@ export const ReversePaymentTransactionParams = __t.object("ReversePaymentTransac
   metadata: __t.option(__t.string()),
 });
 export type ReversePaymentTransactionParams = __Infer<typeof ReversePaymentTransactionParams>;
+
+export const ReviewMessageBatchParams = __t.object("ReviewMessageBatchParams", {
+  approved: __t.bool(),
+  reason: __t.option(__t.string()),
+});
+export type ReviewMessageBatchParams = __Infer<typeof ReviewMessageBatchParams>;
 
 export const Role = __t.object("Role", {
   id: __t.u64(),
@@ -11577,6 +11771,18 @@ export const UpdateMailTemplateParams = __t.object("UpdateMailTemplateParams", {
   metadata: __t.option(__t.string()),
 });
 export type UpdateMailTemplateParams = __Infer<typeof UpdateMailTemplateParams>;
+
+export const UpdateMessageTemplateParams = __t.object("UpdateMessageTemplateParams", {
+  name: __t.option(__t.string()),
+  subject: __t.option(__t.string()),
+  bodyTemplate: __t.option(__t.string()),
+  allowedVariables: __t.option(__t.array(__t.string())),
+  applicableChannels: __t.option(__t.array(MessageChannel)),
+  active: __t.option(__t.bool()),
+  reviewState: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateMessageTemplateParams = __Infer<typeof UpdateMessageTemplateParams>;
 
 export const UpdateMetricValuesParams = __t.object("UpdateMetricValuesParams", {
   currentValue: __t.f64(),

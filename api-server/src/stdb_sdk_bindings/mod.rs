@@ -111,6 +111,7 @@ pub mod consolidation_state_type;
 pub mod contact_type;
 pub mod contact_category_type;
 pub mod contact_category_assignment_type;
+pub mod contact_communication_preference_type;
 pub mod contact_duplicate_candidate_type;
 pub mod contact_identity_kind_type;
 pub mod contact_phone_identity_type;
@@ -213,7 +214,10 @@ pub mod create_leave_request_params_type;
 pub mod create_leave_type_params_type;
 pub mod create_loyalty_program_params_type;
 pub mod create_mail_template_params_type;
+pub mod create_message_batch_params_type;
+pub mod create_message_template_params_type;
 pub mod create_mrp_production_params_type;
+pub mod create_operational_message_params_type;
 pub mod create_opportunity_line_params_type;
 pub mod create_opportunity_params_type;
 pub mod create_organization_params_type;
@@ -401,6 +405,11 @@ pub mod mail_message_type;
 pub mod mail_message_type_type;
 pub mod mail_template_type;
 pub mod merge_contacts_params_type;
+pub mod message_batch_type;
+pub mod message_batch_status_type;
+pub mod message_channel_type;
+pub mod message_template_type;
+pub mod message_template_variable_type;
 pub mod mo_state_type;
 pub mod module_config_input_type;
 pub mod move_stock_quant_params_type;
@@ -412,6 +421,8 @@ pub mod mrp_routing_workcenter_type;
 pub mod mrp_workcenter_type;
 pub mod mrp_workcenter_productivity_type;
 pub mod mrp_workorder_type;
+pub mod operational_message_type;
+pub mod operational_message_status_type;
 pub mod opportunity_type;
 pub mod opportunity_line_type;
 pub mod opportunity_stage_type;
@@ -516,6 +527,7 @@ pub mod return_order_type;
 pub mod return_order_line_type;
 pub mod revenue_recognition_rule_type;
 pub mod reverse_payment_transaction_params_type;
+pub mod review_message_batch_params_type;
 pub mod role_type;
 pub mod rule_type_type;
 pub mod sale_order_type;
@@ -641,6 +653,7 @@ pub mod update_lead_details_params_type;
 pub mod update_lead_revenue_params_type;
 pub mod update_leave_type_params_type;
 pub mod update_mail_template_params_type;
+pub mod update_message_template_params_type;
 pub mod update_metric_values_params_type;
 pub mod update_opportunity_params_type;
 pub mod update_org_member_details_params_type;
@@ -786,6 +799,7 @@ pub mod cancel_contract_reducer;
 pub mod cancel_intercompany_transaction_reducer;
 pub mod cancel_landed_cost_reducer;
 pub mod cancel_manufacturing_order_reducer;
+pub mod cancel_message_batch_reducer;
 pub mod cancel_payment_reducer;
 pub mod cancel_payslip_reducer;
 pub mod cancel_picking_batch_reducer;
@@ -930,6 +944,9 @@ pub mod create_loyalty_card_reducer;
 pub mod create_loyalty_program_reducer;
 pub mod create_mail_template_reducer;
 pub mod create_manufacturing_order_reducer;
+pub mod create_message_batch_reducer;
+pub mod create_message_template_reducer;
+pub mod create_operational_message_reducer;
 pub mod create_opportunity_reducer;
 pub mod create_opportunity_line_reducer;
 pub mod create_organization_reducer;
@@ -1215,6 +1232,7 @@ pub mod record_cycle_count_line_reducer;
 pub mod record_document_view_reducer;
 pub mod record_google_drive_sync_reducer;
 pub mod record_google_drive_sync_error_reducer;
+pub mod record_message_copied_reducer;
 pub mod record_privacy_consent_reducer;
 pub mod record_report_run_reducer;
 pub mod record_telemetry_reducer;
@@ -1251,6 +1269,7 @@ pub mod restore_product_category_reducer;
 pub mod retry_intercompany_transaction_reducer;
 pub mod retry_iot_action_reducer;
 pub mod reverse_payment_transaction_reducer;
+pub mod review_message_batch_reducer;
 pub mod review_supplier_intake_reducer;
 pub mod revoke_permission_reducer;
 pub mod revoke_role_reducer;
@@ -1270,6 +1289,7 @@ pub mod run_all_domain_tests_reducer;
 pub mod run_all_inventory_tests_reducer;
 pub mod run_all_platform_tests_reducer;
 pub mod run_all_sales_tests_reducer;
+pub mod run_core_operational_messaging_test_reducer;
 pub mod run_crm_contact_identity_test_reducer;
 pub mod run_crm_contact_update_delete_test_reducer;
 pub mod run_crm_opportunity_convert_test_reducer;
@@ -1306,6 +1326,7 @@ pub mod set_article_published_reducer;
 pub mod set_asset_active_reducer;
 pub mod set_billing_status_reducer;
 pub mod set_consolidation_company_rate_reducer;
+pub mod set_contact_communication_preference_reducer;
 pub mod set_form_role_config_reducer;
 pub mod set_intercompany_rule_active_reducer;
 pub mod set_iot_threshold_reducer;
@@ -1335,38 +1356,7 @@ pub mod submit_purchase_requisition_reducer;
 pub mod submit_supplier_intake_reducer;
 pub mod subscribe_to_record_reducer;
 pub mod sync_hub_devices_reducer;
-pub mod test_audit_authorization_reducer;
-pub mod test_audit_log_data_integrity_reducer;
-pub mod test_audit_logging_reducer;
-pub mod test_audit_rule_edge_cases_reducer;
-pub mod test_casbin_rule_patterns_reducer;
-pub mod test_classification_level_validation_reducer;
-pub mod test_classification_rule_edge_cases_reducer;
-pub mod test_country_data_integrity_reducer;
-pub mod test_currency_data_integrity_reducer;
-pub mod test_currency_rate_edge_cases_reducer;
-pub mod test_data_protection_settings_reducer;
 pub mod test_iot_device_reducer;
-pub mod test_onboarding_rbac_membership_flows_reducer;
-pub mod test_org_permission_deny_beats_allow_reducer;
-pub mod test_organization_isolation_reducer;
-pub mod test_organization_lifecycle_reducer;
-pub mod test_organization_settings_edge_cases_reducer;
-pub mod test_permission_system_reducer;
-pub mod test_permissions_error_cases_reducer;
-pub mod test_privacy_consent_edge_cases_reducer;
-pub mod test_privacy_system_reducer;
-pub mod test_queue_job_edge_cases_reducer;
-pub mod test_queue_system_reducer;
-pub mod test_reference_data_reducer;
-pub mod test_role_hierarchy_reducer;
-pub mod test_role_update_edge_cases_reducer;
-pub mod test_uom_edge_cases_reducer;
-pub mod test_user_management_reducer;
-pub mod test_user_organization_membership_reducer;
-pub mod test_user_profile_edge_cases_reducer;
-pub mod test_user_session_edge_cases_reducer;
-pub mod test_worker_edge_cases_reducer;
 pub mod toggle_project_favorite_reducer;
 pub mod unassign_team_member_skill_reducer;
 pub mod unblock_workcenter_reducer;
@@ -1442,6 +1432,7 @@ pub mod update_lead_details_reducer;
 pub mod update_lead_revenue_reducer;
 pub mod update_leave_type_reducer;
 pub mod update_mail_template_reducer;
+pub mod update_message_template_reducer;
 pub mod update_metric_values_reducer;
 pub mod update_opportunity_reducer;
 pub mod update_org_member_details_reducer;
@@ -1588,6 +1579,7 @@ pub mod consolidation_journal_table;
 pub mod contact_table;
 pub mod contact_category_table;
 pub mod contact_category_assignment_table;
+pub mod contact_communication_preference_table;
 pub mod contact_duplicate_candidate_table;
 pub mod contact_phone_identity_table;
 pub mod contact_relationship_table;
@@ -1658,6 +1650,8 @@ pub mod lead_source_table;
 pub mod mail_follower_table;
 pub mod mail_message_table;
 pub mod mail_template_table;
+pub mod message_batch_table;
+pub mod message_template_table;
 pub mod mrp_bom_table;
 pub mod mrp_bom_line_table;
 pub mod mrp_production_table;
@@ -1665,6 +1659,7 @@ pub mod mrp_routing_workcenter_table;
 pub mod mrp_workcenter_table;
 pub mod mrp_workcenter_productivity_table;
 pub mod mrp_workorder_table;
+pub mod operational_message_table;
 pub mod opp_stage_table;
 pub mod opportunity_table;
 pub mod opportunity_line_table;
@@ -1886,6 +1881,7 @@ pub use consolidation_state_type::ConsolidationState;
 pub use contact_type::Contact;
 pub use contact_category_type::ContactCategory;
 pub use contact_category_assignment_type::ContactCategoryAssignment;
+pub use contact_communication_preference_type::ContactCommunicationPreference;
 pub use contact_duplicate_candidate_type::ContactDuplicateCandidate;
 pub use contact_identity_kind_type::ContactIdentityKind;
 pub use contact_phone_identity_type::ContactPhoneIdentity;
@@ -1988,7 +1984,10 @@ pub use create_leave_request_params_type::CreateLeaveRequestParams;
 pub use create_leave_type_params_type::CreateLeaveTypeParams;
 pub use create_loyalty_program_params_type::CreateLoyaltyProgramParams;
 pub use create_mail_template_params_type::CreateMailTemplateParams;
+pub use create_message_batch_params_type::CreateMessageBatchParams;
+pub use create_message_template_params_type::CreateMessageTemplateParams;
 pub use create_mrp_production_params_type::CreateMrpProductionParams;
+pub use create_operational_message_params_type::CreateOperationalMessageParams;
 pub use create_opportunity_line_params_type::CreateOpportunityLineParams;
 pub use create_opportunity_params_type::CreateOpportunityParams;
 pub use create_organization_params_type::CreateOrganizationParams;
@@ -2176,6 +2175,11 @@ pub use mail_message_type::MailMessage;
 pub use mail_message_type_type::MailMessageType;
 pub use mail_template_type::MailTemplate;
 pub use merge_contacts_params_type::MergeContactsParams;
+pub use message_batch_type::MessageBatch;
+pub use message_batch_status_type::MessageBatchStatus;
+pub use message_channel_type::MessageChannel;
+pub use message_template_type::MessageTemplate;
+pub use message_template_variable_type::MessageTemplateVariable;
 pub use mo_state_type::MoState;
 pub use module_config_input_type::ModuleConfigInput;
 pub use move_stock_quant_params_type::MoveStockQuantParams;
@@ -2187,6 +2191,8 @@ pub use mrp_routing_workcenter_type::MrpRoutingWorkcenter;
 pub use mrp_workcenter_type::MrpWorkcenter;
 pub use mrp_workcenter_productivity_type::MrpWorkcenterProductivity;
 pub use mrp_workorder_type::MrpWorkorder;
+pub use operational_message_type::OperationalMessage;
+pub use operational_message_status_type::OperationalMessageStatus;
 pub use opportunity_type::Opportunity;
 pub use opportunity_line_type::OpportunityLine;
 pub use opportunity_stage_type::OpportunityStage;
@@ -2291,6 +2297,7 @@ pub use return_order_type::ReturnOrder;
 pub use return_order_line_type::ReturnOrderLine;
 pub use revenue_recognition_rule_type::RevenueRecognitionRule;
 pub use reverse_payment_transaction_params_type::ReversePaymentTransactionParams;
+pub use review_message_batch_params_type::ReviewMessageBatchParams;
 pub use role_type::Role;
 pub use rule_type_type::RuleType;
 pub use sale_order_type::SaleOrder;
@@ -2416,6 +2423,7 @@ pub use update_lead_details_params_type::UpdateLeadDetailsParams;
 pub use update_lead_revenue_params_type::UpdateLeadRevenueParams;
 pub use update_leave_type_params_type::UpdateLeaveTypeParams;
 pub use update_mail_template_params_type::UpdateMailTemplateParams;
+pub use update_message_template_params_type::UpdateMessageTemplateParams;
 pub use update_metric_values_params_type::UpdateMetricValuesParams;
 pub use update_opportunity_params_type::UpdateOpportunityParams;
 pub use update_org_member_details_params_type::UpdateOrgMemberDetailsParams;
@@ -2559,6 +2567,7 @@ pub use consolidation_journal_table::*;
 pub use contact_table::*;
 pub use contact_category_table::*;
 pub use contact_category_assignment_table::*;
+pub use contact_communication_preference_table::*;
 pub use contact_duplicate_candidate_table::*;
 pub use contact_phone_identity_table::*;
 pub use contact_relationship_table::*;
@@ -2629,6 +2638,8 @@ pub use lead_source_table::*;
 pub use mail_follower_table::*;
 pub use mail_message_table::*;
 pub use mail_template_table::*;
+pub use message_batch_table::*;
+pub use message_template_table::*;
 pub use mrp_bom_table::*;
 pub use mrp_bom_line_table::*;
 pub use mrp_production_table::*;
@@ -2636,6 +2647,7 @@ pub use mrp_routing_workcenter_table::*;
 pub use mrp_workcenter_table::*;
 pub use mrp_workcenter_productivity_table::*;
 pub use mrp_workorder_table::*;
+pub use operational_message_table::*;
 pub use opp_stage_table::*;
 pub use opportunity_table::*;
 pub use opportunity_line_table::*;
@@ -2821,6 +2833,7 @@ pub use cancel_contract_reducer::cancel_contract;
 pub use cancel_intercompany_transaction_reducer::cancel_intercompany_transaction;
 pub use cancel_landed_cost_reducer::cancel_landed_cost;
 pub use cancel_manufacturing_order_reducer::cancel_manufacturing_order;
+pub use cancel_message_batch_reducer::cancel_message_batch;
 pub use cancel_payment_reducer::cancel_payment;
 pub use cancel_payslip_reducer::cancel_payslip;
 pub use cancel_picking_batch_reducer::cancel_picking_batch;
@@ -2965,6 +2978,9 @@ pub use create_loyalty_card_reducer::create_loyalty_card;
 pub use create_loyalty_program_reducer::create_loyalty_program;
 pub use create_mail_template_reducer::create_mail_template;
 pub use create_manufacturing_order_reducer::create_manufacturing_order;
+pub use create_message_batch_reducer::create_message_batch;
+pub use create_message_template_reducer::create_message_template;
+pub use create_operational_message_reducer::create_operational_message;
 pub use create_opportunity_reducer::create_opportunity;
 pub use create_opportunity_line_reducer::create_opportunity_line;
 pub use create_organization_reducer::create_organization;
@@ -3250,6 +3266,7 @@ pub use record_cycle_count_line_reducer::record_cycle_count_line;
 pub use record_document_view_reducer::record_document_view;
 pub use record_google_drive_sync_reducer::record_google_drive_sync;
 pub use record_google_drive_sync_error_reducer::record_google_drive_sync_error;
+pub use record_message_copied_reducer::record_message_copied;
 pub use record_privacy_consent_reducer::record_privacy_consent;
 pub use record_report_run_reducer::record_report_run;
 pub use record_telemetry_reducer::record_telemetry;
@@ -3286,6 +3303,7 @@ pub use restore_product_category_reducer::restore_product_category;
 pub use retry_intercompany_transaction_reducer::retry_intercompany_transaction;
 pub use retry_iot_action_reducer::retry_iot_action;
 pub use reverse_payment_transaction_reducer::reverse_payment_transaction;
+pub use review_message_batch_reducer::review_message_batch;
 pub use review_supplier_intake_reducer::review_supplier_intake;
 pub use revoke_permission_reducer::revoke_permission;
 pub use revoke_role_reducer::revoke_role;
@@ -3305,6 +3323,7 @@ pub use run_all_domain_tests_reducer::run_all_domain_tests;
 pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_platform_tests_reducer::run_all_platform_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
+pub use run_core_operational_messaging_test_reducer::run_core_operational_messaging_test;
 pub use run_crm_contact_identity_test_reducer::run_crm_contact_identity_test;
 pub use run_crm_contact_update_delete_test_reducer::run_crm_contact_update_delete_test;
 pub use run_crm_opportunity_convert_test_reducer::run_crm_opportunity_convert_test;
@@ -3341,6 +3360,7 @@ pub use set_article_published_reducer::set_article_published;
 pub use set_asset_active_reducer::set_asset_active;
 pub use set_billing_status_reducer::set_billing_status;
 pub use set_consolidation_company_rate_reducer::set_consolidation_company_rate;
+pub use set_contact_communication_preference_reducer::set_contact_communication_preference;
 pub use set_form_role_config_reducer::set_form_role_config;
 pub use set_intercompany_rule_active_reducer::set_intercompany_rule_active;
 pub use set_iot_threshold_reducer::set_iot_threshold;
@@ -3370,38 +3390,7 @@ pub use submit_purchase_requisition_reducer::submit_purchase_requisition;
 pub use submit_supplier_intake_reducer::submit_supplier_intake;
 pub use subscribe_to_record_reducer::subscribe_to_record;
 pub use sync_hub_devices_reducer::sync_hub_devices;
-pub use test_audit_authorization_reducer::test_audit_authorization;
-pub use test_audit_log_data_integrity_reducer::test_audit_log_data_integrity;
-pub use test_audit_logging_reducer::test_audit_logging;
-pub use test_audit_rule_edge_cases_reducer::test_audit_rule_edge_cases;
-pub use test_casbin_rule_patterns_reducer::test_casbin_rule_patterns;
-pub use test_classification_level_validation_reducer::test_classification_level_validation;
-pub use test_classification_rule_edge_cases_reducer::test_classification_rule_edge_cases;
-pub use test_country_data_integrity_reducer::test_country_data_integrity;
-pub use test_currency_data_integrity_reducer::test_currency_data_integrity;
-pub use test_currency_rate_edge_cases_reducer::test_currency_rate_edge_cases;
-pub use test_data_protection_settings_reducer::test_data_protection_settings;
 pub use test_iot_device_reducer::test_iot_device;
-pub use test_onboarding_rbac_membership_flows_reducer::test_onboarding_rbac_membership_flows;
-pub use test_org_permission_deny_beats_allow_reducer::test_org_permission_deny_beats_allow;
-pub use test_organization_isolation_reducer::test_organization_isolation;
-pub use test_organization_lifecycle_reducer::test_organization_lifecycle;
-pub use test_organization_settings_edge_cases_reducer::test_organization_settings_edge_cases;
-pub use test_permission_system_reducer::test_permission_system;
-pub use test_permissions_error_cases_reducer::test_permissions_error_cases;
-pub use test_privacy_consent_edge_cases_reducer::test_privacy_consent_edge_cases;
-pub use test_privacy_system_reducer::test_privacy_system;
-pub use test_queue_job_edge_cases_reducer::test_queue_job_edge_cases;
-pub use test_queue_system_reducer::test_queue_system;
-pub use test_reference_data_reducer::test_reference_data;
-pub use test_role_hierarchy_reducer::test_role_hierarchy;
-pub use test_role_update_edge_cases_reducer::test_role_update_edge_cases;
-pub use test_uom_edge_cases_reducer::test_uom_edge_cases;
-pub use test_user_management_reducer::test_user_management;
-pub use test_user_organization_membership_reducer::test_user_organization_membership;
-pub use test_user_profile_edge_cases_reducer::test_user_profile_edge_cases;
-pub use test_user_session_edge_cases_reducer::test_user_session_edge_cases;
-pub use test_worker_edge_cases_reducer::test_worker_edge_cases;
 pub use toggle_project_favorite_reducer::toggle_project_favorite;
 pub use unassign_team_member_skill_reducer::unassign_team_member_skill;
 pub use unblock_workcenter_reducer::unblock_workcenter;
@@ -3477,6 +3466,7 @@ pub use update_lead_details_reducer::update_lead_details;
 pub use update_lead_revenue_reducer::update_lead_revenue;
 pub use update_leave_type_reducer::update_leave_type;
 pub use update_mail_template_reducer::update_mail_template;
+pub use update_message_template_reducer::update_message_template;
 pub use update_metric_values_reducer::update_metric_values;
 pub use update_opportunity_reducer::update_opportunity;
 pub use update_org_member_details_reducer::update_org_member_details;
@@ -3890,6 +3880,10 @@ pub enum Reducer {
     CancelManufacturingOrder {
         organization_id: u64,
         mo_id: u64,
+}    ,
+    CancelMessageBatch {
+        organization_id: u64,
+        batch_id: u64,
 }    ,
     CancelPayment {
         organization_id: u64,
@@ -4567,6 +4561,18 @@ pub enum Reducer {
     CreateManufacturingOrder {
         organization_id: u64,
         params: CreateMrpProductionParams,
+}    ,
+    CreateMessageBatch {
+        organization_id: u64,
+        params: CreateMessageBatchParams,
+}    ,
+    CreateMessageTemplate {
+        organization_id: u64,
+        params: CreateMessageTemplateParams,
+}    ,
+    CreateOperationalMessage {
+        organization_id: u64,
+        params: CreateOperationalMessageParams,
 }    ,
     CreateOpportunity {
         organization_id: u64,
@@ -5851,6 +5857,10 @@ pub enum Reducer {
         organization_id: u64,
         error_message: String,
 }    ,
+    RecordMessageCopied {
+        organization_id: u64,
+        message_id: u64,
+}    ,
     RecordPrivacyConsent {
         organization_id: u64,
         params: RecordPrivacyConsentParams,
@@ -6015,6 +6025,11 @@ pub enum Reducer {
         transaction_id: u64,
         params: ReversePaymentTransactionParams,
 }    ,
+    ReviewMessageBatch {
+        organization_id: u64,
+        batch_id: u64,
+        params: ReviewMessageBatchParams,
+}    ,
     ReviewSupplierIntake {
         organization_id: u64,
         intake_id: u64,
@@ -6047,6 +6062,7 @@ pub enum Reducer {
     RunAllInventoryTests ,
     RunAllPlatformTests ,
     RunAllSalesTests ,
+    RunCoreOperationalMessagingTest ,
     RunCrmContactIdentityTest ,
     RunCrmContactUpdateDeleteTest ,
     RunCrmOpportunityConvertTest ,
@@ -6137,6 +6153,13 @@ pub enum Reducer {
     SetConsolidationCompanyRate {
         organization_id: u64,
         params: SetConsolidationCompanyRateParams,
+}    ,
+    SetContactCommunicationPreference {
+        organization_id: u64,
+        company_id: Option::<u64>,
+        contact_id: u64,
+        channel: MessageChannel,
+        opted_in: bool,
 }    ,
     SetFormRoleConfig {
         organization_id: u64,
@@ -6284,41 +6307,10 @@ pub enum Reducer {
         hub_id: u64,
         detected: Vec::<DeviceSyncEntry>,
 }    ,
-    TestAuditAuthorization ,
-    TestAuditLogDataIntegrity ,
-    TestAuditLogging ,
-    TestAuditRuleEdgeCases ,
-    TestCasbinRulePatterns ,
-    TestClassificationLevelValidation ,
-    TestClassificationRuleEdgeCases ,
-    TestCountryDataIntegrity ,
-    TestCurrencyDataIntegrity ,
-    TestCurrencyRateEdgeCases ,
-    TestDataProtectionSettings ,
     TestIotDevice {
         organization_id: u64,
         device_id: u64,
 }    ,
-    TestOnboardingRbacMembershipFlows ,
-    TestOrgPermissionDenyBeatsAllow ,
-    TestOrganizationIsolation ,
-    TestOrganizationLifecycle ,
-    TestOrganizationSettingsEdgeCases ,
-    TestPermissionSystem ,
-    TestPermissionsErrorCases ,
-    TestPrivacyConsentEdgeCases ,
-    TestPrivacySystem ,
-    TestQueueJobEdgeCases ,
-    TestQueueSystem ,
-    TestReferenceData ,
-    TestRoleHierarchy ,
-    TestRoleUpdateEdgeCases ,
-    TestUomEdgeCases ,
-    TestUserManagement ,
-    TestUserOrganizationMembership ,
-    TestUserProfileEdgeCases ,
-    TestUserSessionEdgeCases ,
-    TestWorkerEdgeCases ,
     ToggleProjectFavorite {
         organization_id: u64,
         project_id: u64,
@@ -6715,6 +6707,11 @@ pub enum Reducer {
         company_id: Option::<u64>,
         template_id: u64,
         params: UpdateMailTemplateParams,
+}    ,
+    UpdateMessageTemplate {
+        organization_id: u64,
+        template_id: u64,
+        params: UpdateMessageTemplateParams,
 }    ,
     UpdateMetricValues {
         organization_id: u64,
@@ -7220,6 +7217,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CancelIntercompanyTransaction { .. } => "cancel_intercompany_transaction",
             Reducer::CancelLandedCost { .. } => "cancel_landed_cost",
             Reducer::CancelManufacturingOrder { .. } => "cancel_manufacturing_order",
+            Reducer::CancelMessageBatch { .. } => "cancel_message_batch",
             Reducer::CancelPayment { .. } => "cancel_payment",
             Reducer::CancelPayslip { .. } => "cancel_payslip",
             Reducer::CancelPickingBatch { .. } => "cancel_picking_batch",
@@ -7364,6 +7362,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateLoyaltyProgram { .. } => "create_loyalty_program",
             Reducer::CreateMailTemplate { .. } => "create_mail_template",
             Reducer::CreateManufacturingOrder { .. } => "create_manufacturing_order",
+            Reducer::CreateMessageBatch { .. } => "create_message_batch",
+            Reducer::CreateMessageTemplate { .. } => "create_message_template",
+            Reducer::CreateOperationalMessage { .. } => "create_operational_message",
             Reducer::CreateOpportunity { .. } => "create_opportunity",
             Reducer::CreateOpportunityLine { .. } => "create_opportunity_line",
             Reducer::CreateOrganization { .. } => "create_organization",
@@ -7649,6 +7650,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordDocumentView { .. } => "record_document_view",
             Reducer::RecordGoogleDriveSync { .. } => "record_google_drive_sync",
             Reducer::RecordGoogleDriveSyncError { .. } => "record_google_drive_sync_error",
+            Reducer::RecordMessageCopied { .. } => "record_message_copied",
             Reducer::RecordPrivacyConsent { .. } => "record_privacy_consent",
             Reducer::RecordReportRun { .. } => "record_report_run",
             Reducer::RecordTelemetry { .. } => "record_telemetry",
@@ -7685,6 +7687,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RetryIntercompanyTransaction { .. } => "retry_intercompany_transaction",
             Reducer::RetryIotAction { .. } => "retry_iot_action",
             Reducer::ReversePaymentTransaction { .. } => "reverse_payment_transaction",
+            Reducer::ReviewMessageBatch { .. } => "review_message_batch",
             Reducer::ReviewSupplierIntake { .. } => "review_supplier_intake",
             Reducer::RevokePermission { .. } => "revoke_permission",
             Reducer::RevokeRole { .. } => "revoke_role",
@@ -7704,6 +7707,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllInventoryTests => "run_all_inventory_tests",
             Reducer::RunAllPlatformTests => "run_all_platform_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
+            Reducer::RunCoreOperationalMessagingTest => "run_core_operational_messaging_test",
             Reducer::RunCrmContactIdentityTest => "run_crm_contact_identity_test",
             Reducer::RunCrmContactUpdateDeleteTest => "run_crm_contact_update_delete_test",
             Reducer::RunCrmOpportunityConvertTest => "run_crm_opportunity_convert_test",
@@ -7740,6 +7744,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetAssetActive { .. } => "set_asset_active",
             Reducer::SetBillingStatus { .. } => "set_billing_status",
             Reducer::SetConsolidationCompanyRate { .. } => "set_consolidation_company_rate",
+            Reducer::SetContactCommunicationPreference { .. } => "set_contact_communication_preference",
             Reducer::SetFormRoleConfig { .. } => "set_form_role_config",
             Reducer::SetIntercompanyRuleActive { .. } => "set_intercompany_rule_active",
             Reducer::SetIotThreshold { .. } => "set_iot_threshold",
@@ -7769,38 +7774,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SubmitSupplierIntake { .. } => "submit_supplier_intake",
             Reducer::SubscribeToRecord { .. } => "subscribe_to_record",
             Reducer::SyncHubDevices { .. } => "sync_hub_devices",
-            Reducer::TestAuditAuthorization => "test_audit_authorization",
-            Reducer::TestAuditLogDataIntegrity => "test_audit_log_data_integrity",
-            Reducer::TestAuditLogging => "test_audit_logging",
-            Reducer::TestAuditRuleEdgeCases => "test_audit_rule_edge_cases",
-            Reducer::TestCasbinRulePatterns => "test_casbin_rule_patterns",
-            Reducer::TestClassificationLevelValidation => "test_classification_level_validation",
-            Reducer::TestClassificationRuleEdgeCases => "test_classification_rule_edge_cases",
-            Reducer::TestCountryDataIntegrity => "test_country_data_integrity",
-            Reducer::TestCurrencyDataIntegrity => "test_currency_data_integrity",
-            Reducer::TestCurrencyRateEdgeCases => "test_currency_rate_edge_cases",
-            Reducer::TestDataProtectionSettings => "test_data_protection_settings",
             Reducer::TestIotDevice { .. } => "test_iot_device",
-            Reducer::TestOnboardingRbacMembershipFlows => "test_onboarding_rbac_membership_flows",
-            Reducer::TestOrgPermissionDenyBeatsAllow => "test_org_permission_deny_beats_allow",
-            Reducer::TestOrganizationIsolation => "test_organization_isolation",
-            Reducer::TestOrganizationLifecycle => "test_organization_lifecycle",
-            Reducer::TestOrganizationSettingsEdgeCases => "test_organization_settings_edge_cases",
-            Reducer::TestPermissionSystem => "test_permission_system",
-            Reducer::TestPermissionsErrorCases => "test_permissions_error_cases",
-            Reducer::TestPrivacyConsentEdgeCases => "test_privacy_consent_edge_cases",
-            Reducer::TestPrivacySystem => "test_privacy_system",
-            Reducer::TestQueueJobEdgeCases => "test_queue_job_edge_cases",
-            Reducer::TestQueueSystem => "test_queue_system",
-            Reducer::TestReferenceData => "test_reference_data",
-            Reducer::TestRoleHierarchy => "test_role_hierarchy",
-            Reducer::TestRoleUpdateEdgeCases => "test_role_update_edge_cases",
-            Reducer::TestUomEdgeCases => "test_uom_edge_cases",
-            Reducer::TestUserManagement => "test_user_management",
-            Reducer::TestUserOrganizationMembership => "test_user_organization_membership",
-            Reducer::TestUserProfileEdgeCases => "test_user_profile_edge_cases",
-            Reducer::TestUserSessionEdgeCases => "test_user_session_edge_cases",
-            Reducer::TestWorkerEdgeCases => "test_worker_edge_cases",
             Reducer::ToggleProjectFavorite { .. } => "toggle_project_favorite",
             Reducer::UnassignTeamMemberSkill { .. } => "unassign_team_member_skill",
             Reducer::UnblockWorkcenter { .. } => "unblock_workcenter",
@@ -7876,6 +7850,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateLeadRevenue { .. } => "update_lead_revenue",
             Reducer::UpdateLeaveType { .. } => "update_leave_type",
             Reducer::UpdateMailTemplate { .. } => "update_mail_template",
+            Reducer::UpdateMessageTemplate { .. } => "update_message_template",
             Reducer::UpdateMetricValues { .. } => "update_metric_values",
             Reducer::UpdateOpportunity { .. } => "update_opportunity",
             Reducer::UpdateOrgMemberDetails { .. } => "update_org_member_details",
@@ -8544,6 +8519,13 @@ Reducer::BillTimesheets{
 }             => __sats::bsatn::to_vec(&cancel_manufacturing_order_reducer::CancelManufacturingOrderArgs {
                 organization_id: organization_id.clone(),
                 mo_id: mo_id.clone(),
+}),
+            Reducer::CancelMessageBatch{
+                organization_id,
+                batch_id,
+}             => __sats::bsatn::to_vec(&cancel_message_batch_reducer::CancelMessageBatchArgs {
+                organization_id: organization_id.clone(),
+                batch_id: batch_id.clone(),
 }),
             Reducer::CancelPayment{
                 organization_id,
@@ -9752,6 +9734,27 @@ Reducer::BillTimesheets{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_manufacturing_order_reducer::CreateManufacturingOrderArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateMessageBatch{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_message_batch_reducer::CreateMessageBatchArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateMessageTemplate{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_message_template_reducer::CreateMessageTemplateArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateOperationalMessage{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_operational_message_reducer::CreateOperationalMessageArgs {
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
@@ -12039,6 +12042,13 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 error_message: error_message.clone(),
 }),
+            Reducer::RecordMessageCopied{
+                organization_id,
+                message_id,
+}             => __sats::bsatn::to_vec(&record_message_copied_reducer::RecordMessageCopiedArgs {
+                organization_id: organization_id.clone(),
+                message_id: message_id.clone(),
+}),
             Reducer::RecordPrivacyConsent{
                 organization_id,
                 params,
@@ -12331,6 +12341,15 @@ Reducer::MoveStockQuant{
                 transaction_id: transaction_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::ReviewMessageBatch{
+                organization_id,
+                batch_id,
+                params,
+}             => __sats::bsatn::to_vec(&review_message_batch_reducer::ReviewMessageBatchArgs {
+                organization_id: organization_id.clone(),
+                batch_id: batch_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ReviewSupplierIntake{
                 organization_id,
                 intake_id,
@@ -12390,6 +12409,8 @@ Reducer::RunAllInventoryTests => __sats::bsatn::to_vec(&run_all_inventory_tests_
 Reducer::RunAllPlatformTests => __sats::bsatn::to_vec(&run_all_platform_tests_reducer::RunAllPlatformTestsArgs {
                 }),
 Reducer::RunAllSalesTests => __sats::bsatn::to_vec(&run_all_sales_tests_reducer::RunAllSalesTestsArgs {
+                }),
+Reducer::RunCoreOperationalMessagingTest => __sats::bsatn::to_vec(&run_core_operational_messaging_test_reducer::RunCoreOperationalMessagingTestArgs {
                 }),
 Reducer::RunCrmContactIdentityTest => __sats::bsatn::to_vec(&run_crm_contact_identity_test_reducer::RunCrmContactIdentityTestArgs {
                 }),
@@ -12557,6 +12578,19 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&set_consolidation_company_rate_reducer::SetConsolidationCompanyRateArgs {
                 organization_id: organization_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::SetContactCommunicationPreference{
+                organization_id,
+                company_id,
+                contact_id,
+                channel,
+                opted_in,
+}             => __sats::bsatn::to_vec(&set_contact_communication_preference_reducer::SetContactCommunicationPreferenceArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                contact_id: contact_id.clone(),
+                channel: channel.clone(),
+                opted_in: opted_in.clone(),
 }),
             Reducer::SetFormRoleConfig{
                 organization_id,
@@ -12821,76 +12855,14 @@ Reducer::SeedOrganizationFormConfigs{
                 hub_id: hub_id.clone(),
                 detected: detected.clone(),
 }),
-            Reducer::TestAuditAuthorization => __sats::bsatn::to_vec(&test_audit_authorization_reducer::TestAuditAuthorizationArgs {
-                }),
-Reducer::TestAuditLogDataIntegrity => __sats::bsatn::to_vec(&test_audit_log_data_integrity_reducer::TestAuditLogDataIntegrityArgs {
-                }),
-Reducer::TestAuditLogging => __sats::bsatn::to_vec(&test_audit_logging_reducer::TestAuditLoggingArgs {
-                }),
-Reducer::TestAuditRuleEdgeCases => __sats::bsatn::to_vec(&test_audit_rule_edge_cases_reducer::TestAuditRuleEdgeCasesArgs {
-                }),
-Reducer::TestCasbinRulePatterns => __sats::bsatn::to_vec(&test_casbin_rule_patterns_reducer::TestCasbinRulePatternsArgs {
-                }),
-Reducer::TestClassificationLevelValidation => __sats::bsatn::to_vec(&test_classification_level_validation_reducer::TestClassificationLevelValidationArgs {
-                }),
-Reducer::TestClassificationRuleEdgeCases => __sats::bsatn::to_vec(&test_classification_rule_edge_cases_reducer::TestClassificationRuleEdgeCasesArgs {
-                }),
-Reducer::TestCountryDataIntegrity => __sats::bsatn::to_vec(&test_country_data_integrity_reducer::TestCountryDataIntegrityArgs {
-                }),
-Reducer::TestCurrencyDataIntegrity => __sats::bsatn::to_vec(&test_currency_data_integrity_reducer::TestCurrencyDataIntegrityArgs {
-                }),
-Reducer::TestCurrencyRateEdgeCases => __sats::bsatn::to_vec(&test_currency_rate_edge_cases_reducer::TestCurrencyRateEdgeCasesArgs {
-                }),
-Reducer::TestDataProtectionSettings => __sats::bsatn::to_vec(&test_data_protection_settings_reducer::TestDataProtectionSettingsArgs {
-                }),
-Reducer::TestIotDevice{
+            Reducer::TestIotDevice{
                 organization_id,
                 device_id,
 }             => __sats::bsatn::to_vec(&test_iot_device_reducer::TestIotDeviceArgs {
                 organization_id: organization_id.clone(),
                 device_id: device_id.clone(),
 }),
-            Reducer::TestOnboardingRbacMembershipFlows => __sats::bsatn::to_vec(&test_onboarding_rbac_membership_flows_reducer::TestOnboardingRbacMembershipFlowsArgs {
-                }),
-Reducer::TestOrgPermissionDenyBeatsAllow => __sats::bsatn::to_vec(&test_org_permission_deny_beats_allow_reducer::TestOrgPermissionDenyBeatsAllowArgs {
-                }),
-Reducer::TestOrganizationIsolation => __sats::bsatn::to_vec(&test_organization_isolation_reducer::TestOrganizationIsolationArgs {
-                }),
-Reducer::TestOrganizationLifecycle => __sats::bsatn::to_vec(&test_organization_lifecycle_reducer::TestOrganizationLifecycleArgs {
-                }),
-Reducer::TestOrganizationSettingsEdgeCases => __sats::bsatn::to_vec(&test_organization_settings_edge_cases_reducer::TestOrganizationSettingsEdgeCasesArgs {
-                }),
-Reducer::TestPermissionSystem => __sats::bsatn::to_vec(&test_permission_system_reducer::TestPermissionSystemArgs {
-                }),
-Reducer::TestPermissionsErrorCases => __sats::bsatn::to_vec(&test_permissions_error_cases_reducer::TestPermissionsErrorCasesArgs {
-                }),
-Reducer::TestPrivacyConsentEdgeCases => __sats::bsatn::to_vec(&test_privacy_consent_edge_cases_reducer::TestPrivacyConsentEdgeCasesArgs {
-                }),
-Reducer::TestPrivacySystem => __sats::bsatn::to_vec(&test_privacy_system_reducer::TestPrivacySystemArgs {
-                }),
-Reducer::TestQueueJobEdgeCases => __sats::bsatn::to_vec(&test_queue_job_edge_cases_reducer::TestQueueJobEdgeCasesArgs {
-                }),
-Reducer::TestQueueSystem => __sats::bsatn::to_vec(&test_queue_system_reducer::TestQueueSystemArgs {
-                }),
-Reducer::TestReferenceData => __sats::bsatn::to_vec(&test_reference_data_reducer::TestReferenceDataArgs {
-                }),
-Reducer::TestRoleHierarchy => __sats::bsatn::to_vec(&test_role_hierarchy_reducer::TestRoleHierarchyArgs {
-                }),
-Reducer::TestRoleUpdateEdgeCases => __sats::bsatn::to_vec(&test_role_update_edge_cases_reducer::TestRoleUpdateEdgeCasesArgs {
-                }),
-Reducer::TestUomEdgeCases => __sats::bsatn::to_vec(&test_uom_edge_cases_reducer::TestUomEdgeCasesArgs {
-                }),
-Reducer::TestUserManagement => __sats::bsatn::to_vec(&test_user_management_reducer::TestUserManagementArgs {
-                }),
-Reducer::TestUserOrganizationMembership => __sats::bsatn::to_vec(&test_user_organization_membership_reducer::TestUserOrganizationMembershipArgs {
-                }),
-Reducer::TestUserProfileEdgeCases => __sats::bsatn::to_vec(&test_user_profile_edge_cases_reducer::TestUserProfileEdgeCasesArgs {
-                }),
-Reducer::TestUserSessionEdgeCases => __sats::bsatn::to_vec(&test_user_session_edge_cases_reducer::TestUserSessionEdgeCasesArgs {
-                }),
-Reducer::TestWorkerEdgeCases => __sats::bsatn::to_vec(&test_worker_edge_cases_reducer::TestWorkerEdgeCasesArgs {
-                }),
-Reducer::ToggleProjectFavorite{
+            Reducer::ToggleProjectFavorite{
                 organization_id,
                 project_id,
 }             => __sats::bsatn::to_vec(&toggle_project_favorite_reducer::ToggleProjectFavoriteArgs {
@@ -13606,6 +13578,15 @@ Reducer::ToggleProjectFavorite{
 }             => __sats::bsatn::to_vec(&update_mail_template_reducer::UpdateMailTemplateArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
+                template_id: template_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateMessageTemplate{
+                organization_id,
+                template_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_message_template_reducer::UpdateMessageTemplateArgs {
+                organization_id: organization_id.clone(),
                 template_id: template_id.clone(),
                 params: params.clone(),
 }),
@@ -14456,6 +14437,7 @@ pub struct DbUpdate {
     contact: __sdk::TableUpdate<Contact>,
     contact_category: __sdk::TableUpdate<ContactCategory>,
     contact_category_assignment: __sdk::TableUpdate<ContactCategoryAssignment>,
+    contact_communication_preference: __sdk::TableUpdate<ContactCommunicationPreference>,
     contact_duplicate_candidate: __sdk::TableUpdate<ContactDuplicateCandidate>,
     contact_phone_identity: __sdk::TableUpdate<ContactPhoneIdentity>,
     contact_relationship: __sdk::TableUpdate<ContactRelationship>,
@@ -14526,6 +14508,8 @@ pub struct DbUpdate {
     mail_follower: __sdk::TableUpdate<MailFollower>,
     mail_message: __sdk::TableUpdate<MailMessage>,
     mail_template: __sdk::TableUpdate<MailTemplate>,
+    message_batch: __sdk::TableUpdate<MessageBatch>,
+    message_template: __sdk::TableUpdate<MessageTemplate>,
     mrp_bom: __sdk::TableUpdate<MrpBom>,
     mrp_bom_line: __sdk::TableUpdate<MrpBomLine>,
     mrp_production: __sdk::TableUpdate<MrpProduction>,
@@ -14533,6 +14517,7 @@ pub struct DbUpdate {
     mrp_workcenter: __sdk::TableUpdate<MrpWorkcenter>,
     mrp_workcenter_productivity: __sdk::TableUpdate<MrpWorkcenterProductivity>,
     mrp_workorder: __sdk::TableUpdate<MrpWorkorder>,
+    operational_message: __sdk::TableUpdate<OperationalMessage>,
     opp_stage: __sdk::TableUpdate<OpportunityStage>,
     opportunity: __sdk::TableUpdate<Opportunity>,
     opportunity_line: __sdk::TableUpdate<OpportunityLine>,
@@ -14726,6 +14711,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "contact" => db_update.contact.append(contact_table::parse_table_update(table_update)?),
     "contact_category" => db_update.contact_category.append(contact_category_table::parse_table_update(table_update)?),
     "contact_category_assignment" => db_update.contact_category_assignment.append(contact_category_assignment_table::parse_table_update(table_update)?),
+    "contact_communication_preference" => db_update.contact_communication_preference.append(contact_communication_preference_table::parse_table_update(table_update)?),
     "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(contact_duplicate_candidate_table::parse_table_update(table_update)?),
     "contact_phone_identity" => db_update.contact_phone_identity.append(contact_phone_identity_table::parse_table_update(table_update)?),
     "contact_relationship" => db_update.contact_relationship.append(contact_relationship_table::parse_table_update(table_update)?),
@@ -14796,6 +14782,8 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "mail_follower" => db_update.mail_follower.append(mail_follower_table::parse_table_update(table_update)?),
     "mail_message" => db_update.mail_message.append(mail_message_table::parse_table_update(table_update)?),
     "mail_template" => db_update.mail_template.append(mail_template_table::parse_table_update(table_update)?),
+    "message_batch" => db_update.message_batch.append(message_batch_table::parse_table_update(table_update)?),
+    "message_template" => db_update.message_template.append(message_template_table::parse_table_update(table_update)?),
     "mrp_bom" => db_update.mrp_bom.append(mrp_bom_table::parse_table_update(table_update)?),
     "mrp_bom_line" => db_update.mrp_bom_line.append(mrp_bom_line_table::parse_table_update(table_update)?),
     "mrp_production" => db_update.mrp_production.append(mrp_production_table::parse_table_update(table_update)?),
@@ -14803,6 +14791,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "mrp_workcenter" => db_update.mrp_workcenter.append(mrp_workcenter_table::parse_table_update(table_update)?),
     "mrp_workcenter_productivity" => db_update.mrp_workcenter_productivity.append(mrp_workcenter_productivity_table::parse_table_update(table_update)?),
     "mrp_workorder" => db_update.mrp_workorder.append(mrp_workorder_table::parse_table_update(table_update)?),
+    "operational_message" => db_update.operational_message.append(operational_message_table::parse_table_update(table_update)?),
     "opp_stage" => db_update.opp_stage.append(opp_stage_table::parse_table_update(table_update)?),
     "opportunity" => db_update.opportunity.append(opportunity_table::parse_table_update(table_update)?),
     "opportunity_line" => db_update.opportunity_line.append(opportunity_line_table::parse_table_update(table_update)?),
@@ -15008,6 +14997,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.contact = cache.apply_diff_to_table::<Contact>("contact", &self.contact).with_updates_by_pk(|row| &row.id);
         diff.contact_category = cache.apply_diff_to_table::<ContactCategory>("contact_category", &self.contact_category).with_updates_by_pk(|row| &row.id);
         diff.contact_category_assignment = cache.apply_diff_to_table::<ContactCategoryAssignment>("contact_category_assignment", &self.contact_category_assignment).with_updates_by_pk(|row| &row.id);
+        diff.contact_communication_preference = cache.apply_diff_to_table::<ContactCommunicationPreference>("contact_communication_preference", &self.contact_communication_preference).with_updates_by_pk(|row| &row.id);
         diff.contact_duplicate_candidate = cache.apply_diff_to_table::<ContactDuplicateCandidate>("contact_duplicate_candidate", &self.contact_duplicate_candidate).with_updates_by_pk(|row| &row.id);
         diff.contact_phone_identity = cache.apply_diff_to_table::<ContactPhoneIdentity>("contact_phone_identity", &self.contact_phone_identity).with_updates_by_pk(|row| &row.id);
         diff.contact_relationship = cache.apply_diff_to_table::<ContactRelationship>("contact_relationship", &self.contact_relationship).with_updates_by_pk(|row| &row.id);
@@ -15078,6 +15068,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.mail_follower = cache.apply_diff_to_table::<MailFollower>("mail_follower", &self.mail_follower).with_updates_by_pk(|row| &row.id);
         diff.mail_message = cache.apply_diff_to_table::<MailMessage>("mail_message", &self.mail_message).with_updates_by_pk(|row| &row.id);
         diff.mail_template = cache.apply_diff_to_table::<MailTemplate>("mail_template", &self.mail_template).with_updates_by_pk(|row| &row.id);
+        diff.message_batch = cache.apply_diff_to_table::<MessageBatch>("message_batch", &self.message_batch).with_updates_by_pk(|row| &row.id);
+        diff.message_template = cache.apply_diff_to_table::<MessageTemplate>("message_template", &self.message_template).with_updates_by_pk(|row| &row.id);
         diff.mrp_bom = cache.apply_diff_to_table::<MrpBom>("mrp_bom", &self.mrp_bom).with_updates_by_pk(|row| &row.id);
         diff.mrp_bom_line = cache.apply_diff_to_table::<MrpBomLine>("mrp_bom_line", &self.mrp_bom_line).with_updates_by_pk(|row| &row.id);
         diff.mrp_production = cache.apply_diff_to_table::<MrpProduction>("mrp_production", &self.mrp_production).with_updates_by_pk(|row| &row.id);
@@ -15085,6 +15077,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.mrp_workcenter = cache.apply_diff_to_table::<MrpWorkcenter>("mrp_workcenter", &self.mrp_workcenter).with_updates_by_pk(|row| &row.id);
         diff.mrp_workcenter_productivity = cache.apply_diff_to_table::<MrpWorkcenterProductivity>("mrp_workcenter_productivity", &self.mrp_workcenter_productivity).with_updates_by_pk(|row| &row.id);
         diff.mrp_workorder = cache.apply_diff_to_table::<MrpWorkorder>("mrp_workorder", &self.mrp_workorder).with_updates_by_pk(|row| &row.id);
+        diff.operational_message = cache.apply_diff_to_table::<OperationalMessage>("operational_message", &self.operational_message).with_updates_by_pk(|row| &row.id);
         diff.opp_stage = cache.apply_diff_to_table::<OpportunityStage>("opp_stage", &self.opp_stage).with_updates_by_pk(|row| &row.id);
         diff.opportunity = cache.apply_diff_to_table::<Opportunity>("opportunity", &self.opportunity).with_updates_by_pk(|row| &row.id);
         diff.opportunity_line = cache.apply_diff_to_table::<OpportunityLine>("opportunity_line", &self.opportunity_line).with_updates_by_pk(|row| &row.id);
@@ -15275,6 +15268,7 @@ for table_rows in raw.tables {
                 "contact" => db_update.contact.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_category" => db_update.contact_category.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_category_assignment" => db_update.contact_category_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_communication_preference" => db_update.contact_communication_preference.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_phone_identity" => db_update.contact_phone_identity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_relationship" => db_update.contact_relationship.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -15345,6 +15339,8 @@ for table_rows in raw.tables {
                 "mail_follower" => db_update.mail_follower.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mail_message" => db_update.mail_message.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mail_template" => db_update.mail_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "message_batch" => db_update.message_batch.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "message_template" => db_update.message_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mrp_bom" => db_update.mrp_bom.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mrp_bom_line" => db_update.mrp_bom_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mrp_production" => db_update.mrp_production.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -15352,6 +15348,7 @@ for table_rows in raw.tables {
                 "mrp_workcenter" => db_update.mrp_workcenter.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mrp_workcenter_productivity" => db_update.mrp_workcenter_productivity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mrp_workorder" => db_update.mrp_workorder.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "operational_message" => db_update.operational_message.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "opp_stage" => db_update.opp_stage.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "opportunity" => db_update.opportunity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "opportunity_line" => db_update.opportunity_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -15542,6 +15539,7 @@ for table_rows in raw.tables {
                 "contact" => db_update.contact.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_category" => db_update.contact_category.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_category_assignment" => db_update.contact_category_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_communication_preference" => db_update.contact_communication_preference.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_phone_identity" => db_update.contact_phone_identity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_relationship" => db_update.contact_relationship.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -15612,6 +15610,8 @@ for table_rows in raw.tables {
                 "mail_follower" => db_update.mail_follower.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mail_message" => db_update.mail_message.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mail_template" => db_update.mail_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "message_batch" => db_update.message_batch.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "message_template" => db_update.message_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mrp_bom" => db_update.mrp_bom.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mrp_bom_line" => db_update.mrp_bom_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mrp_production" => db_update.mrp_production.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -15619,6 +15619,7 @@ for table_rows in raw.tables {
                 "mrp_workcenter" => db_update.mrp_workcenter.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mrp_workcenter_productivity" => db_update.mrp_workcenter_productivity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mrp_workorder" => db_update.mrp_workorder.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "operational_message" => db_update.operational_message.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "opp_stage" => db_update.opp_stage.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "opportunity" => db_update.opportunity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "opportunity_line" => db_update.opportunity_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -15811,6 +15812,7 @@ pub struct AppliedDiff<'r> {
     contact: __sdk::TableAppliedDiff<'r, Contact>,
     contact_category: __sdk::TableAppliedDiff<'r, ContactCategory>,
     contact_category_assignment: __sdk::TableAppliedDiff<'r, ContactCategoryAssignment>,
+    contact_communication_preference: __sdk::TableAppliedDiff<'r, ContactCommunicationPreference>,
     contact_duplicate_candidate: __sdk::TableAppliedDiff<'r, ContactDuplicateCandidate>,
     contact_phone_identity: __sdk::TableAppliedDiff<'r, ContactPhoneIdentity>,
     contact_relationship: __sdk::TableAppliedDiff<'r, ContactRelationship>,
@@ -15881,6 +15883,8 @@ pub struct AppliedDiff<'r> {
     mail_follower: __sdk::TableAppliedDiff<'r, MailFollower>,
     mail_message: __sdk::TableAppliedDiff<'r, MailMessage>,
     mail_template: __sdk::TableAppliedDiff<'r, MailTemplate>,
+    message_batch: __sdk::TableAppliedDiff<'r, MessageBatch>,
+    message_template: __sdk::TableAppliedDiff<'r, MessageTemplate>,
     mrp_bom: __sdk::TableAppliedDiff<'r, MrpBom>,
     mrp_bom_line: __sdk::TableAppliedDiff<'r, MrpBomLine>,
     mrp_production: __sdk::TableAppliedDiff<'r, MrpProduction>,
@@ -15888,6 +15892,7 @@ pub struct AppliedDiff<'r> {
     mrp_workcenter: __sdk::TableAppliedDiff<'r, MrpWorkcenter>,
     mrp_workcenter_productivity: __sdk::TableAppliedDiff<'r, MrpWorkcenterProductivity>,
     mrp_workorder: __sdk::TableAppliedDiff<'r, MrpWorkorder>,
+    operational_message: __sdk::TableAppliedDiff<'r, OperationalMessage>,
     opp_stage: __sdk::TableAppliedDiff<'r, OpportunityStage>,
     opportunity: __sdk::TableAppliedDiff<'r, Opportunity>,
     opportunity_line: __sdk::TableAppliedDiff<'r, OpportunityLine>,
@@ -16081,6 +16086,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Contact>("contact", &self.contact, event);
         callbacks.invoke_table_row_callbacks::<ContactCategory>("contact_category", &self.contact_category, event);
         callbacks.invoke_table_row_callbacks::<ContactCategoryAssignment>("contact_category_assignment", &self.contact_category_assignment, event);
+        callbacks.invoke_table_row_callbacks::<ContactCommunicationPreference>("contact_communication_preference", &self.contact_communication_preference, event);
         callbacks.invoke_table_row_callbacks::<ContactDuplicateCandidate>("contact_duplicate_candidate", &self.contact_duplicate_candidate, event);
         callbacks.invoke_table_row_callbacks::<ContactPhoneIdentity>("contact_phone_identity", &self.contact_phone_identity, event);
         callbacks.invoke_table_row_callbacks::<ContactRelationship>("contact_relationship", &self.contact_relationship, event);
@@ -16151,6 +16157,8 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<MailFollower>("mail_follower", &self.mail_follower, event);
         callbacks.invoke_table_row_callbacks::<MailMessage>("mail_message", &self.mail_message, event);
         callbacks.invoke_table_row_callbacks::<MailTemplate>("mail_template", &self.mail_template, event);
+        callbacks.invoke_table_row_callbacks::<MessageBatch>("message_batch", &self.message_batch, event);
+        callbacks.invoke_table_row_callbacks::<MessageTemplate>("message_template", &self.message_template, event);
         callbacks.invoke_table_row_callbacks::<MrpBom>("mrp_bom", &self.mrp_bom, event);
         callbacks.invoke_table_row_callbacks::<MrpBomLine>("mrp_bom_line", &self.mrp_bom_line, event);
         callbacks.invoke_table_row_callbacks::<MrpProduction>("mrp_production", &self.mrp_production, event);
@@ -16158,6 +16166,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<MrpWorkcenter>("mrp_workcenter", &self.mrp_workcenter, event);
         callbacks.invoke_table_row_callbacks::<MrpWorkcenterProductivity>("mrp_workcenter_productivity", &self.mrp_workcenter_productivity, event);
         callbacks.invoke_table_row_callbacks::<MrpWorkorder>("mrp_workorder", &self.mrp_workorder, event);
+        callbacks.invoke_table_row_callbacks::<OperationalMessage>("operational_message", &self.operational_message, event);
         callbacks.invoke_table_row_callbacks::<OpportunityStage>("opp_stage", &self.opp_stage, event);
         callbacks.invoke_table_row_callbacks::<Opportunity>("opportunity", &self.opportunity, event);
         callbacks.invoke_table_row_callbacks::<OpportunityLine>("opportunity_line", &self.opportunity_line, event);
@@ -16982,6 +16991,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         contact_table::register_table(client_cache);
         contact_category_table::register_table(client_cache);
         contact_category_assignment_table::register_table(client_cache);
+        contact_communication_preference_table::register_table(client_cache);
         contact_duplicate_candidate_table::register_table(client_cache);
         contact_phone_identity_table::register_table(client_cache);
         contact_relationship_table::register_table(client_cache);
@@ -17052,6 +17062,8 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         mail_follower_table::register_table(client_cache);
         mail_message_table::register_table(client_cache);
         mail_template_table::register_table(client_cache);
+        message_batch_table::register_table(client_cache);
+        message_template_table::register_table(client_cache);
         mrp_bom_table::register_table(client_cache);
         mrp_bom_line_table::register_table(client_cache);
         mrp_production_table::register_table(client_cache);
@@ -17059,6 +17071,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         mrp_workcenter_table::register_table(client_cache);
         mrp_workcenter_productivity_table::register_table(client_cache);
         mrp_workorder_table::register_table(client_cache);
+        operational_message_table::register_table(client_cache);
         opp_stage_table::register_table(client_cache);
         opportunity_table::register_table(client_cache);
         opportunity_line_table::register_table(client_cache);
@@ -17244,6 +17257,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "contact",
         "contact_category",
         "contact_category_assignment",
+        "contact_communication_preference",
         "contact_duplicate_candidate",
         "contact_phone_identity",
         "contact_relationship",
@@ -17314,6 +17328,8 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "mail_follower",
         "mail_message",
         "mail_template",
+        "message_batch",
+        "message_template",
         "mrp_bom",
         "mrp_bom_line",
         "mrp_production",
@@ -17321,6 +17337,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "mrp_workcenter",
         "mrp_workcenter_productivity",
         "mrp_workorder",
+        "operational_message",
         "opp_stage",
         "opportunity",
         "opportunity_line",

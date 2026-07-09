@@ -10,6 +10,7 @@ mod crm;
 mod documents;
 mod inventory;
 mod mail;
+mod messaging;
 mod proposals;
 mod sales;
 mod session;
@@ -32,6 +33,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(accounting::router())
         .merge(documents::router())
         .merge(mail::router())
+        .merge(messaging::router())
         .merge(inventory::router())
         .merge(settings::router())
         .merge(bootstrap::router())

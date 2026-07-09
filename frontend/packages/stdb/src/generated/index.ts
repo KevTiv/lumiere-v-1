@@ -99,6 +99,7 @@ import CancelContractReducer from "./cancel_contract_reducer";
 import CancelIntercompanyTransactionReducer from "./cancel_intercompany_transaction_reducer";
 import CancelLandedCostReducer from "./cancel_landed_cost_reducer";
 import CancelManufacturingOrderReducer from "./cancel_manufacturing_order_reducer";
+import CancelMessageBatchReducer from "./cancel_message_batch_reducer";
 import CancelPaymentReducer from "./cancel_payment_reducer";
 import CancelPayslipReducer from "./cancel_payslip_reducer";
 import CancelPickingBatchReducer from "./cancel_picking_batch_reducer";
@@ -243,6 +244,9 @@ import CreateLoyaltyCardReducer from "./create_loyalty_card_reducer";
 import CreateLoyaltyProgramReducer from "./create_loyalty_program_reducer";
 import CreateMailTemplateReducer from "./create_mail_template_reducer";
 import CreateManufacturingOrderReducer from "./create_manufacturing_order_reducer";
+import CreateMessageBatchReducer from "./create_message_batch_reducer";
+import CreateMessageTemplateReducer from "./create_message_template_reducer";
+import CreateOperationalMessageReducer from "./create_operational_message_reducer";
 import CreateOpportunityReducer from "./create_opportunity_reducer";
 import CreateOpportunityLineReducer from "./create_opportunity_line_reducer";
 import CreateOrganizationReducer from "./create_organization_reducer";
@@ -528,6 +532,7 @@ import RecordCycleCountLineReducer from "./record_cycle_count_line_reducer";
 import RecordDocumentViewReducer from "./record_document_view_reducer";
 import RecordGoogleDriveSyncReducer from "./record_google_drive_sync_reducer";
 import RecordGoogleDriveSyncErrorReducer from "./record_google_drive_sync_error_reducer";
+import RecordMessageCopiedReducer from "./record_message_copied_reducer";
 import RecordPrivacyConsentReducer from "./record_privacy_consent_reducer";
 import RecordReportRunReducer from "./record_report_run_reducer";
 import RecordTelemetryReducer from "./record_telemetry_reducer";
@@ -564,6 +569,7 @@ import RestoreProductCategoryReducer from "./restore_product_category_reducer";
 import RetryIntercompanyTransactionReducer from "./retry_intercompany_transaction_reducer";
 import RetryIotActionReducer from "./retry_iot_action_reducer";
 import ReversePaymentTransactionReducer from "./reverse_payment_transaction_reducer";
+import ReviewMessageBatchReducer from "./review_message_batch_reducer";
 import ReviewSupplierIntakeReducer from "./review_supplier_intake_reducer";
 import RevokePermissionReducer from "./revoke_permission_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
@@ -583,6 +589,7 @@ import RunAllDomainTestsReducer from "./run_all_domain_tests_reducer";
 import RunAllInventoryTestsReducer from "./run_all_inventory_tests_reducer";
 import RunAllPlatformTestsReducer from "./run_all_platform_tests_reducer";
 import RunAllSalesTestsReducer from "./run_all_sales_tests_reducer";
+import RunCoreOperationalMessagingTestReducer from "./run_core_operational_messaging_test_reducer";
 import RunCrmContactIdentityTestReducer from "./run_crm_contact_identity_test_reducer";
 import RunCrmContactUpdateDeleteTestReducer from "./run_crm_contact_update_delete_test_reducer";
 import RunCrmOpportunityConvertTestReducer from "./run_crm_opportunity_convert_test_reducer";
@@ -619,6 +626,7 @@ import SetArticlePublishedReducer from "./set_article_published_reducer";
 import SetAssetActiveReducer from "./set_asset_active_reducer";
 import SetBillingStatusReducer from "./set_billing_status_reducer";
 import SetConsolidationCompanyRateReducer from "./set_consolidation_company_rate_reducer";
+import SetContactCommunicationPreferenceReducer from "./set_contact_communication_preference_reducer";
 import SetFormRoleConfigReducer from "./set_form_role_config_reducer";
 import SetIntercompanyRuleActiveReducer from "./set_intercompany_rule_active_reducer";
 import SetIotThresholdReducer from "./set_iot_threshold_reducer";
@@ -648,38 +656,7 @@ import SubmitPurchaseRequisitionReducer from "./submit_purchase_requisition_redu
 import SubmitSupplierIntakeReducer from "./submit_supplier_intake_reducer";
 import SubscribeToRecordReducer from "./subscribe_to_record_reducer";
 import SyncHubDevicesReducer from "./sync_hub_devices_reducer";
-import TestAuditAuthorizationReducer from "./test_audit_authorization_reducer";
-import TestAuditLogDataIntegrityReducer from "./test_audit_log_data_integrity_reducer";
-import TestAuditLoggingReducer from "./test_audit_logging_reducer";
-import TestAuditRuleEdgeCasesReducer from "./test_audit_rule_edge_cases_reducer";
-import TestCasbinRulePatternsReducer from "./test_casbin_rule_patterns_reducer";
-import TestClassificationLevelValidationReducer from "./test_classification_level_validation_reducer";
-import TestClassificationRuleEdgeCasesReducer from "./test_classification_rule_edge_cases_reducer";
-import TestCountryDataIntegrityReducer from "./test_country_data_integrity_reducer";
-import TestCurrencyDataIntegrityReducer from "./test_currency_data_integrity_reducer";
-import TestCurrencyRateEdgeCasesReducer from "./test_currency_rate_edge_cases_reducer";
-import TestDataProtectionSettingsReducer from "./test_data_protection_settings_reducer";
 import TestIotDeviceReducer from "./test_iot_device_reducer";
-import TestOnboardingRbacMembershipFlowsReducer from "./test_onboarding_rbac_membership_flows_reducer";
-import TestOrgPermissionDenyBeatsAllowReducer from "./test_org_permission_deny_beats_allow_reducer";
-import TestOrganizationIsolationReducer from "./test_organization_isolation_reducer";
-import TestOrganizationLifecycleReducer from "./test_organization_lifecycle_reducer";
-import TestOrganizationSettingsEdgeCasesReducer from "./test_organization_settings_edge_cases_reducer";
-import TestPermissionSystemReducer from "./test_permission_system_reducer";
-import TestPermissionsErrorCasesReducer from "./test_permissions_error_cases_reducer";
-import TestPrivacyConsentEdgeCasesReducer from "./test_privacy_consent_edge_cases_reducer";
-import TestPrivacySystemReducer from "./test_privacy_system_reducer";
-import TestQueueJobEdgeCasesReducer from "./test_queue_job_edge_cases_reducer";
-import TestQueueSystemReducer from "./test_queue_system_reducer";
-import TestReferenceDataReducer from "./test_reference_data_reducer";
-import TestRoleHierarchyReducer from "./test_role_hierarchy_reducer";
-import TestRoleUpdateEdgeCasesReducer from "./test_role_update_edge_cases_reducer";
-import TestUomEdgeCasesReducer from "./test_uom_edge_cases_reducer";
-import TestUserManagementReducer from "./test_user_management_reducer";
-import TestUserOrganizationMembershipReducer from "./test_user_organization_membership_reducer";
-import TestUserProfileEdgeCasesReducer from "./test_user_profile_edge_cases_reducer";
-import TestUserSessionEdgeCasesReducer from "./test_user_session_edge_cases_reducer";
-import TestWorkerEdgeCasesReducer from "./test_worker_edge_cases_reducer";
 import ToggleProjectFavoriteReducer from "./toggle_project_favorite_reducer";
 import UnassignTeamMemberSkillReducer from "./unassign_team_member_skill_reducer";
 import UnblockWorkcenterReducer from "./unblock_workcenter_reducer";
@@ -755,6 +732,7 @@ import UpdateLeadDetailsReducer from "./update_lead_details_reducer";
 import UpdateLeadRevenueReducer from "./update_lead_revenue_reducer";
 import UpdateLeaveTypeReducer from "./update_leave_type_reducer";
 import UpdateMailTemplateReducer from "./update_mail_template_reducer";
+import UpdateMessageTemplateReducer from "./update_message_template_reducer";
 import UpdateMetricValuesReducer from "./update_metric_values_reducer";
 import UpdateOpportunityReducer from "./update_opportunity_reducer";
 import UpdateOrgMemberDetailsReducer from "./update_org_member_details_reducer";
@@ -905,6 +883,7 @@ import ConsolidationJournalRow from "./consolidation_journal_table";
 import ContactRow from "./contact_table";
 import ContactCategoryRow from "./contact_category_table";
 import ContactCategoryAssignmentRow from "./contact_category_assignment_table";
+import ContactCommunicationPreferenceRow from "./contact_communication_preference_table";
 import ContactDuplicateCandidateRow from "./contact_duplicate_candidate_table";
 import ContactPhoneIdentityRow from "./contact_phone_identity_table";
 import ContactRelationshipRow from "./contact_relationship_table";
@@ -975,6 +954,8 @@ import LeadSourceRow from "./lead_source_table";
 import MailFollowerRow from "./mail_follower_table";
 import MailMessageRow from "./mail_message_table";
 import MailTemplateRow from "./mail_template_table";
+import MessageBatchRow from "./message_batch_table";
+import MessageTemplateRow from "./message_template_table";
 import MrpBomRow from "./mrp_bom_table";
 import MrpBomLineRow from "./mrp_bom_line_table";
 import MrpProductionRow from "./mrp_production_table";
@@ -982,6 +963,7 @@ import MrpRoutingWorkcenterRow from "./mrp_routing_workcenter_table";
 import MrpWorkcenterRow from "./mrp_workcenter_table";
 import MrpWorkcenterProductivityRow from "./mrp_workcenter_productivity_table";
 import MrpWorkorderRow from "./mrp_workorder_table";
+import OperationalMessageRow from "./operational_message_table";
 import OppStageRow from "./opp_stage_table";
 import OpportunityRow from "./opportunity_table";
 import OpportunityLineRow from "./opportunity_line_table";
@@ -2318,6 +2300,23 @@ const tablesSchema = __schema({
       { name: 'contact_category_assignment_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ContactCategoryAssignmentRow),
+  contact_communication_preference: __table({
+    name: 'contact_communication_preference',
+    indexes: [
+      { name: 'preference_by_contact', algorithm: 'btree', columns: [
+        'contactId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'preference_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'contact_communication_preference_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ContactCommunicationPreferenceRow),
   contact_duplicate_candidate: __table({
     name: 'contact_duplicate_candidate',
     indexes: [
@@ -3492,6 +3491,41 @@ const tablesSchema = __schema({
       { name: 'mail_template_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, MailTemplateRow),
+  message_batch: __table({
+    name: 'message_batch',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'message_batch_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'message_batch_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'message_batch_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MessageBatchRow),
+  message_template: __table({
+    name: 'message_template',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'message_template_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'message_template_by_key', algorithm: 'btree', columns: [
+        'organizationId',
+        'key',
+      ] },
+    ],
+    constraints: [
+      { name: 'message_template_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MessageTemplateRow),
   mrp_bom: __table({
     name: 'mrp_bom',
     indexes: [
@@ -3626,6 +3660,28 @@ const tablesSchema = __schema({
       { name: 'mrp_workorder_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, MrpWorkorderRow),
+  operational_message: __table({
+    name: 'operational_message',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'operational_message_by_batch', algorithm: 'btree', columns: [
+        'messageBatchId',
+      ] },
+      { name: 'operational_message_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'operational_message_by_subject', algorithm: 'btree', columns: [
+        'organizationId',
+        'subjectModel',
+        'subjectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'operational_message_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, OperationalMessageRow),
   opp_stage: __table({
     name: 'opp_stage',
     indexes: [
@@ -5807,6 +5863,7 @@ const reducersSchema = __reducers(
   __reducerSchema("cancel_intercompany_transaction", CancelIntercompanyTransactionReducer),
   __reducerSchema("cancel_landed_cost", CancelLandedCostReducer),
   __reducerSchema("cancel_manufacturing_order", CancelManufacturingOrderReducer),
+  __reducerSchema("cancel_message_batch", CancelMessageBatchReducer),
   __reducerSchema("cancel_payment", CancelPaymentReducer),
   __reducerSchema("cancel_payslip", CancelPayslipReducer),
   __reducerSchema("cancel_picking_batch", CancelPickingBatchReducer),
@@ -5951,6 +6008,9 @@ const reducersSchema = __reducers(
   __reducerSchema("create_loyalty_program", CreateLoyaltyProgramReducer),
   __reducerSchema("create_mail_template", CreateMailTemplateReducer),
   __reducerSchema("create_manufacturing_order", CreateManufacturingOrderReducer),
+  __reducerSchema("create_message_batch", CreateMessageBatchReducer),
+  __reducerSchema("create_message_template", CreateMessageTemplateReducer),
+  __reducerSchema("create_operational_message", CreateOperationalMessageReducer),
   __reducerSchema("create_opportunity", CreateOpportunityReducer),
   __reducerSchema("create_opportunity_line", CreateOpportunityLineReducer),
   __reducerSchema("create_organization", CreateOrganizationReducer),
@@ -6236,6 +6296,7 @@ const reducersSchema = __reducers(
   __reducerSchema("record_document_view", RecordDocumentViewReducer),
   __reducerSchema("record_google_drive_sync", RecordGoogleDriveSyncReducer),
   __reducerSchema("record_google_drive_sync_error", RecordGoogleDriveSyncErrorReducer),
+  __reducerSchema("record_message_copied", RecordMessageCopiedReducer),
   __reducerSchema("record_privacy_consent", RecordPrivacyConsentReducer),
   __reducerSchema("record_report_run", RecordReportRunReducer),
   __reducerSchema("record_telemetry", RecordTelemetryReducer),
@@ -6272,6 +6333,7 @@ const reducersSchema = __reducers(
   __reducerSchema("retry_intercompany_transaction", RetryIntercompanyTransactionReducer),
   __reducerSchema("retry_iot_action", RetryIotActionReducer),
   __reducerSchema("reverse_payment_transaction", ReversePaymentTransactionReducer),
+  __reducerSchema("review_message_batch", ReviewMessageBatchReducer),
   __reducerSchema("review_supplier_intake", ReviewSupplierIntakeReducer),
   __reducerSchema("revoke_permission", RevokePermissionReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
@@ -6291,6 +6353,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_all_inventory_tests", RunAllInventoryTestsReducer),
   __reducerSchema("run_all_platform_tests", RunAllPlatformTestsReducer),
   __reducerSchema("run_all_sales_tests", RunAllSalesTestsReducer),
+  __reducerSchema("run_core_operational_messaging_test", RunCoreOperationalMessagingTestReducer),
   __reducerSchema("run_crm_contact_identity_test", RunCrmContactIdentityTestReducer),
   __reducerSchema("run_crm_contact_update_delete_test", RunCrmContactUpdateDeleteTestReducer),
   __reducerSchema("run_crm_opportunity_convert_test", RunCrmOpportunityConvertTestReducer),
@@ -6327,6 +6390,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_asset_active", SetAssetActiveReducer),
   __reducerSchema("set_billing_status", SetBillingStatusReducer),
   __reducerSchema("set_consolidation_company_rate", SetConsolidationCompanyRateReducer),
+  __reducerSchema("set_contact_communication_preference", SetContactCommunicationPreferenceReducer),
   __reducerSchema("set_form_role_config", SetFormRoleConfigReducer),
   __reducerSchema("set_intercompany_rule_active", SetIntercompanyRuleActiveReducer),
   __reducerSchema("set_iot_threshold", SetIotThresholdReducer),
@@ -6356,38 +6420,7 @@ const reducersSchema = __reducers(
   __reducerSchema("submit_supplier_intake", SubmitSupplierIntakeReducer),
   __reducerSchema("subscribe_to_record", SubscribeToRecordReducer),
   __reducerSchema("sync_hub_devices", SyncHubDevicesReducer),
-  __reducerSchema("test_audit_authorization", TestAuditAuthorizationReducer),
-  __reducerSchema("test_audit_log_data_integrity", TestAuditLogDataIntegrityReducer),
-  __reducerSchema("test_audit_logging", TestAuditLoggingReducer),
-  __reducerSchema("test_audit_rule_edge_cases", TestAuditRuleEdgeCasesReducer),
-  __reducerSchema("test_casbin_rule_patterns", TestCasbinRulePatternsReducer),
-  __reducerSchema("test_classification_level_validation", TestClassificationLevelValidationReducer),
-  __reducerSchema("test_classification_rule_edge_cases", TestClassificationRuleEdgeCasesReducer),
-  __reducerSchema("test_country_data_integrity", TestCountryDataIntegrityReducer),
-  __reducerSchema("test_currency_data_integrity", TestCurrencyDataIntegrityReducer),
-  __reducerSchema("test_currency_rate_edge_cases", TestCurrencyRateEdgeCasesReducer),
-  __reducerSchema("test_data_protection_settings", TestDataProtectionSettingsReducer),
   __reducerSchema("test_iot_device", TestIotDeviceReducer),
-  __reducerSchema("test_onboarding_rbac_membership_flows", TestOnboardingRbacMembershipFlowsReducer),
-  __reducerSchema("test_org_permission_deny_beats_allow", TestOrgPermissionDenyBeatsAllowReducer),
-  __reducerSchema("test_organization_isolation", TestOrganizationIsolationReducer),
-  __reducerSchema("test_organization_lifecycle", TestOrganizationLifecycleReducer),
-  __reducerSchema("test_organization_settings_edge_cases", TestOrganizationSettingsEdgeCasesReducer),
-  __reducerSchema("test_permission_system", TestPermissionSystemReducer),
-  __reducerSchema("test_permissions_error_cases", TestPermissionsErrorCasesReducer),
-  __reducerSchema("test_privacy_consent_edge_cases", TestPrivacyConsentEdgeCasesReducer),
-  __reducerSchema("test_privacy_system", TestPrivacySystemReducer),
-  __reducerSchema("test_queue_job_edge_cases", TestQueueJobEdgeCasesReducer),
-  __reducerSchema("test_queue_system", TestQueueSystemReducer),
-  __reducerSchema("test_reference_data", TestReferenceDataReducer),
-  __reducerSchema("test_role_hierarchy", TestRoleHierarchyReducer),
-  __reducerSchema("test_role_update_edge_cases", TestRoleUpdateEdgeCasesReducer),
-  __reducerSchema("test_uom_edge_cases", TestUomEdgeCasesReducer),
-  __reducerSchema("test_user_management", TestUserManagementReducer),
-  __reducerSchema("test_user_organization_membership", TestUserOrganizationMembershipReducer),
-  __reducerSchema("test_user_profile_edge_cases", TestUserProfileEdgeCasesReducer),
-  __reducerSchema("test_user_session_edge_cases", TestUserSessionEdgeCasesReducer),
-  __reducerSchema("test_worker_edge_cases", TestWorkerEdgeCasesReducer),
   __reducerSchema("toggle_project_favorite", ToggleProjectFavoriteReducer),
   __reducerSchema("unassign_team_member_skill", UnassignTeamMemberSkillReducer),
   __reducerSchema("unblock_workcenter", UnblockWorkcenterReducer),
@@ -6463,6 +6496,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_lead_revenue", UpdateLeadRevenueReducer),
   __reducerSchema("update_leave_type", UpdateLeaveTypeReducer),
   __reducerSchema("update_mail_template", UpdateMailTemplateReducer),
+  __reducerSchema("update_message_template", UpdateMessageTemplateReducer),
   __reducerSchema("update_metric_values", UpdateMetricValuesReducer),
   __reducerSchema("update_opportunity", UpdateOpportunityReducer),
   __reducerSchema("update_org_member_details", UpdateOrgMemberDetailsReducer),

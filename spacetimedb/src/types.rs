@@ -1182,6 +1182,123 @@ impl ContactIdentityKind {
     }
 }
 
+/// Channel for operational messaging.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum MessageChannel {
+    Sms,
+    WhatsApp,
+    Email,
+    InApp,
+}
+
+impl MessageChannel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Sms => "sms",
+            Self::WhatsApp => "whatsapp",
+            Self::Email => "email",
+            Self::InApp => "in_app",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "sms" => Ok(Self::Sms),
+            "whatsapp" => Ok(Self::WhatsApp),
+            "email" => Ok(Self::Email),
+            "in_app" => Ok(Self::InApp),
+            other => Err(format!(
+                "Invalid message_channel '{}'. Valid values: sms, whatsapp, email, in_app",
+                other
+            )),
+        }
+    }
+}
+
+/// Lifecycle status of an operational message.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum OperationalMessageStatus {
+    Draft,
+    Copied,
+    Queued,
+    Sent,
+    Delivered,
+    Failed,
+    Cancelled,
+}
+
+impl OperationalMessageStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Draft => "draft",
+            Self::Copied => "copied",
+            Self::Queued => "queued",
+            Self::Sent => "sent",
+            Self::Delivered => "delivered",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "draft" => Ok(Self::Draft),
+            "copied" => Ok(Self::Copied),
+            "queued" => Ok(Self::Queued),
+            "sent" => Ok(Self::Sent),
+            "delivered" => Ok(Self::Delivered),
+            "failed" => Ok(Self::Failed),
+            "cancelled" => Ok(Self::Cancelled),
+            other => Err(format!(
+                "Invalid operational_message_status '{}'. Valid values: draft, copied, queued, sent, delivered, failed, cancelled",
+                other
+            )),
+        }
+    }
+}
+
+/// Lifecycle status of a message batch.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum MessageBatchStatus {
+    Draft,
+    PendingApproval,
+    Approved,
+    Rejected,
+    Partial,
+    Completed,
+    Cancelled,
+}
+
+impl MessageBatchStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Draft => "draft",
+            Self::PendingApproval => "pending_approval",
+            Self::Approved => "approved",
+            Self::Rejected => "rejected",
+            Self::Partial => "partial",
+            Self::Completed => "completed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "draft" => Ok(Self::Draft),
+            "pending_approval" => Ok(Self::PendingApproval),
+            "approved" => Ok(Self::Approved),
+            "rejected" => Ok(Self::Rejected),
+            "partial" => Ok(Self::Partial),
+            "completed" => Ok(Self::Completed),
+            "cancelled" => Ok(Self::Cancelled),
+            other => Err(format!(
+                "Invalid message_batch_status '{}'. Valid values: draft, pending_approval, approved, rejected, partial, completed, cancelled",
+                other
+            )),
+        }
+    }
+}
+
 /// Verification lifecycle for a contact phone identity.
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum ContactVerificationState {

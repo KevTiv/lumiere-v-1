@@ -20,6 +20,7 @@ pub mod billing;
 pub mod audit;
 pub mod auth;
 pub mod messaging;
+pub mod operational_messaging;
 pub mod organization;
 pub mod permissions;
 pub mod privacy;
