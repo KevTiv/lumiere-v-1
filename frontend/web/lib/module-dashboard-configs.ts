@@ -2431,6 +2431,11 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("reports.tabs.vatReport"),
       type: "custom",
     },
+    {
+      id: "query-builder",
+      label: t("reports.tabs.queryBuilder"),
+      type: "custom",
+    },
   ],
 })
 

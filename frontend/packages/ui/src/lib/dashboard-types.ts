@@ -77,8 +77,13 @@ export interface BarChartWidget extends BaseWidget {
 export interface DonutChartWidget extends BaseWidget {
   type: "donut-chart"
   data: {
-    segments: Array<{ name: string; value: number; color: string }>
-    innerRadius?: number
+    segments: Array<{ name: string; value: number; color?: string }>
+    /** Pixels or percentage string (e.g. "62%"). Defaults to "62%". */
+    innerRadius?: number | string
+    /** Small caption rendered under the total in the donut hole. */
+    centerLabel?: string
+    /** Message shown when there are no segments. Defaults to "No data". */
+    emptyLabel?: string
     onSegmentClick?: (name: string) => void
   }
 }

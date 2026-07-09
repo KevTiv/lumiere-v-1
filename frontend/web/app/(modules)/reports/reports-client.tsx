@@ -117,6 +117,7 @@ import {
 import { useRunAiSkill, type AiSkillRunResponse } from "@lumiere/query-hooks/hooks/ai-skills"
 import { PivotExplorer } from "./pivot-explorer"
 import { VatReportPanel } from "./vat-report-panel"
+import { QueryBuilder } from "./query-builder"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
 
@@ -969,6 +970,18 @@ function ReportsClientLoaded({
             ),
           }
         }
+        if (tab.id === "query-builder") {
+          return {
+            ...tab,
+            type: "custom" as const,
+            customContent: (
+              <QueryBuilder
+                organizationId={orgId}
+                dashboards={dashboards as unknown as Record<string, unknown>[]}
+              />
+            ),
+          }
+        }
         return tab
       }),
     }),
@@ -988,6 +1001,7 @@ function ReportsClientLoaded({
       analyticsMetricFormConfig,
       reports,
       trialBalances,
+      dashboards,
       orgId,
       t
     ],

@@ -9164,7 +9164,41 @@
       "dashboards": "Dashboards",
       "dashboardWidgets": "Widgets",
       "pivotExplorer": "Pivot explorer",
-      "vatReport": "VAT report"
+      "vatReport": "VAT report",
+      "queryBuilder": "Query builder"
+    },
+    "queryBuilder": {
+      "title": "Self-serve query builder",
+      "description": "Pick any ERP model, aggregate and filter it, preview the result live, then save it as a dashboard widget.",
+      "model": "Data source",
+      "modelPlaceholder": "Select a model…",
+      "widgetType": "Widget type",
+      "widgetTypes": {
+        "kpi": "KPI",
+        "chart": "Chart",
+        "table": "Table"
+      },
+      "aggregation": "Aggregation",
+      "aggregationField": "Aggregation field",
+      "groupBy": "Group by",
+      "chartType": "Chart type",
+      "displayFields": "Display fields",
+      "filters": "Filters",
+      "addFilter": "Add filter",
+      "sortBy": "Sort by",
+      "sortNone": "None",
+      "limit": "Limit",
+      "preview": "Live preview",
+      "previewEmpty": "Configure a model and widget to see a live preview.",
+      "previewNoRows": "No rows match the current filters.",
+      "widgetName": "Widget name",
+      "widgetNamePlaceholder": "e.g. Open orders by state",
+      "attachDashboard": "Add to dashboard (optional)",
+      "attachNone": "Don't attach",
+      "save": "Save widget",
+      "saved": "Widget \"{{name}}\" saved.",
+      "savedAttached": "Widget \"{{name}}\" saved and added to the dashboard.",
+      "rowsLoaded": "{{count}} rows loaded"
     },
     "createButton": {
       "generateReport": "Generate report",
