@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -23,6 +23,9 @@ import {
   mergeSelectOptionsForFields,
   mergeFieldDefaultValues,
   StoredDashboardView,
+  widgetModelsForDashboard,
+  exportDashboardToPng,
+  Button,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -84,8 +87,7 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting"
-import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
-import { useOpportunities } from "@lumiere/query-hooks/hooks/crm"
+import { useStoredDashboardDataSources } from "@/hooks/use-stored-dashboard-data-sources"
 import {
   companyRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
@@ -109,6 +111,7 @@ import {
   Grid3X3,
   Sparkles,
   Eye,
+  Download,
 } from "lucide-react"
 import { useRunAiSkill, type AiSkillRunResponse } from "@lumiere/query-hooks/hooks/ai-skills"
 import { PivotExplorer } from "./pivot-explorer"
@@ -284,8 +287,6 @@ function ReportsClientLoaded({
   const { data: analyticsMetrics = [] } = useAnalyticsMetrics(orgId, initialAnalyticsMetrics)
   const { data: dashboards = [] } = useDashboards(orgId, initialDashboards)
   const { data: dashboardWidgets = [] } = useDashboardWidgets(orgId, initialDashboardWidgets)
-  const { data: saleOrders = [] } = useSaleOrders(orgId)
-  const { data: opportunities = [] } = useOpportunities(orgId)
   const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
 
@@ -345,14 +346,6 @@ function ReportsClientLoaded({
     [dashboardWidgets],
   )
 
-  const storedDashboardDataSources = useMemo(
-    () => ({
-      sale_order: saleOrders as unknown as Record<string, unknown>[],
-      opportunity: opportunities as unknown as Record<string, unknown>[],
-    }),
-    [saleOrders, opportunities],
-  )
-
   const viewDashboard = useMemo(
     () =>
       viewDashboardId == null
@@ -362,6 +355,26 @@ function ReportsClientLoaded({
             | undefined) ?? null,
     [dashboards, viewDashboardId],
   )
+
+  const viewDashboardModels = useMemo(() => {
+    if (!viewDashboard) return []
+    return widgetModelsForDashboard(
+      viewDashboard,
+      dashboardWidgets as unknown as Record<string, unknown>[],
+    )
+  }, [viewDashboard, dashboardWidgets])
+
+  const { dataSources: storedDashboardDataSources, isLoading: storedDashboardLoading } =
+    useStoredDashboardDataSources(orgId, viewDashboardModels)
+
+  const storedDashboardRef = useRef<HTMLDivElement>(null)
+  const handleStoredDashboardExport = useCallback(async () => {
+    if (!storedDashboardRef.current || !viewDashboard) return
+    await exportDashboardToPng(
+      storedDashboardRef.current,
+      String(viewDashboard.name ?? "dashboard"),
+    )
+  }, [viewDashboard])
 
   const addWidgetFormConfig = useMemo(
     () =>
@@ -1409,13 +1422,31 @@ function ReportsClientLoaded({
       >
         <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{String(viewDashboard?.name ?? t("reports.dashboards.title"))}</DialogTitle>
-            {viewDashboard?.description ? (
-              <DialogDescription>{String(viewDashboard.description)}</DialogDescription>
-            ) : null}
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 space-y-1">
+                <DialogTitle>{String(viewDashboard?.name ?? t("reports.dashboards.title"))}</DialogTitle>
+                {viewDashboard?.description ? (
+                  <DialogDescription>{String(viewDashboard.description)}</DialogDescription>
+                ) : null}
+              </div>
+              {viewDashboard ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-2"
+                  onClick={() => void handleStoredDashboardExport()}
+                  disabled={storedDashboardLoading}
+                >
+                  <Download className="h-4 w-4" />
+                  {t("reports.actions.exportDashboard")}
+                </Button>
+              ) : null}
+            </div>
           </DialogHeader>
           {viewDashboard ? (
             <StoredDashboardView
+              ref={storedDashboardRef}
               dashboard={viewDashboard}
               widgets={dashboardWidgets as unknown as Record<string, unknown>[]}
               dataSources={storedDashboardDataSources}

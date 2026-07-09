@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { buildEntitySelection, resolveAiEntityType } from "@lumiere/query-hooks/ai-ui-context"
 import {
@@ -19,6 +19,7 @@ import type { EntityBoardRuntimeContext } from "../lib/module-types"
 import { isEntitySurfaceVisible } from "../lib/entity-view-types"
 import { getEntityRowKey } from "../lib/entity-row-utils"
 import { useRBAC } from "../lib/rbac-context"
+import { exportDashboardToPng } from "../lib/export-dashboard-png"
 
 interface ModuleViewProps {
   config: ModuleConfig
@@ -77,6 +78,12 @@ export function ModuleView({
   }
   const [openForm, setOpenForm] = useState<string | null>(null)
   const [selectedRecord, setSelectedRecord] = useState<Record<string, unknown> | null>(null)
+  const dashboardGridRef = useRef<HTMLDivElement>(null)
+
+  const handleDashboardExport = useCallback(async () => {
+    if (!dashboardGridRef.current) return
+    await exportDashboardToPng(dashboardGridRef.current, `${config.title}-dashboard`)
+  }, [config.title])
 
   useEffect(() => {
     if (prevActiveTabRef.current === activeTab) return
@@ -88,6 +95,7 @@ export function ModuleView({
   const activeTabConfig = config.tabs.find((tab) => tab.id === activeTab)
   const showDashboardTimeRange =
     activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
+  const showDashboardExport = activeTabConfig?.type === "dashboard"
 
   return (
     <div className="flex flex-col min-h-full gap-2" data-testid={`module-view-${config.id}`}>
@@ -96,6 +104,7 @@ export function ModuleView({
         description={config.description}
         timeRange={showDashboardTimeRange ? dashboardTimeRange : undefined}
         onTimeRangeChange={showDashboardTimeRange ? onDashboardTimeRangeChange : undefined}
+        onExport={showDashboardExport ? () => void handleDashboardExport() : undefined}
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className={"flex-col flex"}>
@@ -115,7 +124,7 @@ export function ModuleView({
         {config.tabs.map((tab) => (
           <TabsContent key={tab.id} value={tab.id} className="mt-6">
             {tab.type === "dashboard" && tab.sections && (
-              <DashboardGrid sections={tab.sections} />
+              <DashboardGrid ref={dashboardGridRef} sections={tab.sections} />
             )}
 
             {tab.type === "custom" && tab.customContent}

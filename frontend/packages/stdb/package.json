@@ -21,6 +21,7 @@
     "./generated/query-registry": "./src/generated/query-registry.ts",
     "./field-policy": "./src/field-policy.ts",
     "./live": "./src/live/index.ts",
+    "./stored-dashboard-model-registry": "./src/stored-dashboard-model-registry.ts",
     "./stdb-params-json": "./src/stdb-params-json.ts"
   },
   "scripts": {

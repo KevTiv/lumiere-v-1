@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { forwardRef, useMemo } from "react"
 import { DashboardGrid } from "./dashboard-grid"
 import {
   resolveStoredDashboardWidgets,
@@ -15,37 +15,37 @@ interface StoredDashboardViewProps {
   testId?: string
 }
 
-export function StoredDashboardView({
-  dashboard,
-  widgets,
-  dataSources,
-  testId = "stored-dashboard-view",
-}: StoredDashboardViewProps) {
-  const sections = useMemo((): DashboardSection[] => {
-    const widgetIds = (dashboard.widgetIds ?? dashboard.widget_ids) as
-      | Array<bigint | number>
-      | undefined
-    if (!widgetIds?.length) return []
+export const StoredDashboardView = forwardRef<HTMLDivElement, StoredDashboardViewProps>(
+  function StoredDashboardView(
+    { dashboard, widgets, dataSources, testId = "stored-dashboard-view" },
+    ref,
+  ) {
+    const sections = useMemo((): DashboardSection[] => {
+      const widgetIds = (dashboard.widgetIds ?? dashboard.widget_ids) as
+        | Array<bigint | number>
+        | undefined
+      if (!widgetIds?.length) return []
 
-    const resolved = resolveStoredDashboardWidgets(widgets, widgetIds, dataSources)
-    if (resolved.length === 0) return []
+      const resolved = resolveStoredDashboardWidgets(widgets, widgetIds, dataSources)
+      if (resolved.length === 0) return []
 
-    return [
-      {
-        id: `stored-dashboard-${String(dashboard.id ?? "view")}`,
-        title: String(dashboard.name ?? "Dashboard"),
-        widgets: resolved,
-      },
-    ]
-  }, [dashboard, widgets, dataSources])
+      return [
+        {
+          id: `stored-dashboard-${String(dashboard.id ?? "view")}`,
+          title: String(dashboard.name ?? "Dashboard"),
+          widgets: resolved,
+        },
+      ]
+    }, [dashboard, widgets, dataSources])
 
-  if (sections.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground" data-testid={testId}>
-        No widgets configured for this dashboard.
-      </p>
-    )
-  }
+    if (sections.length === 0) {
+      return (
+        <p className="text-sm text-muted-foreground" data-testid={testId}>
+          No widgets configured for this dashboard.
+        </p>
+      )
+    }
 
-  return <DashboardGrid sections={sections} testId={testId} />
-}
+    return <DashboardGrid ref={ref} sections={sections} testId={testId} />
+  },
+)

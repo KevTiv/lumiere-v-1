@@ -9296,6 +9296,7 @@
       "newWidget": "New Widget",
       "addWidget": "Add Widget",
       "viewDashboard": "View Dashboard",
+      "exportDashboard": "Export PNG",
       "shareDashboard": "Share Dashboard",
       "updateLayout": "Update Layout"
     },

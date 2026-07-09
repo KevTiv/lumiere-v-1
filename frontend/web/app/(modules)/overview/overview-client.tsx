@@ -1,11 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useRef, useCallback } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   DashboardGrid,
   DashboardHeader,
   MissingOrganization,
+  exportDashboardToPng,
   type TimeRangeValue,
   isTimestampInRange,
   percentChange,
@@ -330,6 +331,12 @@ function OverviewClientLoaded({
     })) as DashboardSection[]
   }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, t])
 
+  const dashboardGridRef = useRef<HTMLDivElement>(null)
+  const handleDashboardExport = useCallback(async () => {
+    if (!dashboardGridRef.current) return
+    await exportDashboardToPng(dashboardGridRef.current, "overview-dashboard")
+  }, [])
+
   return (
     <div className="space-y-6">
       <DashboardHeader
@@ -337,9 +344,11 @@ function OverviewClientLoaded({
         description={t("overview.page.description")}
         timeRange={timeRange}
         onTimeRangeChange={setTimeRange}
+        onExport={() => void handleDashboardExport()}
       />
       {isDataReady ? (
         <DashboardGrid
+          ref={dashboardGridRef}
           sections={liveSections}
           testId="overview-dashboard"
           widgetTestIdPrefix="overview-widget"

@@ -1,7 +1,11 @@
 "use client"
 
+import { useRef } from "react"
+import { Download } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card"
-import type { DashboardWidget } from "../lib/dashboard-types"
+import { Button } from "../components/button"
+import type { DashboardWidget, WidgetType } from "../lib/dashboard-types"
+import { exportChartToPng } from "../lib/export-dashboard-png"
 import { KPIWidget } from "./widgets/kpi-widget"
 import { AreaChartWidget } from "./widgets/area-chart-widget"
 import { LineChartWidget } from "./widgets/line-chart-widget"
@@ -27,8 +31,18 @@ interface WidgetRendererProps {
   testId?: string
 }
 
+const CHART_WIDGET_TYPES = new Set<WidgetType>([
+  "area-chart",
+  "line-chart",
+  "bar-chart",
+  "donut-chart",
+  "funnel-chart",
+])
+
 export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRendererProps) {
+  const chartRef = useRef<HTMLDivElement>(null)
   const useCard = widget.useCard !== false
+  const isChart = CHART_WIDGET_TYPES.has(widget.type)
 
   const renderContent = () => {
     switch (widget.type) {
@@ -77,13 +91,34 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRe
     }
   }
 
+  const handleChartExport = async () => {
+    if (!chartRef.current) return
+    await exportChartToPng(chartRef.current, widget.title || widget.id)
+  }
+
   if (!useCard) {
     return (
       <div className={widthClass} data-testid={testId}>
-        {widget.title && (
-          <h3 className="mb-3 text-sm font-medium text-muted-foreground">{widget.title}</h3>
-        )}
-        {renderContent()}
+        <div className="mb-3 flex items-center justify-between gap-2">
+          {widget.title ? (
+            <h3 className="text-sm font-medium text-muted-foreground">{widget.title}</h3>
+          ) : (
+            <span />
+          )}
+          {isChart ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label={`Export ${widget.title} chart`}
+              onClick={() => void handleChartExport()}
+            >
+              <Download className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
+        </div>
+        <div ref={isChart ? chartRef : undefined}>{renderContent()}</div>
       </div>
     )
   }
@@ -91,11 +126,23 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRe
   return (
     <div className={widthClass} data-testid={testId}>
       <Card className="h-full">
-        <CardHeader className="pb-1">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
           <CardTitle className="text-sm font-semibold">{widget.title}</CardTitle>
+          {isChart ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              aria-label={`Export ${widget.title} chart`}
+              onClick={() => void handleChartExport()}
+            >
+              <Download className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent>
-          {renderContent()}
+          <div ref={isChart ? chartRef : undefined}>{renderContent()}</div>
         </CardContent>
       </Card>
     </div>

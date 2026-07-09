@@ -234,3 +234,24 @@ export function resolveStoredDashboardWidgets(
 
   return resolved
 }
+
+export function widgetModelsForDashboard(
+  dashboard: Record<string, unknown>,
+  widgetRows: Record<string, unknown>[],
+): string[] {
+  const widgetIds = (dashboard.widgetIds ?? dashboard.widget_ids) as
+    | Array<bigint | number>
+    | undefined
+  if (!widgetIds?.length) return []
+
+  const idSet = new Set(widgetIds.map((id) => String(id)))
+  const models = new Set<string>()
+
+  for (const row of widgetRows) {
+    if (!idSet.has(String(row.id ?? ""))) continue
+    const model = String(row.model ?? "").trim()
+    if (model) models.add(model)
+  }
+
+  return [...models]
+}
