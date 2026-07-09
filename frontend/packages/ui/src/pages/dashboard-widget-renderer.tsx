@@ -4,7 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/card"
 import type { DashboardWidget } from "../lib/dashboard-types"
 import { KPIWidget } from "./widgets/kpi-widget"
 import { AreaChartWidget } from "./widgets/area-chart-widget"
+import { LineChartWidget } from "./widgets/line-chart-widget"
 import { BarChartWidget } from "./widgets/bar-chart-widget"
+import { DonutChartWidget } from "./widgets/donut-chart-widget"
+import { FunnelChartWidget } from "./widgets/funnel-chart-widget"
 import { MetricsWidget } from "./widgets/metrics-widget"
 import { TableWidget } from "./widgets/table-widget"
 import { StatCardsWidget } from "./widgets/stat-cards-widget"
@@ -33,8 +36,14 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRe
         return <KPIWidget data={widget.data} />
       case "area-chart":
         return <AreaChartWidget data={widget.data} />
+      case "line-chart":
+        return <LineChartWidget data={widget.data} />
       case "bar-chart":
         return <BarChartWidget data={widget.data} />
+      case "donut-chart":
+        return <DonutChartWidget data={widget.data} />
+      case "funnel-chart":
+        return <FunnelChartWidget data={widget.data} />
       case "metrics":
         return <MetricsWidget data={widget.data} />
       case "table":

@@ -5,7 +5,10 @@ export type GridWidth = "full" | "2/3" | "1/2" | "1/3"
 export type WidgetType =
   | "kpi"
   | "area-chart"
+  | "line-chart"
   | "bar-chart"
+  | "donut-chart"
+  | "funnel-chart"
   | "metrics"
   | "table"
   | "stat-cards"
@@ -49,6 +52,15 @@ export interface AreaChartWidget extends BaseWidget {
   }
 }
 
+export interface LineChartWidget extends BaseWidget {
+  type: "line-chart"
+  data: {
+    series: { name: string; color: string }[]
+    values: Array<{ [key: string]: string | number }>
+    xAxisKey: string
+  }
+}
+
 export interface BarChartWidget extends BaseWidget {
   type: "bar-chart"
   data: {
@@ -57,6 +69,24 @@ export interface BarChartWidget extends BaseWidget {
     categoryKey: string
     layout?: "horizontal" | "vertical"
     stacked?: boolean
+    onSegmentClick?: (name: string) => void
+    onCategoryClick?: (category: string) => void
+  }
+}
+
+export interface DonutChartWidget extends BaseWidget {
+  type: "donut-chart"
+  data: {
+    segments: Array<{ name: string; value: number; color: string }>
+    innerRadius?: number
+    onSegmentClick?: (name: string) => void
+  }
+}
+
+export interface FunnelChartWidget extends BaseWidget {
+  type: "funnel-chart"
+  data: {
+    stages: Array<{ name: string; value: number; color?: string }>
   }
 }
 
@@ -193,7 +223,10 @@ export interface QuickActionsWidget extends BaseWidget {
 export type DashboardWidget =
   | KPIWidget
   | AreaChartWidget
+  | LineChartWidget
   | BarChartWidget
+  | DonutChartWidget
+  | FunnelChartWidget
   | MetricsWidget
   | TableWidget
   | StatCardsWidget

@@ -9,6 +9,7 @@ import {
   FormModal,
   RuntimeFormModal,
   useRBAC,
+  EntityView,
   newPurchaseOrderForm,
   newPurchaseRequisitionForm,
   newPartnerBankForm,
@@ -35,12 +36,14 @@ import {
   DialogTitle,
   Button,
   purchaseOrdersTableConfig,
+  purchaseOrderDetailConfig,
+  purchaseOrderStatusBadges,
   purchaseOrderLinesTableConfig,
   purchaseRequisitionsTableConfig,
   csvImportForm,
   RecordChatterDialog,
 } from "@lumiere/ui"
-import type { EntityViewConfig, EntityTableConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
@@ -389,7 +392,7 @@ function PurchasingClientLoaded({
     if (csvKind) setCsvError(null)
   }, [csvKind])
 
-  const { data: orders = [] } = usePurchaseOrders(orgId, initialOrders)
+  const { data: orders = [], isLoading: ordersLoading } = usePurchaseOrders(orgId, initialOrders)
   const { data: lines = [] } = usePurchaseOrderLines(orgId, initialLines)
   const { data: requisitions = [] } = usePurchaseRequisitions(orgId, initialRequisitions)
   const { data: allContacts = [] } = useContacts(orgId, initialContacts)
@@ -596,6 +599,81 @@ function PurchasingClientLoaded({
     [t, vendorFieldOptions, pricelistFieldOptions, paymentTermFieldOptions],
   )
 
+  const openCreatePurchaseOrder = useCallback(
+    () =>
+      setQuickActionForm({ form: purchaseOrderFormConfig, action: "createPurchaseOrder" }),
+    [purchaseOrderFormConfig],
+  )
+
+  const vendorLabelById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const vendor of vendors) {
+      map.set(String(vendor.id), String(vendor.name ?? vendor.displayName ?? vendor.id))
+    }
+    return map
+  }, [vendors])
+
+  const purchaseOrderRecordSheet = useMemo((): EntityRecordSheetConfig => {
+    const status = purchaseOrderStatusBadges(t)
+    const linesConfig = purchaseOrderLinesTableConfig(t)
+    const baseDetail = purchaseOrderDetailConfig(t)
+    const detailConfig = {
+      ...baseDetail,
+      sections: baseDetail.sections.map((section) =>
+        section.id === "vendor"
+          ? {
+              ...section,
+              fields: section.fields.map((field) =>
+                field.key === "partnerId"
+                  ? {
+                      ...field,
+                      render: (_value: unknown, record: Record<string, unknown>) => {
+                        const partnerId = record.partnerId ?? record.partner_id
+                        if (partnerId == null) return "—"
+                        return (
+                          vendorLabelById.get(String(partnerId)) ?? `Vendor ${String(partnerId)}`
+                        )
+                      },
+                    }
+                  : field,
+              ),
+            }
+          : section,
+      ),
+    }
+    return {
+      titleKey: "name",
+      statusKey: "state",
+      statusBadgeVariants: status.badgeVariants,
+      statusBadgeLabels: status.badgeLabels,
+      detailConfig,
+      auditTableName: "purchase_order",
+      customTabs: [
+        {
+          id: "lines",
+          label: t("purchasing.orderLines.title"),
+          content: (record) => {
+            const orderId = String(record.id ?? "")
+            const orderLines = (lines as Record<string, unknown>[]).filter(
+              (line) => String(line.orderId ?? line.order_id) === orderId,
+            )
+            return (
+              <EntityView
+                config={{
+                  ...linesConfig,
+                  title: "",
+                  description: undefined,
+                }}
+                data={orderLines}
+                useCard={false}
+              />
+            )
+          },
+        },
+      ],
+    }
+  }, [t, lines, vendorLabelById])
+
   const purchaseRequisitionFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newPurchaseRequisitionForm(t), {
@@ -769,11 +847,16 @@ function PurchasingClientLoaded({
   )
 
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
-    const base = purchaseOrdersTableConfig(t)
+    const base = purchaseOrdersTableConfig(t, { onEmptyAction: openCreatePurchaseOrder })
+    const runtimeView = purchaseOrdersTableRuntime
     return {
       ...base,
       view: {
-        ...purchaseOrdersTableRuntime,
+        ...runtimeView,
+        emptyState: {
+          ...runtimeView.emptyState,
+          onAction: openCreatePurchaseOrder,
+        },
         actions: [
           {
             id: "csv-purchase-orders",
@@ -899,6 +982,7 @@ function PurchasingClientLoaded({
   }, [
     t,
     purchaseOrdersTableRuntime,
+    openCreatePurchaseOrder,
     sendPurchaseOrder,
     confirmPurchaseOrder,
     cancelPurchaseOrder,
@@ -1458,7 +1542,12 @@ function PurchasingClientLoaded({
               return { ...tab, sections: liveSections }
             }
             if (tab.id === "orders" && tab.type === "entity") {
-              return { ...tab, entityConfig: ordersEntityConfig, createForm: purchaseOrderFormConfig }
+              return {
+                ...tab,
+                entityConfig: ordersEntityConfig,
+                createForm: purchaseOrderFormConfig,
+                recordSheet: purchaseOrderRecordSheet,
+              }
             }
             if (tab.id === "lines" && tab.type === "entity") {
               return { ...tab, entityConfig: linesEntityConfig }
@@ -1559,6 +1648,7 @@ function PurchasingClientLoaded({
       purchaseOrderFormConfig,
       purchaseRequisitionFormConfig,
       ordersEntityConfig,
+      purchaseOrderRecordSheet,
       linesEntityConfig,
       requisitionsEntityConfig,
       landedCostsEntityConfig,
@@ -1821,6 +1911,7 @@ function PurchasingClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataLoading={{ orders: ordersLoading }}
         onFormSubmit={handleFormSubmit}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}

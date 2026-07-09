@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -17,8 +17,14 @@ import {
   MissingOrganization,
   mergeSelectOptionsForFields,
   hrCsvImportForm,
+  employeeDetailConfig,
+  leaveDetailConfig,
+  contractDetailConfig,
+  employeeStatusBadges,
+  leaveRequestStatusBadges,
+  contractStatusBadges,
 } from "@lumiere/ui"
-import type { EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
+import type { EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
 import { useHrModuleSubscription } from "@/lib/module-subscription-hooks"
 import { groupBy } from "@/lib/utils"
@@ -128,6 +134,21 @@ const confirmPayslipForm: FormConfig = {
   ],
 }
 
+function attachEmptyStateAction(
+  ec: EntityViewConfig,
+  onAction: () => void,
+): EntityViewConfig {
+  if (ec.view.mode !== "table") return ec
+  if (!ec.view.emptyState) return ec
+  return {
+    ...ec,
+    view: {
+      ...ec.view,
+      emptyState: { ...ec.view.emptyState, onAction },
+    },
+  }
+}
+
 interface HrClientProps {
   initialEmployees?: Record<string, unknown>[]
   initialDepartments?: Record<string, unknown>[]
@@ -169,10 +190,10 @@ function HrClientLoaded({
   const [rowAction, setRowAction] = useState<HrRowAction>(null)
   const [rowActionError, setRowActionError] = useState<string | null>(null)
 
-  const { data: employees = [] } = useEmployees(orgId, initialEmployees)
+  const { data: employees = [], isLoading: employeesLoading } = useEmployees(orgId, initialEmployees)
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
-  const { data: leaves = [] } = useLeaveRequests(orgId, initialLeaves)
-  const { data: contracts = [] } = useContracts(orgId, initialContracts)
+  const { data: leaves = [], isLoading: leavesLoading } = useLeaveRequests(orgId, initialLeaves)
+  const { data: contracts = [], isLoading: contractsLoading } = useContracts(orgId, initialContracts)
   const { data: payslips = [] } = usePayslips(orgId, initialPayslips)
   const { data: jobPositions = [] } = useJobPositions(orgId)
   const { data: leaveTypes = [] } = useLeaveTypes(orgId)
@@ -323,6 +344,57 @@ function HrClientLoaded({
     [t, payrollStructureFieldOptions],
   )
 
+  const openCreateEmployee = useCallback(
+    () => setQuickActionForm({ form: employeeFormConfig, action: "createEmployee" }),
+    [employeeFormConfig],
+  )
+
+  const openCreateLeaveRequest = useCallback(
+    () => setQuickActionForm({ form: leaveFormConfig, action: "createLeaveRequest" }),
+    [leaveFormConfig],
+  )
+
+  const openCreateContract = useCallback(
+    () => setQuickActionForm({ form: contractFormConfig, action: "createContract" }),
+    [contractFormConfig],
+  )
+
+  const employeeRecordSheet = useMemo((): EntityRecordSheetConfig => {
+    const status = employeeStatusBadges(t)
+    return {
+      titleKey: "name",
+      statusKey: "employmentType",
+      statusBadgeVariants: status.badgeVariants,
+      statusBadgeLabels: status.badgeLabels,
+      detailConfig: employeeDetailConfig(t),
+      auditTableName: "hr_employee",
+    }
+  }, [t])
+
+  const leaveRecordSheet = useMemo((): EntityRecordSheetConfig => {
+    const status = leaveRequestStatusBadges(t)
+    return {
+      titleKey: "name",
+      statusKey: "state",
+      statusBadgeVariants: status.badgeVariants,
+      statusBadgeLabels: status.badgeLabels,
+      detailConfig: leaveDetailConfig(t),
+      auditTableName: "hr_leave",
+    }
+  }, [t])
+
+  const contractRecordSheet = useMemo((): EntityRecordSheetConfig => {
+    const status = contractStatusBadges(t)
+    return {
+      titleKey: "name",
+      statusKey: "state",
+      statusBadgeVariants: status.badgeVariants,
+      statusBadgeLabels: status.badgeLabels,
+      detailConfig: contractDetailConfig(t),
+      auditTableName: "hr_contract",
+    }
+  }, [t])
+
   const recruitmentPositions = useMemo(
     () => jobPositions.filter((j) => String(j.state ?? "") === "recruit"),
     [jobPositions],
@@ -468,7 +540,9 @@ function HrClientLoaded({
             return {
               ...tab,
               createForm: employeeFormConfig,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
+              recordSheet: employeeRecordSheet,
+              entityConfig: attachEmptyStateAction(
+                addCsvToolbar(tab.entityConfig, [
                 {
                   id: "csv-employee",
                   label: t("hr.toolbar.importEmployeeCsv"),
@@ -489,6 +563,8 @@ function HrClientLoaded({
                   },
                 },
               ]),
+                openCreateEmployee,
+              ),
             }
           }
           if (tab.id === "departments" && tab.entityConfig) {
@@ -510,7 +586,9 @@ function HrClientLoaded({
             return {
               ...tab,
               createForm: leaveFormConfig,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
+              recordSheet: leaveRecordSheet,
+              entityConfig: attachEmptyStateAction(
+                addCsvToolbar(tab.entityConfig, [
                 {
                   id: "csv-leave-type",
                   label: t("hr.toolbar.importLeaveTypeCsv"),
@@ -540,13 +618,17 @@ function HrClientLoaded({
                   onClick: (rows) => void runSelectedRows(rows, "leave", (row) => resetLeave.mutateAsync(row.id as string | number)),
                 },
               ]),
+                openCreateLeaveRequest,
+              ),
             }
           }
           if (tab.id === "contracts" && tab.entityConfig) {
             return {
               ...tab,
               createForm: contractFormConfig,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
+              recordSheet: contractRecordSheet,
+              entityConfig: attachEmptyStateAction(
+                addCsvToolbar(tab.entityConfig, [
                 {
                   id: "csv-contract",
                   label: t("hr.toolbar.importContractCsv"),
@@ -571,6 +653,8 @@ function HrClientLoaded({
                   onClick: (rows) => void runSelectedRows(rows, "contract", (row) => cancelContract.mutateAsync(Number(row.id))),
                 },
               ]),
+                openCreateContract,
+              ),
             }
           }
           if (tab.id === "payslips" && tab.entityConfig) {
@@ -701,6 +785,12 @@ function HrClientLoaded({
       jobFormConfig,
       salaryRuleFormConfig,
       departmentFieldOptions,
+      employeeRecordSheet,
+      leaveRecordSheet,
+      contractRecordSheet,
+      openCreateEmployee,
+      openCreateLeaveRequest,
+      openCreateContract,
       t,
       approveLeave,
       refuseLeave,
@@ -795,6 +885,15 @@ function HrClientLoaded({
     cancelPayslip.isPending ||
     Object.values(csvImports).some((m) => m.isPending)
 
+  const dataLoading = useMemo(
+    () => ({
+      employees: employeesLoading,
+      leaves: leavesLoading,
+      contracts: contractsLoading,
+    }),
+    [employeesLoading, leavesLoading, contractsLoading],
+  )
+
   return (
     <>
       {toolbarError ? (
@@ -805,6 +904,7 @@ function HrClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataLoading={dataLoading}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
       />

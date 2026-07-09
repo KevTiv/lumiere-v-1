@@ -22,6 +22,12 @@ import {
   MissingOrganization,
   mergeSelectOptionsForFields,
   mergeFieldDefaultValues,
+  StoredDashboardView,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
   financialReportsTableConfig,
   reportTemplatesTableConfig,
   analyticsMetricsTableConfig,
@@ -78,6 +84,8 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting"
+import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
+import { useOpportunities } from "@lumiere/query-hooks/hooks/crm"
 import {
   companyRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
@@ -100,6 +108,7 @@ import {
   Plus,
   Grid3X3,
   Sparkles,
+  Eye,
 } from "lucide-react"
 import { useRunAiSkill, type AiSkillRunResponse } from "@lumiere/query-hooks/hooks/ai-skills"
 import { PivotExplorer } from "./pivot-explorer"
@@ -260,6 +269,7 @@ function ReportsClientLoaded({
   const [shareDashboardId, setShareDashboardId] = useState<string | null>(null)
   const [updateLayoutOpen, setUpdateLayoutOpen] = useState(false)
   const [updateLayoutWidgetId, setUpdateLayoutWidgetId] = useState<string | null>(null)
+  const [viewDashboardId, setViewDashboardId] = useState<string | null>(null)
   const [reportExplain, setReportExplain] = useState<ReportExplainState>(null)
   const [reportExplainError, setReportExplainError] = useState<string | null>(null)
   const [reportExplainResult, setReportExplainResult] = useState<Record<string, unknown> | null>(null)
@@ -274,6 +284,8 @@ function ReportsClientLoaded({
   const { data: analyticsMetrics = [] } = useAnalyticsMetrics(orgId, initialAnalyticsMetrics)
   const { data: dashboards = [] } = useDashboards(orgId, initialDashboards)
   const { data: dashboardWidgets = [] } = useDashboardWidgets(orgId, initialDashboardWidgets)
+  const { data: saleOrders = [] } = useSaleOrders(orgId)
+  const { data: opportunities = [] } = useOpportunities(orgId)
   const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
 
@@ -331,6 +343,24 @@ function ReportsClientLoaded({
         label: `${String(row.name ?? row.id)} (id ${String(row.id)})`,
       })),
     [dashboardWidgets],
+  )
+
+  const storedDashboardDataSources = useMemo(
+    () => ({
+      sale_order: saleOrders as unknown as Record<string, unknown>[],
+      opportunity: opportunities as unknown as Record<string, unknown>[],
+    }),
+    [saleOrders, opportunities],
+  )
+
+  const viewDashboard = useMemo(
+    () =>
+      viewDashboardId == null
+        ? null
+        : (dashboards.find((row) => String(row.id) === viewDashboardId) as
+            | Record<string, unknown>
+            | undefined) ?? null,
+    [dashboards, viewDashboardId],
   )
 
   const addWidgetFormConfig = useMemo(
@@ -716,6 +746,17 @@ function ReportsClientLoaded({
       view: {
         ...view,
         actions: [
+          {
+            id: "view-dashboard",
+            label: t("reports.actions.viewDashboard"),
+            icon: Eye,
+            requiresSelection: true,
+            onClick: (rows) => {
+              const first = rows[0]
+              if (!first?.id) return
+              setViewDashboardId(String(first.id))
+            },
+          },
           {
             id: "add-widget",
             label: t("reports.actions.addWidget"),
@@ -1359,6 +1400,29 @@ function ReportsClientLoaded({
           setShareDashboardId(null)
         }}
       />
+
+      <Dialog
+        open={viewDashboardId != null}
+        onOpenChange={(open) => {
+          if (!open) setViewDashboardId(null)
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{String(viewDashboard?.name ?? t("reports.dashboards.title"))}</DialogTitle>
+            {viewDashboard?.description ? (
+              <DialogDescription>{String(viewDashboard.description)}</DialogDescription>
+            ) : null}
+          </DialogHeader>
+          {viewDashboard ? (
+            <StoredDashboardView
+              dashboard={viewDashboard}
+              widgets={dashboardWidgets as unknown as Record<string, unknown>[]}
+              dataSources={storedDashboardDataSources}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

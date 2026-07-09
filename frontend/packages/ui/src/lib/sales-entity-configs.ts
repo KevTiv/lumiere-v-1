@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next"
 import { createElement } from "react"
-import type { EntityViewConfig, EntityTableConfig } from "./entity-view-types"
+import type { EntityDetailConfig, EntityViewConfig, EntityTableConfig } from "./entity-view-types"
 import { transfersTableConfig } from "./inventory-entity-configs"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
@@ -51,12 +51,48 @@ const discountPolicyBadges = (t: TFunction) => ({
   },
 }) as const
 
+export const saleOrderStatusBadges = saleStateBadges
+
 // ── Sale Orders ───────────────────────────────────────────────────────────────
 
 export type SaleOrdersTableConfigOptions = {
   /** Primary label for the reference column (e.g. partner / client ref fallbacks). */
   formatSaleOrderDisplayName?: (row: Record<string, unknown>) => string
+  /** Empty-state CTA — wired by the module client (opens create form). */
+  onEmptyAction?: () => void
 }
+
+export const saleOrderDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "customer",
+      fields: [
+        { key: "partnerName", label: "Customer" },
+        { key: "clientOrderRef", label: t("sales.salesOrders.columns.clientOrderRef") },
+      ],
+    },
+    {
+      id: "dates",
+      fields: [
+        { key: "dateOrder", label: t("sales.salesOrders.columns.dateOrder"), type: "relative-date" },
+      ],
+    },
+    {
+      id: "totals",
+      fields: [
+        { key: "amountTotal", label: t("sales.salesOrders.columns.amountTotal"), type: "currency" },
+        { key: "amountResidual", label: t("sales.salesOrders.columns.amountResidual"), type: "currency" },
+        {
+          key: "invoiceStatus",
+          label: t("sales.salesOrders.columns.invoiceStatus"),
+          type: "badge",
+          ...invoiceStatusBadges(t),
+        },
+      ],
+    },
+  ],
+})
 
 export const saleOrdersTableConfig = (
   t: TFunction,
@@ -68,6 +104,7 @@ export const saleOrdersTableConfig = (
     key: "reference",
     label: t("sales.salesOrders.columns.reference"),
     width: "min-w-28",
+    sortable: true,
     ...(formatName
       ? {
           render: (_value: unknown, row: Record<string, unknown>) => {
@@ -129,7 +166,8 @@ export const saleOrdersTableConfig = (
         {
           key: "state",
           label: t("sales.salesOrders.columns.state"),
-          type: "badge",
+          type: "status",
+          sortable: true,
           ...saleStateBadges(t),
         },
         {
@@ -137,6 +175,7 @@ export const saleOrdersTableConfig = (
           label: t("sales.salesOrders.columns.amountTotal"),
           type: "currency",
           align: "right",
+          sortable: true,
         },
         {
           key: "amountResidual",
@@ -153,7 +192,8 @@ export const saleOrdersTableConfig = (
         {
           key: "dateOrder",
           label: t("sales.salesOrders.columns.dateOrder"),
-          type: "date",
+          type: "relative-date",
+          sortable: true,
         },
         {
           key: "deliveryCount",
@@ -163,6 +203,12 @@ export const saleOrdersTableConfig = (
         },
       ],
       emptyMessage: t("sales.salesOrders.emptyMessage"),
+      emptyState: {
+        title: t("sales.salesOrders.emptyState.title"),
+        description: t("sales.salesOrders.emptyState.description"),
+        actionLabel: t("sales.salesOrders.emptyState.actionLabel"),
+        onAction: options?.onEmptyAction,
+      },
     },
   }
 }

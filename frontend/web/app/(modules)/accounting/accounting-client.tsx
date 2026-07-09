@@ -32,6 +32,11 @@ import {
   fixedAssetsTableConfig,
   depreciationLinesTableConfig,
   accountPaymentsTableConfig,
+  accountPaymentDetailConfig,
+  bankStatementDetailConfig,
+  accountMoveDetailConfig,
+  paymentStateBadges,
+  bankStatementStateBadges,
   paymentTermsTableConfig,
   paymentTermLinesTableConfig,
   accountJournalsTableConfig,
@@ -65,7 +70,7 @@ import {
 } from "@lumiere/ui"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
-import type { EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { BadgeVariant, EntityRecordSheetConfig, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   accountingParamsToJson,
   createAccountAccountParamsToStdbHttpJson,
@@ -605,7 +610,7 @@ function AccountingClientLoaded({
     enabled: organizationId > 0,
     initialData: initialAccounts,
   })
-  const { data: allMoves = [] } = useAccountMoves(orgId, {
+  const { data: allMoves = [], isLoading: movesLoading } = useAccountMoves(orgId, {
     enabled: organizationId > 0,
     initialData: initialMoves,
   })
@@ -623,14 +628,14 @@ function AccountingClientLoaded({
   const { data: analyticDistribution = [] } = useAccountAnalyticDistributionModels(orgId, {
     enabled: organizationId > 0,
   })
-  const { data: bankStatements = [] } = useAccountBankStatements(orgId, { enabled: organizationId > 0 })
+  const { data: bankStatements = [], isLoading: bankStatementsLoading } = useAccountBankStatements(orgId, { enabled: organizationId > 0 })
   const { data: bankStatementLines = [] } = useAccountBankStatementLines(orgId, { enabled: organizationId > 0 })
   const { data: bankMatchCandidates = [] } = useBankMatchCandidates(orgId, { enabled: organizationId > 0 })
   const { data: reconciliationWidgets = [] } = useAccountReconciliationWidgets(orgId, {
     enabled: organizationId > 0,
   })
   const { data: fixedAssets = [] } = useAccountFixedAssets(orgId, { enabled: organizationId > 0 })
-  const { data: accountPayments = [] } = useAccountPayments(orgId, { enabled: organizationId > 0 })
+  const { data: accountPayments = [], isLoading: paymentsLoading } = useAccountPayments(orgId, { enabled: organizationId > 0 })
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId, { enabled: organizationId > 0 })
   const { data: paymentTermLines = [] } = useAccountPaymentTermLines(orgId, { enabled: organizationId > 0 })
   const { data: depreciationLines = [] } = useDepreciationLines(orgId, { enabled: organizationId > 0 })
@@ -831,6 +836,179 @@ function AccountingClientLoaded({
     })
     return mergeFieldDefaultValues(merged, { currencyId: String(defaultCurrencyId) })
   }, [t, partnerSelectOptions, currencySelectOptions, journalFieldOptionsForModularForm, defaultCurrencyId])
+
+  const partnerLabelById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const contact of contacts) {
+      const row = contact as Record<string, unknown>
+      map.set(String(row.id), String(row.name ?? row.displayName ?? row.id))
+    }
+    return map
+  }, [contacts])
+
+  const openCreateAccountPayment = useCallback(
+    () =>
+      setQuickActionForm({
+        form: accountPaymentFormConfig,
+        action: "createAccountPayment",
+      }),
+    [accountPaymentFormConfig],
+  )
+
+  const paymentRecordSheet = useMemo((): EntityRecordSheetConfig => {
+    const status = paymentStateBadges(t)
+    const baseDetail = accountPaymentDetailConfig(t)
+    const detailConfig = {
+      ...baseDetail,
+      sections: baseDetail.sections.map((section) =>
+        section.id === "party"
+          ? {
+              ...section,
+              fields: section.fields.map((field) =>
+                field.key === "partnerId"
+                  ? {
+                      ...field,
+                      render: (_value: unknown, record: Record<string, unknown>) => {
+                        const partnerId = record.partnerId ?? record.partner_id
+                        if (partnerId == null) return "—"
+                        return (
+                          partnerLabelById.get(String(partnerId)) ?? `Partner ${String(partnerId)}`
+                        )
+                      },
+                    }
+                  : field,
+              ),
+            }
+          : section,
+      ),
+    }
+    return {
+      titleKey: "name",
+      statusKey: "state",
+      statusBadgeVariants: status.badgeVariants,
+      statusBadgeLabels: status.badgeLabels,
+      detailConfig,
+      auditTableName: "account_payment",
+    }
+  }, [t, partnerLabelById])
+
+  const bankStatementRecordSheet = useMemo((): EntityRecordSheetConfig => {
+    const status = bankStatementStateBadges(t)
+    return {
+      titleKey: "name",
+      statusKey: "state",
+      statusBadgeVariants: status.badgeVariants,
+      statusBadgeLabels: status.badgeLabels,
+      detailConfig: bankStatementDetailConfig(t),
+      auditTableName: "account_bank_statement",
+      customTabs: [
+        {
+          id: "lines",
+          label: t("accounting.bankStatementDetail.linesHeading"),
+          content: (record) => {
+            const statementId = String(record.id ?? "")
+            const lines = (bankStatementLines as Record<string, unknown>[]).filter(
+              (line) => String(line.statementId ?? line.statement_id) === statementId,
+            )
+            return (
+              <EntityView
+                config={{
+                  id: "bank-statement-lines-inline",
+                  title: "",
+                  view: {
+                    mode: "table",
+                    rowKey: "id",
+                    columns: [
+                      {
+                        key: "date",
+                        label: t("accounting.journalEntries.date"),
+                        type: "relative-date",
+                      },
+                      {
+                        key: "amount",
+                        label: t("accounting.bankStatementDetail.candidateAmount"),
+                        type: "currency",
+                        align: "right",
+                      },
+                      {
+                        key: "partnerId",
+                        label: t("accounting.journalEntries.partner"),
+                      },
+                      {
+                        key: "isReconciled",
+                        label: t("accounting.bankStatementDetail.columnReconciled"),
+                        type: "boolean",
+                        align: "center",
+                      },
+                    ],
+                    emptyMessage: t("accounting.bankStatementDetail.emptyLines"),
+                  },
+                }}
+                data={lines}
+                useCard={false}
+              />
+            )
+          },
+        },
+        {
+          id: "reconcile",
+          label: t("accounting.actions.reconcile"),
+          content: (record) => (
+            <Button type="button" variant="outline" onClick={() => setBankStatementDetail(record)}>
+              {t("accounting.bankStatementDetail.manualReconcileHeading")}
+            </Button>
+          ),
+        },
+      ],
+    }
+  }, [t, bankStatementLines])
+
+  const accountMoveRecordSheet = useMemo((): EntityRecordSheetConfig => {
+    const moveStatus = {
+      badgeVariants: {
+        Draft: "secondary",
+        Posted: "default",
+        Cancelled: "destructive",
+      } as Record<string, BadgeVariant>,
+      badgeLabels: {
+        Draft: "Draft",
+        Posted: "Posted",
+        Cancelled: "Cancelled",
+      },
+    }
+    const linesConfig = accountMoveLinesTableConfig(t)
+    return {
+      titleKey: "name",
+      statusKey: "state",
+      statusBadgeVariants: moveStatus.badgeVariants,
+      statusBadgeLabels: moveStatus.badgeLabels,
+      detailConfig: accountMoveDetailConfig(t),
+      auditTableName: "account_move",
+      customTabs: [
+        {
+          id: "lines",
+          label: t("accounting.tabs.moveLines"),
+          content: (record) => {
+            const moveId = String(record.id ?? "")
+            const lines = (accountMoveLines as Record<string, unknown>[]).filter(
+              (line) => String(line.moveId ?? line.move_id) === moveId,
+            )
+            return (
+              <EntityView
+                config={{
+                  ...linesConfig,
+                  title: "",
+                  description: undefined,
+                }}
+                data={lines}
+                useCard={false}
+              />
+            )
+          },
+        },
+      ],
+    }
+  }, [t, accountMoveLines])
 
   const paymentTermLineFormConfig = useMemo(
     () =>
@@ -1804,7 +1982,7 @@ function AccountingClientLoaded({
   ])
 
   const accountPaymentsEntityConfig = useMemo((): EntityViewConfig => {
-    const base = accountPaymentsTableConfig(t)
+    const base = accountPaymentsTableConfig(t, { onEmptyAction: openCreateAccountPayment })
     const view = base.view as EntityTableConfig
     return {
       ...base,
@@ -1861,7 +2039,7 @@ function AccountingClientLoaded({
         ],
       },
     }
-  }, [t, postAccountPayment, cancelAccountPayment])
+  }, [t, postAccountPayment, cancelAccountPayment, openCreateAccountPayment])
 
   const paymentTermsEntityConfig = useMemo((): EntityViewConfig => {
     const base = paymentTermsTableConfig(t)
@@ -2646,6 +2824,7 @@ function AccountingClientLoaded({
               const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
               return {
                 ...tabRest,
+                recordSheet: accountMoveRecordSheet,
                 type: "custom" as const,
                 customContent: (
                   <GeneralLedgerView
@@ -2838,6 +3017,7 @@ function AccountingClientLoaded({
                 ...tab,
                 createForm: accountPaymentFormConfig,
                 entityConfig: accountPaymentsEntityConfig,
+                recordSheet: paymentRecordSheet,
               }
             }
             if (tab.id === "payment-terms") {
@@ -2887,16 +3067,8 @@ function AccountingClientLoaded({
             if (tab.id === "bank-statements") {
               return {
                 ...tab,
-                type: "custom" as const,
-                customContent: (
-                  <div className="space-y-3">
-                    <EntityView
-                      config={bankStatementsEntityConfig}
-                      data={bankStatements as unknown as Record<string, unknown>[]}
-                      onRowClick={(row) => setBankStatementDetail(row)}
-                    />
-                  </div>
-                ),
+                entityConfig: bankStatementsEntityConfig,
+                recordSheet: bankStatementRecordSheet,
               }
             }
             if (tab.id === "reconciliation-widgets") {
@@ -3051,6 +3223,9 @@ function AccountingClientLoaded({
       intercompanyTransactions,
       accountPaymentFormConfig,
       accountPaymentsEntityConfig,
+      paymentRecordSheet,
+      bankStatementRecordSheet,
+      accountMoveRecordSheet,
       paymentTermsEntityConfig,
       paymentTermLineFormConfig,
       paymentTermLinesEntityConfig,
@@ -3108,6 +3283,7 @@ function AccountingClientLoaded({
       "intercompany-rules": intercompanyRules as unknown as Record<string, unknown>[],
       "intercompany-transactions": intercompanyTransactions as unknown as Record<string, unknown>[],
       payments: accountPayments as unknown as Record<string, unknown>[],
+      "bank-statements": bankStatements as unknown as Record<string, unknown>[],
       "payment-terms": paymentTerms as unknown as Record<string, unknown>[],
       "payment-term-lines": paymentTermLines as unknown as Record<string, unknown>[],
       "account-journals": journals as unknown as Record<string, unknown>[],
@@ -3122,6 +3298,7 @@ function AccountingClientLoaded({
       reconciliationWidgets,
       fixedAssets,
       accountPayments,
+      bankStatements,
       paymentTerms,
       paymentTermLines,
       journals,
@@ -3160,11 +3337,21 @@ function AccountingClientLoaded({
     }
   }, [])
 
+  const dataLoading = useMemo(
+    () => ({
+      payments: paymentsLoading,
+      "bank-statements": bankStatementsLoading,
+      "journal-entries": movesLoading,
+    }),
+    [paymentsLoading, bankStatementsLoading, movesLoading],
+  )
+
   return (
     <>
       <ModuleView
         config={config}
         data={data}
+        dataLoading={dataLoading}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleEntityRowClick}
         activeTab={accountingActiveTab}

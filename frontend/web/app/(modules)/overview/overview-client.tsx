@@ -1,9 +1,18 @@
 "use client"
 
-import { useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { DashboardGrid, DashboardHeader, MissingOrganization } from "@lumiere/ui"
+import {
+  DashboardGrid,
+  DashboardHeader,
+  MissingOrganization,
+  type TimeRangeValue,
+  isTimestampInRange,
+  percentChange,
+  previousPeriodMs,
+  timeRangeToMs,
+} from "@lumiere/ui"
+import { Skeleton } from "@lumiere/ui/components/skeleton"
 import type { DashboardSection } from "@lumiere/ui"
 import { overviewDashboard } from "@/lib/module-dashboard-configs"
 import { useOverviewModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -35,20 +44,9 @@ function matchesCompany(row: Record<string, unknown>, companyId: number | null):
   return Number(row.companyId ?? row.company_id ?? 0) === companyId
 }
 
-function taskStateLabel(task: Record<string, unknown>): string {
-  const tag = enumTag(task.state)
-  if (tag) return tag.replace(/([A-Z])/g, " $1").trim()
-  return String(task.kanbanState ?? "Open")
-}
-
 function isOpenSaleOrder(row: Record<string, unknown>): boolean {
   const state = enumTag(row.state)
   return state !== "Done" && state !== "Cancelled"
-}
-
-function isOpenPurchaseOrder(row: Record<string, unknown>): boolean {
-  const state = enumTag(row.state)
-  return state !== "Done" && state !== "Cancelled" && state !== "Cancel"
 }
 
 function isConfirmedSaleOrder(row: Record<string, unknown>): boolean {
@@ -79,6 +77,28 @@ function monthBucketKey(ms: number): string {
   return d.toLocaleDateString(undefined, { month: "short" })
 }
 
+function OverviewDashboardSkeleton() {
+  return (
+    <div className="space-y-10" data-testid="overview-dashboard-skeleton">
+      <section className="space-y-4">
+        <Skeleton className="h-4 w-28" />
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-24 rounded-xl" />
+          ))}
+        </div>
+      </section>
+      <section className="space-y-4">
+        <Skeleton className="h-[340px] w-full rounded-xl" />
+      </section>
+      <section className="space-y-4">
+        <Skeleton className="h-4 w-36" />
+        <Skeleton className="h-48 w-full rounded-xl" />
+      </section>
+    </div>
+  )
+}
+
 export function OverviewClient(props: OverviewClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
@@ -99,33 +119,37 @@ function OverviewClientLoaded({
 }: OverviewClientProps & { organizationId: number }) {
   useOverviewModuleSubscription()
   const { t } = useTranslation()
-  const router = useRouter()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useOperatingCompanyId(organizationId)
 
-  const { data: orders = [] } = useSaleOrders(orgId, initialOrders)
-  const { data: moves = [] } = useAccountMoves(orgId, { initialData: initialMoves })
-  const { data: stockQuants = [] } = useStockQuants(orgId, initialStockQuants)
-  const { data: products = [] } = useProducts(orgId, initialProducts)
-  const { data: tasks = [] } = useTasks(orgId, initialTasks)
-  const { data: projects = [] } = useProjects(orgId, initialProjects)
-  const { data: purchaseOrders = [] } = usePurchaseOrders(orgId, initialPurchaseOrders)
-  const { data: contacts = [] } = useContacts(orgId, initialContacts)
-  const { count: pendingAiDrafts = 0 } = useAiActionDraftInboxCount(
+  const { data: orders = [], isLoading: ordersLoading } = useSaleOrders(orgId, initialOrders)
+  const { data: moves = [], isLoading: movesLoading } = useAccountMoves(orgId, { initialData: initialMoves })
+  const { isLoading: stockQuantsLoading } = useStockQuants(orgId, initialStockQuants)
+  const { isLoading: productsLoading } = useProducts(orgId, initialProducts)
+  const { data: tasks = [], isLoading: tasksLoading } = useTasks(orgId, initialTasks)
+  const { isLoading: projectsLoading } = useProjects(orgId, initialProjects)
+  const { isLoading: purchaseOrdersLoading } = usePurchaseOrders(orgId, initialPurchaseOrders)
+  const { data: contacts = [], isLoading: contactsLoading } = useContacts(orgId, initialContacts)
+  const { count: pendingAiDrafts = 0, isLoading: aiDraftsLoading } = useAiActionDraftInboxCount(
     organizationId,
     operatingCompanyId != null && operatingCompanyId > 0,
   )
+  const [timeRange, setTimeRange] = useState<TimeRangeValue>("30d")
 
-  const contactNameById = useMemo(() => {
-    const map = new Map<number, string>()
-    for (const row of contacts) {
-      const id = Number(row.id)
-      if (!Number.isFinite(id)) continue
-      const name = String(row.name ?? row.displayName ?? row.email ?? "").trim()
-      map.set(id, name || `#${id}`)
-    }
-    return map
-  }, [contacts])
+  const { startMs, endMs } = useMemo(() => timeRangeToMs(timeRange), [timeRange])
+  const previousRange = useMemo(() => previousPeriodMs(timeRange), [timeRange])
+
+  const isDataReady = !(
+    ordersLoading ||
+    movesLoading ||
+    stockQuantsLoading ||
+    productsLoading ||
+    tasksLoading ||
+    projectsLoading ||
+    purchaseOrdersLoading ||
+    contactsLoading ||
+    aiDraftsLoading
+  )
 
   const scopedOrders = useMemo(
     () => orders.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
@@ -135,25 +159,51 @@ function OverviewClientLoaded({
     () => moves.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
     [moves, operatingCompanyId],
   )
-  const scopedQuants = useMemo(
-    () => stockQuants.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
-    [stockQuants, operatingCompanyId],
-  )
   const scopedTasks = useMemo(
     () => tasks.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
     [tasks, operatingCompanyId],
   )
-  const scopedProjects = useMemo(
-    () => projects.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
-    [projects, operatingCompanyId],
+  const scopedContacts = useMemo(
+    () => contacts.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
+    [contacts, operatingCompanyId],
   )
-  const scopedPurchaseOrders = useMemo(
-    () =>
-      purchaseOrders.filter((row) =>
-        matchesCompany(row as Record<string, unknown>, operatingCompanyId),
-      ),
-    [purchaseOrders, operatingCompanyId],
-  )
+
+  const periodMetrics = useMemo(() => {
+    const currentRevenue = scopedOrders
+      .filter((order) => {
+        if (!isConfirmedSaleOrder(order as Record<string, unknown>)) return false
+        const ms = orderTimestampMs(order as Record<string, unknown>)
+        return isTimestampInRange(ms, startMs, endMs)
+      })
+      .reduce((sum, order) => sum + Number(order.amountTotal ?? 0), 0)
+
+    const previousRevenue = scopedOrders
+      .filter((order) => {
+        if (!isConfirmedSaleOrder(order as Record<string, unknown>)) return false
+        const ms = orderTimestampMs(order as Record<string, unknown>)
+        return isTimestampInRange(ms, previousRange.startMs, previousRange.endMs)
+      })
+      .reduce((sum, order) => sum + Number(order.amountTotal ?? 0), 0)
+
+    const currentOpenOrders = scopedOrders.filter((order) => {
+      if (!isOpenSaleOrder(order as Record<string, unknown>)) return false
+      const ms = orderTimestampMs(order as Record<string, unknown>)
+      return isTimestampInRange(ms, startMs, endMs)
+    }).length
+
+    const previousOpenOrders = scopedOrders.filter((order) => {
+      if (!isOpenSaleOrder(order as Record<string, unknown>)) return false
+      const ms = orderTimestampMs(order as Record<string, unknown>)
+      return isTimestampInRange(ms, previousRange.startMs, previousRange.endMs)
+    }).length
+
+    return {
+      currentRevenue,
+      revenueChange: percentChange(currentRevenue, previousRevenue),
+      currentOpenOrders,
+      openOrdersChange: percentChange(currentOpenOrders, previousOpenOrders),
+    }
+  }, [scopedOrders, startMs, endMs, previousRange])
 
   const salesTrendValues = useMemo(() => {
     const monthLabels = lastSixMonthLabels()
@@ -174,27 +224,47 @@ function OverviewClientLoaded({
   }, [scopedOrders])
 
   const liveSections = useMemo(() => {
-    const openSalesOrders = scopedOrders.filter(isOpenSaleOrder).length
-    const openPurchaseOrderCount = scopedPurchaseOrders.filter(isOpenPurchaseOrder).length
-    const activeProjects = scopedProjects.filter((p) => p.active !== false).length
+    const openTasks = scopedTasks.filter((task) => !task.isClosed).length
+    const { currentRevenue, revenueChange, currentOpenOrders, openOrdersChange } = periodMetrics
 
     const invoices = scopedMoves.filter(
       (m) => moveTypeTagFromRow(m as Record<string, unknown>) === "OutInvoice",
     )
-    const bills = scopedMoves.filter(
-      (m) => moveTypeTagFromRow(m as Record<string, unknown>) === "InInvoice",
+    const nowMs = Date.now()
+    const overdueInvoices = invoices.filter((m) => {
+      const residual = Number(m.amountResidual ?? 0)
+      if (residual <= 0) return false
+      if (m.invoiceDateDue == null) return true
+      const dueMs = Number(m.invoiceDateDue) / 1000
+      return dueMs < nowMs
+    })
+    const overdueInvoiceTotal = overdueInvoices.reduce(
+      (sum, m) => sum + Number(m.amountResidual ?? 0),
+      0,
     )
-    const ar = invoices.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
-    const ap = bills.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
 
-    const lowStockCount = scopedQuants.filter((q) => Number(q.availableQuantity ?? 0) <= 0).length
-    const openTasks = scopedTasks.filter((task) => !task.isClosed).length
+    const overdueTaskCount = scopedTasks.filter((task) => {
+      if (task.isClosed) return false
+      const deadlineMs = Number(task.dateDeadline ?? 0) / 1000
+      return deadlineMs > 0 && deadlineMs < nowMs
+    }).length
 
-    const pipelineMix = [
-      { label: t("overview.dashboard.stats.openSalesOrders"), count: openSalesOrders },
-      { label: t("overview.dashboard.stats.openPurchaseOrders"), count: openPurchaseOrderCount },
-      { label: t("overview.dashboard.stats.openTasks"), count: openTasks },
-      { label: t("overview.dashboard.stats.pendingAiDrafts"), count: pendingAiDrafts },
+    const needsAttentionRows = [
+      {
+        reference: `${t("overview.dashboard.overdue")} Invoices`,
+        amount: String(overdueInvoices.length),
+        status: `$${Math.round(overdueInvoiceTotal).toLocaleString()}`,
+      },
+      {
+        reference: t("overview.dashboard.stats.pendingAiDrafts"),
+        amount: String(pendingAiDrafts),
+        status: t("overview.dashboard.actions.aiDrafts"),
+      },
+      {
+        reference: t("projects.dashboard.overdueTasks"),
+        amount: String(overdueTaskCount),
+        status: t("overview.dashboard.actions.projects"),
+      },
     ]
 
     const baseConfig = overviewDashboard(t)
@@ -208,34 +278,18 @@ function OverviewClientLoaded({
             data: {
               stats: [
                 {
+                  label: t("sales.dashboard.widgets.revenue"),
+                  value: `$${Math.round(currentRevenue).toLocaleString()}`,
+                  change: revenueChange,
+                  icon: "BarChart2",
+                  testId: "overview-stat-revenue",
+                },
+                {
                   label: t("overview.dashboard.stats.openSalesOrders"),
-                  value: String(openSalesOrders),
+                  value: String(currentOpenOrders),
+                  change: openOrdersChange,
                   icon: "ShoppingCart",
                   testId: "overview-stat-open-sales-orders",
-                },
-                {
-                  label: t("overview.dashboard.stats.openPurchaseOrders"),
-                  value: String(openPurchaseOrderCount),
-                  icon: "Truck",
-                  testId: "overview-stat-open-purchase-orders",
-                },
-                {
-                  label: t("overview.dashboard.stats.accountsReceivable"),
-                  value: `$${Math.round(ar).toLocaleString()}`,
-                  icon: "TrendingUp",
-                  testId: "overview-stat-accounts-receivable",
-                },
-                {
-                  label: t("overview.dashboard.stats.accountsPayable"),
-                  value: `$${Math.round(ap).toLocaleString()}`,
-                  icon: "TrendingDown",
-                  testId: "overview-stat-accounts-payable",
-                },
-                {
-                  label: t("overview.dashboard.stats.lowStockAlerts"),
-                  value: String(lowStockCount),
-                  icon: "AlertTriangle",
-                  testId: "overview-stat-low-stock",
                 },
                 {
                   label: t("overview.dashboard.stats.openTasks"),
@@ -244,35 +298,12 @@ function OverviewClientLoaded({
                   testId: "overview-stat-open-tasks",
                 },
                 {
-                  label: t("overview.dashboard.stats.activeProjects"),
-                  value: String(activeProjects),
-                  icon: "FolderKanban",
-                  testId: "overview-stat-active-projects",
-                },
-                {
-                  label: t("overview.dashboard.stats.pendingAiDrafts"),
-                  value: String(pendingAiDrafts),
-                  icon: "Bell",
-                  testId: "overview-stat-pending-ai-drafts",
+                  label: t("crm.contacts.title"),
+                  value: String(scopedContacts.length),
+                  icon: "Users",
+                  testId: "overview-stat-contacts",
                 },
               ],
-            },
-          }
-        }
-        if (w.type === "quick-actions") {
-          const handlers: Record<string, () => void> = {
-            sales: () => router.push("/sales"),
-            accounting: () => router.push("/accounting"),
-            crm: () => router.push("/crm"),
-            inventory: () => router.push("/inventory"),
-            ai_drafts: () => router.push("/ai-action-drafts"),
-            projects: () => router.push("/projects"),
-          }
-          return {
-            ...w,
-            data: {
-              ...w.data,
-              actions: w.data.actions.map((a) => ({ ...a, onClick: handlers[a.id] })),
             },
           }
         }
@@ -285,97 +316,37 @@ function OverviewClientLoaded({
             },
           }
         }
-        if (w.id === "overview-pipeline-mix") {
+        if (w.id === "overview-needs-attention") {
           return {
             ...w,
             data: {
               ...(w.data as Record<string, unknown>),
-              values: pipelineMix,
+              rows: needsAttentionRows,
             },
           }
-        }
-        if (w.id === "overview-upcoming-tasks") {
-          const nowMs = Date.now()
-          const rows = scopedTasks
-            .filter((task) => !task.isClosed && task.dateDeadline != null)
-            .sort((a, b) => Number(a.dateDeadline ?? 0) - Number(b.dateDeadline ?? 0))
-            .slice(0, 6)
-            .map((task) => {
-              const deadlineMs = Number(task.dateDeadline ?? 0) / 1000
-              const project = scopedProjects.find((p) => p.id === task.projectId)
-              const overdue = deadlineMs < nowMs
-              return {
-                task: String(task.name ?? ""),
-                project: String(project?.name ?? "—"),
-                due: new Date(deadlineMs).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                }),
-                status: overdue
-                  ? `${taskStateLabel(task as Record<string, unknown>)} · ${t("overview.dashboard.overdue")}`
-                  : taskStateLabel(task as Record<string, unknown>),
-              }
-            })
-          return { ...w, data: { ...(w.data as Record<string, unknown>), rows } }
-        }
-        if (w.id === "overview-low-stock") {
-          const rows = scopedQuants
-            .filter((q) => Number(q.availableQuantity ?? 0) <= 0)
-            .slice(0, 6)
-            .map((q) => {
-              const product = products.find((p) => p.id === q.productId)
-              return {
-                sku: String(product?.defaultCode ?? `SKU-${String(q.productId).slice(-4)}`),
-                name: String(product?.name ?? t("inventory.dashboard.productFallback", { id: String(q.productId).slice(-4) })),
-                qty: Math.round(Number(q.availableQuantity ?? 0)),
-              }
-            })
-          return { ...w, data: { ...(w.data as Record<string, unknown>), rows } }
-        }
-        if (w.id === "overview-open-pos") {
-          const rows = scopedPurchaseOrders
-            .filter(isOpenPurchaseOrder)
-            .slice(0, 8)
-            .map((po) => {
-              const partnerId = Number(po.partnerId ?? 0)
-              const vendor =
-                contactNameById.get(partnerId) ??
-                (partnerId > 0 ? `#${partnerId}` : "—")
-              return {
-                reference: String(po.name ?? po.origin ?? `#${po.id}`),
-                vendor,
-                amount: `$${Math.round(Number(po.amountTotal ?? 0)).toLocaleString()}`,
-                status: enumTag(po.state) || "Open",
-              }
-            })
-          return { ...w, data: { ...(w.data as Record<string, unknown>), rows } }
         }
         return w
       }),
     })) as DashboardSection[]
-  }, [
-    scopedOrders,
-    scopedMoves,
-    scopedQuants,
-    scopedTasks,
-    scopedProjects,
-    scopedPurchaseOrders,
-    products,
-    pendingAiDrafts,
-    salesTrendValues,
-    contactNameById,
-    t,
-    router,
-  ])
+  }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, t])
 
   return (
     <div className="space-y-6">
-      <DashboardHeader title={t("overview.page.title")} description={t("overview.page.description")} />
-      <DashboardGrid
-        sections={liveSections}
-        testId="overview-dashboard"
-        widgetTestIdPrefix="overview-widget"
+      <DashboardHeader
+        title={t("overview.page.title")}
+        description={t("overview.page.description")}
+        timeRange={timeRange}
+        onTimeRangeChange={setTimeRange}
       />
+      {isDataReady ? (
+        <DashboardGrid
+          sections={liveSections}
+          testId="overview-dashboard"
+          widgetTestIdPrefix="overview-widget"
+        />
+      ) : (
+        <OverviewDashboardSkeleton />
+      )}
     </div>
   )
 }

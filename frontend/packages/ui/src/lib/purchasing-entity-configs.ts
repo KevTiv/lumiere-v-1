@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next"
-import type { EntityViewConfig } from "./entity-view-types"
+import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const poInvoiceStatusBadges = (t: TFunction) => ({
@@ -33,6 +33,47 @@ const poStateBadges = (t: TFunction) => ({
     Cancelled: t("purchasing.purchaseOrders.states.Cancelled"),
   },
 }) as const
+
+export const purchaseOrderStatusBadges = poStateBadges
+
+export type PurchaseOrdersTableConfigOptions = {
+  /** Empty-state CTA — wired by the module client (opens create form). */
+  onEmptyAction?: () => void
+}
+
+export const purchaseOrderDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "vendor",
+      fields: [
+        { key: "partnerId", label: t("purchasing.purchaseOrders.columns.partnerId") },
+        { key: "name", label: t("purchasing.purchaseOrders.columns.name") },
+      ],
+    },
+    {
+      id: "dates",
+      fields: [
+        { key: "dateOrder", label: t("purchasing.purchaseOrders.columns.dateOrder"), type: "relative-date" },
+        { key: "datePlanned", label: t("purchasing.purchaseOrders.columns.datePlanned"), type: "relative-date" },
+      ],
+    },
+    {
+      id: "totals",
+      fields: [
+        { key: "amountUntaxed", label: t("purchasing.purchaseOrders.columns.amountUntaxed"), type: "currency" },
+        { key: "amountTotal", label: t("purchasing.purchaseOrders.columns.amountTotal"), type: "currency" },
+        {
+          key: "invoiceStatus",
+          label: t("purchasing.purchaseOrders.columns.invoiceStatus"),
+          type: "badge",
+          ...poInvoiceStatusBadges(t),
+        },
+        { key: "receiptStatus", label: t("purchasing.purchaseOrders.columns.receiptStatus"), type: "text" },
+      ],
+    },
+  ],
+})
 
 const requisitionStateBadges = (t: TFunction) => ({
   badgeVariants: {
@@ -69,7 +110,10 @@ const lineStateBadges = (t: TFunction) => ({
 }) as const
 
 // ── Purchase Orders ───────────────────────────────────────────────────────────
-export const purchaseOrdersTableConfig = (t: TFunction): EntityViewConfig => ({
+export const purchaseOrdersTableConfig = (
+  t: TFunction,
+  options?: PurchaseOrdersTableConfigOptions,
+): EntityViewConfig => ({
   id: "purchase-orders-table",
   title: t("purchasing.purchaseOrders.title"),
   description: t("purchasing.purchaseOrders.description"),
@@ -95,13 +139,35 @@ export const purchaseOrdersTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("purchasing.purchaseOrders.columns.name"), width: "min-w-32" },
+      {
+        key: "name",
+        label: t("purchasing.purchaseOrders.columns.name"),
+        width: "min-w-32",
+        sortable: true,
+      },
       { key: "partnerId", label: t("purchasing.purchaseOrders.columns.partnerId"), width: "min-w-32" },
-      { key: "state", label: t("purchasing.purchaseOrders.columns.state"), type: "badge", ...poStateBadges(t) },
-      { key: "dateOrder", label: t("purchasing.purchaseOrders.columns.dateOrder"), type: "date" },
-      { key: "datePlanned", label: t("purchasing.purchaseOrders.columns.datePlanned"), type: "date" },
+      {
+        key: "state",
+        label: t("purchasing.purchaseOrders.columns.state"),
+        type: "status",
+        sortable: true,
+        ...poStateBadges(t),
+      },
+      {
+        key: "dateOrder",
+        label: t("purchasing.purchaseOrders.columns.dateOrder"),
+        type: "relative-date",
+        sortable: true,
+      },
+      { key: "datePlanned", label: t("purchasing.purchaseOrders.columns.datePlanned"), type: "relative-date" },
       { key: "amountUntaxed", label: t("purchasing.purchaseOrders.columns.amountUntaxed"), type: "currency", align: "right" },
-      { key: "amountTotal", label: t("purchasing.purchaseOrders.columns.amountTotal"), type: "currency", align: "right" },
+      {
+        key: "amountTotal",
+        label: t("purchasing.purchaseOrders.columns.amountTotal"),
+        type: "currency",
+        align: "right",
+        sortable: true,
+      },
       { key: "receiptStatus", label: t("purchasing.purchaseOrders.columns.receiptStatus"), type: "text" },
       {
         key: "invoiceStatus",
@@ -111,6 +177,12 @@ export const purchaseOrdersTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     emptyMessage: t("purchasing.purchaseOrders.emptyMessage"),
+    emptyState: {
+      title: t("purchasing.purchaseOrders.emptyState.title"),
+      description: t("purchasing.purchaseOrders.emptyState.description"),
+      actionLabel: t("purchasing.purchaseOrders.emptyState.actionLabel"),
+      onAction: options?.onEmptyAction,
+    },
   },
 })
 

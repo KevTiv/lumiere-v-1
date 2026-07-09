@@ -2399,7 +2399,8 @@
       "activeLeads": "Active Leads",
       "pipelineValue": "Pipeline Value",
       "openOpportunities": "Open Opportunities",
-      "totalContacts": "Total Contacts"
+      "totalContacts": "Total Contacts",
+      "opportunityFunnel": "Opportunity Funnel"
     },
     "leads": {
       "title": "Leads",
@@ -3160,6 +3161,11 @@
       "description": "All employees and their details",
       "searchPlaceholder": "Search by name, email, or employee number…",
       "emptyMessage": "No employees found.",
+      "emptyState": {
+        "title": "No employees yet",
+        "description": "Add your first employee to start managing your workforce.",
+        "actionLabel": "New Employee"
+      },
       "columns": {
         "employeeNumber": "#",
         "name": "Name",
@@ -3206,6 +3212,11 @@
       "description": "Employee time-off requests",
       "searchPlaceholder": "Search leave requests…",
       "emptyMessage": "No leave requests found.",
+      "emptyState": {
+        "title": "No leave requests yet",
+        "description": "Submit a time-off request to track employee absences.",
+        "actionLabel": "New Leave Request"
+      },
       "columns": {
         "employeeId": "Employee",
         "leaveTypeId": "Leave Type",
@@ -3239,6 +3250,11 @@
       "description": "Employee employment contracts",
       "searchPlaceholder": "Search contracts…",
       "emptyMessage": "No contracts found.",
+      "emptyState": {
+        "title": "No contracts yet",
+        "description": "Create an employment contract to record salary and terms.",
+        "actionLabel": "New Contract"
+      },
       "columns": {
         "name": "Contract",
         "employeeId": "Employee",
@@ -3629,6 +3645,17 @@
       "description": "Product catalog",
       "searchPlaceholder": "Search by name or internal reference…",
       "emptyMessage": "No products found.",
+      "emptyState": {
+        "title": "No products yet",
+        "description": "Add your first product to start tracking stock and sales.",
+        "actionLabel": "New product"
+      },
+      "detail": {
+        "barcode": "Barcode",
+        "listPrice": "Sales price",
+        "qtyAvailable": "Qty on hand",
+        "active": "Active"
+      },
       "columns": {
         "defaultCode": "SKU",
         "name": "Name",
@@ -3668,6 +3695,11 @@
       "title": "Stock On Hand",
       "description": "Current inventory quantities by location",
       "emptyMessage": "No stock records found.",
+      "emptyState": {
+        "title": "No stock on hand",
+        "description": "Record inventory quantities by product and location.",
+        "actionLabel": "Add stock line"
+      },
       "columns": {
         "productId": "Product ID",
         "locationId": "Location",
@@ -3682,6 +3714,15 @@
       "description": "Stock movements and delivery orders",
       "searchPlaceholder": "Search by reference or origin…",
       "emptyMessage": "No transfers found.",
+      "emptyState": {
+        "title": "No transfers yet",
+        "description": "Create a transfer to move stock between locations.",
+        "actionLabel": "New transfer"
+      },
+      "detail": {
+        "locationFrom": "From location",
+        "locationTo": "To location"
+      },
       "columns": {
         "name": "Reference",
         "origin": "Source",
@@ -4830,6 +4871,11 @@
       "description": "All purchase orders",
       "searchPlaceholder": "Search by reference or origin…",
       "emptyMessage": "No purchase orders found.",
+      "emptyState": {
+        "title": "No purchase orders yet",
+        "description": "Create your first purchase order to track vendor spending.",
+        "actionLabel": "New purchase order"
+      },
       "columns": {
         "name": "Reference",
         "partnerId": "Vendor",
@@ -5319,6 +5365,9 @@
     }
   },
   "sales": {
+    "dashboard": {
+      "ordersByState": "Orders by State"
+    },
     "csvImport": {
       "ordersTitle": "Import sale orders (CSV)",
       "toolbarOrders": "Import orders (CSV)",
@@ -5330,6 +5379,11 @@
       "description": "All sales orders",
       "searchPlaceholder": "Search by reference or customer ref…",
       "emptyMessage": "No sales orders found.",
+      "emptyState": {
+        "title": "No sales orders yet",
+        "description": "Create your first sales order to start tracking revenue.",
+        "actionLabel": "New sales order"
+      },
       "columns": {
         "reference": "Order #",
         "clientOrderRef": "Customer Ref",
@@ -9241,6 +9295,7 @@
       "newDashboard": "New Dashboard",
       "newWidget": "New Widget",
       "addWidget": "Add Widget",
+      "viewDashboard": "View Dashboard",
       "shareDashboard": "Share Dashboard",
       "updateLayout": "Update Layout"
     },

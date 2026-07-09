@@ -71,6 +71,15 @@ export function BarChartWidget({ data }: { data: BarChartWidgetType["data"] }) {
               fill={s.color}
               radius={[4, 4, 0, 0]}
               stackId={data.stacked ? "stack" : undefined}
+              style={{ cursor: data.onCategoryClick || data.onSegmentClick ? "pointer" : "default" }}
+              onClick={(row) => {
+                if (data.onCategoryClick && row) {
+                  data.onCategoryClick(String(row[data.categoryKey]))
+                }
+                if (data.onSegmentClick) {
+                  data.onSegmentClick(s.name)
+                }
+              }}
             >
               {data.values.map((_, index) => (
                 <Cell key={`cell-${index}`} />

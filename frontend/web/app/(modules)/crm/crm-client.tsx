@@ -79,11 +79,11 @@ import {
 } from "@lumiere/query-hooks/hooks/crm"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
-import type { EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityRecordSheetConfig, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { entityTableConfigFromView } from "@lumiere/ui/lib/entity-view-types"
 import {
   DEFAULT_KANBAN_COLUMN_COLORS,
-  CrmRecordChatterDialog,
+  CrmRecordChatter,
   CrmUtmSettings,
   ModuleView,
   MissingOrganization,
@@ -116,13 +116,26 @@ import {
   newLeadForm,
   newOpportunityForm,
   contactsTableConfig,
+  contactDetailConfig,
+  leadDetailConfig,
   leadsTableConfig,
+  opportunityDetailConfig,
   opportunitiesTableConfig,
   ImportAssistantWizard,
+  useIdentityLabelMap,
+  buildModuleTabHref,
+  type TimeRangeValue,
+  isTimestampInRange,
+  percentChange,
+  previousPeriodMs,
+  timeRangeToMs,
 } from "@lumiere/ui"
 import { useCallback, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useModuleTab } from "@/hooks/use-module-tab"
+import { useModuleFilters } from "@/hooks/use-module-filters"
 
 export { CRM_UI_REDUCERS } from "@/lib/crm-ui-reducers"
 
@@ -170,12 +183,22 @@ function rowIdBigInt(row: Record<string, unknown>): bigint {
   return BigInt(String(r ?? 0))
 }
 
-function crmTabToResModel(tabId: string): string | null {
-  if (tabId === "leads") return "lead"
-  if (tabId === "opportunities") return "opportunity"
-  if (tabId === "contacts") return "contact"
-  if (tabId === "activities") return "activity"
-  return null
+function attachEmptyStateAction(
+  view: EntityViewConfig["view"],
+  onAction: () => void,
+): EntityViewConfig["view"] {
+  if (view.mode === "table") {
+    if (!view.emptyState) return view
+    return { ...view, emptyState: { ...view.emptyState, onAction } }
+  }
+  if (view.mode === "table-or-board") {
+    if (!view.table.emptyState) return view
+    return {
+      ...view,
+      table: { ...view.table, emptyState: { ...view.table.emptyState, onAction } },
+    }
+  }
+  return view
 }
 
 function crmRowChatterLabel(tabId: string, row: Record<string, unknown>): string {
@@ -220,6 +243,14 @@ function oppIsClosed(row: Record<string, unknown>): boolean {
   return row.isWon === true || row.is_won === true || row.isLost === true || row.is_lost === true
 }
 
+function recordTimestampMs(row: Record<string, unknown>): number {
+  const raw = row.writeDate ?? row.write_date ?? row.createDate ?? row.create_date
+  if (raw == null) return 0
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return n > 1e15 ? n / 1000 : n
+}
+
 function rowCompanyId(row: Record<string, unknown>, fallback: bigint): bigint {
   const raw = row.companyId ?? row.company_id
   if (raw == null || raw === "") return fallback
@@ -229,6 +260,23 @@ function rowCompanyId(row: Record<string, unknown>, fallback: bigint): bigint {
 
 function partnerId(row: Record<string, unknown>): unknown {
   return row.partnerId ?? row.partner_id
+}
+
+function leadStateFilterFromCategory(category: string): string {
+  const trimmed = category.trim()
+  if (!trimmed || trimmed.toLowerCase() === "unknown") return trimmed
+  return trimmed.toLowerCase()
+}
+
+function leadStageLabel(row: Record<string, unknown>): string {
+  const raw = row.state ?? row.State
+  if (raw == null) return "Unknown"
+  if (typeof raw === "string") return raw
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>
+    if ("tag" in obj && typeof obj.tag === "string") return obj.tag
+  }
+  return String(raw)
 }
 
 type CrmCsvImportKind = "contact" | "lead" | "opportunity"
@@ -254,9 +302,11 @@ function CrmClientLoaded({
 }: CrmClientLoadedProps) {
   useCrmModuleSubscription()
   const { t } = useTranslation()
+  const router = useRouter()
   const { currentUser } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const { orgId } = orgBigInts(organizationId)
+  const ownerLabelMap = useIdentityLabelMap(organizationId)
 
   const leadsTableRuntime = useRuntimeListConfig({
     base: entityTableConfigFromView(leadsTableConfig(t).view),
@@ -277,7 +327,7 @@ function CrmClientLoaded({
     listViewKey: `list-filters:crm:contacts:${organizationId}`,
   })
   const opportunitiesTableRuntime = useRuntimeListConfig({
-    base: entityTableConfigFromView(opportunitiesTableConfig(t).view),
+    base: entityTableConfigFromView(opportunitiesTableConfig(t, { ownerLabelMap }).view),
     moduleId: "crm",
     formId: "new-opportunity",
     organizationId,
@@ -322,16 +372,12 @@ function CrmClientLoaded({
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [workflowModal, setWorkflowModal] = useState<WorkflowModal>(null)
   const [csvKind, setCsvKind] = useState<CrmCsvImportKind | null>(null)
-  const [chatterTarget, setChatterTarget] = useState<{
-    resModel: string
-    resId: bigint
-    recordTitle: string
-  } | null>(null)
+  const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
 
-  const { data: leads = [] } = useLeads(orgId, initialLeads)
-  const { data: opportunities = [] } = useOpportunities(orgId, initialOpportunities)
+  const { data: leads = [], isLoading: leadsLoading } = useLeads(orgId, initialLeads)
+  const { data: opportunities = [], isLoading: opportunitiesLoading } = useOpportunities(orgId, initialOpportunities)
   const { data: opportunityLines = [] } = useOpportunityLines(orgId)
-  const { data: contacts = [] } = useContacts(orgId, initialContacts)
+  const { data: contacts = [], isLoading: contactsLoading } = useContacts(orgId, initialContacts)
   const { data: contactTags = [] } = useContactTags(orgId)
   const { data: contactSegments = [] } = useContactSegments(orgId)
   const { data: activities = [] } = useActivities(orgId)
@@ -885,11 +931,110 @@ function CrmClientLoaded({
     [handleOpportunityStageMove, opportunityBoardColumns, operatingCompanyId],
   )
 
+  const leadRecordSheet = useMemo(
+    (): EntityRecordSheetConfig => ({
+      titleKey: "contactName",
+      statusKey: "state",
+      statusBadgeVariants: {
+        new: "secondary",
+        qualified: "outline",
+        won: "default",
+        lost: "destructive",
+        converted: "default",
+        New: "secondary",
+        Qualified: "outline",
+        Won: "default",
+        Lost: "destructive",
+      },
+      statusBadgeLabels: {
+        new: t("crm.leads.states.New"),
+        qualified: t("crm.leads.states.Qualified"),
+        won: t("crm.leads.states.Won"),
+        lost: t("crm.leads.states.Lost"),
+        converted: t("crm.leads.states.Converted"),
+        New: t("crm.leads.states.New"),
+        Qualified: t("crm.leads.states.Qualified"),
+        Won: t("crm.leads.states.Won"),
+        Lost: t("crm.leads.states.Lost"),
+      },
+      detailConfig: leadDetailConfig(t),
+      auditTableName: "lead",
+      customTabs: [
+        {
+          id: "activity",
+          label: t("crm.chatter.timeline"),
+          content: (record) => (
+            <CrmRecordChatter
+              organizationId={organizationId}
+              resModel="lead"
+              resId={rowIdBigInt(record)}
+              recordTitle={crmRowChatterLabel("leads", record)}
+            />
+          ),
+        },
+      ],
+    }),
+    [t, organizationId],
+  )
+
+  const opportunityRecordSheet = useMemo(
+    (): EntityRecordSheetConfig => ({
+      titleKey: "name",
+      statusKey: "priority",
+      statusBadgeVariants: { Low: "secondary", Medium: "outline", High: "default" },
+      statusBadgeLabels: {
+        Low: t("crm.opportunities.states.Low"),
+        Medium: t("crm.opportunities.states.Medium"),
+        High: t("crm.opportunities.states.High"),
+      },
+      detailConfig: opportunityDetailConfig(t),
+      auditTableName: "opportunity",
+      customTabs: [
+        {
+          id: "activity",
+          label: t("crm.chatter.timeline"),
+          content: (record) => (
+            <CrmRecordChatter
+              organizationId={organizationId}
+              resModel="opportunity"
+              resId={rowIdBigInt(record)}
+              recordTitle={crmRowChatterLabel("opportunities", record)}
+            />
+          ),
+        },
+      ],
+    }),
+    [t, organizationId],
+  )
+
+  const contactRecordSheet = useMemo(
+    (): EntityRecordSheetConfig => ({
+      titleKey: "name",
+      detailConfig: contactDetailConfig(t),
+      auditTableName: "contact",
+      customTabs: [
+        {
+          id: "activity",
+          label: t("crm.chatter.timeline"),
+          content: (record) => (
+            <CrmRecordChatter
+              organizationId={organizationId}
+              resModel="contact"
+              resId={rowIdBigInt(record)}
+              recordTitle={crmRowChatterLabel("contacts", record)}
+            />
+          ),
+        },
+      ],
+    }),
+    [t, organizationId],
+  )
+
   const moduleConfig = useMemo((): ModuleConfig => {
     const base = crmModuleConfig(t)
 
     const leadsCfg = leadsTableConfig(t)
-    const oppCfg = opportunitiesTableConfig(t)
+    const oppCfg = opportunitiesTableConfig(t, { ownerLabelMap })
     const contactCfg = contactsTableConfig(t, {
       formatContactDisplayName: contactPrimaryLabel,
     })
@@ -897,9 +1042,10 @@ function CrmClientLoaded({
 
     const leadsEntity: EntityViewConfig = {
       ...leadsCfg,
-      view: {
-        ...leadsTableRuntime,
-        actions: [
+      view: attachEmptyStateAction(
+        {
+          ...leadsTableRuntime,
+          actions: [
           {
             id: "csv-leads",
             label: t("crm.csvImport.toolbarLeads"),
@@ -942,61 +1088,70 @@ function CrmClientLoaded({
             },
           },
         ],
-      },
+        },
+        () => setQuickActionForm({ form: newLeadForm(t), action: "createLead" }),
+      ),
     }
 
     const oppEntity: EntityViewConfig =
       oppCfg.view.mode === "table-or-board"
         ? {
             ...oppCfg,
-            view: {
-              ...oppCfg.view,
-              table: {
-                ...opportunitiesTableRuntime,
-                actions: [
-                  {
-                    id: "csv-opportunities",
-                    label: t("crm.csvImport.toolbarOpportunities"),
-                    onClick: () => setCsvKind("opportunity"),
-                  },
-                  {
-                    id: "edit-opportunity",
-                    label: t("crm.actions.editOpportunity"),
-                    requiresSelection: true,
-                    onClick: openEditOpportunityModal,
-                  },
-                  {
-                    id: "change-stage",
-                    label: t("crm.actions.changeStage"),
-                    requiresSelection: true,
-                    onClick: openChangeStageModal,
-                  },
-                  {
-                    id: "mark-won",
-                    label: t("crm.actions.markWon"),
-                    requiresSelection: true,
-                    onClick: (rows) => {
-                      void markOpportunityWon(rows)
+            view: attachEmptyStateAction(
+              {
+                ...oppCfg.view,
+                table: {
+                  ...opportunitiesTableRuntime,
+                  actions: [
+                    {
+                      id: "csv-opportunities",
+                      label: t("crm.csvImport.toolbarOpportunities"),
+                      onClick: () => setCsvKind("opportunity"),
                     },
-                  },
-                  {
-                    id: "mark-lost",
-                    label: t("crm.actions.markLost"),
-                    requiresSelection: true,
-                    variant: "destructive",
-                    onClick: (rows) => {
-                      void markOpportunityLost(rows)
+                    {
+                      id: "edit-opportunity",
+                      label: t("crm.actions.editOpportunity"),
+                      requiresSelection: true,
+                      onClick: openEditOpportunityModal,
                     },
-                  },
-                  {
-                    id: "convert-opp-order",
-                    label: t("crm.actions.convertToSaleOrder"),
-                    requiresSelection: true,
-                    onClick: openConvertOppModal,
-                  },
-                ],
+                    {
+                      id: "change-stage",
+                      label: t("crm.actions.changeStage"),
+                      requiresSelection: true,
+                      onClick: openChangeStageModal,
+                    },
+                    {
+                      id: "mark-won",
+                      label: t("crm.actions.markWon"),
+                      requiresSelection: true,
+                      onClick: (rows) => {
+                        void markOpportunityWon(rows)
+                      },
+                    },
+                    {
+                      id: "mark-lost",
+                      label: t("crm.actions.markLost"),
+                      requiresSelection: true,
+                      variant: "destructive",
+                      onClick: (rows) => {
+                        void markOpportunityLost(rows)
+                      },
+                    },
+                    {
+                      id: "convert-opp-order",
+                      label: t("crm.actions.convertToSaleOrder"),
+                      requiresSelection: true,
+                      onClick: openConvertOppModal,
+                    },
+                  ],
+                },
               },
-            },
+              () =>
+                setQuickActionForm({
+                  form: newOpportunityForm(t, opportunityStageOptions),
+                  action: "createOpportunity",
+                }),
+            ),
           }
         : {
             ...oppCfg,
@@ -1008,9 +1163,10 @@ function CrmClientLoaded({
 
     const contactEntity: EntityViewConfig = {
       ...contactCfg,
-      view: {
-        ...contactsTableRuntime,
-        actions: [
+      view: attachEmptyStateAction(
+        {
+          ...contactsTableRuntime,
+          actions: [
           {
             id: "csv-contacts",
             label: t("crm.csvImport.toolbarContacts"),
@@ -1065,7 +1221,9 @@ function CrmClientLoaded({
             },
           },
         ],
-      },
+        },
+        () => setQuickActionForm({ form: newContactForm(t), action: "createContact" }),
+      ),
     }
 
     const activitiesEntity: EntityViewConfig = {
@@ -1092,11 +1250,14 @@ function CrmClientLoaded({
     }
 
     const coreTabs = base.tabs.map((tab) => {
-      if (tab.id === "leads") return { ...tab, entityConfig: leadsEntity }
+      if (tab.id === "leads") {
+        return { ...tab, entityConfig: leadsEntity, recordSheet: leadRecordSheet }
+      }
       if (tab.id === "opportunities") {
         return {
           ...tab,
           entityConfig: oppEntity,
+          recordSheet: opportunityRecordSheet,
           createForm: newOpportunityForm(t, opportunityStageOptions),
           createLabel: t("crm.opportunities.board.newOpportunity"),
         }
@@ -1109,7 +1270,9 @@ function CrmClientLoaded({
           createAction: "createOpportunityLine",
         }
       }
-      if (tab.id === "contacts") return { ...tab, entityConfig: contactEntity }
+      if (tab.id === "contacts") {
+        return { ...tab, entityConfig: contactEntity, recordSheet: contactRecordSheet }
+      }
       if (tab.id === "activities") return { ...tab, entityConfig: activitiesEntity }
       return tab
     })
@@ -1181,21 +1344,69 @@ function CrmClientLoaded({
     leadsTableRuntime,
     contactsTableRuntime,
     opportunitiesTableRuntime,
+    leadRecordSheet,
+    opportunityRecordSheet,
+    contactRecordSheet,
   ])
+
+  const crmTabIds = useMemo(() => moduleConfig.tabs.map((tab) => tab.id), [moduleConfig])
+  const { activeTab, setActiveTab } = useModuleTab(
+    moduleConfig.defaultTab ?? "dashboard",
+    crmTabIds,
+  )
+  const urlFilters = useModuleFilters()
+
+  const navigateToLeadsByState = useCallback(
+    (category: string) => {
+      router.push(
+        buildModuleTabHref("crm", "leads", { state: leadStateFilterFromCategory(category) }),
+      )
+    },
+    [router],
+  )
 
   // Live KPI overrides
   const liveSections = useMemo(() => {
-    const activeLeads = leads.filter((l) => {
-      const s = leadStateRaw(l as Record<string, unknown>)
+    const { startMs, endMs } = timeRangeToMs(dashboardTimeRange)
+    const previousRange = previousPeriodMs(dashboardTimeRange)
+
+    const inCurrentRange = (row: Record<string, unknown>) =>
+      isTimestampInRange(recordTimestampMs(row), startMs, endMs)
+    const inPreviousRange = (row: Record<string, unknown>) =>
+      isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs)
+
+    const isActiveLead = (row: Record<string, unknown>) => {
+      const s = leadStateRaw(row)
       return s !== "lost" && s !== "won" && s !== "converted"
-    }).length
-    const openOpportunities = opportunities.filter(
-      (o) => !oppIsClosed(o as Record<string, unknown>),
+    }
+
+    const currentActiveLeads = leads.filter((l) =>
+      isActiveLead(l as Record<string, unknown>) && inCurrentRange(l as Record<string, unknown>),
+    ).length
+    const previousActiveLeads = leads.filter((l) =>
+      isActiveLead(l as Record<string, unknown>) && inPreviousRange(l as Record<string, unknown>),
+    ).length
+
+    const currentOpenOpportunities = opportunities.filter(
+      (o) => !oppIsClosed(o as Record<string, unknown>) && inCurrentRange(o as Record<string, unknown>),
     )
-    const pipelineValue = openOpportunities.reduce(
+    const previousOpenOpportunities = opportunities.filter(
+      (o) => !oppIsClosed(o as Record<string, unknown>) && inPreviousRange(o as Record<string, unknown>),
+    )
+
+    const currentPipelineValue = currentOpenOpportunities.reduce(
       (s, o) => s + Number(o.expectedRevenue ?? 0),
       0,
     )
+    const previousPipelineValue = previousOpenOpportunities.reduce(
+      (s, o) => s + Number(o.expectedRevenue ?? 0),
+      0,
+    )
+
+    const currentContacts = contacts.filter((c) => inCurrentRange(c as Record<string, unknown>)).length
+    const previousContacts = contacts.filter((c) => inPreviousRange(c as Record<string, unknown>)).length
+
+    const openOpportunities = currentOpenOpportunities
     const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
     if (!dashboardTab?.sections) return []
 
@@ -1207,10 +1418,30 @@ function CrmClientLoaded({
             ...w,
             data: {
               stats: [
-                { label: t("crm.dashboard.activeLeads"), value: String(activeLeads), icon: "Users" },
-                { label: t("crm.dashboard.pipelineValue"), value: `$${pipelineValue.toLocaleString()}`, icon: "TrendingUp" },
-                { label: t("crm.dashboard.openOpportunities"), value: String(openOpportunities.length), icon: "Target" },
-                { label: t("crm.dashboard.totalContacts"), value: String(contacts.length), icon: "BookUser" },
+                {
+                  label: t("crm.dashboard.activeLeads"),
+                  value: String(currentActiveLeads),
+                  change: percentChange(currentActiveLeads, previousActiveLeads),
+                  icon: "Users",
+                },
+                {
+                  label: t("crm.dashboard.pipelineValue"),
+                  value: `$${currentPipelineValue.toLocaleString()}`,
+                  change: percentChange(currentPipelineValue, previousPipelineValue),
+                  icon: "TrendingUp",
+                },
+                {
+                  label: t("crm.dashboard.openOpportunities"),
+                  value: String(openOpportunities.length),
+                  change: percentChange(currentOpenOpportunities.length, previousOpenOpportunities.length),
+                  icon: "Target",
+                },
+                {
+                  label: t("crm.dashboard.totalContacts"),
+                  value: String(currentContacts),
+                  change: percentChange(currentContacts, previousContacts),
+                  icon: "BookUser",
+                },
               ],
             },
           }
@@ -1235,11 +1466,48 @@ function CrmClientLoaded({
           }
         }
         if (w.id === "crm-by-stage") {
-          const stageGroups = groupBy(leads, (l) => String((l as Record<string, unknown>).state ?? "Unknown"))
+          const stageGroups = groupBy(leads, (l) => leadStageLabel(l as Record<string, unknown>))
           const stageValues = Object.entries(stageGroups)
             .map(([stage, items]) => ({ stage, Count: items.length }))
             .sort((a, b) => b.Count - a.Count)
-          return { ...w, data: { ...(w.data as Record<string, unknown>), values: stageValues } }
+          return {
+            ...w,
+            data: {
+              ...(w.data as Record<string, unknown>),
+              values: stageValues,
+              onCategoryClick: navigateToLeadsByState,
+            },
+          }
+        }
+        if (w.id === "crm-opportunity-funnel") {
+          const funnelColors = ["#6366f1", "#8b5cf6", "#a78bfa", "#22c55e", "#f59e0b", "#ef4444"]
+          const orderedStages = [...opportunityStages]
+            .filter((s) => {
+              const row = s as Record<string, unknown>
+              return row.isActive !== false && row.is_active !== false
+            })
+            .sort(
+              (a, b) =>
+                Number((a as Record<string, unknown>).sequence ?? 0) -
+                Number((b as Record<string, unknown>).sequence ?? 0),
+            )
+          const oppByStageId = groupBy(openOpportunities, (o) =>
+            String((o as Record<string, unknown>).stageId ?? (o as Record<string, unknown>).stage_id ?? ""),
+          )
+          const stages = orderedStages.map((s, index) => {
+            const row = s as Record<string, unknown>
+            const stageId = String(row.id ?? "")
+            return {
+              name: String(row.name ?? "—"),
+              value: (oppByStageId[stageId] ?? []).length,
+              color: funnelColors[index % funnelColors.length],
+            }
+          })
+          return {
+            ...w,
+            title: t("crm.dashboard.opportunityFunnel"),
+            data: { stages },
+          }
         }
         if (w.id === "crm-pipeline-health") {
           const stageGroups = groupBy(openOpportunities, (o) =>
@@ -1285,7 +1553,7 @@ function CrmClientLoaded({
         return w
       }),
     }))
-  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, t])
+  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, dashboardTimeRange, t, navigateToLeadsByState, opportunityStages])
 
   const config = useMemo(
     () =>
@@ -1593,37 +1861,30 @@ function CrmClientLoaded({
                               ? `elr-${workflowModal.leadId.toString()}`
                 : `as-${workflowModal.contactId.toString()}`
 
+  const dataLoading = useMemo(
+    () => ({
+      leads: leadsLoading,
+      opportunities: opportunitiesLoading,
+      contacts: contactsLoading,
+    }),
+    [leadsLoading, opportunitiesLoading, contactsLoading],
+  )
+
   return (
     <>
       <ModuleView
         config={config}
         data={data}
+        dataLoading={dataLoading}
         entityBoardContext={entityBoardContext}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
-        onRowClick={(tabId, row) => {
-          const resModel = crmTabToResModel(tabId)
-          if (!resModel) return
-          setChatterTarget({
-            resModel,
-            resId: rowIdBigInt(row),
-            recordTitle: crmRowChatterLabel(tabId, row),
-          })
-        }}
+        activeTab={activeTab}
+        onActiveTabChange={setActiveTab}
+        dashboardTimeRange={dashboardTimeRange}
+        onDashboardTimeRangeChange={setDashboardTimeRange}
+        urlFilters={urlFilters}
       />
-      {chatterTarget ? (
-        <CrmRecordChatterDialog
-          key={`${chatterTarget.resModel}-${chatterTarget.resId.toString()}`}
-          open
-          onOpenChange={(open) => {
-            if (!open) setChatterTarget(null)
-          }}
-          organizationId={organizationId}
-          resModel={chatterTarget.resModel}
-          resId={chatterTarget.resId}
-          recordTitle={chatterTarget.recordTitle}
-        />
-      ) : null}
       <RuntimeFormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect, useCallback } from "react"
 import dynamic from "next/dynamic"
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -37,8 +37,24 @@ import {
   csvImportForm,
   ImportAssistantWizard,
   Button,
+  productsTableConfig,
+  productDetailConfig,
+  productStatusBadges,
+  stockQuantsTableConfig,
+  stockQuantDetailConfig,
+  transfersTableConfig,
+  transferDetailConfig,
+  transferStatusBadges,
+  stockMovesTableConfig,
+  EntityView,
 } from "@lumiere/ui"
-import type { EntityTableConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type {
+  EntityTableConfig,
+  EntityViewConfig,
+  EntityRecordSheetConfig,
+  FormConfig,
+  ModuleConfig,
+} from "@lumiere/ui"
 import { inventoryModuleConfig } from "@/lib/module-dashboard-configs"
 import { useInventoryModuleSubscription } from "@/lib/module-subscription-hooks"
 import { groupBy } from "@/lib/utils"
@@ -209,6 +225,7 @@ import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { useDocuments } from "@lumiere/query-hooks/hooks/documents"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { inventoryProductPrimaryLabel } from "@lumiere/stdb/read-models"
 
 type ScalarId = bigint | number | string
 
@@ -404,11 +421,11 @@ function InventoryClientLoaded({
   const [productPriceSearchResult, setProductPriceSearchResult] = useState<Record<string, unknown> | null>(null)
   const runPriceSearch = useRunAiSkill()
 
-  const { data: products = [] } = useProducts(orgId, initialProducts)
+  const { data: products = [], isLoading: productsLoading } = useProducts(orgId, initialProducts)
   const { data: productCategories = [] } = useProductCategories(orgId, initialProductCategories)
   const { data: uoms = [] } = useUoms(orgId, initialUoms)
-  const { data: stockQuants = [] } = useStockQuants(orgId, initialStockQuants)
-  const { data: transfers = [] } = useStockPickings(orgId, initialTransfers)
+  const { data: stockQuants = [], isLoading: stockQuantsLoading } = useStockQuants(orgId, initialStockQuants)
+  const { data: transfers = [], isLoading: transfersLoading } = useStockPickings(orgId, initialTransfers)
   const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses)
   const { data: adjustments = [] } = useInventoryAdjustments(orgId, initialAdjustments)
   const { data: locations = [] } = useStockLocations(orgId, initialStockLocations)
@@ -927,6 +944,226 @@ function InventoryClientLoaded({
       }),
     [t, products, stockOnHandLocationOptions],
   )
+
+  const openCreateProduct = useCallback(
+    () => setQuickActionForm({ form: productFormConfig, action: "createProduct" }),
+    [productFormConfig],
+  )
+
+  const openCreateTransfer = useCallback(
+    () => setQuickActionForm({ form: transferFormConfig, action: "createStockPicking" }),
+    [transferFormConfig],
+  )
+
+  const openCreateStockQuant = useCallback(
+    () => setQuickActionForm({ form: stockQuantFormConfig, action: "createStockQuant" }),
+    [stockQuantFormConfig],
+  )
+
+  const productLabelById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const product of products) {
+      const row = product as Record<string, unknown>
+      map.set(
+        String(row.id),
+        inventoryProductPrimaryLabel(row) || String(row.name ?? row.id),
+      )
+    }
+    return map
+  }, [products])
+
+  const locationLabelById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const location of locations) {
+      map.set(String(location.id), String(location.completeName ?? location.name ?? location.id))
+    }
+    return map
+  }, [locations])
+
+  const productsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = productsTableConfig(t, {
+      formatProductDisplayName: inventoryProductPrimaryLabel,
+      onEmptyAction: openCreateProduct,
+    })
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        emptyState: {
+          ...view.emptyState,
+          onAction: openCreateProduct,
+        },
+      },
+    }
+  }, [t, openCreateProduct])
+
+  const stockEntityConfig = useMemo((): EntityViewConfig => {
+    const base = stockQuantsTableConfig(t, { onEmptyAction: openCreateStockQuant })
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        emptyState: {
+          ...view.emptyState,
+          onAction: openCreateStockQuant,
+        },
+      },
+    }
+  }, [t, openCreateStockQuant])
+
+  const transfersEntityConfig = useMemo((): EntityViewConfig => {
+    const base = transfersTableConfig(t, { onEmptyAction: openCreateTransfer })
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        emptyState: {
+          ...view.emptyState,
+          onAction: openCreateTransfer,
+        },
+      },
+    }
+  }, [t, openCreateTransfer])
+
+  const productRecordSheet = useMemo((): EntityRecordSheetConfig => {
+    const status = productStatusBadges(t)
+    return {
+      titleKey: "sheetTitle",
+      statusKey: "type",
+      statusBadgeVariants: status.badgeVariants,
+      statusBadgeLabels: status.badgeLabels,
+      detailConfig: productDetailConfig(t),
+      auditTableName: "product",
+    }
+  }, [t])
+
+  const stockQuantRecordSheet = useMemo((): EntityRecordSheetConfig => {
+    const baseDetail = stockQuantDetailConfig(t)
+    const detailConfig = {
+      ...baseDetail,
+      sections: baseDetail.sections.map((section) =>
+        section.id === "stock"
+          ? {
+              ...section,
+              fields: section.fields.map((field) => {
+                if (field.key === "productId") {
+                  return {
+                    ...field,
+                    render: (_value: unknown, record: Record<string, unknown>) => {
+                      const productId = record.productId ?? record.product_id
+                      if (productId == null) return "—"
+                      return (
+                        productLabelById.get(String(productId)) ?? `Product ${String(productId)}`
+                      )
+                    },
+                  }
+                }
+                if (field.key === "locationId") {
+                  return {
+                    ...field,
+                    render: (_value: unknown, record: Record<string, unknown>) => {
+                      const locationId = record.locationId ?? record.location_id
+                      if (locationId == null) return "—"
+                      return (
+                        locationLabelById.get(String(locationId)) ??
+                        `Location ${String(locationId)}`
+                      )
+                    },
+                  }
+                }
+                return field
+              }),
+            }
+          : section,
+      ),
+    }
+    return {
+      titleKey: "sheetTitle",
+      detailConfig,
+      auditTableName: "stock_quant",
+    }
+  }, [t, productLabelById, locationLabelById])
+
+  const transferRecordSheet = useMemo((): EntityRecordSheetConfig => {
+    const status = transferStatusBadges(t)
+    const movesConfig = stockMovesTableConfig(t)
+    const baseDetail = transferDetailConfig(t)
+    const detailConfig = {
+      ...baseDetail,
+      sections: baseDetail.sections.map((section) =>
+        section.id === "locations"
+          ? {
+              ...section,
+              fields: section.fields.map((field) => {
+                if (field.key === "locationId") {
+                  return {
+                    ...field,
+                    render: (_value: unknown, record: Record<string, unknown>) => {
+                      const locationId = record.locationId ?? record.location_id
+                      if (locationId == null) return "—"
+                      return (
+                        locationLabelById.get(String(locationId)) ??
+                        String(record.locationIdName ?? record.location_id_name ?? locationId)
+                      )
+                    },
+                  }
+                }
+                if (field.key === "locationDestId") {
+                  return {
+                    ...field,
+                    render: (_value: unknown, record: Record<string, unknown>) => {
+                      const locationId = record.locationDestId ?? record.location_dest_id
+                      if (locationId == null) return "—"
+                      return (
+                        locationLabelById.get(String(locationId)) ??
+                        String(
+                          record.locationDestIdName ?? record.location_dest_id_name ?? locationId,
+                        )
+                      )
+                    },
+                  }
+                }
+                return field
+              }),
+            }
+          : section,
+      ),
+    }
+    return {
+      titleKey: "sheetTitle",
+      statusKey: "state",
+      statusBadgeVariants: status.badgeVariants,
+      statusBadgeLabels: status.badgeLabels,
+      detailConfig,
+      auditTableName: "stock_picking",
+      customTabs: [
+        {
+          id: "moves",
+          label: t("inventory.stockMoves.title"),
+          content: (record) => {
+            const pickingId = String(record.id ?? "")
+            const moves = (stockMoves as Record<string, unknown>[]).filter(
+              (move) => String(move.pickingId ?? move.picking_id) === pickingId,
+            )
+            return (
+              <EntityView
+                config={{
+                  ...movesConfig,
+                  title: "",
+                  description: undefined,
+                }}
+                data={moves}
+                useCard={false}
+              />
+            )
+          },
+        },
+      ],
+    }
+  }, [t, stockMoves, locationLabelById])
 
   const warehouse3dZoneFormConfig = useMemo(
     () =>
@@ -2831,11 +3068,29 @@ function InventoryClientLoaded({
       tabs: [
         ...moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "products") return withTransferActions(tab)
-          if (tab.id === "transfers") return withTransferActions(tab)
+          if (tab.id === "products") {
+            return withTransferActions({
+              ...tab,
+              entityConfig: productsEntityConfig,
+              recordSheet: productRecordSheet,
+            })
+          }
+          if (tab.id === "transfers") {
+            return withTransferActions({
+              ...tab,
+              entityConfig: transfersEntityConfig,
+              recordSheet: transferRecordSheet,
+            })
+          }
           if (tab.id === "warehouses") return withTransferActions(tab)
           if (tab.id === "stock-moves") return withTransferActions(tab)
-          if (tab.id === "stock") return withTransferActions(tab)
+          if (tab.id === "stock") {
+            return withTransferActions({
+              ...tab,
+              entityConfig: stockEntityConfig,
+              recordSheet: stockQuantRecordSheet,
+            })
+          }
           if (tab.id === "lots") return withTransferActions(tab)
           if (tab.id === "serials") return withTransferActions(tab)
           if (tab.id === "adjustments") return withTransferActions(tab)
@@ -2873,6 +3128,12 @@ function InventoryClientLoaded({
     transferFormConfig,
     adjustmentFormConfig,
     stockLocationFormConfig,
+    productsEntityConfig,
+    stockEntityConfig,
+    transfersEntityConfig,
+    productRecordSheet,
+    stockQuantRecordSheet,
+    transferRecordSheet,
     t,
     confirmPicking,
     assignPicking,
@@ -2983,9 +3244,30 @@ function InventoryClientLoaded({
 
   const data = useMemo(
     () => ({
-      products: products as unknown as Record<string, unknown>[],
-      stock: filteredStockQuants as unknown as Record<string, unknown>[],
-      transfers: transfers as unknown as Record<string, unknown>[],
+      products: (products as Record<string, unknown>[]).map((row) => ({
+        ...row,
+        sheetTitle:
+          inventoryProductPrimaryLabel(row) || String(row.name ?? row.id ?? ""),
+      })),
+      stock: filteredStockQuants.map((row) => {
+        const record = row as Record<string, unknown>
+        const productId = record.productId ?? record.product_id
+        const locationId = record.locationId ?? record.location_id
+        const productLabel =
+          productId != null ? productLabelById.get(String(productId)) : undefined
+        const locationLabel =
+          locationId != null ? locationLabelById.get(String(locationId)) : undefined
+        return {
+          ...record,
+          sheetTitle:
+            [productLabel, locationLabel].filter(Boolean).join(" · ") ||
+            String(record.id ?? ""),
+        }
+      }) as unknown as Record<string, unknown>[],
+      transfers: (transfers as Record<string, unknown>[]).map((row) => ({
+        ...row,
+        sheetTitle: String(row.name ?? row.origin ?? row.id ?? ""),
+      })),
       warehouses: warehouses as unknown as Record<string, unknown>[],
       adjustments: adjustments as unknown as Record<string, unknown>[],
       locations: locations as unknown as Record<string, unknown>[],
@@ -3009,6 +3291,8 @@ function InventoryClientLoaded({
     }),
     [
       products,
+      productLabelById,
+      locationLabelById,
       stockQuants,
       filteredStockQuants,
       stockLocationFilter,
@@ -3323,6 +3607,11 @@ function InventoryClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataLoading={{
+          products: productsLoading,
+          stock: stockQuantsLoading,
+          transfers: transfersLoading,
+        }}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
         activeTab={activeTab}

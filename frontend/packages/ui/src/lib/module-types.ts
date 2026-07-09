@@ -1,8 +1,33 @@
 import type { ReactNode } from "react"
 import type { DashboardSection } from "./dashboard-types"
-import type { EntitySurfacePermission, EntityViewConfig } from "./entity-view-types"
+import type { EntityDetailConfig, EntitySurfacePermission, EntityViewConfig, BadgeVariant } from "./entity-view-types"
 import type { FormConfig } from "./form-types"
 import type { KanbanColumnDef, KanbanMoveHandler } from "./kanban-board-types"
+
+export interface EntityRecordSheetTab {
+  id: string
+  label: string
+  content: (record: Record<string, unknown>) => ReactNode
+}
+
+export interface EntityRecordSheetConfig {
+  /** Record field key used for the sheet title */
+  titleKey: string
+  /** Record field key for an optional status badge in the header */
+  statusKey?: string
+  /** Map raw status value → badge variant */
+  statusBadgeVariants?: Record<string, BadgeVariant>
+  /** Map raw status value → display label */
+  statusBadgeLabels?: Record<string, string>
+  /** Overview tab field layout */
+  detailConfig: EntityDetailConfig
+  /** Additional tabs rendered as ReactNode slots */
+  customTabs?: EntityRecordSheetTab[]
+  /** Optional action buttons rendered in the header area */
+  actions?: ReactNode
+  /** SpacetimeDB snake_case table name for the Audit tab filter */
+  auditTableName?: string
+}
 
 export interface EntityBoardRuntimeContext {
   columns: KanbanColumnDef[]
@@ -26,6 +51,8 @@ export interface ModuleTab {
   createPermission?: EntitySurfacePermission
   /** Identifier passed to onFormSubmit so callers know which mutation to invoke */
   createAction?: string
+  /** Optional right-side record sheet opened on row click */
+  recordSheet?: EntityRecordSheetConfig
   /** For type='custom': arbitrary content rendered inside the tab panel */
   customContent?: ReactNode
 }

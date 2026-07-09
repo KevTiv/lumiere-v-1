@@ -553,6 +553,13 @@ export const salesDashboard: DashboardConfig = {
           width: "1/3",
           data: { metrics: [] },
         },
+        {
+          id: "sales-orders-by-state",
+          type: "donut-chart",
+          title: "Orders by State",
+          width: "1/3",
+          data: { segments: [] },
+        },
       ],
     },
     {
@@ -763,6 +770,13 @@ export const crmDashboard: DashboardConfig = {
             series: [{ name: "Count", color: "#6366f1" }],
             values: [],
           },
+        },
+        {
+          id: "crm-opportunity-funnel",
+          type: "funnel-chart",
+          title: "Opportunity Funnel",
+          width: "1/2",
+          data: { stages: [] },
         },
         {
           id: "crm-pipeline-health",
@@ -1667,29 +1681,6 @@ export const overviewDashboard = (t: TFunction): DashboardConfig => ({
   description: t("overview.page.description"),
   sections: [
     {
-      id: "overview-quick-actions",
-      widgets: [
-        {
-          id: "overview-actions",
-          type: "quick-actions",
-          title: "",
-          width: "full",
-          useCard: false,
-          data: {
-            columns: 6,
-            actions: [
-              { id: "sales", label: t("overview.dashboard.actions.sales"), icon: "trending", color: "blue" },
-              { id: "accounting", label: t("overview.dashboard.actions.accounting"), icon: "dollar", color: "red" },
-              { id: "crm", label: t("overview.dashboard.actions.crm"), icon: "users", color: "orange" },
-              { id: "inventory", label: t("overview.dashboard.actions.inventory"), icon: "package", color: "green" },
-              { id: "ai_drafts", label: t("overview.dashboard.actions.aiDrafts"), icon: "bell", color: "purple" },
-              { id: "projects", label: t("overview.dashboard.actions.projects"), icon: "file", color: "teal" },
-            ],
-          },
-        },
-      ],
-    },
-    {
       id: "overview-kpis",
       widgets: [
         {
@@ -1699,97 +1690,43 @@ export const overviewDashboard = (t: TFunction): DashboardConfig => ({
           width: "full",
           data: {
             stats: [
+              { label: t("sales.dashboard.widgets.revenue"), value: "—", icon: "BarChart2" },
               { label: t("overview.dashboard.stats.openSalesOrders"), value: "—", icon: "ShoppingCart" },
-              { label: t("overview.dashboard.stats.openPurchaseOrders"), value: "—", icon: "Truck" },
-              { label: t("overview.dashboard.stats.accountsReceivable"), value: "—", icon: "TrendingUp" },
-              { label: t("overview.dashboard.stats.accountsPayable"), value: "—", icon: "TrendingDown" },
-              { label: t("overview.dashboard.stats.lowStockAlerts"), value: "—", icon: "AlertTriangle" },
               { label: t("overview.dashboard.stats.openTasks"), value: "—", icon: "CheckSquare" },
-              { label: t("overview.dashboard.stats.activeProjects"), value: "—", icon: "FolderKanban" },
-              { label: t("overview.dashboard.stats.pendingAiDrafts"), value: "—", icon: "Bell" },
+              { label: t("crm.contacts.title"), value: "—", icon: "Users" },
             ],
           },
         },
       ],
     },
     {
-      id: "overview-trends",
-      title: t("overview.dashboard.sections.trends"),
+      id: "overview-revenue",
       widgets: [
         {
           id: "overview-sales-trend",
-          type: "area-chart",
-          title: t("overview.dashboard.widgets.salesTrend"),
-          width: "2/3",
-          data: {
-            xAxisKey: "month",
-            series: [
-              { name: "revenue", color: "hsl(var(--chart-1))" },
-            ],
-            values: [],
-          },
-        },
-        {
-          id: "overview-pipeline-mix",
           type: "bar-chart",
-          title: t("overview.dashboard.widgets.pipelineMix"),
-          width: "1/3",
+          title: t("overview.dashboard.widgets.salesTrend"),
+          width: "full",
           data: {
-            categoryKey: "label",
-            series: [{ name: "count", color: "hsl(var(--chart-2))" }],
+            categoryKey: "month",
+            series: [{ name: "revenue", color: "hsl(var(--chart-1))" }],
             values: [],
           },
         },
       ],
     },
     {
-      id: "overview-details",
+      id: "overview-attention",
       title: t("overview.dashboard.sections.attention"),
       widgets: [
         {
-          id: "overview-upcoming-tasks",
+          id: "overview-needs-attention",
           type: "table",
-          title: t("overview.dashboard.widgets.upcomingTasks"),
-          width: "1/2",
-          data: {
-            columns: [
-              { key: "task", label: t("overview.dashboard.tables.task") },
-              { key: "project", label: t("overview.dashboard.tables.project") },
-              { key: "due", label: t("overview.dashboard.tables.due") },
-              { key: "status", label: t("overview.dashboard.tables.status") },
-            ],
-            rows: [],
-          },
-        },
-        {
-          id: "overview-low-stock",
-          type: "table",
-          title: t("overview.dashboard.widgets.lowStock"),
-          width: "1/2",
-          data: {
-            columns: [
-              { key: "sku", label: t("overview.dashboard.tables.sku") },
-              { key: "name", label: t("overview.dashboard.tables.product") },
-              { key: "qty", label: t("overview.dashboard.tables.qty"), align: "right" as const },
-            ],
-            rows: [],
-          },
-        },
-      ],
-    },
-    {
-      id: "overview-orders",
-      title: t("overview.dashboard.sections.pipeline"),
-      widgets: [
-        {
-          id: "overview-open-pos",
-          type: "table",
-          title: t("overview.dashboard.widgets.openPurchaseOrders"),
+          title: t("overview.dashboard.sections.attention"),
           width: "full",
           data: {
             columns: [
               { key: "reference", label: t("overview.dashboard.tables.reference") },
-              { key: "vendor", label: t("overview.dashboard.tables.vendor") },
               { key: "amount", label: t("overview.dashboard.tables.amount"), align: "right" as const },
               { key: "status", label: t("overview.dashboard.tables.status") },
             ],

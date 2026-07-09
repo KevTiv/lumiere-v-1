@@ -1,7 +1,7 @@
 'use client';
 
 import { phCapture } from '@/lib/posthog-browser';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@lumiere/i18n';
 import {
@@ -28,6 +28,9 @@ import {
   mergeSelectOptionsForFields,
   mergeFieldDefaultValues,
   saleOrdersTableConfig,
+  saleOrderDetailConfig,
+  saleOrderStatusBadges,
+  saleOrderLinesTableConfig,
   pricelistsTableConfig,
   pricelistItemsTableConfig,
   deliveriesTableConfig,
@@ -40,10 +43,12 @@ import {
   ImportAssistantWizard,
   getRowField,
   RecordChatterDialog,
+  buildModuleTabHref,
 } from '@lumiere/ui';
 import type {
   EntityViewConfig,
   EntityTableConfig,
+  EntityRecordSheetConfig,
   FormConfig,
   ModuleConfig,
 } from '@lumiere/ui';
@@ -152,6 +157,8 @@ import {
   persistCustomFieldsToEav,
 } from '@/lib/persist-record-custom-fields';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
+import { useModuleTab } from '@/hooks/use-module-tab';
+import { useModuleFilters } from '@/hooks/use-module-filters';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import {
   contactRowsToPartnerSelectOptions,
@@ -261,6 +268,15 @@ function returnOrderRowId(row: Record<string, unknown>): string | null {
   return id == null ? null : String(id);
 }
 
+const SALE_ORDER_STATE_COLORS: Record<string, string> = {
+  Draft: '#94a3b8',
+  Sent: '#6366f1',
+  ToApprove: '#f59e0b',
+  Sale: '#22c55e',
+  Done: '#8b5cf6',
+  Cancel: '#ef4444',
+};
+
 function SalesClientLoaded({
   initialOrders,
   initialOrderLines,
@@ -319,7 +335,7 @@ function SalesClientLoaded({
   const [creditReturnOrderError, setCreditReturnOrderError] = useState<string | null>(null);
   const [openReturnForm, setOpenReturnForm] = useState(false);
 
-  const { data: orders = [] } = useSaleOrders(orgId, initialOrders);
+  const { data: orders = [], isLoading: ordersLoading } = useSaleOrders(orgId, initialOrders);
   const { data: orderLines = [] } = useSaleOrderLines(
     orgId,
     initialOrderLines,
@@ -428,6 +444,20 @@ function SalesClientLoaded({
   }, [csvKind, t]);
 
   const moduleConfig = useMemo(() => salesModuleConfig(t), [t]);
+
+  const salesTabIds = useMemo(() => moduleConfig.tabs.map((tab) => tab.id), [moduleConfig]);
+  const { activeTab, setActiveTab } = useModuleTab(
+    moduleConfig.defaultTab ?? 'dashboard',
+    salesTabIds,
+  );
+  const urlFilters = useModuleFilters();
+
+  const navigateToOrdersByState = useCallback(
+    (state: string) => {
+      router.push(buildModuleTabHref('sales', 'orders', { state }));
+    },
+    [router],
+  );
 
   const partnerFieldOptions = useMemo(() => {
     const fromApi = contactRowsToPartnerSelectOptions(contacts);
@@ -629,6 +659,85 @@ function SalesClientLoaded({
       }),
     [t, partnerFieldOptions, pricelistFieldOptions, warehouseFieldOptions, paymentTermFieldOptions],
   );
+
+  const openCreateSaleOrder = useCallback(
+    () => setQuickActionForm({ form: saleOrderFormConfig, action: 'createSaleOrder' }),
+    [saleOrderFormConfig],
+  );
+
+  const partnerLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const contact of contacts) {
+      const row = contact as Record<string, unknown>;
+      map.set(String(row.id), String(row.name ?? row.displayName ?? row.id));
+    }
+    return map;
+  }, [contacts]);
+
+  const saleOrderRecordSheet = useMemo((): EntityRecordSheetConfig => {
+    const status = saleOrderStatusBadges(t);
+    const linesConfig = saleOrderLinesTableConfig(t);
+    const baseDetail = saleOrderDetailConfig(t);
+    const detailConfig = {
+      ...baseDetail,
+      sections: baseDetail.sections.map((section) =>
+        section.id === 'customer'
+          ? {
+              ...section,
+              fields: section.fields.map((field) =>
+                field.key === 'partnerName'
+                  ? {
+                      ...field,
+                      render: (_value: unknown, record: Record<string, unknown>) => {
+                        const direct = String(
+                          record.partnerName ?? record.partner_name ?? '',
+                        ).trim();
+                        if (direct) return direct;
+                        const partnerId = record.partnerId ?? record.partner_id;
+                        if (partnerId == null) return '—';
+                        return (
+                          partnerLabelById.get(String(partnerId)) ?? `Partner ${String(partnerId)}`
+                        );
+                      },
+                    }
+                  : field,
+              ),
+            }
+          : section,
+      ),
+    };
+    return {
+      titleKey: 'sheetTitle',
+      statusKey: 'state',
+      statusBadgeVariants: status.badgeVariants,
+      statusBadgeLabels: status.badgeLabels,
+      detailConfig,
+      auditTableName: 'sale_order',
+      customTabs: [
+        {
+          id: 'lines',
+          label: t('sales.orderLines.title'),
+          content: (record) => {
+            const orderId = String(record.id ?? '');
+            const lines = (orderLines as Record<string, unknown>[]).filter(
+              (line) => String(line.orderId ?? line.order_id) === orderId,
+            );
+            return (
+              <EntityView
+                config={{
+                  ...linesConfig,
+                  title: '',
+                  description: undefined,
+                }}
+                data={lines}
+                useCard={false}
+              />
+            );
+          },
+        },
+      ],
+    };
+  }, [t, orderLines, partnerLabelById]);
 
   const pickingBatchFormConfig = useMemo(() => newPickingBatchForm(t), [t]);
 
@@ -922,11 +1031,17 @@ function SalesClientLoaded({
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = saleOrdersTableConfig(t, {
       formatSaleOrderDisplayName: saleOrderPrimaryLabel,
+      onEmptyAction: openCreateSaleOrder,
     });
+    const runtimeView = saleOrdersTableRuntime;
     return {
       ...base,
       view: {
-        ...saleOrdersTableRuntime,
+        ...runtimeView,
+        emptyState: {
+          ...runtimeView.emptyState,
+          onAction: openCreateSaleOrder,
+        },
         actions: [
           {
             id: 'csv-sale-orders',
@@ -1030,6 +1145,7 @@ function SalesClientLoaded({
   }, [
     t,
     saleOrdersTableRuntime,
+    openCreateSaleOrder,
     confirmSaleOrder,
     cancelSaleOrder,
     computeSoTotals,
@@ -1315,6 +1431,35 @@ function SalesClientLoaded({
             },
           };
         }
+        if (w.id === 'sales-orders-by-state') {
+          const byState = groupBy(orders, (o) => saleOrderState(o as Record<string, unknown>));
+          const segments = Object.entries(byState)
+            .filter(([state]) => state !== '')
+            .map(([state, stateOrders]) => ({
+              name:
+                t(`sales.salesOrders.states.${state}`, {
+                  defaultValue: state,
+                }) ?? state,
+              value: stateOrders.length,
+              color: SALE_ORDER_STATE_COLORS[state] ?? '#6366f1',
+            }))
+            .sort((a, b) => b.value - a.value);
+          return {
+            ...w,
+            title: t('sales.dashboard.ordersByState'),
+            data: {
+              segments,
+              onSegmentClick: (name: string) => {
+                const match = Object.keys(byState).find(
+                  (state) =>
+                    t(`sales.salesOrders.states.${state}`, { defaultValue: state }) === name ||
+                    state === name,
+                );
+                if (match) navigateToOrdersByState(match);
+              },
+            },
+          };
+        }
         return w;
       }),
     }));
@@ -1328,6 +1473,7 @@ function SalesClientLoaded({
     pickingBatchFormConfig,
     router,
     salesRepLabelByIdentity,
+    navigateToOrdersByState,
   ]);
 
   // Config with live dashboard sections + lookup-backed create forms + entity actions
@@ -1344,6 +1490,7 @@ function SalesClientLoaded({
               ...tab,
               entityConfig: ordersEntityConfig,
               createForm: saleOrderFormConfig,
+              recordSheet: saleOrderRecordSheet,
             };
           }
           if (tab.id === 'order-lines' && tab.type === 'entity' && tab.entityConfig) {
@@ -1466,6 +1613,7 @@ function SalesClientLoaded({
       saleOrderFormConfig,
       addSaleOrderLineFormConfig,
       ordersEntityConfig,
+      saleOrderRecordSheet,
       pricelistsEntityConfig,
       pricelistItemsEntityConfig,
       pricelistItemFormConfig,
@@ -1497,7 +1645,10 @@ function SalesClientLoaded({
   // Data keyed by tab id
   const data = useMemo(
     () => ({
-      orders: orders as unknown as Record<string, unknown>[],
+      orders: (orders as Record<string, unknown>[]).map((row) => ({
+        ...row,
+        sheetTitle: saleOrderPrimaryLabel(row) || String(row.reference ?? row.id ?? ''),
+      })) as unknown as Record<string, unknown>[],
       'order-lines': orderLines as unknown as Record<string, unknown>[],
       pricelists: pricelists as unknown as Record<string, unknown>[],
       'pricelist-items': pricelistItems as unknown as Record<string, unknown>[],
@@ -1660,8 +1811,12 @@ function SalesClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataLoading={{ orders: ordersLoading }}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
+        activeTab={activeTab}
+        onActiveTabChange={setActiveTab}
+        urlFilters={urlFilters}
         onRowClick={(tabId, row) => {
           const target = chatterTargetFromRow('sales', tabId, row);
           if (target) setChatterTarget(target);

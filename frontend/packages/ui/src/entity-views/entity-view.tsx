@@ -30,6 +30,10 @@ interface EntityViewProps {
   boardColumns?: KanbanColumnDef[]
   onBoardMove?: KanbanMoveHandler
   boardFilterItem?: (row: Record<string, unknown>) => boolean
+  /** Show skeleton rows in table view while subscription data is loading. */
+  isLoading?: boolean
+  /** Applied to table view filters on mount (e.g. URL drill-down from charts). */
+  initialFilters?: Record<string, string>
 }
 
 export function useEntitySurfaceFilter<T extends EntityPermissioned>(
@@ -123,6 +127,8 @@ export function EntityView({
   boardColumns = [],
   onBoardMove,
   boardFilterItem,
+  isLoading,
+  initialFilters,
 }: EntityViewProps) {
   const hybrid =
     config.view.mode === "table-or-board" ? (config.view as EntityTableBoardViewConfig) : null
@@ -183,6 +189,8 @@ export function EntityView({
               data={data}
               aiFocusRowKey={aiFocusRowKey}
               onRowClick={onRowClick}
+              isLoading={isLoading}
+              initialFilters={initialFilters}
             />
           ) : boardColumns.length && onBoardMove ? (
             <EntityBoardView
@@ -209,6 +217,8 @@ export function EntityView({
           data={data}
           aiFocusRowKey={aiFocusRowKey}
           onRowClick={onRowClick}
+          isLoading={isLoading}
+          initialFilters={initialFilters}
         />
       )
     }

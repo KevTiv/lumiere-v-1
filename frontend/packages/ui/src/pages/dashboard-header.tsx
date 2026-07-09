@@ -1,6 +1,17 @@
 "use client"
 
+import type { ReactNode } from "react"
+import { Fragment } from "react"
+import Link from "next/link"
 import { Button } from "../components/button"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "../components/breadcrumb"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,11 +27,18 @@ interface ActionItem {
   testId?: string
 }
 
-type TimeRangeValue = "today" | "7d" | "30d" | "90d" | "ytd"
+export type TimeRangeValue = "today" | "7d" | "30d" | "90d" | "ytd"
+
+interface BreadcrumbItemConfig {
+  label: string
+  href?: string
+}
 
 interface DashboardHeaderProps {
   title: string
   description?: string
+  breadcrumbs?: BreadcrumbItemConfig[]
+  primaryAction?: ReactNode
   onRefresh?: () => void
   onExport?: () => void
   actions?: ActionItem[]
@@ -39,6 +57,8 @@ const timeRanges = [
 export function DashboardHeader({
   title,
   description,
+  breadcrumbs,
+  primaryAction,
   onRefresh,
   onExport,
   actions,
@@ -50,12 +70,36 @@ export function DashboardHeader({
   return (
     <header className="mb-6 flex flex-col justify-between gap-4 border-b border-border/70 pb-5 md:flex-row md:items-end">
       <div className="min-w-0 space-y-1">
+        {breadcrumbs && breadcrumbs.length > 0 ? (
+          <Breadcrumb>
+            <BreadcrumbList>
+              {breadcrumbs.map((crumb, index) => {
+                const isLast = index === breadcrumbs.length - 1
+                return (
+                  <Fragment key={`${crumb.label}-${index}`}>
+                    <BreadcrumbItem>
+                      {isLast || !crumb.href ? (
+                        <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink render={<Link href={crumb.href} />}>
+                          {crumb.label}
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                    {!isLast ? <BreadcrumbSeparator /> : null}
+                  </Fragment>
+                )
+              })}
+            </BreadcrumbList>
+          </Breadcrumb>
+        ) : null}
         <h1 className="truncate text-2xl font-semibold tracking-[-0.02em]">{title}</h1>
         {description && (
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {primaryAction}
         {actions?.map((action) => (
           <Button
             key={action.label}

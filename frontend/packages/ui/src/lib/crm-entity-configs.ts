@@ -1,6 +1,41 @@
 import type { TFunction } from "i18next"
 import { createElement } from "react"
-import type { EntityViewConfig } from "./entity-view-types"
+import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
+import { formatTimestampLike, getRowField } from "./entity-row-utils"
+import { resolveIdentityLabel } from "./identity-label"
+
+export interface CrmEntityConfigOptions {
+  ownerLabelMap?: ReadonlyMap<string, string>
+  formatContactDisplayName?: (row: Record<string, unknown>) => string
+}
+
+function daysInStageLabel(row: Record<string, unknown>): string {
+  const raw =
+    getRowField(row, "dateLastStageUpdate") ??
+    getRowField(row, "updatedAt")
+  const date = formatTimestampLike(raw)
+  if (!date) return "—"
+  const days = Math.max(0, Math.floor((Date.now() - date.getTime()) / 86_400_000))
+  return days === 1 ? "1d" : `${days}d`
+}
+
+const leadEmptyState = (t: TFunction) => ({
+  title: t("crm.leads.emptyMessage"),
+  description: t("crm.leads.description"),
+  actionLabel: t("crm.forms.newLead.title"),
+})
+
+const opportunityEmptyState = (t: TFunction) => ({
+  title: t("crm.opportunities.emptyMessage"),
+  description: t("crm.opportunities.description"),
+  actionLabel: t("crm.forms.newOpportunity.title"),
+})
+
+const contactEmptyState = (t: TFunction) => ({
+  title: t("crm.contacts.emptyMessage"),
+  description: t("crm.contacts.description"),
+  actionLabel: t("crm.forms.newContact.title"),
+})
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const leadStateBadges = (t: TFunction) => ({
@@ -63,20 +98,88 @@ export const leadsTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "contactName", label: t("crm.leads.columns.contactName"), width: "min-w-36" },
+      {
+        key: "contactName",
+        label: t("crm.leads.columns.contactName"),
+        width: "min-w-36",
+        sortable: true,
+      },
       { key: "partnerName", label: t("crm.leads.columns.partnerName"), width: "min-w-36" },
       { key: "emailFrom", label: t("crm.leads.columns.emailFrom"), width: "min-w-40" },
       { key: "phone", label: t("crm.leads.columns.phone"), width: "min-w-28" },
       { key: "state", label: t("crm.leads.columns.state"), type: "badge", ...leadStateBadges(t) },
-      { key: "expectedRevenue", label: t("crm.leads.columns.expectedRevenue"), type: "currency", align: "right" },
-      { key: "createDate", label: t("crm.leads.columns.createDate"), type: "date" },
+      {
+        key: "expectedRevenue",
+        label: t("crm.leads.columns.expectedRevenue"),
+        type: "currency",
+        align: "right",
+        sortable: true,
+      },
+      {
+        key: "createDate",
+        label: t("crm.leads.columns.createDate"),
+        type: "relative-date",
+        sortable: true,
+      },
     ],
     emptyMessage: t("crm.leads.emptyMessage"),
+    emptyState: leadEmptyState(t),
   },
 })
 
+export const leadDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "contact",
+      title: t("crm.forms.newLead.sections.contact"),
+      fields: [
+        { key: "contactName", label: t("crm.leads.columns.contactName"), width: "1/2" },
+        { key: "partnerName", label: t("crm.leads.columns.partnerName"), width: "1/2" },
+        { key: "emailFrom", label: t("crm.leads.columns.emailFrom"), width: "1/2" },
+        { key: "phone", label: t("crm.leads.columns.phone"), width: "1/2" },
+      ],
+    },
+    {
+      id: "details",
+      title: t("crm.forms.newLead.sections.details"),
+      fields: [
+        {
+          key: "state",
+          label: t("crm.leads.columns.state"),
+          type: "badge",
+          ...leadStateBadges(t),
+          width: "1/2",
+        },
+        {
+          key: "expectedRevenue",
+          label: t("crm.leads.columns.expectedRevenue"),
+          type: "currency",
+          width: "1/2",
+        },
+        {
+          key: "probability",
+          label: t("crm.forms.newLead.fields.probability"),
+          type: "progress",
+          width: "1/2",
+        },
+        {
+          key: "createDate",
+          label: t("crm.leads.columns.createDate"),
+          type: "relative-date",
+          width: "1/2",
+        },
+        { key: "description", label: t("crm.forms.newLead.fields.description"), width: "full" },
+      ],
+    },
+  ],
+})
+
 // ── Opportunities ─────────────────────────────────────────────────────────────
-export const opportunitiesTableConfig = (t: TFunction): EntityViewConfig => ({
+export const opportunitiesTableConfig = (
+  t: TFunction,
+  options?: CrmEntityConfigOptions,
+): EntityViewConfig => ({
   id: "opportunities-table",
   entityType: "opportunity",
   title: t("crm.opportunities.title"),
@@ -90,8 +193,18 @@ export const opportunitiesTableConfig = (t: TFunction): EntityViewConfig => ({
       searchPlaceholder: t("crm.opportunities.searchPlaceholder"),
       searchKeys: ["name"],
       columns: [
-        { key: "name", label: t("crm.opportunities.columns.name"), width: "min-w-48" },
-        { key: "stageName", label: t("crm.opportunities.columns.stageName"), width: "min-w-28" },
+        {
+          key: "name",
+          label: t("crm.opportunities.columns.name"),
+          width: "min-w-48",
+          sortable: true,
+        },
+        {
+          key: "stageName",
+          label: t("crm.opportunities.columns.stageName"),
+          type: "status",
+          width: "min-w-28",
+        },
         {
           key: "priority",
           label: t("crm.opportunities.columns.priority"),
@@ -103,20 +216,23 @@ export const opportunitiesTableConfig = (t: TFunction): EntityViewConfig => ({
           label: t("crm.opportunities.columns.expectedRevenue"),
           type: "currency",
           align: "right",
+          sortable: true,
         },
         {
           key: "probability",
           label: t("crm.opportunities.columns.probability"),
-          type: "percent",
+          type: "progress",
           align: "right",
         },
         {
           key: "dateDeadline",
           label: t("crm.opportunities.columns.dateDeadline"),
-          type: "date",
+          type: "relative-date",
+          sortable: true,
         },
       ],
       emptyMessage: t("crm.opportunities.emptyMessage"),
+      emptyState: opportunityEmptyState(t),
     },
     board: {
       groupKey: "stageId",
@@ -130,15 +246,32 @@ export const opportunitiesTableConfig = (t: TFunction): EntityViewConfig => ({
         ],
         footerFields: [
           {
-            key: "priority",
-            label: t("crm.opportunities.columns.priority"),
-            type: "badge",
-            ...opportunityPriorityBadges(t),
+            key: "expectedRevenue",
+            label: t("crm.opportunities.columns.expectedRevenue"),
+            type: "currency",
           },
           {
-            key: "dateDeadline",
-            label: t("crm.opportunities.columns.dateDeadline"),
-            type: "date",
+            key: "userId",
+            label: t("crm.activities.columns.userId"),
+            render: (_value, row) =>
+              createElement(
+                "span",
+                { className: "text-xs text-muted-foreground truncate max-w-[5rem]" },
+                resolveIdentityLabel(
+                  getRowField(row, "userId") ?? getRowField(row, "createdBy"),
+                  options?.ownerLabelMap,
+                ),
+              ),
+          },
+          {
+            key: "daysInStage",
+            label: t("crm.opportunities.columns.stageName"),
+            render: (_value, row) =>
+              createElement(
+                "span",
+                { className: "text-xs text-muted-foreground tabular-nums" },
+                daysInStageLabel(row),
+              ),
           },
         ],
       },
@@ -150,6 +283,55 @@ export const opportunitiesTableConfig = (t: TFunction): EntityViewConfig => ({
     },
     defaultView: "table",
   },
+})
+
+export const opportunityDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "opportunity",
+      title: t("crm.forms.newOpportunity.sections.opportunity"),
+      fields: [
+        { key: "name", label: t("crm.opportunities.columns.name"), width: "full" },
+        {
+          key: "stageName",
+          label: t("crm.opportunities.columns.stageName"),
+          type: "status",
+          width: "1/2",
+        },
+        {
+          key: "priority",
+          label: t("crm.opportunities.columns.priority"),
+          type: "badge",
+          ...opportunityPriorityBadges(t),
+          width: "1/2",
+        },
+        {
+          key: "expectedRevenue",
+          label: t("crm.opportunities.columns.expectedRevenue"),
+          type: "currency",
+          width: "1/2",
+        },
+        {
+          key: "probability",
+          label: t("crm.opportunities.columns.probability"),
+          type: "progress",
+          width: "1/2",
+        },
+        {
+          key: "dateDeadline",
+          label: t("crm.opportunities.columns.dateDeadline"),
+          type: "relative-date",
+          width: "1/2",
+        },
+        {
+          key: "description",
+          label: t("crm.forms.editOpportunity.fields.description"),
+          width: "full",
+        },
+      ],
+    },
+  ],
 })
 
 // ── Contacts ──────────────────────────────────────────────────────────────────
@@ -168,6 +350,7 @@ export const contactsTableConfig = (
     key: "name",
     label: t("crm.contacts.columns.name"),
     width: "min-w-40",
+    sortable: true,
     ...(formatName
       ? {
           render: (_value: unknown, row: Record<string, unknown>) => {
@@ -218,6 +401,7 @@ export const contactsTableConfig = (
           key: "email",
           label: t("crm.contacts.columns.email"),
           width: "min-w-44",
+          sortable: true,
         },
         {
           key: "phone",
@@ -237,9 +421,44 @@ export const contactsTableConfig = (
         },
       ],
       emptyMessage: t("crm.contacts.emptyMessage"),
+      emptyState: contactEmptyState(t),
     },
   }
 }
+
+export const contactDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "identity",
+      title: t("crm.forms.newContact.sections.identity"),
+      fields: [
+        { key: "name", label: t("crm.contacts.columns.name"), width: "1/2" },
+        { key: "companyName", label: t("crm.contacts.columns.companyName"), width: "1/2" },
+        { key: "email", label: t("crm.contacts.columns.email"), width: "1/2" },
+        { key: "phone", label: t("crm.contacts.columns.phone"), width: "1/2" },
+        { key: "isCompany", label: t("crm.contacts.columns.isCompany"), type: "boolean", width: "1/2" },
+        { key: "city", label: t("crm.contacts.columns.city"), width: "1/2" },
+        { key: "countryId", label: t("crm.contacts.columns.countryId"), width: "1/2" },
+      ],
+    },
+    {
+      id: "details",
+      title: t("crm.forms.editContactDetails.sections.details"),
+      fields: [
+        { key: "firstName", label: t("crm.forms.editContactDetails.fields.firstName"), width: "1/2" },
+        { key: "lastName", label: t("crm.forms.editContactDetails.fields.lastName"), width: "1/2" },
+        { key: "title", label: t("crm.forms.editContactDetails.fields.title"), width: "1/2" },
+        { key: "website", label: t("crm.forms.editContactDetails.fields.website"), width: "1/2" },
+        {
+          key: "description",
+          label: t("crm.forms.editContactDetails.fields.description"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
 
 // ── Activities ────────────────────────────────────────────────────────────────
 export const activitiesTableConfig = (t: TFunction): EntityViewConfig => ({

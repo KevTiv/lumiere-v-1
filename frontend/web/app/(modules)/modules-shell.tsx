@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react"
 import {
   DashboardSidebar,
+  ErpCommandPalette,
   AIChatPanel,
   NotebookPanel,
   JournalPanel,
@@ -546,6 +547,12 @@ function ModulesContent({ children }: { children: ReactNode }) {
       />
 
       <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
+
+      <ErpCommandPalette
+        onOpenAIChat={() => setIsAIChatOpen(true)}
+        onOpenNotebook={() => setIsNotebookOpen(true)}
+        onOpenJournal={() => setIsJournalOpen(true)}
+      />
     </div>
   )
 }

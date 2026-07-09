@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next"
-import type { EntityViewConfig } from "./entity-view-types"
+import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const assetStateBadges = (t: TFunction) => ({
@@ -15,7 +15,7 @@ const assetStateBadges = (t: TFunction) => ({
   },
 }) as const
 
-const bankStatementStateBadges = (t: TFunction) => ({
+export const bankStatementStateBadges = (t: TFunction) => ({
   badgeVariants: {
     Open: "outline",
     Posted: "default",
@@ -28,9 +28,72 @@ const bankStatementStateBadges = (t: TFunction) => ({
   },
 }) as const
 
+export type BankStatementsTableConfigOptions = {
+  onEmptyAction?: () => void
+}
+
+export const bankStatementDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "header",
+      fields: [
+        { key: "name", label: t("accounting.entities.bankStatements.columns.name") },
+        { key: "reference", label: t("accounting.journalEntries.ref") },
+        {
+          key: "state",
+          label: t("accounting.entities.bankStatements.columns.state"),
+          type: "badge",
+          ...bankStatementStateBadges(t),
+        },
+        {
+          key: "date",
+          label: t("accounting.entities.bankStatements.columns.date"),
+          type: "relative-date",
+        },
+      ],
+    },
+    {
+      id: "balances",
+      fields: [
+        {
+          key: "balanceStart",
+          label: t("accounting.entities.bankStatements.columns.balanceStart"),
+          type: "currency",
+        },
+        {
+          key: "balanceEndReal",
+          label: t("accounting.entities.bankStatements.columns.balanceEndReal"),
+          type: "currency",
+        },
+        {
+          key: "balanceEnd",
+          label: t("accounting.entities.bankStatements.columns.balanceEnd"),
+          type: "currency",
+        },
+      ],
+    },
+    {
+      id: "meta",
+      fields: [
+        { key: "journalId", label: t("accounting.entities.bankStatements.columns.journalId") },
+        {
+          key: "lineIds",
+          label: t("accounting.entities.bankStatements.columns.lineIds"),
+          type: "number",
+        },
+      ],
+    },
+  ],
+})
+
 // ── Bank Statements ───────────────────────────────────────────────────────────
-export const bankStatementsTableConfig = (t: TFunction): EntityViewConfig => ({
+export const bankStatementsTableConfig = (
+  t: TFunction,
+  options?: BankStatementsTableConfigOptions,
+): EntityViewConfig => ({
   id: "bank-statements-table",
+  entityType: "account_bank_statement",
   title: t("accounting.entities.bankStatements.title"),
   description: t("accounting.entities.bankStatements.description"),
   view: {
@@ -52,15 +115,47 @@ export const bankStatementsTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("accounting.entities.bankStatements.columns.name"), width: "min-w-32" },
+      {
+        key: "name",
+        label: t("accounting.entities.bankStatements.columns.name"),
+        width: "min-w-32",
+        sortable: true,
+      },
       { key: "journalId", label: t("accounting.entities.bankStatements.columns.journalId"), width: "min-w-32" },
-      { key: "state", label: t("accounting.entities.bankStatements.columns.state"), type: "badge", ...bankStatementStateBadges(t) },
-      { key: "date", label: t("accounting.entities.bankStatements.columns.date"), type: "date" },
-      { key: "balanceStart", label: t("accounting.entities.bankStatements.columns.balanceStart"), type: "currency", align: "right" },
-      { key: "balanceEndReal", label: t("accounting.entities.bankStatements.columns.balanceEndReal"), type: "currency", align: "right" },
+      {
+        key: "state",
+        label: t("accounting.entities.bankStatements.columns.state"),
+        type: "status",
+        sortable: true,
+        ...bankStatementStateBadges(t),
+      },
+      {
+        key: "date",
+        label: t("accounting.entities.bankStatements.columns.date"),
+        type: "relative-date",
+        sortable: true,
+      },
+      {
+        key: "balanceStart",
+        label: t("accounting.entities.bankStatements.columns.balanceStart"),
+        type: "currency",
+        align: "right",
+        sortable: true,
+      },
+      {
+        key: "balanceEndReal",
+        label: t("accounting.entities.bankStatements.columns.balanceEndReal"),
+        type: "currency",
+        align: "right",
+      },
       { key: "lineIds", label: t("accounting.entities.bankStatements.columns.lineIds"), type: "number", align: "right" },
     ],
     emptyMessage: t("accounting.entities.bankStatements.emptyMessage"),
+    emptyState: {
+      title: t("accounting.entities.bankStatements.emptyMessage"),
+      description: t("accounting.entities.bankStatements.description"),
+      onAction: options?.onEmptyAction,
+    },
   },
 })
 
@@ -148,7 +243,7 @@ export const depreciationLinesTableConfig = (t: TFunction): EntityViewConfig => 
   },
 })
 
-const paymentStateBadges = (t: TFunction) => ({
+export const paymentStateBadges = (t: TFunction) => ({
   badgeVariants: {
     NotPaid: "secondary",
     Paid: "default",
@@ -161,8 +256,58 @@ const paymentStateBadges = (t: TFunction) => ({
   },
 }) as const
 
-export const accountPaymentsTableConfig = (t: TFunction): EntityViewConfig => ({
+export type AccountPaymentsTableConfigOptions = {
+  onEmptyAction?: () => void
+}
+
+export const accountPaymentDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "header",
+      fields: [
+        { key: "name", label: t("accounting.entities.payments.columns.name") },
+        { key: "ref_", label: t("accounting.journalEntries.ref") },
+        {
+          key: "amount",
+          label: t("accounting.entities.payments.columns.amount"),
+          type: "currency",
+        },
+        {
+          key: "state",
+          label: t("accounting.entities.payments.columns.state"),
+          type: "badge",
+          ...paymentStateBadges(t),
+        },
+      ],
+    },
+    {
+      id: "party",
+      fields: [
+        { key: "partnerId", label: t("accounting.entities.payments.columns.partnerId") },
+        { key: "journalId", label: t("accounting.entities.payments.columns.journalId") },
+        { key: "currencyId", label: t("accounting.entities.payments.columns.currencyId") },
+      ],
+    },
+    {
+      id: "dates",
+      fields: [
+        {
+          key: "date",
+          label: t("accounting.journalEntries.date"),
+          type: "relative-date",
+        },
+      ],
+    },
+  ],
+})
+
+export const accountPaymentsTableConfig = (
+  t: TFunction,
+  options?: AccountPaymentsTableConfigOptions,
+): EntityViewConfig => ({
   id: "account-payments-table",
+  entityType: "account_payment",
   title: t("accounting.entities.payments.title"),
   description: t("accounting.entities.payments.description"),
   view: {
@@ -170,7 +315,7 @@ export const accountPaymentsTableConfig = (t: TFunction): EntityViewConfig => ({
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("accounting.entities.payments.searchPlaceholder"),
-    searchKeys: ["name", "ref"],
+    searchKeys: ["name", "ref_", "ref"],
     filters: [
       {
         key: "state",
@@ -184,14 +329,43 @@ export const accountPaymentsTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("accounting.entities.payments.columns.name"), width: "min-w-28" },
-      { key: "amount", label: t("accounting.entities.payments.columns.amount"), type: "currency", align: "right" },
-      { key: "state", label: t("accounting.entities.payments.columns.state"), type: "badge", ...paymentStateBadges(t) },
+      {
+        key: "name",
+        label: t("accounting.entities.payments.columns.name"),
+        width: "min-w-28",
+        sortable: true,
+      },
+      {
+        key: "amount",
+        label: t("accounting.entities.payments.columns.amount"),
+        type: "currency",
+        align: "right",
+        sortable: true,
+      },
+      {
+        key: "state",
+        label: t("accounting.entities.payments.columns.state"),
+        type: "status",
+        sortable: true,
+        ...paymentStateBadges(t),
+      },
+      {
+        key: "date",
+        label: t("accounting.journalEntries.date"),
+        type: "relative-date",
+        sortable: true,
+      },
       { key: "partnerId", label: t("accounting.entities.payments.columns.partnerId"), width: "min-w-24" },
       { key: "journalId", label: t("accounting.entities.payments.columns.journalId"), width: "min-w-24" },
       { key: "currencyId", label: t("accounting.entities.payments.columns.currencyId"), width: "min-w-20" },
     ],
     emptyMessage: t("accounting.entities.payments.emptyMessage"),
+    emptyState: {
+      title: t("accounting.entities.payments.emptyMessage"),
+      description: t("accounting.entities.payments.description"),
+      actionLabel: t("accounting.actions.newPayment"),
+      onAction: options?.onEmptyAction,
+    },
   },
 })
 
@@ -514,6 +688,179 @@ export const accountMoveLinesTableConfig = (t: TFunction): EntityViewConfig => (
   },
 })
 
+// ── Journal entries (account moves) ───────────────────────────────────────────
+const moveStateBadges = (_t: TFunction) => ({
+  badgeVariants: {
+    Draft: "secondary",
+    Posted: "default",
+    Cancelled: "destructive",
+    draft: "secondary",
+    posted: "default",
+    cancel: "destructive",
+  },
+  badgeLabels: {
+    Draft: "Draft",
+    Posted: "Posted",
+    Cancelled: "Cancelled",
+    draft: "Draft",
+    posted: "Posted",
+    cancel: "Cancelled",
+  },
+}) as const
+
+const movePaymentStateBadges = (_t: TFunction) => ({
+  badgeVariants: {
+    NotPaid: "destructive",
+    Paid: "default",
+    Partial: "outline",
+    Reversed: "secondary",
+    not_paid: "destructive",
+    partial: "outline",
+    paid: "default",
+    reversed: "secondary",
+  },
+  badgeLabels: {
+    NotPaid: "Not paid",
+    Paid: "Paid",
+    Partial: "Partial",
+    Reversed: "Reversed",
+    not_paid: "Unpaid",
+    partial: "Partial",
+    paid: "Paid",
+    reversed: "Reversed",
+  },
+}) as const
+
+export type JournalEntriesTableConfigOptions = {
+  onEmptyAction?: () => void
+}
+
+export const accountMoveDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "header",
+      fields: [
+        { key: "name", label: t("accounting.journalEntries.entryNumber") },
+        { key: "ref", label: t("accounting.journalEntries.ref") },
+        {
+          key: "state",
+          label: t("accounting.journalEntries.state"),
+          type: "badge",
+          ...moveStateBadges(t),
+        },
+        { key: "moveType", label: t("accounting.journalEntries.type") },
+      ],
+    },
+    {
+      id: "dates",
+      fields: [
+        { key: "date", label: t("accounting.journalEntries.date"), type: "relative-date" },
+        { key: "invoiceDate", label: t("accounting.invoices.issueDate"), type: "relative-date" },
+        { key: "invoiceDateDue", label: t("accounting.invoices.dueDate"), type: "relative-date" },
+      ],
+    },
+    {
+      id: "amounts",
+      fields: [
+        { key: "invoicePartnerDisplayName", label: t("accounting.journalEntries.partner") },
+        { key: "amountTotal", label: t("accounting.journalEntries.total"), type: "currency" },
+        { key: "amountResidual", label: t("accounting.journalEntries.residual"), type: "currency" },
+        {
+          key: "paymentState",
+          label: t("accounting.invoices.paymentState"),
+          type: "badge",
+          ...movePaymentStateBadges(t),
+        },
+      ],
+    },
+  ],
+})
+
+export const accountingJournalEntriesTableConfig = (
+  t: TFunction,
+  options?: JournalEntriesTableConfigOptions,
+): EntityViewConfig => ({
+  id: "journal-entries-table",
+  entityType: "account_move",
+  title: t("accounting.journalEntries.title"),
+  description: t("accounting.journalEntries.title"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("accounting.journalEntries.searchPlaceholder"),
+    searchKeys: ["name", "ref", "invoicePartnerDisplayName"],
+    filters: [
+      {
+        key: "state",
+        label: t("accounting.journalEntries.state"),
+        type: "select",
+        options: [
+          { value: "Draft", label: "Draft" },
+          { value: "Posted", label: "Posted" },
+          { value: "Cancelled", label: "Cancelled" },
+        ],
+      },
+      {
+        key: "moveType",
+        label: t("accounting.journalEntries.type"),
+        type: "select",
+        options: [
+          { value: "Entry", label: "Journal Entry" },
+          { value: "OutInvoice", label: "Customer Invoice" },
+          { value: "InInvoice", label: "Vendor Bill" },
+          { value: "OutRefund", label: "Credit Note" },
+          { value: "InRefund", label: "Vendor Credit" },
+        ],
+      },
+    ],
+    columns: [
+      {
+        key: "name",
+        label: t("accounting.journalEntries.entryNumber"),
+        width: "min-w-32",
+        sortable: true,
+      },
+      {
+        key: "date",
+        label: t("accounting.journalEntries.date"),
+        type: "relative-date",
+        sortable: true,
+      },
+      { key: "ref", label: t("accounting.journalEntries.ref"), width: "min-w-28" },
+      { key: "invoicePartnerDisplayName", label: t("accounting.journalEntries.partner") },
+      {
+        key: "amountTotal",
+        label: t("accounting.journalEntries.total"),
+        type: "currency",
+        align: "right",
+        sortable: true,
+      },
+      {
+        key: "state",
+        label: t("accounting.journalEntries.state"),
+        type: "status",
+        sortable: true,
+        ...moveStateBadges(t),
+      },
+      {
+        key: "paymentState",
+        label: t("accounting.invoices.paymentState"),
+        type: "badge",
+        ...movePaymentStateBadges(t),
+      },
+    ],
+    emptyMessage: t("accounting.journalEntries.noResults"),
+    emptyState: {
+      title: t("accounting.journalEntries.noResults"),
+      description: t("accounting.journalEntries.title"),
+      actionLabel: t("accounting.actions.newEntry"),
+      onAction: options?.onEmptyAction,
+    },
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const accountingEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "bank-statements-table": bankStatementsTableConfig(t),
@@ -526,6 +873,7 @@ export const accountingEntityConfigs = (t: TFunction): Record<string, EntityView
   "payment-term-lines-table": paymentTermLinesTableConfig(t),
   "account-journals-table": accountJournalsTableConfig(t),
   "account-move-lines-table": accountMoveLinesTableConfig(t),
+  "journal-entries-table": accountingJournalEntriesTableConfig(t),
   "analytic-lines-table": analyticLinesTableConfig(t),
   "analytic-distribution-models-table": analyticDistributionModelsTableConfig(t),
   "reconciliation-widgets-table": reconciliationWidgetsTableConfig(t),

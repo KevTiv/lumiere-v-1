@@ -111,10 +111,15 @@ export * from "./lib/iot-form-configs";
 // Dashboard pages & widgets
 export * from "./pages/dashboard-grid";
 export * from "./pages/dashboard-header";
+export * from "./lib/dashboard-time-range";
+export * from "./components/trend-badge";
 export * from "./pages/dashboard-sidebar";
 export * from "./pages/dashboard-widget-renderer";
+export * from "./pages/stored-dashboard-view";
 export * from "./lib/dashboard-types";
 export * from "./lib/dashboard-config";
+export * from "./lib/dashboard-drill-down";
+export * from "./lib/stored-dashboard-resolver";
 
 // Module view (config-driven tabs + entity views + forms)
 export * from "./lib/module-types";
@@ -252,9 +257,20 @@ export * from "./proposal-workspace/version-diff-modal";
 
 export * from "./pos/pos-page";
 
+export * from "./components/empty";
+
 // 3D Warehouse Viewer types and context (safe for SSR — no Three.js imports)
 export * from "./stock-3d/types";
 export * from "./stock-3d/warehouse-3d-context";
 // NOTE: WarehouseViewer and other Three.js components are NOT re-exported here because
 // @react-three/fiber breaks SSR. Import them directly with dynamic():
 //   dynamic(() => import("@lumiere/ui/stock-3d/warehouse-viewer").then(m => m.WarehouseViewer), { ssr: false })
+
+export * from "./entity-views/entity-record-sheet";
+
+export * from "./pages/erp-command-palette";
+
+export * from "./entity-views/record-audit-tab";
+export * from "./lib/audit-log-utils";
+export * from "./lib/identity-label";
+export * from "./hooks/use-identity-label-map";

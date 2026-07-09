@@ -2,8 +2,6 @@
 
 import type { ComponentType } from "react"
 import {
-  TrendingUp,
-  TrendingDown,
   DollarSign,
   Users,
   ShoppingCart,
@@ -17,6 +15,7 @@ import {
   LayoutTemplate,
   Activity,
 } from "lucide-react"
+import { TrendBadge } from "../../components/trend-badge"
 import type { StatCardsWidget as StatCardsWidgetType } from "../../lib/dashboard-types"
 
 const iconMap: Record<string, ComponentType<{ className?: string }>> = {
@@ -39,8 +38,6 @@ export function StatCardsWidget({ data }: { data: StatCardsWidgetType["data"] })
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {data.stats.map((stat, index) => {
         const Icon = stat.icon ? iconMap[stat.icon] : null
-        const isPositive = stat.change && stat.change > 0
-        const isNegative = stat.change && stat.change < 0
         const statTestId = stat.testId ?? `stat-${index}`
 
         return (
@@ -54,12 +51,7 @@ export function StatCardsWidget({ data }: { data: StatCardsWidgetType["data"] })
               {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
             </div>
             <p className="text-xl font-bold">{stat.value}</p>
-            {stat.change !== undefined && (
-              <div className={`flex items-center gap-1 mt-1 text-xs ${isPositive ? "text-success" : isNegative ? "text-destructive" : "text-muted-foreground"}`}>
-                {isPositive ? <TrendingUp className="h-3 w-3" /> : isNegative ? <TrendingDown className="h-3 w-3" /> : null}
-                <span>{stat.change > 0 ? "+" : ""}{stat.change}%</span>
-              </div>
-            )}
+            <TrendBadge change={stat.change} />
           </div>
         )
       })}

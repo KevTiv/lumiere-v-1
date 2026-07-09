@@ -1936,7 +1936,7 @@ export async function expectOverviewDashboardLive(page: Page) {
   await expect(page.getByTestId("overview-dashboard")).toBeVisible()
   await expect(page.getByTestId("overview-widget-overview-stat-cards")).toBeVisible()
   await expect(page.getByTestId("overview-stat-open-sales-orders")).not.toHaveText("—")
-  await expect(page.getByTestId("overview-stat-accounts-receivable")).toBeVisible()
+  await expect(page.getByTestId("overview-stat-revenue")).toBeVisible()
   await expectNoAppError(page)
 }
 

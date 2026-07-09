@@ -1,8 +1,8 @@
 import type { TFunction } from "i18next"
-import type { EntityViewConfig } from "./entity-view-types"
+import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
-const employmentTypeBadges = (t: TFunction) => ({
+export const employeeStatusBadges = (t: TFunction) => ({
   badgeVariants: {
     FullTime: "default",
     PartTime: "outline",
@@ -17,7 +17,7 @@ const employmentTypeBadges = (t: TFunction) => ({
   },
 }) as const
 
-const leaveStateBadges = (t: TFunction) => ({
+export const leaveRequestStatusBadges = (t: TFunction) => ({
   badgeVariants: {
     Draft: "secondary",
     Confirm: "outline",
@@ -34,7 +34,7 @@ const leaveStateBadges = (t: TFunction) => ({
   },
 }) as const
 
-const contractStateBadges = (t: TFunction) => ({
+export const contractStatusBadges = (t: TFunction) => ({
   badgeVariants: {
     New: "secondary",
     Open: "default",
@@ -75,6 +75,28 @@ const jobPositionStateBadges = (t: TFunction) => ({
   },
 }) as const
 
+const employmentTypeBadges = employeeStatusBadges
+const leaveStateBadges = leaveRequestStatusBadges
+const contractStateBadges = contractStatusBadges
+
+const employeeEmptyState = (t: TFunction) => ({
+  title: t("hr.employees.emptyState.title"),
+  description: t("hr.employees.emptyState.description"),
+  actionLabel: t("hr.employees.emptyState.actionLabel"),
+})
+
+const leaveRequestEmptyState = (t: TFunction) => ({
+  title: t("hr.leaveRequests.emptyState.title"),
+  description: t("hr.leaveRequests.emptyState.description"),
+  actionLabel: t("hr.leaveRequests.emptyState.actionLabel"),
+})
+
+const contractEmptyState = (t: TFunction) => ({
+  title: t("hr.contracts.emptyState.title"),
+  description: t("hr.contracts.emptyState.description"),
+  actionLabel: t("hr.contracts.emptyState.actionLabel"),
+})
+
 // ── Employees ─────────────────────────────────────────────────────────────────
 export const employeesTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "employees-table",
@@ -100,17 +122,73 @@ export const employeesTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "employeeNumber", label: t("hr.employees.columns.employeeNumber"), width: "min-w-20" },
-      { key: "name", label: t("hr.employees.columns.name"), width: "min-w-40" },
+      {
+        key: "employeeNumber",
+        label: t("hr.employees.columns.employeeNumber"),
+        width: "min-w-20",
+        sortable: true,
+      },
+      { key: "name", label: t("hr.employees.columns.name"), width: "min-w-40", sortable: true },
       { key: "jobTitle", label: t("hr.employees.columns.jobTitle"), width: "min-w-36" },
       { key: "departmentId", label: t("hr.employees.columns.departmentId"), width: "min-w-32" },
-      { key: "employmentType", label: t("hr.employees.columns.employmentType"), type: "badge", ...employmentTypeBadges(t) },
+      {
+        key: "employmentType",
+        label: t("hr.employees.columns.employmentType"),
+        type: "status",
+        sortable: true,
+        ...employmentTypeBadges(t),
+      },
       { key: "workEmail", label: t("hr.employees.columns.workEmail"), width: "min-w-40" },
-      { key: "dateHired", label: t("hr.employees.columns.dateHired"), type: "date" },
+      {
+        key: "dateHired",
+        label: t("hr.employees.columns.dateHired"),
+        type: "relative-date",
+        sortable: true,
+      },
       { key: "isActive", label: t("hr.employees.columns.isActive"), type: "boolean" },
     ],
     emptyMessage: t("hr.employees.emptyMessage"),
+    emptyState: employeeEmptyState(t),
   },
+})
+
+export const employeeDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "profile",
+      title: t("hr.forms.newEmployee.sections.personalInformation"),
+      fields: [
+        { key: "name", label: t("hr.employees.columns.name"), width: "1/2" },
+        { key: "employeeNumber", label: t("hr.employees.columns.employeeNumber"), width: "1/2" },
+        { key: "jobTitle", label: t("hr.employees.columns.jobTitle"), width: "1/2" },
+        {
+          key: "employmentType",
+          label: t("hr.employees.columns.employmentType"),
+          type: "badge",
+          ...employmentTypeBadges(t),
+          width: "1/2",
+        },
+      ],
+    },
+    {
+      id: "contact",
+      title: t("hr.forms.newEmployee.sections.contact"),
+      fields: [
+        { key: "workEmail", label: t("hr.employees.columns.workEmail"), width: "1/2" },
+        { key: "workPhone", label: t("hr.forms.newEmployee.fields.workPhone"), width: "1/2" },
+        { key: "workLocation", label: t("hr.forms.newEmployee.fields.workLocation"), width: "1/2" },
+        {
+          key: "dateHired",
+          label: t("hr.employees.columns.dateHired"),
+          type: "relative-date",
+          width: "1/2",
+        },
+        { key: "departmentId", label: t("hr.employees.columns.departmentId"), width: "1/2" },
+        { key: "isActive", label: t("hr.employees.columns.isActive"), type: "boolean", width: "1/2" },
+      ],
+    },
+  ],
 })
 
 // ── Departments ───────────────────────────────────────────────────────────────
@@ -163,13 +241,71 @@ export const leaveRequestsTableConfig = (t: TFunction): EntityViewConfig => ({
     columns: [
       { key: "employeeId", label: t("hr.leaveRequests.columns.employeeId"), width: "min-w-36" },
       { key: "leaveTypeId", label: t("hr.leaveRequests.columns.leaveTypeId"), width: "min-w-32" },
-      { key: "state", label: t("hr.leaveRequests.columns.state"), type: "badge", ...leaveStateBadges(t) },
-      { key: "dateFrom", label: t("hr.leaveRequests.columns.dateFrom"), type: "date" },
-      { key: "dateTo", label: t("hr.leaveRequests.columns.dateTo"), type: "date" },
-      { key: "numberOfDays", label: t("hr.leaveRequests.columns.numberOfDays"), type: "number", align: "right" },
+      {
+        key: "state",
+        label: t("hr.leaveRequests.columns.state"),
+        type: "status",
+        sortable: true,
+        ...leaveStateBadges(t),
+      },
+      {
+        key: "dateFrom",
+        label: t("hr.leaveRequests.columns.dateFrom"),
+        type: "relative-date",
+        sortable: true,
+      },
+      { key: "dateTo", label: t("hr.leaveRequests.columns.dateTo"), type: "relative-date" },
+      {
+        key: "numberOfDays",
+        label: t("hr.leaveRequests.columns.numberOfDays"),
+        type: "number",
+        align: "right",
+        sortable: true,
+      },
     ],
     emptyMessage: t("hr.leaveRequests.emptyMessage"),
+    emptyState: leaveRequestEmptyState(t),
   },
+})
+
+export const leaveDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "leave",
+      title: t("hr.forms.newLeaveRequest.sections.leaveDetails"),
+      fields: [
+        { key: "employeeId", label: t("hr.leaveRequests.columns.employeeId"), width: "1/2" },
+        { key: "leaveTypeId", label: t("hr.leaveRequests.columns.leaveTypeId"), width: "1/2" },
+        {
+          key: "state",
+          label: t("hr.leaveRequests.columns.state"),
+          type: "badge",
+          ...leaveStateBadges(t),
+          width: "1/2",
+        },
+        {
+          key: "dateFrom",
+          label: t("hr.leaveRequests.columns.dateFrom"),
+          type: "relative-date",
+          width: "1/2",
+        },
+        {
+          key: "dateTo",
+          label: t("hr.leaveRequests.columns.dateTo"),
+          type: "relative-date",
+          width: "1/2",
+        },
+        {
+          key: "numberOfDays",
+          label: t("hr.leaveRequests.columns.numberOfDays"),
+          type: "number",
+          width: "1/2",
+        },
+        { key: "notes", label: t("hr.forms.newLeaveRequest.fields.notes"), width: "full" },
+      ],
+    },
+  ],
 })
 
 // ── Contracts ─────────────────────────────────────────────────────────────────
@@ -197,15 +333,72 @@ export const contractsTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("hr.contracts.columns.name"), width: "min-w-36" },
+      { key: "name", label: t("hr.contracts.columns.name"), width: "min-w-36", sortable: true },
       { key: "employeeId", label: t("hr.contracts.columns.employeeId"), width: "min-w-36" },
-      { key: "state", label: t("hr.contracts.columns.state"), type: "badge", ...contractStateBadges(t) },
-      { key: "dateStart", label: t("hr.contracts.columns.dateStart"), type: "date" },
-      { key: "dateEnd", label: t("hr.contracts.columns.dateEnd"), type: "date" },
-      { key: "wage", label: t("hr.contracts.columns.wage"), type: "currency", align: "right" },
+      {
+        key: "state",
+        label: t("hr.contracts.columns.state"),
+        type: "status",
+        sortable: true,
+        ...contractStateBadges(t),
+      },
+      {
+        key: "dateStart",
+        label: t("hr.contracts.columns.dateStart"),
+        type: "relative-date",
+        sortable: true,
+      },
+      { key: "dateEnd", label: t("hr.contracts.columns.dateEnd"), type: "relative-date" },
+      {
+        key: "wage",
+        label: t("hr.contracts.columns.wage"),
+        type: "currency",
+        align: "right",
+        sortable: true,
+      },
     ],
     emptyMessage: t("hr.contracts.emptyMessage"),
+    emptyState: contractEmptyState(t),
   },
+})
+
+export const contractDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "contract",
+      title: t("hr.forms.newContract.sections.contractDetails"),
+      fields: [
+        { key: "name", label: t("hr.contracts.columns.name"), width: "1/2" },
+        { key: "employeeId", label: t("hr.contracts.columns.employeeId"), width: "1/2" },
+        {
+          key: "state",
+          label: t("hr.contracts.columns.state"),
+          type: "badge",
+          ...contractStateBadges(t),
+          width: "1/2",
+        },
+        {
+          key: "dateStart",
+          label: t("hr.contracts.columns.dateStart"),
+          type: "relative-date",
+          width: "1/2",
+        },
+        {
+          key: "dateEnd",
+          label: t("hr.contracts.columns.dateEnd"),
+          type: "relative-date",
+          width: "1/2",
+        },
+        {
+          key: "wage",
+          label: t("hr.contracts.columns.wage"),
+          type: "currency",
+          width: "1/2",
+        },
+      ],
+    },
+  ],
 })
 
 // ── Payslips ──────────────────────────────────────────────────────────────────

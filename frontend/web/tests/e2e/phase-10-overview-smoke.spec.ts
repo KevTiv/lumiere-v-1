@@ -8,13 +8,13 @@ test.describe("Phase 10 overview smoke", { tag: "@phase-10" }, () => {
     await expect(page.getByTestId("overview-dashboard")).toBeVisible()
     await expect(page.getByTestId("overview-widget-overview-stat-cards")).toBeVisible()
     await expect(page.getByTestId("overview-widget-overview-sales-trend")).toBeVisible()
-    await expect(page.getByTestId("overview-widget-overview-pipeline-mix")).toBeVisible()
+    await expect(page.getByTestId("overview-widget-overview-needs-attention")).toBeVisible()
     await expectNoAppError(page)
   })
 
-  test("overview quick link navigates to a module route", async ({ page }) => {
+  test("overview sidebar navigates to a module route", async ({ page }) => {
     await gotoModule(page, "/overview")
-    await page.getByTestId("quick-action-sales").click()
+    await page.getByRole("link", { name: /sales/i }).first().click()
     await expect(page).toHaveURL(/\/sales/)
     await expect(page.getByTestId("module-view-sales")).toBeVisible()
     await expectNoAppError(page)

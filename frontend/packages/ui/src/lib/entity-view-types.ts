@@ -42,7 +42,11 @@ export type ColumnType =
   | "currency"
   | "date"
   | "datetime"
+  | "relative-date"
   | "badge"
+  | "status"
+  | "avatar"
+  | "progress"
   | "boolean"
   | "percent"
   | "custom"
@@ -110,6 +114,13 @@ export interface EntityTableConfig {
    */
   rowSelectionToggleOnClick?: boolean
   emptyMessage?: string
+  emptyState?: {
+    title?: string
+    description?: string
+    actionLabel?: string
+    onAction?: () => void
+    icon?: ReactNode
+  }
 }
 
 // ─── Detail field (read-only display) ───────────────────────────────────────

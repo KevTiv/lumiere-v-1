@@ -10,8 +10,9 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
 import { DashboardGrid } from "./dashboard-grid"
-import { DashboardHeader } from "./dashboard-header"
+import { DashboardHeader, type TimeRangeValue } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
+import { EntityRecordSheet } from "../entity-views/entity-record-sheet"
 import { FormModal } from "../forms/form-modal"
 import type { ModuleConfig } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
@@ -38,6 +39,13 @@ interface ModuleViewProps {
   onActiveTabChange?: (tab: string) => void
   /** Runtime kanban columns + move handlers keyed by entity tab id */
   entityBoardContext?: Record<string, EntityBoardRuntimeContext>
+  /** Per-tab loading flags keyed by tab id — forwarded to EntityTable as skeleton rows. */
+  dataLoading?: Record<string, boolean>
+  /** Dashboard time range — shown in header only on the dashboard tab. */
+  dashboardTimeRange?: TimeRangeValue
+  onDashboardTimeRangeChange?: (value: TimeRangeValue) => void
+  /** URL filters applied to the active entity tab (chart drill-down). */
+  urlFilters?: Record<string, string>
 }
 
 export function ModuleView({
@@ -49,6 +57,10 @@ export function ModuleView({
   onActiveTabChange,
   isPending,
   entityBoardContext,
+  dataLoading,
+  dashboardTimeRange,
+  onDashboardTimeRangeChange,
+  urlFilters,
 }: ModuleViewProps) {
   const { checkPermission } = useRBAC()
   const { companyIds } = useErpSession()
@@ -64,16 +76,27 @@ export function ModuleView({
     if (activeTabProp === undefined) setInternalTab(v)
   }
   const [openForm, setOpenForm] = useState<string | null>(null)
+  const [selectedRecord, setSelectedRecord] = useState<Record<string, unknown> | null>(null)
 
   useEffect(() => {
     if (prevActiveTabRef.current === activeTab) return
     prevActiveTabRef.current = activeTab
     aiReporter?.setActiveTab(activeTab)
+    setSelectedRecord(null)
   }, [activeTab, aiReporter])
+
+  const activeTabConfig = config.tabs.find((tab) => tab.id === activeTab)
+  const showDashboardTimeRange =
+    activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
 
   return (
     <div className="flex flex-col min-h-full gap-2" data-testid={`module-view-${config.id}`}>
-      <DashboardHeader title={config.title} description={config.description} />
+      <DashboardHeader
+        title={config.title}
+        description={config.description}
+        timeRange={showDashboardTimeRange ? dashboardTimeRange : undefined}
+        onTimeRangeChange={showDashboardTimeRange ? onDashboardTimeRangeChange : undefined}
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className={"flex-col flex"}>
         <TabsList variant="default" className="w-full flex flex-wrap justify-start max-w-fit gap-2">
@@ -99,12 +122,12 @@ export function ModuleView({
 
             {tab.type === "entity" && tab.entityConfig && (
               <div className="space-y-3">
-                {tab.createForm &&
-                  isEntitySurfaceVisible(
-                    { permission: tab.createPermission },
-                    checkPermission,
-                  ) && (
-                  <div className="flex justify-end">
+                <div className="flex justify-end">
+                  {tab.createForm &&
+                    isEntitySurfaceVisible(
+                      { permission: tab.createPermission },
+                      checkPermission,
+                    ) && (
                     <Button
                       size="lg"
                       onClick={() => setOpenForm(tab.id)}
@@ -112,12 +135,14 @@ export function ModuleView({
                     >
                       {tab.createLabel ?? "New"}
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <EntityView
                   config={tab.entityConfig}
                   data={data[tab.id] ?? []}
+                  isLoading={dataLoading?.[tab.id]}
+                  initialFilters={activeTab === tab.id ? urlFilters : undefined}
                   boardColumns={entityBoardContext?.[tab.id]?.columns}
                   onBoardMove={entityBoardContext?.[tab.id]?.onMove}
                   boardFilterItem={entityBoardContext?.[tab.id]?.filterItem}
@@ -140,9 +165,21 @@ export function ModuleView({
                         }),
                       )
                     }
+                    if (tab.recordSheet) {
+                      setSelectedRecord(row)
+                    }
                     onRowClick?.(tab.id, row)
                   }}
                 />
+
+                {tab.recordSheet && (
+                  <EntityRecordSheet
+                    open={selectedRecord != null}
+                    onOpenChange={(open) => !open && setSelectedRecord(null)}
+                    config={tab.recordSheet}
+                    record={selectedRecord}
+                  />
+                )}
 
                 {tab.createForm && (
                   <FormModal

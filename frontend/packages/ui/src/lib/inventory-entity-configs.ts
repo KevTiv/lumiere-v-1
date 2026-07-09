@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next"
 import { createElement } from "react"
-import type { EntityViewConfig } from "./entity-view-types"
+import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const productTypeBadges = (t: TFunction) => ({
@@ -10,7 +10,9 @@ const productTypeBadges = (t: TFunction) => ({
     service: t("inventory.products.states.service"),
     product: t("inventory.products.states.product"),
   },
-})
+}) as const
+
+export const productStatusBadges = productTypeBadges
 
 const pickingStateBadges = (t: TFunction) => ({
   badgeVariants: { draft: "secondary", waiting: "outline", confirmed: "outline", assigned: "default", done: "default", cancel: "destructive" },
@@ -22,7 +24,9 @@ const pickingStateBadges = (t: TFunction) => ({
     done: t("inventory.transfers.states.done"),
     cancel: t("inventory.transfers.states.cancel"),
   },
-})
+}) as const
+
+export const transferStatusBadges = pickingStateBadges
 
 const adjustmentStateBadges = (t: TFunction) => ({
   badgeVariants: { draft: "secondary", confirm: "outline", validate: "default", cancel: "destructive" },
@@ -96,7 +100,132 @@ const locationTypeBadges = (t: TFunction) => ({
 export type ProductsTableConfigOptions = {
   /** Combined default code + name for dense lists (optional). */
   formatProductDisplayName?: (row: Record<string, unknown>) => string
+  /** Empty-state CTA — wired by the module client (opens create form). */
+  onEmptyAction?: () => void
 }
+
+export const productDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "identification",
+      fields: [
+        { key: "defaultCode", label: t("inventory.products.columns.defaultCode") },
+        { key: "barcode", label: t("inventory.products.detail.barcode") },
+        {
+          key: "type",
+          label: t("inventory.products.columns.type"),
+          type: "badge",
+          ...productTypeBadges(t),
+        },
+      ],
+    },
+    {
+      id: "pricing",
+      fields: [
+        {
+          key: "standardPrice",
+          label: t("inventory.products.columns.standardPrice"),
+          type: "currency",
+        },
+        {
+          key: "listPrice",
+          label: t("inventory.products.detail.listPrice"),
+          type: "currency",
+        },
+      ],
+    },
+    {
+      id: "availability",
+      fields: [
+        {
+          key: "qtyAvailable",
+          label: t("inventory.products.detail.qtyAvailable"),
+          type: "number",
+        },
+        {
+          key: "saleOk",
+          label: t("inventory.products.columns.saleOk"),
+          type: "boolean",
+        },
+        {
+          key: "purchaseOk",
+          label: t("inventory.products.columns.purchaseOk"),
+          type: "boolean",
+        },
+        { key: "active", label: t("inventory.products.detail.active"), type: "boolean" },
+      ],
+    },
+  ],
+})
+
+export const stockQuantDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "stock",
+      fields: [
+        { key: "productId", label: t("inventory.stockOnHand.columns.productId") },
+        { key: "locationId", label: t("inventory.stockOnHand.columns.locationId") },
+        {
+          key: "availableQuantity",
+          label: t("inventory.stockOnHand.columns.availableQuantity"),
+          type: "number",
+        },
+        {
+          key: "reservedQuantity",
+          label: t("inventory.stockOnHand.columns.reservedQuantity"),
+          type: "number",
+        },
+        {
+          key: "inventoryQuantity",
+          label: t("inventory.stockOnHand.columns.inventoryQuantity"),
+          type: "number",
+        },
+        {
+          key: "value",
+          label: t("inventory.stockOnHand.columns.value"),
+          type: "currency",
+        },
+      ],
+    },
+  ],
+})
+
+export const transferDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [
+    {
+      id: "source",
+      fields: [
+        { key: "origin", label: t("inventory.transfers.columns.origin") },
+        { key: "moveType", label: t("inventory.transfers.columns.moveType") },
+      ],
+    },
+    {
+      id: "dates",
+      fields: [
+        {
+          key: "scheduledDate",
+          label: t("inventory.transfers.columns.scheduledDate"),
+          type: "relative-date",
+        },
+        {
+          key: "dateDone",
+          label: t("inventory.transfers.columns.dateDone"),
+          type: "relative-date",
+        },
+      ],
+    },
+    {
+      id: "locations",
+      fields: [
+        { key: "locationId", label: t("inventory.transfers.detail.locationFrom") },
+        { key: "locationDestId", label: t("inventory.transfers.detail.locationTo") },
+      ],
+    },
+  ],
+})
 
 export const productsTableConfig = (
   t: TFunction,
@@ -108,6 +237,7 @@ export const productsTableConfig = (
     key: "name",
     label: t("inventory.products.columns.name"),
     width: "min-w-48",
+    sortable: true,
     ...(formatName
       ? {
           render: (_value: unknown, row: Record<string, unknown>) => {
@@ -154,12 +284,14 @@ export const productsTableConfig = (
           key: "defaultCode",
           label: t("inventory.products.columns.defaultCode"),
           width: "min-w-24",
+          sortable: true,
         },
         nameColumn,
         {
           key: "type",
           label: t("inventory.products.columns.type"),
-          type: "badge",
+          type: "status",
+          sortable: true,
           ...productTypeBadges(t),
         },
         {
@@ -167,6 +299,7 @@ export const productsTableConfig = (
           label: t("inventory.products.columns.standardPrice"),
           type: "currency",
           align: "right",
+          sortable: true,
         },
         {
           key: "saleOk",
@@ -180,12 +313,26 @@ export const productsTableConfig = (
         },
       ],
       emptyMessage: t("inventory.products.emptyMessage"),
+      emptyState: {
+        title: t("inventory.products.emptyState.title"),
+        description: t("inventory.products.emptyState.description"),
+        actionLabel: t("inventory.products.emptyState.actionLabel"),
+        onAction: options?.onEmptyAction,
+      },
     },
   }
 }
 
+export type StockQuantsTableConfigOptions = {
+  /** Empty-state CTA — wired by the module client (opens create form). */
+  onEmptyAction?: () => void
+}
+
 // ── Stock (on-hand) ───────────────────────────────────────────────────────────
-export const stockQuantsTableConfig = (t: TFunction): EntityViewConfig => ({
+export const stockQuantsTableConfig = (
+  t: TFunction,
+  options?: StockQuantsTableConfigOptions,
+): EntityViewConfig => ({
   id: "stock-quants-table",
   title: t("inventory.stockOnHand.title"),
   description: t("inventory.stockOnHand.description"),
@@ -193,19 +340,66 @@ export const stockQuantsTableConfig = (t: TFunction): EntityViewConfig => ({
     mode: "table",
     rowKey: "id",
     columns: [
-      { key: "productId", label: t("inventory.stockOnHand.columns.productId"), width: "min-w-24" },
-      { key: "locationId", label: t("inventory.stockOnHand.columns.locationId"), width: "min-w-32" },
-      { key: "availableQuantity", label: t("inventory.stockOnHand.columns.availableQuantity"), type: "number", align: "right" },
-      { key: "reservedQuantity", label: t("inventory.stockOnHand.columns.reservedQuantity"), type: "number", align: "right" },
-      { key: "inventoryQuantity", label: t("inventory.stockOnHand.columns.inventoryQuantity"), type: "number", align: "right" },
-      { key: "value", label: t("inventory.stockOnHand.columns.value"), type: "currency", align: "right" },
+      {
+        key: "productId",
+        label: t("inventory.stockOnHand.columns.productId"),
+        width: "min-w-24",
+        sortable: true,
+      },
+      {
+        key: "locationId",
+        label: t("inventory.stockOnHand.columns.locationId"),
+        width: "min-w-32",
+        sortable: true,
+      },
+      {
+        key: "availableQuantity",
+        label: t("inventory.stockOnHand.columns.availableQuantity"),
+        type: "number",
+        align: "right",
+        sortable: true,
+      },
+      {
+        key: "reservedQuantity",
+        label: t("inventory.stockOnHand.columns.reservedQuantity"),
+        type: "number",
+        align: "right",
+      },
+      {
+        key: "inventoryQuantity",
+        label: t("inventory.stockOnHand.columns.inventoryQuantity"),
+        type: "number",
+        align: "right",
+        sortable: true,
+      },
+      {
+        key: "value",
+        label: t("inventory.stockOnHand.columns.value"),
+        type: "currency",
+        align: "right",
+        sortable: true,
+      },
     ],
     emptyMessage: t("inventory.stockOnHand.emptyMessage"),
+    emptyState: {
+      title: t("inventory.stockOnHand.emptyState.title"),
+      description: t("inventory.stockOnHand.emptyState.description"),
+      actionLabel: t("inventory.stockOnHand.emptyState.actionLabel"),
+      onAction: options?.onEmptyAction,
+    },
   },
 })
 
+export type TransfersTableConfigOptions = {
+  /** Empty-state CTA — wired by the module client (opens create form). */
+  onEmptyAction?: () => void
+}
+
 // ── Transfers (pickings) ──────────────────────────────────────────────────────
-export const transfersTableConfig = (t: TFunction): EntityViewConfig => ({
+export const transfersTableConfig = (
+  t: TFunction,
+  options?: TransfersTableConfigOptions,
+): EntityViewConfig => ({
   id: "transfers-table",
   title: t("inventory.transfers.title"),
   description: t("inventory.transfers.description"),
@@ -230,14 +424,40 @@ export const transfersTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("inventory.transfers.columns.name"), width: "min-w-28" },
+      {
+        key: "name",
+        label: t("inventory.transfers.columns.name"),
+        width: "min-w-28",
+        sortable: true,
+      },
       { key: "origin", label: t("inventory.transfers.columns.origin"), width: "min-w-28" },
-      { key: "state", label: t("inventory.transfers.columns.state"), type: "badge", ...pickingStateBadges(t) },
-      { key: "scheduledDate", label: t("inventory.transfers.columns.scheduledDate"), type: "date" },
-      { key: "dateDone", label: t("inventory.transfers.columns.dateDone"), type: "date" },
+      {
+        key: "state",
+        label: t("inventory.transfers.columns.state"),
+        type: "status",
+        sortable: true,
+        ...pickingStateBadges(t),
+      },
+      {
+        key: "scheduledDate",
+        label: t("inventory.transfers.columns.scheduledDate"),
+        type: "relative-date",
+        sortable: true,
+      },
+      {
+        key: "dateDone",
+        label: t("inventory.transfers.columns.dateDone"),
+        type: "relative-date",
+      },
       { key: "moveType", label: t("inventory.transfers.columns.moveType"), type: "text" },
     ],
     emptyMessage: t("inventory.transfers.emptyMessage"),
+    emptyState: {
+      title: t("inventory.transfers.emptyState.title"),
+      description: t("inventory.transfers.emptyState.description"),
+      actionLabel: t("inventory.transfers.emptyState.actionLabel"),
+      onAction: options?.onEmptyAction,
+    },
   },
 })
 
