@@ -35,6 +35,28 @@ fn filter_and_strip_soft_deleted(rows: &mut Vec<Value>) {
     }
 }
 
+fn row_not_archived(r: &Value) -> bool {
+    match r.get("archivedAt").or_else(|| r.get("archived_at")) {
+        None | Some(Value::Null) => true,
+        Some(Value::Object(obj)) if obj.contains_key("none") => true,
+        Some(_) => false,
+    }
+}
+
+fn strip_archived_fields(row: &mut Value) {
+    if let Value::Object(map) = row {
+        map.remove("archivedAt");
+        map.remove("archived_at");
+    }
+}
+
+fn filter_and_strip_archived(rows: &mut Vec<Value>) {
+    rows.retain(|r| row_not_archived(r));
+    for row in rows.iter_mut() {
+        strip_archived_fields(row);
+    }
+}
+
 fn row_id_u64(row: &Value) -> u64 {
     row.get("id")
         .and_then(|v| v.as_u64())
@@ -890,10 +912,15 @@ pub async fn execute_resource_query(
     if resource == "activities"
         || resource == "companies"
         || resource == "contacts"
+        || resource == "contact-phone-identities"
         || resource == "leads"
         || resource == "product-categories"
     {
         filter_and_strip_soft_deleted(&mut rows);
+    }
+
+    if resource == "contact-phone-identities" {
+        filter_and_strip_archived(&mut rows);
     }
 
     match resource {

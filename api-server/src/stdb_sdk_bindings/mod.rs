@@ -67,6 +67,7 @@ pub mod approval_request_type;
 pub mod approval_rule_type;
 pub mod asset_state_type;
 pub mod asset_type_type;
+pub mod assign_contact_role_params_type;
 pub mod assign_role_params_type;
 pub mod assign_team_member_skill_params_type;
 pub mod assign_user_to_picking_params_type;
@@ -110,10 +111,14 @@ pub mod contact_type;
 pub mod contact_category_type;
 pub mod contact_category_assignment_type;
 pub mod contact_duplicate_candidate_type;
+pub mod contact_identity_kind_type;
+pub mod contact_phone_identity_type;
 pub mod contact_relationship_type;
+pub mod contact_role_assignment_type;
 pub mod contact_segment_type;
 pub mod contact_tag_type;
 pub mod contact_tag_assignment_type;
+pub mod contact_verification_state_type;
 pub mod contract_state_type;
 pub mod convert_lead_params_type;
 pub mod convert_opportunity_params_type;
@@ -157,6 +162,7 @@ pub mod create_calendar_event_params_type;
 pub mod create_company_params_type;
 pub mod create_consolidation_account_params_type;
 pub mod create_consolidation_journal_params_type;
+pub mod create_contact_identity_params_type;
 pub mod create_contact_params_type;
 pub mod create_contact_segment_params_type;
 pub mod create_contact_tag_params_type;
@@ -313,6 +319,7 @@ pub mod document_template_type;
 pub mod document_version_type;
 pub mod done_stock_move_params_type;
 pub mod employment_type_type;
+pub mod end_contact_role_params_type;
 pub mod enqueue_job_params_type;
 pub mod error_intercompany_transaction_params_type;
 pub mod expense_sheet_state_type;
@@ -597,6 +604,7 @@ pub mod update_contact_address_params_type;
 pub mod update_contact_business_params_type;
 pub mod update_contact_core_params_type;
 pub mod update_contact_details_params_type;
+pub mod update_contact_identity_params_type;
 pub mod update_contract_params_type;
 pub mod update_crossovered_budget_line_params_type;
 pub mod update_crossovered_budget_params_type;
@@ -734,8 +742,10 @@ pub mod approve_leave_reducer;
 pub mod approve_purchase_requisition_reducer;
 pub mod approve_supplier_intake_reducer;
 pub mod archive_ai_chat_session_reducer;
+pub mod archive_contact_identity_reducer;
 pub mod archive_employee_reducer;
 pub mod archive_financial_report_reducer;
+pub mod assign_contact_role_reducer;
 pub mod assign_quality_alert_reducer;
 pub mod assign_role_reducer;
 pub mod assign_stock_move_reducer;
@@ -849,6 +859,7 @@ pub mod create_company_reducer;
 pub mod create_consolidation_account_reducer;
 pub mod create_consolidation_journal_reducer;
 pub mod create_contact_reducer;
+pub mod create_contact_identity_reducer;
 pub mod create_contact_segment_reducer;
 pub mod create_contact_tag_reducer;
 pub mod create_contract_reducer;
@@ -1044,6 +1055,7 @@ pub mod dismiss_insight_reducer;
 pub mod dispose_account_asset_reducer;
 pub mod done_budget_reducer;
 pub mod done_stock_move_reducer;
+pub mod end_contact_role_reducer;
 pub mod end_user_session_reducer;
 pub mod enqueue_job_reducer;
 pub mod ensure_dev_admin_reducer;
@@ -1234,6 +1246,7 @@ pub mod run_all_domain_tests_reducer;
 pub mod run_all_inventory_tests_reducer;
 pub mod run_all_platform_tests_reducer;
 pub mod run_all_sales_tests_reducer;
+pub mod run_crm_contact_identity_test_reducer;
 pub mod run_crm_contact_update_delete_test_reducer;
 pub mod run_crm_opportunity_convert_test_reducer;
 pub mod run_documents_folder_test_reducer;
@@ -1379,6 +1392,7 @@ pub mod update_contact_reducer;
 pub mod update_contact_address_reducer;
 pub mod update_contact_business_reducer;
 pub mod update_contact_details_reducer;
+pub mod update_contact_identity_reducer;
 pub mod update_contract_reducer;
 pub mod update_crossovered_budget_reducer;
 pub mod update_department_reducer;
@@ -1481,6 +1495,7 @@ pub mod validate_consolidation_reducer;
 pub mod validate_cycle_count_reducer;
 pub mod validate_stock_picking_reducer;
 pub mod validate_timesheets_reducer;
+pub mod verify_contact_identity_reducer;
 pub mod waive_tax_deadline_reducer;
 pub mod worker_heartbeat_reducer;
 pub mod account_account_table;
@@ -1547,7 +1562,9 @@ pub mod contact_table;
 pub mod contact_category_table;
 pub mod contact_category_assignment_table;
 pub mod contact_duplicate_candidate_table;
+pub mod contact_phone_identity_table;
 pub mod contact_relationship_table;
+pub mod contact_role_assignment_table;
 pub mod contact_segment_table;
 pub mod contact_tag_table;
 pub mod contact_tag_assignment_table;
@@ -1793,6 +1810,7 @@ pub use approval_request_type::ApprovalRequest;
 pub use approval_rule_type::ApprovalRule;
 pub use asset_state_type::AssetState;
 pub use asset_type_type::AssetType;
+pub use assign_contact_role_params_type::AssignContactRoleParams;
 pub use assign_role_params_type::AssignRoleParams;
 pub use assign_team_member_skill_params_type::AssignTeamMemberSkillParams;
 pub use assign_user_to_picking_params_type::AssignUserToPickingParams;
@@ -1836,10 +1854,14 @@ pub use contact_type::Contact;
 pub use contact_category_type::ContactCategory;
 pub use contact_category_assignment_type::ContactCategoryAssignment;
 pub use contact_duplicate_candidate_type::ContactDuplicateCandidate;
+pub use contact_identity_kind_type::ContactIdentityKind;
+pub use contact_phone_identity_type::ContactPhoneIdentity;
 pub use contact_relationship_type::ContactRelationship;
+pub use contact_role_assignment_type::ContactRoleAssignment;
 pub use contact_segment_type::ContactSegment;
 pub use contact_tag_type::ContactTag;
 pub use contact_tag_assignment_type::ContactTagAssignment;
+pub use contact_verification_state_type::ContactVerificationState;
 pub use contract_state_type::ContractState;
 pub use convert_lead_params_type::ConvertLeadParams;
 pub use convert_opportunity_params_type::ConvertOpportunityParams;
@@ -1883,6 +1905,7 @@ pub use create_calendar_event_params_type::CreateCalendarEventParams;
 pub use create_company_params_type::CreateCompanyParams;
 pub use create_consolidation_account_params_type::CreateConsolidationAccountParams;
 pub use create_consolidation_journal_params_type::CreateConsolidationJournalParams;
+pub use create_contact_identity_params_type::CreateContactIdentityParams;
 pub use create_contact_params_type::CreateContactParams;
 pub use create_contact_segment_params_type::CreateContactSegmentParams;
 pub use create_contact_tag_params_type::CreateContactTagParams;
@@ -2039,6 +2062,7 @@ pub use document_template_type::DocumentTemplate;
 pub use document_version_type::DocumentVersion;
 pub use done_stock_move_params_type::DoneStockMoveParams;
 pub use employment_type_type::EmploymentType;
+pub use end_contact_role_params_type::EndContactRoleParams;
 pub use enqueue_job_params_type::EnqueueJobParams;
 pub use error_intercompany_transaction_params_type::ErrorIntercompanyTransactionParams;
 pub use expense_sheet_state_type::ExpenseSheetState;
@@ -2323,6 +2347,7 @@ pub use update_contact_address_params_type::UpdateContactAddressParams;
 pub use update_contact_business_params_type::UpdateContactBusinessParams;
 pub use update_contact_core_params_type::UpdateContactCoreParams;
 pub use update_contact_details_params_type::UpdateContactDetailsParams;
+pub use update_contact_identity_params_type::UpdateContactIdentityParams;
 pub use update_contract_params_type::UpdateContractParams;
 pub use update_crossovered_budget_line_params_type::UpdateCrossoveredBudgetLineParams;
 pub use update_crossovered_budget_params_type::UpdateCrossoveredBudgetParams;
@@ -2487,7 +2512,9 @@ pub use contact_table::*;
 pub use contact_category_table::*;
 pub use contact_category_assignment_table::*;
 pub use contact_duplicate_candidate_table::*;
+pub use contact_phone_identity_table::*;
 pub use contact_relationship_table::*;
+pub use contact_role_assignment_table::*;
 pub use contact_segment_table::*;
 pub use contact_tag_table::*;
 pub use contact_tag_assignment_table::*;
@@ -2713,8 +2740,10 @@ pub use approve_leave_reducer::approve_leave;
 pub use approve_purchase_requisition_reducer::approve_purchase_requisition;
 pub use approve_supplier_intake_reducer::approve_supplier_intake;
 pub use archive_ai_chat_session_reducer::archive_ai_chat_session;
+pub use archive_contact_identity_reducer::archive_contact_identity;
 pub use archive_employee_reducer::archive_employee;
 pub use archive_financial_report_reducer::archive_financial_report;
+pub use assign_contact_role_reducer::assign_contact_role;
 pub use assign_quality_alert_reducer::assign_quality_alert;
 pub use assign_role_reducer::assign_role;
 pub use assign_stock_move_reducer::assign_stock_move;
@@ -2828,6 +2857,7 @@ pub use create_company_reducer::create_company;
 pub use create_consolidation_account_reducer::create_consolidation_account;
 pub use create_consolidation_journal_reducer::create_consolidation_journal;
 pub use create_contact_reducer::create_contact;
+pub use create_contact_identity_reducer::create_contact_identity;
 pub use create_contact_segment_reducer::create_contact_segment;
 pub use create_contact_tag_reducer::create_contact_tag;
 pub use create_contract_reducer::create_contract;
@@ -3023,6 +3053,7 @@ pub use dismiss_insight_reducer::dismiss_insight;
 pub use dispose_account_asset_reducer::dispose_account_asset;
 pub use done_budget_reducer::done_budget;
 pub use done_stock_move_reducer::done_stock_move;
+pub use end_contact_role_reducer::end_contact_role;
 pub use end_user_session_reducer::end_user_session;
 pub use enqueue_job_reducer::enqueue_job;
 pub use ensure_dev_admin_reducer::ensure_dev_admin;
@@ -3213,6 +3244,7 @@ pub use run_all_domain_tests_reducer::run_all_domain_tests;
 pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_platform_tests_reducer::run_all_platform_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
+pub use run_crm_contact_identity_test_reducer::run_crm_contact_identity_test;
 pub use run_crm_contact_update_delete_test_reducer::run_crm_contact_update_delete_test;
 pub use run_crm_opportunity_convert_test_reducer::run_crm_opportunity_convert_test;
 pub use run_documents_folder_test_reducer::run_documents_folder_test;
@@ -3358,6 +3390,7 @@ pub use update_contact_reducer::update_contact;
 pub use update_contact_address_reducer::update_contact_address;
 pub use update_contact_business_reducer::update_contact_business;
 pub use update_contact_details_reducer::update_contact_details;
+pub use update_contact_identity_reducer::update_contact_identity;
 pub use update_contract_reducer::update_contract;
 pub use update_crossovered_budget_reducer::update_crossovered_budget;
 pub use update_department_reducer::update_department;
@@ -3460,6 +3493,7 @@ pub use validate_consolidation_reducer::validate_consolidation;
 pub use validate_cycle_count_reducer::validate_cycle_count;
 pub use validate_stock_picking_reducer::validate_stock_picking;
 pub use validate_timesheets_reducer::validate_timesheets;
+pub use verify_contact_identity_reducer::verify_contact_identity;
 pub use waive_tax_deadline_reducer::waive_tax_deadline;
 pub use worker_heartbeat_reducer::worker_heartbeat;
 
@@ -3664,6 +3698,10 @@ pub enum Reducer {
         session_key: String,
         archived: bool,
 }    ,
+    ArchiveContactIdentity {
+        organization_id: u64,
+        identity_id: u64,
+}    ,
     ArchiveEmployee {
         organization_id: u64,
         company_id: u64,
@@ -3674,6 +3712,10 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         report_id: u64,
+}    ,
+    AssignContactRole {
+        organization_id: u64,
+        params: AssignContactRoleParams,
 }    ,
     AssignQualityAlert {
         organization_id: u64,
@@ -4191,6 +4233,10 @@ pub enum Reducer {
     CreateContact {
         organization_id: u64,
         params: CreateContactParams,
+}    ,
+    CreateContactIdentity {
+        organization_id: u64,
+        params: CreateContactIdentityParams,
 }    ,
     CreateContactSegment {
         organization_id: u64,
@@ -5082,6 +5128,11 @@ pub enum Reducer {
         move_id: u64,
         params: DoneStockMoveParams,
 }    ,
+    EndContactRole {
+        organization_id: u64,
+        assignment_id: u64,
+        params: EndContactRoleParams,
+}    ,
     EndUserSession {
         session_id: u64,
 }    ,
@@ -5902,6 +5953,7 @@ pub enum Reducer {
     RunAllInventoryTests ,
     RunAllPlatformTests ,
     RunAllSalesTests ,
+    RunCrmContactIdentityTest ,
     RunCrmContactUpdateDeleteTest ,
     RunCrmOpportunityConvertTest ,
     RunDocumentsFolderTest ,
@@ -6416,6 +6468,11 @@ pub enum Reducer {
         organization_id: u64,
         contact_id: u64,
         params: UpdateContactDetailsParams,
+}    ,
+    UpdateContactIdentity {
+        organization_id: u64,
+        identity_id: u64,
+        params: UpdateContactIdentityParams,
 }    ,
     UpdateContract {
         organization_id: u64,
@@ -6967,6 +7024,11 @@ pub enum Reducer {
         organization_id: u64,
         params: ValidateTimesheetsParams,
 }    ,
+    VerifyContactIdentity {
+        organization_id: u64,
+        identity_id: u64,
+        state: ContactVerificationState,
+}    ,
     WaiveTaxDeadline {
         organization_id: u64,
         deadline_id: u64,
@@ -7022,8 +7084,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApprovePurchaseRequisition { .. } => "approve_purchase_requisition",
             Reducer::ApproveSupplierIntake { .. } => "approve_supplier_intake",
             Reducer::ArchiveAiChatSession { .. } => "archive_ai_chat_session",
+            Reducer::ArchiveContactIdentity { .. } => "archive_contact_identity",
             Reducer::ArchiveEmployee { .. } => "archive_employee",
             Reducer::ArchiveFinancialReport { .. } => "archive_financial_report",
+            Reducer::AssignContactRole { .. } => "assign_contact_role",
             Reducer::AssignQualityAlert { .. } => "assign_quality_alert",
             Reducer::AssignRole { .. } => "assign_role",
             Reducer::AssignStockMove { .. } => "assign_stock_move",
@@ -7137,6 +7201,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateConsolidationAccount { .. } => "create_consolidation_account",
             Reducer::CreateConsolidationJournal { .. } => "create_consolidation_journal",
             Reducer::CreateContact { .. } => "create_contact",
+            Reducer::CreateContactIdentity { .. } => "create_contact_identity",
             Reducer::CreateContactSegment { .. } => "create_contact_segment",
             Reducer::CreateContactTag { .. } => "create_contact_tag",
             Reducer::CreateContract { .. } => "create_contract",
@@ -7332,6 +7397,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DisposeAccountAsset { .. } => "dispose_account_asset",
             Reducer::DoneBudget { .. } => "done_budget",
             Reducer::DoneStockMove { .. } => "done_stock_move",
+            Reducer::EndContactRole { .. } => "end_contact_role",
             Reducer::EndUserSession { .. } => "end_user_session",
             Reducer::EnqueueJob { .. } => "enqueue_job",
             Reducer::EnsureDevAdmin => "ensure_dev_admin",
@@ -7522,6 +7588,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllInventoryTests => "run_all_inventory_tests",
             Reducer::RunAllPlatformTests => "run_all_platform_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
+            Reducer::RunCrmContactIdentityTest => "run_crm_contact_identity_test",
             Reducer::RunCrmContactUpdateDeleteTest => "run_crm_contact_update_delete_test",
             Reducer::RunCrmOpportunityConvertTest => "run_crm_opportunity_convert_test",
             Reducer::RunDocumentsFolderTest => "run_documents_folder_test",
@@ -7667,6 +7734,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateContactAddress { .. } => "update_contact_address",
             Reducer::UpdateContactBusiness { .. } => "update_contact_business",
             Reducer::UpdateContactDetails { .. } => "update_contact_details",
+            Reducer::UpdateContactIdentity { .. } => "update_contact_identity",
             Reducer::UpdateContract { .. } => "update_contract",
             Reducer::UpdateCrossoveredBudget { .. } => "update_crossovered_budget",
             Reducer::UpdateDepartment { .. } => "update_department",
@@ -7769,6 +7837,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ValidateCycleCount { .. } => "validate_cycle_count",
             Reducer::ValidateStockPicking { .. } => "validate_stock_picking",
             Reducer::ValidateTimesheets { .. } => "validate_timesheets",
+            Reducer::VerifyContactIdentity { .. } => "verify_contact_identity",
             Reducer::WaiveTaxDeadline { .. } => "waive_tax_deadline",
             Reducer::WorkerHeartbeat { .. } => "worker_heartbeat",
             _ => unreachable!(),
@@ -8126,6 +8195,13 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 session_key: session_key.clone(),
                 archived: archived.clone(),
 }),
+            Reducer::ArchiveContactIdentity{
+                organization_id,
+                identity_id,
+}             => __sats::bsatn::to_vec(&archive_contact_identity_reducer::ArchiveContactIdentityArgs {
+                organization_id: organization_id.clone(),
+                identity_id: identity_id.clone(),
+}),
             Reducer::ArchiveEmployee{
                 organization_id,
                 company_id,
@@ -8145,6 +8221,13 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 report_id: report_id.clone(),
+}),
+            Reducer::AssignContactRole{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&assign_contact_role_reducer::AssignContactRoleArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
 }),
             Reducer::AssignQualityAlert{
                 organization_id,
@@ -9065,6 +9148,13 @@ Reducer::BillTimesheets{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_contact_reducer::CreateContactArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateContactIdentity{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_contact_identity_reducer::CreateContactIdentityArgs {
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
@@ -10654,6 +10744,15 @@ Reducer::DismissInsight{
                 move_id: move_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::EndContactRole{
+                organization_id,
+                assignment_id,
+                params,
+}             => __sats::bsatn::to_vec(&end_contact_role_reducer::EndContactRoleArgs {
+                organization_id: organization_id.clone(),
+                assignment_id: assignment_id.clone(),
+                params: params.clone(),
+}),
             Reducer::EndUserSession{
                 session_id,
 }             => __sats::bsatn::to_vec(&end_user_session_reducer::EndUserSessionArgs {
@@ -12120,6 +12219,8 @@ Reducer::RunAllPlatformTests => __sats::bsatn::to_vec(&run_all_platform_tests_re
                 }),
 Reducer::RunAllSalesTests => __sats::bsatn::to_vec(&run_all_sales_tests_reducer::RunAllSalesTestsArgs {
                 }),
+Reducer::RunCrmContactIdentityTest => __sats::bsatn::to_vec(&run_crm_contact_identity_test_reducer::RunCrmContactIdentityTestArgs {
+                }),
 Reducer::RunCrmContactUpdateDeleteTest => __sats::bsatn::to_vec(&run_crm_contact_update_delete_test_reducer::RunCrmContactUpdateDeleteTestArgs {
                 }),
 Reducer::RunCrmOpportunityConvertTest => __sats::bsatn::to_vec(&run_crm_opportunity_convert_test_reducer::RunCrmOpportunityConvertTestArgs {
@@ -13054,6 +13155,15 @@ Reducer::ToggleProjectFavorite{
 }             => __sats::bsatn::to_vec(&update_contact_details_reducer::UpdateContactDetailsArgs {
                 organization_id: organization_id.clone(),
                 contact_id: contact_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateContactIdentity{
+                organization_id,
+                identity_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_contact_identity_reducer::UpdateContactIdentityArgs {
+                organization_id: organization_id.clone(),
+                identity_id: identity_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateContract{
@@ -14054,6 +14164,15 @@ Reducer::ToggleProjectFavorite{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::VerifyContactIdentity{
+                organization_id,
+                identity_id,
+                state,
+}             => __sats::bsatn::to_vec(&verify_contact_identity_reducer::VerifyContactIdentityArgs {
+                organization_id: organization_id.clone(),
+                identity_id: identity_id.clone(),
+                state: state.clone(),
+}),
             Reducer::WaiveTaxDeadline{
                 organization_id,
                 deadline_id,
@@ -14141,7 +14260,9 @@ pub struct DbUpdate {
     contact_category: __sdk::TableUpdate<ContactCategory>,
     contact_category_assignment: __sdk::TableUpdate<ContactCategoryAssignment>,
     contact_duplicate_candidate: __sdk::TableUpdate<ContactDuplicateCandidate>,
+    contact_phone_identity: __sdk::TableUpdate<ContactPhoneIdentity>,
     contact_relationship: __sdk::TableUpdate<ContactRelationship>,
+    contact_role_assignment: __sdk::TableUpdate<ContactRoleAssignment>,
     contact_segment: __sdk::TableUpdate<ContactSegment>,
     contact_tag: __sdk::TableUpdate<ContactTag>,
     contact_tag_assignment: __sdk::TableUpdate<ContactTagAssignment>,
@@ -14404,7 +14525,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "contact_category" => db_update.contact_category.append(contact_category_table::parse_table_update(table_update)?),
     "contact_category_assignment" => db_update.contact_category_assignment.append(contact_category_assignment_table::parse_table_update(table_update)?),
     "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(contact_duplicate_candidate_table::parse_table_update(table_update)?),
+    "contact_phone_identity" => db_update.contact_phone_identity.append(contact_phone_identity_table::parse_table_update(table_update)?),
     "contact_relationship" => db_update.contact_relationship.append(contact_relationship_table::parse_table_update(table_update)?),
+    "contact_role_assignment" => db_update.contact_role_assignment.append(contact_role_assignment_table::parse_table_update(table_update)?),
     "contact_segment" => db_update.contact_segment.append(contact_segment_table::parse_table_update(table_update)?),
     "contact_tag" => db_update.contact_tag.append(contact_tag_table::parse_table_update(table_update)?),
     "contact_tag_assignment" => db_update.contact_tag_assignment.append(contact_tag_assignment_table::parse_table_update(table_update)?),
@@ -14679,7 +14802,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.contact_category = cache.apply_diff_to_table::<ContactCategory>("contact_category", &self.contact_category).with_updates_by_pk(|row| &row.id);
         diff.contact_category_assignment = cache.apply_diff_to_table::<ContactCategoryAssignment>("contact_category_assignment", &self.contact_category_assignment).with_updates_by_pk(|row| &row.id);
         diff.contact_duplicate_candidate = cache.apply_diff_to_table::<ContactDuplicateCandidate>("contact_duplicate_candidate", &self.contact_duplicate_candidate).with_updates_by_pk(|row| &row.id);
+        diff.contact_phone_identity = cache.apply_diff_to_table::<ContactPhoneIdentity>("contact_phone_identity", &self.contact_phone_identity).with_updates_by_pk(|row| &row.id);
         diff.contact_relationship = cache.apply_diff_to_table::<ContactRelationship>("contact_relationship", &self.contact_relationship).with_updates_by_pk(|row| &row.id);
+        diff.contact_role_assignment = cache.apply_diff_to_table::<ContactRoleAssignment>("contact_role_assignment", &self.contact_role_assignment).with_updates_by_pk(|row| &row.id);
         diff.contact_segment = cache.apply_diff_to_table::<ContactSegment>("contact_segment", &self.contact_segment).with_updates_by_pk(|row| &row.id);
         diff.contact_tag = cache.apply_diff_to_table::<ContactTag>("contact_tag", &self.contact_tag).with_updates_by_pk(|row| &row.id);
         diff.contact_tag_assignment = cache.apply_diff_to_table::<ContactTagAssignment>("contact_tag_assignment", &self.contact_tag_assignment).with_updates_by_pk(|row| &row.id);
@@ -14939,7 +15064,9 @@ for table_rows in raw.tables {
                 "contact_category" => db_update.contact_category.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_category_assignment" => db_update.contact_category_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_phone_identity" => db_update.contact_phone_identity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_relationship" => db_update.contact_relationship.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_role_assignment" => db_update.contact_role_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_segment" => db_update.contact_segment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_tag" => db_update.contact_tag.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_tag_assignment" => db_update.contact_tag_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -15199,7 +15326,9 @@ for table_rows in raw.tables {
                 "contact_category" => db_update.contact_category.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_category_assignment" => db_update.contact_category_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_phone_identity" => db_update.contact_phone_identity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_relationship" => db_update.contact_relationship.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_role_assignment" => db_update.contact_role_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_segment" => db_update.contact_segment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_tag" => db_update.contact_tag.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_tag_assignment" => db_update.contact_tag_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -15461,7 +15590,9 @@ pub struct AppliedDiff<'r> {
     contact_category: __sdk::TableAppliedDiff<'r, ContactCategory>,
     contact_category_assignment: __sdk::TableAppliedDiff<'r, ContactCategoryAssignment>,
     contact_duplicate_candidate: __sdk::TableAppliedDiff<'r, ContactDuplicateCandidate>,
+    contact_phone_identity: __sdk::TableAppliedDiff<'r, ContactPhoneIdentity>,
     contact_relationship: __sdk::TableAppliedDiff<'r, ContactRelationship>,
+    contact_role_assignment: __sdk::TableAppliedDiff<'r, ContactRoleAssignment>,
     contact_segment: __sdk::TableAppliedDiff<'r, ContactSegment>,
     contact_tag: __sdk::TableAppliedDiff<'r, ContactTag>,
     contact_tag_assignment: __sdk::TableAppliedDiff<'r, ContactTagAssignment>,
@@ -15724,7 +15855,9 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<ContactCategory>("contact_category", &self.contact_category, event);
         callbacks.invoke_table_row_callbacks::<ContactCategoryAssignment>("contact_category_assignment", &self.contact_category_assignment, event);
         callbacks.invoke_table_row_callbacks::<ContactDuplicateCandidate>("contact_duplicate_candidate", &self.contact_duplicate_candidate, event);
+        callbacks.invoke_table_row_callbacks::<ContactPhoneIdentity>("contact_phone_identity", &self.contact_phone_identity, event);
         callbacks.invoke_table_row_callbacks::<ContactRelationship>("contact_relationship", &self.contact_relationship, event);
+        callbacks.invoke_table_row_callbacks::<ContactRoleAssignment>("contact_role_assignment", &self.contact_role_assignment, event);
         callbacks.invoke_table_row_callbacks::<ContactSegment>("contact_segment", &self.contact_segment, event);
         callbacks.invoke_table_row_callbacks::<ContactTag>("contact_tag", &self.contact_tag, event);
         callbacks.invoke_table_row_callbacks::<ContactTagAssignment>("contact_tag_assignment", &self.contact_tag_assignment, event);
@@ -16618,7 +16751,9 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         contact_category_table::register_table(client_cache);
         contact_category_assignment_table::register_table(client_cache);
         contact_duplicate_candidate_table::register_table(client_cache);
+        contact_phone_identity_table::register_table(client_cache);
         contact_relationship_table::register_table(client_cache);
+        contact_role_assignment_table::register_table(client_cache);
         contact_segment_table::register_table(client_cache);
         contact_tag_table::register_table(client_cache);
         contact_tag_assignment_table::register_table(client_cache);
@@ -16873,7 +17008,9 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "contact_category",
         "contact_category_assignment",
         "contact_duplicate_candidate",
+        "contact_phone_identity",
         "contact_relationship",
+        "contact_role_assignment",
         "contact_segment",
         "contact_tag",
         "contact_tag_assignment",

@@ -1302,6 +1302,16 @@ export const AssetType = __t.enum("AssetType", {
 });
 export type AssetType = __Infer<typeof AssetType>;
 
+export const AssignContactRoleParams = __t.object("AssignContactRoleParams", {
+  contactId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  role: __t.string(),
+  activeFrom: __t.option(__t.timestamp()),
+  activeUntil: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type AssignContactRoleParams = __Infer<typeof AssignContactRoleParams>;
+
 export const AssignRoleParams = __t.object("AssignRoleParams", {
   expiresAtMicros: __t.option(__t.u64()),
   metadata: __t.option(__t.string()),
@@ -1944,6 +1954,37 @@ export const ContactDuplicateCandidate = __t.object("ContactDuplicateCandidate",
 });
 export type ContactDuplicateCandidate = __Infer<typeof ContactDuplicateCandidate>;
 
+// The tagged union or sum type for the algebraic type `ContactIdentityKind`.
+export const ContactIdentityKind = __t.enum("ContactIdentityKind", {
+  Primary: __t.unit(),
+  WhatsApp: __t.unit(),
+  MobileMoney: __t.unit(),
+});
+export type ContactIdentityKind = __Infer<typeof ContactIdentityKind>;
+
+export const ContactPhoneIdentity = __t.object("ContactPhoneIdentity", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  contactId: __t.u64(),
+  get kind() {
+    return ContactIdentityKind;
+  },
+  normalizedE164: __t.string(),
+  displayMasked: __t.string(),
+  get verificationState() {
+    return ContactVerificationState;
+  },
+  isPreferred: __t.bool(),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  verifiedAt: __t.option(__t.timestamp()),
+  archivedAt: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type ContactPhoneIdentity = __Infer<typeof ContactPhoneIdentity>;
+
 export const ContactRelationship = __t.object("ContactRelationship", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -1959,6 +2000,23 @@ export const ContactRelationship = __t.object("ContactRelationship", {
   metadata: __t.option(__t.string()),
 });
 export type ContactRelationship = __Infer<typeof ContactRelationship>;
+
+export const ContactRoleAssignment = __t.object("ContactRoleAssignment", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  contactId: __t.u64(),
+  role: __t.string(),
+  activeFrom: __t.timestamp(),
+  activeUntil: __t.option(__t.timestamp()),
+  isActive: __t.bool(),
+  assignedBy: __t.identity(),
+  assignedAt: __t.timestamp(),
+  endedAt: __t.option(__t.timestamp()),
+  endedBy: __t.option(__t.identity()),
+  metadata: __t.option(__t.string()),
+});
+export type ContactRoleAssignment = __Infer<typeof ContactRoleAssignment>;
 
 export const ContactSegment = __t.object("ContactSegment", {
   id: __t.u64(),
@@ -1997,6 +2055,16 @@ export const ContactTagAssignment = __t.object("ContactTagAssignment", {
   metadata: __t.option(__t.string()),
 });
 export type ContactTagAssignment = __Infer<typeof ContactTagAssignment>;
+
+// The tagged union or sum type for the algebraic type `ContactVerificationState`.
+export const ContactVerificationState = __t.enum("ContactVerificationState", {
+  Unverified: __t.unit(),
+  Pending: __t.unit(),
+  Verified: __t.unit(),
+  Failed: __t.unit(),
+  OptedOut: __t.unit(),
+});
+export type ContactVerificationState = __Infer<typeof ContactVerificationState>;
 
 // The tagged union or sum type for the algebraic type `ContractState`.
 export const ContractState = __t.enum("ContractState", {
@@ -2740,6 +2808,21 @@ export const CreateConsolidationJournalParams = __t.object("CreateConsolidationJ
   metadata: __t.option(__t.string()),
 });
 export type CreateConsolidationJournalParams = __Infer<typeof CreateConsolidationJournalParams>;
+
+export const CreateContactIdentityParams = __t.object("CreateContactIdentityParams", {
+  contactId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  get kind() {
+    return ContactIdentityKind;
+  },
+  rawValue: __t.string(),
+  isPreferred: __t.bool(),
+  get verificationState() {
+    return __t.option(ContactVerificationState);
+  },
+  metadata: __t.option(__t.string()),
+});
+export type CreateContactIdentityParams = __Infer<typeof CreateContactIdentityParams>;
 
 export const CreateContactParams = __t.object("CreateContactParams", {
   name: __t.string(),
@@ -5580,6 +5663,11 @@ export const EmploymentType = __t.enum("EmploymentType", {
   Intern: __t.unit(),
 });
 export type EmploymentType = __Infer<typeof EmploymentType>;
+
+export const EndContactRoleParams = __t.object("EndContactRoleParams", {
+  reason: __t.option(__t.string()),
+});
+export type EndContactRoleParams = __Infer<typeof EndContactRoleParams>;
 
 export const EnqueueJobParams = __t.object("EnqueueJobParams", {
   queueName: __t.string(),
@@ -10991,6 +11079,17 @@ export const UpdateContactDetailsParams = __t.object("UpdateContactDetailsParams
   color: __t.option(__t.string()),
 });
 export type UpdateContactDetailsParams = __Infer<typeof UpdateContactDetailsParams>;
+
+export const UpdateContactIdentityParams = __t.object("UpdateContactIdentityParams", {
+  companyId: __t.option(__t.u64()),
+  rawValue: __t.option(__t.string()),
+  isPreferred: __t.option(__t.bool()),
+  get verificationState() {
+    return __t.option(ContactVerificationState);
+  },
+  metadata: __t.option(__t.string()),
+});
+export type UpdateContactIdentityParams = __Infer<typeof UpdateContactIdentityParams>;
 
 export const UpdateContractParams = __t.object("UpdateContractParams", {
   companyId: __t.option(__t.u64()),

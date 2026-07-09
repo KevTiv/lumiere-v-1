@@ -1008,3 +1008,79 @@ pub enum IoTAlertSeverity {
     Warning,
     Critical,
 }
+
+// Phase 1: Contact Identity & Phone-First CRM
+
+/// Kind of phone/contact identity for a contact.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ContactIdentityKind {
+    /// Default voice/SMS identity
+    Primary,
+    /// WhatsApp-enabled identity
+    WhatsApp,
+    /// Mobile-money wallet identity
+    MobileMoney,
+}
+
+impl ContactIdentityKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Primary => "primary",
+            Self::WhatsApp => "whatsapp",
+            Self::MobileMoney => "mobile_money",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "primary" => Ok(Self::Primary),
+            "whatsapp" => Ok(Self::WhatsApp),
+            "mobile_money" => Ok(Self::MobileMoney),
+            other => Err(format!(
+                "Invalid contact_identity_kind '{}'. Valid values: primary, whatsapp, mobile_money",
+                other
+            )),
+        }
+    }
+}
+
+/// Verification lifecycle for a contact phone identity.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ContactVerificationState {
+    /// Unverified: value is normalized but not confirmed
+    Unverified,
+    /// Pending verification: a challenge was sent
+    Pending,
+    /// Verified: the identity has been confirmed
+    Verified,
+    /// Failed verification or invalidated
+    Failed,
+    /// Explicitly opted out of contact on this identity
+    OptedOut,
+}
+
+impl ContactVerificationState {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Unverified => "unverified",
+            Self::Pending => "pending",
+            Self::Verified => "verified",
+            Self::Failed => "failed",
+            Self::OptedOut => "opted_out",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "unverified" => Ok(Self::Unverified),
+            "pending" => Ok(Self::Pending),
+            "verified" => Ok(Self::Verified),
+            "failed" => Ok(Self::Failed),
+            "opted_out" => Ok(Self::OptedOut),
+            other => Err(format!(
+                "Invalid contact_verification_state '{}'. Valid values: unverified, pending, verified, failed, opted_out",
+                other
+            )),
+        }
+    }
+}

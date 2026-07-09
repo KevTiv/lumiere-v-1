@@ -5,7 +5,7 @@ use std::sync::Arc;
 use axum::{
     extract::{Path, Query, State},
     http::HeaderMap,
-    routing::get,
+    routing::{get, post, put},
     Json, Router,
 };
 use serde::Deserialize;
@@ -462,6 +462,280 @@ async fn contacts_post(
     ))
 }
 
+fn to_unit_enum(value: &Value) -> Result<Value, ApiError> {
+    match value {
+        Value::String(s) => Ok(json!({ s: [] })),
+        _ => Err(ApiError::BadRequest("expected enum variant string".into())),
+    }
+}
+
+fn contact_identity_create_params(body: &Value) -> Result<Value, ApiError> {
+    let contact_id = body
+        .get("contact_id")
+        .ok_or_else(|| ApiError::BadRequest("missing contact_id".into()))?
+        .clone();
+    let company_id = body.get("company_id").cloned().unwrap_or(Value::Null);
+    let kind = body
+        .get("kind")
+        .ok_or_else(|| ApiError::BadRequest("missing kind".into()))?
+        .clone();
+    let raw_value = body
+        .get("raw_value")
+        .ok_or_else(|| ApiError::BadRequest("missing raw_value".into()))?
+        .clone();
+    let is_preferred = body.get("is_preferred").cloned().unwrap_or(json!(false));
+    let verification_state = body
+        .get("verification_state")
+        .cloned()
+        .unwrap_or(Value::String("Unverified".into()));
+    let metadata = body.get("metadata").cloned().unwrap_or(Value::Null);
+    Ok(json!({
+        "contact_id": contact_id,
+        "company_id": company_id,
+        "kind": to_unit_enum(&kind)?,
+        "raw_value": raw_value,
+        "is_preferred": is_preferred,
+        "verification_state": to_unit_enum(&verification_state)?,
+        "metadata": metadata,
+    }))
+}
+
+fn contact_identity_update_params(body: &Value) -> Result<Value, ApiError> {
+    let company_id = body.get("company_id").cloned().unwrap_or(Value::Null);
+    let raw_value = body
+        .get("raw_value")
+        .ok_or_else(|| ApiError::BadRequest("missing raw_value".into()))?
+        .clone();
+    let is_preferred = body.get("is_preferred").cloned().unwrap_or(json!(false));
+    let verification_state = body
+        .get("verification_state")
+        .cloned()
+        .unwrap_or(Value::String("Unverified".into()));
+    let metadata = body.get("metadata").cloned().unwrap_or(Value::Null);
+    Ok(json!({
+        "company_id": company_id,
+        "raw_value": raw_value,
+        "is_preferred": is_preferred,
+        "verification_state": to_unit_enum(&verification_state)?,
+        "metadata": metadata,
+    }))
+}
+
+fn contact_role_assign_params(body: &Value) -> Result<Value, ApiError> {
+    let contact_id = body
+        .get("contact_id")
+        .ok_or_else(|| ApiError::BadRequest("missing contact_id".into()))?
+        .clone();
+    let company_id = body.get("company_id").cloned().unwrap_or(Value::Null);
+    let role = body
+        .get("role")
+        .ok_or_else(|| ApiError::BadRequest("missing role".into()))?;
+    let active_from = body.get("active_from").cloned().unwrap_or(Value::Null);
+    let active_until = body.get("active_until").cloned().unwrap_or(Value::Null);
+    let metadata = body.get("metadata").cloned().unwrap_or(Value::Null);
+    Ok(json!({
+        "contact_id": contact_id,
+        "company_id": company_id,
+        "role": role.clone(),
+        "active_from": active_from,
+        "active_until": active_until,
+        "metadata": metadata,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+struct IdentityListQuery {
+    limit: Option<u64>,
+    offset: Option<u64>,
+}
+
+async fn contact_identities_get(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Query(q): Query<IdentityListQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let org_id = require_org(&session)?;
+    let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
+
+    let client = state.client_with_token(&session.stdb_token);
+    let rows = execute_resource_query(
+        &client,
+        "contact-phone-identities",
+        org_id,
+        &session.identity_hex,
+        session.field_access.as_ref(),
+    )
+    .await?;
+
+    let total = rows.len();
+    let data: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
+    Ok(Json(json!({ "data": data, "meta": { "total": total, "limit": limit, "offset": offset } })))
+}
+
+async fn contact_identities_post(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Json(body): Json<Value>,
+) -> Result<(axum::http::StatusCode, Json<Value>), ApiError> {
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let org_id = require_org(&session)?;
+    let params = contact_identity_create_params(&body)?;
+    let client = state.client_with_token(&session.stdb_token);
+    client
+        .call_reducer("create_contact_identity", json!([org_id, params]))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(json!({ "data": { "message": "Contact identity created successfully" } })),
+    ))
+}
+
+async fn contact_identity_put(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(id): Path<u64>,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let org_id = require_org(&session)?;
+    let params = contact_identity_update_params(&body)?;
+    let client = state.client_with_token(&session.stdb_token);
+    client
+        .call_reducer("update_contact_identity", json!([org_id, id, params]))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(Json(json!({ "data": { "message": "Contact identity updated successfully" } })))
+}
+
+async fn contact_identity_verify(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(id): Path<u64>,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let org_id = require_org(&session)?;
+    let state_value = body
+        .get("state")
+        .ok_or_else(|| ApiError::BadRequest("missing state".into()))?;
+    let client = state.client_with_token(&session.stdb_token);
+    client
+        .call_reducer(
+            "verify_contact_identity",
+            json!([org_id, id, to_unit_enum(state_value)?]),
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(Json(json!({ "data": { "message": "Contact identity verified successfully" } })))
+}
+
+async fn contact_identity_archive(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(id): Path<u64>,
+) -> Result<Json<Value>, ApiError> {
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let org_id = require_org(&session)?;
+    let client = state.client_with_token(&session.stdb_token);
+    client
+        .call_reducer("archive_contact_identity", json!([org_id, id]))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(Json(json!({ "data": { "message": "Contact identity archived successfully" } })))
+}
+
+#[derive(Debug, Deserialize)]
+struct RoleListQuery {
+    limit: Option<u64>,
+    offset: Option<u64>,
+}
+
+async fn contact_roles_get(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Query(q): Query<RoleListQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let org_id = require_org(&session)?;
+    let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
+
+    let client = state.client_with_token(&session.stdb_token);
+    let rows = execute_resource_query(
+        &client,
+        "contact-role-assignments",
+        org_id,
+        &session.identity_hex,
+        session.field_access.as_ref(),
+    )
+    .await?;
+
+    let total = rows.len();
+    let data: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
+    Ok(Json(json!({ "data": data, "meta": { "total": total, "limit": limit, "offset": offset } })))
+}
+
+async fn contact_roles_post(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Json(body): Json<Value>,
+) -> Result<(axum::http::StatusCode, Json<Value>), ApiError> {
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let org_id = require_org(&session)?;
+    let params = contact_role_assign_params(&body)?;
+    let client = state.client_with_token(&session.stdb_token);
+    client
+        .call_reducer("assign_contact_role", json!([org_id, params]))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(json!({ "data": { "message": "Contact role assigned successfully" } })),
+    ))
+}
+
+async fn contact_role_end(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(id): Path<u64>,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let org_id = require_org(&session)?;
+    let reason = body.get("reason").cloned().unwrap_or(Value::Null);
+    let client = state.client_with_token(&session.stdb_token);
+    client
+        .call_reducer("end_contact_role", json!([org_id, id, { "reason": reason }]))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(Json(json!({ "data": { "message": "Contact role ended successfully" } })))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/crm/leads", get(leads_get).post(leads_post))
@@ -470,4 +744,22 @@ pub fn router() -> Router<Arc<AppState>> {
             get(lead_get).put(lead_put).delete(lead_delete),
         )
         .route("/crm/contacts", get(contacts_get).post(contacts_post))
+        .route(
+            "/crm/contact-identities",
+            get(contact_identities_get).post(contact_identities_post),
+        )
+        .route(
+            "/crm/contact-identities/:id",
+            put(contact_identity_put),
+        )
+        .route(
+            "/crm/contact-identities/:id/verify",
+            post(contact_identity_verify),
+        )
+        .route(
+            "/crm/contact-identities/:id/archive",
+            post(contact_identity_archive),
+        )
+        .route("/crm/contact-roles", get(contact_roles_get).post(contact_roles_post))
+        .route("/crm/contact-roles/:id/end", post(contact_role_end))
 }

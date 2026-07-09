@@ -71,8 +71,10 @@ import ApproveLeaveReducer from "./approve_leave_reducer";
 import ApprovePurchaseRequisitionReducer from "./approve_purchase_requisition_reducer";
 import ApproveSupplierIntakeReducer from "./approve_supplier_intake_reducer";
 import ArchiveAiChatSessionReducer from "./archive_ai_chat_session_reducer";
+import ArchiveContactIdentityReducer from "./archive_contact_identity_reducer";
 import ArchiveEmployeeReducer from "./archive_employee_reducer";
 import ArchiveFinancialReportReducer from "./archive_financial_report_reducer";
+import AssignContactRoleReducer from "./assign_contact_role_reducer";
 import AssignQualityAlertReducer from "./assign_quality_alert_reducer";
 import AssignRoleReducer from "./assign_role_reducer";
 import AssignStockMoveReducer from "./assign_stock_move_reducer";
@@ -186,6 +188,7 @@ import CreateCompanyReducer from "./create_company_reducer";
 import CreateConsolidationAccountReducer from "./create_consolidation_account_reducer";
 import CreateConsolidationJournalReducer from "./create_consolidation_journal_reducer";
 import CreateContactReducer from "./create_contact_reducer";
+import CreateContactIdentityReducer from "./create_contact_identity_reducer";
 import CreateContactSegmentReducer from "./create_contact_segment_reducer";
 import CreateContactTagReducer from "./create_contact_tag_reducer";
 import CreateContractReducer from "./create_contract_reducer";
@@ -381,6 +384,7 @@ import DismissInsightReducer from "./dismiss_insight_reducer";
 import DisposeAccountAssetReducer from "./dispose_account_asset_reducer";
 import DoneBudgetReducer from "./done_budget_reducer";
 import DoneStockMoveReducer from "./done_stock_move_reducer";
+import EndContactRoleReducer from "./end_contact_role_reducer";
 import EndUserSessionReducer from "./end_user_session_reducer";
 import EnqueueJobReducer from "./enqueue_job_reducer";
 import EnsureDevAdminReducer from "./ensure_dev_admin_reducer";
@@ -571,6 +575,7 @@ import RunAllDomainTestsReducer from "./run_all_domain_tests_reducer";
 import RunAllInventoryTestsReducer from "./run_all_inventory_tests_reducer";
 import RunAllPlatformTestsReducer from "./run_all_platform_tests_reducer";
 import RunAllSalesTestsReducer from "./run_all_sales_tests_reducer";
+import RunCrmContactIdentityTestReducer from "./run_crm_contact_identity_test_reducer";
 import RunCrmContactUpdateDeleteTestReducer from "./run_crm_contact_update_delete_test_reducer";
 import RunCrmOpportunityConvertTestReducer from "./run_crm_opportunity_convert_test_reducer";
 import RunDocumentsFolderTestReducer from "./run_documents_folder_test_reducer";
@@ -716,6 +721,7 @@ import UpdateContactReducer from "./update_contact_reducer";
 import UpdateContactAddressReducer from "./update_contact_address_reducer";
 import UpdateContactBusinessReducer from "./update_contact_business_reducer";
 import UpdateContactDetailsReducer from "./update_contact_details_reducer";
+import UpdateContactIdentityReducer from "./update_contact_identity_reducer";
 import UpdateContractReducer from "./update_contract_reducer";
 import UpdateCrossoveredBudgetReducer from "./update_crossovered_budget_reducer";
 import UpdateDepartmentReducer from "./update_department_reducer";
@@ -818,6 +824,7 @@ import ValidateConsolidationReducer from "./validate_consolidation_reducer";
 import ValidateCycleCountReducer from "./validate_cycle_count_reducer";
 import ValidateStockPickingReducer from "./validate_stock_picking_reducer";
 import ValidateTimesheetsReducer from "./validate_timesheets_reducer";
+import VerifyContactIdentityReducer from "./verify_contact_identity_reducer";
 import WaiveTaxDeadlineReducer from "./waive_tax_deadline_reducer";
 import WorkerHeartbeatReducer from "./worker_heartbeat_reducer";
 
@@ -888,7 +895,9 @@ import ContactRow from "./contact_table";
 import ContactCategoryRow from "./contact_category_table";
 import ContactCategoryAssignmentRow from "./contact_category_assignment_table";
 import ContactDuplicateCandidateRow from "./contact_duplicate_candidate_table";
+import ContactPhoneIdentityRow from "./contact_phone_identity_table";
 import ContactRelationshipRow from "./contact_relationship_table";
+import ContactRoleAssignmentRow from "./contact_role_assignment_table";
 import ContactSegmentRow from "./contact_segment_table";
 import ContactTagRow from "./contact_tag_table";
 import ContactTagAssignmentRow from "./contact_tag_assignment_table";
@@ -2308,6 +2317,27 @@ const tablesSchema = __schema({
       { name: 'contact_duplicate_candidate_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ContactDuplicateCandidateRow),
+  contact_phone_identity: __table({
+    name: 'contact_phone_identity',
+    indexes: [
+      { name: 'contact_phone_identity_by_contact', algorithm: 'btree', columns: [
+        'contactId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'contact_phone_identity_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'contact_phone_identity_by_lookup', algorithm: 'btree', columns: [
+        'organizationId',
+        'normalizedE164',
+      ] },
+    ],
+    constraints: [
+      { name: 'contact_phone_identity_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ContactPhoneIdentityRow),
   contact_relationship: __table({
     name: 'contact_relationship',
     indexes: [
@@ -2319,6 +2349,27 @@ const tablesSchema = __schema({
       { name: 'contact_relationship_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ContactRelationshipRow),
+  contact_role_assignment: __table({
+    name: 'contact_role_assignment',
+    indexes: [
+      { name: 'contact_role_by_contact', algorithm: 'btree', columns: [
+        'contactId',
+      ] },
+      { name: 'contact_role_by_contact_role', algorithm: 'btree', columns: [
+        'contactId',
+        'role',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'contact_role_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'contact_role_assignment_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ContactRoleAssignmentRow),
   contact_segment: __table({
     name: 'contact_segment',
     indexes: [
@@ -5611,8 +5662,10 @@ const reducersSchema = __reducers(
   __reducerSchema("approve_purchase_requisition", ApprovePurchaseRequisitionReducer),
   __reducerSchema("approve_supplier_intake", ApproveSupplierIntakeReducer),
   __reducerSchema("archive_ai_chat_session", ArchiveAiChatSessionReducer),
+  __reducerSchema("archive_contact_identity", ArchiveContactIdentityReducer),
   __reducerSchema("archive_employee", ArchiveEmployeeReducer),
   __reducerSchema("archive_financial_report", ArchiveFinancialReportReducer),
+  __reducerSchema("assign_contact_role", AssignContactRoleReducer),
   __reducerSchema("assign_quality_alert", AssignQualityAlertReducer),
   __reducerSchema("assign_role", AssignRoleReducer),
   __reducerSchema("assign_stock_move", AssignStockMoveReducer),
@@ -5726,6 +5779,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_consolidation_account", CreateConsolidationAccountReducer),
   __reducerSchema("create_consolidation_journal", CreateConsolidationJournalReducer),
   __reducerSchema("create_contact", CreateContactReducer),
+  __reducerSchema("create_contact_identity", CreateContactIdentityReducer),
   __reducerSchema("create_contact_segment", CreateContactSegmentReducer),
   __reducerSchema("create_contact_tag", CreateContactTagReducer),
   __reducerSchema("create_contract", CreateContractReducer),
@@ -5921,6 +5975,7 @@ const reducersSchema = __reducers(
   __reducerSchema("dispose_account_asset", DisposeAccountAssetReducer),
   __reducerSchema("done_budget", DoneBudgetReducer),
   __reducerSchema("done_stock_move", DoneStockMoveReducer),
+  __reducerSchema("end_contact_role", EndContactRoleReducer),
   __reducerSchema("end_user_session", EndUserSessionReducer),
   __reducerSchema("enqueue_job", EnqueueJobReducer),
   __reducerSchema("ensure_dev_admin", EnsureDevAdminReducer),
@@ -6111,6 +6166,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_all_inventory_tests", RunAllInventoryTestsReducer),
   __reducerSchema("run_all_platform_tests", RunAllPlatformTestsReducer),
   __reducerSchema("run_all_sales_tests", RunAllSalesTestsReducer),
+  __reducerSchema("run_crm_contact_identity_test", RunCrmContactIdentityTestReducer),
   __reducerSchema("run_crm_contact_update_delete_test", RunCrmContactUpdateDeleteTestReducer),
   __reducerSchema("run_crm_opportunity_convert_test", RunCrmOpportunityConvertTestReducer),
   __reducerSchema("run_documents_folder_test", RunDocumentsFolderTestReducer),
@@ -6256,6 +6312,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_contact_address", UpdateContactAddressReducer),
   __reducerSchema("update_contact_business", UpdateContactBusinessReducer),
   __reducerSchema("update_contact_details", UpdateContactDetailsReducer),
+  __reducerSchema("update_contact_identity", UpdateContactIdentityReducer),
   __reducerSchema("update_contract", UpdateContractReducer),
   __reducerSchema("update_crossovered_budget", UpdateCrossoveredBudgetReducer),
   __reducerSchema("update_department", UpdateDepartmentReducer),
@@ -6358,6 +6415,7 @@ const reducersSchema = __reducers(
   __reducerSchema("validate_cycle_count", ValidateCycleCountReducer),
   __reducerSchema("validate_stock_picking", ValidateStockPickingReducer),
   __reducerSchema("validate_timesheets", ValidateTimesheetsReducer),
+  __reducerSchema("verify_contact_identity", VerifyContactIdentityReducer),
   __reducerSchema("waive_tax_deadline", WaiveTaxDeadlineReducer),
   __reducerSchema("worker_heartbeat", WorkerHeartbeatReducer),
 );

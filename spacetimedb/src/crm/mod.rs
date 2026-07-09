@@ -11,11 +11,15 @@
 /// | Module | Tables |
 /// |--------|--------|
 /// | contacts | Contact, ContactCategory, ContactTag, ContactRelationship |
+/// | contact_identities | ContactPhoneIdentity |
+/// | contact_roles | ContactRoleAssignment |
 /// | leads | Lead, LeadSource, LeadLostReason |
 /// | opportunities | Opportunity, OpportunityStage, OpportunityLine |
 /// | activities | Activity, ActivityType, CalendarEvent |
 /// | segments | ContactSegment, SegmentMember, AssignmentRule |
 pub mod activities;
+pub mod contact_identities;
+pub mod contact_roles;
 pub mod contacts;
 pub mod duplicate;
 pub mod leads;
@@ -26,6 +30,15 @@ pub mod segments;
 pub use activities::{
     complete_activity, create_activity, create_calendar_event, delete_calendar_event,
     update_calendar_event, Activity, ActivityType, CalendarEvent, UpdateCalendarEventParams,
+};
+pub use contact_identities::{
+    archive_contact_identity, create_contact_identity, find_identity_by_normalized,
+    mask_e164, normalize_phone, update_contact_identity, verify_contact_identity,
+    ContactPhoneIdentity, CreateContactIdentityParams, UpdateContactIdentityParams,
+};
+pub use contact_roles::{
+    active_roles_for_contact, assign_contact_role, end_contact_role, ContactRoleAssignment,
+    AssignContactRoleParams, EndContactRoleParams,
 };
 pub use contacts::{
     assign_tag_to_contact, create_contact, create_contact_tag, delete_contact, update_contact,

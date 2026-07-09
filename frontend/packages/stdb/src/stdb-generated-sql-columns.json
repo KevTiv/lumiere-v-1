@@ -1094,6 +1094,14 @@
     "write_date",
     "metadata"
   ],
+  "AssignContactRoleParams": [
+    "contact_id",
+    "company_id",
+    "role",
+    "active_from",
+    "active_until",
+    "metadata"
+  ],
   "AssignRoleParams": [
     "expires_at_micros",
     "metadata"
@@ -1596,6 +1604,23 @@
     "match_reason",
     "scanned_at"
   ],
+  "ContactPhoneIdentity": [
+    "id",
+    "organization_id",
+    "company_id",
+    "contact_id",
+    "kind",
+    "normalized_e_164",
+    "display_masked",
+    "verification_state",
+    "is_preferred",
+    "created_by",
+    "created_at",
+    "updated_at",
+    "verified_at",
+    "archived_at",
+    "metadata"
+  ],
   "ContactRelationship": [
     "id",
     "organization_id",
@@ -1608,6 +1633,21 @@
     "notes",
     "created_by",
     "created_at",
+    "metadata"
+  ],
+  "ContactRoleAssignment": [
+    "id",
+    "organization_id",
+    "company_id",
+    "contact_id",
+    "role",
+    "active_from",
+    "active_until",
+    "is_active",
+    "assigned_by",
+    "assigned_at",
+    "ended_at",
+    "ended_by",
     "metadata"
   ],
   "ContactSegment": [
@@ -2258,6 +2298,15 @@
     "exchange_rate",
     "exchange_rate_date",
     "notes",
+    "metadata"
+  ],
+  "CreateContactIdentityParams": [
+    "contact_id",
+    "company_id",
+    "kind",
+    "raw_value",
+    "is_preferred",
+    "verification_state",
     "metadata"
   ],
   "CreateContactParams": [
@@ -4718,6 +4767,9 @@
   "DoneStockMoveParams": [
     "company_id",
     "quantity_done"
+  ],
+  "EndContactRoleParams": [
+    "reason"
   ],
   "EnqueueJobParams": [
     "queue_name",
@@ -9137,6 +9189,13 @@
     "website",
     "description",
     "color"
+  ],
+  "UpdateContactIdentityParams": [
+    "company_id",
+    "raw_value",
+    "is_preferred",
+    "verification_state",
+    "metadata"
   ],
   "UpdateContractParams": [
     "company_id",
