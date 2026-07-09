@@ -1001,6 +1001,16 @@
     "create_date",
     "write_date"
   ],
+  "AllocatePaymentParams": [
+    "company_id",
+    "payment_transaction_id",
+    "allocated_move_line_id",
+    "allocated_amount",
+    "currency_id",
+    "write_off_amount",
+    "write_off_account_id",
+    "metadata"
+  ],
   "AnalyticsMetric": [
     "id",
     "organization_id",
@@ -3049,6 +3059,31 @@
     "journal_id",
     "metadata"
   ],
+  "CreatePaymentAccountParams": [
+    "company_id",
+    "provider_code",
+    "name",
+    "provider_label",
+    "reference_raw",
+    "currency_id",
+    "account_journal_id",
+    "fee_account_id",
+    "clearing_account_id",
+    "is_primary",
+    "metadata"
+  ],
+  "CreatePaymentFeeParams": [
+    "company_id",
+    "payment_transaction_id",
+    "bearer",
+    "amount",
+    "currency_id",
+    "fee_account_id",
+    "tax_account_id",
+    "tax_amount",
+    "provider_reference",
+    "metadata"
+  ],
   "CreatePaymentMethodParams": [
     "name",
     "payment_method_type",
@@ -3088,6 +3123,23 @@
   "CreatePaymentTermParams": [
     "name",
     "note"
+  ],
+  "CreatePaymentTransactionParams": [
+    "company_id",
+    "payment_account_id",
+    "direction",
+    "partner_type",
+    "partner_id",
+    "external_reference",
+    "gross_external_amount",
+    "settlement_amount",
+    "net_account_amount",
+    "currency_id",
+    "occurred_at",
+    "source_entity",
+    "source_entity_id",
+    "evidence_document_ids",
+    "metadata"
   ],
   "CreatePayrollStructureParams": [
     "name",
@@ -6178,6 +6230,103 @@
     "expires_at",
     "used_at"
   ],
+  "PaymentAccount": [
+    "id",
+    "organization_id",
+    "company_id",
+    "provider_code",
+    "name",
+    "provider_label",
+    "reference_normalized",
+    "reference_masked",
+    "currency_id",
+    "account_journal_id",
+    "fee_account_id",
+    "clearing_account_id",
+    "active",
+    "is_primary",
+    "created_at",
+    "updated_at",
+    "created_by",
+    "updated_by",
+    "archived_at",
+    "metadata"
+  ],
+  "PaymentFee": [
+    "id",
+    "organization_id",
+    "company_id",
+    "payment_transaction_id",
+    "bearer",
+    "amount",
+    "currency_id",
+    "fee_account_id",
+    "tax_account_id",
+    "tax_amount",
+    "provider_reference",
+    "created_at",
+    "created_by",
+    "metadata"
+  ],
+  "PaymentReconciliation": [
+    "id",
+    "organization_id",
+    "company_id",
+    "payment_transaction_id",
+    "account_payment_id",
+    "allocated_move_line_id",
+    "allocated_amount",
+    "currency_id",
+    "residual_before",
+    "residual_after",
+    "write_off_amount",
+    "write_off_account_id",
+    "is_reversal",
+    "reversed_reconciliation_id",
+    "created_at",
+    "created_by",
+    "metadata"
+  ],
+  "PaymentReversal": [
+    "id",
+    "organization_id",
+    "company_id",
+    "original_transaction_id",
+    "original_account_payment_id",
+    "correcting_transaction_id",
+    "correcting_account_payment_id",
+    "reason",
+    "created_at",
+    "created_by",
+    "metadata"
+  ],
+  "PaymentTransaction": [
+    "id",
+    "organization_id",
+    "company_id",
+    "payment_account_id",
+    "direction",
+    "partner_type",
+    "partner_id",
+    "external_reference",
+    "reference_fingerprint",
+    "gross_external_amount",
+    "settlement_amount",
+    "net_account_amount",
+    "currency_id",
+    "occurred_at",
+    "status",
+    "account_payment_id",
+    "source_entity",
+    "source_entity_id",
+    "evidence_document_ids",
+    "created_at",
+    "updated_at",
+    "created_by",
+    "updated_by",
+    "voided_at",
+    "metadata"
+  ],
   "PickingWave": [
     "id",
     "organization_id",
@@ -7515,6 +7664,11 @@
     "notes",
     "created_at",
     "created_by",
+    "metadata"
+  ],
+  "ReversePaymentTransactionParams": [
+    "company_id",
+    "reason",
     "metadata"
   ],
   "Role": [
@@ -9446,6 +9600,25 @@
     "acc_holder_name",
     "allow_out_payment",
     "active"
+  ],
+  "UpdatePaymentAccountParams": [
+    "name",
+    "provider_label",
+    "reference_raw",
+    "fee_account_id",
+    "clearing_account_id",
+    "active",
+    "is_primary",
+    "metadata"
+  ],
+  "UpdatePaymentTransactionParams": [
+    "external_reference",
+    "gross_external_amount",
+    "settlement_amount",
+    "net_account_amount",
+    "occurred_at",
+    "evidence_document_ids",
+    "metadata"
   ],
   "UpdateProductCategoryParams": [
     "name",

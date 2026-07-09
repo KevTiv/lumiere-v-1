@@ -1,6 +1,7 @@
 //! Accounting domain test suite — invoke via `run_all_accounting_tests` reducer.
 mod helpers;
 pub mod journal_entries_test;
+pub mod payment_management_test;
 pub mod payment_terms_test;
 pub mod payments_test;
 pub mod period_lock_test;
@@ -20,6 +21,7 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_accounting_period_lock_test(ctx)?;
     run_accounting_posted_immutability_test(ctx)?;
     run_accounting_trial_balance_test(ctx)?;
+    run_accounting_payment_management_test(ctx)?;
     log::info!("✅ run_all_accounting_tests complete");
     Ok(())
 }
@@ -66,4 +68,18 @@ pub fn run_accounting_posted_immutability_test(ctx: &ReducerContext) -> Result<(
 pub fn run_accounting_trial_balance_test(ctx: &ReducerContext) -> Result<(), String> {
     trial_balance_test::test_trial_balance_summary_balances(ctx)
         .map_err(|e| format!("trial_balance: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_payment_management_test(ctx: &ReducerContext) -> Result<(), String> {
+    payment_management_test::test_payment_account_lifecycle(ctx)
+        .map_err(|e| format!("payment_account_lifecycle: {e}"))?;
+    payment_management_test::test_payment_transaction_duplicate_reference(ctx)
+        .map_err(|e| format!("payment_transaction_duplicate_reference: {e}"))?;
+    payment_management_test::test_payment_transaction_post_creates_ledger_payment(ctx)
+        .map_err(|e| format!("payment_transaction_post_creates_ledger_payment: {e}"))?;
+    payment_management_test::test_payment_transaction_fee_and_void(ctx)
+        .map_err(|e| format!("payment_transaction_fee_and_void: {e}"))?;
+    log::info!("✅ run_accounting_payment_management_test complete");
+    Ok(())
 }

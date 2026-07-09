@@ -45,6 +45,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_crm_opportunity_convert_test \
 	run_crm_contact_update_delete_test \
 	run_crm_contact_identity_test \
+	run_accounting_payment_management_test \
 	run_purchasing_bill_balanced_test \
 	run_helpdesk_ticket_test \
 	run_hr_leave_type_test \

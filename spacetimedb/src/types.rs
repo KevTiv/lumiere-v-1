@@ -854,6 +854,144 @@ pub enum PartnerType {
     Supplier,
 }
 
+/// Operational payment provider classification for mobile money, bank, and cash.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PaymentProviderCode {
+    Mtn,
+    Orange,
+    Airtel,
+    Mpesa,
+    Moov,
+    Wave,
+    Cash,
+    Bank,
+    Other,
+}
+
+impl PaymentProviderCode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Mtn => "mtn",
+            Self::Orange => "orange",
+            Self::Airtel => "airtel",
+            Self::Mpesa => "mpesa",
+            Self::Moov => "moov",
+            Self::Wave => "wave",
+            Self::Cash => "cash",
+            Self::Bank => "bank",
+            Self::Other => "other",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "mtn" => Ok(Self::Mtn),
+            "orange" => Ok(Self::Orange),
+            "airtel" => Ok(Self::Airtel),
+            "mpesa" => Ok(Self::Mpesa),
+            "moov" => Ok(Self::Moov),
+            "wave" => Ok(Self::Wave),
+            "cash" => Ok(Self::Cash),
+            "bank" => Ok(Self::Bank),
+            "other" => Ok(Self::Other),
+            other => Err(format!(
+                "Invalid payment_provider_code '{}'. Valid values: mtn, orange, airtel, mpesa, moov, wave, cash, bank, other",
+                other
+            )),
+        }
+    }
+}
+
+/// Direction of an operational payment transaction.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PaymentDirection {
+    Inbound,
+    Outbound,
+}
+
+impl PaymentDirection {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Inbound => "inbound",
+            Self::Outbound => "outbound",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "inbound" => Ok(Self::Inbound),
+            "outbound" => Ok(Self::Outbound),
+            other => Err(format!(
+                "Invalid payment_direction '{}'. Valid values: inbound, outbound",
+                other
+            )),
+        }
+    }
+}
+
+/// Lifecycle of an operational payment transaction.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PaymentTransactionStatus {
+    Draft,
+    Posted,
+    Reversed,
+    Voided,
+}
+
+impl PaymentTransactionStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Draft => "draft",
+            Self::Posted => "posted",
+            Self::Reversed => "reversed",
+            Self::Voided => "voided",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "draft" => Ok(Self::Draft),
+            "posted" => Ok(Self::Posted),
+            "reversed" => Ok(Self::Reversed),
+            "voided" => Ok(Self::Voided),
+            other => Err(format!(
+                "Invalid payment_transaction_status '{}'. Valid values: draft, posted, reversed, voided",
+                other
+            )),
+        }
+    }
+}
+
+/// Who bears a payment fee.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PaymentFeeBearer {
+    Company,
+    Customer,
+    Supplier,
+}
+
+impl PaymentFeeBearer {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Company => "company",
+            Self::Customer => "customer",
+            Self::Supplier => "supplier",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "company" => Ok(Self::Company),
+            "customer" => Ok(Self::Customer),
+            "supplier" => Ok(Self::Supplier),
+            other => Err(format!(
+                "Invalid payment_fee_bearer '{}'. Valid values: company, customer, supplier",
+                other
+            )),
+        }
+    }
+}
+
 // Dangling-ref fixes: Messaging
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum MailMessageType {

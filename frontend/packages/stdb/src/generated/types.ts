@@ -1183,6 +1183,18 @@ export const AiTeamMemberSkill = __t.object("AiTeamMemberSkill", {
 });
 export type AiTeamMemberSkill = __Infer<typeof AiTeamMemberSkill>;
 
+export const AllocatePaymentParams = __t.object("AllocatePaymentParams", {
+  companyId: __t.u64(),
+  paymentTransactionId: __t.u64(),
+  allocatedMoveLineId: __t.u64(),
+  allocatedAmount: __t.f64(),
+  currencyId: __t.u64(),
+  writeOffAmount: __t.f64(),
+  writeOffAccountId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type AllocatePaymentParams = __Infer<typeof AllocatePaymentParams>;
+
 export const AnalyticsMetric = __t.object("AnalyticsMetric", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -3706,6 +3718,39 @@ export const CreatePartnerBankParams = __t.object("CreatePartnerBankParams", {
 });
 export type CreatePartnerBankParams = __Infer<typeof CreatePartnerBankParams>;
 
+export const CreatePaymentAccountParams = __t.object("CreatePaymentAccountParams", {
+  companyId: __t.u64(),
+  get providerCode() {
+    return PaymentProviderCode;
+  },
+  name: __t.string(),
+  providerLabel: __t.option(__t.string()),
+  referenceRaw: __t.option(__t.string()),
+  currencyId: __t.u64(),
+  accountJournalId: __t.u64(),
+  feeAccountId: __t.option(__t.u64()),
+  clearingAccountId: __t.option(__t.u64()),
+  isPrimary: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreatePaymentAccountParams = __Infer<typeof CreatePaymentAccountParams>;
+
+export const CreatePaymentFeeParams = __t.object("CreatePaymentFeeParams", {
+  companyId: __t.u64(),
+  paymentTransactionId: __t.u64(),
+  get bearer() {
+    return PaymentFeeBearer;
+  },
+  amount: __t.f64(),
+  currencyId: __t.u64(),
+  feeAccountId: __t.option(__t.u64()),
+  taxAccountId: __t.option(__t.u64()),
+  taxAmount: __t.f64(),
+  providerReference: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type CreatePaymentFeeParams = __Infer<typeof CreatePaymentFeeParams>;
+
 export const CreatePaymentMethodParams = __t.object("CreatePaymentMethodParams", {
   name: __t.string(),
   get paymentMethodType() {
@@ -3761,6 +3806,29 @@ export const CreatePaymentTermParams = __t.object("CreatePaymentTermParams", {
   note: __t.option(__t.string()),
 });
 export type CreatePaymentTermParams = __Infer<typeof CreatePaymentTermParams>;
+
+export const CreatePaymentTransactionParams = __t.object("CreatePaymentTransactionParams", {
+  companyId: __t.u64(),
+  paymentAccountId: __t.u64(),
+  get direction() {
+    return PaymentDirection;
+  },
+  get partnerType() {
+    return PartnerType;
+  },
+  partnerId: __t.u64(),
+  externalReference: __t.option(__t.string()),
+  grossExternalAmount: __t.f64(),
+  settlementAmount: __t.f64(),
+  netAccountAmount: __t.f64(),
+  currencyId: __t.u64(),
+  occurredAt: __t.option(__t.timestamp()),
+  sourceEntity: __t.option(__t.string()),
+  sourceEntityId: __t.option(__t.u64()),
+  evidenceDocumentIds: __t.array(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type CreatePaymentTransactionParams = __Infer<typeof CreatePaymentTransactionParams>;
 
 export const CreatePayrollStructureParams = __t.object("CreatePayrollStructureParams", {
   name: __t.string(),
@@ -7396,6 +7464,67 @@ export const PasswordResetToken = __t.object("PasswordResetToken", {
 });
 export type PasswordResetToken = __Infer<typeof PasswordResetToken>;
 
+export const PaymentAccount = __t.object("PaymentAccount", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  get providerCode() {
+    return PaymentProviderCode;
+  },
+  name: __t.string(),
+  providerLabel: __t.option(__t.string()),
+  referenceNormalized: __t.option(__t.string()),
+  referenceMasked: __t.option(__t.string()),
+  currencyId: __t.u64(),
+  accountJournalId: __t.u64(),
+  feeAccountId: __t.option(__t.u64()),
+  clearingAccountId: __t.option(__t.u64()),
+  active: __t.bool(),
+  isPrimary: __t.bool(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  updatedBy: __t.identity(),
+  archivedAt: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type PaymentAccount = __Infer<typeof PaymentAccount>;
+
+// The tagged union or sum type for the algebraic type `PaymentDirection`.
+export const PaymentDirection = __t.enum("PaymentDirection", {
+  Inbound: __t.unit(),
+  Outbound: __t.unit(),
+});
+export type PaymentDirection = __Infer<typeof PaymentDirection>;
+
+export const PaymentFee = __t.object("PaymentFee", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  paymentTransactionId: __t.u64(),
+  get bearer() {
+    return PaymentFeeBearer;
+  },
+  amount: __t.f64(),
+  currencyId: __t.u64(),
+  feeAccountId: __t.option(__t.u64()),
+  taxAccountId: __t.option(__t.u64()),
+  taxAmount: __t.f64(),
+  providerReference: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type PaymentFee = __Infer<typeof PaymentFee>;
+
+// The tagged union or sum type for the algebraic type `PaymentFeeBearer`.
+export const PaymentFeeBearer = __t.enum("PaymentFeeBearer", {
+  Company: __t.unit(),
+  Customer: __t.unit(),
+  Supplier: __t.unit(),
+});
+export type PaymentFeeBearer = __Infer<typeof PaymentFeeBearer>;
+
 // The tagged union or sum type for the algebraic type `PaymentMethodType`.
 export const PaymentMethodType = __t.enum("PaymentMethodType", {
   Cash: __t.unit(),
@@ -7405,6 +7534,56 @@ export const PaymentMethodType = __t.enum("PaymentMethodType", {
   LoyaltyPoints: __t.unit(),
 });
 export type PaymentMethodType = __Infer<typeof PaymentMethodType>;
+
+// The tagged union or sum type for the algebraic type `PaymentProviderCode`.
+export const PaymentProviderCode = __t.enum("PaymentProviderCode", {
+  Mtn: __t.unit(),
+  Orange: __t.unit(),
+  Airtel: __t.unit(),
+  Mpesa: __t.unit(),
+  Moov: __t.unit(),
+  Wave: __t.unit(),
+  Cash: __t.unit(),
+  Bank: __t.unit(),
+  Other: __t.unit(),
+});
+export type PaymentProviderCode = __Infer<typeof PaymentProviderCode>;
+
+export const PaymentReconciliation = __t.object("PaymentReconciliation", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  paymentTransactionId: __t.u64(),
+  accountPaymentId: __t.u64(),
+  allocatedMoveLineId: __t.u64(),
+  allocatedAmount: __t.f64(),
+  currencyId: __t.u64(),
+  residualBefore: __t.f64(),
+  residualAfter: __t.f64(),
+  writeOffAmount: __t.f64(),
+  writeOffAccountId: __t.option(__t.u64()),
+  isReversal: __t.bool(),
+  reversedReconciliationId: __t.option(__t.u64()),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type PaymentReconciliation = __Infer<typeof PaymentReconciliation>;
+
+export const PaymentReversal = __t.object("PaymentReversal", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  originalTransactionId: __t.u64(),
+  originalAccountPaymentId: __t.u64(),
+  correctingTransactionId: __t.u64(),
+  correctingAccountPaymentId: __t.u64(),
+  reason: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type PaymentReversal = __Infer<typeof PaymentReversal>;
 
 // The tagged union or sum type for the algebraic type `PaymentState`.
 export const PaymentState = __t.enum("PaymentState", {
@@ -7432,6 +7611,50 @@ export const PaymentTermValue = __t.enum("PaymentTermValue", {
   Fixed: __t.unit(),
 });
 export type PaymentTermValue = __Infer<typeof PaymentTermValue>;
+
+export const PaymentTransaction = __t.object("PaymentTransaction", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  paymentAccountId: __t.u64(),
+  get direction() {
+    return PaymentDirection;
+  },
+  get partnerType() {
+    return PartnerType;
+  },
+  partnerId: __t.u64(),
+  externalReference: __t.option(__t.string()),
+  referenceFingerprint: __t.string(),
+  grossExternalAmount: __t.f64(),
+  settlementAmount: __t.f64(),
+  netAccountAmount: __t.f64(),
+  currencyId: __t.u64(),
+  occurredAt: __t.timestamp(),
+  get status() {
+    return PaymentTransactionStatus;
+  },
+  accountPaymentId: __t.option(__t.u64()),
+  sourceEntity: __t.option(__t.string()),
+  sourceEntityId: __t.option(__t.u64()),
+  evidenceDocumentIds: __t.array(__t.u64()),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  updatedBy: __t.identity(),
+  voidedAt: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type PaymentTransaction = __Infer<typeof PaymentTransaction>;
+
+// The tagged union or sum type for the algebraic type `PaymentTransactionStatus`.
+export const PaymentTransactionStatus = __t.enum("PaymentTransactionStatus", {
+  Draft: __t.unit(),
+  Posted: __t.unit(),
+  Reversed: __t.unit(),
+  Voided: __t.unit(),
+});
+export type PaymentTransactionStatus = __Infer<typeof PaymentTransactionStatus>;
 
 // The tagged union or sum type for the algebraic type `PaymentType`.
 export const PaymentType = __t.enum("PaymentType", {
@@ -9080,6 +9303,13 @@ export const RevenueRecognitionRule = __t.object("RevenueRecognitionRule", {
   metadata: __t.string(),
 });
 export type RevenueRecognitionRule = __Infer<typeof RevenueRecognitionRule>;
+
+export const ReversePaymentTransactionParams = __t.object("ReversePaymentTransactionParams", {
+  companyId: __t.u64(),
+  reason: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type ReversePaymentTransactionParams = __Infer<typeof ReversePaymentTransactionParams>;
 
 export const Role = __t.object("Role", {
   id: __t.u64(),
@@ -11400,6 +11630,29 @@ export const UpdatePartnerBankParams = __t.object("UpdatePartnerBankParams", {
   active: __t.option(__t.bool()),
 });
 export type UpdatePartnerBankParams = __Infer<typeof UpdatePartnerBankParams>;
+
+export const UpdatePaymentAccountParams = __t.object("UpdatePaymentAccountParams", {
+  name: __t.option(__t.string()),
+  providerLabel: __t.option(__t.string()),
+  referenceRaw: __t.option(__t.string()),
+  feeAccountId: __t.option(__t.u64()),
+  clearingAccountId: __t.option(__t.u64()),
+  active: __t.option(__t.bool()),
+  isPrimary: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdatePaymentAccountParams = __Infer<typeof UpdatePaymentAccountParams>;
+
+export const UpdatePaymentTransactionParams = __t.object("UpdatePaymentTransactionParams", {
+  externalReference: __t.option(__t.string()),
+  grossExternalAmount: __t.option(__t.f64()),
+  settlementAmount: __t.option(__t.f64()),
+  netAccountAmount: __t.option(__t.f64()),
+  occurredAt: __t.option(__t.timestamp()),
+  evidenceDocumentIds: __t.option(__t.array(__t.u64())),
+  metadata: __t.option(__t.string()),
+});
+export type UpdatePaymentTransactionParams = __Infer<typeof UpdatePaymentTransactionParams>;
 
 export const UpdateProductCategoryParams = __t.object("UpdateProductCategoryParams", {
   name: __t.option(__t.string()),

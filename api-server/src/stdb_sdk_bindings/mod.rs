@@ -60,6 +60,7 @@ pub mod ai_skill_type;
 pub mod ai_skill_config_type;
 pub mod ai_team_member_type;
 pub mod ai_team_member_skill_type;
+pub mod allocate_payment_params_type;
 pub mod analytics_metric_type;
 pub mod append_ai_agent_run_step_params_type;
 pub mod append_ai_chat_message_params_type;
@@ -217,10 +218,13 @@ pub mod create_opportunity_line_params_type;
 pub mod create_opportunity_params_type;
 pub mod create_organization_params_type;
 pub mod create_partner_bank_params_type;
+pub mod create_payment_account_params_type;
+pub mod create_payment_fee_params_type;
 pub mod create_payment_method_params_type;
 pub mod create_payment_params_type;
 pub mod create_payment_term_line_params_type;
 pub mod create_payment_term_params_type;
+pub mod create_payment_transaction_params_type;
 pub mod create_payroll_structure_params_type;
 pub mod create_payslip_params_type;
 pub mod create_picking_batch_params_type;
@@ -417,10 +421,19 @@ pub mod organization_settings_type;
 pub mod packaging_material_type;
 pub mod partner_type_type;
 pub mod password_reset_token_type;
+pub mod payment_account_type;
+pub mod payment_direction_type;
+pub mod payment_fee_type;
+pub mod payment_fee_bearer_type;
 pub mod payment_method_type_type;
+pub mod payment_provider_code_type;
+pub mod payment_reconciliation_type;
+pub mod payment_reversal_type;
 pub mod payment_state_type;
 pub mod payment_status_type;
 pub mod payment_term_value_type;
+pub mod payment_transaction_type;
+pub mod payment_transaction_status_type;
 pub mod payment_type_type;
 pub mod payslip_state_type;
 pub mod period_state_type;
@@ -502,6 +515,7 @@ pub mod res_partner_bank_type;
 pub mod return_order_type;
 pub mod return_order_line_type;
 pub mod revenue_recognition_rule_type;
+pub mod reverse_payment_transaction_params_type;
 pub mod role_type;
 pub mod rule_type_type;
 pub mod sale_order_type;
@@ -632,6 +646,8 @@ pub mod update_opportunity_params_type;
 pub mod update_org_member_details_params_type;
 pub mod update_organization_params_type;
 pub mod update_partner_bank_params_type;
+pub mod update_payment_account_params_type;
+pub mod update_payment_transaction_params_type;
 pub mod update_product_category_params_type;
 pub mod update_product_inventory_data_params_type;
 pub mod update_product_packaging_params_type;
@@ -729,6 +745,7 @@ pub mod add_user_to_organization_reducer;
 pub mod add_widget_to_dashboard_reducer;
 pub mod add_workflow_activity_reducer;
 pub mod add_workflow_transition_reducer;
+pub mod allocate_payment_transaction_reducer;
 pub mod append_ai_agent_run_step_reducer;
 pub mod append_ai_chat_message_reducer;
 pub mod apply_landed_costs_reducer;
@@ -745,6 +762,7 @@ pub mod archive_ai_chat_session_reducer;
 pub mod archive_contact_identity_reducer;
 pub mod archive_employee_reducer;
 pub mod archive_financial_report_reducer;
+pub mod archive_payment_account_reducer;
 pub mod assign_contact_role_reducer;
 pub mod assign_quality_alert_reducer;
 pub mod assign_role_reducer;
@@ -918,9 +936,12 @@ pub mod create_organization_reducer;
 pub mod create_partner_bank_reducer;
 pub mod create_password_reset_token_reducer;
 pub mod create_payment_reducer;
+pub mod create_payment_account_reducer;
+pub mod create_payment_fee_reducer;
 pub mod create_payment_method_reducer;
 pub mod create_payment_term_reducer;
 pub mod create_payment_term_line_reducer;
+pub mod create_payment_transaction_reducer;
 pub mod create_payroll_structure_reducer;
 pub mod create_payslip_reducer;
 pub mod create_picking_batch_reducer;
@@ -1177,6 +1198,7 @@ pub mod post_invoice_reducer;
 pub mod post_landed_costs_reducer;
 pub mod post_message_reducer;
 pub mod post_payment_reducer;
+pub mod post_payment_transaction_reducer;
 pub mod process_consolidation_reducer;
 pub mod process_intercompany_transaction_reducer;
 pub mod process_inventory_adjustment_reducer;
@@ -1228,11 +1250,13 @@ pub mod resolve_proposal_comment_reducer;
 pub mod restore_product_category_reducer;
 pub mod retry_intercompany_transaction_reducer;
 pub mod retry_iot_action_reducer;
+pub mod reverse_payment_transaction_reducer;
 pub mod review_supplier_intake_reducer;
 pub mod revoke_permission_reducer;
 pub mod revoke_role_reducer;
 pub mod rollback_import_job_reducer;
 pub mod run_accounting_payment_cancel_test_reducer;
+pub mod run_accounting_payment_management_test_reducer;
 pub mod run_accounting_payment_reconcile_test_reducer;
 pub mod run_accounting_payment_term_update_test_reducer;
 pub mod run_accounting_period_lock_test_reducer;
@@ -1424,8 +1448,10 @@ pub mod update_org_member_details_reducer;
 pub mod update_org_member_role_reducer;
 pub mod update_organization_reducer;
 pub mod update_partner_bank_reducer;
+pub mod update_payment_account_reducer;
 pub mod update_payment_term_reducer;
 pub mod update_payment_term_line_reducer;
+pub mod update_payment_transaction_reducer;
 pub mod update_po_invoice_status_reducer;
 pub mod update_po_receipt_status_reducer;
 pub mod update_pos_terminal_reducer;
@@ -1496,6 +1522,7 @@ pub mod validate_cycle_count_reducer;
 pub mod validate_stock_picking_reducer;
 pub mod validate_timesheets_reducer;
 pub mod verify_contact_identity_reducer;
+pub mod void_payment_transaction_reducer;
 pub mod waive_tax_deadline_reducer;
 pub mod worker_heartbeat_reducer;
 pub mod account_account_table;
@@ -1645,6 +1672,11 @@ pub mod org_permission_table;
 pub mod organization_table;
 pub mod organization_settings_table;
 pub mod packaging_material_table;
+pub mod payment_account_table;
+pub mod payment_fee_table;
+pub mod payment_reconciliation_table;
+pub mod payment_reversal_table;
+pub mod payment_transaction_table;
 pub mod picking_wave_table;
 pub mod policy_snapshot_table;
 pub mod pos_config_table;
@@ -1803,6 +1835,7 @@ pub use ai_skill_type::AiSkill;
 pub use ai_skill_config_type::AiSkillConfig;
 pub use ai_team_member_type::AiTeamMember;
 pub use ai_team_member_skill_type::AiTeamMemberSkill;
+pub use allocate_payment_params_type::AllocatePaymentParams;
 pub use analytics_metric_type::AnalyticsMetric;
 pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
 pub use append_ai_chat_message_params_type::AppendAiChatMessageParams;
@@ -1960,10 +1993,13 @@ pub use create_opportunity_line_params_type::CreateOpportunityLineParams;
 pub use create_opportunity_params_type::CreateOpportunityParams;
 pub use create_organization_params_type::CreateOrganizationParams;
 pub use create_partner_bank_params_type::CreatePartnerBankParams;
+pub use create_payment_account_params_type::CreatePaymentAccountParams;
+pub use create_payment_fee_params_type::CreatePaymentFeeParams;
 pub use create_payment_method_params_type::CreatePaymentMethodParams;
 pub use create_payment_params_type::CreatePaymentParams;
 pub use create_payment_term_line_params_type::CreatePaymentTermLineParams;
 pub use create_payment_term_params_type::CreatePaymentTermParams;
+pub use create_payment_transaction_params_type::CreatePaymentTransactionParams;
 pub use create_payroll_structure_params_type::CreatePayrollStructureParams;
 pub use create_payslip_params_type::CreatePayslipParams;
 pub use create_picking_batch_params_type::CreatePickingBatchParams;
@@ -2160,10 +2196,19 @@ pub use organization_settings_type::OrganizationSettings;
 pub use packaging_material_type::PackagingMaterial;
 pub use partner_type_type::PartnerType;
 pub use password_reset_token_type::PasswordResetToken;
+pub use payment_account_type::PaymentAccount;
+pub use payment_direction_type::PaymentDirection;
+pub use payment_fee_type::PaymentFee;
+pub use payment_fee_bearer_type::PaymentFeeBearer;
 pub use payment_method_type_type::PaymentMethodType;
+pub use payment_provider_code_type::PaymentProviderCode;
+pub use payment_reconciliation_type::PaymentReconciliation;
+pub use payment_reversal_type::PaymentReversal;
 pub use payment_state_type::PaymentState;
 pub use payment_status_type::PaymentStatus;
 pub use payment_term_value_type::PaymentTermValue;
+pub use payment_transaction_type::PaymentTransaction;
+pub use payment_transaction_status_type::PaymentTransactionStatus;
 pub use payment_type_type::PaymentType;
 pub use payslip_state_type::PayslipState;
 pub use period_state_type::PeriodState;
@@ -2245,6 +2290,7 @@ pub use res_partner_bank_type::ResPartnerBank;
 pub use return_order_type::ReturnOrder;
 pub use return_order_line_type::ReturnOrderLine;
 pub use revenue_recognition_rule_type::RevenueRecognitionRule;
+pub use reverse_payment_transaction_params_type::ReversePaymentTransactionParams;
 pub use role_type::Role;
 pub use rule_type_type::RuleType;
 pub use sale_order_type::SaleOrder;
@@ -2375,6 +2421,8 @@ pub use update_opportunity_params_type::UpdateOpportunityParams;
 pub use update_org_member_details_params_type::UpdateOrgMemberDetailsParams;
 pub use update_organization_params_type::UpdateOrganizationParams;
 pub use update_partner_bank_params_type::UpdatePartnerBankParams;
+pub use update_payment_account_params_type::UpdatePaymentAccountParams;
+pub use update_payment_transaction_params_type::UpdatePaymentTransactionParams;
 pub use update_product_category_params_type::UpdateProductCategoryParams;
 pub use update_product_inventory_data_params_type::UpdateProductInventoryDataParams;
 pub use update_product_packaging_params_type::UpdateProductPackagingParams;
@@ -2595,6 +2643,11 @@ pub use org_permission_table::*;
 pub use organization_table::*;
 pub use organization_settings_table::*;
 pub use packaging_material_table::*;
+pub use payment_account_table::*;
+pub use payment_fee_table::*;
+pub use payment_reconciliation_table::*;
+pub use payment_reversal_table::*;
+pub use payment_transaction_table::*;
 pub use picking_wave_table::*;
 pub use policy_snapshot_table::*;
 pub use pos_config_table::*;
@@ -2727,6 +2780,7 @@ pub use add_user_to_organization_reducer::add_user_to_organization;
 pub use add_widget_to_dashboard_reducer::add_widget_to_dashboard;
 pub use add_workflow_activity_reducer::add_workflow_activity;
 pub use add_workflow_transition_reducer::add_workflow_transition;
+pub use allocate_payment_transaction_reducer::allocate_payment_transaction;
 pub use append_ai_agent_run_step_reducer::append_ai_agent_run_step;
 pub use append_ai_chat_message_reducer::append_ai_chat_message;
 pub use apply_landed_costs_reducer::apply_landed_costs;
@@ -2743,6 +2797,7 @@ pub use archive_ai_chat_session_reducer::archive_ai_chat_session;
 pub use archive_contact_identity_reducer::archive_contact_identity;
 pub use archive_employee_reducer::archive_employee;
 pub use archive_financial_report_reducer::archive_financial_report;
+pub use archive_payment_account_reducer::archive_payment_account;
 pub use assign_contact_role_reducer::assign_contact_role;
 pub use assign_quality_alert_reducer::assign_quality_alert;
 pub use assign_role_reducer::assign_role;
@@ -2916,9 +2971,12 @@ pub use create_organization_reducer::create_organization;
 pub use create_partner_bank_reducer::create_partner_bank;
 pub use create_password_reset_token_reducer::create_password_reset_token;
 pub use create_payment_reducer::create_payment;
+pub use create_payment_account_reducer::create_payment_account;
+pub use create_payment_fee_reducer::create_payment_fee;
 pub use create_payment_method_reducer::create_payment_method;
 pub use create_payment_term_reducer::create_payment_term;
 pub use create_payment_term_line_reducer::create_payment_term_line;
+pub use create_payment_transaction_reducer::create_payment_transaction;
 pub use create_payroll_structure_reducer::create_payroll_structure;
 pub use create_payslip_reducer::create_payslip;
 pub use create_picking_batch_reducer::create_picking_batch;
@@ -3175,6 +3233,7 @@ pub use post_invoice_reducer::post_invoice;
 pub use post_landed_costs_reducer::post_landed_costs;
 pub use post_message_reducer::post_message;
 pub use post_payment_reducer::post_payment;
+pub use post_payment_transaction_reducer::post_payment_transaction;
 pub use process_consolidation_reducer::process_consolidation;
 pub use process_intercompany_transaction_reducer::process_intercompany_transaction;
 pub use process_inventory_adjustment_reducer::process_inventory_adjustment;
@@ -3226,11 +3285,13 @@ pub use resolve_proposal_comment_reducer::resolve_proposal_comment;
 pub use restore_product_category_reducer::restore_product_category;
 pub use retry_intercompany_transaction_reducer::retry_intercompany_transaction;
 pub use retry_iot_action_reducer::retry_iot_action;
+pub use reverse_payment_transaction_reducer::reverse_payment_transaction;
 pub use review_supplier_intake_reducer::review_supplier_intake;
 pub use revoke_permission_reducer::revoke_permission;
 pub use revoke_role_reducer::revoke_role;
 pub use rollback_import_job_reducer::rollback_import_job;
 pub use run_accounting_payment_cancel_test_reducer::run_accounting_payment_cancel_test;
+pub use run_accounting_payment_management_test_reducer::run_accounting_payment_management_test;
 pub use run_accounting_payment_reconcile_test_reducer::run_accounting_payment_reconcile_test;
 pub use run_accounting_payment_term_update_test_reducer::run_accounting_payment_term_update_test;
 pub use run_accounting_period_lock_test_reducer::run_accounting_period_lock_test;
@@ -3422,8 +3483,10 @@ pub use update_org_member_details_reducer::update_org_member_details;
 pub use update_org_member_role_reducer::update_org_member_role;
 pub use update_organization_reducer::update_organization;
 pub use update_partner_bank_reducer::update_partner_bank;
+pub use update_payment_account_reducer::update_payment_account;
 pub use update_payment_term_reducer::update_payment_term;
 pub use update_payment_term_line_reducer::update_payment_term_line;
+pub use update_payment_transaction_reducer::update_payment_transaction;
 pub use update_po_invoice_status_reducer::update_po_invoice_status;
 pub use update_po_receipt_status_reducer::update_po_receipt_status;
 pub use update_pos_terminal_reducer::update_pos_terminal;
@@ -3494,6 +3557,7 @@ pub use validate_cycle_count_reducer::validate_cycle_count;
 pub use validate_stock_picking_reducer::validate_stock_picking;
 pub use validate_timesheets_reducer::validate_timesheets;
 pub use verify_contact_identity_reducer::verify_contact_identity;
+pub use void_payment_transaction_reducer::void_payment_transaction;
 pub use waive_tax_deadline_reducer::waive_tax_deadline;
 pub use worker_heartbeat_reducer::worker_heartbeat;
 
@@ -3634,6 +3698,10 @@ pub enum Reducer {
         activity_to: u64,
         params: AddWorkflowTransitionParams,
 }    ,
+    AllocatePaymentTransaction {
+        organization_id: u64,
+        params: AllocatePaymentParams,
+}    ,
     AppendAiAgentRunStep {
         organization_id: u64,
         company_id: u64,
@@ -3712,6 +3780,10 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         report_id: u64,
+}    ,
+    ArchivePaymentAccount {
+        organization_id: u64,
+        account_id: u64,
 }    ,
     AssignContactRole {
         organization_id: u64,
@@ -4522,6 +4594,14 @@ pub enum Reducer {
         organization_id: u64,
         params: CreatePaymentParams,
 }    ,
+    CreatePaymentAccount {
+        organization_id: u64,
+        params: CreatePaymentAccountParams,
+}    ,
+    CreatePaymentFee {
+        organization_id: u64,
+        params: CreatePaymentFeeParams,
+}    ,
     CreatePaymentMethod {
         organization_id: u64,
         company_id: u64,
@@ -4534,6 +4614,10 @@ pub enum Reducer {
     CreatePaymentTermLine {
         organization_id: u64,
         params: CreatePaymentTermLineParams,
+}    ,
+    CreatePaymentTransaction {
+        organization_id: u64,
+        params: CreatePaymentTransactionParams,
 }    ,
     CreatePayrollStructure {
         organization_id: u64,
@@ -5685,6 +5769,10 @@ pub enum Reducer {
         organization_id: u64,
         payment_id: u64,
 }    ,
+    PostPaymentTransaction {
+        organization_id: u64,
+        transaction_id: u64,
+}    ,
     ProcessConsolidation {
         organization_id: u64,
         journal_id: u64,
@@ -5922,6 +6010,11 @@ pub enum Reducer {
         organization_id: u64,
         action_id: u64,
 }    ,
+    ReversePaymentTransaction {
+        organization_id: u64,
+        transaction_id: u64,
+        params: ReversePaymentTransactionParams,
+}    ,
     ReviewSupplierIntake {
         organization_id: u64,
         intake_id: u64,
@@ -5940,6 +6033,7 @@ pub enum Reducer {
         job_id: u64,
 }    ,
     RunAccountingPaymentCancelTest ,
+    RunAccountingPaymentManagementTest ,
     RunAccountingPaymentReconcileTest ,
     RunAccountingPaymentTermUpdateTest ,
     RunAccountingPeriodLockTest ,
@@ -6650,6 +6744,11 @@ pub enum Reducer {
         bank_id: u64,
         params: UpdatePartnerBankParams,
 }    ,
+    UpdatePaymentAccount {
+        organization_id: u64,
+        account_id: u64,
+        params: UpdatePaymentAccountParams,
+}    ,
     UpdatePaymentTerm {
         organization_id: u64,
         term_id: u64,
@@ -6666,6 +6765,11 @@ pub enum Reducer {
         months: Option::<u32>,
         days_after_end_of_month: Option::<bool>,
         sequence: Option::<u32>,
+}    ,
+    UpdatePaymentTransaction {
+        organization_id: u64,
+        transaction_id: u64,
+        params: UpdatePaymentTransactionParams,
 }    ,
     UpdatePoInvoiceStatus {
         organization_id: u64,
@@ -7029,6 +7133,10 @@ pub enum Reducer {
         identity_id: u64,
         state: ContactVerificationState,
 }    ,
+    VoidPaymentTransaction {
+        organization_id: u64,
+        transaction_id: u64,
+}    ,
     WaiveTaxDeadline {
         organization_id: u64,
         deadline_id: u64,
@@ -7071,6 +7179,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AddWidgetToDashboard { .. } => "add_widget_to_dashboard",
             Reducer::AddWorkflowActivity { .. } => "add_workflow_activity",
             Reducer::AddWorkflowTransition { .. } => "add_workflow_transition",
+            Reducer::AllocatePaymentTransaction { .. } => "allocate_payment_transaction",
             Reducer::AppendAiAgentRunStep { .. } => "append_ai_agent_run_step",
             Reducer::AppendAiChatMessage { .. } => "append_ai_chat_message",
             Reducer::ApplyLandedCosts { .. } => "apply_landed_costs",
@@ -7087,6 +7196,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ArchiveContactIdentity { .. } => "archive_contact_identity",
             Reducer::ArchiveEmployee { .. } => "archive_employee",
             Reducer::ArchiveFinancialReport { .. } => "archive_financial_report",
+            Reducer::ArchivePaymentAccount { .. } => "archive_payment_account",
             Reducer::AssignContactRole { .. } => "assign_contact_role",
             Reducer::AssignQualityAlert { .. } => "assign_quality_alert",
             Reducer::AssignRole { .. } => "assign_role",
@@ -7260,9 +7370,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreatePartnerBank { .. } => "create_partner_bank",
             Reducer::CreatePasswordResetToken { .. } => "create_password_reset_token",
             Reducer::CreatePayment { .. } => "create_payment",
+            Reducer::CreatePaymentAccount { .. } => "create_payment_account",
+            Reducer::CreatePaymentFee { .. } => "create_payment_fee",
             Reducer::CreatePaymentMethod { .. } => "create_payment_method",
             Reducer::CreatePaymentTerm { .. } => "create_payment_term",
             Reducer::CreatePaymentTermLine { .. } => "create_payment_term_line",
+            Reducer::CreatePaymentTransaction { .. } => "create_payment_transaction",
             Reducer::CreatePayrollStructure { .. } => "create_payroll_structure",
             Reducer::CreatePayslip { .. } => "create_payslip",
             Reducer::CreatePickingBatch { .. } => "create_picking_batch",
@@ -7519,6 +7632,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::PostLandedCosts { .. } => "post_landed_costs",
             Reducer::PostMessage { .. } => "post_message",
             Reducer::PostPayment { .. } => "post_payment",
+            Reducer::PostPaymentTransaction { .. } => "post_payment_transaction",
             Reducer::ProcessConsolidation { .. } => "process_consolidation",
             Reducer::ProcessIntercompanyTransaction { .. } => "process_intercompany_transaction",
             Reducer::ProcessInventoryAdjustment { .. } => "process_inventory_adjustment",
@@ -7570,11 +7684,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::RestoreProductCategory { .. } => "restore_product_category",
             Reducer::RetryIntercompanyTransaction { .. } => "retry_intercompany_transaction",
             Reducer::RetryIotAction { .. } => "retry_iot_action",
+            Reducer::ReversePaymentTransaction { .. } => "reverse_payment_transaction",
             Reducer::ReviewSupplierIntake { .. } => "review_supplier_intake",
             Reducer::RevokePermission { .. } => "revoke_permission",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::RollbackImportJob { .. } => "rollback_import_job",
             Reducer::RunAccountingPaymentCancelTest => "run_accounting_payment_cancel_test",
+            Reducer::RunAccountingPaymentManagementTest => "run_accounting_payment_management_test",
             Reducer::RunAccountingPaymentReconcileTest => "run_accounting_payment_reconcile_test",
             Reducer::RunAccountingPaymentTermUpdateTest => "run_accounting_payment_term_update_test",
             Reducer::RunAccountingPeriodLockTest => "run_accounting_period_lock_test",
@@ -7766,8 +7882,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateOrgMemberRole { .. } => "update_org_member_role",
             Reducer::UpdateOrganization { .. } => "update_organization",
             Reducer::UpdatePartnerBank { .. } => "update_partner_bank",
+            Reducer::UpdatePaymentAccount { .. } => "update_payment_account",
             Reducer::UpdatePaymentTerm { .. } => "update_payment_term",
             Reducer::UpdatePaymentTermLine { .. } => "update_payment_term_line",
+            Reducer::UpdatePaymentTransaction { .. } => "update_payment_transaction",
             Reducer::UpdatePoInvoiceStatus { .. } => "update_po_invoice_status",
             Reducer::UpdatePoReceiptStatus { .. } => "update_po_receipt_status",
             Reducer::UpdatePosTerminal { .. } => "update_pos_terminal",
@@ -7838,6 +7956,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ValidateStockPicking { .. } => "validate_stock_picking",
             Reducer::ValidateTimesheets { .. } => "validate_timesheets",
             Reducer::VerifyContactIdentity { .. } => "verify_contact_identity",
+            Reducer::VoidPaymentTransaction { .. } => "void_payment_transaction",
             Reducer::WaiveTaxDeadline { .. } => "waive_tax_deadline",
             Reducer::WorkerHeartbeat { .. } => "worker_heartbeat",
             _ => unreachable!(),
@@ -8080,6 +8199,13 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 activity_to: activity_to.clone(),
                 params: params.clone(),
 }),
+            Reducer::AllocatePaymentTransaction{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&allocate_payment_transaction_reducer::AllocatePaymentTransactionArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::AppendAiAgentRunStep{
                 organization_id,
                 company_id,
@@ -8221,6 +8347,13 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 report_id: report_id.clone(),
+}),
+            Reducer::ArchivePaymentAccount{
+                organization_id,
+                account_id,
+}             => __sats::bsatn::to_vec(&archive_payment_account_reducer::ArchivePaymentAccountArgs {
+                organization_id: organization_id.clone(),
+                account_id: account_id.clone(),
 }),
             Reducer::AssignContactRole{
                 organization_id,
@@ -9668,6 +9801,20 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreatePaymentAccount{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_payment_account_reducer::CreatePaymentAccountArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreatePaymentFee{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_payment_fee_reducer::CreatePaymentFeeArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreatePaymentMethod{
                 organization_id,
                 company_id,
@@ -9688,6 +9835,13 @@ Reducer::BillTimesheets{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_payment_term_line_reducer::CreatePaymentTermLineArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreatePaymentTransaction{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_payment_transaction_reducer::CreatePaymentTransactionArgs {
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
@@ -11738,6 +11892,13 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 payment_id: payment_id.clone(),
 }),
+            Reducer::PostPaymentTransaction{
+                organization_id,
+                transaction_id,
+}             => __sats::bsatn::to_vec(&post_payment_transaction_reducer::PostPaymentTransactionArgs {
+                organization_id: organization_id.clone(),
+                transaction_id: transaction_id.clone(),
+}),
             Reducer::ProcessConsolidation{
                 organization_id,
                 journal_id,
@@ -12161,6 +12322,15 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 action_id: action_id.clone(),
 }),
+            Reducer::ReversePaymentTransaction{
+                organization_id,
+                transaction_id,
+                params,
+}             => __sats::bsatn::to_vec(&reverse_payment_transaction_reducer::ReversePaymentTransactionArgs {
+                organization_id: organization_id.clone(),
+                transaction_id: transaction_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ReviewSupplierIntake{
                 organization_id,
                 intake_id,
@@ -12192,6 +12362,8 @@ Reducer::MoveStockQuant{
                 job_id: job_id.clone(),
 }),
             Reducer::RunAccountingPaymentCancelTest => __sats::bsatn::to_vec(&run_accounting_payment_cancel_test_reducer::RunAccountingPaymentCancelTestArgs {
+                }),
+Reducer::RunAccountingPaymentManagementTest => __sats::bsatn::to_vec(&run_accounting_payment_management_test_reducer::RunAccountingPaymentManagementTestArgs {
                 }),
 Reducer::RunAccountingPaymentReconcileTest => __sats::bsatn::to_vec(&run_accounting_payment_reconcile_test_reducer::RunAccountingPaymentReconcileTestArgs {
                 }),
@@ -13487,6 +13659,15 @@ Reducer::ToggleProjectFavorite{
                 bank_id: bank_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdatePaymentAccount{
+                organization_id,
+                account_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_payment_account_reducer::UpdatePaymentAccountArgs {
+                organization_id: organization_id.clone(),
+                account_id: account_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdatePaymentTerm{
                 organization_id,
                 term_id,
@@ -13518,6 +13699,15 @@ Reducer::ToggleProjectFavorite{
                 months: months.clone(),
                 days_after_end_of_month: days_after_end_of_month.clone(),
                 sequence: sequence.clone(),
+}),
+            Reducer::UpdatePaymentTransaction{
+                organization_id,
+                transaction_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_payment_transaction_reducer::UpdatePaymentTransactionArgs {
+                organization_id: organization_id.clone(),
+                transaction_id: transaction_id.clone(),
+                params: params.clone(),
 }),
             Reducer::UpdatePoInvoiceStatus{
                 organization_id,
@@ -14173,6 +14363,13 @@ Reducer::ToggleProjectFavorite{
                 identity_id: identity_id.clone(),
                 state: state.clone(),
 }),
+            Reducer::VoidPaymentTransaction{
+                organization_id,
+                transaction_id,
+}             => __sats::bsatn::to_vec(&void_payment_transaction_reducer::VoidPaymentTransactionArgs {
+                organization_id: organization_id.clone(),
+                transaction_id: transaction_id.clone(),
+}),
             Reducer::WaiveTaxDeadline{
                 organization_id,
                 deadline_id,
@@ -14343,6 +14540,11 @@ pub struct DbUpdate {
     organization: __sdk::TableUpdate<Organization>,
     organization_settings: __sdk::TableUpdate<OrganizationSettings>,
     packaging_material: __sdk::TableUpdate<PackagingMaterial>,
+    payment_account: __sdk::TableUpdate<PaymentAccount>,
+    payment_fee: __sdk::TableUpdate<PaymentFee>,
+    payment_reconciliation: __sdk::TableUpdate<PaymentReconciliation>,
+    payment_reversal: __sdk::TableUpdate<PaymentReversal>,
+    payment_transaction: __sdk::TableUpdate<PaymentTransaction>,
     picking_wave: __sdk::TableUpdate<PickingWave>,
     policy_snapshot: __sdk::TableUpdate<PolicySnapshot>,
     pos_config: __sdk::TableUpdate<PosConfig>,
@@ -14608,6 +14810,11 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "organization" => db_update.organization.append(organization_table::parse_table_update(table_update)?),
     "organization_settings" => db_update.organization_settings.append(organization_settings_table::parse_table_update(table_update)?),
     "packaging_material" => db_update.packaging_material.append(packaging_material_table::parse_table_update(table_update)?),
+    "payment_account" => db_update.payment_account.append(payment_account_table::parse_table_update(table_update)?),
+    "payment_fee" => db_update.payment_fee.append(payment_fee_table::parse_table_update(table_update)?),
+    "payment_reconciliation" => db_update.payment_reconciliation.append(payment_reconciliation_table::parse_table_update(table_update)?),
+    "payment_reversal" => db_update.payment_reversal.append(payment_reversal_table::parse_table_update(table_update)?),
+    "payment_transaction" => db_update.payment_transaction.append(payment_transaction_table::parse_table_update(table_update)?),
     "picking_wave" => db_update.picking_wave.append(picking_wave_table::parse_table_update(table_update)?),
     "policy_snapshot" => db_update.policy_snapshot.append(policy_snapshot_table::parse_table_update(table_update)?),
     "pos_config" => db_update.pos_config.append(pos_config_table::parse_table_update(table_update)?),
@@ -14885,6 +15092,11 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.organization = cache.apply_diff_to_table::<Organization>("organization", &self.organization).with_updates_by_pk(|row| &row.id);
         diff.organization_settings = cache.apply_diff_to_table::<OrganizationSettings>("organization_settings", &self.organization_settings).with_updates_by_pk(|row| &row.organization_id);
         diff.packaging_material = cache.apply_diff_to_table::<PackagingMaterial>("packaging_material", &self.packaging_material).with_updates_by_pk(|row| &row.id);
+        diff.payment_account = cache.apply_diff_to_table::<PaymentAccount>("payment_account", &self.payment_account).with_updates_by_pk(|row| &row.id);
+        diff.payment_fee = cache.apply_diff_to_table::<PaymentFee>("payment_fee", &self.payment_fee).with_updates_by_pk(|row| &row.id);
+        diff.payment_reconciliation = cache.apply_diff_to_table::<PaymentReconciliation>("payment_reconciliation", &self.payment_reconciliation).with_updates_by_pk(|row| &row.id);
+        diff.payment_reversal = cache.apply_diff_to_table::<PaymentReversal>("payment_reversal", &self.payment_reversal).with_updates_by_pk(|row| &row.id);
+        diff.payment_transaction = cache.apply_diff_to_table::<PaymentTransaction>("payment_transaction", &self.payment_transaction).with_updates_by_pk(|row| &row.id);
         diff.picking_wave = cache.apply_diff_to_table::<PickingWave>("picking_wave", &self.picking_wave).with_updates_by_pk(|row| &row.id);
         diff.policy_snapshot = cache.apply_diff_to_table::<PolicySnapshot>("policy_snapshot", &self.policy_snapshot).with_updates_by_pk(|row| &row.id);
         diff.pos_config = cache.apply_diff_to_table::<PosConfig>("pos_config", &self.pos_config).with_updates_by_pk(|row| &row.id);
@@ -15147,6 +15359,11 @@ for table_rows in raw.tables {
                 "organization" => db_update.organization.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "organization_settings" => db_update.organization_settings.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "packaging_material" => db_update.packaging_material.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "payment_account" => db_update.payment_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "payment_fee" => db_update.payment_fee.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "payment_reconciliation" => db_update.payment_reconciliation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "payment_reversal" => db_update.payment_reversal.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "payment_transaction" => db_update.payment_transaction.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "picking_wave" => db_update.picking_wave.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "policy_snapshot" => db_update.policy_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "pos_config" => db_update.pos_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -15409,6 +15626,11 @@ for table_rows in raw.tables {
                 "organization" => db_update.organization.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "organization_settings" => db_update.organization_settings.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "packaging_material" => db_update.packaging_material.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "payment_account" => db_update.payment_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "payment_fee" => db_update.payment_fee.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "payment_reconciliation" => db_update.payment_reconciliation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "payment_reversal" => db_update.payment_reversal.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "payment_transaction" => db_update.payment_transaction.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "picking_wave" => db_update.picking_wave.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "policy_snapshot" => db_update.policy_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "pos_config" => db_update.pos_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -15673,6 +15895,11 @@ pub struct AppliedDiff<'r> {
     organization: __sdk::TableAppliedDiff<'r, Organization>,
     organization_settings: __sdk::TableAppliedDiff<'r, OrganizationSettings>,
     packaging_material: __sdk::TableAppliedDiff<'r, PackagingMaterial>,
+    payment_account: __sdk::TableAppliedDiff<'r, PaymentAccount>,
+    payment_fee: __sdk::TableAppliedDiff<'r, PaymentFee>,
+    payment_reconciliation: __sdk::TableAppliedDiff<'r, PaymentReconciliation>,
+    payment_reversal: __sdk::TableAppliedDiff<'r, PaymentReversal>,
+    payment_transaction: __sdk::TableAppliedDiff<'r, PaymentTransaction>,
     picking_wave: __sdk::TableAppliedDiff<'r, PickingWave>,
     policy_snapshot: __sdk::TableAppliedDiff<'r, PolicySnapshot>,
     pos_config: __sdk::TableAppliedDiff<'r, PosConfig>,
@@ -15938,6 +16165,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Organization>("organization", &self.organization, event);
         callbacks.invoke_table_row_callbacks::<OrganizationSettings>("organization_settings", &self.organization_settings, event);
         callbacks.invoke_table_row_callbacks::<PackagingMaterial>("packaging_material", &self.packaging_material, event);
+        callbacks.invoke_table_row_callbacks::<PaymentAccount>("payment_account", &self.payment_account, event);
+        callbacks.invoke_table_row_callbacks::<PaymentFee>("payment_fee", &self.payment_fee, event);
+        callbacks.invoke_table_row_callbacks::<PaymentReconciliation>("payment_reconciliation", &self.payment_reconciliation, event);
+        callbacks.invoke_table_row_callbacks::<PaymentReversal>("payment_reversal", &self.payment_reversal, event);
+        callbacks.invoke_table_row_callbacks::<PaymentTransaction>("payment_transaction", &self.payment_transaction, event);
         callbacks.invoke_table_row_callbacks::<PickingWave>("picking_wave", &self.picking_wave, event);
         callbacks.invoke_table_row_callbacks::<PolicySnapshot>("policy_snapshot", &self.policy_snapshot, event);
         callbacks.invoke_table_row_callbacks::<PosConfig>("pos_config", &self.pos_config, event);
@@ -16834,6 +17066,11 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         organization_table::register_table(client_cache);
         organization_settings_table::register_table(client_cache);
         packaging_material_table::register_table(client_cache);
+        payment_account_table::register_table(client_cache);
+        payment_fee_table::register_table(client_cache);
+        payment_reconciliation_table::register_table(client_cache);
+        payment_reversal_table::register_table(client_cache);
+        payment_transaction_table::register_table(client_cache);
         picking_wave_table::register_table(client_cache);
         policy_snapshot_table::register_table(client_cache);
         pos_config_table::register_table(client_cache);
@@ -17091,6 +17328,11 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "organization",
         "organization_settings",
         "packaging_material",
+        "payment_account",
+        "payment_fee",
+        "payment_reconciliation",
+        "payment_reversal",
+        "payment_transaction",
         "picking_wave",
         "policy_snapshot",
         "pos_config",

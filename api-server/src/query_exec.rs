@@ -919,7 +919,7 @@ pub async fn execute_resource_query(
         filter_and_strip_soft_deleted(&mut rows);
     }
 
-    if resource == "contact-phone-identities" {
+    if resource == "contact-phone-identities" || resource == "payment-accounts" {
         filter_and_strip_archived(&mut rows);
     }
 

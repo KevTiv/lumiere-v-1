@@ -42,6 +42,7 @@ pub mod fiscal_periods;
 pub mod fixed_assets;
 pub mod intercompany;
 pub mod journal_entries;
+pub mod payment_management;
 pub mod payment_terms;
 pub mod payments;
 pub mod tax_management;
@@ -72,5 +73,8 @@ pub use financial_statements::{
 };
 pub use fixed_assets::{AccountAsset, AccountAssetDepreciationLine};
 pub use intercompany::{IntercompanyRule, IntercompanyTransaction};
+pub use payment_management::{
+    PaymentAccount, PaymentFee, PaymentReconciliation, PaymentReversal, PaymentTransaction,
+};
 pub use payment_terms::{AccountPaymentTerm, AccountPaymentTermLine};
 pub use payments::AccountPayment;

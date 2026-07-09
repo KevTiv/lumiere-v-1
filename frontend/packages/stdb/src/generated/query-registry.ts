@@ -115,6 +115,11 @@ export type QueryResourceKey =
   | "opportunity-lines"
   | "opportunity-stages"
   | "partner-banks"
+  | "payment-accounts"
+  | "payment-fees"
+  | "payment-reconciliations"
+  | "payment-reversals"
+  | "payment-transactions"
   | "payroll-structures"
   | "payslips"
   | "picking-batches"
@@ -833,6 +838,36 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["partner_id", "sanitized_acc_number", "acc_holder_name", "active", "allow_out_payment"],
     mandatory: ["id", "organization_id"],
   },
+  "payment-accounts": {
+    table: "payment_account",
+    aliases: ["payment-accounts", "payment_account"],
+    defaultRestricted: ["company_id", "reference_normalized", "reference_masked", "fee_account_id", "clearing_account_id", "created_by", "updated_by", "metadata"],
+    mandatory: ["id", "organization_id", "archived_at"],
+  },
+  "payment-fees": {
+    table: "payment_fee",
+    aliases: ["payment-fees", "payment_fee"],
+    defaultRestricted: ["company_id", "fee_account_id", "tax_account_id", "provider_reference", "created_by", "metadata"],
+    mandatory: ["id", "organization_id", "payment_transaction_id"],
+  },
+  "payment-reconciliations": {
+    table: "payment_reconciliation",
+    aliases: ["payment-reconciliations", "payment_reconciliation"],
+    defaultRestricted: ["company_id", "allocated_move_line_id", "write_off_account_id", "metadata"],
+    mandatory: ["id", "organization_id", "payment_transaction_id", "account_payment_id"],
+  },
+  "payment-reversals": {
+    table: "payment_reversal",
+    aliases: ["payment-reversals", "payment_reversal"],
+    defaultRestricted: ["company_id", "reason", "metadata"],
+    mandatory: ["id", "organization_id", "original_transaction_id", "correcting_transaction_id"],
+  },
+  "payment-transactions": {
+    table: "payment_transaction",
+    aliases: ["payment-transactions", "payment_transaction"],
+    defaultRestricted: ["company_id", "external_reference", "reference_fingerprint", "account_payment_id", "evidence_document_ids", "created_by", "updated_by", "metadata"],
+    mandatory: ["id", "organization_id"],
+  },
   "payroll-structures": {
     table: "hr_payroll_structure",
     aliases: ["payroll-structures", "hr_payroll_structure"],
@@ -1315,4 +1350,4 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   }
 }
 
-export const QUERY_RESOURCE_KEYS: readonly QueryResourceKey[] = ["account-account-types", "account-accounts", "account-assets", "account-groups", "account-journals", "account-move-lines", "account-moves", "account-payment-term-lines", "account-payment-terms", "account-payments", "account-periods", "account-reconciliation-widgets", "account-taxes", "activities", "adjustment-reasons", "ai-agents", "ai-document-processing-jobs", "ai-insights", "ai-reducer-allowlist", "ai-skills", "ai-team-member-skills", "ai-team-members", "analytic-accounts", "analytic-distribution-models", "analytic-lines", "analytics-metrics", "audit-log", "audit-rules", "bank-match-candidates", "bank-statement-lines", "bank-statements", "barcode-nomenclatures", "barcode-rules", "budget-lines", "budget-posts", "budgets", "calendar-events", "casbin-rule", "companies", "consolidation-accounts", "consolidation-elimination-entries", "consolidation-journals", "contact-phone-identities", "contact-role-assignments", "contact-segments", "contact-tags", "contacts", "contracts", "dashboard-widgets", "dashboards", "data-classification-rules", "data-classifications", "deferred-revenue-lines", "deferred-revenue-schedules", "delivery-carriers", "delivery-price-rules", "departments", "depreciation-lines", "document-folders", "documents", "employees", "expense-sheets", "expenses", "financial-reports", "fiscal-years", "fixed-assets", "fleet-vehicles", "form-config-fields", "form-configs", "form-role-configs", "helpdesk-slas", "helpdesk-stages", "helpdesk-teams", "helpdesk-tickets", "hr-resources", "intercompany-rules", "intercompany-transactions", "inventory-adjustments", "inventory-valuations", "iot-actions", "iot-alerts", "iot-devices", "iot-hubs", "iot-pairing-tokens", "iot-telemetry", "iot-thresholds", "job-positions", "knowledge-articles", "knowledge-categories", "landed-cost-lines", "landed-costs", "leads", "leave-requests", "leave-types", "mail-followers", "mail-messages", "mrp-bom-lines", "mrp-boms", "mrp-productions", "mrp-routing-workcenters", "mrp-workcenters", "mrp-workorders", "opportunities", "opportunity-lines", "opportunity-stages", "partner-banks", "payroll-structures", "payslips", "picking-batches", "picking-waves", "pos-configs", "pos-loyalty-cards", "pos-loyalty-programs", "pos-payment-methods", "pos-sessions", "pos-terminals", "pricelist-items", "pricelists", "product-categories", "products", "projects", "proposal-comments", "proposal-line-items", "proposal-presence", "proposal-sections", "proposal-source-docs", "proposal-versions", "proposals", "purchase-order-lines", "purchase-orders", "purchase-requisitions", "quality-alerts", "quality-checks", "quality-teams", "record-custom-field-values", "replenishment-rules", "report-templates", "return-order-lines", "return-orders", "revenue-recognition-rules", "roles", "salary-rules", "sale-order-lines", "sale-orders", "saved-reports", "scheduled-reports", "serial-lot-traceability", "shipping-methods", "stock-cycle-counts", "stock-inventories", "stock-locations", "stock-moves", "stock-pickings", "stock-production-lots", "stock-production-serials", "stock-quants", "stock-routes", "stock-rules", "stock-traceability-reports", "subscription-plans", "subscriptions", "supplier-intakes", "tasks", "tax-deadlines", "tax-groups", "tax-jurisdictions", "tax-schedules", "timesheets", "trial-balances", "uoms", "user-custom-fields", "user-organization", "user-profile", "user-role-assignment", "user-roles", "utm-campaigns", "utm-media", "utm-sources", "warehouse-3d-zones", "warehouse-tasks", "warehouses", "workflow-activities", "workflow-instances", "workflow-transitions", "workflow-workitems", "workflows"]
+export const QUERY_RESOURCE_KEYS: readonly QueryResourceKey[] = ["account-account-types", "account-accounts", "account-assets", "account-groups", "account-journals", "account-move-lines", "account-moves", "account-payment-term-lines", "account-payment-terms", "account-payments", "account-periods", "account-reconciliation-widgets", "account-taxes", "activities", "adjustment-reasons", "ai-agents", "ai-document-processing-jobs", "ai-insights", "ai-reducer-allowlist", "ai-skills", "ai-team-member-skills", "ai-team-members", "analytic-accounts", "analytic-distribution-models", "analytic-lines", "analytics-metrics", "audit-log", "audit-rules", "bank-match-candidates", "bank-statement-lines", "bank-statements", "barcode-nomenclatures", "barcode-rules", "budget-lines", "budget-posts", "budgets", "calendar-events", "casbin-rule", "companies", "consolidation-accounts", "consolidation-elimination-entries", "consolidation-journals", "contact-phone-identities", "contact-role-assignments", "contact-segments", "contact-tags", "contacts", "contracts", "dashboard-widgets", "dashboards", "data-classification-rules", "data-classifications", "deferred-revenue-lines", "deferred-revenue-schedules", "delivery-carriers", "delivery-price-rules", "departments", "depreciation-lines", "document-folders", "documents", "employees", "expense-sheets", "expenses", "financial-reports", "fiscal-years", "fixed-assets", "fleet-vehicles", "form-config-fields", "form-configs", "form-role-configs", "helpdesk-slas", "helpdesk-stages", "helpdesk-teams", "helpdesk-tickets", "hr-resources", "intercompany-rules", "intercompany-transactions", "inventory-adjustments", "inventory-valuations", "iot-actions", "iot-alerts", "iot-devices", "iot-hubs", "iot-pairing-tokens", "iot-telemetry", "iot-thresholds", "job-positions", "knowledge-articles", "knowledge-categories", "landed-cost-lines", "landed-costs", "leads", "leave-requests", "leave-types", "mail-followers", "mail-messages", "mrp-bom-lines", "mrp-boms", "mrp-productions", "mrp-routing-workcenters", "mrp-workcenters", "mrp-workorders", "opportunities", "opportunity-lines", "opportunity-stages", "partner-banks", "payment-accounts", "payment-fees", "payment-reconciliations", "payment-reversals", "payment-transactions", "payroll-structures", "payslips", "picking-batches", "picking-waves", "pos-configs", "pos-loyalty-cards", "pos-loyalty-programs", "pos-payment-methods", "pos-sessions", "pos-terminals", "pricelist-items", "pricelists", "product-categories", "products", "projects", "proposal-comments", "proposal-line-items", "proposal-presence", "proposal-sections", "proposal-source-docs", "proposal-versions", "proposals", "purchase-order-lines", "purchase-orders", "purchase-requisitions", "quality-alerts", "quality-checks", "quality-teams", "record-custom-field-values", "replenishment-rules", "report-templates", "return-order-lines", "return-orders", "revenue-recognition-rules", "roles", "salary-rules", "sale-order-lines", "sale-orders", "saved-reports", "scheduled-reports", "serial-lot-traceability", "shipping-methods", "stock-cycle-counts", "stock-inventories", "stock-locations", "stock-moves", "stock-pickings", "stock-production-lots", "stock-production-serials", "stock-quants", "stock-routes", "stock-rules", "stock-traceability-reports", "subscription-plans", "subscriptions", "supplier-intakes", "tasks", "tax-deadlines", "tax-groups", "tax-jurisdictions", "tax-schedules", "timesheets", "trial-balances", "uoms", "user-custom-fields", "user-organization", "user-profile", "user-role-assignment", "user-roles", "utm-campaigns", "utm-media", "utm-sources", "warehouse-3d-zones", "warehouse-tasks", "warehouses", "workflow-activities", "workflow-instances", "workflow-transitions", "workflow-workitems", "workflows"]

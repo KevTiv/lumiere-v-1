@@ -58,6 +58,7 @@ import AddUserToOrganizationReducer from "./add_user_to_organization_reducer";
 import AddWidgetToDashboardReducer from "./add_widget_to_dashboard_reducer";
 import AddWorkflowActivityReducer from "./add_workflow_activity_reducer";
 import AddWorkflowTransitionReducer from "./add_workflow_transition_reducer";
+import AllocatePaymentTransactionReducer from "./allocate_payment_transaction_reducer";
 import AppendAiAgentRunStepReducer from "./append_ai_agent_run_step_reducer";
 import AppendAiChatMessageReducer from "./append_ai_chat_message_reducer";
 import ApplyLandedCostsReducer from "./apply_landed_costs_reducer";
@@ -74,6 +75,7 @@ import ArchiveAiChatSessionReducer from "./archive_ai_chat_session_reducer";
 import ArchiveContactIdentityReducer from "./archive_contact_identity_reducer";
 import ArchiveEmployeeReducer from "./archive_employee_reducer";
 import ArchiveFinancialReportReducer from "./archive_financial_report_reducer";
+import ArchivePaymentAccountReducer from "./archive_payment_account_reducer";
 import AssignContactRoleReducer from "./assign_contact_role_reducer";
 import AssignQualityAlertReducer from "./assign_quality_alert_reducer";
 import AssignRoleReducer from "./assign_role_reducer";
@@ -247,9 +249,12 @@ import CreateOrganizationReducer from "./create_organization_reducer";
 import CreatePartnerBankReducer from "./create_partner_bank_reducer";
 import CreatePasswordResetTokenReducer from "./create_password_reset_token_reducer";
 import CreatePaymentReducer from "./create_payment_reducer";
+import CreatePaymentAccountReducer from "./create_payment_account_reducer";
+import CreatePaymentFeeReducer from "./create_payment_fee_reducer";
 import CreatePaymentMethodReducer from "./create_payment_method_reducer";
 import CreatePaymentTermReducer from "./create_payment_term_reducer";
 import CreatePaymentTermLineReducer from "./create_payment_term_line_reducer";
+import CreatePaymentTransactionReducer from "./create_payment_transaction_reducer";
 import CreatePayrollStructureReducer from "./create_payroll_structure_reducer";
 import CreatePayslipReducer from "./create_payslip_reducer";
 import CreatePickingBatchReducer from "./create_picking_batch_reducer";
@@ -506,6 +511,7 @@ import PostInvoiceReducer from "./post_invoice_reducer";
 import PostLandedCostsReducer from "./post_landed_costs_reducer";
 import PostMessageReducer from "./post_message_reducer";
 import PostPaymentReducer from "./post_payment_reducer";
+import PostPaymentTransactionReducer from "./post_payment_transaction_reducer";
 import ProcessConsolidationReducer from "./process_consolidation_reducer";
 import ProcessIntercompanyTransactionReducer from "./process_intercompany_transaction_reducer";
 import ProcessInventoryAdjustmentReducer from "./process_inventory_adjustment_reducer";
@@ -557,11 +563,13 @@ import ResolveProposalCommentReducer from "./resolve_proposal_comment_reducer";
 import RestoreProductCategoryReducer from "./restore_product_category_reducer";
 import RetryIntercompanyTransactionReducer from "./retry_intercompany_transaction_reducer";
 import RetryIotActionReducer from "./retry_iot_action_reducer";
+import ReversePaymentTransactionReducer from "./reverse_payment_transaction_reducer";
 import ReviewSupplierIntakeReducer from "./review_supplier_intake_reducer";
 import RevokePermissionReducer from "./revoke_permission_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
 import RollbackImportJobReducer from "./rollback_import_job_reducer";
 import RunAccountingPaymentCancelTestReducer from "./run_accounting_payment_cancel_test_reducer";
+import RunAccountingPaymentManagementTestReducer from "./run_accounting_payment_management_test_reducer";
 import RunAccountingPaymentReconcileTestReducer from "./run_accounting_payment_reconcile_test_reducer";
 import RunAccountingPaymentTermUpdateTestReducer from "./run_accounting_payment_term_update_test_reducer";
 import RunAccountingPeriodLockTestReducer from "./run_accounting_period_lock_test_reducer";
@@ -753,8 +761,10 @@ import UpdateOrgMemberDetailsReducer from "./update_org_member_details_reducer";
 import UpdateOrgMemberRoleReducer from "./update_org_member_role_reducer";
 import UpdateOrganizationReducer from "./update_organization_reducer";
 import UpdatePartnerBankReducer from "./update_partner_bank_reducer";
+import UpdatePaymentAccountReducer from "./update_payment_account_reducer";
 import UpdatePaymentTermReducer from "./update_payment_term_reducer";
 import UpdatePaymentTermLineReducer from "./update_payment_term_line_reducer";
+import UpdatePaymentTransactionReducer from "./update_payment_transaction_reducer";
 import UpdatePoInvoiceStatusReducer from "./update_po_invoice_status_reducer";
 import UpdatePoReceiptStatusReducer from "./update_po_receipt_status_reducer";
 import UpdatePosTerminalReducer from "./update_pos_terminal_reducer";
@@ -825,6 +835,7 @@ import ValidateCycleCountReducer from "./validate_cycle_count_reducer";
 import ValidateStockPickingReducer from "./validate_stock_picking_reducer";
 import ValidateTimesheetsReducer from "./validate_timesheets_reducer";
 import VerifyContactIdentityReducer from "./verify_contact_identity_reducer";
+import VoidPaymentTransactionReducer from "./void_payment_transaction_reducer";
 import WaiveTaxDeadlineReducer from "./waive_tax_deadline_reducer";
 import WorkerHeartbeatReducer from "./worker_heartbeat_reducer";
 
@@ -978,6 +989,11 @@ import OrgPermissionRow from "./org_permission_table";
 import OrganizationRow from "./organization_table";
 import OrganizationSettingsRow from "./organization_settings_table";
 import PackagingMaterialRow from "./packaging_material_table";
+import PaymentAccountRow from "./payment_account_table";
+import PaymentFeeRow from "./payment_fee_table";
+import PaymentReconciliationRow from "./payment_reconciliation_table";
+import PaymentReversalRow from "./payment_reversal_table";
+import PaymentTransactionRow from "./payment_transaction_table";
 import PickingWaveRow from "./picking_wave_table";
 import PolicySnapshotRow from "./policy_snapshot_table";
 import PosConfigRow from "./pos_config_table";
@@ -3708,6 +3724,107 @@ const tablesSchema = __schema({
       { name: 'packaging_material_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PackagingMaterialRow),
+  payment_account: __table({
+    name: 'payment_account',
+    indexes: [
+      { name: 'payment_account_by_journal', algorithm: 'btree', columns: [
+        'accountJournalId',
+      ] },
+      { name: 'payment_account_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'payment_account_by_provider', algorithm: 'btree', columns: [
+        'companyId',
+        'providerCode',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'payment_account_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'payment_account_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PaymentAccountRow),
+  payment_fee: __table({
+    name: 'payment_fee',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'payment_fee_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'payment_fee_by_transaction', algorithm: 'btree', columns: [
+        'paymentTransactionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'payment_fee_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PaymentFeeRow),
+  payment_reconciliation: __table({
+    name: 'payment_reconciliation',
+    indexes: [
+      { name: 'reconciliation_by_move_line', algorithm: 'btree', columns: [
+        'allocatedMoveLineId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'reconciliation_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'reconciliation_by_transaction', algorithm: 'btree', columns: [
+        'paymentTransactionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'payment_reconciliation_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PaymentReconciliationRow),
+  payment_reversal: __table({
+    name: 'payment_reversal',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'reversal_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'reversal_by_original', algorithm: 'btree', columns: [
+        'originalTransactionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'payment_reversal_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PaymentReversalRow),
+  payment_transaction: __table({
+    name: 'payment_transaction',
+    indexes: [
+      { name: 'payment_transaction_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'payment_transaction_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'payment_transaction_by_account', algorithm: 'btree', columns: [
+        'paymentAccountId',
+      ] },
+      { name: 'payment_transaction_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'payment_transaction_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PaymentTransactionRow),
   picking_wave: __table({
     name: 'picking_wave',
     indexes: [
@@ -5649,6 +5766,7 @@ const reducersSchema = __reducers(
   __reducerSchema("add_widget_to_dashboard", AddWidgetToDashboardReducer),
   __reducerSchema("add_workflow_activity", AddWorkflowActivityReducer),
   __reducerSchema("add_workflow_transition", AddWorkflowTransitionReducer),
+  __reducerSchema("allocate_payment_transaction", AllocatePaymentTransactionReducer),
   __reducerSchema("append_ai_agent_run_step", AppendAiAgentRunStepReducer),
   __reducerSchema("append_ai_chat_message", AppendAiChatMessageReducer),
   __reducerSchema("apply_landed_costs", ApplyLandedCostsReducer),
@@ -5665,6 +5783,7 @@ const reducersSchema = __reducers(
   __reducerSchema("archive_contact_identity", ArchiveContactIdentityReducer),
   __reducerSchema("archive_employee", ArchiveEmployeeReducer),
   __reducerSchema("archive_financial_report", ArchiveFinancialReportReducer),
+  __reducerSchema("archive_payment_account", ArchivePaymentAccountReducer),
   __reducerSchema("assign_contact_role", AssignContactRoleReducer),
   __reducerSchema("assign_quality_alert", AssignQualityAlertReducer),
   __reducerSchema("assign_role", AssignRoleReducer),
@@ -5838,9 +5957,12 @@ const reducersSchema = __reducers(
   __reducerSchema("create_partner_bank", CreatePartnerBankReducer),
   __reducerSchema("create_password_reset_token", CreatePasswordResetTokenReducer),
   __reducerSchema("create_payment", CreatePaymentReducer),
+  __reducerSchema("create_payment_account", CreatePaymentAccountReducer),
+  __reducerSchema("create_payment_fee", CreatePaymentFeeReducer),
   __reducerSchema("create_payment_method", CreatePaymentMethodReducer),
   __reducerSchema("create_payment_term", CreatePaymentTermReducer),
   __reducerSchema("create_payment_term_line", CreatePaymentTermLineReducer),
+  __reducerSchema("create_payment_transaction", CreatePaymentTransactionReducer),
   __reducerSchema("create_payroll_structure", CreatePayrollStructureReducer),
   __reducerSchema("create_payslip", CreatePayslipReducer),
   __reducerSchema("create_picking_batch", CreatePickingBatchReducer),
@@ -6097,6 +6219,7 @@ const reducersSchema = __reducers(
   __reducerSchema("post_landed_costs", PostLandedCostsReducer),
   __reducerSchema("post_message", PostMessageReducer),
   __reducerSchema("post_payment", PostPaymentReducer),
+  __reducerSchema("post_payment_transaction", PostPaymentTransactionReducer),
   __reducerSchema("process_consolidation", ProcessConsolidationReducer),
   __reducerSchema("process_intercompany_transaction", ProcessIntercompanyTransactionReducer),
   __reducerSchema("process_inventory_adjustment", ProcessInventoryAdjustmentReducer),
@@ -6148,11 +6271,13 @@ const reducersSchema = __reducers(
   __reducerSchema("restore_product_category", RestoreProductCategoryReducer),
   __reducerSchema("retry_intercompany_transaction", RetryIntercompanyTransactionReducer),
   __reducerSchema("retry_iot_action", RetryIotActionReducer),
+  __reducerSchema("reverse_payment_transaction", ReversePaymentTransactionReducer),
   __reducerSchema("review_supplier_intake", ReviewSupplierIntakeReducer),
   __reducerSchema("revoke_permission", RevokePermissionReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
   __reducerSchema("rollback_import_job", RollbackImportJobReducer),
   __reducerSchema("run_accounting_payment_cancel_test", RunAccountingPaymentCancelTestReducer),
+  __reducerSchema("run_accounting_payment_management_test", RunAccountingPaymentManagementTestReducer),
   __reducerSchema("run_accounting_payment_reconcile_test", RunAccountingPaymentReconcileTestReducer),
   __reducerSchema("run_accounting_payment_term_update_test", RunAccountingPaymentTermUpdateTestReducer),
   __reducerSchema("run_accounting_period_lock_test", RunAccountingPeriodLockTestReducer),
@@ -6344,8 +6469,10 @@ const reducersSchema = __reducers(
   __reducerSchema("update_org_member_role", UpdateOrgMemberRoleReducer),
   __reducerSchema("update_organization", UpdateOrganizationReducer),
   __reducerSchema("update_partner_bank", UpdatePartnerBankReducer),
+  __reducerSchema("update_payment_account", UpdatePaymentAccountReducer),
   __reducerSchema("update_payment_term", UpdatePaymentTermReducer),
   __reducerSchema("update_payment_term_line", UpdatePaymentTermLineReducer),
+  __reducerSchema("update_payment_transaction", UpdatePaymentTransactionReducer),
   __reducerSchema("update_po_invoice_status", UpdatePoInvoiceStatusReducer),
   __reducerSchema("update_po_receipt_status", UpdatePoReceiptStatusReducer),
   __reducerSchema("update_pos_terminal", UpdatePosTerminalReducer),
@@ -6416,6 +6543,7 @@ const reducersSchema = __reducers(
   __reducerSchema("validate_stock_picking", ValidateStockPickingReducer),
   __reducerSchema("validate_timesheets", ValidateTimesheetsReducer),
   __reducerSchema("verify_contact_identity", VerifyContactIdentityReducer),
+  __reducerSchema("void_payment_transaction", VoidPaymentTransactionReducer),
   __reducerSchema("waive_tax_deadline", WaiveTaxDeadlineReducer),
   __reducerSchema("worker_heartbeat", WorkerHeartbeatReducer),
 );
