@@ -3807,7 +3807,7 @@ function AccountingClientLoaded({
           } catch (e) {
             toast({
               variant: "destructive",
-              title: t("common.error"),
+              title: t("common.error.title"),
               description: e instanceof Error ? e.message : String(e),
             })
           }

@@ -24,7 +24,10 @@
     "reset": "Reset",
     "yes": "Yes",
     "no": "No",
-    "error": "Error",
+    "error": {
+      "title": "Error",
+      "generic": "Something went wrong. Please try again."
+    },
     "success": "Success",
     "warning": "Warning",
     "noData": "No data available",
@@ -5375,7 +5378,10 @@
   },
   "sales": {
     "dashboard": {
-      "ordersByState": "Orders by State"
+      "ordersByState": "Orders by State",
+      "widgets": {
+        "revenue": "Revenue"
+      }
     },
     "csvImport": {
       "ordersTitle": "Import sale orders (CSV)",
@@ -8393,6 +8399,46 @@
     "page": {
       "title": "Settings",
       "description": "Manage your account and system configuration"
+    },
+    "import": {
+      "title": "Guided data import",
+      "entity": "Entity",
+      "file": "CSV file",
+      "stepUpload": "1. Upload CSV",
+      "stepAnalyze": "2. Analyze columns",
+      "stepMap": "3. Map columns",
+      "stepPreview": "4. Preview",
+      "stepImport": "5. Import",
+      "analyze": "Analyze with AI",
+      "analyzing": "Analyzing…",
+      "analyzed": "Column mapping suggested — review and continue.",
+      "preview": "Preview import",
+      "run": "Import",
+      "done": "Imported {{count}} rows.",
+      "startOver": "Start over",
+      "row": "Row",
+      "action": "Action",
+      "matchReason": "Match",
+      "existingId": "Existing ID",
+      "duplicatesFound": "Possible duplicates ({{count}})",
+      "duplicateSkip": "Skip row",
+      "duplicateUpdate": "Update existing",
+      "duplicateImport": "Import anyway",
+      "confirmErrorsRequired": "Preview has validation errors. Confirm override to import anyway.",
+      "overridePreviewErrors": "Import anyway despite {{count}} validation error(s)",
+      "noTemplate": "— None —",
+      "savedTemplate": "Saved template",
+      "saveTemplate": "Save template",
+      "saveTemplateTitle": "Save mapping template",
+      "saveTemplateDescription": "Save the current column mapping for reuse on future imports.",
+      "templateName": "Template name",
+      "templateNamePlaceholder": "e.g. HubSpot contacts",
+      "templateNameRequired": "Template name is required",
+      "templateSaved": "Mapping template saved.",
+      "templateDeleted": "Mapping template deleted.",
+      "deleteTemplate": "Delete template",
+      "deleteTemplateConfirm": "Delete this mapping template?",
+      "deleteTemplateHint": "This cannot be undone."
     },
     "backToSettings": "Back to Settings",
     "adminAccess": "Admin Access",
