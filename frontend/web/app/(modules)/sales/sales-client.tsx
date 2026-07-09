@@ -44,6 +44,11 @@ import {
   getRowField,
   RecordChatterDialog,
   buildModuleTabHref,
+  type TimeRangeValue,
+  isTimestampInRange,
+  percentChange,
+  previousPeriodMs,
+  timeRangeToMs,
 } from '@lumiere/ui';
 import type {
   EntityViewConfig,
@@ -181,6 +186,14 @@ function saleOrderState(row: Record<string, unknown>): string {
   if (v != null && typeof v === 'object' && 'tag' in v)
     return String((v as { tag: string }).tag);
   return String(v ?? '');
+}
+
+function recordTimestampMs(row: Record<string, unknown>): number {
+  const raw = row.writeDate ?? row.write_date ?? row.createDate ?? row.create_date;
+  if (raw == null) return 0;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return n > 1e15 ? n / 1000 : n;
 }
 
 function deliveryBatchState(row: Record<string, unknown>): string {
@@ -331,6 +344,7 @@ function SalesClientLoaded({
     useState<Record<string, unknown> | null>(null);
   const [cancelPickingError, setCancelPickingError] = useState<string | null>(null);
   const [selectedReturnOrderId, setSelectedReturnOrderId] = useState<string | null>(null);
+  const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>('30d');
   const [creditReturnOrderId, setCreditReturnOrderId] = useState<bigint | null>(null);
   const [creditReturnOrderError, setCreditReturnOrderError] = useState<string | null>(null);
   const [openReturnForm, setOpenReturnForm] = useState(false);
@@ -1296,12 +1310,33 @@ function SalesClientLoaded({
 
   // Live KPI dashboard sections override
   const liveSections = useMemo(() => {
-    const revenue = confirmedOrders.reduce(
+    const { startMs, endMs } = timeRangeToMs(dashboardTimeRange);
+    const previousRange = previousPeriodMs(dashboardTimeRange);
+    const inCurrentRange = (row: Record<string, unknown>) =>
+      isTimestampInRange(recordTimestampMs(row), startMs, endMs);
+    const inPreviousRange = (row: Record<string, unknown>) =>
+      isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs);
+
+    const currentConfirmed = confirmedOrders.filter((o) =>
+      inCurrentRange(o as Record<string, unknown>),
+    );
+    const previousConfirmed = confirmedOrders.filter((o) =>
+      inPreviousRange(o as Record<string, unknown>),
+    );
+
+    const revenue = currentConfirmed.reduce(
       (s, o) => s + Number(o.amountTotal ?? 0),
       0,
     );
-    const orderCount = confirmedOrders.length;
+    const previousRevenue = previousConfirmed.reduce(
+      (s, o) => s + Number(o.amountTotal ?? 0),
+      0,
+    );
+    const orderCount = currentConfirmed.length;
+    const previousOrderCount = previousConfirmed.length;
     const avgDeal = orderCount > 0 ? revenue / orderCount : 0;
+    const previousAvgDeal =
+      previousOrderCount > 0 ? previousRevenue / previousOrderCount : 0;
     const outstanding = orders.reduce(
       (s, o) => s + Number(o.amountResidual ?? 0),
       0,
@@ -1323,16 +1358,19 @@ function SalesClientLoaded({
                 {
                   label: 'Revenue MTD',
                   value: `$${revenue.toLocaleString()}`,
+                  change: percentChange(revenue, previousRevenue),
                   icon: 'TrendingUp',
                 },
                 {
                   label: 'Orders Confirmed',
                   value: String(orderCount),
+                  change: percentChange(orderCount, previousOrderCount),
                   icon: 'ShoppingCart',
                 },
                 {
                   label: 'Avg Deal Size',
                   value: `$${Math.round(avgDeal).toLocaleString()}`,
+                  change: percentChange(avgDeal, previousAvgDeal),
                   icon: 'DollarSign',
                 },
                 {
@@ -1474,6 +1512,7 @@ function SalesClientLoaded({
     router,
     salesRepLabelByIdentity,
     navigateToOrdersByState,
+    dashboardTimeRange,
   ]);
 
   // Config with live dashboard sections + lookup-backed create forms + entity actions
@@ -1816,6 +1855,8 @@ function SalesClientLoaded({
         isPending={isFormMutationPending}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
+        dashboardTimeRange={dashboardTimeRange}
+        onDashboardTimeRangeChange={setDashboardTimeRange}
         urlFilters={urlFilters}
         onRowClick={(tabId, row) => {
           const target = chatterTargetFromRow('sales', tabId, row);

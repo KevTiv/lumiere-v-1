@@ -121,6 +121,7 @@ export * from "./lib/dashboard-config";
 export * from "./lib/dashboard-drill-down";
 export * from "./lib/stored-dashboard-resolver";
 export * from "./lib/export-dashboard-png";
+export * from "./lib/export-csv";
 
 // Module view (config-driven tabs + entity views + forms)
 export * from "./lib/module-types";

@@ -23,6 +23,11 @@ import {
   employeeStatusBadges,
   leaveRequestStatusBadges,
   contractStatusBadges,
+  type TimeRangeValue,
+  isTimestampInRange,
+  percentChange,
+  previousPeriodMs,
+  timeRangeToMs,
 } from "@lumiere/ui"
 import type { EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
@@ -134,6 +139,23 @@ const confirmPayslipForm: FormConfig = {
   ],
 }
 
+function recordTimestampMs(row: Record<string, unknown>): number {
+  const raw = row.writeDate ?? row.write_date ?? row.createDate ?? row.create_date
+  if (raw == null) return 0
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return n > 1e15 ? n / 1000 : n
+}
+
+function employeeStartMs(row: Record<string, unknown>): number {
+  const raw =
+    row.hireDate ?? row.hire_date ?? row.createDate ?? row.create_date ?? row.writeDate ?? row.write_date
+  if (raw == null) return 0
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return n > 1e15 ? n / 1000 : n
+}
+
 function attachEmptyStateAction(
   ec: EntityViewConfig,
   onAction: () => void,
@@ -189,6 +211,7 @@ function HrClientLoaded({
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [rowAction, setRowAction] = useState<HrRowAction>(null)
   const [rowActionError, setRowActionError] = useState<string | null>(null)
+  const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
 
   const { data: employees = [], isLoading: employeesLoading } = useEmployees(orgId, initialEmployees)
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
@@ -416,10 +439,22 @@ function HrClientLoaded({
   )
 
   const liveSections = useMemo(() => {
+    const { startMs, endMs } = timeRangeToMs(dashboardTimeRange)
+    const previousRange = previousPeriodMs(dashboardTimeRange)
+    const inCurrentRange = (row: Record<string, unknown>) =>
+      isTimestampInRange(recordTimestampMs(row), startMs, endMs)
+    const inPreviousRange = (row: Record<string, unknown>) =>
+      isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs)
+
     const activeEmployees = employees.filter((e) => e.isActive)
     const pendingLeaves = leaves.filter((l) => String(l.state) === "Confirm").length
     const runningContracts = contracts.filter((c) => String(c.state) === "Open").length
     const openPositions = jobPositions.filter((j) => String(j.state) === "recruit").length
+
+    const currentLeaves = leaves.filter((l) => inCurrentRange(l as Record<string, unknown>)).length
+    const previousLeaves = leaves.filter((l) => inPreviousRange(l as Record<string, unknown>)).length
+    const currentContracts = contracts.filter((c) => inCurrentRange(c as Record<string, unknown>)).length
+    const previousContracts = contracts.filter((c) => inPreviousRange(c as Record<string, unknown>)).length
 
     return (
       moduleConfig.tabs
@@ -434,8 +469,18 @@ function HrClientLoaded({
                   stats: [
                     { label: t("hr.dashboard.totalHeadcount"), value: activeEmployees.length.toString(), icon: "Users" },
                     { label: t("hr.dashboard.openPositions"), value: openPositions.toString(), icon: "UserPlus" },
-                    { label: t("hr.dashboard.pendingLeaveRequests"), value: pendingLeaves.toString(), icon: "Calendar" },
-                    { label: t("hr.dashboard.runningContracts"), value: runningContracts.toString(), icon: "FileText" },
+                    {
+                      label: t("hr.dashboard.pendingLeaveRequests"),
+                      value: pendingLeaves.toString(),
+                      change: percentChange(currentLeaves, previousLeaves),
+                      icon: "Calendar",
+                    },
+                    {
+                      label: t("hr.dashboard.runningContracts"),
+                      value: runningContracts.toString(),
+                      change: percentChange(currentContracts, previousContracts),
+                      icon: "FileText",
+                    },
                   ],
                 },
               }
@@ -487,6 +532,25 @@ function HrClientLoaded({
                 .map((m, i) => ({ ...m, color: colors[i] ?? "#6366f1" }))
               return { ...w, data: { metrics } }
             }
+            if (w.id === "hr-headcount-trend") {
+              const now = new Date()
+              const values: Array<{ month: string; Headcount: number }> = []
+              for (let i = 5; i >= 0; i--) {
+                const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999)
+                const monthEndMs = monthEnd.getTime()
+                const label = monthEnd.toLocaleDateString("en", { month: "short" })
+                const headcount = employees.filter((e) => {
+                  const startedMs = employeeStartMs(e as Record<string, unknown>)
+                  return startedMs === 0 || startedMs <= monthEndMs
+                }).length
+                values.push({ month: label, Headcount: headcount })
+              }
+              return {
+                ...w,
+                title: t("hr.dashboard.headcountTrend"),
+                data: { ...(w.data as Record<string, unknown>), values },
+              }
+            }
             if (w.id === "hr-open-roles") {
               const rows = jobPositions
                 .filter((j) => String(j.state ?? "") === "recruit")
@@ -516,6 +580,7 @@ function HrClientLoaded({
     contracts,
     jobPositions,
     moduleConfig,
+    dashboardTimeRange,
     t,
     employeeFormConfig,
     leaveFormConfig,
@@ -907,6 +972,8 @@ function HrClientLoaded({
         dataLoading={dataLoading}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
+        dashboardTimeRange={dashboardTimeRange}
+        onDashboardTimeRangeChange={setDashboardTimeRange}
       />
       <FormModal
         open={quickActionForm !== null}

@@ -67,6 +67,12 @@ import {
   DialogTitle,
   csvImportForm,
   RecordChatterDialog,
+  EntityRecordSheet,
+  type TimeRangeValue,
+  isTimestampInRange,
+  percentChange,
+  previousPeriodMs,
+  timeRangeToMs,
 } from "@lumiere/ui"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
@@ -391,6 +397,22 @@ function taxDeadlineStatusStr(row: Record<string, unknown>): string {
   return String(v ?? "")
 }
 
+/**
+ * Move/payment timestamp → milliseconds since epoch.
+ * Handles raw microsecond numbers (> 1e15), millisecond numbers, and
+ * `{ microsSinceUnixEpoch }` objects.
+ */
+function flexibleTimestampMs(value: unknown): number | null {
+  if (value == null) return null
+  if (typeof value === "object" && "microsSinceUnixEpoch" in (value as Record<string, unknown>)) {
+    const micros = Number((value as { microsSinceUnixEpoch: unknown }).microsSinceUnixEpoch)
+    return Number.isFinite(micros) && micros !== 0 ? micros / 1000 : null
+  }
+  const n = typeof value === "bigint" ? Number(value) : Number(value)
+  if (!Number.isFinite(n) || n === 0) return null
+  return n > 1e15 ? n / 1000 : n
+}
+
 /** SpacetimeDB timestamp JSON → milliseconds since epoch. */
 function stdbTimestampToMs(ts: unknown): number | null {
   if (ts == null) return null
@@ -566,6 +588,10 @@ function AccountingClientLoaded({
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   // Invoice detail modal
   const [selectedInvoice, setSelectedInvoice] = useState<AccountMove | null>(null)
+  // Invoice/bill record sheet (row click on invoices/bills tabs)
+  const [invoiceSheetRecord, setInvoiceSheetRecord] = useState<Record<string, unknown> | null>(null)
+  // Dashboard time range (trend deltas compare against the previous period)
+  const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
   // Create invoice / bill modals
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
   const [showCreateBill, setShowCreateBill] = useState(false)
@@ -1009,6 +1035,37 @@ function AccountingClientLoaded({
       ],
     }
   }, [t, accountMoveLines])
+
+  /**
+   * Record sheet for invoices and bills: move overview + lines + audit trail,
+   * plus an Actions tab that opens the legacy InvoiceDetailModal for
+   * workflow actions (post draft, register payment, credit note, PDF, email).
+   */
+  const invoiceBillRecordSheet = useMemo(
+    (): EntityRecordSheetConfig => ({
+      ...accountMoveRecordSheet,
+      customTabs: [
+        ...(accountMoveRecordSheet.customTabs ?? []),
+        {
+          id: "actions",
+          label: t("accounting.invoices.recordSheet.actionsTab"),
+          content: (record) => (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setInvoiceSheetRecord(null)
+                setSelectedInvoice(record as unknown as AccountMove)
+              }}
+            >
+              {t("accounting.invoices.recordSheet.openActions")}
+            </Button>
+          ),
+        },
+      ],
+    }),
+    [accountMoveRecordSheet, t],
+  )
 
   const paymentTermLineFormConfig = useMemo(
     () =>
@@ -2453,9 +2510,42 @@ function AccountingClientLoaded({
     const cash = accounts
       .filter((a) => a.isBankAccount)
       .reduce((s, a) => s + Number(a.openingBalance ?? 0), 0)
-    const revenue = invoices
-      .filter((m) => moveStateStr(m as Record<string, unknown>) === "Posted")
-      .reduce((s, m) => s + Number(m.amountTotal ?? 0), 0)
+
+    const currentRange = timeRangeToMs(dashboardTimeRange)
+    const previousRange = previousPeriodMs(dashboardTimeRange)
+    const inRange = (ms: number | null, range: { startMs: number; endMs: number }) =>
+      ms != null && isTimestampInRange(ms, range.startMs, range.endMs)
+
+    const moveDateMs = (row: Record<string, unknown>): number | null =>
+      flexibleTimestampMs(
+        row.invoiceDate ?? row.invoice_date ?? row.date ?? row.createDate ?? row.create_date,
+      )
+
+    const currentIssuedInvoices = invoices.filter((m) =>
+      inRange(moveDateMs(m as Record<string, unknown>), currentRange),
+    )
+    const previousIssuedInvoices = invoices.filter((m) =>
+      inRange(moveDateMs(m as Record<string, unknown>), previousRange),
+    )
+
+    const revenueOf = (rows: typeof invoices) =>
+      rows
+        .filter((m) => moveStateStr(m as Record<string, unknown>) === "Posted")
+        .reduce((s, m) => s + Number(m.amountTotal ?? 0), 0)
+    const currentRevenue = revenueOf(currentIssuedInvoices)
+    const previousRevenue = revenueOf(previousIssuedInvoices)
+
+    const paymentRows = accountPayments as Record<string, unknown>[]
+    const paymentsReceivedIn = (range: { startMs: number; endMs: number }) =>
+      paymentRows
+        .filter((p) => enumTag(p.state) !== "Reversed")
+        .filter((p) => enumTag(p.paymentType ?? p.payment_type) !== "Outbound")
+        .filter((p) =>
+          inRange(flexibleTimestampMs(p.date ?? p.paymentDate ?? p.createDate ?? p.create_date), range),
+        )
+        .reduce((s, p) => s + Number(p.amount ?? 0), 0)
+    const currentPaymentsReceived = paymentsReceivedIn(currentRange)
+    const previousPaymentsReceived = paymentsReceivedIn(previousRange)
 
     const dashboardTab = moduleConfigBase.tabs.find((tb) => tb.id === "dashboard")
     if (!dashboardTab?.sections) return []
@@ -2471,7 +2561,24 @@ function AccountingClientLoaded({
                 { label: t("accounting.dashboard.accountsReceivable"), value: `$${ar.toLocaleString()}`, icon: "TrendingUp" },
                 { label: t("accounting.dashboard.accountsPayable"), value: `$${ap.toLocaleString()}`, icon: "TrendingDown" },
                 { label: t("accounting.dashboard.cashBalance"), value: `$${cash.toLocaleString()}`, icon: "DollarSign" },
-                { label: t("accounting.dashboard.revenueMTD"), value: `$${revenue.toLocaleString()}`, icon: "BarChart2" },
+                {
+                  label: t("accounting.dashboard.revenue"),
+                  value: `$${currentRevenue.toLocaleString()}`,
+                  change: percentChange(currentRevenue, previousRevenue),
+                  icon: "BarChart2",
+                },
+                {
+                  label: t("accounting.dashboard.invoicesIssued"),
+                  value: String(currentIssuedInvoices.length),
+                  change: percentChange(currentIssuedInvoices.length, previousIssuedInvoices.length),
+                  icon: "FileText",
+                },
+                {
+                  label: t("accounting.dashboard.paymentsReceived"),
+                  value: `$${currentPaymentsReceived.toLocaleString()}`,
+                  change: percentChange(currentPaymentsReceived, previousPaymentsReceived),
+                  icon: "dollar",
+                },
               ],
             },
           }
@@ -2527,6 +2634,35 @@ function AccountingClientLoaded({
           }))
           return { ...w, data: { accounts: accountRows } }
         }
+        if (w.id === "accounting-ar-ap-aging") {
+          const nowMs = Date.now()
+          const buckets = ["Current", "1-30", "31-60", "61-90", "90+"] as const
+          const bucketFor = (row: Record<string, unknown>): (typeof buckets)[number] => {
+            const dueMs = flexibleTimestampMs(row.invoiceDateDue ?? row.invoice_date_due)
+            if (dueMs == null || dueMs >= nowMs) return "Current"
+            const days = Math.floor((nowMs - dueMs) / 86_400_000)
+            if (days <= 0) return "Current"
+            if (days <= 30) return "1-30"
+            if (days <= 60) return "31-60"
+            if (days <= 90) return "61-90"
+            return "90+"
+          }
+          const totals = new Map(buckets.map((b) => [b, { AR: 0, AP: 0 }]))
+          for (const m of invoices) {
+            const residual = Number(m.amountResidual ?? 0)
+            if (residual > 0) totals.get(bucketFor(m as Record<string, unknown>))!.AR += residual
+          }
+          for (const m of bills) {
+            const residual = Number(m.amountResidual ?? 0)
+            if (residual > 0) totals.get(bucketFor(m as Record<string, unknown>))!.AP += residual
+          }
+          const values = buckets.map((bucket) => ({
+            bucket,
+            AR: Math.round(totals.get(bucket)!.AR),
+            AP: Math.round(totals.get(bucket)!.AP),
+          }))
+          return { ...w, data: { ...(w.data as Record<string, unknown>), values } }
+        }
         if (w.id === "acc-tax-deadlines") {
           const nowMs = Date.now()
           const rows = (taxDeadlines as Record<string, unknown>[])
@@ -2564,6 +2700,8 @@ function AccountingClientLoaded({
     bills,
     budgets,
     taxDeadlines,
+    accountPayments,
+    dashboardTimeRange,
     moduleConfigBase,
     t,
     journalEntryFormConfig,
@@ -2773,7 +2911,9 @@ function AccountingClientLoaded({
                 customContent: (
                   <InvoiceListView
                     invoices={invoices as unknown as AccountMove[]}
-                    onSelectInvoice={(invoice) => setSelectedInvoice(invoice as unknown as AccountMove)}
+                    onSelectInvoice={(invoice) =>
+                      setInvoiceSheetRecord(invoice as unknown as Record<string, unknown>)
+                    }
                     onCreateInvoice={() => setShowCreateInvoice(true)}
                     onRecalculateTotals={(inv) =>
                       void computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint)
@@ -2791,7 +2931,9 @@ function AccountingClientLoaded({
                   <BillsListView
                     bills={bills as unknown as AccountMove[]}
                     onCreateBill={() => setShowCreateBill(true)}
-                    onSelectBill={(bill) => setSelectedInvoice(bill as unknown as AccountMove)}
+                    onSelectBill={(bill) =>
+                      setInvoiceSheetRecord(bill as unknown as Record<string, unknown>)
+                    }
                     onRecalculateTotals={(bill) =>
                       void computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint)
                     }
@@ -3356,6 +3498,18 @@ function AccountingClientLoaded({
         onRowClick={handleEntityRowClick}
         activeTab={accountingActiveTab}
         onActiveTabChange={setAccountingActiveTab}
+        dashboardTimeRange={dashboardTimeRange}
+        onDashboardTimeRangeChange={setDashboardTimeRange}
+      />
+
+      {/* Invoice / bill record sheet (row click on invoices/bills tabs) */}
+      <EntityRecordSheet
+        open={invoiceSheetRecord != null}
+        onOpenChange={(open) => {
+          if (!open) setInvoiceSheetRecord(null)
+        }}
+        config={invoiceBillRecordSheet}
+        record={invoiceSheetRecord}
       />
 
       <AccountGlDrilldownPanel

@@ -25,6 +25,7 @@ import {
   StoredDashboardView,
   widgetModelsForDashboard,
   exportDashboardToPng,
+  timeRangeToMs,
   Button,
   Dialog,
   DialogContent,
@@ -273,6 +274,7 @@ function ReportsClientLoaded({
   const [updateLayoutOpen, setUpdateLayoutOpen] = useState(false)
   const [updateLayoutWidgetId, setUpdateLayoutWidgetId] = useState<string | null>(null)
   const [viewDashboardId, setViewDashboardId] = useState<string | null>(null)
+  const [viewDashboardRange, setViewDashboardRange] = useState<"all" | "7d" | "30d" | "90d" | "ytd">("all")
   const [reportExplain, setReportExplain] = useState<ReportExplainState>(null)
   const [reportExplainError, setReportExplainError] = useState<string | null>(null)
   const [reportExplainResult, setReportExplainResult] = useState<Record<string, unknown> | null>(null)
@@ -366,6 +368,11 @@ function ReportsClientLoaded({
 
   const { dataSources: storedDashboardDataSources, isLoading: storedDashboardLoading } =
     useStoredDashboardDataSources(orgId, viewDashboardModels)
+
+  const viewDashboardTimeRange = useMemo(
+    () => (viewDashboardRange === "all" ? undefined : timeRangeToMs(viewDashboardRange)),
+    [viewDashboardRange],
+  )
 
   const storedDashboardRef = useRef<HTMLDivElement>(null)
   const handleStoredDashboardExport = useCallback(async () => {
@@ -1417,7 +1424,10 @@ function ReportsClientLoaded({
       <Dialog
         open={viewDashboardId != null}
         onOpenChange={(open) => {
-          if (!open) setViewDashboardId(null)
+          if (!open) {
+            setViewDashboardId(null)
+            setViewDashboardRange("all")
+          }
         }}
       >
         <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
@@ -1430,17 +1440,36 @@ function ReportsClientLoaded({
                 ) : null}
               </div>
               {viewDashboard ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 gap-2"
-                  onClick={() => void handleStoredDashboardExport()}
-                  disabled={storedDashboardLoading}
-                >
-                  <Download className="h-4 w-4" />
-                  {t("reports.actions.exportDashboard")}
-                </Button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <select
+                    aria-label={t("reports.actions.dashboardTimeRange")}
+                    className="h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={viewDashboardRange}
+                    onChange={(event) =>
+                      setViewDashboardRange(
+                        event.target.value as "all" | "7d" | "30d" | "90d" | "ytd",
+                      )
+                    }
+                    data-testid="stored-dashboard-time-range"
+                  >
+                    <option value="all">All time</option>
+                    <option value="7d">Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                    <option value="90d">Last 90 days</option>
+                    <option value="ytd">Year to date</option>
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => void handleStoredDashboardExport()}
+                    disabled={storedDashboardLoading}
+                  >
+                    <Download className="h-4 w-4" />
+                    {t("reports.actions.exportDashboard")}
+                  </Button>
+                </div>
               ) : null}
             </div>
           </DialogHeader>
@@ -1450,6 +1479,7 @@ function ReportsClientLoaded({
               dashboard={viewDashboard}
               widgets={dashboardWidgets as unknown as Record<string, unknown>[]}
               dataSources={storedDashboardDataSources}
+              timeRange={viewDashboardTimeRange}
             />
           ) : null}
         </DialogContent>

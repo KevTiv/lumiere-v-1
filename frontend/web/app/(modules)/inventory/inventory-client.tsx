@@ -47,6 +47,11 @@ import {
   transferStatusBadges,
   stockMovesTableConfig,
   EntityView,
+  type TimeRangeValue,
+  isTimestampInRange,
+  percentChange,
+  previousPeriodMs,
+  timeRangeToMs,
 } from "@lumiere/ui"
 import type {
   EntityTableConfig,
@@ -245,6 +250,14 @@ type ProductPriceSearchState = {
   form: FormConfig
 } | null
 
+function recordTimestampMs(row: Record<string, unknown>): number {
+  const raw = row.writeDate ?? row.write_date ?? row.createDate ?? row.create_date
+  if (raw == null) return 0
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return n > 1e15 ? n / 1000 : n
+}
+
 function skillRunToPanel(result: AiSkillRunResponse): Record<string, unknown> {
   const tableArtifact = result.artifacts.find((a) => a.kind === "table")
   return {
@@ -419,6 +432,7 @@ function InventoryClientLoaded({
   const [productPriceSearch, setProductPriceSearch] = useState<ProductPriceSearchState>(null)
   const [productPriceSearchError, setProductPriceSearchError] = useState<string | null>(null)
   const [productPriceSearchResult, setProductPriceSearchResult] = useState<Record<string, unknown> | null>(null)
+  const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
   const runPriceSearch = useRunAiSkill()
 
   const { data: products = [], isLoading: productsLoading } = useProducts(orgId, initialProducts)
@@ -1218,11 +1232,30 @@ function InventoryClientLoaded({
   useEffect(() => setIsMounted(true), [])
 
   const liveSections = useMemo(() => {
+    const { startMs, endMs } = timeRangeToMs(dashboardTimeRange)
+    const previousRange = previousPeriodMs(dashboardTimeRange)
+    const inCurrentRange = (row: Record<string, unknown>) =>
+      isTimestampInRange(recordTimestampMs(row), startMs, endMs)
+    const inPreviousRange = (row: Record<string, unknown>) =>
+      isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs)
+
     const totalSkus = products.length
     const stockValue = stockQuants.reduce((s, q) => s + Number(q.value ?? 0), 0)
     const zeroStock = stockQuants.filter((q) => Number(q.availableQuantity ?? 0) <= 0).length
     const pendingTransfers = transfers.filter(
       (transfer) => String(transfer.state) === "confirmed" || String(transfer.state) === "assigned"
+    ).length
+    const currentTransfers = transfers.filter((transfer) =>
+      inCurrentRange(transfer as Record<string, unknown>),
+    ).length
+    const previousTransfers = transfers.filter((transfer) =>
+      inPreviousRange(transfer as Record<string, unknown>),
+    ).length
+    const currentAdjustments = adjustments.filter((a) =>
+      inCurrentRange(a as Record<string, unknown>),
+    ).length
+    const previousAdjustments = adjustments.filter((a) =>
+      inPreviousRange(a as Record<string, unknown>),
     ).length
 
     return (
@@ -1238,8 +1271,18 @@ function InventoryClientLoaded({
                   stats: [
                     { label: t("inventory.dashboard.totalSKUs"), value: totalSkus.toString(), icon: "Package" },
                     { label: t("inventory.dashboard.stockValue"), value: `$${stockValue.toLocaleString()}`, icon: "DollarSign" },
-                    { label: t("inventory.dashboard.zeroStockAlerts"), value: zeroStock.toString(), icon: "AlertTriangle" },
-                    { label: t("inventory.dashboard.pendingTransfers"), value: pendingTransfers.toString(), icon: "Truck" },
+                    {
+                      label: t("inventory.dashboard.zeroStockAlerts"),
+                      value: zeroStock.toString(),
+                      change: percentChange(currentAdjustments, previousAdjustments),
+                      icon: "AlertTriangle",
+                    },
+                    {
+                      label: t("inventory.dashboard.pendingTransfers"),
+                      value: pendingTransfers.toString(),
+                      change: percentChange(currentTransfers, previousTransfers),
+                      icon: "Truck",
+                    },
                   ],
                 },
               }
@@ -1303,6 +1346,28 @@ function InventoryClientLoaded({
               const values = orderedDays.map((day) => ({ day, In: dayIn[day] ?? 0, Out: dayOut[day] ?? 0 }))
               return { ...w, data: { ...(w.data as Record<string, unknown>), values } }
             }
+            if (w.id === "inventory-stock-turnover") {
+              const movesByProduct = groupBy(
+                stockMoves as Record<string, unknown>[],
+                (m) => {
+                  const pid = String(m.productId ?? m.product_id ?? "")
+                  const product = products.find((p) => String(p.id) === pid)
+                  return String(
+                    product?.name ??
+                      t("inventory.dashboard.productFallback", { id: pid.slice(-4) }),
+                  )
+                },
+              )
+              const values = Object.entries(movesByProduct)
+                .map(([product, moves]) => ({ product, Moves: moves.length }))
+                .sort((a, b) => b.Moves - a.Moves)
+                .slice(0, 6)
+              return {
+                ...w,
+                title: t("inventory.dashboard.stockTurnover"),
+                data: { ...(w.data as Record<string, unknown>), values },
+              }
+            }
             if (w.id === "inv-low-stock-table") {
               const lowStock = stockQuants
                 .filter((q) => Number(q.availableQuantity ?? 0) <= 0)
@@ -1329,6 +1394,9 @@ function InventoryClientLoaded({
     products,
     stockQuants,
     transfers,
+    adjustments,
+    stockMoves,
+    dashboardTimeRange,
     t,
     moduleConfig,
     productFormConfig,
@@ -3615,6 +3683,8 @@ function InventoryClientLoaded({
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
         activeTab={activeTab}
+        dashboardTimeRange={dashboardTimeRange}
+        onDashboardTimeRangeChange={setDashboardTimeRange}
         onActiveTabChange={(tab) => {
           setActiveTab(tab)
           if (tab !== "stock") setStockLocationFilter(null)

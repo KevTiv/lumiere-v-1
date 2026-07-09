@@ -42,6 +42,11 @@ import {
   purchaseRequisitionsTableConfig,
   csvImportForm,
   RecordChatterDialog,
+  type TimeRangeValue,
+  isTimestampInRange,
+  percentChange,
+  previousPeriodMs,
+  timeRangeToMs,
 } from "@lumiere/ui"
 import type { EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
@@ -153,6 +158,14 @@ function poState(row: Record<string, unknown>): string {
   const v = row.state
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
   return String(v ?? "")
+}
+
+function recordTimestampMs(row: Record<string, unknown>): number {
+  const raw = row.writeDate ?? row.write_date ?? row.createDate ?? row.create_date
+  if (raw == null) return 0
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return n > 1e15 ? n / 1000 : n
 }
 
 function journalTypeTag(row: Record<string, unknown>): string {
@@ -381,6 +394,7 @@ function PurchasingClientLoaded({
   const [billOrderId, setBillOrderId] = useState<bigint | null>(null)
   const [billOrderError, setBillOrderError] = useState<string | null>(null)
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
+  const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
 
   useEffect(() => {
     if (quickActionForm != null) {
@@ -1449,11 +1463,28 @@ function PurchasingClientLoaded({
   ])
 
   const liveSections = useMemo(() => {
-    const openOrders = orders.filter(
-      (o) => String(o.state) !== "Done" && String(o.state) !== "Cancelled",
+    const { startMs, endMs } = timeRangeToMs(dashboardTimeRange)
+    const previousRange = previousPeriodMs(dashboardTimeRange)
+    const inCurrentRange = (row: Record<string, unknown>) =>
+      isTimestampInRange(recordTimestampMs(row), startMs, endMs)
+    const inPreviousRange = (row: Record<string, unknown>) =>
+      isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs)
+
+    const isOpenOrder = (o: Record<string, unknown>) =>
+      String(o.state) !== "Done" && String(o.state) !== "Cancelled"
+    const isConfirmedOrder = (o: Record<string, unknown>) =>
+      String(o.state) === "Purchase" || String(o.state) === "Done"
+
+    const openOrders = orders.filter((o) => isOpenOrder(o as Record<string, unknown>))
+    const currentOpenOrders = openOrders.filter((o) => inCurrentRange(o as Record<string, unknown>))
+    const previousOpenOrders = orders.filter(
+      (o) => isOpenOrder(o as Record<string, unknown>) && inPreviousRange(o as Record<string, unknown>),
     )
     const spendMtd = orders
-      .filter((o) => String(o.state) === "Purchase" || String(o.state) === "Done")
+      .filter((o) => isConfirmedOrder(o as Record<string, unknown>) && inCurrentRange(o as Record<string, unknown>))
+      .reduce((s, o) => s + Number(o.amountTotal ?? 0), 0)
+    const previousSpend = orders
+      .filter((o) => isConfirmedOrder(o as Record<string, unknown>) && inPreviousRange(o as Record<string, unknown>))
       .reduce((s, o) => s + Number(o.amountTotal ?? 0), 0)
     const pendingReceipt = orders.filter((o) => o.receiptStatus === "pending").length
     const toApprove = orders.filter((o) => String(o.state) === "ToApprove").length
@@ -1469,8 +1500,18 @@ function PurchasingClientLoaded({
             ...w,
             data: {
               stats: [
-                { label: t("purchasing.dashboard.openPOs"), value: openOrders.length.toString(), icon: "FileText" },
-                { label: t("purchasing.dashboard.spendMTD"), value: `$${spendMtd.toLocaleString()}`, icon: "DollarSign" },
+                {
+                  label: t("purchasing.dashboard.openPOs"),
+                  value: openOrders.length.toString(),
+                  change: percentChange(currentOpenOrders.length, previousOpenOrders.length),
+                  icon: "FileText",
+                },
+                {
+                  label: t("purchasing.dashboard.spendMTD"),
+                  value: `$${spendMtd.toLocaleString()}`,
+                  change: percentChange(spendMtd, previousSpend),
+                  icon: "DollarSign",
+                },
                 { label: t("purchasing.dashboard.pendingReceipt"), value: pendingReceipt.toString(), icon: "Truck" },
                 { label: t("purchasing.dashboard.awaitingApproval"), value: toApprove.toString(), icon: "Clock" },
               ],
@@ -1530,7 +1571,7 @@ function PurchasingClientLoaded({
         return w
       }),
     }))
-  }, [orders, moduleConfig, t, purchaseOrderFormConfig, purchaseRequisitionFormConfig, receiveLineFormConfig, setActiveTab])
+  }, [orders, moduleConfig, t, purchaseOrderFormConfig, purchaseRequisitionFormConfig, receiveLineFormConfig, setActiveTab, dashboardTimeRange])
 
   const config = useMemo(
     () =>
@@ -1915,6 +1956,8 @@ function PurchasingClientLoaded({
         onFormSubmit={handleFormSubmit}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
+        dashboardTimeRange={dashboardTimeRange}
+        onDashboardTimeRangeChange={setDashboardTimeRange}
         isPending={isFormMutationPending}
         onRowClick={(tabId, row) => {
           const target = chatterTargetFromRow("purchasing", tabId, row)

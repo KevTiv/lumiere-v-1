@@ -665,7 +665,10 @@
       "accountsReceivable": "Accounts Receivable",
       "accountsPayable": "Accounts Payable",
       "cashBalance": "Cash Balance",
-      "revenueMTD": "Revenue MTD"
+      "revenueMTD": "Revenue MTD",
+      "revenue": "Revenue",
+      "invoicesIssued": "Invoices Issued",
+      "paymentsReceived": "Payments Received"
     },
     "accounts": {
       "title": "Chart of Accounts",
@@ -821,6 +824,10 @@
         "postDraft": "Post",
         "recalculateTotals": "Recalculate totals",
         "createCreditNote": "Create credit note"
+      },
+      "recordSheet": {
+        "actionsTab": "Actions",
+        "openActions": "Open document actions"
       },
       "postMissingCogsAccounts": "Cannot post: chart of accounts is missing COGS and inventory GL accounts. Add expense (COGS) and asset (inventory) accounts first."
     },
@@ -3154,7 +3161,8 @@
       "totalHeadcount": "Total Headcount",
       "openPositions": "Open Positions",
       "pendingLeaveRequests": "Pending Leave Requests",
-      "runningContracts": "Running Contracts"
+      "runningContracts": "Running Contracts",
+      "headcountTrend": "Headcount Trend"
     },
     "employees": {
       "title": "Employees",
@@ -3629,6 +3637,7 @@
       "stockValue": "Stock Value",
       "zeroStockAlerts": "Zero Stock Alerts",
       "pendingTransfers": "Pending Transfers",
+      "stockTurnover": "Top Products by Stock Movement",
       "skuFallback": "SKU-{{id}}",
       "productFallback": "Product {{id}}"
     },
@@ -9297,6 +9306,7 @@
       "addWidget": "Add Widget",
       "viewDashboard": "View Dashboard",
       "exportDashboard": "Export PNG",
+      "dashboardTimeRange": "Time range",
       "shareDashboard": "Share Dashboard",
       "updateLayout": "Update Layout"
     },

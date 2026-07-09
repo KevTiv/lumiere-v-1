@@ -2,6 +2,11 @@ import type { DashboardWidget, GridWidth } from "./dashboard-types"
 
 export type StoredDashboardDataSources = Record<string, Record<string, unknown>[]>
 
+export interface StoredDashboardResolverOptions {
+  startMs?: number
+  endMs?: number
+}
+
 function scalarField(value: unknown): string {
   if (value == null) return ""
   if (typeof value === "object" && !Array.isArray(value)) {
@@ -33,9 +38,26 @@ function applyDomain(
     return rows.filter((row) =>
       Object.entries(parsed).every(([key, expected]) => {
         const actual = scalarField(rowField(row, key))
-        if (expected && typeof expected === "object" && "$in" in (expected as object)) {
-          const list = (expected as { $in: unknown[] }).$in.map((v) => String(v))
-          return list.includes(actual)
+        if (expected && typeof expected === "object" && !Array.isArray(expected)) {
+          const ops = expected as Record<string, unknown>
+          return Object.entries(ops).every(([op, operand]) => {
+            if (op === "$in") {
+              return Array.isArray(operand) && operand.map((v) => String(v)).includes(actual)
+            }
+            if (op === "$ne") {
+              return actual.toLowerCase() !== String(operand).toLowerCase()
+            }
+            if (op === "$gte" || op === "$lte" || op === "$gt" || op === "$lt") {
+              const a = Number(actual)
+              const b = Number(operand)
+              if (!Number.isFinite(a) || !Number.isFinite(b)) return false
+              if (op === "$gte") return a >= b
+              if (op === "$lte") return a <= b
+              if (op === "$gt") return a > b
+              return a < b
+            }
+            return true
+          })
         }
         return actual.toLowerCase() === String(expected).toLowerCase()
       }),
@@ -43,6 +65,87 @@ function applyDomain(
   } catch {
     return rows
   }
+}
+
+interface SortOrder {
+  field: string
+  direction: "asc" | "desc"
+}
+
+function parseSortOrder(raw: unknown): SortOrder | null {
+  if (typeof raw !== "string" || !raw.trim()) return null
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const entry = Object.entries(parsed)[0]
+    if (!entry) return null
+    const [field, dir] = entry
+    if (!field) return null
+    return {
+      field,
+      direction: String(dir).toLowerCase() === "asc" ? "asc" : "desc",
+    }
+  } catch {
+    return null
+  }
+}
+
+function sortRowsByField(
+  rows: Record<string, unknown>[],
+  sortOrder: SortOrder,
+): Record<string, unknown>[] {
+  return [...rows].sort((a, b) => {
+    const av = rowField(a, sortOrder.field)
+    const bv = rowField(b, sortOrder.field)
+    const an = Number(av)
+    const bn = Number(bv)
+    const cmp =
+      Number.isFinite(an) && Number.isFinite(bn)
+        ? an - bn
+        : scalarField(av).localeCompare(scalarField(bv))
+    return sortOrder.direction === "asc" ? cmp : -cmp
+  })
+}
+
+const TIMESTAMP_FIELDS = ["date_order", "date", "create_date"]
+
+function timestampToMs(raw: unknown): number | null {
+  if (raw == null) return null
+  if (raw instanceof Date) return raw.getTime()
+  if (typeof raw === "object") {
+    const obj = raw as Record<string, unknown>
+    if ("some" in obj) return timestampToMs(obj.some)
+    const toDate = (obj as { toDate?: () => Date }).toDate
+    if (typeof toDate === "function") {
+      const date = toDate.call(raw)
+      return date instanceof Date ? date.getTime() : null
+    }
+    if ("__timestamp_micros_since_unix_epoch__" in obj) {
+      return timestampToMs(obj.__timestamp_micros_since_unix_epoch__)
+    }
+    return null
+  }
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return n > 1e15 ? n / 1000 : n
+}
+
+function applyTimeRange(
+  rows: Record<string, unknown>[],
+  startMs?: number,
+  endMs?: number,
+): Record<string, unknown>[] {
+  if (startMs == null && endMs == null) return rows
+  return rows.filter((row) => {
+    let ms: number | null = null
+    for (const field of TIMESTAMP_FIELDS) {
+      ms = timestampToMs(rowField(row, field))
+      if (ms != null) break
+    }
+    if (ms == null) return true
+    if (startMs != null && ms < startMs) return false
+    if (endMs != null && ms > endMs) return false
+    return true
+  })
 }
 
 function aggregateValue(
@@ -85,6 +188,7 @@ export function resolveStoredDashboardWidgets(
   widgetRows: Record<string, unknown>[],
   widgetIds: Array<bigint | number>,
   dataSources: StoredDashboardDataSources,
+  options?: StoredDashboardResolverOptions,
 ): DashboardWidget[] {
   const idSet = new Set(widgetIds.map((id) => String(id)))
   const widgets = widgetRows
@@ -103,10 +207,15 @@ export function resolveStoredDashboardWidgets(
 
   widgets.forEach((row, index) => {
     const model = String(row.model ?? "")
-    const sourceRows = applyDomain(
-      dataSources[model] ?? [],
-      (row.domain as string | null | undefined) ?? null,
+    const sourceRows = applyTimeRange(
+      applyDomain(
+        dataSources[model] ?? [],
+        (row.domain as string | null | undefined) ?? null,
+      ),
+      options?.startMs,
+      options?.endMs,
     )
+    const sortOrder = parseSortOrder(row.sortOrder ?? row.sort_order)
     const fields = Array.isArray(row.fields)
       ? row.fields.map((f) => String(f))
       : []
@@ -143,13 +252,24 @@ export function resolveStoredDashboardWidgets(
           bucket.push(sourceRow)
           groups.set(key, bucket)
         }
-        const entries = [...groups.entries()]
-          .map(([name, grouped]) => ({
-            name,
-            value: aggregateValue(grouped, primaryField, aggregation),
-          }))
-          .sort((a, b) => b.value - a.value)
-          .slice(0, Number(row.limit ?? 12))
+        const unsorted = [...groups.entries()].map(([name, grouped]) => ({
+          name,
+          value: aggregateValue(grouped, primaryField, aggregation),
+        }))
+        if (sortOrder && sortOrder.field === groupBy) {
+          unsorted.sort((a, b) =>
+            sortOrder.direction === "asc"
+              ? a.name.localeCompare(b.name)
+              : b.name.localeCompare(a.name),
+          )
+        } else if (sortOrder && sortOrder.field === "value") {
+          unsorted.sort((a, b) =>
+            sortOrder.direction === "asc" ? a.value - b.value : b.value - a.value,
+          )
+        } else {
+          unsorted.sort((a, b) => b.value - a.value)
+        }
+        const entries = unsorted.slice(0, Number(row.limit ?? 12))
 
         if (chartType === "pie" || chartType === "donut") {
           resolved.push({
@@ -207,6 +327,7 @@ export function resolveStoredDashboardWidgets(
     if (widgetType === "Table" || widgetType === "List") {
       const limit = Number(row.limit ?? 10)
       const displayFields = fields.length > 0 ? fields : ["name"]
+      const orderedRows = sortOrder ? sortRowsByField(sourceRows, sortOrder) : sourceRows
       resolved.push({
         id,
         type: "table",
@@ -217,7 +338,7 @@ export function resolveStoredDashboardWidgets(
             key: snakeToCamel(field),
             label: field.replace(/_/g, " "),
           })),
-          rows: sourceRows.slice(0, limit).map((sourceRow) => {
+          rows: orderedRows.slice(0, limit).map((sourceRow) => {
             const out: Record<string, string | number> = {}
             for (const field of displayFields) {
               const camel = snakeToCamel(field)

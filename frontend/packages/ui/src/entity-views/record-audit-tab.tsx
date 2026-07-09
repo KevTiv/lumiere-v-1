@@ -7,6 +7,8 @@ import { useAuditLog } from "@lumiere/query-hooks/hooks/auth"
 import { Badge } from "../components/badge"
 import { Skeleton } from "../components/skeleton"
 import { cn } from "../lib/utils"
+import { useIdentityLabelMap } from "../hooks/use-identity-label-map"
+import { resolveIdentityLabel } from "../lib/identity-label"
 import { auditActionPillClass } from "../lib/theme-colors"
 import {
   auditActionFromRow,
@@ -45,11 +47,13 @@ function formatRelativeTime(iso: string): string {
   return date.toLocaleDateString()
 }
 
-function identityShortLabel(raw: unknown): string {
+function actorDisplayLabel(
+  raw: unknown,
+  labelMap: ReadonlyMap<string, string>,
+): string {
   if (raw == null) return "System"
-  const s = String(raw).trim()
-  if (!s) return "System"
-  return s.length > 10 ? `${s.slice(0, 8)}…` : s
+  const label = resolveIdentityLabel(raw, labelMap)
+  return label === "—" ? "System" : label
 }
 
 export function RecordAuditTab({ tableName, recordId, className }: RecordAuditTabProps) {
@@ -57,6 +61,7 @@ export function RecordAuditTab({ tableName, recordId, className }: RecordAuditTa
   const orgReady = hasValidOrganizationId(organizationId)
   const orgBigInt = orgReady ? BigInt(organizationId) : 0n
   const auditQuery = useAuditLog(orgBigInt)
+  const identityLabelMap = useIdentityLabelMap(orgBigInt)
 
   const recordIdStr = String(recordId)
   const tableNorm = tableName.trim().toLowerCase()
@@ -85,11 +90,11 @@ export function RecordAuditTab({ tableName, recordId, className }: RecordAuditTa
           action,
           details,
           iso,
-          actorLabel: identityShortLabel(actor),
+          actorLabel: actorDisplayLabel(actor, identityLabelMap),
         }
       })
       .sort((a, b) => new Date(b.iso).getTime() - new Date(a.iso).getTime())
-  }, [auditQuery.data, recordIdStr, tableNorm])
+  }, [auditQuery.data, recordIdStr, tableNorm, identityLabelMap])
 
   if (!orgReady) {
     return (

@@ -1,11 +1,12 @@
 "use client"
 
 import { useRef } from "react"
-import { Download } from "lucide-react"
+import { Download, FileDown } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card"
 import { Button } from "../components/button"
 import type { DashboardWidget, WidgetType } from "../lib/dashboard-types"
 import { exportChartToPng } from "../lib/export-dashboard-png"
+import { downloadCsv, widgetDataToCsv } from "../lib/export-csv"
 import { KPIWidget } from "./widgets/kpi-widget"
 import { AreaChartWidget } from "./widgets/area-chart-widget"
 import { LineChartWidget } from "./widgets/line-chart-widget"
@@ -43,6 +44,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRe
   const chartRef = useRef<HTMLDivElement>(null)
   const useCard = widget.useCard !== false
   const isChart = CHART_WIDGET_TYPES.has(widget.type)
+  const canExportCsv = isChart || widget.type === "table"
 
   const renderContent = () => {
     switch (widget.type) {
@@ -96,6 +98,40 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRe
     await exportChartToPng(chartRef.current, widget.title || widget.id)
   }
 
+  const handleCsvExport = () => {
+    const csv = widgetDataToCsv(widget)
+    if (csv !== null) downloadCsv(widget.title || widget.id, csv)
+  }
+
+  const exportButtons = (
+    <>
+      {isChart ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          aria-label={`Export ${widget.title} chart`}
+          onClick={() => void handleChartExport()}
+        >
+          <Download className="h-3.5 w-3.5" />
+        </Button>
+      ) : null}
+      {canExportCsv ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          aria-label={`Export ${widget.title} as CSV`}
+          onClick={handleCsvExport}
+        >
+          <FileDown className="h-3.5 w-3.5" />
+        </Button>
+      ) : null}
+    </>
+  )
+
   if (!useCard) {
     return (
       <div className={widthClass} data-testid={testId}>
@@ -105,17 +141,8 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRe
           ) : (
             <span />
           )}
-          {isChart ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              aria-label={`Export ${widget.title} chart`}
-              onClick={() => void handleChartExport()}
-            >
-              <Download className="h-3.5 w-3.5" />
-            </Button>
+          {isChart || canExportCsv ? (
+            <div className="flex items-center gap-1">{exportButtons}</div>
           ) : null}
         </div>
         <div ref={isChart ? chartRef : undefined}>{renderContent()}</div>
@@ -128,17 +155,8 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRe
       <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
           <CardTitle className="text-sm font-semibold">{widget.title}</CardTitle>
-          {isChart ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0"
-              aria-label={`Export ${widget.title} chart`}
-              onClick={() => void handleChartExport()}
-            >
-              <Download className="h-3.5 w-3.5" />
-            </Button>
+          {isChart || canExportCsv ? (
+            <div className="flex shrink-0 items-center gap-1">{exportButtons}</div>
           ) : null}
         </CardHeader>
         <CardContent>

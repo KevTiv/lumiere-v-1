@@ -12,12 +12,13 @@ interface StoredDashboardViewProps {
   dashboard: Record<string, unknown>
   widgets: Record<string, unknown>[]
   dataSources: StoredDashboardDataSources
+  timeRange?: { startMs: number; endMs: number }
   testId?: string
 }
 
 export const StoredDashboardView = forwardRef<HTMLDivElement, StoredDashboardViewProps>(
   function StoredDashboardView(
-    { dashboard, widgets, dataSources, testId = "stored-dashboard-view" },
+    { dashboard, widgets, dataSources, timeRange, testId = "stored-dashboard-view" },
     ref,
   ) {
     const sections = useMemo((): DashboardSection[] => {
@@ -26,7 +27,12 @@ export const StoredDashboardView = forwardRef<HTMLDivElement, StoredDashboardVie
         | undefined
       if (!widgetIds?.length) return []
 
-      const resolved = resolveStoredDashboardWidgets(widgets, widgetIds, dataSources)
+      const resolved = resolveStoredDashboardWidgets(
+        widgets,
+        widgetIds,
+        dataSources,
+        timeRange ? { startMs: timeRange.startMs, endMs: timeRange.endMs } : undefined,
+      )
       if (resolved.length === 0) return []
 
       return [
@@ -36,7 +42,7 @@ export const StoredDashboardView = forwardRef<HTMLDivElement, StoredDashboardVie
           widgets: resolved,
         },
       ]
-    }, [dashboard, widgets, dataSources])
+    }, [dashboard, widgets, dataSources, timeRange])
 
     if (sections.length === 0) {
       return (

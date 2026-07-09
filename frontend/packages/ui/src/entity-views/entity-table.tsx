@@ -41,7 +41,7 @@ import {
 } from "../components/empty"
 import { Skeleton } from "../components/skeleton"
 import { TooltipProvider } from "../components/tooltip"
-import { Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
+import { Search, ArrowUp, ArrowDown, ArrowUpDown, FileDown } from "lucide-react"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -52,6 +52,7 @@ import {
   formatTimestampLike,
   getRowField,
 } from "../lib/entity-row-utils"
+import { rowsToCsv, downloadCsv } from "../lib/export-csv"
 
 const PAGE_SIZE = 25
 const LOADING_ROW_COUNT = 5
@@ -79,6 +80,20 @@ function rowFilterValue(row: Record<string, unknown>, key: string): string {
     if ("some" in obj) return rowFilterValue({ [key]: obj.some }, key)
   }
   return String(val)
+}
+
+function csvCellValue(value: unknown): string | number {
+  if (value == null) return ""
+  if (typeof value === "string" || typeof value === "number") return value
+  if (typeof value === "boolean") return value ? "Yes" : "No"
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>
+    if ("tag" in obj && typeof obj.tag === "string") return obj.tag
+    if ("some" in obj) return csvCellValue(obj.some)
+    const d = formatTimestampLike(value)
+    if (d) return d.toISOString()
+  }
+  return String(value)
 }
 
 function compareRowValues(a: unknown, b: unknown, direction: SortDirection): number {
@@ -260,6 +275,14 @@ export function EntityTable({
   const emptyTitle =
     config.emptyState?.title ?? config.emptyMessage ?? "No records found."
 
+  const handleCsvExport = () => {
+    const csv = rowsToCsv(
+      columns.map((col) => col.label),
+      sorted.map((row) => columns.map((col) => csvCellValue(getRowField(row, col.key)))),
+    )
+    downloadCsv(config.listViewKey ?? "export", csv)
+  }
+
   return (
     <TooltipProvider>
       <div className={cn("space-y-4", className)} data-testid="entity-table">
@@ -310,6 +333,18 @@ export function EntityTable({
               )
             })}
             <div className="ml-auto flex items-center gap-2">
+              {sorted.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCsvExport}
+                  aria-label="Export CSV"
+                  data-testid="entity-export-csv"
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Export CSV
+                </Button>
+              )}
               {actions.map((action) => {
                 const Icon = action.icon
                 return (
