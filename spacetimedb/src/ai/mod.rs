@@ -14,6 +14,7 @@ pub mod reducer_allowlist;
 pub mod agents;
 pub mod chat;
 pub mod intelligence;
+pub mod skill_registry;
 pub mod skills;
 
 pub use action_drafts::*;
@@ -21,4 +22,5 @@ pub use reducer_allowlist::*;
 pub use agents::*;
 pub use chat::*;
 pub use intelligence::*;
+pub use skill_registry::*;
 pub use skills::*;

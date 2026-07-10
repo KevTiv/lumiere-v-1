@@ -8292,6 +8292,28 @@
       "send": "send"
     }
   },
+  "aiHarness": {
+    "reportComposer": {
+      "title": "Report Composer",
+      "greenSkillBadge": "Green skill",
+      "description": "Run a promoted green skill that fetches a typed owner report, evaluates it through the policy engine, and returns a masked summary with citations.",
+      "formTitle": "Compose report",
+      "formDescription": "Select a previewable report and scope. Organization context comes from your session.",
+      "companyLabel": "Company",
+      "companyPlaceholder": "Select a company…",
+      "reportLabel": "Report",
+      "reportPlaceholder": "Select a report…",
+      "dateLabel": "Date",
+      "timezoneLabel": "Timezone",
+      "runButton": "Run report composer",
+      "errorTitle": "Composer failed",
+      "errorDescription": "Could not compose the report. Please try again.",
+      "decisionTitle": "Policy decision",
+      "summaryTitle": "Summary",
+      "citationsTitle": "Citations",
+      "rowsProcessed": "{{count}} rows"
+    }
+  },
   "map": {
     "loading": "Loading map…",
     "title": "Map Overview",
@@ -9211,7 +9233,8 @@
       "dashboardWidgets": "Widgets",
       "pivotExplorer": "Pivot explorer",
       "vatReport": "VAT report",
-      "queryBuilder": "Query builder"
+      "queryBuilder": "Query builder",
+      "ownerReports": "Owner reports"
     },
     "queryBuilder": {
       "title": "Self-serve query builder",
@@ -9245,6 +9268,79 @@
       "saved": "Widget \"{{name}}\" saved.",
       "savedAttached": "Widget \"{{name}}\" saved and added to the dashboard.",
       "rowsLoaded": "{{count}} rows loaded"
+    },
+    "ownerReports": {
+      "title": "Owner Reports",
+      "description": "Typed, scoped daily reports for business owners.",
+      "companyLabel": "Company",
+      "companyPlaceholder": "Select a company…",
+      "dateLabel": "Date",
+      "timezoneLabel": "Timezone",
+      "previewButton": "Preview",
+      "maxWindowDays": "Up to {{count}} days",
+      "availability": {
+        "preview": "Preview",
+        "planned": "Planned"
+      },
+      "previewTitle": "Report preview",
+      "previewErrorTitle": "Preview failed",
+      "previewErrorDescription": "Could not generate the report preview. Please try again.",
+      "noCompanyTitle": "No company selected",
+      "noCompanyDescription": "Select a company to preview this report.",
+      "catalogErrorTitle": "Could not load catalog",
+      "catalogErrorDescription": "The report catalog could not be loaded. Please try again.",
+      "emptyCatalogTitle": "No reports available",
+      "emptyCatalogDescription": "The report catalog is empty.",
+      "watermarkTitle": "Watermark",
+      "caveatsTitle": "Caveats",
+      "sourceWatermarkTitle": "Source watermark",
+      "sourceWatermarkCutoff": "Accounting cutoff: {{cutoff}}",
+      "scope": {
+        "company": "Company",
+        "dateFrom": "From",
+        "dateTo": "To",
+        "timezone": "Timezone"
+      },
+      "totals": {
+        "salesGross": "Sales gross",
+        "purchasesGross": "Purchases gross",
+        "receipts": "Receipts",
+        "disbursements": "Disbursements",
+        "feesAndTax": "Fees & tax",
+        "netCashFlow": "Net cash flow"
+      },
+      "sections": {
+        "sales": "Sales",
+        "receipts": "Receipts",
+        "purchases": "Purchases",
+        "expensesAndFees": "Expenses & fees",
+        "stockAlerts": "Stock alerts",
+        "exceptions": "Exceptions"
+      },
+      "columns": {
+        "net": "Net",
+        "tax": "Tax",
+        "gross": "Gross",
+        "fees": "Fees",
+        "total": "Total",
+        "feeCount": "Fee count"
+      },
+      "ordersCount": "{{count}} orders",
+      "receipts": {
+        "receiptCount": "{{count}} receipts",
+        "disbursementCount": "{{count}} disbursements"
+      },
+      "stockAlerts": {
+        "count": "{{count}} alerts",
+        "empty": "No stock alerts for the selected date.",
+        "productId": "Product {{id}}",
+        "available": "Available: {{value}}",
+        "outdated": "Outdated"
+      },
+      "exceptions": {
+        "count": "{{count}} exceptions",
+        "empty": "No exceptions for the selected date."
+      }
     },
     "createButton": {
       "generateReport": "Generate report",

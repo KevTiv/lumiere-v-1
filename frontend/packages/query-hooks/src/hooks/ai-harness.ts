@@ -3,6 +3,10 @@
 import { useMutation } from "@tanstack/react-query"
 
 import type { AiUiContext } from "../ai-ui-context"
+import type {
+  PolicyControlledRequest,
+  PolicyResult,
+} from "@lumiere/erp-shared/ai-policy-schemas"
 import { apiFetch } from "../http"
 import type { GatewayActionDraft } from "./ai-action-drafts"
 
@@ -46,3 +50,34 @@ export function useAiActionDraft() {
 }
 
 export type { GatewayActionDraft } from "./ai-action-drafts"
+export type { PolicyControlledRequest, PolicyResult }
+
+export interface AiPolicyEvaluationInput {
+  companyId: number
+  skill: PolicyControlledRequest["execution"]["skill"]
+  correlationId: string
+  input: unknown
+  plan: PolicyControlledRequest["execution"]["plan"]
+  candidateOutput: unknown
+}
+
+export function useAiPolicyEvaluation() {
+  return useMutation({
+    mutationFn: async (args: AiPolicyEvaluationInput) => {
+      const r = await apiFetch("/api/ai/policy/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: args.companyId,
+          skill: args.skill,
+          correlationId: args.correlationId,
+          input: args.input,
+          plan: args.plan,
+          candidateOutput: args.candidateOutput,
+        }),
+      })
+      if (!r.ok) throw new Error(await parseAiError(r))
+      return (await r.json()) as PolicyResult
+    },
+  })
+}

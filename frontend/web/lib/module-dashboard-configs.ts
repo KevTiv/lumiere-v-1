@@ -2362,6 +2362,11 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
       ],
     },
     {
+      id: "owner-reports",
+      label: t("reports.tabs.ownerReports"),
+      type: "custom",
+    },
+    {
       id: "reports",
       label: t("reports.tabs.financialReports"),
       type: "entity",
@@ -2642,7 +2647,7 @@ export const helpdeskModuleConfig = (t: TFunction): ModuleConfig => ({
               type: "quick-actions",
               title: "Quick Actions",
               width: "full",
-                data: {
+              data: {
                 columns: undefined,
                 actions: [
                   { id: "new_ticket", label: "New Ticket", icon: "plus", color: "red" },

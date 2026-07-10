@@ -12,6 +12,7 @@ mod inventory;
 mod mail;
 mod messaging;
 mod proposals;
+mod reports;
 mod sales;
 mod session;
 mod settings;
@@ -41,4 +42,5 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(billing::router())
         .merge(admin::router())
         .merge(proposals::router())
+        .merge(reports::router())
 }

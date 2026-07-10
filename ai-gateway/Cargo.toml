@@ -29,3 +29,4 @@ base64.workspace = true
 stdb-client.workspace = true
 duckdb = { version = "1.1", features = ["bundled"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+urlencoding = "2"

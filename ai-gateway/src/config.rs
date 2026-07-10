@@ -54,6 +54,10 @@ pub struct Config {
     pub web_search_provider: String,
     pub web_search_api_key: Option<String>,
     pub web_fetch_max_bytes: usize,
+
+    /// Rust api-server base URL for typed owner-report previews and other
+    /// protected domain services. Optional — report-composer returns 503 when unset.
+    pub api_server_url: Option<String>,
 }
 
 impl Config {
@@ -157,6 +161,10 @@ impl Config {
                 .unwrap_or_else(|_| "262144".to_string())
                 .parse()
                 .context("WEB_FETCH_MAX_BYTES must be a valid number")?,
+
+            api_server_url: std::env::var("LUMIERE_API_SERVER_URL")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
         })
     }
 }

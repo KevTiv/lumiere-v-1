@@ -9,6 +9,7 @@ pub mod query_exec;
 pub mod realtime;
 pub mod reducer_allowlist;
 pub mod metrics;
+pub mod reports;
 pub mod routes;
 pub mod session;
 pub mod state;

@@ -1,6 +1,5 @@
 mod ai_agent;
 mod config;
-mod rate_limit;
 mod context_worker;
 mod error;
 mod harness;
@@ -8,6 +7,7 @@ mod kaggle;
 mod orchestrator;
 mod providers;
 mod qdrant_client;
+mod rate_limit;
 mod rig_agent;
 mod routes;
 mod sandbox;
@@ -155,6 +155,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/kaggle/search", post(routes::kaggle::post_search))
         .route("/v1/kaggle/download", post(routes::kaggle::post_download))
         .route("/v1/kaggle/status/:job_id", get(routes::kaggle::get_status))
+        .route("/v1/policy/evaluate", post(routes::policy::post_evaluate))
+        .route(
+            "/v1/skills/report/compose",
+            post(routes::report::post_compose),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_gateway_secret,

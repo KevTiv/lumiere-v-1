@@ -5,6 +5,8 @@ pub mod forms;
 pub mod health;
 pub mod import;
 pub mod kaggle;
+pub mod policy;
 pub mod rag;
+pub mod report;
 pub mod search;
 pub mod skills;

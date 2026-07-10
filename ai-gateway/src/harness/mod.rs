@@ -1,4 +1,12 @@
+pub mod audit;
+pub mod data_scope_resolver;
 pub mod entity_registry;
+pub mod low_stock;
+pub mod manifest;
+pub mod policy_engine;
+pub mod privacy_guard;
+pub mod report_composer;
+pub mod skill_registry;
 pub mod snapshot;
 
 pub use snapshot::{

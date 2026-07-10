@@ -115,6 +115,7 @@ import {
   Download,
 } from "lucide-react"
 import { useRunAiSkill, type AiSkillRunResponse } from "@lumiere/query-hooks/hooks/ai-skills"
+import { OwnerReportsPanel } from "./owner-reports-panel"
 import { PivotExplorer } from "./pivot-explorer"
 import { VatReportPanel } from "./vat-report-panel"
 import { QueryBuilder } from "./query-builder"
@@ -354,8 +355,8 @@ function ReportsClientLoaded({
       viewDashboardId == null
         ? null
         : (dashboards.find((row) => String(row.id) === viewDashboardId) as
-            | Record<string, unknown>
-            | undefined) ?? null,
+          | Record<string, unknown>
+          | undefined) ?? null,
     [dashboards, viewDashboardId],
   )
 
@@ -932,6 +933,21 @@ function ReportsClientLoaded({
       ...moduleConfig,
       tabs: moduleConfig.tabs.map((tab) => {
         if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+        if (tab.id === "owner-reports") {
+          return {
+            ...tab,
+            type: "custom" as const,
+            customContent: (
+              <OwnerReportsPanel
+                organizationId={orgId}
+                companies={companies as Record<string, unknown>[]}
+                defaultCompanyId={
+                  operatingCompanyId > 0n ? Number(operatingCompanyId) : undefined
+                }
+              />
+            ),
+          }
+        }
         if (tab.id === "reports") return { ...tab, entityConfig: financialReportsEntityConfig }
         if (tab.id === "trial-balance") return { ...tab, entityConfig: trialBalanceEntityConfig, createForm: trialBalanceEntryFormConfig, createAction: "createTrialBalanceEntry", createLabel: t("reports.trialBalance.createEntryLabel") }
         if (tab.id === "report-templates") return { ...tab, entityConfig: reportTemplatesEntityConfig, createForm: reportTemplateFormConfig }
@@ -1002,6 +1018,8 @@ function ReportsClientLoaded({
       reports,
       trialBalances,
       dashboards,
+      companies,
+      operatingCompanyId,
       orgId,
       t
     ],

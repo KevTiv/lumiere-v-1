@@ -5,6 +5,8 @@ target
 .env.*
 .env
 */**/node_modules
+*/**/.tmp/e2e
+*.log
 node_modules
 */**/playwright-report
 */**/test-results
