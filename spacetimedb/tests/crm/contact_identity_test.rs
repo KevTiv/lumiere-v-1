@@ -4,8 +4,8 @@ use spacetimedb::{ReducerContext, Table};
 use crate::core::audit::audit_log;
 use crate::crm::contact_identities::{
     archive_contact_identity, contact_phone_identity, create_contact_identity,
-    find_identity_by_normalized, normalize_phone, update_contact_identity,
-    verify_contact_identity, CreateContactIdentityParams, UpdateContactIdentityParams,
+    find_identity_by_normalized, normalize_phone, update_contact_identity, verify_contact_identity,
+    CreateContactIdentityParams, UpdateContactIdentityParams,
 };
 use crate::crm::contact_roles::{
     assign_contact_role, contact_role_assignment, end_contact_role, AssignContactRoleParams,
@@ -20,15 +20,15 @@ pub fn test_phone_normalization(ctx: &ReducerContext) -> Result<(), String> {
 
     // E.164 input
     assert_eq!(
-        normalize_phone("+1 415 123 4567", None)?,
-        "+14151234567",
+        normalize_phone("+1 415 555 0101", None)?,
+        "+14155550101",
         "E.164 with spaces"
     );
 
     // National input with default region
     assert_eq!(
-        normalize_phone("(415) 123-4568", Some("US"))?,
-        "+14151234568",
+        normalize_phone("(415) 555-0102", Some("US"))?,
+        "+14155550102",
         "US national format"
     );
 
@@ -107,7 +107,7 @@ pub fn test_create_and_normalize_contact_identity(ctx: &ReducerContext) -> Resul
             contact_id: contact_row.id,
             company_id: Some(company_id),
             kind: ContactIdentityKind::Primary,
-            raw_value: "+1 415 123 4567".to_string(),
+            raw_value: "+1 415 555 0101".to_string(),
             is_preferred: true,
             verification_state: None,
             metadata: None,
@@ -122,9 +122,9 @@ pub fn test_create_and_normalize_contact_identity(ctx: &ReducerContext) -> Resul
         .find(|i| i.kind == ContactIdentityKind::Primary)
         .ok_or("Primary identity not found after create")?;
 
-    if identity.normalized_e164 != "+14151234567" {
+    if identity.normalized_e164 != "+14155550101" {
         return Err(format!(
-            "Expected normalized +1555010100, got {}",
+            "Expected normalized +14155550101, got {}",
             identity.normalized_e164
         ));
     }
@@ -610,18 +610,14 @@ pub fn test_duplicate_identity_detection(ctx: &ReducerContext) -> Result<(), Str
         .db
         .contact()
         .iter()
-        .find(|c| {
-            c.organization_id == org_id && c.email == Some("dup-a@test.local".to_string())
-        })
+        .find(|c| c.organization_id == org_id && c.email == Some("dup-a@test.local".to_string()))
         .ok_or("Contact A not found")?;
 
     let contact_b = ctx
         .db
         .contact()
         .iter()
-        .find(|c| {
-            c.organization_id == org_id && c.email == Some("dup-b@test.local".to_string())
-        })
+        .find(|c| c.organization_id == org_id && c.email == Some("dup-b@test.local".to_string()))
         .ok_or("Contact B not found")?;
 
     create_contact_identity(
@@ -663,7 +659,11 @@ pub fn test_duplicate_identity_detection(ctx: &ReducerContext) -> Result<(), Str
     Ok(())
 }
 
-fn create_contact(ctx: &ReducerContext, org_id: u64, params: CreateContactParams) -> Result<(), String> {
+fn create_contact(
+    ctx: &ReducerContext,
+    org_id: u64,
+    params: CreateContactParams,
+) -> Result<(), String> {
     use crate::crm::contacts::create_contact;
     create_contact(ctx, org_id, params)
 }
