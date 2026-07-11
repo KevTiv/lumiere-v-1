@@ -172,6 +172,8 @@ import CreateAiChatSessionReducer from "./create_ai_chat_session_reducer";
 import CreateAiInsightReducer from "./create_ai_insight_reducer";
 import CreateAiReducerAllowlistReducer from "./create_ai_reducer_allowlist_reducer";
 import CreateAiSkillReducer from "./create_ai_skill_reducer";
+import CreateAiSkillFixtureReducer from "./create_ai_skill_fixture_reducer";
+import CreateAiSkillVersionReducer from "./create_ai_skill_version_reducer";
 import CreateAiTeamMemberReducer from "./create_ai_team_member_reducer";
 import CreateAnalyticAccountReducer from "./create_analytic_account_reducer";
 import CreateAnalyticDistributionModelReducer from "./create_analytic_distribution_model_reducer";
@@ -521,15 +523,19 @@ import ProcessIntercompanyTransactionReducer from "./process_intercompany_transa
 import ProcessInventoryAdjustmentReducer from "./process_inventory_adjustment_reducer";
 import ProcessPendingScansReducer from "./process_pending_scans_reducer";
 import ProduceManufacturingOrderReducer from "./produce_manufacturing_order_reducer";
+import PromoteAiSkillVersionReducer from "./promote_ai_skill_version_reducer";
 import QueueMailFromTemplateReducer from "./queue_mail_from_template_reducer";
 import ReceivePoLineReducer from "./receive_po_line_reducer";
 import RecognizeDeferredRevenueReducer from "./recognize_deferred_revenue_reducer";
 import ReconcileAccountBankStatementLineReducer from "./reconcile_account_bank_statement_line_reducer";
 import ReconcilePaymentWithInvoiceReducer from "./reconcile_payment_with_invoice_reducer";
+import RecordAiAgentRunPolicySnapshotReducer from "./record_ai_agent_run_policy_snapshot_reducer";
+import RecordAiSkillTestRunReducer from "./record_ai_skill_test_run_reducer";
 import RecordAiSpendReducer from "./record_ai_spend_reducer";
 import RecordBarcodeScanReducer from "./record_barcode_scan_reducer";
 import RecordCycleCountLineReducer from "./record_cycle_count_line_reducer";
 import RecordDocumentViewReducer from "./record_document_view_reducer";
+import RecordGeneratedOwnerReportReducer from "./record_generated_owner_report_reducer";
 import RecordGoogleDriveSyncReducer from "./record_google_drive_sync_reducer";
 import RecordGoogleDriveSyncErrorReducer from "./record_google_drive_sync_error_reducer";
 import RecordMessageCopiedReducer from "./record_message_copied_reducer";
@@ -573,6 +579,7 @@ import ReviewMessageBatchReducer from "./review_message_batch_reducer";
 import ReviewSupplierIntakeReducer from "./review_supplier_intake_reducer";
 import RevokePermissionReducer from "./revoke_permission_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
+import RollbackAiSkillReleaseReducer from "./rollback_ai_skill_release_reducer";
 import RollbackImportJobReducer from "./rollback_import_job_reducer";
 import RunAccountingPaymentCancelTestReducer from "./run_accounting_payment_cancel_test_reducer";
 import RunAccountingPaymentManagementTestReducer from "./run_accounting_payment_management_test_reducer";
@@ -847,6 +854,7 @@ import AdjustmentReasonRow from "./adjustment_reason_table";
 import AiActionDraftRow from "./ai_action_draft_table";
 import AiAgentRow from "./ai_agent_table";
 import AiAgentRunRow from "./ai_agent_run_table";
+import AiAgentRunPolicySnapshotRow from "./ai_agent_run_policy_snapshot_table";
 import AiAgentRunStepRow from "./ai_agent_run_step_table";
 import AiChatMessageRow from "./ai_chat_message_table";
 import AiChatSessionRow from "./ai_chat_session_table";
@@ -855,6 +863,10 @@ import AiInsightRow from "./ai_insight_table";
 import AiReducerAllowlistRow from "./ai_reducer_allowlist_table";
 import AiSkillRow from "./ai_skill_table";
 import AiSkillConfigRow from "./ai_skill_config_table";
+import AiSkillFixtureRow from "./ai_skill_fixture_table";
+import AiSkillReleaseRow from "./ai_skill_release_table";
+import AiSkillTestRunRow from "./ai_skill_test_run_table";
+import AiSkillVersionRow from "./ai_skill_version_table";
 import AiTeamMemberRow from "./ai_team_member_table";
 import AiTeamMemberSkillRow from "./ai_team_member_skill_table";
 import AnalyticsMetricRow from "./analytics_metric_table";
@@ -915,6 +927,7 @@ import FleetVehicleRow from "./fleet_vehicle_table";
 import FormConfigRow from "./form_config_table";
 import FormConfigFieldRow from "./form_config_field_table";
 import FormRoleConfigRow from "./form_role_config_table";
+import GeneratedOwnerReportRow from "./generated_owner_report_table";
 import GoogleDriveConnectionRow from "./google_drive_connection_table";
 import HelpdeskSlaRow from "./helpdesk_sla_table";
 import HelpdeskStageRow from "./helpdesk_stage_table";
@@ -1674,6 +1687,27 @@ const tablesSchema = __schema({
       { name: 'ai_agent_run_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AiAgentRunRow),
+  ai_agent_run_policy_snapshot: __table({
+    name: 'ai_agent_run_policy_snapshot',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_agent_run_policy_snapshot_registry_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'ai_agent_run_policy_snapshot_registry_by_release', algorithm: 'btree', columns: [
+        'releaseId',
+      ] },
+      { name: 'run_id', algorithm: 'btree', columns: [
+        'runId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_agent_run_policy_snapshot_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'ai_agent_run_policy_snapshot_run_id_key', constraint: 'unique', columns: ['runId'] },
+    ],
+  }, AiAgentRunPolicySnapshotRow),
   ai_agent_run_step: __table({
     name: 'ai_agent_run_step',
     indexes: [
@@ -1815,6 +1849,85 @@ const tablesSchema = __schema({
       { name: 'ai_skill_config_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AiSkillConfigRow),
+  ai_skill_fixture: __table({
+    name: 'ai_skill_fixture',
+    indexes: [
+      { name: 'fixture_key', algorithm: 'btree', columns: [
+        'fixtureKey',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_skill_fixture_registry_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'ai_skill_fixture_registry_by_skill', algorithm: 'btree', columns: [
+        'skillId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_skill_fixture_fixture_key_key', constraint: 'unique', columns: ['fixtureKey'] },
+      { name: 'ai_skill_fixture_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiSkillFixtureRow),
+  ai_skill_release: __table({
+    name: 'ai_skill_release',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_skill_release_registry_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'ai_skill_release_registry_by_version', algorithm: 'btree', columns: [
+        'skillVersionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_skill_release_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiSkillReleaseRow),
+  ai_skill_test_run: __table({
+    name: 'ai_skill_test_run',
+    indexes: [
+      { name: 'ai_skill_test_run_registry_by_fixture', algorithm: 'btree', columns: [
+        'fixtureId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_skill_test_run_registry_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'ai_skill_test_run_registry_by_version', algorithm: 'btree', columns: [
+        'skillVersionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_skill_test_run_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiSkillTestRunRow),
+  ai_skill_version: __table({
+    name: 'ai_skill_version',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_skill_version_registry_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'ai_skill_version_registry_by_skill', algorithm: 'btree', columns: [
+        'skillId',
+      ] },
+      { name: 'version_key', algorithm: 'btree', columns: [
+        'versionKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_skill_version_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'ai_skill_version_version_key_key', constraint: 'unique', columns: ['versionKey'] },
+    ],
+  }, AiSkillVersionRow),
   ai_team_member: __table({
     name: 'ai_team_member',
     indexes: [
@@ -2814,6 +2927,26 @@ const tablesSchema = __schema({
       { name: 'form_role_config_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, FormRoleConfigRow),
+  generated_owner_report: __table({
+    name: 'generated_owner_report',
+    indexes: [
+      { name: 'generated_owner_report_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'generated_owner_report_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'generated_owner_report_by_key', algorithm: 'btree', columns: [
+        'reportKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'generated_owner_report_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, GeneratedOwnerReportRow),
   google_drive_connection: __table({
     name: 'google_drive_connection',
     indexes: [
@@ -5936,6 +6069,8 @@ const reducersSchema = __reducers(
   __reducerSchema("create_ai_insight", CreateAiInsightReducer),
   __reducerSchema("create_ai_reducer_allowlist", CreateAiReducerAllowlistReducer),
   __reducerSchema("create_ai_skill", CreateAiSkillReducer),
+  __reducerSchema("create_ai_skill_fixture", CreateAiSkillFixtureReducer),
+  __reducerSchema("create_ai_skill_version", CreateAiSkillVersionReducer),
   __reducerSchema("create_ai_team_member", CreateAiTeamMemberReducer),
   __reducerSchema("create_analytic_account", CreateAnalyticAccountReducer),
   __reducerSchema("create_analytic_distribution_model", CreateAnalyticDistributionModelReducer),
@@ -6285,15 +6420,19 @@ const reducersSchema = __reducers(
   __reducerSchema("process_inventory_adjustment", ProcessInventoryAdjustmentReducer),
   __reducerSchema("process_pending_scans", ProcessPendingScansReducer),
   __reducerSchema("produce_manufacturing_order", ProduceManufacturingOrderReducer),
+  __reducerSchema("promote_ai_skill_version", PromoteAiSkillVersionReducer),
   __reducerSchema("queue_mail_from_template", QueueMailFromTemplateReducer),
   __reducerSchema("receive_po_line", ReceivePoLineReducer),
   __reducerSchema("recognize_deferred_revenue", RecognizeDeferredRevenueReducer),
   __reducerSchema("reconcile_account_bank_statement_line", ReconcileAccountBankStatementLineReducer),
   __reducerSchema("reconcile_payment_with_invoice", ReconcilePaymentWithInvoiceReducer),
+  __reducerSchema("record_ai_agent_run_policy_snapshot", RecordAiAgentRunPolicySnapshotReducer),
+  __reducerSchema("record_ai_skill_test_run", RecordAiSkillTestRunReducer),
   __reducerSchema("record_ai_spend", RecordAiSpendReducer),
   __reducerSchema("record_barcode_scan", RecordBarcodeScanReducer),
   __reducerSchema("record_cycle_count_line", RecordCycleCountLineReducer),
   __reducerSchema("record_document_view", RecordDocumentViewReducer),
+  __reducerSchema("record_generated_owner_report", RecordGeneratedOwnerReportReducer),
   __reducerSchema("record_google_drive_sync", RecordGoogleDriveSyncReducer),
   __reducerSchema("record_google_drive_sync_error", RecordGoogleDriveSyncErrorReducer),
   __reducerSchema("record_message_copied", RecordMessageCopiedReducer),
@@ -6337,6 +6476,7 @@ const reducersSchema = __reducers(
   __reducerSchema("review_supplier_intake", ReviewSupplierIntakeReducer),
   __reducerSchema("revoke_permission", RevokePermissionReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
+  __reducerSchema("rollback_ai_skill_release", RollbackAiSkillReleaseReducer),
   __reducerSchema("rollback_import_job", RollbackImportJobReducer),
   __reducerSchema("run_accounting_payment_cancel_test", RunAccountingPaymentCancelTestReducer),
   __reducerSchema("run_accounting_payment_management_test", RunAccountingPaymentManagementTestReducer),

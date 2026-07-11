@@ -19,7 +19,8 @@ aes-gcm.workspace = true
 axum = { workspace = true, features = ["macros", "ws"] }
 bcrypt.workspace = true
 reqwest.workspace = true
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10"
 cookie = "0.18"
 base64.workspace = true
 dotenvy.workspace = true

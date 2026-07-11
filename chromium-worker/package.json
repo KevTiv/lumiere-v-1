@@ -1,0 +1,16 @@
+{
+  "name": "lumiere-chromium-worker",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Trusted HTML-to-PDF renderer for typed owner reports",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.ts"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.2.0"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.2.0"
+  }
+}

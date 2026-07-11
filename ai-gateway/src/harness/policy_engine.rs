@@ -2,12 +2,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{
+    action_draft_bridge::{self, BridgeError},
     audit::{
-        hash_serializable, DecisionHashes, DecisionOutcome, DecisionReason, PolicyDecision,
-        PolicyReasonCode, PolicyResult,
+        hash_serializable, ActionDraftProposal, DecisionHashes, DecisionOutcome, DecisionReason,
+        PolicyDecision, PolicyReasonCode, PolicyResult,
     },
     data_scope_resolver::{DataScope, DataScopeResolver, ResourceRegistry, ScopeError},
-    manifest::{Capability, ReviewStatus, RiskClass, SkillManifest, SkillVersionRef},
+    manifest::{
+        Capability, OrgPrivacyPolicy, ReviewStatus, RiskClass, SkillManifest, SkillVersionRef,
+    },
     privacy_guard::{PrivacyError, PrivacyGuard},
     skill_registry::SkillRegistry,
 };
@@ -100,6 +103,7 @@ pub struct PolicyEngine {
     skills: SkillRegistry,
     scopes: DataScopeResolver,
     privacy: PrivacyGuard,
+    org_privacy: OrgPrivacyPolicy,
 }
 
 impl Default for PolicyEngine {
@@ -114,7 +118,13 @@ impl PolicyEngine {
             skills,
             scopes: DataScopeResolver::new(resources),
             privacy: PrivacyGuard,
+            org_privacy: OrgPrivacyPolicy::default(),
         }
+    }
+
+    pub fn with_org_privacy(mut self, org_privacy: OrgPrivacyPolicy) -> Self {
+        self.org_privacy = org_privacy;
+        self
     }
 
     pub fn evaluate(&self, request: &PolicyExecutionRequest) -> PolicyDecision {
@@ -124,7 +134,48 @@ impl PolicyEngine {
     pub fn execute_controlled(&self, request: PolicyControlledRequest) -> PolicyResult {
         let evaluation = self.evaluate_internal(&request.execution);
         if evaluation.decision.outcome == DecisionOutcome::Deny {
-            return PolicyResult::new(evaluation.decision, None, None);
+            return PolicyResult::new(evaluation.decision, None, None, None);
+        }
+
+        let manifest = self
+            .skills
+            .get(&request.execution.skill)
+            .expect("allowed decisions always have a registered manifest");
+
+        // Red skills become pending action drafts; they never produce a direct
+        // output or execute a reducer without independent human approval.
+        if manifest.risk == RiskClass::Red
+            && evaluation.decision.outcome == DecisionOutcome::DraftOnly
+        {
+            return match action_draft_bridge::build_proposal(&request) {
+                Ok(proposal) => PolicyResult::new(evaluation.decision, None, None, Some(proposal)),
+                Err(BridgeError::MissingActionDraft) => PolicyResult::new(
+                    deny(
+                        evaluation.decision,
+                        PolicyReasonCode::CapabilityDenied,
+                        "red skill plan is missing an action-draft tool call",
+                    ),
+                    None,
+                    None,
+                    None,
+                ),
+                Err(BridgeError::MultipleActionDrafts) => PolicyResult::new(
+                    deny(
+                        evaluation.decision,
+                        PolicyReasonCode::CapabilityDenied,
+                        "red skill plan contains multiple action-draft tool calls",
+                    ),
+                    None,
+                    None,
+                    None,
+                ),
+                Err(BridgeError::InvalidInput(message)) => PolicyResult::new(
+                    deny(evaluation.decision, PolicyReasonCode::InvalidInput, message),
+                    None,
+                    None,
+                    None,
+                ),
+            };
         }
 
         let Some(scope) = evaluation.scopes.first() else {
@@ -134,6 +185,7 @@ impl PolicyEngine {
                     PolicyReasonCode::UnknownResource,
                     "no resolved named resource contract",
                 ),
+                None,
                 None,
                 None,
             );
@@ -147,24 +199,22 @@ impl PolicyEngine {
                 ),
                 None,
                 None,
+                None,
             );
         }
 
-        let manifest = self
-            .skills
-            .get(&request.execution.skill)
-            .expect("allowed decisions always have a registered manifest");
         let contract = self
             .scopes
             .resources()
             .get(&scope.named_resource)
             .expect("resolved scopes always have a registered contract");
 
+        let merged_privacy = manifest.privacy.merge_with_org(&self.org_privacy);
         let (protected_output, privacy_report) = match self.privacy.protect_output(
             &request.candidate_output,
             &scope.rows_field,
             request.execution.company_id,
-            &manifest.privacy,
+            &merged_privacy,
         ) {
             Ok(output) => output,
             Err(error) => {
@@ -174,6 +224,7 @@ impl PolicyEngine {
                 };
                 return PolicyResult::new(
                     deny(evaluation.decision, code, error.message()),
+                    None,
                     None,
                     None,
                 );
@@ -192,6 +243,7 @@ impl PolicyEngine {
                 ),
                 None,
                 Some(privacy_report),
+                None,
             );
         }
 
@@ -204,6 +256,7 @@ impl PolicyEngine {
                 ),
                 None,
                 Some(privacy_report),
+                None,
             );
         }
 
@@ -211,6 +264,7 @@ impl PolicyEngine {
             evaluation.decision,
             Some(protected_output),
             Some(privacy_report),
+            None,
         )
     }
 
@@ -422,23 +476,29 @@ impl PolicyEngine {
                 DecisionOutcome::DraftOnly
             }
             RiskClass::Red => {
-                let explicitly_approved = request
-                    .metadata
-                    .approval
-                    .as_ref()
-                    .is_some_and(ApprovalMetadata::is_explicit)
-                    || request
-                        .metadata
-                        .correction
-                        .as_ref()
-                        .is_some_and(CorrectionMetadata::is_explicit);
-                if !explicitly_approved {
+                // Red skills are not executed directly. If the manifest permits
+                // ActionDraft capability, the request is converted into a pending
+                // action draft that requires independent human approval.
+                let capabilities: std::collections::BTreeSet<_> = request
+                    .plan
+                    .tool_calls
+                    .iter()
+                    .map(|call| call.capability)
+                    .collect();
+                let only_safe = capabilities
+                    .iter()
+                    .all(|cap| matches!(cap, Capability::NamedRead | Capability::ActionDraft));
+                let has_action_draft = capabilities.contains(&Capability::ActionDraft);
+
+                if has_action_draft && only_safe {
+                    DecisionOutcome::DraftOnly
+                } else {
                     violations.push(DecisionReason::new(
-                        PolicyReasonCode::RedApprovalRequired,
-                        "red skills require complete approval or correction metadata",
+                        PolicyReasonCode::RedExecutionUnavailable,
+                        "red skills with execution capabilities other than action-draft are not supported",
                     ));
+                    DecisionOutcome::Deny
                 }
-                DecisionOutcome::Allow
             }
         };
 
@@ -457,8 +517,12 @@ impl PolicyEngine {
             };
         }
 
-        let reason = match outcome {
-            DecisionOutcome::DraftOnly => DecisionReason::new(
+        let reason = match (manifest.risk, outcome) {
+            (RiskClass::Red, DecisionOutcome::DraftOnly) => DecisionReason::new(
+                PolicyReasonCode::RedApprovalRequired,
+                "red action requires independent human approval via action draft",
+            ),
+            (_, DecisionOutcome::DraftOnly) => DecisionReason::new(
                 PolicyReasonCode::DraftOnly,
                 "amber policy permits draft output only",
             ),
@@ -744,7 +808,7 @@ mod tests {
     }
 
     #[test]
-    fn red_requires_explicit_approval_or_correction() {
+    fn red_without_action_draft_capability_is_denied() {
         let engine = custom_engine(RiskClass::Red, ReviewStatus::Promoted);
         let mut request = valid_request();
         request.skill = SkillVersionRef::new("custom", 1);
@@ -755,7 +819,7 @@ mod tests {
             approved_by: "manager-1".to_string(),
             approved_at: "2026-07-10T12:00:00Z".to_string(),
         });
-        assert_eq!(engine.evaluate(&request).outcome, DecisionOutcome::Allow);
+        assert_eq!(engine.evaluate(&request).outcome, DecisionOutcome::Deny);
 
         request.metadata.approval = None;
         request.metadata.correction = Some(CorrectionMetadata {
@@ -764,7 +828,40 @@ mod tests {
             corrected_at: "2026-07-10T12:00:00Z".to_string(),
             reason: "verified exception".to_string(),
         });
-        assert_eq!(engine.evaluate(&request).outcome, DecisionOutcome::Allow);
+        let decision = engine.evaluate(&request);
+        assert_eq!(decision.outcome, DecisionOutcome::Deny);
+        assert!(decision
+            .reasons
+            .iter()
+            .any(|reason| reason.code == PolicyReasonCode::RedExecutionUnavailable));
+    }
+
+    #[test]
+    fn red_action_draft_returns_proposal() {
+        let engine = custom_engine(RiskClass::Red, ReviewStatus::Promoted);
+        let mut request = valid_request();
+        request.skill = SkillVersionRef::new("custom", 1);
+        request.input = serde_json::json!({"partner_id": 42});
+        request.plan.tool_calls[0].tool_name = "create_sale_order".to_string();
+        request.plan.tool_calls[0].capability = Capability::ActionDraft;
+        request.plan.tool_calls[0].named_resource = None;
+        request.plan.output_type = "action_draft".to_string();
+
+        let result = engine.execute_controlled(PolicyControlledRequest {
+            execution: request,
+            candidate_output: Value::Null,
+        });
+
+        assert_eq!(result.decision.outcome, DecisionOutcome::DraftOnly);
+        assert!(result
+            .decision
+            .reasons
+            .iter()
+            .any(|reason| reason.code == PolicyReasonCode::RedApprovalRequired));
+        let proposal = result.action_draft.expect("action draft proposal missing");
+        assert_eq!(proposal.reducer_name, "create_sale_order");
+        assert!(proposal.elevated);
+        assert!(proposal.params_json.contains("\"company_id\":7"));
     }
 
     #[test]

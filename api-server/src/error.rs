@@ -19,6 +19,7 @@ pub enum ApiError {
     Gone(String),
     NotFound(String),
     Unprocessable(String),
+    Unavailable(String),
     Internal(String),
 }
 
@@ -48,6 +49,7 @@ impl IntoResponse for ApiError {
             ApiError::Gone(m) => (StatusCode::GONE, m),
             ApiError::NotFound(m) => (StatusCode::NOT_FOUND, m),
             ApiError::Unprocessable(m) => (StatusCode::UNPROCESSABLE_ENTITY, m),
+            ApiError::Unavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m),
             ApiError::Internal(m) => {
                 error!(message = %m, "internal api error");
                 (StatusCode::INTERNAL_SERVER_ERROR, m)

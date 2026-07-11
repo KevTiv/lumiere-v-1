@@ -9,9 +9,15 @@ if [[ ! -d "$DIR" ]]; then
   exit 1
 fi
 find "$DIR" -name '*.rs' -print0 | xargs -0 perl -pi -e '
-  s/pub type:/pub r#type:/g;
-  s/pub ref:/pub r#ref:/g;
-  s/^(\s+)type: (__sdk)/$1r#type: $2/gm;
-  s/^(\s+)ref: (__sdk)/$1r#ref: $2/gm;
+  # A raw identifier preserves the original column name for generated codecs.
+  # `self`, `Self`, `super`, and `crate` cannot be raw identifiers and require
+  # generator support if they are ever used as column names.
+  my $keyword = qr/
+    as|async|await|break|const|continue|dyn|else|enum|extern|false|fn|for|gen|if|impl|in|
+    let|loop|match|mod|move|mut|pub|ref|return|static|struct|trait|true|type|union|unsafe|use|
+    where|while|abstract|become|box|do|final|macro|override|priv|try|typeof|unsized|virtual|yield
+  /x;
+  s/^(\s*pub\s+)($keyword)(\s*:)/${1}r#${2}${3}/gm;
+  s/^(\s*)($keyword)(\s*:)/${1}r#${2}${3}/gm;
 '
-echo "fixed Rust keywords in $DIR"
+echo "escaped Rust keyword fields in $DIR"

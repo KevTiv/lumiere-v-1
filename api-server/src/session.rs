@@ -5,13 +5,13 @@ use serde_json::Value;
 
 use crate::error::ApiError;
 use crate::state::AppState;
-use stdb_config::runtime_is_production;
 use stdb_auth::{
     select_casbin_rules_in_subjects_sql, select_roles_active_sql,
     select_user_organization_for_identity_sql, select_user_profile_by_identity_sql, CasbinRuleLike,
     FieldAccessContext,
 };
 use stdb_client::StdbClient;
+use stdb_config::runtime_is_production;
 
 const ADMIN_TOKEN_PLACEHOLDERS: &[&str] = &[
     "",
@@ -363,6 +363,8 @@ mod tests {
             resend_from_email: "test@example.com".into(),
             app_url: "http://localhost:3000".into(),
             cookie_secure: false,
+            report_renderer_url: None,
+            report_artifact_dir: std::env::temp_dir().join("lumiere-owner-reports-test"),
         }
     }
 
@@ -404,14 +406,9 @@ mod tests {
         let state = AppState::new(test_config(None));
         let token = fake_jwt(r#"{"iss":"spacetimedb"}"#);
         let auth = format!("Bearer {token}");
-        let session = resolve_api_session(
-            &state,
-            Some(&auth),
-            None,
-            Some(VALID_IDENTITY_HEX),
-        )
-        .await
-        .expect("resolve should not error");
+        let session = resolve_api_session(&state, Some(&auth), None, Some(VALID_IDENTITY_HEX))
+            .await
+            .expect("resolve should not error");
         assert!(session.is_none());
     }
 

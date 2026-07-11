@@ -138,7 +138,7 @@ export function AiActionDraftDiffPanel({
               className="grid grid-cols-[minmax(7rem,35%)_1fr] gap-2 py-1.5 text-[10px]"
             >
               <dt className="text-muted-foreground">{field.label}</dt>
-              <dd className="text-foreground break-words">{field.value}</dd>
+              <dd className="text-foreground wrap-break-word">{field.value}</dd>
             </div>
           ))}
         </dl>

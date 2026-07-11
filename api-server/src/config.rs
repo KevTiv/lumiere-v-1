@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::path::PathBuf;
 use stdb_config::{
     env_stdb_host_or_next_public, env_stdb_module_or_next_public, normalize_stdb_http_host,
     runtime_is_production, DEFAULT_STDB_MODULE_DEV,
@@ -24,6 +25,10 @@ pub struct Config {
     pub resend_from_email: String,
     pub app_url: String,
     pub cookie_secure: bool,
+    /// Trusted internal Chromium worker used only for owner-report PDFs.
+    pub report_renderer_url: Option<String>,
+    /// Mounted, durable object-store volume for opaque owner-report artifacts.
+    pub report_artifact_dir: PathBuf,
 }
 
 impl Config {
@@ -128,6 +133,13 @@ impl Config {
             || std::env::var("COOKIE_FORCE_SECURE")
                 .map(|v| v == "true")
                 .unwrap_or(false);
+        let report_renderer_url = std::env::var("LUMIERE_REPORT_RENDERER_URL")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .map(|value| value.trim_end_matches('/').to_string());
+        let report_artifact_dir = std::env::var("LUMIERE_REPORT_ARTIFACT_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| std::env::temp_dir().join("lumiere-owner-reports"));
 
         Ok(Config {
             port,
@@ -143,6 +155,8 @@ impl Config {
             resend_from_email,
             app_url,
             cookie_secure,
+            report_renderer_url,
+            report_artifact_dir,
         })
     }
 }

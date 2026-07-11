@@ -217,6 +217,50 @@ pub async fn execute_resource_query(
             sort_rows_by_id_desc(&mut rows);
             return Ok(rows);
         }
+        "ai-skill-versions" => {
+            let sql = format!(
+                "SELECT id, organization_id, skill_id, skill_key, version, manifest_schema_version, source_hash, risk, max_steps, max_tool_calls, permissions, resources, output_types, reviewed_at, review_notes, created_at, metadata FROM ai_skill_version WHERE organization_id = {organization_id}"
+            );
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
+        }
+        "ai-skill-releases" => {
+            let sql = format!(
+                "SELECT id, organization_id, skill_id, skill_version_id, release_number, is_active, action, previous_release_id, rollback_target_release_id, released_at, reason FROM ai_skill_release WHERE organization_id = {organization_id}"
+            );
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
+        }
+        "ai-skill-fixtures" => {
+            let sql = format!(
+                "SELECT id, organization_id, skill_id, fixture_key, name, description, input_json, expected_output_json, created_at, metadata FROM ai_skill_fixture WHERE organization_id = {organization_id}"
+            );
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
+        }
+        "ai-skill-test-runs" => {
+            let sql = format!(
+                "SELECT id, organization_id, skill_id, skill_version_id, fixture_id, status, actual_output_json, output_fingerprint, failure_reason, executed_at, metadata FROM ai_skill_test_run WHERE organization_id = {organization_id}"
+            );
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
+        }
         "ai-action-drafts-inbox" => {
             // `ai_action_draft` has `organization_id`; `company_id IN (...)` is redundant and
             // SpacetimeDB SQL does not support `IN` clauses. Scope by org only.
@@ -288,7 +332,11 @@ pub async fn execute_resource_query(
                 row.get("metadata")
                     .and_then(|v| v.as_str())
                     .and_then(|s| serde_json::from_str::<Value>(s).ok())
-                    .and_then(|meta| meta.get("delivery").and_then(|d| d.as_str()).map(|d| d == "queued"))
+                    .and_then(|meta| {
+                        meta.get("delivery")
+                            .and_then(|d| d.as_str())
+                            .map(|d| d == "queued")
+                    })
                     .unwrap_or(false)
             });
             return Ok(rows);
@@ -722,7 +770,11 @@ pub async fn execute_resource_query(
                 .query_sql(&job_sql)
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
-            let job_ids: Vec<u64> = job_rows.iter().map(row_id_u64).filter(|id| *id > 0).collect();
+            let job_ids: Vec<u64> = job_rows
+                .iter()
+                .map(row_id_u64)
+                .filter(|id| *id > 0)
+                .collect();
             if job_ids.is_empty() {
                 return Ok(vec![]);
             }
@@ -759,7 +811,8 @@ pub async fn execute_resource_query(
             if config_ids.is_empty() {
                 return Ok(vec![]);
             }
-            let cols = resolve_http_sql_columns("form-config-fields", fa).map_err(ApiError::Internal)?;
+            let cols =
+                resolve_http_sql_columns("form-config-fields", fa).map_err(ApiError::Internal)?;
             let sql = format!("SELECT {} FROM form_config_field", cols.join(", "));
             let mut rows = client
                 .query_sql(&sql)
@@ -798,7 +851,8 @@ pub async fn execute_resource_query(
             if config_ids.is_empty() {
                 return Ok(vec![]);
             }
-            let cols = resolve_http_sql_columns("form-role-configs", fa).map_err(ApiError::Internal)?;
+            let cols =
+                resolve_http_sql_columns("form-role-configs", fa).map_err(ApiError::Internal)?;
             let sql = format!("SELECT {} FROM form_role_config", cols.join(", "));
             let mut rows = client
                 .query_sql(&sql)

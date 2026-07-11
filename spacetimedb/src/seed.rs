@@ -130,6 +130,10 @@ use crate::accounting::intercompany::{
 use crate::accounting::journal_entries::{
     account_move, account_move_line, AccountMove, AccountMoveLine,
 };
+use crate::accounting::payment_management::{
+    payment_account, payment_fee, payment_reconciliation, payment_transaction, PaymentAccount,
+    PaymentFee, PaymentReconciliation, PaymentTransaction,
+};
 use crate::accounting::payment_terms::{
     account_payment_term, account_payment_term_line, AccountPaymentTerm, AccountPaymentTermLine,
 };
@@ -160,7 +164,8 @@ use crate::types::{
     HelpdeskTicketState, HrLeaveState, InsightSeverity, InstanceState, IntakeState,
     IntegrationStatus, IntercompanyState, InvoiceStatus, JobStatus, JournalType, LandedCostState,
     LineInvoiceStatus, LineState, MailMessageType, MoState, MoveType, PartnerType,
-    PaymentMethodType, PaymentState, PaymentStatus, PaymentTermValue, PaymentType, PayslipState,
+    PaymentDirection, PaymentFeeBearer, PaymentMethodType, PaymentProviderCode, PaymentState,
+    PaymentStatus, PaymentTermValue, PaymentTransactionStatus, PaymentType, PayslipState,
     PeriodState, PoInvoiceStatus, PoState, PosOrderState, ReportState, ReportType,
     RequisitionState, RuleType, SaleState, SessionState, SplitMethod, SyncStatus, TaskState,
     TaxAmountType, TaxDeadlineStatus, TaxDeadlineType, TaxTypeUse, TicketPriority, WidgetType,
@@ -233,6 +238,10 @@ use crate::ai::agents::{ai_agent, ai_team_member, AiAgent, AiTeamMember};
 use crate::ai::intelligence::{
     ai_document_processing_job, ai_insight, search_embedding, AiDocumentProcessingJob, AiInsight,
     SearchEmbedding,
+};
+use crate::ai::skill_registry::{
+    ai_skill_fixture, ai_skill_release, ai_skill_test_run, ai_skill_version, AiSkillFixture,
+    AiSkillRelease, AiSkillRisk, AiSkillTestRun, AiSkillTestRunStatus, AiSkillVersion,
 };
 use crate::ai::skills::{
     ai_skill, ai_skill_config, ai_team_member_skill, AiSkill, AiSkillConfig, AiTeamMemberSkill,
@@ -1482,7 +1491,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         partner_invoice_id: contact_acme.id,
         partner_shipping_id: contact_acme.id,
         pricelist_id: default_pricelist.id,
-        currency_id: 1,  // placeholder
+        currency_id: 1, // placeholder
         payment_term_id: None,
         fiscal_position_id: None,
         user_id: seeder,
@@ -3046,7 +3055,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
 
     // AR line for unpaid invoice 1
-    ctx.db.account_move_line().insert(AccountMoveLine {
+    let invoice_unpaid1_ar_line = ctx.db.account_move_line().insert(AccountMoveLine {
         id: 0,
         organization_id: org_id,
         move_id: invoice_unpaid1.id,
@@ -3832,6 +3841,209 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         state: PaymentState::NotPaid,
         created_at: ctx.timestamp,
         create_uid: seeder,
+    });
+
+    // ── 5.5b Owner report payment fixtures ────────────────────────────────────
+    let owner_wallet = ctx.db.payment_account().insert(PaymentAccount {
+        id: 0,
+        organization_id: org_id,
+        company_id: company_id,
+        provider_code: PaymentProviderCode::Mtn,
+        name: "MTN Main Wallet".to_string(),
+        provider_label: None,
+        reference_normalized: Some("233501010001".to_string()),
+        reference_masked: Some("***0001".to_string()),
+        currency_id: 1,
+        account_journal_id: journal_bank.id,
+        fee_account_id: None,
+        clearing_account_id: None,
+        active: true,
+        is_primary: true,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        created_by: seeder,
+        updated_by: seeder,
+        archived_at: None,
+        metadata: Some("{\"seed\":true,\"purpose\":\"owner_reports\"}".to_string()),
+    });
+
+    let owner_receipt_payment = ctx.db.account_payment().insert(AccountPayment {
+        id: 0,
+        organization_id: org_id,
+        company_id: company_id,
+        name: Some("PAY-OWNER-0001".to_string()),
+        move_id: None,
+        payment_type: PaymentType::InBound,
+        partner_type: PartnerType::Customer,
+        partner_id: contact_acme.id,
+        amount: 15_000.0,
+        currency_id: 1,
+        date: ctx.timestamp,
+        journal_id: journal_bank.id,
+        ref_: Some("SEED-MTN-0001".to_string()),
+        memo: Some("Owner report seeded mobile-money receipt".to_string()),
+        reconciled_invoice_ids: vec![],
+        reconciled_bill_ids: vec![],
+        state: PaymentState::Paid,
+        created_at: ctx.timestamp,
+        create_uid: seeder,
+    });
+
+    let owner_receipt_txn = ctx.db.payment_transaction().insert(PaymentTransaction {
+        id: 0,
+        organization_id: org_id,
+        company_id: company_id,
+        payment_account_id: owner_wallet.id,
+        direction: PaymentDirection::Inbound,
+        partner_type: PartnerType::Customer,
+        partner_id: contact_acme.id,
+        external_reference: Some("SEED-MTN-0001".to_string()),
+        reference_fingerprint: "seedmtn0001".to_string(),
+        gross_external_amount: 15_300.0,
+        settlement_amount: 15_000.0,
+        net_account_amount: 14_700.0,
+        currency_id: 1,
+        occurred_at: ctx.timestamp,
+        status: PaymentTransactionStatus::Posted,
+        account_payment_id: Some(owner_receipt_payment.id),
+        source_entity: None,
+        source_entity_id: None,
+        evidence_document_ids: vec![],
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        created_by: seeder,
+        updated_by: seeder,
+        voided_at: None,
+        metadata: Some("{\"seed\":true,\"purpose\":\"owner_reports_receipt\"}".to_string()),
+    });
+
+    let _ = ctx.db.payment_fee().insert(PaymentFee {
+        id: 0,
+        organization_id: org_id,
+        company_id: company_id,
+        payment_transaction_id: owner_receipt_txn.id,
+        bearer: PaymentFeeBearer::Company,
+        amount: 300.0,
+        currency_id: 1,
+        fee_account_id: None,
+        tax_account_id: None,
+        tax_amount: 0.0,
+        provider_reference: Some("SEED-MTN-FEE-0001".to_string()),
+        created_at: ctx.timestamp,
+        created_by: seeder,
+        metadata: None,
+    });
+
+    let _ = ctx.db.payment_transaction().insert(PaymentTransaction {
+        id: 0,
+        organization_id: org_id,
+        company_id: company_id,
+        payment_account_id: owner_wallet.id,
+        direction: PaymentDirection::Inbound,
+        partner_type: PartnerType::Customer,
+        partner_id: contact_acme.id,
+        external_reference: Some("SEED-UNREC-0001".to_string()),
+        reference_fingerprint: "seedunrec0001".to_string(),
+        gross_external_amount: 2_500.0,
+        settlement_amount: 2_500.0,
+        net_account_amount: 2_500.0,
+        currency_id: 1,
+        occurred_at: ctx.timestamp,
+        status: PaymentTransactionStatus::Posted,
+        account_payment_id: None,
+        source_entity: None,
+        source_entity_id: None,
+        evidence_document_ids: vec![],
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        created_by: seeder,
+        updated_by: seeder,
+        voided_at: None,
+        metadata: Some("{\"seed\":true,\"purpose\":\"owner_reports_unreconciled\"}".to_string()),
+    });
+
+    let owner_partial_payment = ctx.db.account_payment().insert(AccountPayment {
+        id: 0,
+        organization_id: org_id,
+        company_id: company_id,
+        name: Some("PAY-OWNER-0002".to_string()),
+        move_id: None,
+        payment_type: PaymentType::InBound,
+        partner_type: PartnerType::Customer,
+        partner_id: contact_wayne.id,
+        amount: 5_000.0,
+        currency_id: 1,
+        date: ctx.timestamp,
+        journal_id: journal_bank.id,
+        ref_: Some("INV/2026/00010".to_string()),
+        memo: Some("Partial receipt against Wayne invoice".to_string()),
+        reconciled_invoice_ids: vec![invoice_unpaid1.id],
+        reconciled_bill_ids: vec![],
+        state: PaymentState::Paid,
+        created_at: ctx.timestamp,
+        create_uid: seeder,
+    });
+
+    let owner_partial_txn = ctx.db.payment_transaction().insert(PaymentTransaction {
+        id: 0,
+        organization_id: org_id,
+        company_id: company_id,
+        payment_account_id: owner_wallet.id,
+        direction: PaymentDirection::Inbound,
+        partner_type: PartnerType::Customer,
+        partner_id: contact_wayne.id,
+        external_reference: Some("SEED-WAYNE-PARTIAL".to_string()),
+        reference_fingerprint: "seedwaynepartial".to_string(),
+        gross_external_amount: 5_000.0,
+        settlement_amount: 5_000.0,
+        net_account_amount: 5_000.0,
+        currency_id: 1,
+        occurred_at: ctx.timestamp,
+        status: PaymentTransactionStatus::Posted,
+        account_payment_id: Some(owner_partial_payment.id),
+        source_entity: Some("account_move".to_string()),
+        source_entity_id: Some(invoice_unpaid1.id),
+        evidence_document_ids: vec![],
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        created_by: seeder,
+        updated_by: seeder,
+        voided_at: None,
+        metadata: Some("{\"seed\":true,\"purpose\":\"owner_reports_partial_ar\"}".to_string()),
+    });
+
+    let _ = ctx
+        .db
+        .payment_reconciliation()
+        .insert(PaymentReconciliation {
+            id: 0,
+            organization_id: org_id,
+            company_id: company_id,
+            payment_transaction_id: owner_partial_txn.id,
+            account_payment_id: owner_partial_payment.id,
+            allocated_move_line_id: invoice_unpaid1_ar_line.id,
+            allocated_amount: 5_000.0,
+            currency_id: 1,
+            residual_before: 13_750.0,
+            residual_after: 8_750.0,
+            write_off_amount: 0.0,
+            write_off_account_id: None,
+            is_reversal: false,
+            reversed_reconciliation_id: None,
+            created_at: ctx.timestamp,
+            created_by: seeder,
+            metadata: Some("{\"seed\":true,\"purpose\":\"owner_reports_partial_ar\"}".to_string()),
+        });
+
+    ctx.db.account_move().id().update(AccountMove {
+        amount_residual: 8_750.0,
+        amount_residual_signed: 8_750.0,
+        ..invoice_unpaid1
+    });
+    ctx.db.account_move_line().id().update(AccountMoveLine {
+        amount_residual: 8_750.0,
+        amount_residual_currency: 8_750.0,
+        ..invoice_unpaid1_ar_line
     });
 
     // ── 5.6 Tax Management ────────────────────────────────────────────────────
@@ -6552,7 +6764,8 @@ Prioritize high-severity findings and cite related records."#,
         company_id: Some(company_id),
         skill_id: report_analysis.id,
         is_enabled: true,
-        config_json: "{\"default_limit\":10,\"max_snapshots\":3,\"max_output_rows\":500}".to_string(),
+        config_json: "{\"default_limit\":10,\"max_snapshots\":3,\"max_output_rows\":500}"
+            .to_string(),
         custom_instructions: None,
         tool_overrides: vec![],
         create_date: ctx.timestamp,
@@ -6594,7 +6807,9 @@ Prioritize high-severity findings and cite related records."#,
         company_id: Some(company_id),
         skill_id: supplier_discovery.id,
         is_enabled: true,
-        config_json: "{\"regions\":[],\"categories\":[],\"blocked_domains\":[],\"max_web_results\":8}".to_string(),
+        config_json:
+            "{\"regions\":[],\"categories\":[],\"blocked_domains\":[],\"max_web_results\":8}"
+                .to_string(),
         custom_instructions: None,
         tool_overrides: vec![],
         create_date: ctx.timestamp,
@@ -6622,6 +6837,187 @@ Prioritize high-severity findings and cite related records."#,
         module_hint: Some("inventory".to_string()),
         create_date: ctx.timestamp,
         write_date: ctx.timestamp,
+    });
+
+    // ── Phase 1 harness skill registry (report_composer) ──────────────────────
+    let report_composer = seed_system_skill(
+        ctx,
+        "report_composer",
+        "Report Composer",
+        "Compose typed owner-report summaries from catalog previews with policy enforcement.",
+        "reporting",
+        vec![
+            "named_resource_read".to_string(),
+            "save_artifact".to_string(),
+        ],
+        vec![],
+        r#"You are a green read-only report composer. Fetch typed owner-report previews for the selected company/date/timezone and summarize totals with citations."#,
+        None,
+        vec![],
+    );
+
+    let report_composer_manifest = concat!(
+        r#"{"limits":{"max_steps":1,"max_tool_calls":1},"output_types":["reports.daily_business_summary.summary.v1"],"permissions":["report:read"],"resources":["reports.daily_business_summary.v1"],"risk":"green","schema_version":1,"skill_key":"report_composer","source_hash":"sha256:"#,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        r#","version":"1.0.0"}"#
+    )
+    .to_string();
+
+    let report_composer_version = ctx.db.ai_skill_version().insert(AiSkillVersion {
+        id: 0,
+        version_key: format!("{}:{}:1.0.0", org_id, report_composer.id),
+        organization_id: org_id,
+        skill_id: report_composer.id,
+        skill_key: "report_composer".to_string(),
+        version: "1.0.0".to_string(),
+        manifest_schema_version: 1,
+        manifest_json: report_composer_manifest,
+        source_hash: format!("sha256:{}", "a".repeat(64)),
+        risk: AiSkillRisk::Green,
+        max_steps: 1,
+        max_tool_calls: 1,
+        permissions: vec!["report:read".to_string()],
+        resources: vec!["reports.daily_business_summary.v1".to_string()],
+        output_types: vec!["reports.daily_business_summary.summary.v1".to_string()],
+        reviewed_by: seeder,
+        reviewed_at: ctx.timestamp,
+        review_notes: Some("Seeded Phase 1 green report composer".to_string()),
+        created_by: seeder,
+        created_at: ctx.timestamp,
+        metadata: Some("{\"seed\":true,\"purpose\":\"harness_report_composer\"}".to_string()),
+    });
+
+    let report_composer_fixture = ctx.db.ai_skill_fixture().insert(AiSkillFixture {
+        id: 0,
+        fixture_key: format!("{}:{}:daily-summary-smoke", org_id, report_composer.id),
+        organization_id: org_id,
+        skill_id: report_composer.id,
+        name: "Daily summary smoke".to_string(),
+        description: Some("Canonical report composer output shape for daily summary".to_string()),
+        input_json: r#"{"companyId":1,"date":"2026-07-10","reportKey":"daily_business_summary_v1","timezone":"UTC"}"#.to_string(),
+        expected_output_json: r#"{"items":[],"reportKey":"daily_business_summary_v1","title":"Daily Business Summary"}"#.to_string(),
+        created_by: seeder,
+        created_at: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    let _ = ctx.db.ai_skill_test_run().insert(AiSkillTestRun {
+        id: 0,
+        organization_id: org_id,
+        skill_id: report_composer.id,
+        skill_version_id: report_composer_version.id,
+        fixture_id: report_composer_fixture.id,
+        status: AiSkillTestRunStatus::Passed,
+        actual_output_json: report_composer_fixture.expected_output_json.clone(),
+        output_fingerprint: "fnv1a:seed-smoke".to_string(),
+        failure_reason: None,
+        executed_by: seeder,
+        executed_at: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    let _ = ctx.db.ai_skill_release().insert(AiSkillRelease {
+        id: 0,
+        organization_id: org_id,
+        skill_id: report_composer.id,
+        skill_version_id: report_composer_version.id,
+        release_number: 1,
+        is_active: true,
+        action: "promote".to_string(),
+        previous_release_id: None,
+        rollback_target_release_id: None,
+        released_by: seeder,
+        released_at: ctx.timestamp,
+        reason: Some("Seeded Phase 1 harness release".to_string()),
+    });
+
+    // ── Phase 1 harness skill registry (low_stock) ──────────────────────────
+    let low_stock = seed_system_skill(
+        ctx,
+        "low_stock",
+        "Low Stock Scan",
+        "Scan inventory for products at or below reorder threshold with policy enforcement.",
+        "inventory",
+        vec!["named_resource_read".to_string()],
+        vec![],
+        r#"You are a green read-only inventory scanner. List products with quantity on hand at or below the reorder threshold for the selected company."#,
+        None,
+        vec![],
+    );
+
+    let low_stock_manifest = concat!(
+        r#"{"limits":{"max_steps":1,"max_tool_calls":1},"output_types":["inventory.low_stock.result.v1"],"permissions":["inventory:read"],"resources":["inventory.low_stock.v1"],"risk":"green","schema_version":1,"skill_key":"low_stock","source_hash":"sha256:"#,
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        r#","version":"1.0.0"}"#
+    )
+    .to_string();
+
+    let low_stock_version = ctx.db.ai_skill_version().insert(AiSkillVersion {
+        id: 0,
+        version_key: format!("{}:{}:1.0.0", org_id, low_stock.id),
+        organization_id: org_id,
+        skill_id: low_stock.id,
+        skill_key: "low_stock".to_string(),
+        version: "1.0.0".to_string(),
+        manifest_schema_version: 1,
+        manifest_json: low_stock_manifest,
+        source_hash: format!("sha256:{}", "b".repeat(64)),
+        risk: AiSkillRisk::Green,
+        max_steps: 1,
+        max_tool_calls: 1,
+        permissions: vec!["inventory:read".to_string()],
+        resources: vec!["inventory.low_stock.v1".to_string()],
+        output_types: vec!["inventory.low_stock.result.v1".to_string()],
+        reviewed_by: seeder,
+        reviewed_at: ctx.timestamp,
+        review_notes: Some("Seeded Phase 1 green low stock scanner".to_string()),
+        created_by: seeder,
+        created_at: ctx.timestamp,
+        metadata: Some("{\"seed\":true,\"purpose\":\"harness_low_stock\"}".to_string()),
+    });
+
+    let low_stock_fixture = ctx.db.ai_skill_fixture().insert(AiSkillFixture {
+        id: 0,
+        fixture_key: format!("{}:{}:low-stock-smoke", org_id, low_stock.id),
+        organization_id: org_id,
+        skill_id: low_stock.id,
+        name: "Low stock smoke".to_string(),
+        description: Some("Canonical low stock output shape for inventory scan".to_string()),
+        input_json: r#"{"threshold":5.0,"locationId":null}"#.to_string(),
+        expected_output_json: r#"{"items":[]}"#.to_string(),
+        created_by: seeder,
+        created_at: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    let _ = ctx.db.ai_skill_test_run().insert(AiSkillTestRun {
+        id: 0,
+        organization_id: org_id,
+        skill_id: low_stock.id,
+        skill_version_id: low_stock_version.id,
+        fixture_id: low_stock_fixture.id,
+        status: AiSkillTestRunStatus::Passed,
+        actual_output_json: low_stock_fixture.expected_output_json.clone(),
+        output_fingerprint: "fnv1a:seed-low-stock-smoke".to_string(),
+        failure_reason: None,
+        executed_by: seeder,
+        executed_at: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    let _ = ctx.db.ai_skill_release().insert(AiSkillRelease {
+        id: 0,
+        organization_id: org_id,
+        skill_id: low_stock.id,
+        skill_version_id: low_stock_version.id,
+        release_number: 1,
+        is_active: true,
+        action: "promote".to_string(),
+        previous_release_id: None,
+        rollback_target_release_id: None,
+        released_by: seeder,
+        released_at: ctx.timestamp,
+        reason: Some("Seeded Phase 1 harness low stock release".to_string()),
     });
 
     // =========================================================================
@@ -9691,9 +10087,10 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
         .organization()
         .iter()
         .find(|o| {
-            ctx.db.company().iter().any(|c| {
-                c.organization_id == o.id && c.deleted_at.is_none()
-            })
+            ctx.db
+                .company()
+                .iter()
+                .any(|c| c.organization_id == o.id && c.deleted_at.is_none())
         })
         .or_else(|| ctx.db.organization().iter().next())
         .ok_or("No organization row after ensure_minimal_dev_org")?;

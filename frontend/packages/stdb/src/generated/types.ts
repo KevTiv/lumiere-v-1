@@ -985,6 +985,34 @@ export const AiAgentRun = __t.object("AiAgentRun", {
 });
 export type AiAgentRun = __Infer<typeof AiAgentRun>;
 
+export const AiAgentRunPolicySnapshot = __t.object("AiAgentRunPolicySnapshot", {
+  id: __t.u64(),
+  runId: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  skillId: __t.u64(),
+  skillConfigId: __t.option(__t.u64()),
+  releaseId: __t.u64(),
+  skillVersionId: __t.u64(),
+  version: __t.string(),
+  sourceHash: __t.string(),
+  get risk() {
+    return AiSkillRisk;
+  },
+  manifestJson: __t.string(),
+  maxSteps: __t.u32(),
+  maxToolCalls: __t.u32(),
+  permissions: __t.array(__t.string()),
+  resources: __t.array(__t.string()),
+  outputTypes: __t.array(__t.string()),
+  configJson: __t.string(),
+  customInstructions: __t.option(__t.string()),
+  toolOverrides: __t.array(__t.string()),
+  recordedBy: __t.identity(),
+  recordedAt: __t.timestamp(),
+});
+export type AiAgentRunPolicySnapshot = __Infer<typeof AiAgentRunPolicySnapshot>;
+
 export const AiAgentRunStep = __t.object("AiAgentRunStep", {
   id: __t.u64(),
   runId: __t.u64(),
@@ -1148,6 +1176,97 @@ export const AiSkillConfig = __t.object("AiSkillConfig", {
   metadata: __t.option(__t.string()),
 });
 export type AiSkillConfig = __Infer<typeof AiSkillConfig>;
+
+export const AiSkillFixture = __t.object("AiSkillFixture", {
+  id: __t.u64(),
+  fixtureKey: __t.string(),
+  organizationId: __t.u64(),
+  skillId: __t.u64(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  inputJson: __t.string(),
+  expectedOutputJson: __t.string(),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiSkillFixture = __Infer<typeof AiSkillFixture>;
+
+export const AiSkillRelease = __t.object("AiSkillRelease", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  skillId: __t.u64(),
+  skillVersionId: __t.u64(),
+  releaseNumber: __t.u64(),
+  isActive: __t.bool(),
+  action: __t.string(),
+  previousReleaseId: __t.option(__t.u64()),
+  rollbackTargetReleaseId: __t.option(__t.u64()),
+  releasedBy: __t.identity(),
+  releasedAt: __t.timestamp(),
+  reason: __t.option(__t.string()),
+});
+export type AiSkillRelease = __Infer<typeof AiSkillRelease>;
+
+// The tagged union or sum type for the algebraic type `AiSkillRisk`.
+export const AiSkillRisk = __t.enum("AiSkillRisk", {
+  Green: __t.unit(),
+  Amber: __t.unit(),
+  Red: __t.unit(),
+});
+export type AiSkillRisk = __Infer<typeof AiSkillRisk>;
+
+export const AiSkillTestRun = __t.object("AiSkillTestRun", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  skillId: __t.u64(),
+  skillVersionId: __t.u64(),
+  fixtureId: __t.u64(),
+  get status() {
+    return AiSkillTestRunStatus;
+  },
+  actualOutputJson: __t.string(),
+  outputFingerprint: __t.string(),
+  failureReason: __t.option(__t.string()),
+  executedBy: __t.identity(),
+  executedAt: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiSkillTestRun = __Infer<typeof AiSkillTestRun>;
+
+// The tagged union or sum type for the algebraic type `AiSkillTestRunStatus`.
+export const AiSkillTestRunStatus = __t.enum("AiSkillTestRunStatus", {
+  Passed: __t.unit(),
+  Failed: __t.unit(),
+});
+export type AiSkillTestRunStatus = __Infer<typeof AiSkillTestRunStatus>;
+
+export const AiSkillVersion = __t.object("AiSkillVersion", {
+  id: __t.u64(),
+  versionKey: __t.string(),
+  organizationId: __t.u64(),
+  skillId: __t.u64(),
+  skillKey: __t.string(),
+  version: __t.string(),
+  manifestSchemaVersion: __t.u32(),
+  manifestJson: __t.string(),
+  sourceHash: __t.string(),
+  get risk() {
+    return AiSkillRisk;
+  },
+  maxSteps: __t.u32(),
+  maxToolCalls: __t.u32(),
+  permissions: __t.array(__t.string()),
+  resources: __t.array(__t.string()),
+  outputTypes: __t.array(__t.string()),
+  reviewedBy: __t.identity(),
+  reviewedAt: __t.timestamp(),
+  reviewNotes: __t.option(__t.string()),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiSkillVersion = __Infer<typeof AiSkillVersion>;
 
 export const AiTeamMember = __t.object("AiTeamMember", {
   id: __t.u64(),
@@ -2538,6 +2657,17 @@ export const CreateAiReducerAllowlistParams = __t.object("CreateAiReducerAllowli
 });
 export type CreateAiReducerAllowlistParams = __Infer<typeof CreateAiReducerAllowlistParams>;
 
+export const CreateAiSkillFixtureParams = __t.object("CreateAiSkillFixtureParams", {
+  skillId: __t.u64(),
+  fixtureKey: __t.string(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  inputJson: __t.string(),
+  expectedOutputJson: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateAiSkillFixtureParams = __Infer<typeof CreateAiSkillFixtureParams>;
+
 export const CreateAiSkillParams = __t.object("CreateAiSkillParams", {
   skillKey: __t.string(),
   name: __t.string(),
@@ -2557,6 +2687,14 @@ export const CreateAiSkillParams = __t.object("CreateAiSkillParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateAiSkillParams = __Infer<typeof CreateAiSkillParams>;
+
+export const CreateAiSkillVersionParams = __t.object("CreateAiSkillVersionParams", {
+  skillId: __t.u64(),
+  manifestJson: __t.string(),
+  reviewNotes: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateAiSkillVersionParams = __Infer<typeof CreateAiSkillVersionParams>;
 
 export const CreateAiTeamMemberParams = __t.object("CreateAiTeamMemberParams", {
   name: __t.string(),
@@ -6057,6 +6195,25 @@ export const GenerateSubscriptionInvoiceParams = __t.object("GenerateSubscriptio
 });
 export type GenerateSubscriptionInvoiceParams = __Infer<typeof GenerateSubscriptionInvoiceParams>;
 
+export const GeneratedOwnerReport = __t.object("GeneratedOwnerReport", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  reportKey: __t.string(),
+  schemaVersion: __t.u32(),
+  parametersJson: __t.string(),
+  sourceWatermarkJson: __t.string(),
+  outputHash: __t.string(),
+  rendererVersion: __t.string(),
+  artifactKey: __t.string(),
+  documentId: __t.u64(),
+  correlationId: __t.string(),
+  generatedBy: __t.identity(),
+  generatedAt: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type GeneratedOwnerReport = __Infer<typeof GeneratedOwnerReport>;
+
 export const GoogleDriveConnection = __t.object("GoogleDriveConnection", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -9225,6 +9382,15 @@ export const ReconcileAccountBankStatementLineParams = __t.object("ReconcileAcco
 });
 export type ReconcileAccountBankStatementLineParams = __Infer<typeof ReconcileAccountBankStatementLineParams>;
 
+export const RecordAiSkillTestRunParams = __t.object("RecordAiSkillTestRunParams", {
+  skillVersionId: __t.u64(),
+  fixtureId: __t.u64(),
+  actualOutputJson: __t.string(),
+  failureReason: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type RecordAiSkillTestRunParams = __Infer<typeof RecordAiSkillTestRunParams>;
+
 export const RecordBarcodeScanParams = __t.object("RecordBarcodeScanParams", {
   barcode: __t.string(),
   barcodeType: __t.string(),
@@ -9269,6 +9435,20 @@ export const RecordCycleCountLineParams = __t.object("RecordCycleCountLineParams
   metadata: __t.option(__t.string()),
 });
 export type RecordCycleCountLineParams = __Infer<typeof RecordCycleCountLineParams>;
+
+export const RecordGeneratedOwnerReportParams = __t.object("RecordGeneratedOwnerReportParams", {
+  reportKey: __t.string(),
+  schemaVersion: __t.u32(),
+  parametersJson: __t.string(),
+  sourceWatermarkJson: __t.string(),
+  outputHash: __t.string(),
+  rendererVersion: __t.string(),
+  artifactKey: __t.string(),
+  artifactSize: __t.u64(),
+  correlationId: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type RecordGeneratedOwnerReportParams = __Infer<typeof RecordGeneratedOwnerReportParams>;
 
 export const RecordPrivacyConsentParams = __t.object("RecordPrivacyConsentParams", {
   contactId: __t.u64(),

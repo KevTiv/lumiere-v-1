@@ -8293,6 +8293,15 @@
     }
   },
   "aiHarness": {
+    "tabs": {
+      "reportComposer": "Report composer",
+      "lowStock": "Low stock",
+      "redActionDrafts": "Red action drafts"
+    },
+    "auditTrail": {
+      "title": "Audit trail",
+      "correlationId": "Correlation ID"
+    },
     "reportComposer": {
       "title": "Report Composer",
       "greenSkillBadge": "Green skill",
@@ -8312,6 +8321,54 @@
       "summaryTitle": "Summary",
       "citationsTitle": "Citations",
       "rowsProcessed": "{{count}} rows"
+    },
+    "redAction": {
+      "title": "Red Action Drafts",
+      "redSkillBadge": "Red skill",
+      "description": "Create a proposed sales order for independent human approval. This workflow never executes the sales-order reducer directly.",
+      "approvalTitle": "Independent approval required",
+      "approvalDescription": "Submitting creates a pending, elevated action draft. Review and approve it from the AI Action Approvals inbox before any ERP mutation can occur.",
+      "formTitle": "Propose a sales order",
+      "formDescription": "Enter the existing ERP record IDs for the customer, pricelist, currency, and warehouse. Organization and actor scope come from your session.",
+      "companyLabel": "Company",
+      "companyPlaceholder": "Select a company…",
+      "customerIdLabel": "Customer ID",
+      "pricelistIdLabel": "Pricelist ID",
+      "currencyIdLabel": "Currency ID",
+      "warehouseIdLabel": "Warehouse ID",
+      "customerReferenceLabel": "Customer reference",
+      "customerReferencePlaceholder": "Optional customer PO or reference",
+      "noteLabel": "Internal note",
+      "notePlaceholder": "Optional note for the approver",
+      "previewTitle": "Draft preview",
+      "previewSummary": "Proposed sales order awaiting independent approval.",
+      "approvalWarning": "This is a red action draft requiring independent human approval.",
+      "createDraftButton": "Create approval draft",
+      "errorTitle": "Draft creation failed",
+      "errorDescription": "Could not create the approval draft. Please try again.",
+      "successTitle": "Approval draft created",
+      "successDescription": "Draft #{{id}} is pending review in AI Action Approvals."
+    },
+    "lowStock": {
+      "title": "Low Stock Scan",
+      "greenSkillBadge": "Green skill",
+      "description": "Run a promoted green skill that scans inventory for products at or below the reorder threshold with policy enforcement and audit logging.",
+      "formTitle": "Scan inventory",
+      "formDescription": "Select a company and threshold. Organization context comes from your session.",
+      "companyLabel": "Company",
+      "companyPlaceholder": "Select a company…",
+      "thresholdLabel": "Threshold",
+      "runButton": "Run low stock scan",
+      "errorTitle": "Scan failed",
+      "errorDescription": "Could not scan inventory. Please try again.",
+      "decisionTitle": "Policy decision",
+      "summaryTitle": "Summary",
+      "itemsTitle": "Low stock items ({{count}})",
+      "emptyItems": "No products matched the threshold.",
+      "skuColumn": "SKU",
+      "nameColumn": "Product",
+      "qtyColumn": "On hand",
+      "reorderColumn": "Reorder level"
     }
   },
   "map": {
@@ -9295,11 +9352,15 @@
       "caveatsTitle": "Caveats",
       "sourceWatermarkTitle": "Source watermark",
       "sourceWatermarkCutoff": "Accounting cutoff: {{cutoff}}",
+      "cutoffLabel": "Report window",
       "scope": {
         "company": "Company",
+        "localDate": "Local date",
         "dateFrom": "From",
         "dateTo": "To",
-        "timezone": "Timezone"
+        "timezone": "Timezone",
+        "windowStartUtc": "Window start (UTC)",
+        "windowEndUtc": "Window end (UTC)"
       },
       "totals": {
         "salesGross": "Sales gross",

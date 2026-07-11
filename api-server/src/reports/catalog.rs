@@ -64,7 +64,7 @@ pub const REPORT_CATALOG: [ReportCatalogEntry; 10] = [
             "unreconciled",
         ],
         authoritative_sources: &["journals", "payment_transactions", "allocations"],
-        availability: ReportAvailability::Planned,
+        availability: ReportAvailability::Preview,
         max_window_days: 31,
     },
     ReportCatalogEntry {
@@ -80,7 +80,7 @@ pub const REPORT_CATALOG: [ReportCatalogEntry; 10] = [
             "payments",
         ],
         authoritative_sources: &["account_move_lines", "allocations"],
-        availability: ReportAvailability::Planned,
+        availability: ReportAvailability::Preview,
         max_window_days: 366,
     },
     ReportCatalogEntry {
@@ -96,7 +96,7 @@ pub const REPORT_CATALOG: [ReportCatalogEntry; 10] = [
             "paid_amounts",
         ],
         authoritative_sources: &["account_move_lines", "allocations"],
-        availability: ReportAvailability::Planned,
+        availability: ReportAvailability::Preview,
         max_window_days: 366,
     },
     ReportCatalogEntry {
@@ -239,14 +239,21 @@ mod tests {
     }
 
     #[test]
-    fn only_daily_summary_is_previewable_in_the_first_slice() {
+    fn phase_one_slice_exposes_four_previewable_reports() {
         let previewable: Vec<_> = REPORT_CATALOG
             .iter()
             .filter(|entry| entry.availability == ReportAvailability::Preview)
             .collect();
 
-        assert_eq!(previewable.len(), 1);
-        assert_eq!(previewable[0].key, ReportKey::DailyBusinessSummaryV1);
-        assert_eq!(previewable[0].max_window_days, 1);
+        assert_eq!(previewable.len(), 4);
+        let keys: Vec<_> = previewable.iter().map(|entry| entry.key).collect();
+        assert!(keys.contains(&ReportKey::DailyBusinessSummaryV1));
+        assert!(keys.contains(&ReportKey::CashMobileMoneyV1));
+        assert!(keys.contains(&ReportKey::CustomerBalancesV1));
+        assert!(keys.contains(&ReportKey::SupplierPayablesV1));
+        assert_eq!(
+            catalog_entry(ReportKey::DailyBusinessSummaryV1).max_window_days,
+            1
+        );
     }
 }

@@ -142,6 +142,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/rag", post(routes::rag::post_rag))
         .route("/v1/rag/stream", post(routes::rag::post_rag_stream))
         .route("/v1/actions/draft", post(routes::actions::post_draft))
+        .route(
+            "/v1/actions/bridge",
+            post(routes::action_draft_bridge::post_bridge),
+        )
         .route("/v1/skills", get(routes::skills::get_skills))
         .route("/v1/skills/run", post(routes::skills::post_run))
         .route("/v1/skills/sync", post(routes::skills::post_sync))
@@ -159,6 +163,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/skills/report/compose",
             post(routes::report::post_compose),
+        )
+        .route(
+            "/v1/skills/inventory/low-stock",
+            post(routes::inventory::post_scan),
         )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),

@@ -16,6 +16,9 @@ const MAX_POLICY_ITEMS: usize = 128;
 const MAX_POLICY_ITEM_LEN: usize = 512;
 const MAX_STEPS: u32 = 32;
 const MAX_TOOL_CALLS: u32 = 64;
+const MAX_FIXTURE_JSON_LEN: usize = 64_000;
+const MAX_FIXTURE_NAME_LEN: usize = 120;
+const MAX_FIXTURE_KEY_LEN: usize = 160;
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
 pub enum AiSkillRisk {
@@ -122,6 +125,87 @@ pub struct AiSkillRelease {
     pub reason: Option<String>,
 }
 
+/// Deterministic fixture input/output contract for a skill version review gate.
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = ai_skill_fixture,
+    public,
+    index(
+        accessor = ai_skill_fixture_registry_by_org,
+        btree(columns = [organization_id])
+    ),
+    index(
+        accessor = ai_skill_fixture_registry_by_skill,
+        btree(columns = [skill_id])
+    )
+)]
+pub struct AiSkillFixture {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    #[unique]
+    pub fixture_key: String,
+    pub organization_id: u64,
+    pub skill_id: u64,
+    pub name: String,
+    pub description: Option<String>,
+    pub input_json: String,
+    pub expected_output_json: String,
+    pub created_by: Identity,
+    pub created_at: Timestamp,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
+pub enum AiSkillTestRunStatus {
+    Passed,
+    Failed,
+}
+
+impl AiSkillTestRunStatus {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Passed => "passed",
+            Self::Failed => "failed",
+        }
+    }
+}
+
+/// Immutable recorded result of executing one fixture against one skill version.
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = ai_skill_test_run,
+    public,
+    index(
+        accessor = ai_skill_test_run_registry_by_org,
+        btree(columns = [organization_id])
+    ),
+    index(
+        accessor = ai_skill_test_run_registry_by_version,
+        btree(columns = [skill_version_id])
+    ),
+    index(
+        accessor = ai_skill_test_run_registry_by_fixture,
+        btree(columns = [fixture_id])
+    )
+)]
+pub struct AiSkillTestRun {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub skill_id: u64,
+    pub skill_version_id: u64,
+    pub fixture_id: u64,
+    pub status: AiSkillTestRunStatus,
+    pub actual_output_json: String,
+    pub output_fingerprint: String,
+    pub failure_reason: Option<String>,
+    pub executed_by: Identity,
+    pub executed_at: Timestamp,
+    pub metadata: Option<String>,
+}
+
 /// Immutable effective policy recorded for one legacy `AiAgentRun`.
 #[derive(Clone)]
 #[spacetimedb::table(
@@ -171,6 +255,26 @@ pub struct CreateAiSkillVersionParams {
     /// insignificant whitespace. Policy arrays must be sorted and unique.
     pub manifest_json: String,
     pub review_notes: Option<String>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateAiSkillFixtureParams {
+    pub skill_id: u64,
+    pub fixture_key: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub input_json: String,
+    pub expected_output_json: String,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RecordAiSkillTestRunParams {
+    pub skill_version_id: u64,
+    pub fixture_id: u64,
+    pub actual_output_json: String,
+    pub failure_reason: Option<String>,
     pub metadata: Option<String>,
 }
 
@@ -289,7 +393,160 @@ pub fn promote_ai_skill_version(
         return Err("skill is not active".to_string());
     }
 
+    ensure_fixtures_passed_for_version(ctx, organization_id, version.skill_id, version.id)?;
     transition_release(ctx, organization_id, &version, "promote", None, reason)?;
+    Ok(())
+}
+
+#[reducer]
+pub fn create_ai_skill_fixture(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateAiSkillFixtureParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_skill", "create")?;
+    let skill = load_available_skill(ctx, organization_id, params.skill_id)?;
+    validate_canonical_text("fixture_key", &params.fixture_key, MAX_FIXTURE_KEY_LEN)?;
+    validate_canonical_text("name", &params.name, MAX_FIXTURE_NAME_LEN)?;
+    validate_optional_text(
+        "description",
+        params.description.as_deref(),
+        MAX_REVIEW_NOTES_LEN,
+    )?;
+    validate_fixture_json("input_json", &params.input_json)?;
+    validate_fixture_json("expected_output_json", &params.expected_output_json)?;
+
+    let fixture_key = format!(
+        "{}:{}:{}",
+        organization_id, params.skill_id, params.fixture_key
+    );
+    if ctx
+        .db
+        .ai_skill_fixture()
+        .fixture_key()
+        .find(&fixture_key)
+        .is_some()
+    {
+        return Err("fixture key already exists".to_string());
+    }
+
+    let row = ctx.db.ai_skill_fixture().insert(AiSkillFixture {
+        id: 0,
+        fixture_key,
+        organization_id,
+        skill_id: params.skill_id,
+        name: params.name,
+        description: params.description,
+        input_json: params.input_json,
+        expected_output_json: params.expected_output_json,
+        created_by: ctx.sender(),
+        created_at: ctx.timestamp,
+        metadata: params.metadata,
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "ai_skill_fixture",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "skill_id": row.skill_id,
+                    "skill_key": skill.skill_key,
+                    "name": row.name,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "fixture_key".to_string(),
+                "input_json".to_string(),
+                "expected_output_json".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[reducer]
+pub fn record_ai_skill_test_run(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: RecordAiSkillTestRunParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_skill", "write")?;
+    validate_fixture_json("actual_output_json", &params.actual_output_json)?;
+    validate_optional_text(
+        "failure_reason",
+        params.failure_reason.as_deref(),
+        MAX_REVIEW_NOTES_LEN,
+    )?;
+
+    let version = load_org_version(ctx, organization_id, params.skill_version_id)?;
+    let fixture = ctx
+        .db
+        .ai_skill_fixture()
+        .id()
+        .find(&params.fixture_id)
+        .ok_or("fixture not found")?;
+    if fixture.organization_id != organization_id {
+        return Err("fixture does not belong to this organization".to_string());
+    }
+    if fixture.skill_id != version.skill_id {
+        return Err("fixture does not belong to the version skill".to_string());
+    }
+
+    let status = if json_values_equal(&params.actual_output_json, &fixture.expected_output_json) {
+        if params.failure_reason.is_some() {
+            return Err("failure_reason cannot be set when output matches the fixture".to_string());
+        }
+        AiSkillTestRunStatus::Passed
+    } else {
+        AiSkillTestRunStatus::Failed
+    };
+
+    let row = ctx.db.ai_skill_test_run().insert(AiSkillTestRun {
+        id: 0,
+        organization_id,
+        skill_id: version.skill_id,
+        skill_version_id: version.id,
+        fixture_id: fixture.id,
+        status: status.clone(),
+        actual_output_json: params.actual_output_json.clone(),
+        output_fingerprint: output_fingerprint(&params.actual_output_json),
+        failure_reason: params.failure_reason,
+        executed_by: ctx.sender(),
+        executed_at: ctx.timestamp,
+        metadata: params.metadata,
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "ai_skill_test_run",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "skill_version_id": row.skill_version_id,
+                    "fixture_id": row.fixture_id,
+                    "status": status.as_str(),
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["status".to_string(), "actual_output_json".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -552,6 +809,74 @@ fn load_org_version(
         return Err("skill version does not belong to this organization".to_string());
     }
     Ok(version)
+}
+
+fn ensure_fixtures_passed_for_version(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    skill_id: u64,
+    skill_version_id: u64,
+) -> Result<(), String> {
+    let fixtures = ctx
+        .db
+        .ai_skill_fixture()
+        .ai_skill_fixture_registry_by_org()
+        .filter(&organization_id)
+        .filter(|row| row.skill_id == skill_id)
+        .collect::<Vec<_>>();
+    if fixtures.is_empty() {
+        return Ok(());
+    }
+
+    for fixture in fixtures {
+        let passed = ctx
+            .db
+            .ai_skill_test_run()
+            .ai_skill_test_run_registry_by_version()
+            .filter(&skill_version_id)
+            .any(|run| run.fixture_id == fixture.id && run.status == AiSkillTestRunStatus::Passed);
+        if !passed {
+            return Err(format!(
+                "fixture '{}' has no passing test run for this version",
+                fixture.name
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_fixture_json(field: &str, raw: &str) -> Result<(), String> {
+    if raw.is_empty() {
+        return Err(format!("{field} is required"));
+    }
+    if raw.len() > MAX_FIXTURE_JSON_LEN {
+        return Err(format!("{field} is too long"));
+    }
+    let value: Value =
+        serde_json::from_str(raw).map_err(|error| format!("invalid {field}: {error}"))?;
+    if value.to_string() != raw {
+        return Err(format!("{field} must use canonical compact JSON"));
+    }
+    Ok(())
+}
+
+fn json_values_equal(left: &str, right: &str) -> bool {
+    let Ok(left_value) = serde_json::from_str::<Value>(left) else {
+        return false;
+    };
+    let Ok(right_value) = serde_json::from_str::<Value>(right) else {
+        return false;
+    };
+    left_value == right_value
+}
+
+fn output_fingerprint(raw: &str) -> String {
+    let mut hash: u64 = 14695981039346656037;
+    for byte in raw.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(1099511628211);
+    }
+    format!("fnv1a:{hash:016x}")
 }
 
 fn load_active_release(
@@ -901,6 +1226,15 @@ mod tests {
         assert!(validate_manifest(&unsorted, "lead-enrichment")
             .unwrap_err()
             .contains("sorted and unique"));
+    }
+
+    #[test]
+    fn json_values_equal_compares_canonical_structures() {
+        assert!(json_values_equal(
+            r#"{"a":1,"b":[2]}"#,
+            r#"{"a":1,"b":[2]}"#
+        ));
+        assert!(!json_values_equal(r#"{"a":1}"#, r#"{"a":2}"#));
     }
 
     #[test]

@@ -12,6 +12,11 @@ export const AI_SKILLS_BFF_REDUCERS = [
   "upsert_ai_skill_config",
   "assign_team_member_skill",
   "unassign_team_member_skill",
+  "create_ai_skill_version",
+  "create_ai_skill_fixture",
+  "record_ai_skill_test_run",
+  "promote_ai_skill_version",
+  "rollback_ai_skill_release",
 ] as const;
 
 export type AiSkillsBffReducerKey = (typeof AI_SKILLS_BFF_REDUCERS)[number];
@@ -46,6 +51,11 @@ const AI_SKILLS_HINT_OVERRIDES: Partial<
   upsert_ai_skill_config: ["ai-skills"],
   assign_team_member_skill: ["ai-team-member-skills"],
   unassign_team_member_skill: ["ai-team-member-skills"],
+  create_ai_skill_version: ["ai-skill-versions"],
+  create_ai_skill_fixture: ["ai-skill-fixtures"],
+  record_ai_skill_test_run: ["ai-skill-test-runs"],
+  promote_ai_skill_version: ["ai-skill-releases"],
+  rollback_ai_skill_release: ["ai-skill-releases"],
 };
 
 function aiSkillsReducerHints(): Record<AiSkillsBffReducerKey, readonly string[]> {

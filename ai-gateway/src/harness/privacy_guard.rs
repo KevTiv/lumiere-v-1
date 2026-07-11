@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use serde_json::{Map, Value};
 
-use super::{audit::PrivacyReport, manifest::PrivacyPolicy};
+use super::{audit::PrivacyReport, manifest::MergedPrivacyPolicy};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PrivacyError {
@@ -38,7 +38,7 @@ impl PrivacyGuard {
         output: &Value,
         rows_field: &str,
         expected_company_id: u64,
-        policy: &PrivacyPolicy,
+        policy: &MergedPrivacyPolicy,
     ) -> Result<(Value, PrivacyReport), PrivacyError> {
         let object = output.as_object().ok_or_else(|| {
             PrivacyError::InvalidOutput("policy-controlled output must be an object".to_string())
@@ -54,6 +54,11 @@ impl PrivacyGuard {
 
         let allowed: BTreeSet<String> = policy
             .allowed_fields
+            .iter()
+            .map(|field| normalized_field(field))
+            .collect();
+        let explicitly_masked: BTreeSet<String> = policy
+            .masked_fields
             .iter()
             .map(|field| normalized_field(field))
             .collect();
@@ -88,7 +93,8 @@ impl PrivacyGuard {
                     continue;
                 }
 
-                let should_mask = (policy.mask_phone_fields && is_phone_field(&normalized))
+                let should_mask = explicitly_masked.contains(&normalized)
+                    || (policy.mask_phone_fields && is_phone_field(&normalized))
                     || (policy.mask_payment_references && is_payment_reference_field(&normalized));
                 if should_mask && !value.is_null() {
                     protected.insert(field.clone(), mask_value(value));
@@ -183,14 +189,20 @@ fn mask_value(value: &Value) -> Value {
 mod tests {
     use super::*;
 
-    fn policy() -> PrivacyPolicy {
-        PrivacyPolicy::new([
-            "company_id",
-            "name",
-            "customer_phone",
-            "payment_reference",
-            "api_token",
-        ])
+    fn policy() -> MergedPrivacyPolicy {
+        MergedPrivacyPolicy {
+            allowed_fields: vec![
+                "company_id".to_string(),
+                "name".to_string(),
+                "customer_phone".to_string(),
+                "payment_reference".to_string(),
+                "api_token".to_string(),
+            ],
+            masked_fields: vec![],
+            mask_phone_fields: true,
+            mask_payment_references: true,
+            suppress_secrets: true,
+        }
     }
 
     #[test]
@@ -239,5 +251,40 @@ mod tests {
                 .unwrap_err();
             assert!(matches!(error, PrivacyError::CrossCompanyRow { .. }));
         }
+    }
+
+    #[test]
+    fn masks_org_explicitly_masked_fields() {
+        let (output, report) = PrivacyGuard
+            .protect_output(
+                &serde_json::json!({
+                    "items": [{
+                        "company_id": 7,
+                        "name": "Widget",
+                        "customer_phone": "+1-555-123-4567",
+                        "payment_reference": "pay_12345678",
+                    }]
+                }),
+                "items",
+                7,
+                &MergedPrivacyPolicy {
+                    allowed_fields: vec![
+                        "company_id".to_string(),
+                        "name".to_string(),
+                        "customer_phone".to_string(),
+                        "payment_reference".to_string(),
+                    ],
+                    masked_fields: vec!["customer_phone".to_string()],
+                    mask_phone_fields: false,
+                    mask_payment_references: false,
+                    suppress_secrets: true,
+                },
+            )
+            .unwrap();
+
+        let row = &output["items"][0];
+        assert_eq!(row["customer_phone"], "[MASKED]…4567");
+        assert_eq!(row["payment_reference"], "pay_12345678");
+        assert!(report.masked_fields.contains(&"customer_phone".to_string()));
     }
 }

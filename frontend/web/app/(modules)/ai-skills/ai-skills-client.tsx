@@ -23,6 +23,8 @@ import { AiResultPanel } from "@/lib/ai-result-panel"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 
+import { SkillRegistryPanel } from "./skill-registry-panel"
+
 export { AI_SKILLS_UI_REDUCERS } from "@/lib/ai-skills-ui-reducers"
 
 const runSkillForm = (skillKey: string): FormConfig => ({
@@ -488,6 +490,11 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           </div>
         ))}
       </div>
+
+      <SkillRegistryPanel
+        organizationId={orgId}
+        skills={sortedSkills.filter((skill) => skill.id > 0)}
+      />
 
       <section className="rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4">

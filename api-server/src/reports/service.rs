@@ -1,4 +1,4 @@
-use chrono::{Days, NaiveDate, SecondsFormat, Utc};
+use chrono::{NaiveDate, SecondsFormat, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use stdb_client::StdbClient;
 
@@ -7,13 +7,24 @@ use crate::error::ApiError;
 use super::{
     catalog::{catalog_entry, ReportAvailability},
     common::{
-        ReportCurrency, ReportEnvelope, ReportKey, ReportPreviewRequest, ReportScope,
-        SourceRowCount, SourceWatermark,
+        GeneratedOwnerReportHistoryRow, ReportCurrency, ReportEnvelope, ReportKey,
+        ReportPreviewRequest, ReportScope, SourceRowCount, SourceWatermark,
     },
     daily_business_summary::{
         aggregate_daily_business_summary, DailyBusinessSummaryReportV1, DailyBusinessSummarySource,
         FeeSourceRow, PaymentSourceRow, PurchaseSourceRow, SaleSourceRow, StockSourceRow,
     },
+    financial_position::{
+        aggregate_cash_mobile_money, ledger_opening_by_journal, CashMobileMoneyReportV1,
+        JournalDefaultAccountRow, LiquidityMoveLineRow, PaymentAccountSourceRow,
+        PaymentFeeSourceRow, PaymentReconciliationSourceRow, PostedPaymentSourceRow,
+        UnreconciledPaymentSourceRow,
+    },
+    open_balances::{
+        aggregate_customer_balances, aggregate_supplier_payables, CustomerBalancesReportV1,
+        MoveAllocationSourceRow, MoveLineMoveIdRow, OpenMoveSourceRow, SupplierPayablesReportV1,
+    },
+    timezone::{day_window, parse_timezone, ReportDayWindow},
 };
 
 const MAX_ROWS_PER_SOURCE: usize = 1_000;
@@ -30,6 +41,23 @@ struct CompanyRow {
     deleted_at: Option<serde_json::Value>,
 }
 
+pub async fn report_artifact_key(
+    client: &StdbClient,
+    organization_id: u64,
+    report_id: u64,
+) -> Result<(u64, String), ApiError> {
+    let sql = format!(
+        "SELECT id, company_id, artifact_key FROM generated_owner_report WHERE organization_id = {organization_id} AND id = {report_id} LIMIT 1"
+    );
+    let row: super::common::GeneratedOwnerReportArtifactRow =
+        query_typed(client, "generated_owner_report", sql)
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| ApiError::NotFound("generated owner report not found".into()))?;
+    Ok((row.company_id, row.artifact_key))
+}
+
 #[derive(Debug)]
 struct ValidatedPreviewRequest {
     company_id: u64,
@@ -41,6 +69,9 @@ struct ValidatedPreviewRequest {
 #[serde(untagged)]
 pub enum ReportPreview {
     DailyBusinessSummaryV1(ReportEnvelope<DailyBusinessSummaryReportV1>),
+    CashMobileMoneyV1(ReportEnvelope<CashMobileMoneyReportV1>),
+    CustomerBalancesV1(ReportEnvelope<CustomerBalancesReportV1>),
+    SupplierPayablesV1(ReportEnvelope<SupplierPayablesReportV1>),
 }
 
 pub async fn preview_report(
@@ -62,8 +93,320 @@ pub async fn preview_report(
         ReportKey::DailyBusinessSummaryV1 => {
             preview_daily_business_summary(client, organization_id, identity_hex, request).await
         }
+        ReportKey::CashMobileMoneyV1 => {
+            preview_cash_mobile_money(client, organization_id, identity_hex, request).await
+        }
+        ReportKey::CustomerBalancesV1 => {
+            preview_open_balances(
+                client,
+                organization_id,
+                identity_hex,
+                request,
+                "OutInvoice",
+                ReportKey::CustomerBalancesV1,
+            )
+            .await
+        }
+        ReportKey::SupplierPayablesV1 => {
+            preview_open_balances(
+                client,
+                organization_id,
+                identity_hex,
+                request,
+                "InInvoice",
+                ReportKey::SupplierPayablesV1,
+            )
+            .await
+        }
         _ => unreachable!("availability and report implementation must stay aligned"),
     }
+}
+
+pub async fn report_history(
+    client: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+) -> Result<Vec<GeneratedOwnerReportHistoryRow>, ApiError> {
+    query_company(client, organization_id, company_id).await?;
+    let sql = format!(
+        "SELECT id, company_id, report_key, schema_version, output_hash, renderer_version, document_id, correlation_id, generated_at FROM generated_owner_report WHERE organization_id = {organization_id} AND company_id = {company_id} LIMIT 100"
+    );
+    query_typed(client, "generated_owner_report", sql).await
+}
+
+async fn preview_cash_mobile_money(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    request: ValidatedPreviewRequest,
+) -> Result<ReportPreview, ApiError> {
+    let company = query_company(client, organization_id, request.company_id).await?;
+    let window = day_window(request.date, &request.timezone)?;
+    let accounts_sql = format!(
+        "SELECT id, name, provider_code, reference_masked, currency_id, account_journal_id FROM payment_account WHERE organization_id = {organization_id} AND company_id = {} AND active = true LIMIT {QUERY_LIMIT}",
+        company.id
+    );
+    let accounts =
+        query_typed::<PaymentAccountSourceRow>(client, "payment_account", accounts_sql).await?;
+    let journal_ids = accounts
+        .iter()
+        .map(|account| account.account_journal_id)
+        .collect::<Vec<_>>();
+    let journal_id_list = sql_id_list(&journal_ids);
+
+    let payments_sql = format!(
+        "SELECT id, payment_account_id, direction, settlement_amount, net_account_amount, currency_id FROM payment_transaction WHERE organization_id = {organization_id} AND company_id = {} AND status = 'Posted' AND occurred_at >= '{}' AND occurred_at < '{}' LIMIT {QUERY_LIMIT}",
+        company.id, window.start_sql, window.end_sql
+    );
+    let prior_payments_sql = format!(
+        "SELECT id, payment_account_id, direction, settlement_amount, net_account_amount, currency_id FROM payment_transaction WHERE organization_id = {organization_id} AND company_id = {} AND status = 'Posted' AND occurred_at < '{}' LIMIT {QUERY_LIMIT}",
+        company.id, window.start_sql
+    );
+    let fees_sql = format!(
+        "SELECT payment_transaction_id, amount, tax_amount, currency_id FROM payment_fee WHERE organization_id = {organization_id} AND company_id = {} AND created_at >= '{}' AND created_at < '{}' LIMIT {QUERY_LIMIT}",
+        company.id, window.start_sql, window.end_sql
+    );
+    let prior_fees_sql = format!(
+        "SELECT payment_transaction_id, amount, tax_amount, currency_id FROM payment_fee WHERE organization_id = {organization_id} AND company_id = {} AND created_at < '{}' LIMIT {QUERY_LIMIT}",
+        company.id, window.start_sql
+    );
+    let reconciliations_sql = format!(
+        "SELECT payment_transaction_id, is_reversal FROM payment_reconciliation WHERE organization_id = {organization_id} AND company_id = {company_id} LIMIT {QUERY_LIMIT}",
+        company_id = company.id
+    );
+    let unreconciled_candidates_sql = format!(
+        "SELECT id, payment_account_id, external_reference, occurred_at, net_account_amount, currency_id FROM payment_transaction WHERE organization_id = {organization_id} AND company_id = {} AND status = 'Posted' AND occurred_at < '{}' LIMIT {QUERY_LIMIT}",
+        company.id, window.end_sql
+    );
+
+    let journals_sql = if journal_id_list.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "SELECT id, default_account_id FROM account_journal WHERE organization_id = {organization_id} AND company_id = {} AND id IN ({journal_id_list}) LIMIT {QUERY_LIMIT}",
+            company.id
+        ))
+    };
+    let liquidity_lines_sql = if journal_id_list.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "SELECT journal_id, account_id, balance FROM account_move_line WHERE organization_id = {organization_id} AND company_id = {} AND parent_state = 'Posted' AND date < '{}' AND currency_id = {} AND journal_id IN ({journal_id_list}) LIMIT {QUERY_LIMIT}",
+            company.id, window.start_sql, company.currency_id
+        ))
+    };
+
+    let (payments, prior_payments, fees, prior_fees) = tokio::try_join!(
+        query_typed::<PostedPaymentSourceRow>(client, "payment_transaction", payments_sql),
+        query_typed::<PostedPaymentSourceRow>(client, "payment_transaction", prior_payments_sql),
+        query_typed::<PaymentFeeSourceRow>(client, "payment_fee", fees_sql),
+        query_typed::<PaymentFeeSourceRow>(client, "payment_fee", prior_fees_sql),
+    )?;
+
+    let reconciliations = query_typed::<PaymentReconciliationSourceRow>(
+        client,
+        "payment_reconciliation",
+        reconciliations_sql,
+    )
+    .await?;
+    let reconciliation_count = reconciliations.len();
+    let unreconciled_candidates = query_typed::<UnreconciledPaymentSourceRow>(
+        client,
+        "payment_transaction",
+        unreconciled_candidates_sql,
+    )
+    .await?;
+
+    let journals = if let Some(sql) = journals_sql {
+        query_typed::<JournalDefaultAccountRow>(client, "account_journal", sql).await?
+    } else {
+        vec![]
+    };
+    let liquidity_lines = if let Some(sql) = liquidity_lines_sql {
+        query_typed::<LiquidityMoveLineRow>(client, "account_move_line", sql).await?
+    } else {
+        vec![]
+    };
+    let opening_by_journal =
+        ledger_opening_by_journal(&journals, &liquidity_lines, company.currency_id);
+    let reconciled_ids = reconciliations
+        .into_iter()
+        .filter(|row| !row.is_reversal)
+        .map(|row| row.payment_transaction_id)
+        .collect::<std::collections::HashSet<_>>();
+    let unreconciled = unreconciled_candidates
+        .into_iter()
+        .filter(|payment| !reconciled_ids.contains(&payment.id))
+        .collect::<Vec<_>>();
+
+    let generated_at = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+    let source_rows = vec![
+        SourceRowCount {
+            source: "payment_account",
+            rows: accounts.len(),
+        },
+        SourceRowCount {
+            source: "account_move_line",
+            rows: liquidity_lines.len(),
+        },
+        SourceRowCount {
+            source: "payment_transaction",
+            rows: payments.len(),
+        },
+        SourceRowCount {
+            source: "payment_fee",
+            rows: fees.len(),
+        },
+        SourceRowCount {
+            source: "payment_reconciliation",
+            rows: reconciliation_count,
+        },
+    ];
+    Ok(ReportPreview::CashMobileMoneyV1(ReportEnvelope {
+        report_key: ReportKey::CashMobileMoneyV1,
+        schema_version: 1,
+        scope: scope_for(&company, &window),
+        generated_at: generated_at.clone(),
+        generated_by: identity_hex.to_string(),
+        currency: ReportCurrency {
+            currency_id: company.currency_id,
+            minor_unit_scale: 2,
+        },
+        source_watermark: source_watermark(&window, generated_at, source_rows),
+        caveats: vec![
+            format!("Operational window: {}.", window.cutoff_label),
+            "Opening balances use posted liquidity journal lines before the window; when absent, opening is reconstructed from prior posted payment transactions.".into(),
+            "Closing balances equal opening plus receipts minus disbursements and fees for the window.".into(),
+            "Unreconciled items are posted payment transactions without a non-reversal allocation as of the report cutoff.".into(),
+            "Payment references in unreconciled details are masked; account references remain masked in account rows.".into(),
+        ],
+        watermark: PREVIEW_WATERMARK.into(),
+        report: aggregate_cash_mobile_money(
+            accounts,
+            opening_by_journal,
+            prior_payments,
+            prior_fees,
+            payments,
+            fees,
+            unreconciled,
+            company.currency_id,
+        ),
+    }))
+}
+
+async fn preview_open_balances(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    request: ValidatedPreviewRequest,
+    move_type: &str,
+    report_key: ReportKey,
+) -> Result<ReportPreview, ApiError> {
+    let company = query_company(client, organization_id, request.company_id).await?;
+    let window = day_window(request.date, &request.timezone)?;
+    let moves_sql = format!(
+        "SELECT id, partner_id, invoice_partner_display_name, invoice_date_due, amount_total, amount_residual, currency_id FROM account_move WHERE organization_id = {organization_id} AND company_id = {} AND state = 'Posted' AND move_type = '{move_type}' AND date < '{}' LIMIT {QUERY_LIMIT}",
+        company.id, window.end_sql
+    );
+    let moves = query_typed::<OpenMoveSourceRow>(client, "account_move", moves_sql).await?;
+    let move_ids = moves.iter().map(|move_| move_.id).collect::<Vec<_>>();
+    let move_id_list = sql_id_list(&move_ids);
+
+    let lines = if move_id_list.is_empty() {
+        vec![]
+    } else {
+        let lines_sql = format!(
+            "SELECT id, move_id FROM account_move_line WHERE organization_id = {organization_id} AND company_id = {} AND move_id IN ({move_id_list}) LIMIT {QUERY_LIMIT}",
+            company.id
+        );
+        query_typed::<MoveLineMoveIdRow>(client, "account_move_line", lines_sql).await?
+    };
+    let line_ids = lines.iter().map(|line| line.id).collect::<Vec<_>>();
+    let line_id_list = sql_id_list(&line_ids);
+    let allocations = if line_id_list.is_empty() {
+        vec![]
+    } else {
+        let allocations_sql = format!(
+            "SELECT allocated_move_line_id, allocated_amount, is_reversal, created_at, currency_id FROM payment_reconciliation WHERE organization_id = {organization_id} AND company_id = {} AND allocated_move_line_id IN ({line_id_list}) LIMIT {QUERY_LIMIT}",
+            company.id
+        );
+        query_typed::<MoveAllocationSourceRow>(client, "payment_reconciliation", allocations_sql)
+            .await?
+    };
+
+    let source_rows = vec![
+        SourceRowCount {
+            source: "account_move",
+            rows: moves.len(),
+        },
+        SourceRowCount {
+            source: "account_move_line",
+            rows: lines.len(),
+        },
+        SourceRowCount {
+            source: "payment_reconciliation",
+            rows: allocations.len(),
+        },
+    ];
+    let generated_at = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+    let scope = scope_for(&company, &window);
+    let currency = ReportCurrency {
+        currency_id: company.currency_id,
+        minor_unit_scale: 2,
+    };
+    let source_watermark = source_watermark(&window, generated_at.clone(), source_rows);
+    let caveats = vec![
+        format!("Posted-ledger as-of cutoff: {}.", window.cutoff_label),
+        "Open balances use posted move residuals as the authority for amounts due.".into(),
+        "Paid amounts are derived from payment_reconciliation allocations linked via move lines; reversals reduce paid totals.".into(),
+        "Due-date aging uses the requested local report date in the selected timezone.".into(),
+        "Partner display names are included only when present on the posted move; no unmasked contact data is joined.".into(),
+        "Customer credit status is unknown until credit limits are modelled in the ledger.".into(),
+    ];
+    let watermark = PREVIEW_WATERMARK.to_string();
+
+    Ok(match report_key {
+        ReportKey::CustomerBalancesV1 => ReportPreview::CustomerBalancesV1(ReportEnvelope {
+            report_key,
+            schema_version: 1,
+            scope,
+            generated_at,
+            generated_by: identity_hex.to_string(),
+            currency,
+            source_watermark,
+            caveats,
+            watermark,
+            report: aggregate_customer_balances(
+                moves,
+                &lines,
+                &allocations,
+                company.currency_id,
+                request.date,
+            ),
+        }),
+        ReportKey::SupplierPayablesV1 => ReportPreview::SupplierPayablesV1(ReportEnvelope {
+            report_key,
+            schema_version: 1,
+            scope,
+            generated_at,
+            generated_by: identity_hex.to_string(),
+            currency,
+            source_watermark,
+            caveats: caveats
+                .into_iter()
+                .filter(|caveat| !caveat.starts_with("Customer credit"))
+                .collect(),
+            watermark,
+            report: aggregate_supplier_payables(
+                moves,
+                &lines,
+                &allocations,
+                company.currency_id,
+                request.date,
+            ),
+        }),
+        _ => unreachable!("only customer and supplier balance reports use this projection"),
+    })
 }
 
 async fn preview_daily_business_summary(
@@ -73,35 +416,23 @@ async fn preview_daily_business_summary(
     request: ValidatedPreviewRequest,
 ) -> Result<ReportPreview, ApiError> {
     let company = query_company(client, organization_id, request.company_id).await?;
-    let start = request
-        .date
-        .and_hms_opt(0, 0, 0)
-        .expect("midnight is always valid");
-    let end_date = request
-        .date
-        .checked_add_days(Days::new(1))
-        .ok_or_else(|| ApiError::BadRequest("Date is outside the supported range".into()))?;
-    let end = end_date
-        .and_hms_opt(0, 0, 0)
-        .expect("midnight is always valid");
-    let start_sql = start.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-    let end_sql = end.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let window = day_window(request.date, &request.timezone)?;
 
     let sale_sql = format!(
-        "SELECT id, currency_id, state, amount_untaxed, amount_tax, amount_total FROM sale_order WHERE organization_id = {organization_id} AND company_id = {} AND date_order >= '{start_sql}' AND date_order < '{end_sql}' LIMIT {QUERY_LIMIT}",
-        company.id
+        "SELECT id, currency_id, state, amount_untaxed, amount_tax, amount_total FROM sale_order WHERE organization_id = {organization_id} AND company_id = {} AND date_order >= '{}' AND date_order < '{}' LIMIT {QUERY_LIMIT}",
+        company.id, window.start_sql, window.end_sql
     );
     let payment_sql = format!(
-        "SELECT id, currency_id, direction, status, settlement_amount FROM payment_transaction WHERE organization_id = {organization_id} AND company_id = {} AND occurred_at >= '{start_sql}' AND occurred_at < '{end_sql}' LIMIT {QUERY_LIMIT}",
-        company.id
+        "SELECT id, currency_id, direction, status, settlement_amount FROM payment_transaction WHERE organization_id = {organization_id} AND company_id = {} AND occurred_at >= '{}' AND occurred_at < '{}' LIMIT {QUERY_LIMIT}",
+        company.id, window.start_sql, window.end_sql
     );
     let purchase_sql = format!(
-        "SELECT id, currency_id, state, amount_untaxed, amount_tax, amount_total FROM purchase_order WHERE organization_id = {organization_id} AND company_id = {} AND date_order >= '{start_sql}' AND date_order < '{end_sql}' LIMIT {QUERY_LIMIT}",
-        company.id
+        "SELECT id, currency_id, state, amount_untaxed, amount_tax, amount_total FROM purchase_order WHERE organization_id = {organization_id} AND company_id = {} AND date_order >= '{}' AND date_order < '{}' LIMIT {QUERY_LIMIT}",
+        company.id, window.start_sql, window.end_sql
     );
     let fee_sql = format!(
-        "SELECT id, payment_transaction_id, currency_id, amount, tax_amount FROM payment_fee WHERE organization_id = {organization_id} AND company_id = {} AND created_at >= '{start_sql}' AND created_at < '{end_sql}' LIMIT {QUERY_LIMIT}",
-        company.id
+        "SELECT id, payment_transaction_id, currency_id, amount, tax_amount FROM payment_fee WHERE organization_id = {organization_id} AND company_id = {} AND created_at >= '{}' AND created_at < '{}' LIMIT {QUERY_LIMIT}",
+        company.id, window.start_sql, window.end_sql
     );
     let stock_sql = format!(
         "SELECT id, product_id, quantity, reserved_quantity, available_quantity, is_outdated FROM stock_quant WHERE organization_id = {organization_id} AND company_id = {} LIMIT {QUERY_LIMIT}",
@@ -153,30 +484,23 @@ async fn preview_daily_business_summary(
     Ok(ReportPreview::DailyBusinessSummaryV1(ReportEnvelope {
         report_key: ReportKey::DailyBusinessSummaryV1,
         schema_version: 1,
-        scope: ReportScope {
-            organization_id: company.organization_id,
-            company_id: company.id,
-            date_from: request.date.to_string(),
-            date_to_exclusive: end_date.to_string(),
-            timezone: request.timezone,
-        },
+        scope: scope_for(&company, &window),
         generated_at: generated_at.clone(),
         generated_by: identity_hex.to_string(),
         currency: ReportCurrency {
             currency_id: company.currency_id,
             minor_unit_scale: 2,
         },
-        source_watermark: SourceWatermark {
-            accounting_cutoff: end_sql,
-            queried_at: generated_at,
-            source_rows,
-        },
+        source_watermark: source_watermark(&window, generated_at, source_rows),
         caveats: vec![
             format!(
                 "Company scope validated for {} (company ID {}).",
                 company.name, company.id
             ),
-            "V1 date filtering uses a UTC [start, end) window; the requested timezone is recorded but does not shift the cutoff until the owner-report timezone policy is approved.".into(),
+            format!(
+                "Operational window: {}.",
+                window.cutoff_label
+            ),
             "Sales and purchases are operational order totals, not posted invoice or ledger totals.".into(),
             "Fees include only fee rows linked to posted payment transactions in the same window.".into(),
             "Stock alerts are a current quant snapshot; available quantity <= 0 or an outdated quant is flagged, and reorder points are not yet applied.".into(),
@@ -185,6 +509,42 @@ async fn preview_daily_business_summary(
         watermark: PREVIEW_WATERMARK.into(),
         report,
     }))
+}
+
+fn source_watermark(
+    window: &ReportDayWindow,
+    queried_at: String,
+    source_rows: Vec<SourceRowCount>,
+) -> SourceWatermark {
+    SourceWatermark {
+        accounting_cutoff: window.end_sql.clone(),
+        window_start_utc: window.start_sql.clone(),
+        window_end_utc: window.end_sql.clone(),
+        cutoff_label: window.cutoff_label.clone(),
+        queried_at,
+        source_rows,
+    }
+}
+
+fn scope_for(company: &CompanyRow, window: &ReportDayWindow) -> ReportScope {
+    ReportScope {
+        organization_id: company.organization_id,
+        company_id: company.id,
+        local_date: window.local_date.to_string(),
+        date_from: window.local_date.to_string(),
+        date_to_exclusive: window.local_end_date.to_string(),
+        timezone: window.timezone.clone(),
+        window_start_utc: window.start_sql.clone(),
+        window_end_utc: window.end_sql.clone(),
+        cutoff_label: window.cutoff_label.clone(),
+    }
+}
+
+fn sql_id_list(ids: &[u64]) -> String {
+    ids.iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 async fn query_company(
@@ -249,6 +609,7 @@ fn validate_request(request: ReportPreviewRequest) -> Result<ValidatedPreviewReq
             "timezone must be a valid non-empty timezone identifier".into(),
         ));
     }
+    parse_timezone(timezone)?;
 
     Ok(ValidatedPreviewRequest {
         company_id: request.company_id,
@@ -291,5 +652,15 @@ mod tests {
         assert_eq!(request.company_id, 7);
         assert_eq!(request.date.to_string(), "2026-07-10");
         assert_eq!(request.timezone, "Africa/Nairobi");
+    }
+
+    #[test]
+    fn preview_request_rejects_invalid_iana_timezone() {
+        let invalid = validate_request(ReportPreviewRequest {
+            company_id: 1,
+            date: "2026-07-10".into(),
+            timezone: "Not/A_Real_Zone".into(),
+        });
+        assert!(invalid.is_err());
     }
 }

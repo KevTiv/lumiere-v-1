@@ -13,14 +13,16 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import type {
   DailyBusinessSummaryReportV1,
   ReportCatalogV1,
-  ReportEnvelope,
+  GeneratedOwnerReportHistoryRow,
   ReportKey,
+  ReportPreview,
   ReportPreviewRequest,
 } from "@lumiere/erp-shared/report-schemas"
 
 import { apiFetch, rqBigIntKey } from "../http"
 
-export type { ReportCatalogV1, ReportEnvelope, ReportKey, ReportPreviewRequest }
+export type { ReportCatalogV1, ReportKey, ReportPreview, ReportPreviewRequest }
+export type { GeneratedOwnerReportHistoryRow }
 export type { DailyBusinessSummaryReportV1 }
 
 export interface ReportPreviewInput {
@@ -47,7 +49,7 @@ export function useReportCatalog(organizationId: bigint) {
 }
 
 export function useReportPreview(organizationId: bigint) {
-  return useMutation<ReportEnvelope<DailyBusinessSummaryReportV1>, Error, ReportPreviewInput>({
+  return useMutation<ReportPreview, Error, ReportPreviewInput>({
     mutationKey: [OWNER_REPORTS_QUERY_KEY, "preview", rqBigIntKey(organizationId)],
     mutationFn: async (input) => {
       const body: ReportPreviewRequest = {
@@ -64,7 +66,33 @@ export function useReportPreview(organizationId: bigint) {
         const text = await response.text().catch(() => "Preview request failed")
         throw new Error(text)
       }
-      return response.json() as Promise<ReportEnvelope<DailyBusinessSummaryReportV1>>
+      return response.json() as Promise<ReportPreview>
+    },
+  })
+}
+
+export function useReportPdf() {
+  return useMutation<Blob, Error, ReportPreviewInput>({
+    mutationFn: async (input) => {
+      const response = await apiFetch(`/api/reports/${encodeURIComponent(input.reportKey)}/pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId: input.companyId, date: input.date, timezone: input.timezone }),
+      })
+      if (!response.ok) throw new Error(await response.text())
+      return response.blob()
+    },
+  })
+}
+
+export function useGeneratedOwnerReportHistory(organizationId: bigint, companyId?: number) {
+  return useQuery<GeneratedOwnerReportHistoryRow[]>({
+    queryKey: [OWNER_REPORTS_QUERY_KEY, "history", rqBigIntKey(organizationId), companyId ?? 0],
+    enabled: Boolean(companyId && companyId > 0),
+    queryFn: async () => {
+      const response = await apiFetch(`/api/reports/history?companyId=${companyId}`)
+      if (!response.ok) throw new Error("Failed to fetch generated report history")
+      return response.json() as Promise<GeneratedOwnerReportHistoryRow[]>
     },
   })
 }

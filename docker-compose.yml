@@ -60,6 +60,8 @@ services:
       dockerfile: Dockerfile.rust
       args:
         BIN: api-server
+    depends_on:
+      - chromium-worker
     environment:
       PORT: 8082
       NODE_ENV: production
@@ -75,8 +77,22 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@lumiere-erp.com}
       WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
+      LUMIERE_REPORT_RENDERER_URL: http://chromium-worker:8090
+      LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports
+    volumes:
+      - owner-report-artifacts:/var/lib/lumiere/owner-reports
     expose:
       - "8082"
+    restart: unless-stopped
+
+  chromium-worker:
+    build:
+      context: ./chromium-worker
+    environment:
+      PORT: 8090
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+    expose:
+      - "8090"
     restart: unless-stopped
 
   ai-gateway:
@@ -116,3 +132,4 @@ services:
 
 volumes:
   qdrant-data:
+  owner-report-artifacts:

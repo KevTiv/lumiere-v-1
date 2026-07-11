@@ -118,7 +118,7 @@ export function reportStateTag(state: unknown): string {
   if (state == null) return ''
   if (typeof state === 'object' && !Array.isArray(state)) {
     const keys = Object.keys(state as object)
-    if (keys.length === 1) return keys[0]!.toLowerCase()
+    if (keys.length === 1) return keys[0]?.toLowerCase()
   }
   return String(state).toLowerCase()
 }

@@ -1,11 +1,18 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use stdb_client::StdbClient;
 
 use super::{
+    audit::{DecisionOutcome, PolicyResult},
+    audit_logger::{HarnessAuditLogger, HarnessAuditTrail},
     data_scope_resolver::NamedResourceContract,
     manifest::{
         Capability, ExecutionLimits, PrivacyPolicy, ReviewMetadata, ReviewStatus, RiskClass,
         SkillManifest, SkillVersionRef,
+    },
+    policy_engine::{
+        ExecutionMetadata, ExecutionPlan, PlannedToolCall, PolicyControlledRequest, PolicyEngine,
+        PolicyExecutionRequest,
     },
 };
 
@@ -39,6 +46,15 @@ pub struct LowStockItem {
 #[serde(deny_unknown_fields)]
 pub struct LowStockOutput {
     pub items: Vec<LowStockItem>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LowStockScanResult {
+    pub decision: PolicyResult,
+    pub summary: String,
+    pub items: Vec<LowStockItem>,
+    pub audit: HarnessAuditTrail,
 }
 
 pub fn manifest() -> SkillManifest {
@@ -107,6 +123,214 @@ fn validate_output(value: &Value) -> Result<(), String> {
         return Err("low-stock quantities must be finite non-negative numbers".to_string());
     }
     Ok(())
+}
+
+/// Scan scoped inventory for products at or below the requested threshold.
+pub async fn scan_low_stock(
+    stdb: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    input: LowStockInput,
+    company_id: u64,
+    policy: PolicyEngine,
+) -> Result<LowStockScanResult, String> {
+    let correlation_id = uuid::Uuid::new_v4().to_string();
+    let mut audit = HarnessAuditLogger::new(correlation_id.clone());
+    audit.record(
+        "requested",
+        format!(
+            "low_stock org={organization_id} company={company_id} threshold={}",
+            input.threshold
+        ),
+    );
+
+    let output = fetch_low_stock_output(stdb, organization_id, company_id, &input).await?;
+    audit.record(
+        "resource_accessed",
+        format!(
+            "inventory.low_stock.v1 returned {} rows",
+            output.items.len()
+        ),
+    );
+
+    let request = PolicyControlledRequest {
+        execution: PolicyExecutionRequest {
+            skill: SkillVersionRef::new(LOW_STOCK_SKILL_KEY, LOW_STOCK_SKILL_VERSION),
+            organization_id,
+            company_id,
+            correlation_id: correlation_id.clone(),
+            metadata: ExecutionMetadata {
+                actor_id: Some(identity_hex.to_string()),
+                causation_id: Some(correlation_id),
+                ..Default::default()
+            },
+            input: serde_json::to_value(&input).unwrap_or_default(),
+            plan: ExecutionPlan {
+                named_resources: vec![LOW_STOCK_RESOURCE.to_string()],
+                tool_calls: vec![PlannedToolCall {
+                    tool_name: NAMED_READ_TOOL.to_string(),
+                    capability: Capability::NamedRead,
+                    named_resource: Some(LOW_STOCK_RESOURCE.to_string()),
+                }],
+                steps: 1,
+                expected_rows: output.items.len() as u32,
+                output_type: LOW_STOCK_OUTPUT_TYPE.to_string(),
+            },
+        },
+        candidate_output: serde_json::to_value(&output).unwrap_or_default(),
+    };
+
+    let decision = policy.execute_controlled(request);
+    audit.record(
+        "policy",
+        format!(
+            "outcome={:?} reasons={}",
+            decision.decision.outcome,
+            decision.decision.reasons.len()
+        ),
+    );
+
+    if decision.decision.outcome == DecisionOutcome::Deny {
+        audit.record("completed", "low_stock scan denied by policy");
+        return Ok(LowStockScanResult {
+            decision,
+            summary: String::new(),
+            items: Vec::new(),
+            audit: audit.into_trail(),
+        });
+    }
+
+    let summary = if output.items.is_empty() {
+        "No low-stock products found for the selected threshold.".to_string()
+    } else {
+        format!(
+            "Found {} product(s) at or below threshold {}.",
+            output.items.len(),
+            input.threshold
+        )
+    };
+    audit.record("artifact", "low-stock summary composed");
+
+    Ok(LowStockScanResult {
+        decision,
+        summary,
+        items: output.items,
+        audit: audit.into_trail(),
+    })
+}
+
+async fn fetch_low_stock_output(
+    stdb: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    input: &LowStockInput,
+) -> Result<LowStockOutput, String> {
+    validate_input(&serde_json::to_value(input).unwrap_or_default())?;
+
+    let product_sql = format!(
+        "SELECT id, default_code, name, reordering_min_qty FROM product WHERE organization_id = {organization_id} AND company_id = {company_id} LIMIT 500"
+    );
+    let quant_sql = format!(
+        "SELECT product_id, quantity FROM stock_quant WHERE organization_id = {organization_id} AND company_id = {company_id} LIMIT 500"
+    );
+
+    let products = stdb
+        .query_sql(&product_sql)
+        .await
+        .map_err(|error| format!("load products: {error}"))?;
+    let quants = stdb
+        .query_sql(&quant_sql)
+        .await
+        .map_err(|error| format!("load stock quants: {error}"))?;
+
+    let mut quantity_by_product = std::collections::BTreeMap::<u64, f64>::new();
+    for row in quants {
+        let product_id = row_u64(&row, "productId", "product_id").unwrap_or(0);
+        if product_id == 0 {
+            continue;
+        }
+        let quantity = row_f64(&row, "quantity").unwrap_or(0.0);
+        *quantity_by_product.entry(product_id).or_default() += quantity;
+    }
+
+    let mut items = Vec::new();
+    for row in products {
+        let product_id = row_u64(&row, "id", "id").unwrap_or(0);
+        if product_id == 0 {
+            continue;
+        }
+        let quantity_on_hand = quantity_by_product.get(&product_id).copied().unwrap_or(0.0);
+        let reorder_level = row_f64(&row, "reorderingMinQty")
+            .or_else(|| row_f64(&row, "reordering_min_qty"))
+            .unwrap_or(0.0);
+        let threshold = if reorder_level > 0.0 {
+            reorder_level
+        } else {
+            input.threshold
+        };
+        if quantity_on_hand > threshold {
+            continue;
+        }
+        if let Some(location_id) = input.location_id {
+            let _ = location_id;
+        }
+        items.push(LowStockItem {
+            organization_id,
+            company_id,
+            product_id,
+            sku: row_string(&row, "defaultCode", Some("default_code")).unwrap_or_default(),
+            name: row_string(&row, "name", None)
+                .unwrap_or_else(|| format!("Product #{product_id}")),
+            quantity_on_hand,
+            reorder_level: threshold,
+        });
+    }
+
+    items.sort_by(|left, right| {
+        left.quantity_on_hand
+            .partial_cmp(&right.quantity_on_hand)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let output = LowStockOutput { items };
+    validate_output(&serde_json::to_value(&output).unwrap_or_default())?;
+    Ok(output)
+}
+
+fn row_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+}
+
+fn row_f64(row: &Value, field: &str) -> Option<f64> {
+    let camel = snake_to_camel(field);
+    row.get(&camel)
+        .or_else(|| row.get(field))
+        .and_then(|value| value.as_f64().or_else(|| value.as_str()?.parse().ok()))
+}
+
+fn row_string(row: &Value, camel: &str, snake: Option<&str>) -> Option<String> {
+    row.get(camel)
+        .or_else(|| snake.and_then(|field| row.get(field)))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn snake_to_camel(value: &str) -> String {
+    let mut out = String::new();
+    let mut uppercase = false;
+    for character in value.chars() {
+        if character == '_' {
+            uppercase = true;
+        } else if uppercase {
+            out.extend(character.to_uppercase());
+            uppercase = false;
+        } else {
+            out.push(character);
+        }
+    }
+    out
 }
 
 #[cfg(test)]

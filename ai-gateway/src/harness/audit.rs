@@ -35,6 +35,7 @@ pub enum PolicyReasonCode {
     InvalidInput,
     InvalidOutput,
     RedApprovalRequired,
+    RedExecutionUnavailable,
     CrossCompanyRow,
     PrivacyViolation,
 }
@@ -93,6 +94,17 @@ pub struct PrivacyReport {
     pub suppressed_fields: Vec<String>,
 }
 
+/// Proposed action draft produced by the harness for red/amber skills.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionDraftProposal {
+    pub reducer_name: String,
+    pub params_json: String,
+    pub summary: String,
+    pub elevated: bool,
+    pub warnings: Vec<String>,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct PolicyResult {
     pub decision: PolicyDecision,
@@ -100,6 +112,8 @@ pub struct PolicyResult {
     pub output: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub privacy: Option<PrivacyReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action_draft: Option<ActionDraftProposal>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_hash: Option<String>,
     pub result_hash: String,
@@ -110,12 +124,14 @@ impl PolicyResult {
         decision: PolicyDecision,
         output: Option<Value>,
         privacy: Option<PrivacyReport>,
+        action_draft: Option<ActionDraftProposal>,
     ) -> Self {
         let output_hash = output.as_ref().map(hash_value);
         let mut result = Self {
             decision,
             output,
             privacy,
+            action_draft,
             output_hash,
             result_hash: String::new(),
         };

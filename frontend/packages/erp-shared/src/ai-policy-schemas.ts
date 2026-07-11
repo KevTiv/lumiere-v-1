@@ -119,6 +119,7 @@ export type PolicyReasonCode =
   | "invalid_input"
   | "invalid_output"
   | "red_approval_required"
+  | "red_execution_unavailable"
   | "cross_company_row"
   | "privacy_violation"
 
@@ -157,10 +158,19 @@ export interface PrivacyReport {
   suppressedFields: string[]
 }
 
+export interface ActionDraftProposal {
+  reducerName: string
+  paramsJson: string
+  summary: string
+  elevated: boolean
+  warnings: string[]
+}
+
 export interface PolicyResult {
   decision: PolicyDecision
   output?: unknown
   privacy?: PrivacyReport
+  actionDraft?: ActionDraftProposal
   outputHash?: string
   resultHash: string
 }

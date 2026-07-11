@@ -31,6 +31,7 @@
     "./ai-create-params": "./src/ai-create-params.ts",
     "./ai-policy-schemas": "./src/ai-policy-schemas.ts",
     "./ai-report-composer-schemas": "./src/ai-report-composer-schemas.ts",
+    "./ai-low-stock-schemas": "./src/ai-low-stock-schemas.ts",
     "./iot-create-params": "./src/iot-create-params.ts",
     "./warehouse-3d-from-api": "./src/warehouse-3d-from-api.ts",
     "./ai-ui-context": "./src/ai-ui-context.ts",

@@ -52,6 +52,50 @@ export function useAiActionDraft() {
 export type { GatewayActionDraft } from "./ai-action-drafts"
 export type { PolicyControlledRequest, PolicyResult }
 
+export interface AiActionDraftBridgeResponse {
+  decision: PolicyResult["decision"]
+  draftId?: number
+  error?: string
+}
+
+export function useAiActionDraftBridge() {
+  return useMutation({
+    mutationFn: async (args: { companyId: number; input: Record<string, unknown> }) => {
+      const correlationId =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `action-draft-${Date.now()}`
+      const r = await apiFetch("/api/ai/action-draft/bridge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          execution: {
+            skill: { skill_key: "create_sale_order_draft", version: 1 },
+            company_id: args.companyId,
+            correlation_id: correlationId,
+            input: args.input,
+            plan: {
+              named_resources: [],
+              tool_calls: [
+                {
+                  tool_name: "create_sale_order",
+                  capability: "action_draft",
+                },
+              ],
+              steps: 1,
+              expected_rows: 0,
+              output_type: "action_draft.create_sale_order.v1",
+            },
+          },
+          candidate_output: null,
+        }),
+      })
+      if (!r.ok) throw new Error(await parseAiError(r))
+      return (await r.json()) as AiActionDraftBridgeResponse
+    },
+  })
+}
+
 export interface AiPolicyEvaluationInput {
   companyId: number
   skill: PolicyControlledRequest["execution"]["skill"]

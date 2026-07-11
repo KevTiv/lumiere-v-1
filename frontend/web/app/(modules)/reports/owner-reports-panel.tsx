@@ -37,17 +37,20 @@ import {
   Clock,
   Eye,
   FileText,
+  Download,
 } from "lucide-react"
 
 import type {
   DailyBusinessSummaryReportV1,
   MoneyAmount,
   ReportCatalogEntry,
-  ReportEnvelope,
+  ReportPreview,
 } from "@lumiere/erp-shared/report-schemas"
 import { isReportPreviewAvailable } from "@lumiere/erp-shared/report-schemas"
 import {
   useReportCatalog,
+  useGeneratedOwnerReportHistory,
+  useReportPdf,
   useReportPreview,
 } from "@lumiere/query-hooks/hooks/owner-reports"
 import { useToast } from "@/hooks/use-toast"
@@ -92,6 +95,7 @@ export function OwnerReportsPanel({
   const { toast } = useToast()
   const catalog = useReportCatalog(organizationId)
   const preview = useReportPreview(organizationId)
+  const pdf = useReportPdf()
 
   const companyOptions = useMemo(
     () => companyRowsToSelectOptions(companies),
@@ -106,8 +110,13 @@ export function OwnerReportsPanel({
   const [date, setDate] = useState(todayInputValue)
   const [timezone] = useState(timezoneInputValue)
   const [activePreview, setActivePreview] = useState<
-    ReportEnvelope<DailyBusinessSummaryReportV1> | null
+    ReportPreview | null
   >(null)
+  const selectedCompanyNumber = Number(selectedCompanyId)
+  const history = useGeneratedOwnerReportHistory(
+    organizationId,
+    Number.isFinite(selectedCompanyNumber) ? selectedCompanyNumber : undefined,
+  )
 
   useEffect(() => {
     if (defaultCompanyId && defaultCompanyId > 0) {
@@ -145,6 +154,17 @@ export function OwnerReportsPanel({
       timezone,
     })
     setActivePreview(result)
+  }
+
+  const handlePdf = async () => {
+    if (!activePreview) return
+    const blob = await pdf.mutateAsync({ reportKey: activePreview.reportKey, companyId: activePreview.scope.companyId, date, timezone })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = `${activePreview.reportKey}.pdf`
+    anchor.click()
+    URL.revokeObjectURL(url)
   }
 
   if (catalog.isLoading) {
@@ -265,7 +285,24 @@ export function OwnerReportsPanel({
       )}
 
       {activePreview && !preview.isPending && (
-        <ReportPreviewPanel preview={activePreview} />
+        <div className="flex flex-col gap-4"><div className="flex justify-end"><Button size="sm" onClick={() => void handlePdf()} disabled={pdf.isPending}><Download data-icon="inline-start" />PDF</Button></div><ReportPreviewPanel preview={activePreview} /></div>
+      )}
+
+      {!history.isLoading && (history.data?.length ?? 0) > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Generated report history</CardTitle>
+            <CardDescription>Immutable render provenance for this company.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm">
+            {history.data?.slice(0, 10).map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-3 rounded border p-3">
+                <span>{item.reportKey} · v{item.schemaVersion}</span>
+                <div className="flex items-center gap-3"><span className="text-muted-foreground">{item.generatedAt}</span><Button size="sm" variant="outline" asChild><a href={`/api/reports/history/${item.id}/pdf`}>PDF</a></Button></div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       )}
     </div>
   )
@@ -320,12 +357,13 @@ function ReportCard({ entry, isPending, onPreview }: ReportCardProps) {
   )
 }
 
-interface ReportPreviewPanelProps {
-  preview: ReportEnvelope<DailyBusinessSummaryReportV1>
-}
+interface ReportPreviewPanelProps { preview: ReportPreview }
 
 function ReportPreviewPanel({ preview }: ReportPreviewPanelProps) {
   const { t } = useTranslation()
+  if (preview.reportKey !== "daily_business_summary_v1") {
+    return <LedgerReportPreviewPanel preview={preview} />
+  }
   const report = preview.report
 
   return (
@@ -345,16 +383,16 @@ function ReportPreviewPanel({ preview }: ReportPreviewPanelProps) {
           value={String(preview.scope.companyId)}
         />
         <ScopeItem
-          label={t("reports.ownerReports.scope.dateFrom")}
-          value={preview.scope.dateFrom}
-        />
-        <ScopeItem
-          label={t("reports.ownerReports.scope.dateTo")}
-          value={preview.scope.dateToExclusive}
+          label={t("reports.ownerReports.scope.localDate")}
+          value={preview.scope.localDate}
         />
         <ScopeItem
           label={t("reports.ownerReports.scope.timezone")}
           value={preview.scope.timezone}
+        />
+        <ScopeItem
+          label={t("reports.ownerReports.cutoffLabel")}
+          value={preview.scope.cutoffLabel}
         />
       </div>
 
@@ -435,11 +473,21 @@ function ReportPreviewPanel({ preview }: ReportPreviewPanelProps) {
           </CardTitle>
           <CardDescription>
             {t("reports.ownerReports.sourceWatermarkCutoff", {
-              cutoff: preview.sourceWatermark.accountingCutoff,
+              cutoff: preview.sourceWatermark.cutoffLabel,
             })}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <ScopeItem
+              label={t("reports.ownerReports.scope.windowStartUtc")}
+              value={preview.sourceWatermark.windowStartUtc}
+            />
+            <ScopeItem
+              label={t("reports.ownerReports.scope.windowEndUtc")}
+              value={preview.sourceWatermark.windowEndUtc}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
             {preview.sourceWatermark.sourceRows.map((row) => (
               <div
@@ -456,6 +504,195 @@ function ReportPreviewPanel({ preview }: ReportPreviewPanelProps) {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function LedgerReportPreviewPanel({
+  preview,
+}: {
+  preview: Exclude<ReportPreview, { reportKey: "daily_business_summary_v1" }>
+}) {
+  const { t } = useTranslation()
+  const isCash = preview.reportKey === "cash_mobile_money_v1"
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h3 className="text-lg font-semibold tracking-tight">{t("reports.ownerReports.previewTitle")}</h3>
+        <p className="text-sm text-muted-foreground">{preview.reportKey} · v{preview.schemaVersion}</p>
+      </div>
+      <Alert variant="destructive"><AlertCircle /><AlertTitle>{t("reports.ownerReports.watermarkTitle")}</AlertTitle><AlertDescription>{preview.watermark}</AlertDescription></Alert>
+      {preview.reportKey === "cash_mobile_money_v1" ? (
+        <CashReportStats report={preview.report} />
+      ) : preview.reportKey === "customer_balances_v1" ? (
+        <CustomerBalanceStats report={preview.report} />
+      ) : (
+        <SupplierPayablesStats report={preview.report} />
+      )}
+      {preview.reportKey === "cash_mobile_money_v1" && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Providers</CardTitle>
+              <CardDescription>Receipts, disbursements, and fees grouped by provider.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 text-sm">
+              {preview.report.providers.map((provider) => (
+                <div key={provider.provider} className="flex justify-between gap-4 rounded border p-3">
+                  <span>{provider.provider}</span>
+                  <span>{formatMoney(provider.net)}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Unreconciled</CardTitle>
+              <CardDescription>{preview.report.unreconciled.count} posted payment(s) without allocation.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 text-sm">
+              {preview.report.unreconciled.lines.length === 0 ? (
+                <p className="text-muted-foreground">No unreconciled posted payments as of the cutoff.</p>
+              ) : (
+                preview.report.unreconciled.lines.map((line) => (
+                  <div key={line.paymentTransactionId} className="flex justify-between gap-4 rounded border p-3">
+                    <span>{line.referenceMasked ?? `Txn #${line.paymentTransactionId}`}</span>
+                    <span>{formatMoney(line.amount)}</span>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+      {preview.reportKey !== "cash_mobile_money_v1" && preview.report.dueBuckets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Due buckets</CardTitle>
+            <CardDescription>Aging by invoice due date as of the report date.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm">
+            {preview.report.dueBuckets.map((bucket) => (
+              <div key={bucket.bucket} className="flex justify-between gap-4 rounded border p-3">
+                <span>{bucket.label}</span>
+                <span>{formatMoney(bucket.amount)}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      <Card>
+        <CardHeader><CardTitle className="text-base">{isCash ? "Accounts" : "Open items"}</CardTitle></CardHeader>
+        <CardContent className="flex flex-col gap-2 text-sm">
+          {preview.reportKey === "cash_mobile_money_v1"
+            ? preview.report.accounts.map((line) => (
+                <div key={line.paymentAccountId} className="flex justify-between gap-4 rounded border p-3">
+                  <span>{line.name} · {line.provider}</span>
+                  <span>{formatMoney(line.closing)}</span>
+                </div>
+              ))
+            : preview.report.lines.map((line) => (
+                <div key={line.moveId} className="flex flex-col gap-1 rounded border p-3">
+                  <div className="flex justify-between gap-4">
+                    <span>{line.partnerDisplayName ?? `Partner #${line.partnerId ?? "-"}`}</span>
+                    <span>{formatMoney(line.residual)}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {line.dueDate ? <span>Due {line.dueDate}</span> : null}
+                    <span>Original {formatMoney(line.originalAmount)}</span>
+                    <span>Paid {formatMoney(line.paidAmount)}</span>
+                    {line.isPartial ? <span>Partial</span> : null}
+                    {line.lastPaymentDate ? <span>Last payment {line.lastPaymentDate}</span> : null}
+                  </div>
+                </div>
+              ))}
+        </CardContent>
+      </Card>
+      <ReportMetadata preview={preview} />
+    </div>
+  )
+}
+
+function CashReportStats({ report }: { report: Extract<ReportPreview, { reportKey: "cash_mobile_money_v1" }>['report'] }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {[["Opening", report.opening], ["Receipts", report.receipts], ["Disbursements", report.disbursements], ["Fees", report.fees], ["Closing", report.closing]].map(([label, value]) => (
+        <StatCard key={label} label={label} value={formatMoney(value)} />
+      ))}
+    </div>
+  )
+}
+
+function CustomerBalanceStats({
+  report,
+}: {
+  report: Extract<ReportPreview, { reportKey: "customer_balances_v1" }>["report"]
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {[["Open", report.totalOpen], ["Overdue", report.overdue], ["Current", report.current]].map(
+          ([label, value]) => (
+            <StatCard key={label} label={label} value={formatMoney(value)} />
+          ),
+        )}
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {[["Within limit", report.creditStatus.withinLimit], ["Over limit", report.creditStatus.overLimit], ["Unknown", report.creditStatus.unknown]].map(
+          ([label, value]) => (
+            <StatCard key={label} label={label} value={String(value)} />
+          ),
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SupplierPayablesStats({
+  report,
+}: {
+  report: Extract<ReportPreview, { reportKey: "supplier_payables_v1" }>["report"]
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {[["Open", report.totalOpen], ["Overdue", report.overdue], ["Current", report.current], ["Paid", report.paidAmounts], ["Planned", report.plannedAmounts]].map(
+        ([label, value]) => (
+          <StatCard key={label} label={label} value={formatMoney(value)} />
+        ),
+      )}
+    </div>
+  )
+}
+
+function ReportMetadata({ preview }: { preview: ReportPreview }) {
+  const { t } = useTranslation()
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{t("reports.ownerReports.sourceWatermarkTitle")}</CardTitle>
+        <CardDescription>
+          {t("reports.ownerReports.sourceWatermarkCutoff", {
+            cutoff: preview.sourceWatermark.cutoffLabel,
+          })}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <ScopeItem
+            label={t("reports.ownerReports.scope.windowStartUtc")}
+            value={preview.sourceWatermark.windowStartUtc}
+          />
+          <ScopeItem
+            label={t("reports.ownerReports.scope.windowEndUtc")}
+            value={preview.sourceWatermark.windowEndUtc}
+          />
+        </div>
+        <ul className="flex list-disc flex-col gap-2 pl-4 text-sm text-muted-foreground">
+          {preview.caveats.map((caveat) => (
+            <li key={caveat}>{caveat}</li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   )
 }
 

@@ -5,7 +5,17 @@ use serde::Deserialize;
 
 use crate::{
     error::{AppError, AppResult},
-    harness::report_composer::{compose_report, ReportComposerInput, ReportComposerResult},
+    harness::{
+        data_scope_resolver::ResourceRegistry,
+        manifest::OrgPrivacyPolicy,
+        policy_engine::PolicyEngine,
+        release_registry::load_active_manifest,
+        report_composer::{
+            compose_report, ReportComposerInput, ReportComposerResult, REPORT_COMPOSER_SKILL_KEY,
+            REPORT_COMPOSER_SKILL_VERSION,
+        },
+        skill_registry::SkillRegistry,
+    },
     state::AppState,
 };
 
@@ -19,6 +29,8 @@ pub struct GatewayReportComposeRequest {
     pub timezone: String,
     pub stdb_token: String,
     pub identity_hex: Option<String>,
+    #[serde(default)]
+    pub org_privacy_policy: OrgPrivacyPolicy,
 }
 
 pub async fn post_compose(
@@ -47,6 +59,16 @@ pub async fn post_compose(
     let identity_hex = req
         .identity_hex
         .unwrap_or_else(|| "report-composer".to_string());
+    let manifest = load_active_manifest(
+        &state.stdb,
+        req.org_id,
+        REPORT_COMPOSER_SKILL_KEY,
+        REPORT_COMPOSER_SKILL_VERSION,
+    )
+    .await
+    .map_err(AppError::Forbidden)?;
+    let policy = PolicyEngine::new(SkillRegistry::exact(manifest), ResourceRegistry::built_in())
+        .with_org_privacy(req.org_privacy_policy);
 
     let result = compose_report(
         &state.http,
@@ -60,6 +82,7 @@ pub async fn post_compose(
             date: req.date,
             timezone: req.timezone,
         },
+        policy,
     )
     .await
     .map_err(|message| AppError::Internal(message))?;

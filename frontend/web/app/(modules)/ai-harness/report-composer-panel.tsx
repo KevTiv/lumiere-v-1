@@ -46,6 +46,8 @@ import { useAiReportComposer } from "@lumiere/query-hooks/hooks/ai-report-compos
 import type { DecisionOutcome } from "@lumiere/erp-shared/ai-policy-schemas"
 import type { ReportComposerResult } from "@lumiere/erp-shared/ai-report-composer-schemas"
 
+import { HarnessAuditTrailCard } from "./harness-audit-trail-card"
+
 interface ReportComposerPanelProps {
   organizationId: bigint
   companies: Record<string, unknown>[]
@@ -164,7 +166,7 @@ export function ReportComposerPanel({
                 onValueChange={setSelectedCompanyId}
                 disabled={companyOptions.length === 0}
               >
-                <SelectTrigger>
+                <SelectTrigger data-testid="report-composer-company-trigger">
                   <Building2 data-icon="inline-start" />
                   <SelectValue
                     placeholder={t("aiHarness.reportComposer.companyPlaceholder")}
@@ -187,7 +189,7 @@ export function ReportComposerPanel({
                 onValueChange={setReportKey}
                 disabled={reportOptions.length === 0}
               >
-                <SelectTrigger>
+                <SelectTrigger data-testid="report-composer-report-trigger">
                   <FileText data-icon="inline-start" />
                   <SelectValue
                     placeholder={t("aiHarness.reportComposer.reportPlaceholder")}
@@ -231,6 +233,7 @@ export function ReportComposerPanel({
           <Separator className="my-4" />
 
           <Button
+            data-testid="report-composer-run"
             disabled={
               !reportKey ||
               !selectedCompanyId ||
@@ -259,7 +262,9 @@ export function ReportComposerPanel({
       )}
 
       {compose.data && !compose.isPending && (
-        <ReportComposerResultView result={compose.data} />
+        <div data-testid="report-composer-result">
+          <ReportComposerResultView result={compose.data} />
+        </div>
       )}
     </div>
   )
@@ -350,6 +355,8 @@ function ReportComposerResultView({ result }: { result: ReportComposerResult }) 
           </Card>
         </>
       )}
+
+      <HarnessAuditTrailCard audit={result.audit} />
     </div>
   )
 }

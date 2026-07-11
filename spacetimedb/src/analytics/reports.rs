@@ -8,6 +8,8 @@
 /// | **AnalyticsMetric** | KPI / trend metric with cached computed values |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::require_company_in_organization;
+use crate::documents::documents::{document, document_version, Document, DocumentVersion};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
@@ -97,6 +99,23 @@ pub struct CreateAnalyticsMetricParams {
 pub struct UpdateMetricValuesParams {
     pub current_value: f64,
     pub previous_value: Option<f64>,
+}
+
+/// Immutable metadata for a typed owner-report generation. The binary artifact
+/// remains in the document/object store; this row is the scoped audit and
+/// provenance record used by report history.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RecordGeneratedOwnerReportParams {
+    pub report_key: String,
+    pub schema_version: u32,
+    pub parameters_json: String,
+    pub source_watermark_json: String,
+    pub output_hash: String,
+    pub renderer_version: String,
+    pub artifact_key: String,
+    pub artifact_size: u64,
+    pub correlation_id: String,
+    pub metadata: Option<String>,
 }
 
 // ============================================================================
@@ -227,9 +246,181 @@ pub struct AnalyticsMetric {
     pub metadata: Option<String>,
 }
 
+/// Immutable generated owner-report provenance. This is separate from generic
+/// `FinancialReport`: typed owner-report schemas and rendering lifecycle do not
+/// share the latter's editable analytical-report semantics.
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = generated_owner_report,
+    public,
+    index(accessor = generated_owner_report_by_org, btree(columns = [organization_id])),
+    index(accessor = generated_owner_report_by_company, btree(columns = [company_id])),
+    index(accessor = generated_owner_report_by_key, btree(columns = [report_key]))
+)]
+pub struct GeneratedOwnerReport {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub report_key: String,
+    pub schema_version: u32,
+    pub parameters_json: String,
+    pub source_watermark_json: String,
+    pub output_hash: String,
+    pub renderer_version: String,
+    pub artifact_key: String,
+    pub document_id: u64,
+    pub correlation_id: String,
+    pub generated_by: Identity,
+    pub generated_at: Timestamp,
+    pub metadata: Option<String>,
+}
+
 // ============================================================================
 // REDUCERS
 // ============================================================================
+
+/// Record a completed typed owner-report render. The report service, not the
+/// browser, owns all provenance values.
+#[reducer]
+pub fn record_generated_owner_report(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: RecordGeneratedOwnerReportParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "report", "read")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    if params.report_key.trim().is_empty()
+        || params.parameters_json.trim().is_empty()
+        || params.source_watermark_json.trim().is_empty()
+        || params.output_hash.trim().is_empty()
+        || params.renderer_version.trim().is_empty()
+        || params.correlation_id.trim().is_empty()
+        || params.artifact_key.trim().is_empty()
+    {
+        return Err("owner-report provenance fields are required".to_string());
+    }
+    let artifact_url = format!("report-artifact://{}", params.artifact_key);
+    let checksum = params.output_hash.clone();
+    let file_name = format!(
+        "{}-{}.pdf",
+        params.report_key,
+        &checksum[..checksum.len().min(16)]
+    );
+    let mut document = ctx.db.document().insert(Document {
+        id: 0,
+        organization_id,
+        name: format!("Owner report: {}", params.report_key),
+        description: Some("Immutable typed owner-report artifact".to_string()),
+        file_name: file_name.clone(),
+        file_size: params.artifact_size,
+        mimetype: "application/pdf".to_string(),
+        checksum: Some(checksum.clone()),
+        index_content: None,
+        access_token: None,
+        url: Some(artifact_url.clone()),
+        res_model: Some("generated_owner_report".to_string()),
+        res_id: None,
+        res_name: Some(params.report_key.clone()),
+        partner_id: None,
+        owner_id: ctx.sender(),
+        company_id: Some(company_id),
+        folder_id: None,
+        tag_ids: Vec::new(),
+        is_locked: true,
+        locked_by: Some(ctx.sender()),
+        locked_at: Some(ctx.timestamp),
+        is_favorite: false,
+        is_shared: false,
+        share_link: None,
+        share_expires: None,
+        is_deleted: false,
+        deleted_at: None,
+        deleted_by: None,
+        version_count: 1,
+        current_version_id: None,
+        download_count: 0,
+        last_viewed_at: None,
+        last_viewed_by: None,
+        activity_ids: Vec::new(),
+        message_follower_ids: Vec::new(),
+        message_ids: Vec::new(),
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        metadata: Some(
+            serde_json::json!({"artifact_key": params.artifact_key.clone()}).to_string(),
+        ),
+    });
+    let version = ctx.db.document_version().insert(DocumentVersion {
+        id: 0,
+        document_id: document.id,
+        version_number: 1,
+        name: "Owner report render".to_string(),
+        file_name,
+        file_size: params.artifact_size,
+        mimetype: "application/pdf".to_string(),
+        checksum: Some(checksum),
+        url: artifact_url,
+        changes_description: Some("Generated by typed owner-report renderer".to_string()),
+        created_by: ctx.sender(),
+        created_at: ctx.timestamp,
+        is_current: true,
+        metadata: Some(
+            serde_json::json!({"renderer_version": params.renderer_version.clone()}).to_string(),
+        ),
+    });
+    document.current_version_id = Some(version.id);
+    ctx.db.document().id().update(document.clone());
+    let row = ctx
+        .db
+        .generated_owner_report()
+        .insert(GeneratedOwnerReport {
+            id: 0,
+            organization_id,
+            company_id,
+            report_key: params.report_key,
+            schema_version: params.schema_version,
+            parameters_json: params.parameters_json,
+            source_watermark_json: params.source_watermark_json,
+            output_hash: params.output_hash,
+            renderer_version: params.renderer_version,
+            artifact_key: params.artifact_key,
+            document_id: version.document_id,
+            correlation_id: params.correlation_id,
+            generated_by: ctx.sender(),
+            generated_at: ctx.timestamp,
+            metadata: params.metadata,
+        });
+    document.res_id = Some(row.id);
+    ctx.db.document().id().update(document);
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "generated_owner_report",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "report_key": row.report_key,
+                    "schema_version": row.schema_version,
+                    "output_hash": row.output_hash,
+                    "correlation_id": row.correlation_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["generated".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
 
 /// Create a report template
 #[reducer]
@@ -726,9 +917,7 @@ pub fn update_saved_report(
     ctx.db.saved_report().id().update(SavedReport {
         name: params.name.unwrap_or(existing.name),
         row_dimension: params.row_dimension.unwrap_or(existing.row_dimension),
-        column_dimension: params
-            .column_dimension
-            .unwrap_or(existing.column_dimension),
+        column_dimension: params.column_dimension.unwrap_or(existing.column_dimension),
         measure_field: params.measure_field.unwrap_or(existing.measure_field),
         measure_op: params.measure_op.unwrap_or(existing.measure_op),
         filter_json: params.filter_json.unwrap_or(existing.filter_json),

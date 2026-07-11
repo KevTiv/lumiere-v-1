@@ -58,9 +58,14 @@ export interface ReportPreviewRequest {
 export interface ReportScope {
   organizationId: number
   companyId: number
+  /** Requested local calendar date (`YYYY-MM-DD`) in `timezone`. */
+  localDate: string
   dateFrom: string
   dateToExclusive: string
   timezone: string
+  windowStartUtc: string
+  windowEndUtc: string
+  cutoffLabel: string
 }
 
 export interface ReportCurrency {
@@ -75,8 +80,23 @@ export interface SourceRowCount {
 
 export interface SourceWatermark {
   accountingCutoff: string
+  windowStartUtc: string
+  windowEndUtc: string
+  cutoffLabel: string
   queriedAt: string
   sourceRows: SourceRowCount[]
+}
+
+export interface GeneratedOwnerReportHistoryRow {
+  id: number
+  companyId: number
+  reportKey: string
+  schemaVersion: number
+  outputHash: string
+  rendererVersion: string
+  documentId: number
+  correlationId: string
+  generatedAt: string
 }
 
 export interface ReportEnvelope<T> {
@@ -209,10 +229,116 @@ export interface DailyBusinessSummaryReportV1 {
   totals: DailyTotals
 }
 
+// ── Ledger-backed owner reports V1 ──────────────────────────────────────────
+
+export interface CashAccountLine {
+  paymentAccountId: number
+  name: string
+  provider: string
+  referenceMasked?: string
+  opening: MoneyAmount
+  receipts: MoneyAmount
+  disbursements: MoneyAmount
+  fees: MoneyAmount
+  closing: MoneyAmount
+  closingMovement: MoneyAmount
+}
+
+export interface ProviderSummary {
+  provider: string
+  receipts: MoneyAmount
+  disbursements: MoneyAmount
+  fees: MoneyAmount
+  net: MoneyAmount
+}
+
+export interface UnreconciledPaymentLine {
+  paymentTransactionId: number
+  paymentAccountId: number
+  referenceMasked?: string
+  occurredAt: string
+  amount: MoneyAmount
+}
+
+export interface UnreconciledSummary {
+  count: number
+  lines: UnreconciledPaymentLine[]
+}
+
+export interface CashMobileMoneyReportV1 {
+  opening: MoneyAmount
+  receipts: MoneyAmount
+  disbursements: MoneyAmount
+  fees: MoneyAmount
+  closing: MoneyAmount
+  accounts: CashAccountLine[]
+  providers: ProviderSummary[]
+  unreconciled: UnreconciledSummary
+}
+
+export interface DueBucketSummary {
+  bucket: string
+  label: string
+  amount: MoneyAmount
+}
+
+export interface OpenBalanceLine {
+  moveId: number
+  partnerId?: number
+  partnerDisplayName?: string
+  dueDate?: string
+  originalAmount: MoneyAmount
+  paidAmount: MoneyAmount
+  residual: MoneyAmount
+  isPartial: boolean
+  lastPaymentDate?: string
+}
+
+export interface CreditStatusSummary {
+  withinLimit: number
+  overLimit: number
+  unknown: number
+}
+
+export interface CustomerBalancesReportV1 {
+  totalOpen: MoneyAmount
+  overdue: MoneyAmount
+  current: MoneyAmount
+  dueBuckets: DueBucketSummary[]
+  creditStatus: CreditStatusSummary
+  lines: OpenBalanceLine[]
+}
+
+export interface SupplierPayablesReportV1 {
+  totalOpen: MoneyAmount
+  overdue: MoneyAmount
+  current: MoneyAmount
+  dueBuckets: DueBucketSummary[]
+  paidAmounts: MoneyAmount
+  plannedAmounts: MoneyAmount
+  lines: OpenBalanceLine[]
+}
+
 // ── Preview union ────────────────────────────────────────────────────────────
 
+export type DailyBusinessSummaryPreview = ReportEnvelope<DailyBusinessSummaryReportV1> & {
+  reportKey: "daily_business_summary_v1"
+}
+export type CashMobileMoneyPreview = ReportEnvelope<CashMobileMoneyReportV1> & {
+  reportKey: "cash_mobile_money_v1"
+}
+export type CustomerBalancesPreview = ReportEnvelope<CustomerBalancesReportV1> & {
+  reportKey: "customer_balances_v1"
+}
+export type SupplierPayablesPreview = ReportEnvelope<SupplierPayablesReportV1> & {
+  reportKey: "supplier_payables_v1"
+}
+
 export type ReportPreview =
-  | ReportEnvelope<DailyBusinessSummaryReportV1>
+  | DailyBusinessSummaryPreview
+  | CashMobileMoneyPreview
+  | CustomerBalancesPreview
+  | SupplierPayablesPreview
 
 // ── Type guards ──────────────────────────────────────────────────────────────
 

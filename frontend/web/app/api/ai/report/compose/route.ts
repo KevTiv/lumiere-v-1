@@ -1,25 +1,22 @@
-import { type NextRequest, NextResponse } from "next/server"
+/**
+ * POST /api/ai/report/compose — run the promoted green report-composer skill.
+ *
+ * The BFF resolves the caller's organization-level AI privacy policy from Casbin
+ * rules and forwards it to the gateway, where it is merged with the skill
+ * manifest's privacy policy before `PrivacyGuard` is applied.
+ */
+import { type NextRequest, NextResponse } from 'next/server'
 
+import { fetchAiGateway, resolveAiGatewayBaseUrl } from '@/lib/ai-gateway-server'
 import {
-  fetchAiGateway,
-  resolveAiGatewayBaseUrl,
-} from "@/lib/ai-gateway-server"
-import {
-  boundedString,
+  optionalPositiveInteger,
   parseJsonBody,
-  positiveInteger,
   requireAiRouteContext,
   sanitizeIdentifier,
   validateCompanyScope,
-} from "../../_lib/route-helpers"
+} from '../../_lib/route-helpers'
+import { resolveAiPrivacyPolicy } from '../../_lib/ai-privacy-policy'
 
-/**
- * POST /api/ai/report/compose
- *
- * Protected BFF for the promoted `report_composer` green AI skill. Organization
- * and actor context are derived from the session; only company, report key,
- * date, and timezone come from the browser.
- */
 export async function POST(request: NextRequest) {
   const contextResult = await requireAiRouteContext(request)
   if (!contextResult.ok) return contextResult.response
@@ -30,59 +27,59 @@ export async function POST(request: NextRequest) {
   const { session, orgId } = contextResult.context
   const body = bodyResult.body
 
-  const companyId = positiveInteger(body.companyId ?? body.company_id)
+  const companyId = optionalPositiveInteger(body.companyId ?? body.company_id)
   const companyError = await validateCompanyScope(session, companyId ?? NaN)
   if (companyError) return companyError
 
-  const reportKey = sanitizeIdentifier(body.reportKey ?? body.report_key ?? "", 120)
-  const date = boundedString(body.date, 10)
-  const timezone = boundedString(body.timezone, 64)
-
+  const reportKey = sanitizeIdentifier(body.reportKey ?? body.report_key ?? '', 120)
   if (!reportKey) {
-    return NextResponse.json({ error: "reportKey is required" }, { status: 400 })
-  }
-  if (!date) {
-    return NextResponse.json({ error: "date is required" }, { status: 400 })
-  }
-  if (!timezone) {
-    return NextResponse.json({ error: "timezone is required" }, { status: 400 })
+    return NextResponse.json({ error: 'reportKey is required' }, { status: 400 })
   }
 
-  if (!resolveAiGatewayBaseUrl()) {
-    return NextResponse.json(
-      { error: "AI gateway is not configured" },
-      { status: 503 },
-    )
+  const date = sanitizeIdentifier(body.date ?? '', 120)
+  if (!date) {
+    return NextResponse.json({ error: 'date is required' }, { status: 400 })
+  }
+
+  const timezone = sanitizeIdentifier(body.timezone ?? '', 120)
+  if (!timezone) {
+    return NextResponse.json({ error: 'timezone is required' }, { status: 400 })
+  }
+
+  const orgPrivacyPolicy = resolveAiPrivacyPolicy(session.fieldAccess)
+
+  const base = resolveAiGatewayBaseUrl()
+  if (!base) {
+    return NextResponse.json({ error: 'AI gateway is not configured' }, { status: 503 })
   }
 
   try {
-    const gw = await fetchAiGateway("/v1/skills/report/compose", {
-      method: "POST",
+    const gw = await fetchAiGateway('/v1/skills/report/compose', {
+      method: 'POST',
       body: JSON.stringify({
-        orgId,
-        companyId,
-        reportKey,
+        org_id: orgId,
+        company_id: companyId,
+        report_key: reportKey,
         date,
         timezone,
-        stdbToken: session.stdbToken,
-        identityHex: session.identityHex,
+        stdb_token: session.stdbToken,
+        identity_hex: session.identityHex,
+        org_privacy_policy: orgPrivacyPolicy,
       }),
     })
-    const payload = gw.text
+
+    const responsePayload = gw.text
       ? (() => {
         try {
-          return JSON.parse(gw.text) as unknown
+          return JSON.parse(gw.text) as Record<string, unknown>
         } catch {
           return { error: gw.text }
         }
       })()
       : {}
-    return NextResponse.json(payload, { status: gw.status })
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    return NextResponse.json(
-      { error: "AI gateway request failed", detail },
-      { status: 502 },
-    )
+    return NextResponse.json(responsePayload, { status: gw.status })
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: 'AI gateway request failed', detail }, { status: 502 })
   }
 }

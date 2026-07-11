@@ -1,8 +1,8 @@
 //! Live ERP row snapshots via SpacetimeDB SQL (read-only grounding layer).
 
 use anyhow::{Context, Result};
-use serde::Serialize;
 use serde::Deserialize;
+use serde::Serialize;
 use serde_json::{Map, Value};
 use stdb_client::StdbClient;
 
@@ -219,15 +219,12 @@ async fn fetch_relation_snapshots(
     for relation in spec.relations {
         let select_list = relation.prompt_fields.join(", ");
         let sql = build_relation_sql(relation, org_id, company_id, entity_id, &select_list);
-        let rows = stdb
-            .query_sql(&sql)
-            .await
-            .with_context(|| {
-                format!(
-                    "relation SQL for {} #{} ({})",
-                    spec.entity_type, entity_id, relation.relation_key
-                )
-            })?;
+        let rows = stdb.query_sql(&sql).await.with_context(|| {
+            format!(
+                "relation SQL for {} #{} ({})",
+                spec.entity_type, entity_id, relation.relation_key
+            )
+        })?;
 
         let filtered_rows: Vec<Value> = rows
             .into_iter()
@@ -351,12 +348,7 @@ fn build_snapshot_sql(
     }
 }
 
-fn row_matches_scope(
-    spec: &EntitySnapshotSpec,
-    row: &Value,
-    org_id: u64,
-    company_id: u64,
-) -> bool {
+fn row_matches_scope(spec: &EntitySnapshotSpec, row: &Value, org_id: u64, company_id: u64) -> bool {
     if let Some(org_col) = spec.org_column {
         let camel = snake_to_camel(org_col);
         if let Some(row_org) = json_u64(row.get(org_col).or_else(|| row.get(&camel))) {
@@ -466,9 +458,7 @@ fn utc_now_rfc3339() -> String {
     let seconds = time_of_day % 60;
 
     let (year, month, day) = civil_from_days(days as i64);
-    format!(
-        "{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z"
-    )
+    format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z")
 }
 
 /// Algorithm from http://howardhinnant.github.io/date_algorithms.html (civil_from_days).

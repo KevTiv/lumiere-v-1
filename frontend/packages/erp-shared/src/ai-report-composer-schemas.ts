@@ -37,10 +37,22 @@ export interface ReportCitation {
   valueMinorUnits: number
 }
 
+export interface HarnessAuditEvent {
+  sequence: number
+  phase: string
+  message: string
+}
+
+export interface HarnessAuditTrail {
+  correlationId: string
+  events: HarnessAuditEvent[]
+}
+
 export interface ReportComposerResult {
   decision: PolicyResult
   summary: string
   citations: ReportCitation[]
+  audit: HarnessAuditTrail
 }
 
 export type { PolicyDecision, PolicyResult, PrivacyReport }

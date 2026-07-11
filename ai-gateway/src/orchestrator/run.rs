@@ -6,10 +6,12 @@ use uuid::Uuid;
 
 use crate::{
     ai_agent::{
-        ensure_allowed_action, ensure_model_allowed, ensure_within_budget,
-        enforce_chargeable_limits, record_ai_spend, resolve_agent,
+        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed,
+        ensure_within_budget, record_ai_spend, resolve_agent,
     },
-    orchestrator::skill_loader::{complete_run, create_run, load_skill, resolve_dataset_specs, LoadedSkill},
+    orchestrator::skill_loader::{
+        complete_run, create_run, load_skill, resolve_dataset_specs, LoadedSkill,
+    },
     providers::llm::LlmMessage,
     sandbox::{default_analysis_sql, SandboxSession},
     skills::{
@@ -82,6 +84,8 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
     if skill_key.is_empty() {
         anyhow::bail!("skill_key is required");
     }
+    crate::harness::legacy_fence::ensure_legacy_orchestrator_allowed(skill_key)
+        .map_err(|message| anyhow::anyhow!(message))?;
 
     let stdb = req
         .stdb_token
@@ -95,13 +99,7 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
         anyhow::bail!("skill '{skill_key}' is disabled for this company");
     }
 
-    let agent = resolve_agent(
-        &stdb,
-        req.org_id,
-        req.agent_id,
-        req.team_member_id,
-    )
-    .await?;
+    let agent = resolve_agent(&stdb, req.org_id, req.agent_id, req.team_member_id).await?;
     ensure_allowed_action(&agent, "skill_run")?;
     ensure_model_allowed(&agent)?;
     ensure_within_budget(&agent)?;
@@ -136,7 +134,10 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
     let allowed_tools = resolve_allowed_tools(&skill, &agent);
     let dataset_specs = resolve_dataset_specs(&skill);
     let needs_sandbox = allowed_tools.iter().any(|t| {
-        matches!(t.as_str(), "list_datasets" | "describe_dataset" | "run_query")
+        matches!(
+            t.as_str(),
+            "list_datasets" | "describe_dataset" | "run_query"
+        )
     });
     let sandbox = if needs_sandbox && !dataset_specs.is_empty() {
         Some(Arc::new(Mutex::new(
@@ -199,7 +200,11 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
                     .get("activity_query")
                     .and_then(|v| v.as_str())
                     .map(str::to_string),
-                top_k: req.inputs.get("top_k").and_then(|v| v.as_u64()).map(|v| v as usize),
+                top_k: req
+                    .inputs
+                    .get("top_k")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize),
             },
         )
         .await;
@@ -218,7 +223,11 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
             InsightsScanRequest {
                 org_id: req.org_id,
                 company_id: Some(req.company_id),
-                max_insights: req.inputs.get("max_insights").and_then(|v| v.as_u64()).map(|v| v as usize),
+                max_insights: req
+                    .inputs
+                    .get("max_insights")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize),
                 abnormal_amount_threshold: req
                     .inputs
                     .get("abnormal_amount_threshold")
@@ -245,7 +254,12 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
         .or_else(|| req.inputs.get("productId"))
         .and_then(|v| v.as_u64().or_else(|| v.as_str()?.parse().ok()));
     let entity_type = entity_type.or_else(|| {
-        if req.inputs.get("product_id").or_else(|| req.inputs.get("productId")).is_some() {
+        if req
+            .inputs
+            .get("product_id")
+            .or_else(|| req.inputs.get("productId"))
+            .is_some()
+        {
             Some("product".to_string())
         } else {
             None
@@ -285,8 +299,7 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
         tool_payloads.push(json!({ "tool": "erp_snapshot", "data": output.data }));
     }
 
-    if allowed_tools.iter().any(|t| t == "erp_search") && step_no < max_steps && !query.is_empty()
-    {
+    if allowed_tools.iter().any(|t| t == "erp_search") && step_no < max_steps && !query.is_empty() {
         step_no += 1;
         let input = json!({
             "query": query,
@@ -403,15 +416,8 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
         }
     }
 
-    let (summary, tokens_used) = synthesize_summary(
-        state,
-        req.org_id,
-        &agent,
-        &skill,
-        &query,
-        &tool_payloads,
-    )
-    .await?;
+    let (summary, tokens_used) =
+        synthesize_summary(state, req.org_id, &agent, &skill, &query, &tool_payloads).await?;
 
     let artifact = SkillArtifact {
         kind: "markdown".to_string(),
@@ -421,7 +427,10 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
 
     let mut artifacts = vec![artifact.clone()];
     if skill.skill_key == "insights_scan" {
-        if let Some(payload) = tool_payloads.iter().find(|p| p.get("tool").and_then(|v| v.as_str()) == Some("insights_scan")) {
+        if let Some(payload) = tool_payloads
+            .iter()
+            .find(|p| p.get("tool").and_then(|v| v.as_str()) == Some("insights_scan"))
+        {
             if let Some(data) = payload.get("data") {
                 artifacts.push(SkillArtifact {
                     kind: "insights".to_string(),
@@ -502,7 +511,10 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
     })
 }
 
-fn resolve_allowed_tools(skill: &LoadedSkill, agent: &crate::ai_agent::ResolvedAgentConfig) -> Vec<String> {
+fn resolve_allowed_tools(
+    skill: &LoadedSkill,
+    agent: &crate::ai_agent::ResolvedAgentConfig,
+) -> Vec<String> {
     let registry = ToolRegistry::new();
     let mut tool_names = skill.required_tools.clone();
     for name in &skill.optional_tools {
@@ -680,7 +692,12 @@ fn string_list_from_input(inputs: &Value, key: &str) -> Option<Vec<String>> {
             return Some(
                 items
                     .iter()
-                    .filter_map(|v| v.as_str().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string))
+                    .filter_map(|v| {
+                        v.as_str()
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty())
+                            .map(str::to_string)
+                    })
                     .collect(),
             );
         }
@@ -759,7 +776,10 @@ fn run_import_mapping_skill(inputs: &Value) -> Option<Value> {
             headers: headers.clone(),
             rows: preview_rows_data,
             mapping: mapping.into_iter().collect(),
-            max_rows: inputs.get("max_rows").and_then(|v| v.as_u64()).map(|v| v as usize),
+            max_rows: inputs
+                .get("max_rows")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize),
         })
         .ok()?;
         return Some(json!(preview));

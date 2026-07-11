@@ -1,17 +1,17 @@
 import { getStdbSession } from "@/lib/api-session"
 import { serverFetchQueryListAllowEmpty } from "@/lib/server-query"
-import { ReportComposerPanel } from "./report-composer-panel"
+import { AiHarnessClient } from "./ai-harness-client"
 
 export default async function AiHarnessPage() {
   const session = await getStdbSession()
   if (!session?.organizationId) {
-    return <ReportComposerPanel organizationId={0n} companies={[]} />
+    return <AiHarnessClient organizationId={0n} companies={[]} />
   }
 
   const companies = await serverFetchQueryListAllowEmpty(session, "companies")
 
   return (
-    <ReportComposerPanel
+    <AiHarnessClient
       organizationId={BigInt(session.organizationId)}
       companies={companies}
     />

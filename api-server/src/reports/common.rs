@@ -82,9 +82,14 @@ pub struct ReportPreviewRequest {
 pub struct ReportScope {
     pub organization_id: u64,
     pub company_id: u64,
+    /// Requested local calendar date (`YYYY-MM-DD`) in `timezone`.
+    pub local_date: String,
     pub date_from: String,
     pub date_to_exclusive: String,
     pub timezone: String,
+    pub window_start_utc: String,
+    pub window_end_utc: String,
+    pub cutoff_label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -104,7 +109,11 @@ pub struct SourceRowCount {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceWatermark {
+    /// Exclusive UTC instant for posted-ledger as-of semantics.
     pub accounting_cutoff: String,
+    pub window_start_utc: String,
+    pub window_end_utc: String,
+    pub cutoff_label: String,
     pub queried_at: String,
     pub source_rows: Vec<SourceRowCount>,
 }
@@ -122,4 +131,26 @@ pub struct ReportEnvelope<T> {
     pub caveats: Vec<String>,
     pub watermark: String,
     pub report: T,
+}
+
+/// Immutable provenance row for a rendered owner-report artifact.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeneratedOwnerReportHistoryRow {
+    pub id: u64,
+    pub company_id: u64,
+    pub report_key: String,
+    pub schema_version: u32,
+    pub output_hash: String,
+    pub renderer_version: String,
+    pub document_id: u64,
+    pub correlation_id: String,
+    pub generated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct GeneratedOwnerReportArtifactRow {
+    pub id: u64,
+    pub company_id: u64,
+    pub artifact_key: String,
 }

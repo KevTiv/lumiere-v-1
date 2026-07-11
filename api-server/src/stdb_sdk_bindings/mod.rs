@@ -50,6 +50,7 @@ pub mod adjustment_reason_type;
 pub mod ai_action_draft_type;
 pub mod ai_agent_type;
 pub mod ai_agent_run_type;
+pub mod ai_agent_run_policy_snapshot_type;
 pub mod ai_agent_run_step_type;
 pub mod ai_chat_message_type;
 pub mod ai_chat_session_type;
@@ -58,6 +59,12 @@ pub mod ai_insight_type;
 pub mod ai_reducer_allowlist_type;
 pub mod ai_skill_type;
 pub mod ai_skill_config_type;
+pub mod ai_skill_fixture_type;
+pub mod ai_skill_release_type;
+pub mod ai_skill_risk_type;
+pub mod ai_skill_test_run_type;
+pub mod ai_skill_test_run_status_type;
+pub mod ai_skill_version_type;
 pub mod ai_team_member_type;
 pub mod ai_team_member_skill_type;
 pub mod allocate_payment_params_type;
@@ -146,7 +153,9 @@ pub mod create_ai_agent_run_params_type;
 pub mod create_ai_chat_session_params_type;
 pub mod create_ai_insight_params_type;
 pub mod create_ai_reducer_allowlist_params_type;
+pub mod create_ai_skill_fixture_params_type;
 pub mod create_ai_skill_params_type;
+pub mod create_ai_skill_version_params_type;
 pub mod create_ai_team_member_params_type;
 pub mod create_analytic_account_params_type;
 pub mod create_analytic_distribution_model_params_type;
@@ -346,6 +355,7 @@ pub mod form_config_field_type;
 pub mod form_role_config_type;
 pub mod generate_eu_vat_report_params_type;
 pub mod generate_subscription_invoice_params_type;
+pub mod generated_owner_report_type;
 pub mod google_drive_connection_type;
 pub mod grant_org_permission_params_type;
 pub mod helpdesk_sla_type;
@@ -506,10 +516,12 @@ pub mod queue_mail_from_template_params_type;
 pub mod queue_worker_type;
 pub mod recognize_deferred_revenue_params_type;
 pub mod reconcile_account_bank_statement_line_params_type;
+pub mod record_ai_skill_test_run_params_type;
 pub mod record_barcode_scan_params_type;
 pub mod record_custom_field_entry_type;
 pub mod record_custom_field_value_type;
 pub mod record_cycle_count_line_params_type;
+pub mod record_generated_owner_report_params_type;
 pub mod record_privacy_consent_params_type;
 pub mod record_telemetry_params_type;
 pub mod record_whats_app_health_check_params_type;
@@ -872,6 +884,8 @@ pub mod create_ai_chat_session_reducer;
 pub mod create_ai_insight_reducer;
 pub mod create_ai_reducer_allowlist_reducer;
 pub mod create_ai_skill_reducer;
+pub mod create_ai_skill_fixture_reducer;
+pub mod create_ai_skill_version_reducer;
 pub mod create_ai_team_member_reducer;
 pub mod create_analytic_account_reducer;
 pub mod create_analytic_distribution_model_reducer;
@@ -1221,15 +1235,19 @@ pub mod process_intercompany_transaction_reducer;
 pub mod process_inventory_adjustment_reducer;
 pub mod process_pending_scans_reducer;
 pub mod produce_manufacturing_order_reducer;
+pub mod promote_ai_skill_version_reducer;
 pub mod queue_mail_from_template_reducer;
 pub mod receive_po_line_reducer;
 pub mod recognize_deferred_revenue_reducer;
 pub mod reconcile_account_bank_statement_line_reducer;
 pub mod reconcile_payment_with_invoice_reducer;
+pub mod record_ai_agent_run_policy_snapshot_reducer;
+pub mod record_ai_skill_test_run_reducer;
 pub mod record_ai_spend_reducer;
 pub mod record_barcode_scan_reducer;
 pub mod record_cycle_count_line_reducer;
 pub mod record_document_view_reducer;
+pub mod record_generated_owner_report_reducer;
 pub mod record_google_drive_sync_reducer;
 pub mod record_google_drive_sync_error_reducer;
 pub mod record_message_copied_reducer;
@@ -1273,6 +1291,7 @@ pub mod review_message_batch_reducer;
 pub mod review_supplier_intake_reducer;
 pub mod revoke_permission_reducer;
 pub mod revoke_role_reducer;
+pub mod rollback_ai_skill_release_reducer;
 pub mod rollback_import_job_reducer;
 pub mod run_accounting_payment_cancel_test_reducer;
 pub mod run_accounting_payment_management_test_reducer;
@@ -1543,6 +1562,7 @@ pub mod adjustment_reason_table;
 pub mod ai_action_draft_table;
 pub mod ai_agent_table;
 pub mod ai_agent_run_table;
+pub mod ai_agent_run_policy_snapshot_table;
 pub mod ai_agent_run_step_table;
 pub mod ai_chat_message_table;
 pub mod ai_chat_session_table;
@@ -1551,6 +1571,10 @@ pub mod ai_insight_table;
 pub mod ai_reducer_allowlist_table;
 pub mod ai_skill_table;
 pub mod ai_skill_config_table;
+pub mod ai_skill_fixture_table;
+pub mod ai_skill_release_table;
+pub mod ai_skill_test_run_table;
+pub mod ai_skill_version_table;
 pub mod ai_team_member_table;
 pub mod ai_team_member_skill_table;
 pub mod analytics_metric_table;
@@ -1611,6 +1635,7 @@ pub mod fleet_vehicle_table;
 pub mod form_config_table;
 pub mod form_config_field_table;
 pub mod form_role_config_table;
+pub mod generated_owner_report_table;
 pub mod google_drive_connection_table;
 pub mod helpdesk_sla_table;
 pub mod helpdesk_stage_table;
@@ -1820,6 +1845,7 @@ pub use adjustment_reason_type::AdjustmentReason;
 pub use ai_action_draft_type::AiActionDraft;
 pub use ai_agent_type::AiAgent;
 pub use ai_agent_run_type::AiAgentRun;
+pub use ai_agent_run_policy_snapshot_type::AiAgentRunPolicySnapshot;
 pub use ai_agent_run_step_type::AiAgentRunStep;
 pub use ai_chat_message_type::AiChatMessage;
 pub use ai_chat_session_type::AiChatSession;
@@ -1828,6 +1854,12 @@ pub use ai_insight_type::AiInsight;
 pub use ai_reducer_allowlist_type::AiReducerAllowlist;
 pub use ai_skill_type::AiSkill;
 pub use ai_skill_config_type::AiSkillConfig;
+pub use ai_skill_fixture_type::AiSkillFixture;
+pub use ai_skill_release_type::AiSkillRelease;
+pub use ai_skill_risk_type::AiSkillRisk;
+pub use ai_skill_test_run_type::AiSkillTestRun;
+pub use ai_skill_test_run_status_type::AiSkillTestRunStatus;
+pub use ai_skill_version_type::AiSkillVersion;
 pub use ai_team_member_type::AiTeamMember;
 pub use ai_team_member_skill_type::AiTeamMemberSkill;
 pub use allocate_payment_params_type::AllocatePaymentParams;
@@ -1916,7 +1948,9 @@ pub use create_ai_agent_run_params_type::CreateAiAgentRunParams;
 pub use create_ai_chat_session_params_type::CreateAiChatSessionParams;
 pub use create_ai_insight_params_type::CreateAiInsightParams;
 pub use create_ai_reducer_allowlist_params_type::CreateAiReducerAllowlistParams;
+pub use create_ai_skill_fixture_params_type::CreateAiSkillFixtureParams;
 pub use create_ai_skill_params_type::CreateAiSkillParams;
+pub use create_ai_skill_version_params_type::CreateAiSkillVersionParams;
 pub use create_ai_team_member_params_type::CreateAiTeamMemberParams;
 pub use create_analytic_account_params_type::CreateAnalyticAccountParams;
 pub use create_analytic_distribution_model_params_type::CreateAnalyticDistributionModelParams;
@@ -2116,6 +2150,7 @@ pub use form_config_field_type::FormConfigField;
 pub use form_role_config_type::FormRoleConfig;
 pub use generate_eu_vat_report_params_type::GenerateEuVatReportParams;
 pub use generate_subscription_invoice_params_type::GenerateSubscriptionInvoiceParams;
+pub use generated_owner_report_type::GeneratedOwnerReport;
 pub use google_drive_connection_type::GoogleDriveConnection;
 pub use grant_org_permission_params_type::GrantOrgPermissionParams;
 pub use helpdesk_sla_type::HelpdeskSla;
@@ -2276,10 +2311,12 @@ pub use queue_mail_from_template_params_type::QueueMailFromTemplateParams;
 pub use queue_worker_type::QueueWorker;
 pub use recognize_deferred_revenue_params_type::RecognizeDeferredRevenueParams;
 pub use reconcile_account_bank_statement_line_params_type::ReconcileAccountBankStatementLineParams;
+pub use record_ai_skill_test_run_params_type::RecordAiSkillTestRunParams;
 pub use record_barcode_scan_params_type::RecordBarcodeScanParams;
 pub use record_custom_field_entry_type::RecordCustomFieldEntry;
 pub use record_custom_field_value_type::RecordCustomFieldValue;
 pub use record_cycle_count_line_params_type::RecordCycleCountLineParams;
+pub use record_generated_owner_report_params_type::RecordGeneratedOwnerReportParams;
 pub use record_privacy_consent_params_type::RecordPrivacyConsentParams;
 pub use record_telemetry_params_type::RecordTelemetryParams;
 pub use record_whats_app_health_check_params_type::RecordWhatsAppHealthCheckParams;
@@ -2531,6 +2568,7 @@ pub use adjustment_reason_table::*;
 pub use ai_action_draft_table::*;
 pub use ai_agent_table::*;
 pub use ai_agent_run_table::*;
+pub use ai_agent_run_policy_snapshot_table::*;
 pub use ai_agent_run_step_table::*;
 pub use ai_chat_message_table::*;
 pub use ai_chat_session_table::*;
@@ -2539,6 +2577,10 @@ pub use ai_insight_table::*;
 pub use ai_reducer_allowlist_table::*;
 pub use ai_skill_table::*;
 pub use ai_skill_config_table::*;
+pub use ai_skill_fixture_table::*;
+pub use ai_skill_release_table::*;
+pub use ai_skill_test_run_table::*;
+pub use ai_skill_version_table::*;
 pub use ai_team_member_table::*;
 pub use ai_team_member_skill_table::*;
 pub use analytics_metric_table::*;
@@ -2599,6 +2641,7 @@ pub use fleet_vehicle_table::*;
 pub use form_config_table::*;
 pub use form_config_field_table::*;
 pub use form_role_config_table::*;
+pub use generated_owner_report_table::*;
 pub use google_drive_connection_table::*;
 pub use helpdesk_sla_table::*;
 pub use helpdesk_stage_table::*;
@@ -2906,6 +2949,8 @@ pub use create_ai_chat_session_reducer::create_ai_chat_session;
 pub use create_ai_insight_reducer::create_ai_insight;
 pub use create_ai_reducer_allowlist_reducer::create_ai_reducer_allowlist;
 pub use create_ai_skill_reducer::create_ai_skill;
+pub use create_ai_skill_fixture_reducer::create_ai_skill_fixture;
+pub use create_ai_skill_version_reducer::create_ai_skill_version;
 pub use create_ai_team_member_reducer::create_ai_team_member;
 pub use create_analytic_account_reducer::create_analytic_account;
 pub use create_analytic_distribution_model_reducer::create_analytic_distribution_model;
@@ -3255,15 +3300,19 @@ pub use process_intercompany_transaction_reducer::process_intercompany_transacti
 pub use process_inventory_adjustment_reducer::process_inventory_adjustment;
 pub use process_pending_scans_reducer::process_pending_scans;
 pub use produce_manufacturing_order_reducer::produce_manufacturing_order;
+pub use promote_ai_skill_version_reducer::promote_ai_skill_version;
 pub use queue_mail_from_template_reducer::queue_mail_from_template;
 pub use receive_po_line_reducer::receive_po_line;
 pub use recognize_deferred_revenue_reducer::recognize_deferred_revenue;
 pub use reconcile_account_bank_statement_line_reducer::reconcile_account_bank_statement_line;
 pub use reconcile_payment_with_invoice_reducer::reconcile_payment_with_invoice;
+pub use record_ai_agent_run_policy_snapshot_reducer::record_ai_agent_run_policy_snapshot;
+pub use record_ai_skill_test_run_reducer::record_ai_skill_test_run;
 pub use record_ai_spend_reducer::record_ai_spend;
 pub use record_barcode_scan_reducer::record_barcode_scan;
 pub use record_cycle_count_line_reducer::record_cycle_count_line;
 pub use record_document_view_reducer::record_document_view;
+pub use record_generated_owner_report_reducer::record_generated_owner_report;
 pub use record_google_drive_sync_reducer::record_google_drive_sync;
 pub use record_google_drive_sync_error_reducer::record_google_drive_sync_error;
 pub use record_message_copied_reducer::record_message_copied;
@@ -3307,6 +3356,7 @@ pub use review_message_batch_reducer::review_message_batch;
 pub use review_supplier_intake_reducer::review_supplier_intake;
 pub use revoke_permission_reducer::revoke_permission;
 pub use revoke_role_reducer::revoke_role;
+pub use rollback_ai_skill_release_reducer::rollback_ai_skill_release;
 pub use rollback_import_job_reducer::rollback_import_job;
 pub use run_accounting_payment_cancel_test_reducer::run_accounting_payment_cancel_test;
 pub use run_accounting_payment_management_test_reducer::run_accounting_payment_management_test;
@@ -4218,6 +4268,14 @@ pub enum Reducer {
     CreateAiSkill {
         organization_id: u64,
         params: CreateAiSkillParams,
+}    ,
+    CreateAiSkillFixture {
+        organization_id: u64,
+        params: CreateAiSkillFixtureParams,
+}    ,
+    CreateAiSkillVersion {
+        organization_id: u64,
+        params: CreateAiSkillVersionParams,
 }    ,
     CreateAiTeamMember {
         organization_id: u64,
@@ -5801,6 +5859,11 @@ pub enum Reducer {
         mo_id: u64,
         qty_producing: f64,
 }    ,
+    PromoteAiSkillVersion {
+        organization_id: u64,
+        skill_version_id: u64,
+        reason: Option::<String>,
+}    ,
     QueueMailFromTemplate {
         organization_id: u64,
         company_id: u64,
@@ -5828,6 +5891,16 @@ pub enum Reducer {
         payment_move_id: u64,
         invoice_move_id: u64,
 }    ,
+    RecordAiAgentRunPolicySnapshot {
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        expected_release_id: Option::<u64>,
+}    ,
+    RecordAiSkillTestRun {
+        organization_id: u64,
+        params: RecordAiSkillTestRunParams,
+}    ,
     RecordAiSpend {
         organization_id: u64,
         agent_id: u64,
@@ -5846,6 +5919,11 @@ pub enum Reducer {
     RecordDocumentView {
         organization_id: u64,
         document_id: u64,
+}    ,
+    RecordGeneratedOwnerReport {
+        organization_id: u64,
+        company_id: u64,
+        params: RecordGeneratedOwnerReportParams,
 }    ,
     RecordGoogleDriveSync {
         connection_id: u64,
@@ -6042,6 +6120,12 @@ pub enum Reducer {
     RevokeRole {
         organization_id: u64,
         assignment_id: u64,
+}    ,
+    RollbackAiSkillRelease {
+        organization_id: u64,
+        skill_id: u64,
+        target_release_id: u64,
+        reason: String,
 }    ,
     RollbackImportJob {
         organization_id: u64,
@@ -7290,6 +7374,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateAiInsight { .. } => "create_ai_insight",
             Reducer::CreateAiReducerAllowlist { .. } => "create_ai_reducer_allowlist",
             Reducer::CreateAiSkill { .. } => "create_ai_skill",
+            Reducer::CreateAiSkillFixture { .. } => "create_ai_skill_fixture",
+            Reducer::CreateAiSkillVersion { .. } => "create_ai_skill_version",
             Reducer::CreateAiTeamMember { .. } => "create_ai_team_member",
             Reducer::CreateAnalyticAccount { .. } => "create_analytic_account",
             Reducer::CreateAnalyticDistributionModel { .. } => "create_analytic_distribution_model",
@@ -7639,15 +7725,19 @@ impl __sdk::Reducer for Reducer {
             Reducer::ProcessInventoryAdjustment { .. } => "process_inventory_adjustment",
             Reducer::ProcessPendingScans { .. } => "process_pending_scans",
             Reducer::ProduceManufacturingOrder { .. } => "produce_manufacturing_order",
+            Reducer::PromoteAiSkillVersion { .. } => "promote_ai_skill_version",
             Reducer::QueueMailFromTemplate { .. } => "queue_mail_from_template",
             Reducer::ReceivePoLine { .. } => "receive_po_line",
             Reducer::RecognizeDeferredRevenue { .. } => "recognize_deferred_revenue",
             Reducer::ReconcileAccountBankStatementLine { .. } => "reconcile_account_bank_statement_line",
             Reducer::ReconcilePaymentWithInvoice { .. } => "reconcile_payment_with_invoice",
+            Reducer::RecordAiAgentRunPolicySnapshot { .. } => "record_ai_agent_run_policy_snapshot",
+            Reducer::RecordAiSkillTestRun { .. } => "record_ai_skill_test_run",
             Reducer::RecordAiSpend { .. } => "record_ai_spend",
             Reducer::RecordBarcodeScan { .. } => "record_barcode_scan",
             Reducer::RecordCycleCountLine { .. } => "record_cycle_count_line",
             Reducer::RecordDocumentView { .. } => "record_document_view",
+            Reducer::RecordGeneratedOwnerReport { .. } => "record_generated_owner_report",
             Reducer::RecordGoogleDriveSync { .. } => "record_google_drive_sync",
             Reducer::RecordGoogleDriveSyncError { .. } => "record_google_drive_sync_error",
             Reducer::RecordMessageCopied { .. } => "record_message_copied",
@@ -7691,6 +7781,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReviewSupplierIntake { .. } => "review_supplier_intake",
             Reducer::RevokePermission { .. } => "revoke_permission",
             Reducer::RevokeRole { .. } => "revoke_role",
+            Reducer::RollbackAiSkillRelease { .. } => "rollback_ai_skill_release",
             Reducer::RollbackImportJob { .. } => "rollback_import_job",
             Reducer::RunAccountingPaymentCancelTest => "run_accounting_payment_cancel_test",
             Reducer::RunAccountingPaymentManagementTest => "run_accounting_payment_management_test",
@@ -9120,6 +9211,20 @@ Reducer::BillTimesheets{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_ai_skill_reducer::CreateAiSkillArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateAiSkillFixture{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_ai_skill_fixture_reducer::CreateAiSkillFixtureArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateAiSkillVersion{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_ai_skill_version_reducer::CreateAiSkillVersionArgs {
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
@@ -11941,6 +12046,15 @@ Reducer::MoveStockQuant{
                 mo_id: mo_id.clone(),
                 qty_producing: qty_producing.clone(),
 }),
+            Reducer::PromoteAiSkillVersion{
+                organization_id,
+                skill_version_id,
+                reason,
+}             => __sats::bsatn::to_vec(&promote_ai_skill_version_reducer::PromoteAiSkillVersionArgs {
+                organization_id: organization_id.clone(),
+                skill_version_id: skill_version_id.clone(),
+                reason: reason.clone(),
+}),
             Reducer::QueueMailFromTemplate{
                 organization_id,
                 company_id,
@@ -11990,6 +12104,24 @@ Reducer::MoveStockQuant{
                 payment_move_id: payment_move_id.clone(),
                 invoice_move_id: invoice_move_id.clone(),
 }),
+            Reducer::RecordAiAgentRunPolicySnapshot{
+                organization_id,
+                company_id,
+                run_id,
+                expected_release_id,
+}             => __sats::bsatn::to_vec(&record_ai_agent_run_policy_snapshot_reducer::RecordAiAgentRunPolicySnapshotArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                run_id: run_id.clone(),
+                expected_release_id: expected_release_id.clone(),
+}),
+            Reducer::RecordAiSkillTestRun{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_ai_skill_test_run_reducer::RecordAiSkillTestRunArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RecordAiSpend{
                 organization_id,
                 agent_id,
@@ -12023,6 +12155,15 @@ Reducer::MoveStockQuant{
 }             => __sats::bsatn::to_vec(&record_document_view_reducer::RecordDocumentViewArgs {
                 organization_id: organization_id.clone(),
                 document_id: document_id.clone(),
+}),
+            Reducer::RecordGeneratedOwnerReport{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_generated_owner_report_reducer::RecordGeneratedOwnerReportArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RecordGoogleDriveSync{
                 connection_id,
@@ -12372,6 +12513,17 @@ Reducer::MoveStockQuant{
 }             => __sats::bsatn::to_vec(&revoke_role_reducer::RevokeRoleArgs {
                 organization_id: organization_id.clone(),
                 assignment_id: assignment_id.clone(),
+}),
+            Reducer::RollbackAiSkillRelease{
+                organization_id,
+                skill_id,
+                target_release_id,
+                reason,
+}             => __sats::bsatn::to_vec(&rollback_ai_skill_release_reducer::RollbackAiSkillReleaseArgs {
+                organization_id: organization_id.clone(),
+                skill_id: skill_id.clone(),
+                target_release_id: target_release_id.clone(),
+                reason: reason.clone(),
 }),
             Reducer::RollbackImportJob{
                 organization_id,
@@ -14401,6 +14553,7 @@ pub struct DbUpdate {
     ai_action_draft: __sdk::TableUpdate<AiActionDraft>,
     ai_agent: __sdk::TableUpdate<AiAgent>,
     ai_agent_run: __sdk::TableUpdate<AiAgentRun>,
+    ai_agent_run_policy_snapshot: __sdk::TableUpdate<AiAgentRunPolicySnapshot>,
     ai_agent_run_step: __sdk::TableUpdate<AiAgentRunStep>,
     ai_chat_message: __sdk::TableUpdate<AiChatMessage>,
     ai_chat_session: __sdk::TableUpdate<AiChatSession>,
@@ -14409,6 +14562,10 @@ pub struct DbUpdate {
     ai_reducer_allowlist: __sdk::TableUpdate<AiReducerAllowlist>,
     ai_skill: __sdk::TableUpdate<AiSkill>,
     ai_skill_config: __sdk::TableUpdate<AiSkillConfig>,
+    ai_skill_fixture: __sdk::TableUpdate<AiSkillFixture>,
+    ai_skill_release: __sdk::TableUpdate<AiSkillRelease>,
+    ai_skill_test_run: __sdk::TableUpdate<AiSkillTestRun>,
+    ai_skill_version: __sdk::TableUpdate<AiSkillVersion>,
     ai_team_member: __sdk::TableUpdate<AiTeamMember>,
     ai_team_member_skill: __sdk::TableUpdate<AiTeamMemberSkill>,
     analytics_metric: __sdk::TableUpdate<AnalyticsMetric>,
@@ -14469,6 +14626,7 @@ pub struct DbUpdate {
     form_config: __sdk::TableUpdate<FormConfig>,
     form_config_field: __sdk::TableUpdate<FormConfigField>,
     form_role_config: __sdk::TableUpdate<FormRoleConfig>,
+    generated_owner_report: __sdk::TableUpdate<GeneratedOwnerReport>,
     google_drive_connection: __sdk::TableUpdate<GoogleDriveConnection>,
     helpdesk_sla: __sdk::TableUpdate<HelpdeskSla>,
     helpdesk_stage: __sdk::TableUpdate<HelpdeskStage>,
@@ -14675,6 +14833,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "ai_action_draft" => db_update.ai_action_draft.append(ai_action_draft_table::parse_table_update(table_update)?),
     "ai_agent" => db_update.ai_agent.append(ai_agent_table::parse_table_update(table_update)?),
     "ai_agent_run" => db_update.ai_agent_run.append(ai_agent_run_table::parse_table_update(table_update)?),
+    "ai_agent_run_policy_snapshot" => db_update.ai_agent_run_policy_snapshot.append(ai_agent_run_policy_snapshot_table::parse_table_update(table_update)?),
     "ai_agent_run_step" => db_update.ai_agent_run_step.append(ai_agent_run_step_table::parse_table_update(table_update)?),
     "ai_chat_message" => db_update.ai_chat_message.append(ai_chat_message_table::parse_table_update(table_update)?),
     "ai_chat_session" => db_update.ai_chat_session.append(ai_chat_session_table::parse_table_update(table_update)?),
@@ -14683,6 +14842,10 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "ai_reducer_allowlist" => db_update.ai_reducer_allowlist.append(ai_reducer_allowlist_table::parse_table_update(table_update)?),
     "ai_skill" => db_update.ai_skill.append(ai_skill_table::parse_table_update(table_update)?),
     "ai_skill_config" => db_update.ai_skill_config.append(ai_skill_config_table::parse_table_update(table_update)?),
+    "ai_skill_fixture" => db_update.ai_skill_fixture.append(ai_skill_fixture_table::parse_table_update(table_update)?),
+    "ai_skill_release" => db_update.ai_skill_release.append(ai_skill_release_table::parse_table_update(table_update)?),
+    "ai_skill_test_run" => db_update.ai_skill_test_run.append(ai_skill_test_run_table::parse_table_update(table_update)?),
+    "ai_skill_version" => db_update.ai_skill_version.append(ai_skill_version_table::parse_table_update(table_update)?),
     "ai_team_member" => db_update.ai_team_member.append(ai_team_member_table::parse_table_update(table_update)?),
     "ai_team_member_skill" => db_update.ai_team_member_skill.append(ai_team_member_skill_table::parse_table_update(table_update)?),
     "analytics_metric" => db_update.analytics_metric.append(analytics_metric_table::parse_table_update(table_update)?),
@@ -14743,6 +14906,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "form_config" => db_update.form_config.append(form_config_table::parse_table_update(table_update)?),
     "form_config_field" => db_update.form_config_field.append(form_config_field_table::parse_table_update(table_update)?),
     "form_role_config" => db_update.form_role_config.append(form_role_config_table::parse_table_update(table_update)?),
+    "generated_owner_report" => db_update.generated_owner_report.append(generated_owner_report_table::parse_table_update(table_update)?),
     "google_drive_connection" => db_update.google_drive_connection.append(google_drive_connection_table::parse_table_update(table_update)?),
     "helpdesk_sla" => db_update.helpdesk_sla.append(helpdesk_sla_table::parse_table_update(table_update)?),
     "helpdesk_stage" => db_update.helpdesk_stage.append(helpdesk_stage_table::parse_table_update(table_update)?),
@@ -14961,6 +15125,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.ai_action_draft = cache.apply_diff_to_table::<AiActionDraft>("ai_action_draft", &self.ai_action_draft).with_updates_by_pk(|row| &row.id);
         diff.ai_agent = cache.apply_diff_to_table::<AiAgent>("ai_agent", &self.ai_agent).with_updates_by_pk(|row| &row.id);
         diff.ai_agent_run = cache.apply_diff_to_table::<AiAgentRun>("ai_agent_run", &self.ai_agent_run).with_updates_by_pk(|row| &row.id);
+        diff.ai_agent_run_policy_snapshot = cache.apply_diff_to_table::<AiAgentRunPolicySnapshot>("ai_agent_run_policy_snapshot", &self.ai_agent_run_policy_snapshot).with_updates_by_pk(|row| &row.id);
         diff.ai_agent_run_step = cache.apply_diff_to_table::<AiAgentRunStep>("ai_agent_run_step", &self.ai_agent_run_step).with_updates_by_pk(|row| &row.id);
         diff.ai_chat_message = cache.apply_diff_to_table::<AiChatMessage>("ai_chat_message", &self.ai_chat_message).with_updates_by_pk(|row| &row.id);
         diff.ai_chat_session = cache.apply_diff_to_table::<AiChatSession>("ai_chat_session", &self.ai_chat_session).with_updates_by_pk(|row| &row.id);
@@ -14969,6 +15134,10 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.ai_reducer_allowlist = cache.apply_diff_to_table::<AiReducerAllowlist>("ai_reducer_allowlist", &self.ai_reducer_allowlist).with_updates_by_pk(|row| &row.id);
         diff.ai_skill = cache.apply_diff_to_table::<AiSkill>("ai_skill", &self.ai_skill).with_updates_by_pk(|row| &row.id);
         diff.ai_skill_config = cache.apply_diff_to_table::<AiSkillConfig>("ai_skill_config", &self.ai_skill_config).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_fixture = cache.apply_diff_to_table::<AiSkillFixture>("ai_skill_fixture", &self.ai_skill_fixture).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_release = cache.apply_diff_to_table::<AiSkillRelease>("ai_skill_release", &self.ai_skill_release).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_test_run = cache.apply_diff_to_table::<AiSkillTestRun>("ai_skill_test_run", &self.ai_skill_test_run).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_version = cache.apply_diff_to_table::<AiSkillVersion>("ai_skill_version", &self.ai_skill_version).with_updates_by_pk(|row| &row.id);
         diff.ai_team_member = cache.apply_diff_to_table::<AiTeamMember>("ai_team_member", &self.ai_team_member).with_updates_by_pk(|row| &row.id);
         diff.ai_team_member_skill = cache.apply_diff_to_table::<AiTeamMemberSkill>("ai_team_member_skill", &self.ai_team_member_skill).with_updates_by_pk(|row| &row.id);
         diff.analytics_metric = cache.apply_diff_to_table::<AnalyticsMetric>("analytics_metric", &self.analytics_metric).with_updates_by_pk(|row| &row.id);
@@ -15029,6 +15198,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.form_config = cache.apply_diff_to_table::<FormConfig>("form_config", &self.form_config).with_updates_by_pk(|row| &row.id);
         diff.form_config_field = cache.apply_diff_to_table::<FormConfigField>("form_config_field", &self.form_config_field).with_updates_by_pk(|row| &row.id);
         diff.form_role_config = cache.apply_diff_to_table::<FormRoleConfig>("form_role_config", &self.form_role_config).with_updates_by_pk(|row| &row.id);
+        diff.generated_owner_report = cache.apply_diff_to_table::<GeneratedOwnerReport>("generated_owner_report", &self.generated_owner_report).with_updates_by_pk(|row| &row.id);
         diff.google_drive_connection = cache.apply_diff_to_table::<GoogleDriveConnection>("google_drive_connection", &self.google_drive_connection).with_updates_by_pk(|row| &row.id);
         diff.helpdesk_sla = cache.apply_diff_to_table::<HelpdeskSla>("helpdesk_sla", &self.helpdesk_sla).with_updates_by_pk(|row| &row.id);
         diff.helpdesk_stage = cache.apply_diff_to_table::<HelpdeskStage>("helpdesk_stage", &self.helpdesk_stage).with_updates_by_pk(|row| &row.id);
@@ -15232,6 +15402,7 @@ for table_rows in raw.tables {
                 "ai_action_draft" => db_update.ai_action_draft.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_agent" => db_update.ai_agent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_agent_run" => db_update.ai_agent_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_agent_run_policy_snapshot" => db_update.ai_agent_run_policy_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_agent_run_step" => db_update.ai_agent_run_step.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_chat_message" => db_update.ai_chat_message.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_chat_session" => db_update.ai_chat_session.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -15240,6 +15411,10 @@ for table_rows in raw.tables {
                 "ai_reducer_allowlist" => db_update.ai_reducer_allowlist.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_skill" => db_update.ai_skill.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_skill_config" => db_update.ai_skill_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_fixture" => db_update.ai_skill_fixture.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_release" => db_update.ai_skill_release.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_test_run" => db_update.ai_skill_test_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_version" => db_update.ai_skill_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_team_member" => db_update.ai_team_member.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_team_member_skill" => db_update.ai_team_member_skill.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "analytics_metric" => db_update.analytics_metric.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -15300,6 +15475,7 @@ for table_rows in raw.tables {
                 "form_config" => db_update.form_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "form_config_field" => db_update.form_config_field.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "form_role_config" => db_update.form_role_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "generated_owner_report" => db_update.generated_owner_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "google_drive_connection" => db_update.google_drive_connection.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "helpdesk_sla" => db_update.helpdesk_sla.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "helpdesk_stage" => db_update.helpdesk_stage.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -15503,6 +15679,7 @@ for table_rows in raw.tables {
                 "ai_action_draft" => db_update.ai_action_draft.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_agent" => db_update.ai_agent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_agent_run" => db_update.ai_agent_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_agent_run_policy_snapshot" => db_update.ai_agent_run_policy_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_agent_run_step" => db_update.ai_agent_run_step.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_chat_message" => db_update.ai_chat_message.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_chat_session" => db_update.ai_chat_session.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -15511,6 +15688,10 @@ for table_rows in raw.tables {
                 "ai_reducer_allowlist" => db_update.ai_reducer_allowlist.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_skill" => db_update.ai_skill.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_skill_config" => db_update.ai_skill_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_fixture" => db_update.ai_skill_fixture.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_release" => db_update.ai_skill_release.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_test_run" => db_update.ai_skill_test_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_version" => db_update.ai_skill_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_team_member" => db_update.ai_team_member.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_team_member_skill" => db_update.ai_team_member_skill.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "analytics_metric" => db_update.analytics_metric.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -15571,6 +15752,7 @@ for table_rows in raw.tables {
                 "form_config" => db_update.form_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "form_config_field" => db_update.form_config_field.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "form_role_config" => db_update.form_role_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "generated_owner_report" => db_update.generated_owner_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "google_drive_connection" => db_update.google_drive_connection.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "helpdesk_sla" => db_update.helpdesk_sla.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "helpdesk_stage" => db_update.helpdesk_stage.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -15776,6 +15958,7 @@ pub struct AppliedDiff<'r> {
     ai_action_draft: __sdk::TableAppliedDiff<'r, AiActionDraft>,
     ai_agent: __sdk::TableAppliedDiff<'r, AiAgent>,
     ai_agent_run: __sdk::TableAppliedDiff<'r, AiAgentRun>,
+    ai_agent_run_policy_snapshot: __sdk::TableAppliedDiff<'r, AiAgentRunPolicySnapshot>,
     ai_agent_run_step: __sdk::TableAppliedDiff<'r, AiAgentRunStep>,
     ai_chat_message: __sdk::TableAppliedDiff<'r, AiChatMessage>,
     ai_chat_session: __sdk::TableAppliedDiff<'r, AiChatSession>,
@@ -15784,6 +15967,10 @@ pub struct AppliedDiff<'r> {
     ai_reducer_allowlist: __sdk::TableAppliedDiff<'r, AiReducerAllowlist>,
     ai_skill: __sdk::TableAppliedDiff<'r, AiSkill>,
     ai_skill_config: __sdk::TableAppliedDiff<'r, AiSkillConfig>,
+    ai_skill_fixture: __sdk::TableAppliedDiff<'r, AiSkillFixture>,
+    ai_skill_release: __sdk::TableAppliedDiff<'r, AiSkillRelease>,
+    ai_skill_test_run: __sdk::TableAppliedDiff<'r, AiSkillTestRun>,
+    ai_skill_version: __sdk::TableAppliedDiff<'r, AiSkillVersion>,
     ai_team_member: __sdk::TableAppliedDiff<'r, AiTeamMember>,
     ai_team_member_skill: __sdk::TableAppliedDiff<'r, AiTeamMemberSkill>,
     analytics_metric: __sdk::TableAppliedDiff<'r, AnalyticsMetric>,
@@ -15844,6 +16031,7 @@ pub struct AppliedDiff<'r> {
     form_config: __sdk::TableAppliedDiff<'r, FormConfig>,
     form_config_field: __sdk::TableAppliedDiff<'r, FormConfigField>,
     form_role_config: __sdk::TableAppliedDiff<'r, FormRoleConfig>,
+    generated_owner_report: __sdk::TableAppliedDiff<'r, GeneratedOwnerReport>,
     google_drive_connection: __sdk::TableAppliedDiff<'r, GoogleDriveConnection>,
     helpdesk_sla: __sdk::TableAppliedDiff<'r, HelpdeskSla>,
     helpdesk_stage: __sdk::TableAppliedDiff<'r, HelpdeskStage>,
@@ -16050,6 +16238,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<AiActionDraft>("ai_action_draft", &self.ai_action_draft, event);
         callbacks.invoke_table_row_callbacks::<AiAgent>("ai_agent", &self.ai_agent, event);
         callbacks.invoke_table_row_callbacks::<AiAgentRun>("ai_agent_run", &self.ai_agent_run, event);
+        callbacks.invoke_table_row_callbacks::<AiAgentRunPolicySnapshot>("ai_agent_run_policy_snapshot", &self.ai_agent_run_policy_snapshot, event);
         callbacks.invoke_table_row_callbacks::<AiAgentRunStep>("ai_agent_run_step", &self.ai_agent_run_step, event);
         callbacks.invoke_table_row_callbacks::<AiChatMessage>("ai_chat_message", &self.ai_chat_message, event);
         callbacks.invoke_table_row_callbacks::<AiChatSession>("ai_chat_session", &self.ai_chat_session, event);
@@ -16058,6 +16247,10 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<AiReducerAllowlist>("ai_reducer_allowlist", &self.ai_reducer_allowlist, event);
         callbacks.invoke_table_row_callbacks::<AiSkill>("ai_skill", &self.ai_skill, event);
         callbacks.invoke_table_row_callbacks::<AiSkillConfig>("ai_skill_config", &self.ai_skill_config, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillFixture>("ai_skill_fixture", &self.ai_skill_fixture, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillRelease>("ai_skill_release", &self.ai_skill_release, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillTestRun>("ai_skill_test_run", &self.ai_skill_test_run, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillVersion>("ai_skill_version", &self.ai_skill_version, event);
         callbacks.invoke_table_row_callbacks::<AiTeamMember>("ai_team_member", &self.ai_team_member, event);
         callbacks.invoke_table_row_callbacks::<AiTeamMemberSkill>("ai_team_member_skill", &self.ai_team_member_skill, event);
         callbacks.invoke_table_row_callbacks::<AnalyticsMetric>("analytics_metric", &self.analytics_metric, event);
@@ -16118,6 +16311,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<FormConfig>("form_config", &self.form_config, event);
         callbacks.invoke_table_row_callbacks::<FormConfigField>("form_config_field", &self.form_config_field, event);
         callbacks.invoke_table_row_callbacks::<FormRoleConfig>("form_role_config", &self.form_role_config, event);
+        callbacks.invoke_table_row_callbacks::<GeneratedOwnerReport>("generated_owner_report", &self.generated_owner_report, event);
         callbacks.invoke_table_row_callbacks::<GoogleDriveConnection>("google_drive_connection", &self.google_drive_connection, event);
         callbacks.invoke_table_row_callbacks::<HelpdeskSla>("helpdesk_sla", &self.helpdesk_sla, event);
         callbacks.invoke_table_row_callbacks::<HelpdeskStage>("helpdesk_stage", &self.helpdesk_stage, event);
@@ -16955,6 +17149,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         ai_action_draft_table::register_table(client_cache);
         ai_agent_table::register_table(client_cache);
         ai_agent_run_table::register_table(client_cache);
+        ai_agent_run_policy_snapshot_table::register_table(client_cache);
         ai_agent_run_step_table::register_table(client_cache);
         ai_chat_message_table::register_table(client_cache);
         ai_chat_session_table::register_table(client_cache);
@@ -16963,6 +17158,10 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         ai_reducer_allowlist_table::register_table(client_cache);
         ai_skill_table::register_table(client_cache);
         ai_skill_config_table::register_table(client_cache);
+        ai_skill_fixture_table::register_table(client_cache);
+        ai_skill_release_table::register_table(client_cache);
+        ai_skill_test_run_table::register_table(client_cache);
+        ai_skill_version_table::register_table(client_cache);
         ai_team_member_table::register_table(client_cache);
         ai_team_member_skill_table::register_table(client_cache);
         analytics_metric_table::register_table(client_cache);
@@ -17023,6 +17222,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         form_config_table::register_table(client_cache);
         form_config_field_table::register_table(client_cache);
         form_role_config_table::register_table(client_cache);
+        generated_owner_report_table::register_table(client_cache);
         google_drive_connection_table::register_table(client_cache);
         helpdesk_sla_table::register_table(client_cache);
         helpdesk_stage_table::register_table(client_cache);
@@ -17221,6 +17421,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "ai_action_draft",
         "ai_agent",
         "ai_agent_run",
+        "ai_agent_run_policy_snapshot",
         "ai_agent_run_step",
         "ai_chat_message",
         "ai_chat_session",
@@ -17229,6 +17430,10 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "ai_reducer_allowlist",
         "ai_skill",
         "ai_skill_config",
+        "ai_skill_fixture",
+        "ai_skill_release",
+        "ai_skill_test_run",
+        "ai_skill_version",
         "ai_team_member",
         "ai_team_member_skill",
         "analytics_metric",
@@ -17289,6 +17494,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "form_config",
         "form_config_field",
         "form_role_config",
+        "generated_owner_report",
         "google_drive_connection",
         "helpdesk_sla",
         "helpdesk_stage",

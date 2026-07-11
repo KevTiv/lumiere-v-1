@@ -20,6 +20,8 @@ fn test_config(server_token: Option<&str>, dev_mock_org_id: Option<u64>) -> Conf
         resend_from_email: "test@example.com".into(),
         app_url: "http://localhost:3000".into(),
         cookie_secure: false,
+        report_renderer_url: None,
+        report_artifact_dir: std::env::temp_dir().join("lumiere-owner-reports-test"),
     }
 }
 
@@ -29,8 +31,7 @@ fn fake_jwt(payload_json: &str) -> String {
     format!("{header}.{payload}.sig")
 }
 
-const VALID_IDENTITY_HEX: &str =
-    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const VALID_IDENTITY_HEX: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 #[tokio::test]
 async fn no_bearer_or_cookie_returns_none_even_with_server_token_configured() {
@@ -46,14 +47,9 @@ async fn x_stdb_identity_header_does_not_grant_identity_without_jwt_claim() {
     let state = AppState::new(test_config(None, None));
     let token = fake_jwt(r#"{"iss":"spacetimedb"}"#);
     let auth = format!("Bearer {token}");
-    let session = resolve_api_session(
-        &state,
-        Some(&auth),
-        None,
-        Some(VALID_IDENTITY_HEX),
-    )
-    .await
-    .expect("resolve should not error");
+    let session = resolve_api_session(&state, Some(&auth), None, Some(VALID_IDENTITY_HEX))
+        .await
+        .expect("resolve should not error");
     assert!(session.is_none());
 }
 

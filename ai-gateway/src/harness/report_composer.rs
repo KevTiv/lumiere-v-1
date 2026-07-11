@@ -10,6 +10,7 @@ use serde_json::Value;
 
 use super::{
     audit::{DecisionOutcome, PolicyResult},
+    audit_logger::{HarnessAuditLogger, HarnessAuditTrail},
     data_scope_resolver::NamedResourceContract,
     manifest::{
         Capability, ExecutionLimits, PrivacyPolicy, ReviewMetadata, ReviewStatus, RiskClass,
@@ -62,6 +63,7 @@ pub struct ReportComposerResult {
     pub decision: PolicyResult,
     pub summary: String,
     pub citations: Vec<ReportCitation>,
+    pub audit: HarnessAuditTrail,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -155,11 +157,26 @@ pub async fn compose_report(
     identity_hex: &str,
     stdb_token: &str,
     input: ReportComposerInput,
+    policy: PolicyEngine,
 ) -> Result<ReportComposerResult, String> {
+    let correlation_id = uuid::Uuid::new_v4().to_string();
+    let mut audit = HarnessAuditLogger::new(correlation_id.clone());
+    audit.record(
+        "requested",
+        format!(
+            "report_composer org={organization_id} company={} report={}",
+            input.company_id, input.report_key
+        ),
+    );
+
     let preview = fetch_report_preview(http, api_server_url, stdb_token, &input).await?;
+    audit.record("resource_accessed", "typed owner-report preview fetched");
 
     let output = build_composer_output(&input.report_key, input.company_id, &preview)?;
-    let correlation_id = uuid::Uuid::new_v4().to_string();
+    audit.record(
+        "candidate_output",
+        format!("composed {} summary items", output.items.len()),
+    );
 
     let request = PolicyControlledRequest {
         execution: PolicyExecutionRequest {
@@ -188,13 +205,23 @@ pub async fn compose_report(
         candidate_output: serde_json::to_value(&output).unwrap_or_default(),
     };
 
-    let decision = PolicyEngine::default().execute_controlled(request);
+    let decision = policy.execute_controlled(request);
+    audit.record(
+        "policy",
+        format!(
+            "outcome={:?} reasons={}",
+            decision.decision.outcome,
+            decision.decision.reasons.len()
+        ),
+    );
 
     if decision.decision.outcome == DecisionOutcome::Deny {
+        audit.record("completed", "report composer denied by policy");
         return Ok(ReportComposerResult {
             decision,
             summary: String::new(),
             citations: Vec::new(),
+            audit: audit.into_trail(),
         });
     }
 
@@ -208,11 +235,13 @@ pub async fn compose_report(
             value_minor_units: item.value_minor_units,
         })
         .collect();
+    audit.record("artifact", "report summary composed");
 
     Ok(ReportComposerResult {
         decision,
         summary,
         citations,
+        audit: audit.into_trail(),
     })
 }
 
