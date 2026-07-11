@@ -827,6 +827,30 @@
     "write_date",
     "metadata"
   ],
+  "AiAgentRunPolicySnapshot": [
+    "id",
+    "run_id",
+    "organization_id",
+    "company_id",
+    "skill_id",
+    "skill_config_id",
+    "release_id",
+    "skill_version_id",
+    "version",
+    "source_hash",
+    "risk",
+    "manifest_json",
+    "max_steps",
+    "max_tool_calls",
+    "permissions",
+    "resources",
+    "output_types",
+    "config_json",
+    "custom_instructions",
+    "tool_overrides",
+    "recorded_by",
+    "recorded_at"
+  ],
   "AiAgentRunStep": [
     "id",
     "run_id",
@@ -969,6 +993,70 @@
     "tool_overrides",
     "create_date",
     "write_date",
+    "metadata"
+  ],
+  "AiSkillFixture": [
+    "id",
+    "fixture_key",
+    "organization_id",
+    "skill_id",
+    "name",
+    "description",
+    "input_json",
+    "expected_output_json",
+    "created_by",
+    "created_at",
+    "metadata"
+  ],
+  "AiSkillRelease": [
+    "id",
+    "organization_id",
+    "skill_id",
+    "skill_version_id",
+    "release_number",
+    "is_active",
+    "action",
+    "previous_release_id",
+    "rollback_target_release_id",
+    "released_by",
+    "released_at",
+    "reason"
+  ],
+  "AiSkillTestRun": [
+    "id",
+    "organization_id",
+    "skill_id",
+    "skill_version_id",
+    "fixture_id",
+    "status",
+    "actual_output_json",
+    "output_fingerprint",
+    "failure_reason",
+    "executed_by",
+    "executed_at",
+    "metadata"
+  ],
+  "AiSkillVersion": [
+    "id",
+    "version_key",
+    "organization_id",
+    "skill_id",
+    "skill_key",
+    "version",
+    "manifest_schema_version",
+    "manifest_json",
+    "source_hash",
+    "risk",
+    "max_steps",
+    "max_tool_calls",
+    "permissions",
+    "resources",
+    "output_types",
+    "reviewed_by",
+    "reviewed_at",
+    "review_notes",
+    "created_by",
+    "created_at",
     "metadata"
   ],
   "AiTeamMember": [
@@ -2067,6 +2155,15 @@
     "enabled",
     "metadata"
   ],
+  "CreateAiSkillFixtureParams": [
+    "skill_id",
+    "fixture_key",
+    "name",
+    "description",
+    "input_json",
+    "expected_output_json",
+    "metadata"
+  ],
   "CreateAiSkillParams": [
     "skill_key",
     "name",
@@ -2083,6 +2180,12 @@
     "allowed_action_drafts",
     "is_active",
     "is_system",
+    "metadata"
+  ],
+  "CreateAiSkillVersionParams": [
+    "skill_id",
+    "manifest_json",
+    "review_notes",
     "metadata"
   ],
   "CreateAiTeamMemberParams": [
@@ -5034,6 +5137,23 @@
   "GenerateSubscriptionInvoiceParams": [
     "invoice_date"
   ],
+  "GeneratedOwnerReport": [
+    "id",
+    "organization_id",
+    "company_id",
+    "report_key",
+    "schema_version",
+    "parameters_json",
+    "source_watermark_json",
+    "output_hash",
+    "renderer_version",
+    "artifact_key",
+    "document_id",
+    "correlation_id",
+    "generated_by",
+    "generated_at",
+    "metadata"
+  ],
   "GoogleDriveConnection": [
     "id",
     "organization_id",
@@ -7584,6 +7704,13 @@
     "move_ids",
     "amount_residual"
   ],
+  "RecordAiSkillTestRunParams": [
+    "skill_version_id",
+    "fixture_id",
+    "actual_output_json",
+    "failure_reason",
+    "metadata"
+  ],
   "RecordBarcodeScanParams": [
     "barcode",
     "barcode_type",
@@ -7619,6 +7746,18 @@
     "qty_counted",
     "uom_id",
     "notes",
+    "metadata"
+  ],
+  "RecordGeneratedOwnerReportParams": [
+    "report_key",
+    "schema_version",
+    "parameters_json",
+    "source_watermark_json",
+    "output_hash",
+    "renderer_version",
+    "artifact_key",
+    "artifact_size",
+    "correlation_id",
     "metadata"
   ],
   "RecordPrivacyConsentParams": [
