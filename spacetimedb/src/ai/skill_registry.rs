@@ -393,6 +393,7 @@ pub fn promote_ai_skill_version(
         return Err("skill is not active".to_string());
     }
 
+    require_independent_release_actor(ctx, &version)?;
     ensure_fixtures_passed_for_version(ctx, organization_id, version.skill_id, version.id)?;
     transition_release(ctx, organization_id, &version, "promote", None, reason)?;
     Ok(())
@@ -580,6 +581,14 @@ pub fn rollback_ai_skill_release(
     }
 
     let version = load_org_version(ctx, organization_id, target.skill_version_id)?;
+    require_independent_release_actor(ctx, &version)?;
+    let current = load_active_release(ctx, organization_id, skill_id)?
+        .ok_or("skill has no active release to roll back")?;
+    if current.released_by == ctx.sender() || target.released_by == ctx.sender() {
+        return Err(
+            "rollback requires an approver independent of both release transitions".to_string(),
+        );
+    }
     transition_release(
         ctx,
         organization_id,
@@ -825,22 +834,38 @@ fn ensure_fixtures_passed_for_version(
         .filter(|row| row.skill_id == skill_id)
         .collect::<Vec<_>>();
     if fixtures.is_empty() {
-        return Ok(());
+        return Err("skill version requires at least one certification fixture".to_string());
     }
 
     for fixture in fixtures {
-        let passed = ctx
+        let latest = ctx
             .db
             .ai_skill_test_run()
             .ai_skill_test_run_registry_by_version()
             .filter(&skill_version_id)
-            .any(|run| run.fixture_id == fixture.id && run.status == AiSkillTestRunStatus::Passed);
-        if !passed {
+            .filter(|run| run.fixture_id == fixture.id)
+            .max_by_key(|run| run.id);
+        if !latest.is_some_and(|run| run.status == AiSkillTestRunStatus::Passed) {
             return Err(format!(
-                "fixture '{}' has no passing test run for this version",
+                "fixture '{}' is not currently passing for this version",
                 fixture.name
             ));
         }
+    }
+    Ok(())
+}
+
+/// The person who authored or reviewed a version cannot promote it. This keeps
+/// the immutable review record and release decision independently attributable.
+fn require_independent_release_actor(
+    ctx: &ReducerContext,
+    version: &AiSkillVersion,
+) -> Result<(), String> {
+    if version.created_by == ctx.sender() || version.reviewed_by == ctx.sender() {
+        return Err(
+            "skill release requires an approver independent of the version author and reviewer"
+                .to_string(),
+        );
     }
     Ok(())
 }

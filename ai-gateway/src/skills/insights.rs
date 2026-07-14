@@ -24,10 +24,7 @@ pub struct InsightsScanRequest {
     pub abnormal_amount_threshold: Option<f64>,
 }
 
-pub async fn scan_insights(
-    state: &AppState,
-    req: InsightsScanRequest,
-) -> InsightsGenerateResponse {
+pub async fn scan_insights(state: &AppState, req: InsightsScanRequest) -> InsightsGenerateResponse {
     let inner = InsightsGenerateRequest {
         org_id: req.org_id,
         company_id: req.company_id,

@@ -2,12 +2,7 @@
 
 use std::sync::Arc;
 
-use axum::{
-    extract::State,
-    http::HeaderMap,
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::State, http::HeaderMap, routing::post, Json, Router};
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
 

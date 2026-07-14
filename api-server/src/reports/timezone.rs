@@ -3,7 +3,9 @@
 //! All preview queries use a half-open UTC interval `[window_start_utc, window_end_utc)`
 //! that corresponds to one local calendar day in the requested timezone.
 
-use chrono::{DateTime, Days, LocalResult, NaiveDate, NaiveTime, SecondsFormat, TimeZone, Utc};
+use chrono::{
+    DateTime, Datelike, Days, LocalResult, NaiveDate, NaiveTime, SecondsFormat, TimeZone, Utc,
+};
 use chrono_tz::Tz;
 
 use crate::error::ApiError;
@@ -45,6 +47,38 @@ pub fn day_window(date: NaiveDate, timezone: &str) -> Result<ReportDayWindow, Ap
 
     Ok(ReportDayWindow {
         local_date: date,
+        local_end_date,
+        timezone: timezone.to_string(),
+        window_start_utc,
+        window_end_utc,
+        start_sql,
+        end_sql,
+        cutoff_label,
+    })
+}
+
+pub fn month_window(date: NaiveDate, timezone: &str) -> Result<ReportDayWindow, ApiError> {
+    let tz = parse_timezone(timezone)?;
+    let local_date = NaiveDate::from_ymd_opt(date.year(), date.month(), 1)
+        .ok_or_else(|| ApiError::BadRequest("date is outside the supported range".into()))?;
+    let (year, month) = if date.month() == 12 {
+        (date.year() + 1, 1)
+    } else {
+        (date.year(), date.month() + 1)
+    };
+    let local_end_date = NaiveDate::from_ymd_opt(year, month, 1)
+        .ok_or_else(|| ApiError::BadRequest("date is outside the supported range".into()))?;
+    let window_start_utc = local_midnight_utc(tz, local_date)?;
+    let window_end_utc = local_midnight_utc(tz, local_end_date)?;
+    let start_sql = format_utc_sql(&window_start_utc);
+    let end_sql = format_utc_sql(&window_end_utc);
+    let cutoff_label = format!(
+        "{} {} local month [{start_sql}, {end_sql}) UTC",
+        local_date.format("%Y-%m"),
+        timezone
+    );
+    Ok(ReportDayWindow {
+        local_date,
         local_end_date,
         timezone: timezone.to_string(),
         window_start_utc,

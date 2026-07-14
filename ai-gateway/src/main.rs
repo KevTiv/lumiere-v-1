@@ -168,6 +168,14 @@ async fn main() -> anyhow::Result<()> {
             "/v1/skills/inventory/low-stock",
             post(routes::inventory::post_scan),
         )
+        .route(
+            "/v1/skills/distributor/credit-hold-summary",
+            post(routes::distributor::post_credit_hold_summary),
+        )
+        .route(
+            "/v1/skills/distributor/delivery-run-summary",
+            post(routes::distributor::post_delivery_run_summary),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_gateway_secret,

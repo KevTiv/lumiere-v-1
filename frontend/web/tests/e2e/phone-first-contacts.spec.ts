@@ -304,8 +304,8 @@ test.describe("P1-CONTACT-01 phone-first contacts", { tag: ["@p1", "@contacts"] 
       const duplicateName = smokeName("contact-customer-duplicate")
       const supplierName = smokeName("contact-supplier")
 
-      // The CRM form is the customer-facing creation path. Phone identities and explicit
-      // contact roles currently have API-only surfaces, so they are created through typed reducers.
+      // This cross-company fixture controls exact tenant/company scope through typed BFF calls.
+      // The normal CRM record workflow is covered separately in crm-contact-identities-ui.spec.ts.
       await openEntityCreate(alpha.page, "/crm", "crm", "contacts", "new-contact")
       await fillField(alpha.page, "name", customerName)
       await fillField(alpha.page, "phone", FORMATTED_PHONE)

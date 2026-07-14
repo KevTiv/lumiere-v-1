@@ -345,9 +345,7 @@ fn normalize_entity_key(raw: &str) -> String {
 
 fn resolve_import_entity(entity: &str) -> Option<&'static ImportEntity> {
     let key = normalize_entity_key(entity);
-    IMPORT_ENTITIES
-        .iter()
-        .find(|e| e.table_name == key)
+    IMPORT_ENTITIES.iter().find(|e| e.table_name == key)
 }
 
 #[derive(Debug, Deserialize)]
@@ -460,11 +458,9 @@ async fn import_entity_post(
             let company_id = if let Some(cid) = params.company_id {
                 cid
             } else {
-                default_company_id(&client, org_id)
-                    .await?
-                    .ok_or_else(|| {
-                        ApiError::Unprocessable("No company found for organization".into())
-                    })?
+                default_company_id(&client, org_id).await?.ok_or_else(|| {
+                    ApiError::Unprocessable("No company found for organization".into())
+                })?
             };
             json!([org_id, company_id, body.csv])
         }

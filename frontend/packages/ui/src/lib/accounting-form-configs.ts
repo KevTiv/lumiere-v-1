@@ -2336,12 +2336,119 @@ export const newAnalyticDistributionModelForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newOperationalPaymentAccountForm = (t: TFunction): FormConfig => ({
+  id: "new-operational-payment-account",
+  title: t("accounting.forms.operationalPaymentAccount.title"),
+  description: t("accounting.forms.operationalPaymentAccount.description"),
+  submitLabel: t("accounting.forms.operationalPaymentAccount.submit"),
+  cancelLabel: t("common.cancel"),
+  sections: [{
+    id: "account",
+    fields: [
+      { id: "providerCode", name: "providerCode", type: "select", label: t("accounting.forms.operationalPaymentAccount.provider"), required: true, width: "1/2", defaultValue: "Mtn", options: [
+        { value: "Mtn", label: "MTN Mobile Money" }, { value: "Orange", label: "Orange Money" }, { value: "Airtel", label: "Airtel Money" }, { value: "Mpesa", label: "M-Pesa" }, { value: "Moov", label: "Moov Money" }, { value: "Wave", label: "Wave" }, { value: "Cash", label: t("accounting.forms.operationalPaymentAccount.cash") }, { value: "Bank", label: t("accounting.forms.operationalPaymentAccount.bank") }, { value: "Other", label: "Other" },
+      ] },
+      { id: "name", name: "name", type: "text", label: t("accounting.forms.operationalPaymentAccount.name"), required: true, width: "1/2" },
+      { id: "referenceRaw", name: "referenceRaw", type: "text", label: t("accounting.forms.operationalPaymentAccount.reference"), width: "1/2" },
+      { id: "currencyId", name: "currencyId", type: "select", label: t("accounting.forms.operationalPaymentAccount.currency"), required: true, width: "1/4", options: [] },
+      { id: "accountJournalId", name: "accountJournalId", type: "select", label: t("accounting.forms.operationalPaymentAccount.journal"), required: true, width: "1/2", options: [] },
+      { id: "isPrimary", name: "isPrimary", type: "switch", label: t("accounting.forms.operationalPaymentAccount.primary"), width: "1/4" },
+    ],
+  }],
+})
+
+export const newOperationalPaymentTransactionForm = (t: TFunction): FormConfig => ({
+  id: "new-operational-payment-transaction",
+  title: t("accounting.forms.operationalPaymentTransaction.title"),
+  description: t("accounting.forms.operationalPaymentTransaction.description"),
+  submitLabel: t("accounting.forms.operationalPaymentTransaction.submit"),
+  cancelLabel: t("common.cancel"),
+  sections: [{
+    id: "transaction",
+    fields: [
+      { id: "paymentAccountId", name: "paymentAccountId", type: "select", label: t("accounting.forms.operationalPaymentTransaction.account"), required: true, width: "1/2", options: [] },
+      { id: "direction", name: "direction", type: "select", label: t("accounting.forms.operationalPaymentTransaction.direction"), required: true, width: "1/4", defaultValue: "Inbound", options: [{ value: "Inbound", label: t("accounting.forms.operationalPaymentTransaction.inbound") }, { value: "Outbound", label: t("accounting.forms.operationalPaymentTransaction.outbound") }] },
+      { id: "partnerType", name: "partnerType", type: "select", label: t("accounting.forms.operationalPaymentTransaction.partnerType"), required: true, width: "1/4", defaultValue: "Customer", options: [{ value: "Customer", label: t("accounting.forms.operationalPaymentTransaction.customer") }, { value: "Supplier", label: t("accounting.forms.operationalPaymentTransaction.supplier") }] },
+      { id: "partnerId", name: "partnerId", type: "select", label: t("accounting.forms.operationalPaymentTransaction.partner"), required: true, width: "1/2", options: [] },
+      { id: "externalReference", name: "externalReference", type: "text", label: t("accounting.forms.operationalPaymentTransaction.reference"), width: "1/2" },
+      { id: "grossExternalAmount", name: "grossExternalAmount", type: "number", label: t("accounting.forms.operationalPaymentTransaction.gross"), required: true, width: "1/3", validation: { min: 0 } },
+      { id: "settlementAmount", name: "settlementAmount", type: "number", label: t("accounting.forms.operationalPaymentTransaction.settlement"), required: true, width: "1/3", validation: { min: 0 } },
+      { id: "netAccountAmount", name: "netAccountAmount", type: "number", label: t("accounting.forms.operationalPaymentTransaction.net"), required: true, width: "1/3", validation: { min: 0 } },
+      { id: "currencyId", name: "currencyId", type: "select", label: t("accounting.forms.operationalPaymentTransaction.currency"), required: true, width: "1/2", options: [] },
+    ],
+  }],
+})
+
+export const allocateOperationalPaymentForm = (t: TFunction): FormConfig => ({
+  id: "allocate-operational-payment",
+  title: t("accounting.forms.allocateOperationalPayment.title"),
+  description: t("accounting.forms.allocateOperationalPayment.description"),
+  submitLabel: t("accounting.forms.allocateOperationalPayment.submit"),
+  cancelLabel: t("common.cancel"),
+  sections: [{ id: "allocation", fields: [
+    { id: "allocatedMoveLineId", name: "allocatedMoveLineId", type: "select", label: t("accounting.forms.allocateOperationalPayment.moveLine"), required: true, width: "full", options: [] },
+    { id: "allocatedAmount", name: "allocatedAmount", type: "number", label: t("accounting.forms.allocateOperationalPayment.amount"), required: true, width: "1/2", validation: { min: 0 } },
+    { id: "writeOffAmount", name: "writeOffAmount", type: "number", label: t("accounting.forms.allocateOperationalPayment.writeOff"), width: "1/2", defaultValue: 0, validation: { min: 0 } },
+  ] }],
+})
+
+export const reverseOperationalPaymentForm = (t: TFunction): FormConfig => ({
+  id: "reverse-operational-payment",
+  title: t("accounting.forms.reverseOperationalPayment.title"),
+  description: t("accounting.forms.reverseOperationalPayment.description"),
+  submitLabel: t("accounting.forms.reverseOperationalPayment.submit"),
+  cancelLabel: t("common.cancel"),
+  sections: [{ id: "reason", fields: [{ id: "reason", name: "reason", type: "textarea", label: t("accounting.forms.reverseOperationalPayment.reason"), required: true, width: "full", rows: 3 }] }],
+})
+
+export const newOperationalPaymentFeeForm = (t: TFunction): FormConfig => ({
+  id: "new-operational-payment-fee",
+  title: t("accounting.forms.operationalPaymentFee.title"),
+  description: t("accounting.forms.operationalPaymentFee.description"),
+  submitLabel: t("accounting.forms.operationalPaymentFee.submit"),
+  cancelLabel: t("common.cancel"),
+  sections: [{ id: "fee", fields: [
+    { id: "bearer", name: "bearer", type: "select", label: t("accounting.forms.operationalPaymentFee.bearer"), required: true, width: "1/2", defaultValue: "Company", options: [
+      { value: "Company", label: t("accounting.forms.operationalPaymentFee.company") },
+      { value: "Customer", label: t("accounting.forms.operationalPaymentFee.customer") },
+      { value: "Supplier", label: t("accounting.forms.operationalPaymentFee.supplier") },
+    ] },
+    { id: "amount", name: "amount", type: "number", label: t("accounting.forms.operationalPaymentFee.amount"), required: true, width: "1/2", validation: { min: 0 } },
+    { id: "taxAmount", name: "taxAmount", type: "number", label: t("accounting.forms.operationalPaymentFee.taxAmount"), defaultValue: 0, width: "1/2", validation: { min: 0 } },
+    { id: "providerReference", name: "providerReference", type: "text", label: t("accounting.forms.operationalPaymentFee.reference"), width: "1/2" },
+  ] }],
+})
+
+export const stageBankStatementImportForm = (t: TFunction): FormConfig => ({
+  id: "stage-bank-statement-import",
+  title: t("accounting.forms.bankStatementImport.title"),
+  description: t("accounting.forms.bankStatementImport.description"),
+  submitLabel: t("accounting.forms.bankStatementImport.submit"),
+  cancelLabel: t("common.cancel"),
+  sections: [{
+    id: "statement",
+    fields: [
+      { id: "fileName", name: "fileName", type: "text", label: t("accounting.forms.bankStatementImport.fileName"), width: "1/2" },
+      { id: "journalId", name: "journalId", type: "select", label: t("accounting.forms.bankStatementImport.journal"), required: true, width: "1/2", options: [] },
+      { id: "currencyId", name: "currencyId", type: "select", label: t("accounting.forms.bankStatementImport.currency"), required: true, width: "1/2", options: [] },
+      { id: "openingBalance", name: "openingBalance", type: "number", label: t("accounting.forms.bankStatementImport.openingBalance"), required: true, defaultValue: 0, width: "1/2" },
+      { id: "csvFile", name: "csvFile", type: "file", label: t("accounting.forms.bankStatementImport.csvData"), accept: ".csv,text/csv,text/plain", required: true, width: "full" },
+    ],
+  }],
+})
+
 export const accountingFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-invoice": newInvoiceForm(t),
   "new-bill": newBillForm(t),
   "new-journal-entry": newJournalEntryForm(t),
   "new-account": newAccountForm(t),
   "new-tax": newTaxForm(t),
+  "new-operational-payment-account": newOperationalPaymentAccountForm(t),
+  "new-operational-payment-transaction": newOperationalPaymentTransactionForm(t),
+  "allocate-operational-payment": allocateOperationalPaymentForm(t),
+  "reverse-operational-payment": reverseOperationalPaymentForm(t),
+  "new-operational-payment-fee": newOperationalPaymentFeeForm(t),
+  "stage-bank-statement-import": stageBankStatementImportForm(t),
   "new-budget": newBudgetForm(t),
   "budget-post": budgetPostForm(t),
   "update-budget-line-actuals": updateBudgetLineActualsForm(t),

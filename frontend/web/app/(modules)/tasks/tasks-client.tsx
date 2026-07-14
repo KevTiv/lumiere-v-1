@@ -297,15 +297,17 @@ function TasksClientLoaded({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("tasks.board.allProjects")}</SelectItem>
-            {projectFieldOptions.map((option) => (
-              <SelectItem
-                key={option.value}
-                value={option.value}
-                disabled={"disabled" in option ? option.disabled : false}
-              >
-                {option.label}
-              </SelectItem>
-            ))}
+            {projectFieldOptions
+              .filter((option) => option.value !== "")
+              .map((option) => (
+                <SelectItem
+                  key={option.value}
+                  value={option.value}
+                  disabled={"disabled" in option && option.disabled === true}
+                >
+                  {option.label}
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </div>

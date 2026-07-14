@@ -2,12 +2,7 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{
-	self as __sdk,
-	__lib,
-	__sats,
-	__ws,
-};
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 use super::account_internal_group_type::AccountInternalGroup;
 
@@ -21,19 +16,17 @@ pub struct AccountAccountType {
     pub internal_group: AccountInternalGroup,
     pub include_initial_balance: bool,
     pub is_deprecated: bool,
-    pub company_id: Option::<u64>,
-    pub create_uid: Option::<__sdk::Identity>,
-    pub create_date: Option::<__sdk::Timestamp>,
-    pub write_uid: Option::<__sdk::Identity>,
-    pub write_date: Option::<__sdk::Timestamp>,
-    pub metadata: Option::<String>,
+    pub company_id: Option<u64>,
+    pub create_uid: Option<__sdk::Identity>,
+    pub create_date: Option<__sdk::Timestamp>,
+    pub write_uid: Option<__sdk::Identity>,
+    pub write_date: Option<__sdk::Timestamp>,
+    pub metadata: Option<String>,
 }
-
 
 impl __sdk::InModule for AccountAccountType {
     type Module = super::RemoteModule;
 }
-
 
 /// Column accessor struct for the table `AccountAccountType`.
 ///
@@ -46,12 +39,12 @@ pub struct AccountAccountTypeCols {
     pub internal_group: __sdk::__query_builder::Col<AccountAccountType, AccountInternalGroup>,
     pub include_initial_balance: __sdk::__query_builder::Col<AccountAccountType, bool>,
     pub is_deprecated: __sdk::__query_builder::Col<AccountAccountType, bool>,
-    pub company_id: __sdk::__query_builder::Col<AccountAccountType, Option::<u64>>,
-    pub create_uid: __sdk::__query_builder::Col<AccountAccountType, Option::<__sdk::Identity>>,
-    pub create_date: __sdk::__query_builder::Col<AccountAccountType, Option::<__sdk::Timestamp>>,
-    pub write_uid: __sdk::__query_builder::Col<AccountAccountType, Option::<__sdk::Identity>>,
-    pub write_date: __sdk::__query_builder::Col<AccountAccountType, Option::<__sdk::Timestamp>>,
-    pub metadata: __sdk::__query_builder::Col<AccountAccountType, Option::<String>>,
+    pub company_id: __sdk::__query_builder::Col<AccountAccountType, Option<u64>>,
+    pub create_uid: __sdk::__query_builder::Col<AccountAccountType, Option<__sdk::Identity>>,
+    pub create_date: __sdk::__query_builder::Col<AccountAccountType, Option<__sdk::Timestamp>>,
+    pub write_uid: __sdk::__query_builder::Col<AccountAccountType, Option<__sdk::Identity>>,
+    pub write_date: __sdk::__query_builder::Col<AccountAccountType, Option<__sdk::Timestamp>>,
+    pub metadata: __sdk::__query_builder::Col<AccountAccountType, Option<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for AccountAccountType {
@@ -63,7 +56,10 @@ impl __sdk::__query_builder::HasCols for AccountAccountType {
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             r#type: __sdk::__query_builder::Col::new(table_name, "type"),
             internal_group: __sdk::__query_builder::Col::new(table_name, "internal_group"),
-            include_initial_balance: __sdk::__query_builder::Col::new(table_name, "include_initial_balance"),
+            include_initial_balance: __sdk::__query_builder::Col::new(
+                table_name,
+                "include_initial_balance",
+            ),
             is_deprecated: __sdk::__query_builder::Col::new(table_name, "is_deprecated"),
             company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             create_uid: __sdk::__query_builder::Col::new(table_name, "create_uid"),
@@ -71,7 +67,6 @@ impl __sdk::__query_builder::HasCols for AccountAccountType {
             write_uid: __sdk::__query_builder::Col::new(table_name, "write_uid"),
             write_date: __sdk::__query_builder::Col::new(table_name, "write_date"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
-
         }
     }
 }
@@ -80,7 +75,7 @@ impl __sdk::__query_builder::HasCols for AccountAccountType {
 ///
 /// Provides typed access to indexed columns for query building.
 pub struct AccountAccountTypeIxCols {
-    pub company_id: __sdk::__query_builder::IxCol<AccountAccountType, Option::<u64>>,
+    pub company_id: __sdk::__query_builder::IxCol<AccountAccountType, Option<u64>>,
     pub id: __sdk::__query_builder::IxCol<AccountAccountType, u64>,
     pub organization_id: __sdk::__query_builder::IxCol<AccountAccountType, u64>,
 }
@@ -92,10 +87,8 @@ impl __sdk::__query_builder::HasIxCols for AccountAccountType {
             company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
-
         }
     }
 }
 
 impl __sdk::__query_builder::CanBeLookupTable for AccountAccountType {}
-

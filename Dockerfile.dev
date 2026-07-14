@@ -1,0 +1,15 @@
+FROM rust:1.93-bookworm
+
+# `cargo watch` gives the Rust services a tight edit/restart loop. curl is also
+# used by Compose health checks.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && cargo install cargo-watch --locked
+
+WORKDIR /workspace
+
+# Compose mounts this directory as a named volume. Keeping it out of the macOS
+# bind mount makes incremental Rust builds faster in OrbStack.
+ENV CARGO_TARGET_DIR=/cargo-target \
+    CARGO_INCREMENTAL=1

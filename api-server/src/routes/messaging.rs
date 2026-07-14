@@ -57,14 +57,8 @@ async fn list_resource(
     offset: usize,
 ) -> Result<Value, ApiError> {
     let client = state.client_with_token(stdb_token);
-    let rows = execute_resource_query(
-        &client,
-        resource,
-        org_id,
-        identity_hex,
-        field_access,
-    )
-    .await?;
+    let rows =
+        execute_resource_query(&client, resource, org_id, identity_hex, field_access).await?;
     let total = rows.len();
     let data: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
     Ok(json!({ "data": data, "meta": list_meta(total, offset, limit) }))
@@ -87,10 +81,7 @@ fn message_template_create_params(body: &Value) -> Result<Value, ApiError> {
         .get("applicable_channels")
         .and_then(|v| v.as_array())
         .ok_or_else(|| ApiError::BadRequest("missing applicable_channels".into()))?;
-    let channels: Result<Vec<Value>, _> = applicable_channels
-        .iter()
-        .map(to_unit_enum)
-        .collect();
+    let channels: Result<Vec<Value>, _> = applicable_channels.iter().map(to_unit_enum).collect();
     Ok(json!({
         "company_id": body.get("company_id").cloned().unwrap_or(Value::Null),
         "key": key,
@@ -168,7 +159,9 @@ async fn message_template_put(
         .call_reducer("update_message_template", json!([org_id, id, body]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Message template updated successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Message template updated successfully" } }),
+    ))
 }
 
 fn operational_message_create_params(body: &Value) -> Result<Value, ApiError> {
@@ -178,10 +171,7 @@ fn operational_message_create_params(body: &Value) -> Result<Value, ApiError> {
     let status = body
         .get("status")
         .ok_or_else(|| ApiError::BadRequest("missing status".into()))?;
-    let variables = body
-        .get("variables")
-        .cloned()
-        .unwrap_or(json!([]));
+    let variables = body.get("variables").cloned().unwrap_or(json!([]));
     Ok(json!({
         "company_id": body.get("company_id").cloned().unwrap_or(Value::Null),
         "template_id": body.get("template_id").cloned().unwrap_or(json!(0)),
@@ -260,7 +250,9 @@ async fn operational_message_copied(
         .call_reducer("record_message_copied", json!([org_id, id]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Message copy recorded successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Message copy recorded successfully" } }),
+    ))
 }
 
 async fn message_batches_get(
@@ -337,7 +329,9 @@ async fn message_batch_review(
         .call_reducer("review_message_batch", json!([org_id, id, body]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Message batch reviewed successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Message batch reviewed successfully" } }),
+    ))
 }
 
 async fn message_batch_cancel(
@@ -355,7 +349,9 @@ async fn message_batch_cancel(
         .call_reducer("cancel_message_batch", json!([org_id, id]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Message batch cancelled successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Message batch cancelled successfully" } }),
+    ))
 }
 
 async fn contact_preferences_get(
@@ -405,23 +401,40 @@ async fn contact_preferences_put(
     client
         .call_reducer(
             "set_contact_communication_preference",
-            json!([org_id, body.get("company_id").cloned().unwrap_or(Value::Null), contact_id, to_unit_enum(channel)?, opted_in]),
+            json!([
+                org_id,
+                body.get("company_id").cloned().unwrap_or(Value::Null),
+                contact_id,
+                to_unit_enum(channel)?,
+                opted_in
+            ]),
         )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Contact preference updated successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Contact preference updated successfully" } }),
+    ))
 }
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/messaging/templates", get(message_templates_get).post(message_templates_post))
+        .route(
+            "/messaging/templates",
+            get(message_templates_get).post(message_templates_post),
+        )
         .route("/messaging/templates/:id", put(message_template_put))
         .route(
             "/messaging/messages",
             get(operational_messages_get).post(operational_messages_post),
         )
-        .route("/messaging/messages/:id/copy", post(operational_message_copied))
-        .route("/messaging/batches", get(message_batches_get).post(message_batches_post))
+        .route(
+            "/messaging/messages/:id/copy",
+            post(operational_message_copied),
+        )
+        .route(
+            "/messaging/batches",
+            get(message_batches_get).post(message_batches_post),
+        )
         .route("/messaging/batches/:id/review", post(message_batch_review))
         .route("/messaging/batches/:id/cancel", post(message_batch_cancel))
         .route(

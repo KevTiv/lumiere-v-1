@@ -1,0 +1,6 @@
+# The upstream Qdrant image intentionally contains no shell, curl, or wget.
+# Add only static BusyBox so Compose can report the real HTTP health state.
+FROM busybox:1.36.1 AS busybox
+
+FROM qdrant/qdrant:v1.12.6
+COPY --from=busybox /bin/busybox /bin/busybox

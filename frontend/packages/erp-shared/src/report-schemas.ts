@@ -99,6 +99,38 @@ export interface GeneratedOwnerReportHistoryRow {
   generatedAt: string
 }
 
+export interface OwnerReportSchedule {
+  id: number
+  name: string
+  companyId: number
+  ownerReportKey: ReportKey
+  timezone: string | null
+  frequency: "daily" | "weekly" | "monthly"
+  hour: number
+  minute: number
+  recipientIdentities: string[]
+  lastRun: { microsSinceUnixEpoch: number | string } | null
+  nextRun: { microsSinceUnixEpoch: number | string }
+  isActive: boolean
+  runCount: number
+}
+
+export interface OwnerReportScheduleRun {
+  id: number
+  scheduledReportId: number
+  scheduledPeriod: { microsSinceUnixEpoch: number | string }
+  status: "queued" | "completed" | "failed"
+  generatedOwnerReportId: number | null
+  documentId: number | null
+  errorMessage: string | null
+  notificationOutcome: string | null
+}
+
+export interface OwnerReportScheduleList {
+  schedules: OwnerReportSchedule[]
+  runs: OwnerReportScheduleRun[]
+}
+
 export interface ReportEnvelope<T> {
   reportKey: ReportKey
   schemaVersion: number
@@ -229,6 +261,51 @@ export interface DailyBusinessSummaryReportV1 {
   totals: DailyTotals
 }
 
+export interface LowStockLine {
+  productId: number
+  sku?: string
+  name: string
+  onHand: number
+  reserved: number
+  available: number
+  reorderPoint: number
+  forecast: number
+  supplierHint: string
+  outdatedQuant: boolean
+}
+
+export interface LowStockReportV1 {
+  alertCount: number
+  lines: LowStockLine[]
+}
+
+export interface StockMovementLine {
+  moveId: number
+  productId: number
+  sku?: string
+  productName: string
+  sourceLocation: string
+  destinationLocation: string
+  quantity: number
+  unitValuationReference: MoneyAmount
+  valuationReference: MoneyAmount
+  movedAt?: string
+  reference?: string
+  moveType: string
+}
+
+export interface StockMovementReportV1 {
+  movementCount: number
+  quantityMoved: number
+  valuationReference: MoneyAmount
+  lines: StockMovementLine[]
+}
+
+export interface SalesByProductReportV1 { quantitySold: number; grossSales: MoneyAmount; netSales: MoneyAmount; returns: MoneyAmount; margin: MoneyAmount; lines: Array<{ productId: number; productName: string; quantity: number; grossSales: MoneyAmount; netSales: MoneyAmount; returns: MoneyAmount; margin: MoneyAmount }> }
+export interface PurchaseSpendReportV1 { quantityPurchased: number; totalSpend: MoneyAmount; landedCosts: MoneyAmount; totalIncludingLandedCosts: MoneyAmount; lines: Array<{ supplierId: number; supplierName: string; productId: number; productName: string; quantity: number; spend: MoneyAmount }> }
+export interface PaymentFeeSummaryReportV1 { feeCount: number; fees: MoneyAmount; tax: MoneyAmount; total: MoneyAmount; lines: Array<{ providerAccount: string; bearer: string; amount: MoneyAmount; tax: MoneyAmount; total: MoneyAmount }> }
+export interface MonthlyOwnerReportV1 { sales: MoneyAmount; purchaseSpend: MoneyAmount; paymentFees: MoneyAmount; stockMovementValue: MoneyAmount; stockMovementCount: number }
+
 // ── Ledger-backed owner reports V1 ──────────────────────────────────────────
 
 export interface CashAccountLine {
@@ -333,12 +410,28 @@ export type CustomerBalancesPreview = ReportEnvelope<CustomerBalancesReportV1> &
 export type SupplierPayablesPreview = ReportEnvelope<SupplierPayablesReportV1> & {
   reportKey: "supplier_payables_v1"
 }
+export type LowStockPreview = ReportEnvelope<LowStockReportV1> & {
+  reportKey: "low_stock_v1"
+}
+export type StockMovementPreview = ReportEnvelope<StockMovementReportV1> & {
+  reportKey: "stock_movement_v1"
+}
+export type SalesByProductPreview = ReportEnvelope<SalesByProductReportV1> & { reportKey: "sales_by_product_v1" }
+export type PurchaseSpendPreview = ReportEnvelope<PurchaseSpendReportV1> & { reportKey: "purchase_spend_v1" }
+export type PaymentFeeSummaryPreview = ReportEnvelope<PaymentFeeSummaryReportV1> & { reportKey: "payment_fee_summary_v1" }
+export type MonthlyOwnerPreview = ReportEnvelope<MonthlyOwnerReportV1> & { reportKey: "monthly_owner_report_v1" }
 
 export type ReportPreview =
   | DailyBusinessSummaryPreview
   | CashMobileMoneyPreview
   | CustomerBalancesPreview
   | SupplierPayablesPreview
+  | LowStockPreview
+  | StockMovementPreview
+  | SalesByProductPreview
+  | PurchaseSpendPreview
+  | PaymentFeeSummaryPreview
+  | MonthlyOwnerPreview
 
 // ── Type guards ──────────────────────────────────────────────────────────────
 

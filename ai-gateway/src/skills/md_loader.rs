@@ -292,9 +292,9 @@ Body text."#;
         let (front, body) = split_frontmatter(md).unwrap();
         let fields = parse_frontmatter(&front);
         assert_eq!(body, "Body text.");
-        assert_eq!(parse_string_list(fields.get("required_tools")), vec![
-            "erp_search".to_string(),
-            "save_artifact".to_string(),
-        ]);
+        assert_eq!(
+            parse_string_list(fields.get("required_tools")),
+            vec!["erp_search".to_string(), "save_artifact".to_string(),]
+        );
     }
 }

@@ -946,6 +946,139 @@ export const mergeContactsForm = (
   ],
 })
 
+export type ContactIdentityFormOptions = {
+  mode?: "create" | "edit"
+  kind?: "Primary" | "WhatsApp" | "MobileMoney"
+  verificationState?: "Unverified" | "Pending" | "Verified" | "Failed" | "OptedOut"
+  isPreferred?: boolean
+}
+
+export const contactIdentityForm = (
+  t: TFunction,
+  options: ContactIdentityFormOptions = {},
+): FormConfig => {
+  const editing = options.mode === "edit"
+  return {
+    id: editing ? "edit-contact-identity" : "create-contact-identity",
+    title: t(editing ? "crm.forms.contactIdentity.editTitle" : "crm.forms.contactIdentity.createTitle"),
+    description: t("crm.forms.contactIdentity.description"),
+    submitLabel: t(editing ? "crm.forms.contactIdentity.save" : "crm.forms.contactIdentity.add"),
+    sections: [
+      {
+        id: "contact-identity",
+        title: t("crm.forms.contactIdentity.sections.phone"),
+        fields: [
+          {
+            id: "rawValue",
+            name: "rawValue",
+            type: "tel",
+            label: t("crm.forms.contactIdentity.fields.phone"),
+            placeholder: t(
+              editing
+                ? "crm.forms.contactIdentity.fields.phoneEditPlaceholder"
+                : "crm.forms.contactIdentity.fields.phonePlaceholder",
+            ),
+            description: t("crm.forms.contactIdentity.fields.phoneDescription"),
+            required: !editing,
+            autoComplete: "tel",
+            width: "full",
+          },
+          ...(!editing
+            ? [
+                {
+                  id: "kind",
+                  name: "kind",
+                  type: "select" as const,
+                  label: t("crm.forms.contactIdentity.fields.kind"),
+                  defaultValue: options.kind ?? "Primary",
+                  options: [
+                    { value: "Primary", label: t("crm.forms.contactIdentity.kinds.primary") },
+                    { value: "WhatsApp", label: t("crm.forms.contactIdentity.kinds.whatsApp") },
+                    { value: "MobileMoney", label: t("crm.forms.contactIdentity.kinds.mobileMoney") },
+                  ],
+                  width: "full" as const,
+                },
+              ]
+            : []),
+          {
+            id: "verificationState",
+            name: "verificationState",
+            type: "select",
+            label: t("crm.forms.contactIdentity.fields.verification"),
+            defaultValue: options.verificationState ?? "Unverified",
+            options: [
+              { value: "Unverified", label: t("crm.forms.contactIdentity.states.unverified") },
+              { value: "Pending", label: t("crm.forms.contactIdentity.states.pending") },
+              { value: "Verified", label: t("crm.forms.contactIdentity.states.verified") },
+              { value: "Failed", label: t("crm.forms.contactIdentity.states.failed") },
+              { value: "OptedOut", label: t("crm.forms.contactIdentity.states.optedOut") },
+            ],
+            width: "full",
+          },
+          {
+            id: "isPreferred",
+            name: "isPreferred",
+            type: "checkbox",
+            label: t("crm.forms.contactIdentity.fields.preferred"),
+            defaultValue: options.isPreferred ?? true,
+            width: "full",
+          },
+        ],
+      },
+    ],
+  }
+}
+
+export const assignContactRoleForm = (t: TFunction): FormConfig => ({
+  id: "assign-contact-role",
+  title: t("crm.forms.assignContactRole.title"),
+  description: t("crm.forms.assignContactRole.description"),
+  submitLabel: t("crm.forms.assignContactRole.submit"),
+  sections: [
+    {
+      id: "contact-role",
+      title: t("crm.forms.assignContactRole.sections.role"),
+      fields: [
+        {
+          id: "role",
+          name: "role",
+          type: "text",
+          label: t("crm.forms.assignContactRole.fields.role"),
+          placeholder: t("crm.forms.assignContactRole.fields.rolePlaceholder"),
+          description: t("crm.forms.assignContactRole.fields.roleDescription"),
+          required: true,
+          autoComplete: "off",
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const endContactRoleForm = (t: TFunction): FormConfig => ({
+  id: "end-contact-role",
+  title: t("crm.forms.endContactRole.title"),
+  description: t("crm.forms.endContactRole.description"),
+  submitLabel: t("crm.forms.endContactRole.submit"),
+  sections: [
+    {
+      id: "role-correction",
+      title: t("crm.forms.endContactRole.sections.correction"),
+      fields: [
+        {
+          id: "reason",
+          name: "reason",
+          type: "text",
+          label: t("crm.forms.endContactRole.fields.reason"),
+          placeholder: t("crm.forms.endContactRole.fields.reasonPlaceholder"),
+          autoComplete: "off",
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
 export const crmFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-lead": newLeadForm(t),
   "new-opportunity": newOpportunityForm(t),
@@ -968,4 +1101,8 @@ export const crmFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "edit-lead-revenue": editLeadRevenueForm(t),
   "add-opportunity-line": addOpportunityLineForm(t),
   "merge-contacts": mergeContactsForm(t, []),
+  "create-contact-identity": contactIdentityForm(t),
+  "edit-contact-identity": contactIdentityForm(t, { mode: "edit" }),
+  "assign-contact-role": assignContactRoleForm(t),
+  "end-contact-role": endContactRoleForm(t),
 })

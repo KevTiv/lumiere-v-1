@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::{
-    low_stock,
+    distributor_controls, low_stock,
     manifest::{SkillManifest, SkillVersionRef},
     red_action_drafts, report_composer,
 };
@@ -14,6 +14,8 @@ pub struct SkillRegistry {
 impl SkillRegistry {
     pub fn built_in() -> Self {
         let mut registry = Self::default();
+        registry.insert(distributor_controls::credit_hold_manifest());
+        registry.insert(distributor_controls::delivery_run_manifest());
         registry.insert(low_stock::manifest());
         registry.insert(report_composer::manifest());
         registry.insert(red_action_drafts::create_sale_order_draft_manifest());

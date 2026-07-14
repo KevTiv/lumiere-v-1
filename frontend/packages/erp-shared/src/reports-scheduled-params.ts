@@ -58,6 +58,8 @@ export function toCreateScheduledReportParams(
   return {
     name,
     reportTemplateId,
+    ownerReportKey: undefined,
+    timezone: undefined,
     model: String(formData.model ?? 'account.move'),
     frequency,
     hour,
@@ -66,6 +68,7 @@ export function toCreateScheduledReportParams(
     nextRun,
     isActive: Boolean(formData.isActive ?? true),
     recipients,
+    recipientIdentities: [],
     description: undefined,
     domain: undefined,
     dayOfWeek: undefined,

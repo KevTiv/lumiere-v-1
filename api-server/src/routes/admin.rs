@@ -22,7 +22,9 @@ async fn require_superuser(
     headers: &HeaderMap,
     cookies: &Cookies,
 ) -> Result<crate::session::ApiSession, ApiError> {
-    let auth = headers.get(axum::http::header::AUTHORIZATION).and_then(|v| v.to_str().ok());
+    let auth = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
     let id_hint = stdb_identity_hex_hint(headers, cookies);
     let cookie_tok = cookies.get("stdb_token").map(|c| c.value().to_string());
     let session = resolve_api_session(state, auth, cookie_tok.as_deref(), id_hint.as_deref())
@@ -32,7 +34,10 @@ async fn require_superuser(
     let id = normalize_identity_hex_for_sql(&session.identity_hex);
     let sql = format!("SELECT is_superuser FROM user_profile WHERE identity = 0x{id}");
     let client = state.client_with_token(&session.stdb_token);
-    let rows = client.query_sql(&sql).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+    let rows = client
+        .query_sql(&sql)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
     let is_superuser = rows
         .first()
         .and_then(|r| r.get("isSuperuser").or_else(|| r.get("is_superuser")))
@@ -71,7 +76,9 @@ async fn suspend_organization(
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    Ok(Json(json!({ "ok": true, "organizationId": org_id, "status": "suspended" })))
+    Ok(Json(
+        json!({ "ok": true, "organizationId": org_id, "status": "suspended" }),
+    ))
 }
 
 async fn export_organization(

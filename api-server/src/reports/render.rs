@@ -8,14 +8,20 @@ use serde::Serialize;
 use crate::{error::ApiError, state::AppState};
 
 use super::{
+    commercial::{
+        MonthlyOwnerReportV1, PaymentFeeSummaryReportV1, PurchaseSpendReportV1,
+        SalesByProductReportV1,
+    },
     common::ReportScope,
     daily_business_summary::{
         DailyBusinessSummaryReportV1, ExpensesAndFeesSummary, MoneyAmount, PurchasesSummary,
         ReceiptsSummary, SalesSummary, StockAlertsSummary,
     },
     financial_position::CashMobileMoneyReportV1,
+    low_stock::LowStockReportV1,
     open_balances::{CustomerBalancesReportV1, SupplierPayablesReportV1},
     service::ReportPreview,
+    stock_movement::StockMovementReportV1,
 };
 
 #[derive(Serialize)]
@@ -74,6 +80,12 @@ fn preview_key(preview: &ReportPreview) -> &'static str {
         ReportPreview::CashMobileMoneyV1(_) => "cash-mobile-money",
         ReportPreview::CustomerBalancesV1(_) => "customer-balances",
         ReportPreview::SupplierPayablesV1(_) => "supplier-payables",
+        ReportPreview::LowStockV1(_) => "low-stock",
+        ReportPreview::StockMovementV1(_) => "stock-movement",
+        ReportPreview::SalesByProductV1(_) => "sales-by-product",
+        ReportPreview::PurchaseSpendV1(_) => "purchase-spend",
+        ReportPreview::PaymentFeeSummaryV1(_) => "payment-fee-summary",
+        ReportPreview::MonthlyOwnerReportV1(_) => "monthly-owner-report",
     }
 }
 
@@ -97,7 +109,112 @@ fn render_html(preview: &ReportPreview) -> String {
         ReportPreview::SupplierPayablesV1(envelope) => {
             render_supplier_payables(&envelope.scope, &envelope.watermark, &envelope.report)
         }
+        ReportPreview::LowStockV1(envelope) => {
+            render_low_stock(&envelope.scope, &envelope.watermark, &envelope.report)
+        }
+        ReportPreview::StockMovementV1(envelope) => {
+            render_stock_movement(&envelope.scope, &envelope.watermark, &envelope.report)
+        }
+        ReportPreview::SalesByProductV1(envelope) => render_commercial(
+            "Sales by Product",
+            &envelope.scope,
+            &envelope.watermark,
+            &format!(
+                "Gross sales {} · net sales {} · margin {}",
+                format_money(&envelope.report.gross_sales),
+                format_money(&envelope.report.net_sales),
+                format_money(&envelope.report.margin)
+            ),
+        ),
+        ReportPreview::PurchaseSpendV1(envelope) => render_commercial(
+            "Purchase Spend",
+            &envelope.scope,
+            &envelope.watermark,
+            &format!(
+                "Purchased {:.2} units · total spend {}",
+                envelope.report.quantity_purchased,
+                format_money(&envelope.report.total_spend)
+            ),
+        ),
+        ReportPreview::PaymentFeeSummaryV1(envelope) => render_commercial(
+            "Payment Fee Summary",
+            &envelope.scope,
+            &envelope.watermark,
+            &format!(
+                "{} fee groups · total {}",
+                envelope.report.fee_count,
+                format_money(&envelope.report.total)
+            ),
+        ),
+        ReportPreview::MonthlyOwnerReportV1(envelope) => render_commercial(
+            "Monthly Owner Report",
+            &envelope.scope,
+            &envelope.watermark,
+            &format!(
+                "Sales {} · purchase spend {} · payment fees {} · stock movement value {}",
+                format_money(&envelope.report.sales),
+                format_money(&envelope.report.purchase_spend),
+                format_money(&envelope.report.payment_fees),
+                format_money(&envelope.report.stock_movement_value)
+            ),
+        ),
     }
+}
+
+fn render_commercial(title: &str, scope: &ReportScope, watermark: &str, summary: &str) -> String {
+    render_shell(
+        title,
+        scope,
+        watermark,
+        &format!("<h2>{}</h2><p>{}</p>", escape(title), escape(summary)),
+    )
+}
+
+fn render_stock_movement(
+    scope: &ReportScope,
+    watermark: &str,
+    report: &StockMovementReportV1,
+) -> String {
+    let rows = report
+        .lines
+        .iter()
+        .map(|line| {
+            format!(
+                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{:.2}</td><td>{}</td></tr>",
+                escape(&line.product_name),
+                escape(&line.source_location),
+                escape(&line.destination_location),
+                line.quantity,
+                format_money(&line.valuation_reference),
+            )
+        })
+        .collect::<String>();
+    let summary = format!(
+        "<p>{} completed movements · {:.2} units moved · valuation reference {}</p>",
+        report.movement_count,
+        report.quantity_moved,
+        format_money(&report.valuation_reference),
+    );
+    let table = if report.lines.is_empty() {
+        "<p class=\"empty\">No completed stock movements in this window.</p>".into()
+    } else {
+        format!("<table><thead><tr><th>Product</th><th>Source</th><th>Destination</th><th>Quantity</th><th>Valuation reference</th></tr></thead><tbody>{rows}</tbody></table>")
+    };
+    render_shell(
+        "Stock Movement Report",
+        scope,
+        watermark,
+        &format!("<h2>Stock movement</h2>{summary}{table}"),
+    )
+}
+
+fn render_low_stock(scope: &ReportScope, watermark: &str, report: &LowStockReportV1) -> String {
+    let rows = report.lines.iter().map(|line| format!(
+        "<tr><td>{}</td><td>{}</td><td>{:.2}</td><td>{:.2}</td><td>{:.2}</td><td>{}</td></tr>",
+        escape(&line.name), line.sku.as_deref().map(escape).unwrap_or_default(), line.available, line.reorder_point, line.forecast, escape(&line.supplier_hint)
+    )).collect::<String>();
+    let body = format!("<h2>Low-stock alerts ({})</h2><table><thead><tr><th>Product</th><th>SKU</th><th>Available</th><th>Reorder</th><th>Forecast</th><th>Supplier hint</th></tr></thead><tbody>{rows}</tbody></table>", report.alert_count);
+    render_shell("Low Stock Report", scope, watermark, &body)
 }
 
 fn render_daily_summary(

@@ -103,6 +103,15 @@ pub struct UpdateCompanyParams {
     pub address_country_code: Option<String>,
 }
 
+/// Enable or disable a company-scoped vertical pack. Pack configuration is
+/// deliberately separate from generic company metadata so feature lifecycle is auditable.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct SetCompanyVerticalPackParams {
+    pub pack_key: String,
+    pub enabled: bool,
+    pub configuration: Option<String>,
+}
+
 /// Params for updating company address fields.
 /// Scope: `company_id` is a flat reducer param.
 #[derive(SpacetimeType, Clone, Debug)]
@@ -222,6 +231,27 @@ pub struct Company {
     pub updated_at: Timestamp,
     pub deleted_at: Option<Timestamp>,
     pub metadata: Option<String>,
+}
+
+/// A company-level product-pack switch. Disabling a pack hides its workspace
+/// only; it never removes operational records created while enabled.
+#[spacetimedb::table(
+    accessor = company_vertical_pack,
+    public,
+    index(accessor = company_pack_by_org, btree(columns = [organization_id])),
+    index(accessor = company_pack_by_company, btree(columns = [company_id]))
+)]
+pub struct CompanyVerticalPack {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub pack_key: String,
+    pub enabled: bool,
+    pub configuration: Option<String>,
+    pub updated_at: Timestamp,
+    pub updated_by: spacetimedb::Identity,
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -576,6 +606,78 @@ pub fn update_company(
         ..company
     });
 
+    Ok(())
+}
+
+/// Upsert a company-scoped vertical pack configuration.
+#[spacetimedb::reducer]
+pub fn set_company_vertical_pack(
+    ctx: &ReducerContext,
+    company_id: u64,
+    params: SetCompanyVerticalPackParams,
+) -> Result<(), String> {
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+    check_permission(ctx, company.organization_id, "company", "write")?;
+    if params.pack_key != "distributor_wholesaler" {
+        return Err("unsupported company vertical pack".to_string());
+    }
+    let existing = ctx
+        .db
+        .company_vertical_pack()
+        .company_pack_by_company()
+        .filter(&company_id)
+        .find(|pack| pack.pack_key == params.pack_key);
+    let record_id = if let Some(pack) = existing {
+        let id = pack.id;
+        ctx.db
+            .company_vertical_pack()
+            .id()
+            .update(CompanyVerticalPack {
+                enabled: params.enabled,
+                configuration: params.configuration,
+                updated_at: ctx.timestamp,
+                updated_by: ctx.sender(),
+                ..pack
+            });
+        id
+    } else {
+        ctx.db
+            .company_vertical_pack()
+            .insert(CompanyVerticalPack {
+                id: 0,
+                organization_id: company.organization_id,
+                company_id,
+                pack_key: params.pack_key,
+                enabled: params.enabled,
+                configuration: params.configuration,
+                updated_at: ctx.timestamp,
+                updated_by: ctx.sender(),
+            })
+            .id
+    };
+    write_audit_log_v2(
+        ctx,
+        company.organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "company_vertical_pack",
+            record_id,
+            action: if params.enabled {
+                "ENABLE".into()
+            } else {
+                "DISABLE".into()
+            },
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["enabled".into(), "configuration".into()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 

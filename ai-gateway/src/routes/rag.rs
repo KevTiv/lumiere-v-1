@@ -12,14 +12,13 @@ use std::time::Instant;
 
 use crate::{
     ai_agent::{
-        ensure_allowed_action, ensure_model_allowed, enforce_chargeable_limits, record_ai_spend,
-        resolve_agent,
-        agent_allows_live_read,
+        agent_allows_live_read, enforce_chargeable_limits, ensure_allowed_action,
+        ensure_model_allowed, record_ai_spend, resolve_agent,
     },
     error::{AppError, AppResult},
     harness::{
         fetch_live_snapshots, filter_entity_refs_by_allowed_types, format_live_context_block,
-        resolve_snapshot_candidates, LiveSnapshot, RAG_MAX_LIVE_SNAPSHOTS, SnapshotUiContext,
+        resolve_snapshot_candidates, LiveSnapshot, SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
     providers::llm::LlmMessage,
     qdrant_client::SearchResult,
@@ -179,7 +178,9 @@ fn build_user_prompt(
     }
 
     if !retrieved_context.trim().is_empty() {
-        sections.push(format!("Retrieved memory (may be stale):\n{retrieved_context}"));
+        sections.push(format!(
+            "Retrieved memory (may be stale):\n{retrieved_context}"
+        ));
     }
 
     sections.push(format!("Question: {query}"));
@@ -419,21 +420,16 @@ pub async fn post_rag(
     let company_hit_count = company_hits.len();
     let org_hit_count = org_hits.len();
 
-    let org_id = req.org_id.ok_or_else(|| {
-        AppError::BadRequest("org_id is required for RAG generation".into())
-    })?;
+    let org_id = req
+        .org_id
+        .ok_or_else(|| AppError::BadRequest("org_id is required for RAG generation".into()))?;
 
-    let agent = resolve_agent(
-        &state.stdb,
-        org_id,
-        req.agent_id,
-        req.team_member_id,
-    )
-    .await
-    .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    let agent = resolve_agent(&state.stdb, org_id, req.agent_id, req.team_member_id)
+        .await
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
 
-    let allowed_types = (!req.allowed_entity_types.is_empty())
-        .then_some(req.allowed_entity_types.as_slice());
+    let allowed_types =
+        (!req.allowed_entity_types.is_empty()).then_some(req.allowed_entity_types.as_slice());
     let snapshot_candidates = filter_entity_refs_by_allowed_types(
         resolve_snapshot_candidates(
             snapshot_ui_from(req.ui_context.as_ref()).as_ref(),
@@ -445,22 +441,17 @@ pub async fn post_rag(
     );
 
     let live_snapshots = if agent_allows_live_read(&agent) {
-        fetch_live_snapshots(
-            &state.stdb,
-            org_id,
-            req.company_id,
-            &snapshot_candidates,
-        )
-        .await
-        .unwrap_or_else(|err| {
-            tracing::warn!(
-                company_id = req.company_id,
-                org_id,
-                error = %err,
-                "Live snapshot fetch failed; continuing with memory retrieval only"
-            );
-            Vec::new()
-        })
+        fetch_live_snapshots(&state.stdb, org_id, req.company_id, &snapshot_candidates)
+            .await
+            .unwrap_or_else(|err| {
+                tracing::warn!(
+                    company_id = req.company_id,
+                    org_id,
+                    error = %err,
+                    "Live snapshot fetch failed; continuing with memory retrieval only"
+                );
+                Vec::new()
+            })
     } else {
         tracing::debug!(
             agent_id = agent.agent_id,
@@ -494,10 +485,8 @@ pub async fn post_rag(
         }));
     }
 
-    ensure_allowed_action(&agent, "chat")
-        .map_err(|e| AppError::Forbidden(e.to_string()))?;
-    ensure_model_allowed(&agent)
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    ensure_allowed_action(&agent, "chat").map_err(|e| AppError::Forbidden(e.to_string()))?;
+    ensure_model_allowed(&agent).map_err(|e| AppError::BadRequest(e.to_string()))?;
     enforce_chargeable_limits(state.agent_rate_limiter.as_ref(), org_id, &agent)
         .map_err(|e| e.into_app_error())?;
 
@@ -597,17 +586,15 @@ pub async fn post_rag_stream(
     }
 
     events.push(
-        Event::default()
-            .event("sources")
-            .data(
-                json!({
-                    "sources": response.sources,
-                    "agent_id": response.agent_id,
-                    "provider": response.provider,
-                    "model": response.model,
-                })
-                .to_string(),
-            ),
+        Event::default().event("sources").data(
+            json!({
+                "sources": response.sources,
+                "agent_id": response.agent_id,
+                "provider": response.provider,
+                "model": response.model,
+            })
+            .to_string(),
+        ),
     );
     events.push(Event::default().event("done").data("{}"));
 

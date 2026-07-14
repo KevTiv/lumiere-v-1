@@ -32,6 +32,11 @@ import type {
   UpdateLeadRevenueParams,
   UpdateOpportunityParams,
   MergeContactsParams,
+  AssignContactRoleParams,
+  CreateContactIdentityParams,
+  EndContactRoleParams,
+  UpdateContactIdentityParams,
+  ContactVerificationState,
 } from "@lumiere/stdb/types"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -111,6 +116,26 @@ export function useContacts(
   initialData?: QueryRows,
 ) {
   return useSubscriptionAwareQuery('contacts', organizationId, { initialData })
+}
+
+/** Phone, WhatsApp, and mobile-money identities for CRM contacts. */
+export function useContactPhoneIdentities(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useSubscriptionAwareQuery("contact-phone-identities", organizationId, {
+    initialData,
+  })
+}
+
+/** Explicit commercial and operational roles assigned to CRM contacts. */
+export function useContactRoleAssignments(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useSubscriptionAwareQuery("contact-role-assignments", organizationId, {
+    initialData,
+  })
 }
 
 export function useContactTags(
@@ -253,6 +278,117 @@ export function useCreateContact(
       }
     },
     onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contacts']),
+  })
+}
+
+export function useCreateContactIdentity(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreateContactIdentityParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = crmBffPost("create_contact_identity", [
+        organizationId,
+        stdbParamsToJson(params, "CreateContactIdentityParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallErrorCrm(response))
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["contact-phone-identities"]),
+  })
+}
+
+export function useUpdateContactIdentity(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { identityId: ScalarId; params: UpdateContactIdentityParams }
+  >({
+    mutationFn: async ({ identityId, params }) => {
+      const { urlPath, init } = crmBffPost("update_contact_identity", [
+        organizationId,
+        toScalarU64(identityId),
+        stdbParamsToJson(params, "UpdateContactIdentityParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallErrorCrm(response))
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["contact-phone-identities"]),
+  })
+}
+
+export function useVerifyContactIdentity(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { identityId: ScalarId; state: ContactVerificationState }
+  >({
+    mutationFn: async ({ identityId, state }) => {
+      const { urlPath, init } = crmBffPost("verify_contact_identity", [
+        organizationId,
+        toScalarU64(identityId),
+        state,
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallErrorCrm(response))
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["contact-phone-identities"]),
+  })
+}
+
+export function useArchiveContactIdentity(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (identityId) => {
+      const { urlPath, init } = crmBffPost("archive_contact_identity", [
+        organizationId,
+        toScalarU64(identityId),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallErrorCrm(response))
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["contact-phone-identities"]),
+  })
+}
+
+export function useAssignContactRole(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, AssignContactRoleParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = crmBffPost("assign_contact_role", [
+        organizationId,
+        stdbParamsToJson(params, "AssignContactRoleParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallErrorCrm(response))
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["contact-role-assignments"]),
+  })
+}
+
+export function useEndContactRole(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { assignmentId: ScalarId; params: EndContactRoleParams }
+  >({
+    mutationFn: async ({ assignmentId, params }) => {
+      const { urlPath, init } = crmBffPost("end_contact_role", [
+        organizationId,
+        toScalarU64(assignmentId),
+        stdbParamsToJson(params, "EndContactRoleParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallErrorCrm(response))
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["contact-role-assignments"]),
   })
 }
 
@@ -678,6 +814,7 @@ export type {
   ConvertOpportunityParams,
   CreateActivityParams,
   CreateContactParams,
+  CreateContactIdentityParams,
   CreateContactSegmentParams,
   CreateContactTagParams,
   CreateLeadParams,
@@ -687,6 +824,9 @@ export type {
   UpdateContactBusinessParams,
   UpdateContactDetailsParams,
   UpdateContactCoreParams,
+  UpdateContactIdentityParams,
+  AssignContactRoleParams,
+  EndContactRoleParams,
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
   UpdateLeadRevenueParams,

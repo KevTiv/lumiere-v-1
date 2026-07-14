@@ -39,6 +39,7 @@ import {
   ClipboardList,
   ClipboardCheck,
   Map as MapIcon,
+  Store,
   LogOut,
 } from "lucide-react"
 import type { Resource } from "@/lib/rbac-types"
@@ -115,6 +116,7 @@ export function DashboardSidebar({
       label: t("nav.groups.operations"),
       items: [
         { label: t("nav.inventory"), href: "/inventory", icon: Package, resource: "module:inventory" },
+        { label: t("nav.distributor"), href: "/distributor", icon: Store, resource: "module:inventory" },
         { label: t("nav.pos"), href: "/pos", icon: ShoppingCart, resource: "module:pos" },
         { label: t("nav.manufacturing"), href: "/manufacturing", icon: Factory, resource: "module:manufacturing" },
         { label: t("nav.map"), href: "/map", icon: MapIcon, resource: "module:map" },

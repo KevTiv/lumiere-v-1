@@ -31,12 +31,7 @@ const STORAGE_KEY = "lumiere-theme";
 const PALETTE_STORAGE_KEY = "lumiere-palette";
 const SHELL_STORAGE_KEY = "lumiere-shell";
 
-function getSystemTheme(): "light" | "dark" {
-  if (typeof window === "undefined") return "light";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
-}
+
 
 function applyTheme(resolved: "light" | "dark") {
   const root = document.documentElement;
@@ -81,23 +76,23 @@ export function ThemeProvider({
   paletteStorageKey = PALETTE_STORAGE_KEY,
   shellStorageKey = SHELL_STORAGE_KEY,
 }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === "undefined") return defaultTheme;
-    return (localStorage.getItem(storageKey) as Theme) ?? defaultTheme;
-  });
+  // Use the supplied defaults for SSR and the first client render so hydration
+  // never depends on browser-only storage.
+  const [theme, setThemeState] = useState<Theme>(defaultTheme);
+  const [palette, setPaletteState] = useState<PaletteId>(defaultPalette);
+  const [shell, setShellState] = useState<ShellId>(defaultShell);
+  const [systemTheme, setSystemTheme] = useState<"light" | "dark">("light");
 
-  const [palette, setPaletteState] = useState<PaletteId>(() => {
-    if (typeof window === "undefined") return defaultPalette;
-    return parsePalette(localStorage.getItem(paletteStorageKey));
-  });
+  const resolvedTheme: "light" | "dark" = theme === "system" ? systemTheme : theme;
 
-  const [shell, setShellState] = useState<ShellId>(() => {
-    if (typeof window === "undefined") return defaultShell;
-    return parseShell(localStorage.getItem(shellStorageKey));
-  });
-
-  const resolvedTheme: "light" | "dark" =
-    theme === "system" ? getSystemTheme() : theme;
+  useEffect(() => {
+    const storedTheme = localStorage.getItem(storageKey) as Theme | null;
+    if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system") {
+      setThemeState(storedTheme);
+    }
+    setPaletteState(parsePalette(localStorage.getItem(paletteStorageKey)));
+    setShellState(parseShell(localStorage.getItem(shellStorageKey)));
+  }, [storageKey, paletteStorageKey, shellStorageKey]);
 
   useEffect(() => {
     applyTheme(resolvedTheme);
@@ -114,9 +109,10 @@ export function ThemeProvider({
   useEffect(() => {
     if (theme !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => applyTheme(mq.matches ? "dark" : "light");
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
+    const updateSystemTheme = () => setSystemTheme(mq.matches ? "dark" : "light");
+    updateSystemTheme();
+    mq.addEventListener("change", updateSystemTheme);
+    return () => mq.removeEventListener("change", updateSystemTheme);
   }, [theme]);
 
   const setTheme = useCallback(

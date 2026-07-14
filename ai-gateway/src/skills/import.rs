@@ -327,7 +327,13 @@ fn manifest(target_entity: &str) -> Option<&'static [FieldSpec]> {
                 name: "client_order_ref",
                 required: false,
                 field_type: FieldType::String,
-                aliases: &["reference", "clientref", "customerreference", "po", "orderref"],
+                aliases: &[
+                    "reference",
+                    "clientref",
+                    "customerreference",
+                    "po",
+                    "orderref",
+                ],
                 allowed_values: &[],
             },
             FieldSpec {
@@ -510,7 +516,11 @@ fn summarize_structure(headers: &[String], sample_rows: &[Vec<String>]) -> CsvSt
         if key.is_empty() {
             continue;
         }
-        if !seen.insert(key.clone()) && !duplicate_headers.iter().any(|h: &String| h.eq_ignore_ascii_case(header)) {
+        if !seen.insert(key.clone())
+            && !duplicate_headers
+                .iter()
+                .any(|h: &String| h.eq_ignore_ascii_case(header))
+        {
             duplicate_headers.push(header.clone());
         }
     }
@@ -520,10 +530,9 @@ fn summarize_structure(headers: &[String], sample_rows: &[Vec<String>]) -> CsvSt
         .enumerate()
         .filter(|(idx, header)| {
             !header.trim().is_empty()
-                && sample_rows.iter().all(|row| {
-                    row.get(*idx)
-                        .is_none_or(|value| value.trim().is_empty())
-                })
+                && sample_rows
+                    .iter()
+                    .all(|row| row.get(*idx).is_none_or(|value| value.trim().is_empty()))
         })
         .map(|(_, header)| header.clone())
         .collect();
@@ -594,7 +603,8 @@ fn scan_cell(location: &str, value: &str) -> Vec<CsvSafetyFinding> {
         findings.push(CsvSafetyFinding {
             location: location.to_string(),
             kind: "prompt_injection".to_string(),
-            message: "Cell contains instruction-like text unsafe for AI import analysis".to_string(),
+            message: "Cell contains instruction-like text unsafe for AI import analysis"
+                .to_string(),
             severity: "error".to_string(),
         });
     }
@@ -619,10 +629,7 @@ pub fn scan_csv_content(headers: &[String], rows: &[Vec<String>]) -> CsvSafetyRe
 
     for (row_idx, row) in rows.iter().take(MAX_SAMPLE_ROWS).enumerate() {
         for (col_idx, value) in row.iter().enumerate() {
-            findings.extend(scan_cell(
-                &format!("row[{row_idx}].col[{col_idx}]"),
-                value,
-            ));
+            findings.extend(scan_cell(&format!("row[{row_idx}].col[{col_idx}]"), value));
         }
     }
 
@@ -769,11 +776,9 @@ fn detect_import_bundle(
         }
     }
 
-    let has_line_signal = line_mappings
-        .iter()
-        .any(|mapping| {
-            mapping.target_field == "product_id" || mapping.target_field == "product_uom_qty"
-        });
+    let has_line_signal = line_mappings.iter().any(|mapping| {
+        mapping.target_field == "product_id" || mapping.target_field == "product_uom_qty"
+    });
     if !has_line_signal && bundle_key != Some("sale_order_bundle") {
         return None;
     }
@@ -789,12 +794,21 @@ fn detect_import_bundle(
         .find(|mapping| mapping.target_field == "client_order_ref")
         .map(|mapping| mapping.source_column.clone())
         .or_else(|| {
-            headers.iter().find(|header| {
-                let normalized_header = normalize_name(header);
-                ["clientorderref", "reference", "orderref", "ordernumber", "po"]
+            headers
+                .iter()
+                .find(|header| {
+                    let normalized_header = normalize_name(header);
+                    [
+                        "clientorderref",
+                        "reference",
+                        "orderref",
+                        "ordernumber",
+                        "po",
+                    ]
                     .iter()
                     .any(|alias| normalized_header == *alias)
-            }).cloned()
+                })
+                .cloned()
         });
 
     Some(ImportBundleHint {
@@ -1020,8 +1034,7 @@ mod tests {
 
     #[test]
     fn parse_csv_text_respects_quoted_commas() {
-        let (headers, rows) =
-            parse_csv_text("Name,Notes\nAcme,\"Hello, world\"").expect("parse");
+        let (headers, rows) = parse_csv_text("Name,Notes\nAcme,\"Hello, world\"").expect("parse");
         assert_eq!(headers, vec!["Name", "Notes"]);
         assert_eq!(rows[0][1], "Hello, world");
     }

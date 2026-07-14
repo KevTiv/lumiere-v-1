@@ -2,6 +2,7 @@ pub mod action_draft_bridge;
 pub mod audit;
 pub mod audit_logger;
 pub mod data_scope_resolver;
+pub mod distributor_controls;
 pub mod entity_registry;
 pub mod legacy_fence;
 pub mod low_stock;

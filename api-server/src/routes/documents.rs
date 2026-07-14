@@ -18,8 +18,8 @@ use tower_cookies::Cookies;
 
 use crate::error::ApiError;
 use crate::query_exec::execute_resource_query;
-use crate::state::AppState;
 use crate::session::ApiSession;
+use crate::state::AppState;
 use crate::web_session::{require_org, resolve_session};
 
 #[derive(Debug, Deserialize)]
@@ -34,11 +34,19 @@ struct PivotTableBody {
     rows: Vec<Vec<serde_json::Value>>,
 }
 
-fn pivot_table_xlsx_bytes(title: &str, headers: &[String], rows: &[Vec<Value>]) -> Result<Vec<u8>, ApiError> {
+fn pivot_table_xlsx_bytes(
+    title: &str,
+    headers: &[String],
+    rows: &[Vec<Value>],
+) -> Result<Vec<u8>, ApiError> {
     let mut workbook = Workbook::new();
     let worksheet = workbook.add_worksheet();
     worksheet
-        .set_name(if title.len() > 31 { &title[..31] } else { title })
+        .set_name(if title.len() > 31 {
+            &title[..31]
+        } else {
+            title
+        })
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     let header = Format::new().set_bold();
     for (col, label) in headers.iter().enumerate() {
@@ -131,7 +139,10 @@ pub fn router() -> Router<Arc<AppState>> {
         )
         .route("/documents/xlsx/pivot-table", post(pivot_table_xlsx))
         .route("/documents/pdf/sale-order/:order_id", get(sale_order_pdf))
-        .route("/documents/pdf/account-move/:move_id", get(account_move_pdf))
+        .route(
+            "/documents/pdf/account-move/:move_id",
+            get(account_move_pdf),
+        )
 }
 
 fn row_id(row: &Value) -> Option<u64> {
@@ -329,7 +340,10 @@ fn trial_balance_csv(report: &Value, trial_rows: &[Value]) -> String {
     }
     if trial_rows.is_empty() {
         if let Some(data_raw) = report.get("report_data").and_then(|v| v.as_str()) {
-            out.push_str(&format!("report_data,\"{}\"\n", data_raw.replace('"', "\"\"")));
+            out.push_str(&format!(
+                "report_data,\"{}\"\n",
+                data_raw.replace('"', "\"\"")
+            ));
         }
     }
     out
@@ -378,7 +392,14 @@ fn trial_balance_xlsx(report: &Value, trial_rows: &[Value]) -> Result<Vec<u8>, A
     }
     if trial_rows.is_empty() {
         worksheet
-            .write_string(1, 0, report.get("name").and_then(|v| v.as_str()).unwrap_or("Report"))
+            .write_string(
+                1,
+                0,
+                report
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Report"),
+            )
             .map_err(|e| ApiError::Internal(e.to_string()))?;
     }
     workbook
@@ -430,11 +451,7 @@ async fn financial_report_pdf(
     let lines = financial_report_lines(&report, &trial_rows);
     let pdf_bytes = render_lines_pdf(title, &lines);
     let filename = format!("financial-report-{report_id}.pdf");
-    attachment_response(
-        filename,
-        "application/pdf",
-        pdf_bytes,
-    )
+    attachment_response(filename, "application/pdf", pdf_bytes)
 }
 
 async fn financial_report_csv(
@@ -575,10 +592,7 @@ async fn account_move_pdf(
         .find(|row| row_id(row) == Some(move_id))
         .ok_or_else(|| ApiError::NotFound(format!("account move {move_id} not found")))?;
 
-    let name = mv
-        .get("name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("Invoice");
+    let name = mv.get("name").and_then(|v| v.as_str()).unwrap_or("Invoice");
     let amount = mv
         .get("amountTotal")
         .or_else(|| mv.get("amount_total"))

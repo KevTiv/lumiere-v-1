@@ -22,6 +22,9 @@ fn test_config(server_token: Option<&str>, dev_mock_org_id: Option<u64>) -> Conf
         cookie_secure: false,
         report_renderer_url: None,
         report_artifact_dir: std::env::temp_dir().join("lumiere-owner-reports-test"),
+        owner_report_worker_poll_secs: 15,
+        owner_report_worker_name: "test-owner-report-worker".to_string(),
+        owner_report_worker_port: 8091,
     }
 }
 

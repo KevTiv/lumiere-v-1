@@ -8,7 +8,7 @@ const EXECUTABLE_PATH =
   undefined;
 
 /** @type {Promise<import("puppeteer-core").Browser> | undefined} */
-let browserPromise: import("puppeteer-core").Browser;
+let browserPromise: Promise<import("puppeteer-core").Browser>;
 
 async function launchBrowser() {
   if (!EXECUTABLE_PATH) {
@@ -56,6 +56,12 @@ async function readJsonBody(req: http.IncomingMessage) {
  * @returns {Promise<Buffer>}
  */
 type Body = { html?: string; filename?: string; media?: string }
+
+function safeFilename(value: string | undefined): string {
+  const cleaned = (value?.trim() || "report.pdf").replace(/[^A-Za-z0-9._-]/g, "_")
+  return cleaned.endsWith(".pdf") ? cleaned : `${cleaned}.pdf`
+}
+
 async function renderPdf(body: Body) {
   const html = body.html?.trim();
   if (!html) {
@@ -64,6 +70,7 @@ async function renderPdf(body: Body) {
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
+    await page.emulateMediaType(body.media === "screen" ? "screen" : "print");
     await page.setContent(html, { waitUntil: "domcontentloaded" });
     const pdf = await page.pdf({
       format: "A4",
@@ -88,10 +95,10 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/v1/render/pdf") {
       const body = await readJsonBody(req);
       const pdf = await renderPdf(body);
-      const filename = body.filename?.trim() || "report.pdf";
+      const filename = safeFilename(body.filename);
       res.writeHead(200, {
         "content-type": "application/pdf",
-        "content-disposition": `inline; filename="${filename.replace(/"/g, "")}"`,
+        "content-disposition": `inline; filename="${filename}"`,
         "cache-control": "no-store",
       });
       res.end(pdf);

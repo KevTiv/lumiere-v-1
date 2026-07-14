@@ -66,26 +66,20 @@ mod tests {
 
     #[test]
     fn strict_blocks_test_and_bootstrap_reducers() {
-        assert!(blocked_reducer_reason(
-            "run_all_domain_tests",
-            ReducerAllowlistMode::Strict
-        )
-        .is_some());
-        assert!(blocked_reducer_reason(
-            "bootstrap_new_tenant",
-            ReducerAllowlistMode::Strict
-        )
-        .is_some());
+        assert!(
+            blocked_reducer_reason("run_all_domain_tests", ReducerAllowlistMode::Strict).is_some()
+        );
+        assert!(
+            blocked_reducer_reason("bootstrap_new_tenant", ReducerAllowlistMode::Strict).is_some()
+        );
         assert!(blocked_reducer_reason("create_lead", ReducerAllowlistMode::Strict).is_none());
     }
 
     #[test]
     fn off_allows_everything() {
-        assert!(blocked_reducer_reason(
-            "run_all_domain_tests",
-            ReducerAllowlistMode::Off
-        )
-        .is_none());
+        assert!(
+            blocked_reducer_reason("run_all_domain_tests", ReducerAllowlistMode::Off).is_none()
+        );
     }
 
     #[test]
@@ -95,20 +89,17 @@ mod tests {
             ReducerAllowlistMode::Strict
         )
         .is_some());
-        assert!(blocked_reducer_reason(
-            "run_helpdesk_ticket_test",
-            ReducerAllowlistMode::Strict
-        )
-        .is_some());
+        assert!(
+            blocked_reducer_reason("run_helpdesk_ticket_test", ReducerAllowlistMode::Strict)
+                .is_some()
+        );
     }
 
     #[test]
     fn strict_blocks_csv_import_reducers() {
-        assert!(blocked_reducer_reason(
-            "import_contact_csv",
-            ReducerAllowlistMode::Strict
-        )
-        .is_some());
+        assert!(
+            blocked_reducer_reason("import_contact_csv", ReducerAllowlistMode::Strict).is_some()
+        );
     }
 
     #[test]
@@ -135,11 +126,9 @@ mod tests {
             );
         }
 
-        assert!(blocked_reducer_reason(
-            "delete_organization",
-            ReducerAllowlistMode::Strict
-        )
-        .is_some());
+        assert!(
+            blocked_reducer_reason("delete_organization", ReducerAllowlistMode::Strict).is_some()
+        );
         assert!(blocked_reducer_reason(
             "run_crm_contact_update_delete_test",
             ReducerAllowlistMode::Strict

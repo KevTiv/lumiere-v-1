@@ -2,12 +2,7 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{
-	self as __sdk,
-	__lib,
-	__sats,
-	__ws,
-};
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 use super::fiscal_year_state_type::FiscalYearState;
 
@@ -19,16 +14,14 @@ pub struct CreateFiscalYearParams {
     pub date_to: __sdk::Timestamp,
     pub r#type: String,
     pub state: FiscalYearState,
-    pub carry_over_accounts: Vec::<u64>,
-    pub closing_move_id: Option::<u64>,
-    pub opening_move_id: Option::<u64>,
+    pub carry_over_accounts: Vec<u64>,
+    pub closing_move_id: Option<u64>,
+    pub opening_move_id: Option<u64>,
     pub is_adjustment: bool,
-    pub notes: Option::<String>,
-    pub metadata: Option::<String>,
+    pub notes: Option<String>,
+    pub metadata: Option<String>,
 }
-
 
 impl __sdk::InModule for CreateFiscalYearParams {
     type Module = super::RemoteModule;
 }
-

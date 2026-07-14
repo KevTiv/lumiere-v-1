@@ -162,7 +162,12 @@ async fn signup(
     client
         .call_reducer(
             "store_user_credential",
-            json!([identity_json_for_reducer_call(&identity), email.clone(), password_hash, token_enc]),
+            json!([
+                identity_json_for_reducer_call(&identity),
+                email.clone(),
+                password_hash,
+                token_enc
+            ]),
         )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -238,7 +243,11 @@ async fn forgot_password(
         let _ = client
             .call_reducer(
                 "create_password_reset_token",
-                json!([identity_json_for_reducer_call(&cred.identity_hex), token_hash, expires_at.to_string()]),
+                json!([
+                    identity_json_for_reducer_call(&cred.identity_hex),
+                    token_hash,
+                    expires_at.to_string()
+                ]),
             )
             .await;
 
@@ -335,7 +344,10 @@ async fn reset_password(
     client
         .call_reducer(
             "update_user_password",
-            json!([identity_json_for_reducer_call(&reset_token.identity_hex), new_hash]),
+            json!([
+                identity_json_for_reducer_call(&reset_token.identity_hex),
+                new_hash
+            ]),
         )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -427,7 +439,10 @@ async fn invite(
         .into_iter()
         .filter(|r| {
             r.get("id")
-                .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+                .and_then(|v| {
+                    v.as_u64()
+                        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+                })
                 .is_some_and(|id| role_id_set.contains(&id))
         })
         .collect();
@@ -589,7 +604,12 @@ async fn accept_invite(
             client
                 .call_reducer(
                     "store_user_credential",
-                    json!([identity_json_for_reducer_call(&identity), email, password_hash, token_enc]),
+                    json!([
+                        identity_json_for_reducer_call(&identity),
+                        email,
+                        password_hash,
+                        token_enc
+                    ]),
                 )
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?;

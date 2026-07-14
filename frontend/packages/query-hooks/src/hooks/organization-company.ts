@@ -29,6 +29,29 @@ export function useCompanies(organizationId: number, enabled: boolean) {
   })
 }
 
+export type CompanyVerticalPackRow = {
+  id: bigint | number | string
+  companyId: bigint | number | string
+  packKey: string
+  enabled: boolean
+  configuration?: string | null
+  updatedAt: unknown
+}
+
+export function useCompanyVerticalPacks(companyId: bigint, enabled = true) {
+  return useQuery<CompanyVerticalPackRow[]>({
+    queryKey: ["company-vertical-packs", String(companyId)],
+    queryFn: async () => {
+      const response = await apiFetch(`/api/vertical-packs/${companyId}`)
+      if (!response.ok) throw new Error(await parseCallError(response))
+      const body = (await response.json()) as { data?: CompanyVerticalPackRow[] }
+      return body.data ?? []
+    },
+    enabled: enabled && companyId > 0n,
+    staleTime: 30_000,
+  })
+}
+
 export function useDataClassifications(organizationId: number, enabled: boolean) {
   return useQuery({
     queryKey: stdbQueryKey("data-classifications", organizationId),
@@ -95,6 +118,26 @@ export function useUpdateCompany() {
     },
     onSuccess: (orgId) => {
       if (orgId != null) invalidateOrgCompanyQueries(qc, orgId)
+    },
+  })
+}
+
+/** Company-scoped vertical-pack enablement. The server keeps immutable business history when disabled. */
+export function useSetCompanyVerticalPack() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { companyId: bigint; organizationId: number; packKey: "distributor_wholesaler"; enabled: boolean; configuration?: string }) => {
+      const { urlPath, init } = organizationCompanyBffPost("set_company_vertical_pack", [
+        args.companyId,
+        stdbParamsToJson({ packKey: args.packKey, enabled: args.enabled, configuration: args.configuration }, "SetCompanyVerticalPackParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallError(response))
+      return args.organizationId
+    },
+    onSuccess: (organizationId, args) => {
+      invalidateOrgCompanyQueries(qc, organizationId)
+      void qc.invalidateQueries({ queryKey: ["company-vertical-packs", String(args.companyId)] })
     },
   })
 }

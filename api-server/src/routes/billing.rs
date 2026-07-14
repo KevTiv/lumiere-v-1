@@ -2,12 +2,7 @@
 
 use std::sync::Arc;
 
-use axum::{
-    extract::State,
-    http::HeaderMap,
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::State, http::HeaderMap, routing::get, Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
@@ -30,7 +25,9 @@ async fn require_org_session(
     headers: &HeaderMap,
     cookies: &Cookies,
 ) -> Result<(crate::session::ApiSession, u64), ApiError> {
-    let auth = headers.get(axum::http::header::AUTHORIZATION).and_then(|v| v.to_str().ok());
+    let auth = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
     let id_hint = stdb_identity_hex_hint(headers, cookies);
     let cookie_tok = cookies.get("stdb_token").map(|c| c.value().to_string());
     let session = resolve_api_session(state, auth, cookie_tok.as_deref(), id_hint.as_deref())
@@ -52,7 +49,10 @@ async fn get_billing_account(
     let sql = format!(
         "SELECT id, organization_id, plan_tier, seat_count, status, trial_ends_at, metadata FROM billing_account WHERE organization_id = {org_id}"
     );
-    let rows = client.query_sql(&sql).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+    let rows = client
+        .query_sql(&sql)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(json!({ "data": rows })))
 }
 
@@ -64,10 +64,11 @@ async fn patch_billing_account(
 ) -> Result<Json<Value>, ApiError> {
     let (session, org_id) = require_org_session(&state, &headers, &cookies).await?;
     let client = state.client_with_token(&session.stdb_token);
-    let sql = format!(
-        "SELECT id FROM billing_account WHERE organization_id = {org_id}"
-    );
-    let rows = client.query_sql(&sql).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+    let sql = format!("SELECT id FROM billing_account WHERE organization_id = {org_id}");
+    let rows = client
+        .query_sql(&sql)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
     let Some(row) = rows.first() else {
         return Err(ApiError::NotFound("Billing account not found".into()));
     };
@@ -94,6 +95,8 @@ async fn patch_billing_account(
 }
 
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/billing/account", get(get_billing_account).patch(patch_billing_account))
+    Router::new().route(
+        "/billing/account",
+        get(get_billing_account).patch(patch_billing_account),
+    )
 }

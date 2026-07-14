@@ -6,11 +6,17 @@
 /// | **ReportTemplate** | Layout and format definitions for generated reports |
 /// | **ScheduledReport** | Automated periodic report delivery configuration |
 /// | **AnalyticsMetric** | KPI / trend metric with cached computed values |
+use chrono::{Datelike, Days, LocalResult, NaiveDate, NaiveTime, TimeZone, Utc};
+use chrono_tz::Tz;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::require_company_in_organization;
+use crate::core::messaging::{mail_message, MailMessage};
+use crate::core::organization::{organization, require_company_in_organization};
+use crate::core::queue::{queue_job, QueueJob};
+use crate::core::users::user_organization;
 use crate::documents::documents::{document, document_version, Document, DocumentVersion};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::types::{JobStatus, MailMessageType};
 
 // ============================================================================
 // PARAMS TYPES
@@ -55,7 +61,12 @@ pub struct UpdateReportTemplateParams {
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateScheduledReportParams {
     pub name: String,
-    pub report_template_id: u64,
+    pub report_template_id: Option<u64>,
+    /// A catalogued typed owner-report key. Exactly one of this and
+    /// `report_template_id` is required.
+    pub owner_report_key: Option<String>,
+    /// IANA timezone used when the worker chooses the completed local period.
+    pub timezone: Option<String>,
     pub model: String,
     pub frequency: String,
     pub hour: u8,
@@ -64,6 +75,8 @@ pub struct CreateScheduledReportParams {
     pub next_run: Timestamp,
     pub is_active: bool,
     pub recipients: Vec<String>,
+    /// Active organization identities selected for in-app owner-report delivery.
+    pub recipient_identities: Vec<String>,
     pub description: Option<String>,
     pub domain: Option<String>,
     pub day_of_week: Option<u8>,
@@ -116,6 +129,20 @@ pub struct RecordGeneratedOwnerReportParams {
     pub artifact_size: u64,
     pub correlation_id: String,
     pub metadata: Option<String>,
+}
+
+/// Controlled changes to an owner-report schedule. Generic template schedules
+/// intentionally keep their legacy reducer surface.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateOwnerReportScheduleParams {
+    pub name: Option<String>,
+    pub frequency: Option<String>,
+    pub hour: Option<u8>,
+    pub minute: Option<u8>,
+    pub timezone: Option<String>,
+    pub recipient_identities: Option<Vec<String>>,
+    pub is_active: Option<bool>,
+    pub next_run: Option<Timestamp>,
 }
 
 // ============================================================================
@@ -180,7 +207,9 @@ pub struct ScheduledReport {
     pub organization_id: u64, // Tenant isolation
     pub name: String,
     pub description: Option<String>,
-    pub report_template_id: u64,
+    pub report_template_id: Option<u64>,
+    pub owner_report_key: Option<String>,
+    pub timezone: Option<String>,
     pub model: String,
     pub domain: Option<String>,   // JSON filter applied when generating
     pub frequency: String,        // Daily, Weekly, Monthly, Quarterly
@@ -189,6 +218,7 @@ pub struct ScheduledReport {
     pub hour: u8,
     pub minute: u8,
     pub recipients: Vec<String>, // Email addresses
+    pub recipient_identities: Vec<String>,
     pub subject: Option<String>,
     pub body: Option<String>,
     pub attachment_format: String, // PDF, Excel, CSV
@@ -202,6 +232,35 @@ pub struct ScheduledReport {
     pub write_uid: Identity,
     pub write_date: Timestamp,
     pub metadata: Option<String>,
+}
+
+/// One immutable execution attempt for a scheduled or manually requested
+/// typed owner report. The generated document itself remains immutable in the
+/// document store; this row joins that provenance to queue execution.
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = scheduled_report_run,
+    public,
+    index(accessor = scheduled_report_run_by_org, btree(columns = [organization_id])),
+    index(accessor = scheduled_report_run_by_schedule, btree(columns = [scheduled_report_id])),
+    index(accessor = scheduled_report_run_by_period, btree(columns = [scheduled_report_id, scheduled_period]))
+)]
+pub struct ScheduledReportRun {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub scheduled_report_id: u64,
+    pub scheduled_period: Timestamp,
+    pub queue_job_id: Option<u64>,
+    pub trigger: String,
+    pub status: String,
+    pub error_message: Option<String>,
+    pub generated_owner_report_id: Option<u64>,
+    pub document_id: Option<u64>,
+    pub notification_outcome: Option<String>,
+    pub created_at: Timestamp,
+    pub completed_at: Option<Timestamp>,
 }
 
 /// AnalyticsMetric — A named KPI or trend metric with cached computed values
@@ -277,6 +336,302 @@ pub struct GeneratedOwnerReport {
     pub metadata: Option<String>,
 }
 
+fn validate_schedule_configuration(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: Option<u64>,
+    params: &CreateScheduledReportParams,
+) -> Result<(), String> {
+    if params.name.trim().is_empty() {
+        return Err("scheduled report name is required".to_string());
+    }
+    if params.hour > 23 || params.minute > 59 {
+        return Err("scheduled report time is invalid".to_string());
+    }
+    validate_frequency(&params.frequency)?;
+    match (&params.report_template_id, &params.owner_report_key) {
+        (Some(template_id), None) => {
+            let template = ctx
+                .db
+                .report_template()
+                .id()
+                .find(template_id)
+                .ok_or("Report template not found")?;
+            if template.organization_id != organization_id {
+                return Err("Report template does not belong to this organization".to_string());
+            }
+            if params.recipients.is_empty() {
+                return Err("At least one recipient is required".to_string());
+            }
+        }
+        (None, Some(report_key)) => {
+            if !is_owner_report_key(report_key) {
+                return Err("unknown owner report key".to_string());
+            }
+            if company_id.is_none() {
+                return Err("owner-report schedules require a company".to_string());
+            }
+            if !params.attachment_format.eq_ignore_ascii_case("pdf") {
+                return Err("owner-report schedules support PDF output only".to_string());
+            }
+            validate_timezone(params.timezone.as_deref().unwrap_or("UTC"))?;
+            validate_owner_recipients(ctx, organization_id, &params.recipient_identities)?;
+        }
+        _ => {
+            return Err(
+                "exactly one of report_template_id or owner_report_key is required".to_string(),
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_frequency(frequency: &str) -> Result<(), String> {
+    if ["daily", "weekly", "monthly"]
+        .iter()
+        .any(|value| frequency.eq_ignore_ascii_case(value))
+    {
+        Ok(())
+    } else {
+        Err("frequency must be daily, weekly, or monthly".to_string())
+    }
+}
+
+fn validate_timezone(timezone: &str) -> Result<(), String> {
+    let timezone = timezone.trim();
+    if timezone == "UTC" || (timezone.contains('/') && !timezone.chars().any(char::is_whitespace)) {
+        Ok(())
+    } else {
+        Err("timezone must be a valid IANA identifier".to_string())
+    }
+}
+
+fn is_owner_report_key(key: &str) -> bool {
+    matches!(
+        key,
+        "daily_business_summary_v1"
+            | "cash_mobile_money_v1"
+            | "customer_balances_v1"
+            | "supplier_payables_v1"
+            | "low_stock_v1"
+            | "stock_movement_v1"
+            | "sales_by_product_v1"
+            | "purchase_spend_v1"
+            | "payment_fee_summary_v1"
+            | "monthly_owner_report_v1"
+    )
+}
+
+fn validate_owner_recipients(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    recipients: &[String],
+) -> Result<(), String> {
+    if recipients.is_empty() {
+        return Err("at least one active recipient identity is required".to_string());
+    }
+    for recipient in recipients {
+        let is_active_member = ctx.db.user_organization().iter().any(|membership| {
+            membership.organization_id == organization_id
+                && membership.is_active
+                && membership
+                    .user_identity
+                    .to_hex()
+                    .eq_ignore_ascii_case(recipient)
+        });
+        if !is_active_member {
+            return Err("recipient must be an active organization member".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn next_run_after(
+    schedule: &ScheduledReport,
+    timezone: &str,
+    now: Timestamp,
+) -> Result<Timestamp, String> {
+    let timezone = timezone
+        .parse::<Tz>()
+        .map_err(|_| "timezone must be a valid IANA identifier".to_string())?;
+    let mut local_date = chrono::DateTime::<Utc>::from_timestamp_micros(
+        schedule.next_run.to_micros_since_unix_epoch(),
+    )
+    .ok_or("scheduled report next_run is invalid")?
+    .with_timezone(&timezone)
+    .date_naive();
+    let now_micros = now.to_micros_since_unix_epoch();
+    loop {
+        local_date = advance_schedule_date(local_date, &schedule.frequency)?;
+        let local_time = NaiveTime::from_hms_opt(schedule.hour as u32, schedule.minute as u32, 0)
+            .ok_or("scheduled report time is invalid")?;
+        let local = local_date.and_time(local_time);
+        let candidate = match timezone.from_local_datetime(&local) {
+            LocalResult::Single(value) | LocalResult::Ambiguous(value, _) => value,
+            // A skipped wall time (normally spring-forward) runs at the first
+            // valid instant after the gap instead of silently dropping a run.
+            LocalResult::None => timezone
+                .from_local_datetime(&(local + chrono::Duration::hours(1)))
+                .earliest()
+                .ok_or("scheduled report time is invalid due to DST")?,
+        };
+        let candidate_micros = candidate.with_timezone(&Utc).timestamp_micros();
+        if candidate_micros > now_micros {
+            return Ok(Timestamp::from_micros_since_unix_epoch(candidate_micros));
+        }
+    }
+}
+
+fn advance_schedule_date(date: NaiveDate, frequency: &str) -> Result<NaiveDate, String> {
+    if frequency.eq_ignore_ascii_case("daily") {
+        return date
+            .checked_add_days(Days::new(1))
+            .ok_or("scheduled report date is out of range".to_string());
+    }
+    if frequency.eq_ignore_ascii_case("weekly") {
+        return date
+            .checked_add_days(Days::new(7))
+            .ok_or("scheduled report date is out of range".to_string());
+    }
+    let (year, month) = if date.month() == 12 {
+        (date.year() + 1, 1)
+    } else {
+        (date.year(), date.month() + 1)
+    };
+    let last_day = match month {
+        2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    NaiveDate::from_ymd_opt(year, month, date.day().min(last_day))
+        .ok_or("scheduled report date is out of range".to_string())
+}
+
+fn enqueue_owner_report_run(
+    ctx: &ReducerContext,
+    report: ScheduledReport,
+    period: Timestamp,
+    trigger: &str,
+) -> Result<(), String> {
+    if ctx
+        .db
+        .scheduled_report_run()
+        .iter()
+        .any(|run| run.scheduled_report_id == report.id && run.scheduled_period == period)
+    {
+        return Ok(());
+    }
+    let run = ctx.db.scheduled_report_run().insert(ScheduledReportRun {
+        id: 0,
+        organization_id: report.organization_id,
+        scheduled_report_id: report.id,
+        scheduled_period: period,
+        queue_job_id: None,
+        trigger: trigger.to_string(),
+        status: "queued".to_string(),
+        error_message: None,
+        generated_owner_report_id: None,
+        document_id: None,
+        notification_outcome: None,
+        created_at: ctx.timestamp,
+        completed_at: None,
+    });
+    let timezone = report
+        .timezone
+        .clone()
+        .filter(|timezone| !timezone.trim().is_empty())
+        .or_else(|| {
+            ctx.db
+                .organization()
+                .id()
+                .find(&report.organization_id)
+                .map(|organization| organization.timezone)
+        })
+        .unwrap_or_else(|| "UTC".to_string());
+    let payload = serde_json::json!({
+        "scheduledReportId": report.id,
+        "scheduledReportRunId": run.id,
+        "reportKey": report.owner_report_key.clone(),
+        "companyId": report.company_id,
+        "timezone": timezone,
+    })
+    .to_string();
+    let job = ctx.db.queue_job().insert(QueueJob {
+        id: 0,
+        organization_id: report.organization_id,
+        queue_name: "owner_report".to_string(),
+        job_type: "owner_report.generate".to_string(),
+        payload,
+        priority: 0,
+        attempts: 0,
+        max_attempts: 3,
+        status: JobStatus::Pending,
+        scheduled_at: None,
+        started_at: None,
+        completed_at: None,
+        error_message: None,
+        created_by: ctx.sender(),
+        created_at: ctx.timestamp,
+        metadata: Some(serde_json::json!({ "scheduled_report_run_id": run.id }).to_string()),
+    });
+    ctx.db
+        .scheduled_report_run()
+        .id()
+        .update(ScheduledReportRun {
+            queue_job_id: Some(job.id),
+            ..run
+        });
+    ctx.db.scheduled_report().id().update(ScheduledReport {
+        next_run: next_run_after(&report, &timezone, ctx.timestamp)?,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..report
+    });
+    Ok(())
+}
+
+fn create_owner_report_notifications(
+    ctx: &ReducerContext,
+    report: &ScheduledReport,
+    run_id: u64,
+    document_id: u64,
+) -> usize {
+    let mut delivered = 0;
+    for recipient in &report.recipient_identities {
+        let active = ctx.db.user_organization().iter().any(|membership| {
+            membership.organization_id == report.organization_id
+                && membership.is_active
+                && membership
+                    .user_identity
+                    .to_hex()
+                    .eq_ignore_ascii_case(recipient)
+        });
+        if !active {
+            continue;
+        }
+        ctx.db.mail_message().insert(MailMessage {
+            id: 0,
+            organization_id: report.organization_id,
+            model: "scheduled_report_run".to_string(),
+            res_id: run_id,
+            author_id: ctx.sender(),
+            body: format!("Scheduled owner report '{}' is ready.", report.name),
+            message_type: MailMessageType::Notification,
+            subtype: Some("owner_report.ready".to_string()),
+            date: ctx.timestamp,
+            parent_id: None,
+            attachment_ids: vec![document_id],
+            metadata: Some(
+                serde_json::json!({ "recipient": recipient, "document_id": document_id })
+                    .to_string(),
+            ),
+        });
+        delivered += 1;
+    }
+    delivered
+}
+
 // ============================================================================
 // REDUCERS
 // ============================================================================
@@ -301,6 +656,12 @@ pub fn record_generated_owner_report(
         || params.artifact_key.trim().is_empty()
     {
         return Err("owner-report provenance fields are required".to_string());
+    }
+    if ctx.db.generated_owner_report().iter().any(|existing| {
+        existing.organization_id == organization_id
+            && existing.correlation_id == params.correlation_id
+    }) {
+        return Ok(());
     }
     let artifact_url = format!("report-artifact://{}", params.artifact_key);
     let checksum = params.output_hash.clone();
@@ -543,21 +904,7 @@ pub fn create_scheduled_report(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "scheduled_report", "create")?;
 
-    // Verify template exists and belongs to this org
-    let tmpl = ctx
-        .db
-        .report_template()
-        .id()
-        .find(&params.report_template_id)
-        .ok_or("Report template not found")?;
-
-    if tmpl.organization_id != organization_id {
-        return Err("Report template does not belong to this organization".to_string());
-    }
-
-    if params.recipients.is_empty() {
-        return Err("At least one recipient is required".to_string());
-    }
+    validate_schedule_configuration(ctx, organization_id, company_id, &params)?;
 
     let report = ctx.db.scheduled_report().insert(ScheduledReport {
         id: 0,
@@ -565,6 +912,8 @@ pub fn create_scheduled_report(
         name: params.name,
         description: params.description,
         report_template_id: params.report_template_id,
+        owner_report_key: params.owner_report_key,
+        timezone: params.timezone,
         model: params.model,
         domain: params.domain,
         frequency: params.frequency,
@@ -573,6 +922,7 @@ pub fn create_scheduled_report(
         hour: params.hour,
         minute: params.minute,
         recipients: params.recipients,
+        recipient_identities: params.recipient_identities,
         subject: params.subject,
         body: params.body,
         attachment_format: params.attachment_format,
@@ -610,6 +960,193 @@ pub fn create_scheduled_report(
         report.id,
         report.frequency
     );
+    Ok(())
+}
+
+/// Update a typed owner-report schedule. The report key and company scope are
+/// immutable so a schedule's historical runs always have one meaning.
+#[reducer]
+pub fn update_owner_report_schedule(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    report_id: u64,
+    params: UpdateOwnerReportScheduleParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "scheduled_report", "write")?;
+    let report = ctx
+        .db
+        .scheduled_report()
+        .id()
+        .find(&report_id)
+        .ok_or("Scheduled report not found")?;
+    if report.organization_id != organization_id || report.owner_report_key.is_none() {
+        return Err("Owner-report schedule not found".to_string());
+    }
+    if let Some(timezone) = params.timezone.as_deref() {
+        validate_timezone(timezone)?;
+    }
+    if let Some(recipients) = params.recipient_identities.as_ref() {
+        validate_owner_recipients(ctx, organization_id, recipients)?;
+    }
+    if let Some(frequency) = params.frequency.as_deref() {
+        validate_frequency(frequency)?;
+    }
+    if let Some(hour) = params.hour {
+        if hour > 23 {
+            return Err("hour must be between 0 and 23".to_string());
+        }
+    }
+    if let Some(minute) = params.minute {
+        if minute > 59 {
+            return Err("minute must be between 0 and 59".to_string());
+        }
+    }
+
+    ctx.db.scheduled_report().id().update(ScheduledReport {
+        name: params.name.unwrap_or(report.name),
+        frequency: params.frequency.unwrap_or(report.frequency),
+        hour: params.hour.unwrap_or(report.hour),
+        minute: params.minute.unwrap_or(report.minute),
+        timezone: params.timezone.or(report.timezone),
+        recipient_identities: params
+            .recipient_identities
+            .unwrap_or(report.recipient_identities),
+        is_active: params.is_active.unwrap_or(report.is_active),
+        next_run: params.next_run.unwrap_or(report.next_run),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..report
+    });
+    Ok(())
+}
+
+/// Atomically dispatch each due owner-report schedule at most once. A long
+/// outage creates one catch-up run and advances the schedule beyond now.
+#[reducer]
+pub fn dispatch_due_owner_reports(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "scheduled_report", "write")?;
+    let due_reports: Vec<ScheduledReport> = ctx
+        .db
+        .scheduled_report()
+        .sched_report_by_org()
+        .filter(&organization_id)
+        .filter(|report| {
+            report.is_active
+                && report.owner_report_key.is_some()
+                && report.next_run <= ctx.timestamp
+        })
+        .collect();
+    for report in due_reports {
+        // `ctx.timestamp` is deliberately the catch-up period. It ensures an
+        // outage makes one current run rather than backfilling every missed slot.
+        enqueue_owner_report_run(ctx, report, ctx.timestamp, "scheduled")?;
+    }
+    Ok(())
+}
+
+/// Queue an immediate owner-report execution through the same immutable run
+/// path as automatic dispatch.
+#[reducer]
+pub fn run_owner_report_schedule(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    report_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "scheduled_report", "write")?;
+    let report = ctx
+        .db
+        .scheduled_report()
+        .id()
+        .find(&report_id)
+        .ok_or("Scheduled report not found")?;
+    if report.organization_id != organization_id || report.owner_report_key.is_none() {
+        return Err("Owner-report schedule not found".to_string());
+    }
+    enqueue_owner_report_run(ctx, report, ctx.timestamp, "manual")
+}
+
+/// Attach an immutable generated artifact to a run and fan out internal
+/// notifications to recipients who are still active organization members.
+#[reducer]
+pub fn complete_scheduled_owner_report_run(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    run_id: u64,
+    generated_owner_report_id: u64,
+    document_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "scheduled_report", "write")?;
+    let run = ctx
+        .db
+        .scheduled_report_run()
+        .id()
+        .find(&run_id)
+        .ok_or("Scheduled report run not found")?;
+    if run.organization_id != organization_id {
+        return Err("Scheduled report run does not belong to this organization".to_string());
+    }
+    if run.generated_owner_report_id.is_some() {
+        return Ok(());
+    }
+    let report = ctx
+        .db
+        .scheduled_report()
+        .id()
+        .find(&run.scheduled_report_id)
+        .ok_or("Scheduled report not found")?;
+    let notifications = create_owner_report_notifications(ctx, &report, run.id, document_id);
+    ctx.db
+        .scheduled_report_run()
+        .id()
+        .update(ScheduledReportRun {
+            status: "completed".to_string(),
+            generated_owner_report_id: Some(generated_owner_report_id),
+            document_id: Some(document_id),
+            notification_outcome: Some(format!("delivered:{notifications}")),
+            completed_at: Some(ctx.timestamp),
+            error_message: None,
+            ..run
+        });
+    ctx.db.scheduled_report().id().update(ScheduledReport {
+        last_run: Some(ctx.timestamp),
+        run_count: report.run_count + 1,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..report
+    });
+    Ok(())
+}
+
+/// Retain a failed attempt on the immutable run. A later successful retry
+/// updates this same run, so retries cannot duplicate artifacts or messages.
+#[reducer]
+pub fn fail_scheduled_owner_report_run(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    run_id: u64,
+    error_message: String,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "scheduled_report", "write")?;
+    let run = ctx
+        .db
+        .scheduled_report_run()
+        .id()
+        .find(&run_id)
+        .ok_or("Scheduled report run not found")?;
+    if run.organization_id != organization_id {
+        return Err("Scheduled report run does not belong to this organization".to_string());
+    }
+    ctx.db
+        .scheduled_report_run()
+        .id()
+        .update(ScheduledReportRun {
+            status: "failed".to_string(),
+            error_message: Some(error_message),
+            ..run
+        });
     Ok(())
 }
 
@@ -788,6 +1325,25 @@ pub fn update_metric_values(
         params.current_value
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod scheduled_owner_report_tests {
+    use super::*;
+
+    #[test]
+    fn monthly_cadence_clamps_month_end() {
+        let january_31 = NaiveDate::from_ymd_opt(2026, 1, 31).expect("valid date");
+        assert_eq!(
+            advance_schedule_date(january_31, "monthly").expect("advance date"),
+            NaiveDate::from_ymd_opt(2026, 2, 28).expect("valid date"),
+        );
+    }
+
+    #[test]
+    fn cadence_rejects_unsupported_values() {
+        assert!(validate_frequency("quarterly").is_err());
+    }
 }
 
 // ============================================================================

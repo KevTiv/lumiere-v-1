@@ -1,9 +1,9 @@
 //! Bundled ERP skill definitions loaded from markdown files (Claude/Cursor skill style).
 
-mod md_loader;
 mod briefing;
 mod import;
 mod insights;
+mod md_loader;
 
 pub use briefing::{collect_briefing_context, BriefingContext, BriefingContextRequest};
 pub use import::{

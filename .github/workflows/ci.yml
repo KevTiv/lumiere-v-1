@@ -106,3 +106,24 @@ jobs:
       - name: Validate Playwright tests load
         working-directory: frontend/web
         run: pnpm exec playwright test --list
+
+  owner-report-pdf:
+    name: Owner-report PDF structural regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start trusted Chromium renderer
+        run: docker build -t lumiere-chromium-worker ./chromium-worker && docker run -d --name chromium-worker -p 8090:8090 lumiere-chromium-worker
+      - name: Install PDF text extractor
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - name: Validate deterministic report fixtures
+        run: PDF_STRUCTURAL_OUTPUT="$GITHUB_WORKSPACE/artifacts/owner-report-pdf" node chromium-worker/scripts/structural-pdf-check.mjs
+      - name: Capture renderer logs on failure
+        if: failure()
+        run: docker logs chromium-worker
+      - name: Upload PDF diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-report-pdf-diagnostics
+          path: artifacts/owner-report-pdf

@@ -5,7 +5,8 @@
   "description": "Trusted HTML-to-PDF renderer for typed owner reports",
   "type": "module",
   "scripts": {
-    "start": "node src/server.ts"
+    "start": "node src/server.ts",
+    "test:structural": "node scripts/structural-pdf-check.mjs"
   },
   "dependencies": {
     "puppeteer-core": "^24.2.0"

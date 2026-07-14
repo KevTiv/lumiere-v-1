@@ -9,6 +9,8 @@ export const CRM_WORKSPACE_RESOURCE_KEYS = [
   "opportunities",
   "opportunity-stages",
   "contacts",
+  "contact-phone-identities",
+  "contact-role-assignments",
   "activities",
   "users",
 ] as const;

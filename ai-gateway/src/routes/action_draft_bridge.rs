@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::{
     error::{AppError, AppResult},
     harness::{
-        audit::{DecisionOutcome, PolicyResult},
+        audit::{hash_value, DecisionOutcome, PolicyDecision, PolicyResult},
         data_scope_resolver::ResourceRegistry,
         policy_engine::{PolicyControlledRequest, PolicyEngine},
         red_action_drafts::CREATE_SALE_ORDER_DRAFT_SKILL_KEY,
@@ -78,6 +78,7 @@ pub async fn post_bridge(
                 company_id,
                 req.identity_hex.as_deref().unwrap_or("unknown"),
                 proposal,
+                &decision.decision,
             )
             .await
             {
@@ -110,7 +111,20 @@ async fn persist_draft(
     company_id: u64,
     identity_hex: &str,
     proposal: &crate::harness::audit::ActionDraftProposal,
+    policy: &PolicyDecision,
 ) -> Result<u64, String> {
+    let governance_metadata = serde_json::json!({
+        "approval_channel": "harness_action_draft_bridge",
+        "identity_hex": identity_hex,
+        "risk": "red",
+        "skill_key": policy.skill.skill_key,
+        "skill_version": policy.skill.version,
+        "policy_decision_hash": policy.hashes.request_hash,
+        "source_snapshot_hash": policy.hashes.input_hash,
+        "diff_hash": hash_value(&serde_json::from_str::<Value>(&proposal.params_json).unwrap_or(Value::Null)),
+        "required_approver_permission": "ai_action_draft:write",
+        "correction_plan": "Use the standard sales-order cancellation workflow before fulfillment; the original action remains auditable.",
+    });
     let args = serde_json::json!([
         organization_id,
         company_id,
@@ -128,10 +142,7 @@ async fn persist_draft(
             "source_query": Value::Null,
             "ui_context_json": Value::Null,
             "expires_at": Value::Null,
-            "metadata": serde_json::json!({
-                "approval_channel": "harness_action_draft_bridge",
-                "identity_hex": identity_hex,
-            }).to_string(),
+            "metadata": governance_metadata.to_string(),
         }
     ]);
 

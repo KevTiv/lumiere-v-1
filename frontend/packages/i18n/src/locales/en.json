@@ -177,6 +177,7 @@
     "subscriptions": "Subscriptions",
     "expenses": "Expenses",
     "inventory": "Inventory",
+    "distributor": "Distributor",
     "pos": "Point of Sale",
     "manufacturing": "Manufacturing",
     "map": "Map",
@@ -1158,6 +1159,7 @@
       "taxSchedules": "Schedules",
       "taxDeadlines": "Deadlines",
       "payments": "Payments",
+      "operationalPayments": "Payment operations",
       "paymentTerms": "Payment terms",
       "paymentTermLines": "Term lines",
       "journals": "Journals",
@@ -1577,6 +1579,74 @@
       }
     },
     "forms": {
+      "operationalPaymentAccount": {
+        "title": "New payment account",
+        "description": "Set up a cash drawer, bank account, or mobile-money wallet linked to the ledger.",
+        "submit": "Create account",
+        "provider": "Provider",
+        "name": "Account name",
+        "reference": "Account or phone reference",
+        "currency": "Currency",
+        "journal": "Accounting journal",
+        "primary": "Primary account",
+        "cash": "Cash",
+        "bank": "Bank"
+      },
+      "operationalPaymentTransaction": {
+        "title": "Record payment transaction",
+        "description": "Capture the provider event before posting it to the accounting ledger.",
+        "submit": "Record transaction",
+        "account": "Payment account",
+        "direction": "Direction",
+        "inbound": "Money received",
+        "outbound": "Money paid",
+        "partnerType": "Partner type",
+        "customer": "Customer",
+        "supplier": "Supplier",
+        "partner": "Partner",
+        "reference": "Provider reference",
+        "gross": "Gross external amount",
+        "settlement": "Settlement amount",
+        "net": "Net account amount",
+        "currency": "Currency"
+      },
+      "allocateOperationalPayment": {
+        "title": "Allocate payment",
+        "description": "Match this posted payment to an open invoice or bill line.",
+        "submit": "Allocate payment",
+        "moveLine": "Invoice or bill line",
+        "amount": "Allocation amount",
+        "writeOff": "Write-off amount"
+      },
+      "reverseOperationalPayment": {
+        "title": "Reverse payment",
+        "description": "Create an auditable correcting transaction for this posted payment.",
+        "submit": "Reverse payment",
+        "reason": "Reason"
+      },
+      "operationalPaymentFee": {
+        "title": "Add payment fee",
+        "description": "Record the provider or settlement fee before this transaction is posted.",
+        "submit": "Add fee",
+        "bearer": "Fee bearer",
+        "company": "Company",
+        "customer": "Customer",
+        "supplier": "Supplier",
+        "amount": "Fee amount",
+        "taxAmount": "Tax amount",
+        "reference": "Provider fee reference"
+      },
+      "bankStatementImport": {
+        "title": "Stage bank statement CSV",
+        "description": "Review parsed rows before they create a bank statement or reconciliation work.",
+        "submit": "Stage import",
+        "fileName": "File name",
+        "journal": "Accounting journal",
+        "currency": "Currency",
+        "openingBalance": "Opening balance",
+        "csvData": "CSV data",
+        "csvPlaceholder": "date,amount,reference,description\\n2026-07-13,1250.00,MTN-001,Customer payment"
+      },
       "newInvoice": {
         "title": "New Invoice",
         "createTitle": "Create New Invoice",
@@ -2706,6 +2776,62 @@
           "colorPlaceholder": "e.g. blue",
           "description": "Notes",
           "descriptionPlaceholder": "Internal notes about this contact…"
+        }
+      },
+      "contactIdentity": {
+        "createTitle": "Add phone identity",
+        "editTitle": "Edit phone identity",
+        "description": "Phone numbers are normalized and shown masked by default.",
+        "add": "Add phone",
+        "save": "Save changes",
+        "sections": {
+          "phone": "Phone identity"
+        },
+        "fields": {
+          "phone": "Phone number",
+          "phonePlaceholder": "+1 202 555 0101",
+          "phoneEditPlaceholder": "Leave blank to keep the current number",
+          "phoneDescription": "Use an international number. Normalization happens when you save.",
+          "kind": "Type",
+          "verification": "Verification",
+          "preferred": "Preferred for this type"
+        },
+        "kinds": {
+          "primary": "Primary phone",
+          "whatsApp": "WhatsApp",
+          "mobileMoney": "Mobile money"
+        },
+        "states": {
+          "unverified": "Unverified",
+          "pending": "Pending",
+          "verified": "Verified",
+          "failed": "Failed",
+          "optedOut": "Opted out"
+        }
+      },
+      "assignContactRole": {
+        "title": "Assign contact role",
+        "description": "Give this contact a commercial or operational role without duplicating the party record.",
+        "submit": "Assign role",
+        "sections": {
+          "role": "Role"
+        },
+        "fields": {
+          "role": "Role",
+          "rolePlaceholder": "customer, supplier, distributor…",
+          "roleDescription": "Common roles include customer, supplier, employee, member, distributor, and agent."
+        }
+      },
+      "endContactRole": {
+        "title": "End contact role",
+        "description": "This records a correction and preserves the assignment history.",
+        "submit": "End role",
+        "sections": {
+          "correction": "Correction"
+        },
+        "fields": {
+          "reason": "Reason",
+          "reasonPlaceholder": "Optional reason"
         }
       },
       "newActivity": {
@@ -8102,6 +8228,28 @@
           "resModel": "Related model",
           "resId": "Record ID"
         }
+      },
+      "messageTemplate": {
+        "title": "New message template",
+        "description": "Create controlled reminder copy with only the variables you approve.",
+        "submit": "Create template",
+        "key": "Template key",
+        "name": "Template name",
+        "locale": "Locale",
+        "subject": "Subject",
+        "body": "Message body",
+        "variables": "Allowed variables",
+        "variablesHint": "Comma-separated. Invoice reminders support customer_name, invoice_number, amount_due, and invoice_total.",
+        "channels": "Allowed channels"
+      },
+      "invoiceReminder": {
+        "title": "New invoice reminder batch",
+        "description": "Select outstanding posted invoices. The system derives recipients, renders copy, and excludes contacts that cannot receive the chosen channel.",
+        "submit": "Create reminder batch",
+        "template": "Message template",
+        "channel": "Channel",
+        "invoices": "Invoices",
+        "invoicesHint": "Select one or more outstanding customer invoices."
       }
     },
     "notifications": {

@@ -8,7 +8,9 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct CreateScheduledReportParams {
     pub name: String,
-    pub report_template_id: u64,
+    pub report_template_id: Option<u64>,
+    pub owner_report_key: Option<String>,
+    pub timezone: Option<String>,
     pub model: String,
     pub frequency: String,
     pub hour: u8,
@@ -17,6 +19,7 @@ pub struct CreateScheduledReportParams {
     pub next_run: __sdk::Timestamp,
     pub is_active: bool,
     pub recipients: Vec<String>,
+    pub recipient_identities: Vec<String>,
     pub description: Option<String>,
     pub domain: Option<String>,
     pub day_of_week: Option<u8>,

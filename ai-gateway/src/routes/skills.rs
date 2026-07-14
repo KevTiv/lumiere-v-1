@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
+    ai_agent::map_anyhow_limit_error,
     error::{AppError, AppResult},
     orchestrator::{
         run::{run_skill, RunSkillRequest, RunSkillResponse},
         skill_loader::{list_skills, sync_bundled_skills},
     },
-    ai_agent::map_anyhow_limit_error,
     state::AppState,
 };
 
@@ -129,7 +129,9 @@ pub async fn post_sync(
 
     Ok(Json(SyncSkillsResponse {
         synced,
-        skills_dir: crate::skills::resolve_skills_dir().to_string_lossy().to_string(),
+        skills_dir: crate::skills::resolve_skills_dir()
+            .to_string_lossy()
+            .to_string(),
     }))
 }
 

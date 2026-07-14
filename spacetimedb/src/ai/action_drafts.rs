@@ -8,7 +8,6 @@ use crate::ai::action_draft_lifecycle::{
 };
 use crate::ai::reducer_allowlist::is_allowed_ai_reducer;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::workflow::approval_gate::create_ai_draft_approval_request;
 use crate::projects::tasks::{create_task, project_task, CreateTaskParams};
 use crate::purchasing::purchase_orders::{
     add_purchase_order_line, create_purchase_order, purchase_order, AddPurchaseOrderLineParams,
@@ -18,8 +17,19 @@ use crate::sales::sales_core::{
     create_sale_order, sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
 };
 use crate::types::TaskState;
+use crate::workflow::approval_gate::create_ai_draft_approval_request;
 
 const DRAFT_TTL_SECS: u64 = 86_400;
+const ELEVATED_GOVERNANCE_FIELDS: [&str; 8] = [
+    "risk",
+    "skill_key",
+    "skill_version",
+    "policy_decision_hash",
+    "source_snapshot_hash",
+    "diff_hash",
+    "required_approver_permission",
+    "correction_plan",
+];
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -104,10 +114,13 @@ pub fn create_ai_action_draft(
     if params.summary.trim().is_empty() {
         return Err("summary is required".to_string());
     }
+    if params.elevated {
+        validate_elevated_governance_metadata(params.metadata.as_deref())?;
+    }
 
-    let expires_at = params.expires_at.or_else(|| {
-        Some(ctx.timestamp + std::time::Duration::from_secs(DRAFT_TTL_SECS))
-    });
+    let expires_at = params
+        .expires_at
+        .or_else(|| Some(ctx.timestamp + std::time::Duration::from_secs(DRAFT_TTL_SECS)));
 
     let row = ctx.db.ai_action_draft().insert(AiActionDraft {
         id: 0,
@@ -132,9 +145,9 @@ pub fn create_ai_action_draft(
         expires_at,
         create_date: ctx.timestamp,
         write_date: ctx.timestamp,
-        metadata: params.metadata.or_else(|| {
-            Some(r#"{"approval_channel":"ai_action_draft"}"#.to_string())
-        }),
+        metadata: params
+            .metadata
+            .or_else(|| Some(r#"{"approval_channel":"ai_action_draft"}"#.to_string())),
     });
 
     on_draft_created(ctx, &row);
@@ -172,9 +185,10 @@ pub fn create_ai_action_draft(
                 "reducer_name".to_string(),
                 "summary".to_string(),
             ],
-            metadata: params.source_query.as_ref().map(|q| {
-                serde_json::json!({ "source_query": q }).to_string()
-            }),
+            metadata: params
+                .source_query
+                .as_ref()
+                .map(|q| serde_json::json!({ "source_query": q }).to_string()),
         },
     );
 
@@ -263,9 +277,7 @@ pub fn approve_ai_action_draft_core(
         return Err("draft has expired".to_string());
     }
     if draft.elevated && draft.proposed_by == ctx.sender() {
-        return Err(
-            "elevated drafts require a different approver than the proposer".to_string(),
-        );
+        return Err("elevated drafts require a different approver than the proposer".to_string());
     }
 
     let execution_result = execute_whitelisted_draft(ctx, organization_id, company_id, &draft);
@@ -310,10 +322,7 @@ pub fn approve_ai_action_draft_core(
                         })
                         .to_string(),
                     ),
-                    changed_fields: vec![
-                        "status".to_string(),
-                        "executed_record_id".to_string(),
-                    ],
+                    changed_fields: vec!["status".to_string(), "executed_record_id".to_string()],
                     metadata: Some(updated.params_json.clone()),
                 },
             );
@@ -338,17 +347,12 @@ pub fn approve_ai_action_draft_core(
                     table_name: "ai_action_draft",
                     record_id: draft_id,
                     action: "UPDATE",
-                    old_values: Some(
-                        serde_json::json!({ "status": "pending" }).to_string(),
-                    ),
+                    old_values: Some(serde_json::json!({ "status": "pending" }).to_string()),
                     new_values: Some(
                         serde_json::json!({ "status": "failed", "execution_error": err })
                             .to_string(),
                     ),
-                    changed_fields: vec![
-                        "status".to_string(),
-                        "execution_error".to_string(),
-                    ],
+                    changed_fields: vec!["status".to_string(), "execution_error".to_string()],
                     metadata: None,
                 },
             );
@@ -403,11 +407,7 @@ pub fn reject_ai_action_draft_core(
     };
     ctx.db.ai_action_draft().id().update(updated.clone());
 
-    on_draft_rejected(
-        ctx,
-        &updated,
-        updated.reject_reason.as_deref(),
-    );
+    on_draft_rejected(ctx, &updated, updated.reject_reason.as_deref());
 
     write_audit_log_v2(
         ctx,
@@ -426,9 +426,10 @@ pub fn reject_ai_action_draft_core(
                 .to_string(),
             ),
             changed_fields: vec!["status".to_string(), "reject_reason".to_string()],
-            metadata: updated.reject_reason.as_ref().map(|reason| {
-                serde_json::json!({ "reject_reason": reason }).to_string()
-            }),
+            metadata: updated
+                .reject_reason
+                .as_ref()
+                .map(|reason| serde_json::json!({ "reject_reason": reason }).to_string()),
         },
     );
 
@@ -521,6 +522,38 @@ fn mark_expired(ctx: &ReducerContext, draft: &AiActionDraft) {
         write_date: ctx.timestamp,
         ..draft.clone()
     });
+}
+
+/// Elevated drafts are the persisted boundary for red AI actions. Require the
+/// policy decision, source/diff fingerprints, approver authorization, and a
+/// correction plan before a draft can enter the human approval queue.
+fn validate_elevated_governance_metadata(raw: Option<&str>) -> Result<(), String> {
+    let raw = raw.ok_or("elevated drafts require governance metadata")?;
+    let metadata: Value = serde_json::from_str(raw)
+        .map_err(|error| format!("invalid elevated draft governance metadata: {error}"))?;
+    let object = metadata
+        .as_object()
+        .ok_or("elevated draft governance metadata must be a JSON object")?;
+
+    if object.get("risk").and_then(Value::as_str) != Some("red") {
+        return Err("elevated draft governance metadata must declare risk=red".to_string());
+    }
+    for field in ELEVATED_GOVERNANCE_FIELDS
+        .into_iter()
+        .filter(|field| *field != "risk")
+    {
+        let present = object.get(field).is_some_and(|value| match value {
+            Value::String(text) => !text.trim().is_empty(),
+            Value::Number(number) => number.as_u64().is_some_and(|value| value > 0),
+            _ => false,
+        });
+        if !present {
+            return Err(format!(
+                "elevated draft governance metadata requires {field}"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn execute_whitelisted_draft(
@@ -698,7 +731,11 @@ fn build_create_sale_order_line_params(value: &Value) -> Option<CreateSaleOrderL
             .or_else(|| obj.get("product_uom_qty"))
             .and_then(|v| v.as_f64())
             .unwrap_or(1.0),
-        uom_id: obj.get("uom_id").or_else(|| obj.get("product_uom")).and_then(json_u64).unwrap_or(1),
+        uom_id: obj
+            .get("uom_id")
+            .or_else(|| obj.get("product_uom"))
+            .and_then(json_u64)
+            .unwrap_or(1),
         price_unit: obj.get("price_unit").and_then(|v| v.as_f64()),
         discount: obj.get("discount").and_then(|v| v.as_f64()).unwrap_or(0.0),
         tax_ids: json_u64_vec(obj.get("tax_ids")),
@@ -788,12 +825,22 @@ fn build_add_purchase_order_line_params(value: &Value) -> Option<AddPurchaseOrde
             .or_else(|| obj.get("product_qty"))
             .and_then(|v| v.as_f64())
             .unwrap_or(1.0),
-        uom_id: obj.get("uom_id").or_else(|| obj.get("product_uom")).and_then(json_u64).unwrap_or(1),
-        price_unit: obj.get("price_unit").and_then(|v| v.as_f64()).unwrap_or(0.0),
+        uom_id: obj
+            .get("uom_id")
+            .or_else(|| obj.get("product_uom"))
+            .and_then(json_u64)
+            .unwrap_or(1),
+        price_unit: obj
+            .get("price_unit")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0),
         discount: obj.get("discount").and_then(|v| v.as_f64()).unwrap_or(0.0),
         tax_ids: json_u64_vec(obj.get("tax_ids")),
         name: json_string(obj, "name"),
-        sequence: obj.get("sequence").and_then(json_u64).map(|value| value as u32),
+        sequence: obj
+            .get("sequence")
+            .and_then(json_u64)
+            .map(|value| value as u32),
         display_type: json_string(obj, "display_type"),
         product_variant_id: obj.get("product_variant_id").and_then(json_u64),
         account_analytic_id: obj.get("account_analytic_id").and_then(json_u64),
@@ -834,10 +881,7 @@ fn build_create_task_params(company_id: u64, value: &Value) -> Result<CreateTask
         name,
         description: json_string(obj, "description"),
         priority: json_string(obj, "priority").unwrap_or_else(|| "1".to_string()),
-        sequence: obj
-            .get("sequence")
-            .and_then(json_u64)
-            .unwrap_or(0) as u32,
+        sequence: obj.get("sequence").and_then(json_u64).unwrap_or(0) as u32,
         stage_id: obj.get("stage_id").and_then(json_u64),
         state: parse_task_state(obj.get("state")),
         kanban_state: json_string(obj, "kanban_state").unwrap_or_else(|| "normal".to_string()),
@@ -899,11 +943,9 @@ fn json_string(map: &serde_json::Map<String, Value>, key: &str) -> Option<String
 }
 
 fn json_u64(value: &Value) -> Option<u64> {
-    value.as_u64().or_else(|| {
-        value
-            .as_i64()
-            .and_then(|n| (n >= 0).then_some(n as u64))
-    })
+    value
+        .as_u64()
+        .or_else(|| value.as_i64().and_then(|n| (n >= 0).then_some(n as u64)))
 }
 
 fn json_f64(map: &serde_json::Map<String, Value>, key: &str) -> Option<f64> {

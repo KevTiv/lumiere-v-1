@@ -60,7 +60,10 @@ async fn health_ready(State(state): State<Arc<AppState>>) -> Result<StatusCode, 
         return Err(StatusCode::SERVICE_UNAVAILABLE);
     }
     if !state.config.ai_gateway_url.is_empty() {
-        let url = format!("{}/health", state.config.ai_gateway_url.trim_end_matches('/'));
+        let url = format!(
+            "{}/health",
+            state.config.ai_gateway_url.trim_end_matches('/')
+        );
         if let Ok(resp) = state.http.get(&url).send().await {
             if !resp.status().is_success() {
                 return Err(StatusCode::SERVICE_UNAVAILABLE);

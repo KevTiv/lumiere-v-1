@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useRef, useCallback } from "react"
+import { useMemo, useState, useRef, useCallback, useEffect } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   DashboardGrid,
@@ -21,12 +21,15 @@ import { enumTag, moveTypeTagFromRow } from "@/lib/accounting-post-draft"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
 import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
+import { usePaymentReconciliations, usePaymentTransactions } from "@lumiere/query-hooks/hooks/accounting"
 import { useStockQuants, useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { usePurchaseOrders } from "@lumiere/query-hooks/hooks/purchasing"
 import { useTasks, useProjects } from "@lumiere/query-hooks/hooks/projects"
 import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { useAiActionDraftInboxCount } from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useMessageBatches } from "@lumiere/query-hooks/hooks/messages"
+import { OwnerControlLoop } from "./owner-control-loop"
 
 interface OverviewClientProps {
   organizationId?: number
@@ -125,17 +128,25 @@ function OverviewClientLoaded({
 
   const { data: orders = [], isLoading: ordersLoading } = useSaleOrders(orgId, initialOrders)
   const { data: moves = [], isLoading: movesLoading } = useAccountMoves(orgId, { initialData: initialMoves })
-  const { isLoading: stockQuantsLoading } = useStockQuants(orgId, initialStockQuants)
-  const { isLoading: productsLoading } = useProducts(orgId, initialProducts)
+  const { data: stockQuants = [], isLoading: stockQuantsLoading } = useStockQuants(orgId, initialStockQuants)
+  const { data: products = [], isLoading: productsLoading } = useProducts(orgId, initialProducts)
   const { data: tasks = [], isLoading: tasksLoading } = useTasks(orgId, initialTasks)
   const { isLoading: projectsLoading } = useProjects(orgId, initialProjects)
   const { isLoading: purchaseOrdersLoading } = usePurchaseOrders(orgId, initialPurchaseOrders)
   const { data: contacts = [], isLoading: contactsLoading } = useContacts(orgId, initialContacts)
+  const { data: paymentTransactions = [], isLoading: paymentTransactionsLoading } = usePaymentTransactions(orgId)
+  const { data: paymentReconciliations = [], isLoading: paymentReconciliationsLoading } = usePaymentReconciliations(orgId)
+  const { data: messageBatches = [], isLoading: messageBatchesLoading } = useMessageBatches(orgId)
   const { count: pendingAiDrafts = 0, isLoading: aiDraftsLoading } = useAiActionDraftInboxCount(
     organizationId,
     operatingCompanyId != null && operatingCompanyId > 0,
   )
   const [timeRange, setTimeRange] = useState<TimeRangeValue>("30d")
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   const { startMs, endMs } = useMemo(() => timeRangeToMs(timeRange), [timeRange])
   const previousRange = useMemo(() => previousPeriodMs(timeRange), [timeRange])
@@ -149,6 +160,9 @@ function OverviewClientLoaded({
     projectsLoading ||
     purchaseOrdersLoading ||
     contactsLoading ||
+    paymentTransactionsLoading ||
+    paymentReconciliationsLoading ||
+    messageBatchesLoading ||
     aiDraftsLoading
   )
 
@@ -331,6 +345,28 @@ function OverviewClientLoaded({
     })) as DashboardSection[]
   }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, t])
 
+  const ownerControlLoop = useMemo(() => {
+    const reconciledTransactionIds = new Set(paymentReconciliations.map((row) => String((row as Record<string, unknown>).paymentTransactionId ?? "")))
+    const unreconciledPayments = paymentTransactions.filter((row) => {
+      const payment = row as Record<string, unknown>
+      return matchesCompany(payment, operatingCompanyId) && enumTag(payment.status) === "Posted" && !reconciledTransactionIds.has(String(payment.id))
+    }).length
+    const productByTemplate = new Map(products.map((row) => [String((row as Record<string, unknown>).productTmplId ?? (row as Record<string, unknown>).id ?? ""), row as Record<string, unknown>]))
+    const lowStockProducts = stockQuants.filter((row) => {
+      const quant = row as Record<string, unknown>
+      if (!matchesCompany(quant, operatingCompanyId)) return false
+      const product = productByTemplate.get(String(quant.productId ?? ""))
+      return Number(quant.availableQuantity ?? 0) <= Number(product?.reorderingMinQty ?? 0) || Boolean(quant.isOutdated)
+    }).length
+    const pendingMessageApprovals = messageBatches.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId) && enumTag((row as Record<string, unknown>).status) === "PendingApproval").length
+    const overdueInvoices = scopedMoves.filter((row) => {
+      const move = row as Record<string, unknown>
+      const due = Number(move.invoiceDateDue ?? 0) / 1000
+      return moveTypeTagFromRow(move) === "OutInvoice" && Number(move.amountResidual ?? 0) > 0 && due > 0 && due < Date.now()
+    }).length
+    return { overdueInvoices, unreconciledPayments, lowStockProducts, pendingMessageApprovals }
+  }, [messageBatches, operatingCompanyId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants])
+
   const dashboardGridRef = useRef<HTMLDivElement>(null)
   const handleDashboardExport = useCallback(async () => {
     if (!dashboardGridRef.current) return
@@ -346,13 +382,16 @@ function OverviewClientLoaded({
         onTimeRangeChange={setTimeRange}
         onExport={() => void handleDashboardExport()}
       />
-      {isDataReady ? (
-        <DashboardGrid
-          ref={dashboardGridRef}
-          sections={liveSections}
-          testId="overview-dashboard"
-          widgetTestIdPrefix="overview-widget"
-        />
+      {isHydrated && isDataReady ? (
+        <div className="flex flex-col gap-6">
+          <OwnerControlLoop {...ownerControlLoop} />
+          <DashboardGrid
+            ref={dashboardGridRef}
+            sections={liveSections}
+            testId="overview-dashboard"
+            widgetTestIdPrefix="overview-widget"
+          />
+        </div>
       ) : (
         <OverviewDashboardSkeleton />
       )}

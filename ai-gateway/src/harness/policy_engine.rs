@@ -547,13 +547,10 @@ impl PolicyEngine {
 }
 
 fn validate_manifest(manifest: &SkillManifest, violations: &mut Vec<DecisionReason>) {
-    if manifest.limits.max_rows == 0
-        || manifest.limits.max_steps == 0
+    if manifest.limits.max_steps == 0
         || manifest.limits.max_tool_calls == 0
-        || manifest.named_resources.is_empty()
         || manifest.allowed_tools.is_empty()
         || manifest.output_type.trim().is_empty()
-        || manifest.privacy.allowed_fields.is_empty()
     {
         violations.push(DecisionReason::new(
             PolicyReasonCode::InvalidManifest,
@@ -573,6 +570,15 @@ fn validate_manifest(manifest: &SkillManifest, violations: &mut Vec<DecisionReas
                 "green manifests may allow named-read capability only",
             ));
         }
+        RiskClass::Green
+            if manifest.named_resources.is_empty()
+                || manifest.privacy.allowed_fields.is_empty() =>
+        {
+            violations.push(DecisionReason::new(
+                PolicyReasonCode::InvalidManifest,
+                "green manifests require scoped named resources and an output privacy allowlist",
+            ));
+        }
         RiskClass::Amber
             if manifest.allowed_capabilities.iter().any(|capability| {
                 !matches!(capability, Capability::NamedRead | Capability::ActionDraft)
@@ -584,6 +590,21 @@ fn validate_manifest(manifest: &SkillManifest, violations: &mut Vec<DecisionReas
             ));
         }
         _ => {}
+    }
+
+    let uses_named_reads = manifest
+        .allowed_capabilities
+        .iter()
+        .any(|capability| *capability == Capability::NamedRead);
+    if uses_named_reads
+        && (manifest.limits.max_rows == 0
+            || manifest.named_resources.is_empty()
+            || manifest.privacy.allowed_fields.is_empty())
+    {
+        violations.push(DecisionReason::new(
+            PolicyReasonCode::InvalidManifest,
+            "manifests with named reads require a positive row limit, scoped resources, and a privacy allowlist",
+        ));
     }
 }
 
@@ -641,6 +662,10 @@ mod tests {
             LOW_STOCK_SKILL_VERSION, NAMED_READ_TOOL,
         },
         manifest::{ExecutionLimits, PrivacyPolicy, ReviewMetadata},
+        red_action_drafts::{
+            CREATE_SALE_ORDER_DRAFT_OUTPUT_TYPE, CREATE_SALE_ORDER_DRAFT_SKILL_KEY,
+            CREATE_SALE_ORDER_DRAFT_VERSION,
+        },
     };
 
     fn valid_request() -> PolicyExecutionRequest {
@@ -862,6 +887,39 @@ mod tests {
         assert_eq!(proposal.reducer_name, "create_sale_order");
         assert!(proposal.elevated);
         assert!(proposal.params_json.contains("\"company_id\":7"));
+    }
+
+    #[test]
+    fn built_in_red_skill_only_allows_a_governed_draft() {
+        let mut request = valid_request();
+        request.skill = SkillVersionRef::new(
+            CREATE_SALE_ORDER_DRAFT_SKILL_KEY,
+            CREATE_SALE_ORDER_DRAFT_VERSION,
+        );
+        request.input = serde_json::json!({"partner_id": 42});
+        request.plan.named_resources.clear();
+        request.plan.tool_calls = vec![PlannedToolCall {
+            tool_name: "create_sale_order".to_string(),
+            capability: Capability::ActionDraft,
+            named_resource: None,
+        }];
+        request.plan.expected_rows = 0;
+        request.plan.output_type = CREATE_SALE_ORDER_DRAFT_OUTPUT_TYPE.to_string();
+
+        let result = PolicyEngine::default().execute_controlled(PolicyControlledRequest {
+            execution: request.clone(),
+            candidate_output: Value::Null,
+        });
+        assert_eq!(result.decision.outcome, DecisionOutcome::DraftOnly);
+        assert!(result.action_draft.is_some());
+
+        request.plan.tool_calls[0].capability = Capability::Network;
+        let denied = PolicyEngine::default().evaluate(&request);
+        assert_eq!(denied.outcome, DecisionOutcome::Deny);
+        assert!(denied
+            .reasons
+            .iter()
+            .any(|reason| reason.code == PolicyReasonCode::CapabilityDenied));
     }
 
     #[test]

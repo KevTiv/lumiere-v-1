@@ -7,6 +7,14 @@ import type { ReducerCommandContractMeta } from "./types";
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` messages hooks.
  */
 export const MESSAGES_BFF_REDUCERS = [
+  "create_message_batch",
+  "create_invoice_reminder_batch",
+  "create_message_template",
+  "create_operational_message",
+  "record_message_copied",
+  "review_message_batch",
+  "cancel_message_batch",
+  "set_contact_communication_preference",
   "post_message",
   "post_internal_note",
   "subscribe_to_record",
@@ -42,6 +50,14 @@ export const MESSAGES_COMMAND_SUBSCRIPTION_HINTS: Record<
   MessagesBffReducerKey,
   readonly string[]
 > = {
+  create_message_batch: ["message-batches", "operational-messages"],
+  create_invoice_reminder_batch: ["message-batches", "operational-messages"],
+  create_message_template: ["message-templates"],
+  create_operational_message: ["operational-messages", "message-batches"],
+  record_message_copied: ["operational-messages"],
+  review_message_batch: ["message-batches", "operational-messages"],
+  cancel_message_batch: ["message-batches", "operational-messages"],
+  set_contact_communication_preference: ["contact-communication-preferences"],
   post_message: ["mail-messages"],
   post_internal_note: ["mail-messages"],
   subscribe_to_record: ["mail-followers"],

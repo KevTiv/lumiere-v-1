@@ -6,8 +6,8 @@ import { expectNoAppError, gotoModule, signIn } from "./helpers"
  * Phase 0 AI harness policy scenarios.
  *
  * - P3-AI-01: green report skill — scope/masking/resource caps/run audit.
- * - P4-AI-01: red action draft — policy denial without approval; correction
- *   after independent approval. Skipped until the action-draft bridge lands.
+ * - P4-AI-01: red action draft — denied capabilities are audited at the policy
+ *   boundary and permitted requests become independently approved drafts.
  */
 test.describe("AI harness policy", { tag: "@p0" }, () => {
   test.beforeEach(async ({ page }) => {
@@ -79,7 +79,41 @@ test.describe("AI harness policy", { tag: "@p0" }, () => {
     await expectNoAppError(page)
   })
 
-  test("P4-AI-01: red action draft is bridged to a pending approval draft", async ({
+  test("P4-AI-01: red action draft denies network capability before persistence", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/ai/action-draft/bridge", {
+      data: {
+        execution: {
+          skill: { skill_key: "create_sale_order_draft", version: 1 },
+          company_id: 1,
+          correlation_id: `e2e-red-denied-${Date.now()}`,
+          input: { partner_id: 1 },
+          plan: {
+            named_resources: [],
+            tool_calls: [{ tool_name: "network", capability: "network" }],
+            steps: 1,
+            expected_rows: 0,
+            output_type: "action_draft.create_sale_order.v1",
+          },
+        },
+        candidate_output: null,
+      },
+    })
+
+    expect(response.ok()).toBe(true)
+    const body = (await response.json()) as {
+      decision?: { outcome?: string; reasons?: Array<{ code?: string }> }
+      draft_id?: number
+    }
+    expect(body.decision?.outcome).toBe("deny")
+    expect(body.decision?.reasons?.some((reason) => reason.code === "capability_denied")).toBe(
+      true,
+    )
+    expect(body.draft_id).toBeUndefined()
+  })
+
+  test("P4-AI-02: red action draft is bridged to a pending approval draft", async ({
     page,
     request,
   }) => {
@@ -89,24 +123,22 @@ test.describe("AI harness policy", { tag: "@p0" }, () => {
     const bridgeRes = await request.post("/api/ai/action-draft/bridge", {
       data: {
         execution: {
-          skill: { skillKey: "red_sale_order_draft", version: 1 },
-          organizationId: 1,
-          companyId: 1,
-          correlationId: `e2e-red-${Date.now()}`,
-          metadata: { actorId: "e2e-tester" },
+          skill: { skill_key: "create_sale_order_draft", version: 1 },
+          company_id: 1,
+          correlation_id: `e2e-red-${Date.now()}`,
+          metadata: { actor_id: "e2e-tester" },
           input: { partner_id: 1 },
           plan: {
-            namedResources: [],
-            toolCalls: [
+            named_resources: [],
+            tool_calls: [
               {
-                toolName: "create_sale_order",
+                tool_name: "create_sale_order",
                 capability: "action_draft",
-                namedResource: null,
               },
             ],
             steps: 1,
-            expectedRows: 0,
-            outputType: "action_draft",
+            expected_rows: 0,
+            output_type: "action_draft.create_sale_order.v1",
           },
         },
         candidateOutput: null,

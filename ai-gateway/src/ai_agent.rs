@@ -4,11 +4,7 @@ use anyhow::{Context, Result};
 use serde_json::Value;
 use stdb_client::StdbClient;
 
-use crate::{
-    error::AppError,
-    providers::llm::normalize_provider,
-    rate_limit::AgentRateLimiter,
-};
+use crate::{error::AppError, providers::llm::normalize_provider, rate_limit::AgentRateLimiter};
 
 const BASE_ERP_RULES: &str = "You are an intelligent ERP assistant for Lumiere. Answer using only the provided context. Be concise and factual. If the context is insufficient, say so. Never invent data or claim to have performed mutations.";
 
@@ -84,12 +80,7 @@ pub fn ensure_allowed_action(agent: &ResolvedAgentConfig, action: &str) -> Resul
         && agent
             .allowed_actions
             .iter()
-            .any(|a| {
-                a == "action_draft"
-                    || a == "chat"
-                    || a == "summarize"
-                    || a == "form_suggest"
-            })
+            .any(|a| a == "action_draft" || a == "chat" || a == "summarize" || a == "form_suggest")
     {
         return Ok(());
     }
@@ -135,7 +126,9 @@ impl AgentLimitViolation {
 impl std::fmt::Display for AgentLimitViolation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::BudgetExceeded(message) | Self::RateLimitExceeded(message) => f.write_str(message),
+            Self::BudgetExceeded(message) | Self::RateLimitExceeded(message) => {
+                f.write_str(message)
+            }
         }
     }
 }
@@ -148,7 +141,8 @@ pub fn enforce_chargeable_limits(
     org_id: u64,
     agent: &ResolvedAgentConfig,
 ) -> Result<(), AgentLimitViolation> {
-    ensure_within_budget(agent).map_err(|err| AgentLimitViolation::BudgetExceeded(err.to_string()))?;
+    ensure_within_budget(agent)
+        .map_err(|err| AgentLimitViolation::BudgetExceeded(err.to_string()))?;
 
     if agent.rate_limit_per_minute > 0
         && !limiter.check_and_acquire(org_id, agent.agent_id, agent.rate_limit_per_minute)
@@ -223,9 +217,7 @@ async fn fetch_agent(stdb: &StdbClient, org_id: u64, agent_id: u64) -> Result<Ag
         "SELECT * FROM ai_agent WHERE id = {agent_id} AND organization_id = {org_id} LIMIT 1"
     );
     let rows = stdb.query_sql(&sql).await?;
-    let row = rows
-        .first()
-        .context("AI agent not found")?;
+    let row = rows.first().context("AI agent not found")?;
     parse_agent_row(row)
 }
 
@@ -251,8 +243,8 @@ async fn fetch_team_member(
     let rows = stdb.query_sql(&sql).await?;
     let row = rows.first().context("AI team member not found")?;
 
-    let ai_agent_id = u64_field(row, "aiAgentId", "ai_agent_id")
-        .context("team member missing ai_agent_id")?;
+    let ai_agent_id =
+        u64_field(row, "aiAgentId", "ai_agent_id").context("team member missing ai_agent_id")?;
 
     Ok(TeamMemberRow {
         ai_agent_id,
@@ -300,9 +292,16 @@ fn parse_agent_row(row: &Value) -> Result<AgentRow> {
     })
 }
 
-fn row_to_agent_config(row: &AgentRow, persona: Option<&TeamMemberPersona>) -> Result<ResolvedAgentConfig> {
+fn row_to_agent_config(
+    row: &AgentRow,
+    persona: Option<&TeamMemberPersona>,
+) -> Result<ResolvedAgentConfig> {
     let mut system_prompt = BASE_ERP_RULES.to_string();
-    if let Some(custom) = row.system_prompt.as_deref().filter(|s| !s.trim().is_empty()) {
+    if let Some(custom) = row
+        .system_prompt
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
         system_prompt.push_str("\n\n");
         system_prompt.push_str(custom);
     }
@@ -316,10 +315,7 @@ fn row_to_agent_config(row: &AgentRow, persona: Option<&TeamMemberPersona>) -> R
             ));
         }
         if !p.expertise_areas.is_empty() {
-            system_prompt.push_str(&format!(
-                "Expertise: {}\n",
-                p.expertise_areas.join(", ")
-            ));
+            system_prompt.push_str(&format!("Expertise: {}\n", p.expertise_areas.join(", ")));
         }
         if let Some(personality) = p.personality.as_deref().filter(|s| !s.is_empty()) {
             system_prompt.push_str(&format!("Personality: {personality}\n"));
@@ -347,22 +343,21 @@ fn row_to_agent_config(row: &AgentRow, persona: Option<&TeamMemberPersona>) -> R
 fn validate_provider(provider: &str) -> Result<()> {
     match normalize_provider(provider).as_str() {
         "mistral" | "gemini" | "ollama" => Ok(()),
-        other => anyhow::bail!(
-            "Unsupported provider '{other}'. Configure Mistral, Gemini, or Ollama."
-        ),
+        other => {
+            anyhow::bail!("Unsupported provider '{other}'. Configure Mistral, Gemini, or Ollama.")
+        }
     }
 }
 
 fn u64_field(row: &Value, camel: &str, snake: &str) -> Option<u64> {
-    row.get(camel)
-        .or_else(|| row.get(snake))
-        .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+    row.get(camel).or_else(|| row.get(snake)).and_then(|v| {
+        v.as_u64()
+            .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+    })
 }
 
 fn f64_field(row: &Value, camel: &str, snake: Option<&str>) -> Option<f64> {
-    let v = row
-        .get(camel)
-        .or_else(|| snake.and_then(|s| row.get(s)))?;
+    let v = row.get(camel).or_else(|| snake.and_then(|s| row.get(s)))?;
     v.as_f64()
         .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
 }
@@ -394,7 +389,11 @@ fn string_vec_field(row: &Value, camel: &str, snake: Option<&str>) -> Vec<String
 mod tests {
     use super::*;
 
-    fn sample_agent(monthly_budget: Option<f64>, monthly_spend: f64, rate_limit: u32) -> ResolvedAgentConfig {
+    fn sample_agent(
+        monthly_budget: Option<f64>,
+        monthly_spend: f64,
+        rate_limit: u32,
+    ) -> ResolvedAgentConfig {
         ResolvedAgentConfig {
             agent_id: 9,
             provider: "mistral".to_string(),

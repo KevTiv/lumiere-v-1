@@ -404,4 +404,33 @@ test.describe("Operational messaging", { tag: ["@phase-1", "@operational-messagi
       })
       .toEqual({ created: true, approved: true, cancelled: true })
   })
+
+  test("P1-MSG-03 records invalid invoice selections as reviewable exclusions", async ({ page }) => {
+    const marker = smokeName("invoice-reminder-exclusion")
+    const organizationId = await fetchSessionOrganizationId(page)
+    const templateId = await createApprovedReminderTemplate(page, organizationId, marker)
+
+    await callRawReducer(page, "create_invoice_reminder_batch", [
+      organizationId,
+      {
+        company_id: none(),
+        template_id: templateId,
+        channel: SMS,
+        invoice_ids: [0],
+        metadata: some(marker),
+      },
+    ])
+
+    const batch = await waitForRow(
+      page,
+      "message-batches",
+      (row) =>
+        scalarId(rowValue(row, "templateId", "template_id")) === templateId &&
+        String(rowValue(row, "metadata") ?? "").includes(marker),
+      `invoice reminder exclusion batch for ${marker}`,
+    )
+    expect(Number(rowValue(batch, "recipientCount", "recipient_count"))).toBe(0)
+    expect(Number(rowValue(batch, "excludedCount", "excluded_count"))).toBe(1)
+    expect(String(rowValue(batch, "subjectModel", "subject_model"))).toBe("account_move")
+  })
 })

@@ -139,6 +139,61 @@ pub struct BankMatchCandidate {
     pub created_at: Timestamp,
 }
 
+/// An idempotent, reviewable CSV statement import before it becomes an
+/// accounting bank statement. Parsed values are stored separately from the raw
+/// source values so validation errors can be shown without creating ledger data.
+#[spacetimedb::table(
+    accessor = bank_statement_import,
+    public,
+    index(accessor = bank_statement_import_by_org, btree(columns = [organization_id])),
+    index(accessor = bank_statement_import_by_company, btree(columns = [company_id])),
+    index(accessor = bank_statement_import_by_idempotency, btree(columns = [organization_id, company_id, idempotency_key]))
+)]
+pub struct BankStatementImport {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub journal_id: u64,
+    pub currency_id: u64,
+    pub file_name: Option<String>,
+    /// Deterministic key generated from the selected account and CSV payload.
+    pub idempotency_key: String,
+    /// `staged` | `needs_review` | `approved`.
+    pub state: String,
+    pub opening_balance: f64,
+    pub total_rows: u32,
+    pub valid_rows: u32,
+    pub invalid_rows: u32,
+    pub approved_statement_id: Option<u64>,
+    pub created_at: Timestamp,
+    pub created_by: Identity,
+    pub approved_at: Option<Timestamp>,
+    pub approved_by: Option<Identity>,
+}
+
+#[spacetimedb::table(
+    accessor = bank_statement_import_line,
+    public,
+    index(accessor = bank_statement_import_line_by_import, btree(columns = [import_id])),
+    index(accessor = bank_statement_import_line_by_org, btree(columns = [organization_id]))
+)]
+pub struct BankStatementImportLine {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub import_id: u64,
+    pub row_number: u32,
+    pub date: Option<Timestamp>,
+    pub amount: Option<f64>,
+    pub reference: Option<String>,
+    pub description: Option<String>,
+    pub validation_error: Option<String>,
+    pub created_statement_line_id: Option<u64>,
+}
+
 // ── Input Params ─────────────────────────────────────────────────────────────
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -253,7 +308,286 @@ pub struct UnreconcileAccountBankStatementLineParams {
     pub amount_residual: f64,
 }
 
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct StageBankStatementImportLineParams {
+    pub row_number: u32,
+    pub date: Option<Timestamp>,
+    pub amount: Option<f64>,
+    pub reference: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct StageBankStatementImportParams {
+    pub file_name: Option<String>,
+    pub idempotency_key: String,
+    pub opening_balance: f64,
+    pub rows: Vec<StageBankStatementImportLineParams>,
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
+
+/// Stage parsed statement rows for review. Repeating the same payload for the
+/// same company is a no-op, which makes client and network retries safe.
+#[spacetimedb::reducer]
+pub fn stage_bank_statement_import(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    journal_id: u64,
+    currency_id: u64,
+    params: StageBankStatementImportParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_bank_statement", "create")?;
+    if params.idempotency_key.trim().is_empty() {
+        return Err("idempotency_key is required".to_string());
+    }
+    if params.rows.is_empty() {
+        return Err("statement import must contain at least one row".to_string());
+    }
+    let journal = ctx
+        .db
+        .account_journal()
+        .id()
+        .find(&journal_id)
+        .ok_or("Journal not found")?;
+    if journal.company_id != company_id {
+        return Err("Journal does not belong to the specified company".to_string());
+    }
+    if ctx.db.bank_statement_import().iter().any(|import| {
+        import.organization_id == organization_id
+            && import.company_id == company_id
+            && import.idempotency_key == params.idempotency_key
+    }) {
+        return Ok(());
+    }
+
+    let mut invalid_rows = 0_u32;
+    let mut staged_lines = Vec::with_capacity(params.rows.len());
+    for row in params.rows {
+        let validation_error = match (row.date, row.amount) {
+            (None, _) => Some("date is required".to_string()),
+            (_, None) => Some("amount is required".to_string()),
+            (_, Some(amount)) if !amount.is_finite() => Some("amount must be finite".to_string()),
+            (_, Some(0.0)) => Some("amount must not be zero".to_string()),
+            _ => None,
+        };
+        if validation_error.is_some() {
+            invalid_rows += 1;
+        }
+        staged_lines.push((row, validation_error));
+    }
+
+    let total_rows = staged_lines.len() as u32;
+    let import = ctx.db.bank_statement_import().insert(BankStatementImport {
+        id: 0,
+        organization_id,
+        company_id,
+        journal_id,
+        currency_id,
+        file_name: params.file_name,
+        idempotency_key: params.idempotency_key,
+        state: if invalid_rows == 0 {
+            "staged"
+        } else {
+            "needs_review"
+        }
+        .to_string(),
+        opening_balance: params.opening_balance,
+        total_rows,
+        valid_rows: total_rows - invalid_rows,
+        invalid_rows,
+        approved_statement_id: None,
+        created_at: ctx.timestamp,
+        created_by: ctx.sender(),
+        approved_at: None,
+        approved_by: None,
+    });
+    for (row, validation_error) in staged_lines {
+        ctx.db
+            .bank_statement_import_line()
+            .insert(BankStatementImportLine {
+                id: 0,
+                organization_id,
+                import_id: import.id,
+                row_number: row.row_number,
+                date: row.date,
+                amount: row.amount,
+                reference: row.reference,
+                description: row.description,
+                validation_error,
+                created_statement_line_id: None,
+            });
+    }
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "bank_statement_import",
+            record_id: import.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "total_rows": total_rows, "invalid_rows": invalid_rows })
+                    .to_string(),
+            ),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+/// Release a fully valid import into the existing bank-statement reconciliation
+/// workflow. A second approval call is safe and returns without duplicating lines.
+#[spacetimedb::reducer]
+pub fn approve_bank_statement_import(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    import_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_bank_statement", "write")?;
+    let import = ctx
+        .db
+        .bank_statement_import()
+        .id()
+        .find(&import_id)
+        .ok_or("Statement import not found")?;
+    if import.organization_id != organization_id {
+        return Err("Statement import does not belong to this organization".to_string());
+    }
+    if import.approved_statement_id.is_some() {
+        return Ok(());
+    }
+    if import.invalid_rows > 0 {
+        return Err("Correct invalid rows before approving this statement import".to_string());
+    }
+    let lines: Vec<_> = ctx
+        .db
+        .bank_statement_import_line()
+        .bank_statement_import_line_by_import()
+        .filter(&import_id)
+        .collect();
+    if lines.is_empty() {
+        return Err("Statement import has no rows".to_string());
+    }
+    let total_amount = lines.iter().filter_map(|line| line.amount).sum::<f64>();
+    let metadata = format!(r#"{{"bank_statement_import_id":{import_id}}}"#);
+    create_account_bank_statement(
+        ctx,
+        organization_id,
+        import.company_id,
+        import.journal_id,
+        CreateAccountBankStatementParams {
+            name: import
+                .file_name
+                .clone()
+                .or_else(|| Some(format!("Statement import #{import_id}"))),
+            reference: Some(import.idempotency_key.clone()),
+            date: None,
+            balance_start: import.opening_balance,
+            currency_id: import.currency_id,
+            state: BankStatementState::Open,
+            line_ids: Vec::new(),
+            move_line_ids: Vec::new(),
+            total_entry_encoding: total_amount,
+            total_amount,
+            total_amount_currency: total_amount,
+            date_done: None,
+            is_valid_balance_start: true,
+            is_valid_balance_end: true,
+            metadata: Some(metadata.clone()),
+        },
+    )?;
+    let statement_id = ctx
+        .db
+        .account_bank_statement()
+        .iter()
+        .find(|statement| {
+            statement.organization_id == organization_id
+                && statement.company_id == import.company_id
+                && statement.metadata.as_deref() == Some(metadata.as_str())
+        })
+        .map(|statement| statement.id)
+        .ok_or("Statement import approval could not create a bank statement")?;
+    for line in lines {
+        let date = line.date.ok_or("Staged import line is missing date")?;
+        let amount = line.amount.ok_or("Staged import line is missing amount")?;
+        create_account_bank_statement_line(
+            ctx,
+            organization_id,
+            import.company_id,
+            statement_id,
+            CreateAccountBankStatementLineParams {
+                date,
+                amount,
+                amount_currency: amount,
+                currency_id: Some(import.currency_id),
+                foreign_currency_id: None,
+                partner_id: None,
+                bank_account_id: None,
+                account_number: None,
+                move_id: None,
+                is_reconciled: false,
+                transaction_type: Some("imported_statement".to_string()),
+                move_ids: Vec::new(),
+                payment_ids: Vec::new(),
+                amount_residual: amount,
+                auto_reconcile_ids: Vec::new(),
+                metadata: Some(
+                    serde_json::json!({
+                        "bank_statement_import_id": import_id,
+                        "source_row": line.row_number,
+                        "reference": line.reference,
+                        "description": line.description,
+                    })
+                    .to_string(),
+                ),
+            },
+        )?;
+        let created_statement_line_id = ctx
+            .db
+            .account_bank_statement_line()
+            .iter()
+            .filter(|statement_line| statement_line.statement_id == statement_id)
+            .max_by_key(|statement_line| statement_line.id)
+            .map(|statement_line| statement_line.id)
+            .ok_or("Statement import approval could not create a statement line")?;
+        ctx.db
+            .bank_statement_import_line()
+            .id()
+            .update(BankStatementImportLine {
+                created_statement_line_id: Some(created_statement_line_id),
+                ..line
+            });
+    }
+    ctx.db
+        .bank_statement_import()
+        .id()
+        .update(BankStatementImport {
+            state: "approved".to_string(),
+            approved_statement_id: Some(statement_id),
+            approved_at: Some(ctx.timestamp),
+            approved_by: Some(ctx.sender()),
+            ..import
+        });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(import.company_id),
+            table_name: "bank_statement_import",
+            record_id: import_id,
+            action: "APPROVE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "statement_id": statement_id }).to_string()),
+            changed_fields: vec!["state".to_string(), "approved_statement_id".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
 
 #[spacetimedb::reducer]
 pub fn create_account_bank_statement(

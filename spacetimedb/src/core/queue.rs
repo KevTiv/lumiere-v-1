@@ -130,7 +130,9 @@ pub fn enqueue_job(
     Ok(())
 }
 
-/// Atomically claim a Pending job for processing.
+/// Atomically claim a pending job, or a scheduled job whose due time has
+/// arrived, for processing. Claiming remains idempotent because a second
+/// worker observes `Processing` after the first update.
 #[spacetimedb::reducer]
 pub fn claim_queue_job(
     ctx: &ReducerContext,
@@ -149,8 +151,13 @@ pub fn claim_queue_job(
     if job.organization_id != organization_id {
         return Err("Job does not belong to this organization".to_string());
     }
-    if job.status != JobStatus::Pending {
-        return Err("Job is not in Pending status".to_string());
+    let is_due_scheduled = job.status == JobStatus::Scheduled
+        && job
+            .scheduled_at
+            .map(|scheduled_at| scheduled_at <= ctx.timestamp)
+            .unwrap_or(false);
+    if job.status != JobStatus::Pending && !is_due_scheduled {
+        return Err("Job is not pending or due".to_string());
     }
 
     ctx.db.queue_job().id().update(QueueJob {

@@ -387,6 +387,11 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       createAction: "createAccountPayment",
     },
     {
+      id: "payment-operations",
+      label: t("accounting.tabs.operationalPayments"),
+      type: "custom",
+    },
+    {
       id: "payment-terms",
       label: t("accounting.tabs.paymentTerms"),
       type: "entity",
@@ -2848,6 +2853,11 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newMailMessageForm(t),
       createLabel: "New Message",
       createAction: "createMessage",
+    },
+    {
+      id: "message-batches",
+      label: "Message batches",
+      type: "custom",
     },
     {
       id: "notifications",

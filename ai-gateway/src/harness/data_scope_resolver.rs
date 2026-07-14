@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{
-    low_stock,
+    distributor_controls, low_stock,
     manifest::{ReviewMetadata, ReviewStatus, SkillManifest},
     report_composer,
 };
@@ -67,6 +67,8 @@ pub struct ResourceRegistry {
 impl ResourceRegistry {
     pub fn built_in() -> Self {
         let mut registry = Self::default();
+        registry.insert(distributor_controls::credit_hold_resource_contract());
+        registry.insert(distributor_controls::delivery_run_resource_contract());
         registry.insert(low_stock::resource_contract());
         registry.insert(report_composer::resource_contract());
         registry

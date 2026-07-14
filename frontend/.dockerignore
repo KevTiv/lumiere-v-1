@@ -1,0 +1,16 @@
+# The frontend is built with its own Docker context, so it needs its own ignore
+# list in addition to the repository-root .dockerignore.
+node_modules
+**/node_modules
+.next
+**/.next
+.turbo
+**/.turbo
+dist
+**/dist
+coverage
+playwright-report
+test-results
+.env
+.env.*
+.DS_Store

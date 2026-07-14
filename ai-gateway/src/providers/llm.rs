@@ -93,9 +93,9 @@ impl LlmClient {
             "mistral" => self.complete_mistral(req).await,
             "gemini" => self.complete_gemini(req).await,
             "ollama" => self.complete_ollama(req).await,
-            other => anyhow::bail!(
-                "Unsupported LLM provider '{other}'. Use Mistral, Gemini, or Ollama."
-            ),
+            other => {
+                anyhow::bail!("Unsupported LLM provider '{other}'. Use Mistral, Gemini, or Ollama.")
+            }
         }
     }
 
@@ -176,10 +176,7 @@ impl LlmClient {
         }
 
         let parsed: OllamaChatResponse = resp.json().await.context("parse Ollama response")?;
-        let text = parsed
-            .message
-            .and_then(|m| m.content)
-            .unwrap_or_default();
+        let text = parsed.message.and_then(|m| m.content).unwrap_or_default();
 
         Ok(LlmResponse {
             text,
@@ -275,7 +272,12 @@ impl LlmClient {
 
         let (input_tokens, output_tokens) = body
             .usage
-            .map(|u| (u.prompt_tokens.unwrap_or(0), u.completion_tokens.unwrap_or(0)))
+            .map(|u| {
+                (
+                    u.prompt_tokens.unwrap_or(0),
+                    u.completion_tokens.unwrap_or(0),
+                )
+            })
             .unwrap_or((0, 0));
 
         LlmResponse {

@@ -11,9 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::{
-    config::Config,
-    providers::EmbedProvider,
-    qdrant_client::VectorStore,
+    config::Config, providers::EmbedProvider, qdrant_client::VectorStore,
     stdb_embed::LumiereStdbExt,
 };
 use stdb_client::StdbClient;

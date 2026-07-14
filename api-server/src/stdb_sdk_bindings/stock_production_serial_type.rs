@@ -2,13 +2,7 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{
-	self as __sdk,
-	__lib,
-	__sats,
-	__ws,
-};
-
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
@@ -16,38 +10,36 @@ pub struct StockProductionSerial {
     pub id: u64,
     pub organization_id: u64,
     pub name: String,
-    pub r#ref: Option::<String>,
+    pub r#ref: Option<String>,
     pub product_id: u64,
-    pub product_variant_id: Option::<u64>,
-    pub lot_id: Option::<u64>,
+    pub product_variant_id: Option<u64>,
+    pub lot_id: Option<u64>,
     pub company_id: u64,
-    pub note: Option::<String>,
-    pub expiration_date: Option::<__sdk::Timestamp>,
-    pub use_date: Option::<__sdk::Timestamp>,
-    pub removal_date: Option::<__sdk::Timestamp>,
-    pub alert_date: Option::<__sdk::Timestamp>,
+    pub note: Option<String>,
+    pub expiration_date: Option<__sdk::Timestamp>,
+    pub use_date: Option<__sdk::Timestamp>,
+    pub removal_date: Option<__sdk::Timestamp>,
+    pub alert_date: Option<__sdk::Timestamp>,
     pub product_qty: f64,
-    pub location_id: Option::<u64>,
-    pub package_id: Option::<u64>,
-    pub owner_id: Option::<u64>,
+    pub location_id: Option<u64>,
+    pub package_id: Option<u64>,
+    pub owner_id: Option<u64>,
     pub state: String,
     pub is_scrap: bool,
     pub is_locked: bool,
-    pub warranty_expiration: Option::<__sdk::Timestamp>,
-    pub warranty_start: Option::<__sdk::Timestamp>,
-    pub last_maintenance: Option::<__sdk::Timestamp>,
-    pub next_maintenance: Option::<__sdk::Timestamp>,
+    pub warranty_expiration: Option<__sdk::Timestamp>,
+    pub warranty_start: Option<__sdk::Timestamp>,
+    pub last_maintenance: Option<__sdk::Timestamp>,
+    pub next_maintenance: Option<__sdk::Timestamp>,
     pub maintenance_count: i32,
     pub create_date: __sdk::Timestamp,
     pub write_date: __sdk::Timestamp,
-    pub metadata: Option::<String>,
+    pub metadata: Option<String>,
 }
-
 
 impl __sdk::InModule for StockProductionSerial {
     type Module = super::RemoteModule;
 }
-
 
 /// Column accessor struct for the table `StockProductionSerial`.
 ///
@@ -56,31 +48,36 @@ pub struct StockProductionSerialCols {
     pub id: __sdk::__query_builder::Col<StockProductionSerial, u64>,
     pub organization_id: __sdk::__query_builder::Col<StockProductionSerial, u64>,
     pub name: __sdk::__query_builder::Col<StockProductionSerial, String>,
-    pub r#ref: __sdk::__query_builder::Col<StockProductionSerial, Option::<String>>,
+    pub r#ref: __sdk::__query_builder::Col<StockProductionSerial, Option<String>>,
     pub product_id: __sdk::__query_builder::Col<StockProductionSerial, u64>,
-    pub product_variant_id: __sdk::__query_builder::Col<StockProductionSerial, Option::<u64>>,
-    pub lot_id: __sdk::__query_builder::Col<StockProductionSerial, Option::<u64>>,
+    pub product_variant_id: __sdk::__query_builder::Col<StockProductionSerial, Option<u64>>,
+    pub lot_id: __sdk::__query_builder::Col<StockProductionSerial, Option<u64>>,
     pub company_id: __sdk::__query_builder::Col<StockProductionSerial, u64>,
-    pub note: __sdk::__query_builder::Col<StockProductionSerial, Option::<String>>,
-    pub expiration_date: __sdk::__query_builder::Col<StockProductionSerial, Option::<__sdk::Timestamp>>,
-    pub use_date: __sdk::__query_builder::Col<StockProductionSerial, Option::<__sdk::Timestamp>>,
-    pub removal_date: __sdk::__query_builder::Col<StockProductionSerial, Option::<__sdk::Timestamp>>,
-    pub alert_date: __sdk::__query_builder::Col<StockProductionSerial, Option::<__sdk::Timestamp>>,
+    pub note: __sdk::__query_builder::Col<StockProductionSerial, Option<String>>,
+    pub expiration_date:
+        __sdk::__query_builder::Col<StockProductionSerial, Option<__sdk::Timestamp>>,
+    pub use_date: __sdk::__query_builder::Col<StockProductionSerial, Option<__sdk::Timestamp>>,
+    pub removal_date: __sdk::__query_builder::Col<StockProductionSerial, Option<__sdk::Timestamp>>,
+    pub alert_date: __sdk::__query_builder::Col<StockProductionSerial, Option<__sdk::Timestamp>>,
     pub product_qty: __sdk::__query_builder::Col<StockProductionSerial, f64>,
-    pub location_id: __sdk::__query_builder::Col<StockProductionSerial, Option::<u64>>,
-    pub package_id: __sdk::__query_builder::Col<StockProductionSerial, Option::<u64>>,
-    pub owner_id: __sdk::__query_builder::Col<StockProductionSerial, Option::<u64>>,
+    pub location_id: __sdk::__query_builder::Col<StockProductionSerial, Option<u64>>,
+    pub package_id: __sdk::__query_builder::Col<StockProductionSerial, Option<u64>>,
+    pub owner_id: __sdk::__query_builder::Col<StockProductionSerial, Option<u64>>,
     pub state: __sdk::__query_builder::Col<StockProductionSerial, String>,
     pub is_scrap: __sdk::__query_builder::Col<StockProductionSerial, bool>,
     pub is_locked: __sdk::__query_builder::Col<StockProductionSerial, bool>,
-    pub warranty_expiration: __sdk::__query_builder::Col<StockProductionSerial, Option::<__sdk::Timestamp>>,
-    pub warranty_start: __sdk::__query_builder::Col<StockProductionSerial, Option::<__sdk::Timestamp>>,
-    pub last_maintenance: __sdk::__query_builder::Col<StockProductionSerial, Option::<__sdk::Timestamp>>,
-    pub next_maintenance: __sdk::__query_builder::Col<StockProductionSerial, Option::<__sdk::Timestamp>>,
+    pub warranty_expiration:
+        __sdk::__query_builder::Col<StockProductionSerial, Option<__sdk::Timestamp>>,
+    pub warranty_start:
+        __sdk::__query_builder::Col<StockProductionSerial, Option<__sdk::Timestamp>>,
+    pub last_maintenance:
+        __sdk::__query_builder::Col<StockProductionSerial, Option<__sdk::Timestamp>>,
+    pub next_maintenance:
+        __sdk::__query_builder::Col<StockProductionSerial, Option<__sdk::Timestamp>>,
     pub maintenance_count: __sdk::__query_builder::Col<StockProductionSerial, i32>,
     pub create_date: __sdk::__query_builder::Col<StockProductionSerial, __sdk::Timestamp>,
     pub write_date: __sdk::__query_builder::Col<StockProductionSerial, __sdk::Timestamp>,
-    pub metadata: __sdk::__query_builder::Col<StockProductionSerial, Option::<String>>,
+    pub metadata: __sdk::__query_builder::Col<StockProductionSerial, Option<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for StockProductionSerial {
@@ -107,7 +104,10 @@ impl __sdk::__query_builder::HasCols for StockProductionSerial {
             state: __sdk::__query_builder::Col::new(table_name, "state"),
             is_scrap: __sdk::__query_builder::Col::new(table_name, "is_scrap"),
             is_locked: __sdk::__query_builder::Col::new(table_name, "is_locked"),
-            warranty_expiration: __sdk::__query_builder::Col::new(table_name, "warranty_expiration"),
+            warranty_expiration: __sdk::__query_builder::Col::new(
+                table_name,
+                "warranty_expiration",
+            ),
             warranty_start: __sdk::__query_builder::Col::new(table_name, "warranty_start"),
             last_maintenance: __sdk::__query_builder::Col::new(table_name, "last_maintenance"),
             next_maintenance: __sdk::__query_builder::Col::new(table_name, "next_maintenance"),
@@ -115,7 +115,6 @@ impl __sdk::__query_builder::HasCols for StockProductionSerial {
             create_date: __sdk::__query_builder::Col::new(table_name, "create_date"),
             write_date: __sdk::__query_builder::Col::new(table_name, "write_date"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
-
         }
     }
 }
@@ -126,7 +125,7 @@ impl __sdk::__query_builder::HasCols for StockProductionSerial {
 pub struct StockProductionSerialIxCols {
     pub company_id: __sdk::__query_builder::IxCol<StockProductionSerial, u64>,
     pub id: __sdk::__query_builder::IxCol<StockProductionSerial, u64>,
-    pub lot_id: __sdk::__query_builder::IxCol<StockProductionSerial, Option::<u64>>,
+    pub lot_id: __sdk::__query_builder::IxCol<StockProductionSerial, Option<u64>>,
     pub name: __sdk::__query_builder::IxCol<StockProductionSerial, String>,
     pub organization_id: __sdk::__query_builder::IxCol<StockProductionSerial, u64>,
     pub product_id: __sdk::__query_builder::IxCol<StockProductionSerial, u64>,
@@ -142,10 +141,8 @@ impl __sdk::__query_builder::HasIxCols for StockProductionSerial {
             name: __sdk::__query_builder::IxCol::new(table_name, "name"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             product_id: __sdk::__query_builder::IxCol::new(table_name, "product_id"),
-
         }
     }
 }
 
 impl __sdk::__query_builder::CanBeLookupTable for StockProductionSerial {}
-

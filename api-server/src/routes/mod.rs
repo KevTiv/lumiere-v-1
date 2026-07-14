@@ -1,22 +1,24 @@
 //! Domain routes mirroring Next.js `/api/*` (Phase 2). Mounted under `/v1` in `http_app`.
 
-mod admin;
 mod accounting;
+mod admin;
 mod auth;
 mod billing;
 mod bootstrap;
-mod import;
 mod crm;
 mod documents;
+mod import;
 mod inventory;
 mod mail;
 mod messaging;
 mod proposals;
-mod reports;
+pub(crate) mod reports;
 mod sales;
 mod session;
 mod settings;
+mod statement_imports;
 mod stdb;
+mod vertical_packs;
 
 use std::sync::Arc;
 
@@ -37,10 +39,12 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(messaging::router())
         .merge(inventory::router())
         .merge(settings::router())
+        .merge(statement_imports::router())
         .merge(bootstrap::router())
         .merge(import::router())
         .merge(billing::router())
         .merge(admin::router())
         .merge(proposals::router())
         .merge(reports::router())
+        .merge(vertical_packs::router())
 }

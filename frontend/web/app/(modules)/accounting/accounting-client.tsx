@@ -141,6 +141,7 @@ import type {
   UpdateAccountJournalParams,
 } from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
+import { PaymentOperationsPanel } from "./payment-operations-panel"
 import { useAccountingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import {
@@ -3160,6 +3161,22 @@ function AccountingClientLoaded({
                 createForm: accountPaymentFormConfig,
                 entityConfig: accountPaymentsEntityConfig,
                 recordSheet: paymentRecordSheet,
+              }
+            }
+            if (tab.id === "payment-operations") {
+              return {
+                ...tab,
+                customContent: (
+                  <PaymentOperationsPanel
+                    organizationId={organizationId}
+                    companyId={operatingCompanyId}
+                    defaultCurrencyId={defaultCurrencyId}
+                    currencyOptions={currencySelectOptions}
+                    journalOptions={journalFieldOptionsForModularForm}
+                    partnerOptions={partnerSelectOptions}
+                    moveLines={accountMoveLines as Record<string, unknown>[]}
+                  />
+                ),
               }
             }
             if (tab.id === "payment-terms") {

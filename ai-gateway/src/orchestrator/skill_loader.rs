@@ -3,7 +3,10 @@ use serde_json::Value;
 use stdb_client::StdbClient;
 
 use crate::sandbox::{
-    datasets::{default_process_research_specs, default_report_analysis_specs, default_price_search_specs, parse_dataset_specs},
+    datasets::{
+        default_price_search_specs, default_process_research_specs, default_report_analysis_specs,
+        parse_dataset_specs,
+    },
     DatasetSpec,
 };
 use crate::skills::{compose_prompt, load_bundled_skill};
@@ -199,13 +202,8 @@ async fn load_skill_config(
 
 pub async fn lookup_run_id(stdb: &StdbClient, run_key: &str) -> Result<u64> {
     let escaped = run_key.replace('\'', "''");
-    let sql = format!(
-        "SELECT id FROM ai_agent_run WHERE run_key = '{escaped}' LIMIT 1"
-    );
-    let rows = stdb
-        .query_sql(&sql)
-        .await
-        .context("lookup ai_agent_run")?;
+    let sql = format!("SELECT id FROM ai_agent_run WHERE run_key = '{escaped}' LIMIT 1");
+    let rows = stdb.query_sql(&sql).await.context("lookup ai_agent_run")?;
     rows.first()
         .map(|row| row_u64(row, "id"))
         .filter(|id| *id > 0)

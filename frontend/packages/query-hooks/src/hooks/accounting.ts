@@ -1,10 +1,18 @@
 "use client"
 
 import { apiFetch } from "../http"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { paymentParamsToJson } from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson, encodeOptionalU64, encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
-import type { CreatePaymentParams } from "@lumiere/stdb/types"
+import type {
+  AllocatePaymentParams,
+  CreatePaymentAccountParams,
+  CreatePaymentFeeParams,
+  CreatePaymentParams,
+  CreatePaymentTransactionParams,
+  ReversePaymentTransactionParams,
+  StageBankStatementImportParams,
+} from "@lumiere/stdb/types"
 import { accountingBffPost, type AccountingBffReducerKey } from "@lumiere/stdb/commands"
 import { invalidateStdbQueryResources, useStdbQuery } from "./stdb"
 import { stdbInvalidationFor } from "../generated/stdb-reducer-invalidation"
@@ -167,6 +175,26 @@ export function useAccountBankStatementLines(
   return useStdbQuery("bank-statement-lines", organizationId, options)
 }
 
+export type BankStatementImportWorkspace = {
+  imports: Record<string, unknown>[]
+  lines: Record<string, unknown>[]
+}
+
+/** Reviewed CSV statement-import batches, loaded from the scoped accounting API. */
+export function useBankStatementImports(organizationId: bigint, companyId: bigint, enabled = true) {
+  return useQuery<BankStatementImportWorkspace>({
+    queryKey: ["bank-statement-imports", String(organizationId), String(companyId)],
+    enabled: enabled && organizationId > 0n && companyId > 0n,
+    queryFn: async () => {
+      const response = await apiFetch(`/api/accounting/bank-statement-imports/${companyId}`)
+      if (!response.ok) throw new Error(await parseCallError(response))
+      const body = (await response.json()) as Partial<BankStatementImportWorkspace>
+      return { imports: body.imports ?? [], lines: body.lines ?? [] }
+    },
+    staleTime: 15_000,
+  })
+}
+
 /**
  * Fetch all fixed assets for the organization.
  */
@@ -199,6 +227,146 @@ export function useAccountPayments(
   options?: { staleTime?: number; enabled?: boolean },
 ) {
   return useStdbQuery("account-payments", organizationId, options)
+}
+
+/** Operational cash, bank, and mobile-money accounts. */
+export function usePaymentAccounts(organizationId: bigint) {
+  return useStdbQuery("payment-accounts", organizationId)
+}
+
+/** Provider and settlement fees recorded against operational payment transactions. */
+export function usePaymentFees(organizationId: bigint) {
+  return useStdbQuery("payment-fees", organizationId)
+}
+
+/** Draft, posted, and corrected operational payment transactions. */
+export function usePaymentTransactions(organizationId: bigint) {
+  return useStdbQuery("payment-transactions", organizationId)
+}
+
+export function usePaymentReconciliations(organizationId: bigint) {
+  return useStdbQuery("payment-reconciliations", organizationId)
+}
+
+export function usePaymentReversals(organizationId: bigint) {
+  return useStdbQuery("payment-reversals", organizationId)
+}
+
+function invalidateOperationalPaymentQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
+  for (const resource of [
+    "payment-accounts",
+    "payment-fees",
+    "payment-reconciliations",
+    "payment-reversals",
+    "payment-transactions",
+    "account-moves",
+    "account-move-lines",
+    "account-payments",
+  ]) {
+    void qc.invalidateQueries({ queryKey: ["stdb", resource, String(organizationId)] })
+  }
+}
+
+export function useCreatePaymentAccount(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreatePaymentAccountParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = accountingBffPost("create_payment_account", [
+        organizationId,
+        stdbParamsToJson(params, "CreatePaymentAccountParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => invalidateOperationalPaymentQueries(qc, organizationId),
+  })
+}
+
+export function useCreatePaymentTransaction(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreatePaymentTransactionParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = accountingBffPost("create_payment_transaction", [
+        organizationId,
+        stdbParamsToJson(params, "CreatePaymentTransactionParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => invalidateOperationalPaymentQueries(qc, organizationId),
+  })
+}
+
+export function usePostPaymentTransaction(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, bigint>({
+    mutationFn: async (transactionId) => {
+      const { urlPath, init } = accountingBffPost("post_payment_transaction", [organizationId, transactionId])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => invalidateOperationalPaymentQueries(qc, organizationId),
+  })
+}
+
+export function useAllocatePaymentTransaction(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, AllocatePaymentParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = accountingBffPost("allocate_payment_transaction", [
+        organizationId,
+        stdbParamsToJson(params, "AllocatePaymentParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => invalidateOperationalPaymentQueries(qc, organizationId),
+  })
+}
+
+export function useReversePaymentTransaction(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { transactionId: bigint; params: ReversePaymentTransactionParams }>({
+    mutationFn: async ({ transactionId, params }) => {
+      const { urlPath, init } = accountingBffPost("reverse_payment_transaction", [
+        organizationId,
+        transactionId,
+        stdbParamsToJson(params, "ReversePaymentTransactionParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => invalidateOperationalPaymentQueries(qc, organizationId),
+  })
+}
+
+/** Void a draft provider transaction before it is posted to the ledger. */
+export function useVoidPaymentTransaction(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, bigint>({
+    mutationFn: async (transactionId) => {
+      const { urlPath, init } = accountingBffPost("void_payment_transaction", [organizationId, transactionId])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => invalidateOperationalPaymentQueries(qc, organizationId),
+  })
+}
+
+/** Add an explicit provider fee to a draft operational payment transaction. */
+export function useCreatePaymentFee(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreatePaymentFeeParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = accountingBffPost("create_payment_fee", [
+        organizationId,
+        stdbParamsToJson(params, "CreatePaymentFeeParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => invalidateOperationalPaymentQueries(qc, organizationId),
+  })
 }
 
 /**
@@ -725,6 +893,7 @@ function invalidateBankStatementQueries(qc: ReturnType<typeof useQueryClient>, o
   void qc.invalidateQueries({ queryKey: ["stdb", "bank-statement-lines", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "bank-match-candidates", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "account-reconciliation-widgets", k] })
+  void qc.invalidateQueries({ queryKey: ["bank-statement-imports", String(k)] })
 }
 
 function invalidateFiscalYearQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint | number) {
@@ -1001,6 +1170,44 @@ export function useUpdateAnalyticDistributionModel(organizationId: number) {
 }
 
 // ── Bank statements (explicit /api/call — org + company via ?withCompany=true) ──
+
+export function useStageBankStatementImport(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      companyId: bigint
+      journalId: bigint
+      currencyId: bigint
+      params: StageBankStatementImportParams
+    }) => {
+      const { urlPath, init } = accountingBffPost("stage_bank_statement_import", [
+        organizationId,
+        args.companyId,
+        args.journalId,
+        args.currencyId,
+        stdbParamsToJson(args.params as object, "StageBankStatementImportParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
+  })
+}
+
+export function useApproveBankStatementImport(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (importId: bigint) => {
+      const { urlPath, init } = accountingBffPost("approve_bank_statement_import", [
+        organizationId,
+        importId,
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
+  })
+}
 
 export function usePostAccountBankStatement(organizationId: number) {
   const qc = useQueryClient()

@@ -10,6 +10,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "add_account_move_line",
   "apply_reconciliation_rules",
   "approve_intercompany_transaction",
+  "approve_bank_statement_import",
   "cancel_account_move",
   "cancel_budget",
   "cancel_consolidation",
@@ -52,6 +53,9 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "create_intercompany_rule",
   "create_intercompany_transaction",
   "create_payment",
+  "create_payment_account",
+  "create_payment_fee",
+  "create_payment_transaction",
   "create_payment_term",
   "create_payment_term_line",
   "create_tax_deadline",
@@ -89,10 +93,14 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "post_account_move",
   "post_invoice",
   "post_payment",
+  "post_payment_transaction",
   "process_consolidation",
   "process_intercompany_transaction",
   "reconcile_account_bank_statement_line",
   "reconcile_payment_with_invoice",
+  "allocate_payment_transaction",
+  "archive_payment_account",
+  "reverse_payment_transaction",
   "refresh_tax_deadline_statuses",
   "register_payment_on_invoice",
   "retry_intercompany_transaction",
@@ -101,6 +109,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "set_analytic_account_active",
   "set_asset_active",
   "set_consolidation_company_rate",
+  "stage_bank_statement_import",
   "set_intercompany_rule_active",
   "unmatch_elimination_entry",
   "unreconcile_account_bank_statement_line",
@@ -128,12 +137,15 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "update_fiscal_year",
   "update_intercompany_rule",
   "update_payment_term",
+  "update_payment_account",
+  "update_payment_transaction",
   "update_payment_term_line",
   "update_tax_deadline",
   "update_tax_jurisdiction",
   "update_tax_schedule",
   "validate_budget",
   "validate_consolidation",
+  "void_payment_transaction",
   "waive_tax_deadline",
 ] as const;
 
@@ -177,6 +189,7 @@ function accountingReducerHints(): Record<AccountingBffReducerKey, readonly stri
   o["add_account_move_line"] = ["account-moves","account-move-lines"] as const
   o["apply_reconciliation_rules"] = []
   o["approve_intercompany_transaction"] = []
+  o["approve_bank_statement_import"] = ["bank-statements","bank-statement-lines","bank-match-candidates","account-reconciliation-widgets"] as const
   o["cancel_account_move"] = ["account-moves","account-move-lines"] as const
   o["cancel_budget"] = []
   o["cancel_consolidation"] = []
@@ -219,6 +232,9 @@ function accountingReducerHints(): Record<AccountingBffReducerKey, readonly stri
   o["create_intercompany_rule"] = []
   o["create_intercompany_transaction"] = []
   o["create_payment"] = []
+  o["create_payment_account"] = ["payment-accounts"] as const
+  o["create_payment_fee"] = ["payment-fees","payment-transactions"] as const
+  o["create_payment_transaction"] = ["payment-transactions"] as const
   o["create_payment_term"] = []
   o["create_payment_term_line"] = []
   o["create_tax_deadline"] = []
@@ -256,10 +272,14 @@ function accountingReducerHints(): Record<AccountingBffReducerKey, readonly stri
   o["post_account_move"] = ["account-moves","account-move-lines"] as const
   o["post_invoice"] = ["account-moves","account-move-lines"] as const
   o["post_payment"] = []
+  o["post_payment_transaction"] = ["payment-transactions","account-payments","account-moves"] as const
   o["process_consolidation"] = []
   o["process_intercompany_transaction"] = []
   o["reconcile_account_bank_statement_line"] = []
   o["reconcile_payment_with_invoice"] = []
+  o["allocate_payment_transaction"] = ["payment-reconciliations","payment-transactions","account-move-lines"] as const
+  o["archive_payment_account"] = ["payment-accounts"] as const
+  o["reverse_payment_transaction"] = ["payment-reversals","payment-reconciliations","payment-transactions","account-payments"] as const
   o["refresh_tax_deadline_statuses"] = []
   o["register_payment_on_invoice"] = []
   o["retry_intercompany_transaction"] = []
@@ -267,6 +287,7 @@ function accountingReducerHints(): Record<AccountingBffReducerKey, readonly stri
   o["set_analytic_account_active"] = []
   o["set_asset_active"] = []
   o["set_consolidation_company_rate"] = []
+  o["stage_bank_statement_import"] = []
   o["set_intercompany_rule_active"] = []
   o["unmatch_elimination_entry"] = []
   o["unreconcile_account_bank_statement_line"] = ["bank-statements","bank-statement-lines","bank-match-candidates","account-reconciliation-widgets"] as const
@@ -294,12 +315,15 @@ function accountingReducerHints(): Record<AccountingBffReducerKey, readonly stri
   o["update_fiscal_year"] = []
   o["update_intercompany_rule"] = []
   o["update_payment_term"] = []
+  o["update_payment_account"] = ["payment-accounts"] as const
+  o["update_payment_transaction"] = ["payment-transactions"] as const
   o["update_payment_term_line"] = []
   o["update_tax_deadline"] = []
   o["update_tax_jurisdiction"] = []
   o["update_tax_schedule"] = []
   o["validate_budget"] = []
   o["validate_consolidation"] = []
+  o["void_payment_transaction"] = ["payment-transactions"] as const
   o["waive_tax_deadline"] = []
   return o
 }

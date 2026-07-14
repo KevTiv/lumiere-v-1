@@ -154,7 +154,12 @@ fn string_list(config: &Value, key: &str) -> Vec<String> {
         .map(|items| {
             items
                 .iter()
-                .filter_map(|v| v.as_str().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string))
+                .filter_map(|v| {
+                    v.as_str()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string)
+                })
                 .collect()
         })
         .unwrap_or_default()

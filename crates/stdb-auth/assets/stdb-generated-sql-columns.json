@@ -1291,6 +1291,37 @@
     "score",
     "created_at"
   ],
+  "BankStatementImport": [
+    "id",
+    "organization_id",
+    "company_id",
+    "journal_id",
+    "currency_id",
+    "file_name",
+    "idempotency_key",
+    "state",
+    "opening_balance",
+    "total_rows",
+    "valid_rows",
+    "invalid_rows",
+    "approved_statement_id",
+    "created_at",
+    "created_by",
+    "approved_at",
+    "approved_by"
+  ],
+  "BankStatementImportLine": [
+    "id",
+    "organization_id",
+    "import_id",
+    "row_number",
+    "date",
+    "amount",
+    "reference",
+    "description",
+    "validation_error",
+    "created_statement_line_id"
+  ],
   "BarcodeNomenclature": [
     "id",
     "organization_id",
@@ -1522,6 +1553,16 @@
   ],
   "CompanyScopeParams": [
     "company_id"
+  ],
+  "CompanyVerticalPack": [
+    "id",
+    "organization_id",
+    "company_id",
+    "pack_key",
+    "enabled",
+    "configuration",
+    "updated_at",
+    "updated_by"
   ],
   "CompleteAiAgentRunParams": [
     "status",
@@ -2948,6 +2989,13 @@
     "income_line",
     "metadata"
   ],
+  "CreateInvoiceReminderBatchParams": [
+    "company_id",
+    "template_id",
+    "channel",
+    "invoice_ids",
+    "metadata"
+  ],
   "CreateJobPositionParams": [
     "company_id",
     "name",
@@ -3829,6 +3877,8 @@
   "CreateScheduledReportParams": [
     "name",
     "report_template_id",
+    "owner_report_key",
+    "timezone",
     "model",
     "frequency",
     "hour",
@@ -3837,6 +3887,7 @@
     "next_run",
     "is_active",
     "recipients",
+    "recipient_identities",
     "description",
     "domain",
     "day_of_week",
@@ -8159,6 +8210,8 @@
     "name",
     "description",
     "report_template_id",
+    "owner_report_key",
+    "timezone",
     "model",
     "domain",
     "frequency",
@@ -8167,6 +8220,7 @@
     "hour",
     "minute",
     "recipients",
+    "recipient_identities",
     "subject",
     "body",
     "attachment_format",
@@ -8180,6 +8234,21 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "ScheduledReportRun": [
+    "id",
+    "organization_id",
+    "scheduled_report_id",
+    "scheduled_period",
+    "queue_job_id",
+    "trigger",
+    "status",
+    "error_message",
+    "generated_owner_report_id",
+    "document_id",
+    "notification_outcome",
+    "created_at",
+    "completed_at"
   ],
   "SearchEmbedding": [
     "id",
@@ -8235,6 +8304,11 @@
     "is_published",
     "website_url"
   ],
+  "SetCompanyVerticalPackParams": [
+    "pack_key",
+    "enabled",
+    "configuration"
+  ],
   "SetConsolidationCompanyRateParams": [
     "company_id",
     "period_id",
@@ -8274,6 +8348,19 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "StageBankStatementImportLineParams": [
+    "row_number",
+    "date",
+    "amount",
+    "reference",
+    "description"
+  ],
+  "StageBankStatementImportParams": [
+    "file_name",
+    "idempotency_key",
+    "opening_balance",
+    "rows"
   ],
   "StartTimesheetTimerParams": [
     "company_id",
@@ -9864,6 +9951,16 @@
     "timezone",
     "date_format",
     "language"
+  ],
+  "UpdateOwnerReportScheduleParams": [
+    "name",
+    "frequency",
+    "hour",
+    "minute",
+    "timezone",
+    "recipient_identities",
+    "is_active",
+    "next_run"
   ],
   "UpdatePartnerBankParams": [
     "acc_number",

@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
 
 const FORBIDDEN: &[&str] = &[
-    "ATTACH", "COPY", "CREATE", "DELETE", "DROP", "EXPORT", "IMPORT", "INSTALL", "LOAD",
-    "INSERT", "UPDATE", "PRAGMA", "ALTER", "GRANT", "VACUUM",
+    "ATTACH", "COPY", "CREATE", "DELETE", "DROP", "EXPORT", "IMPORT", "INSTALL", "LOAD", "INSERT",
+    "UPDATE", "PRAGMA", "ALTER", "GRANT", "VACUUM",
 ];
 
 pub fn validate_read_only_sql(sql: &str) -> Result<String> {
@@ -19,7 +19,8 @@ pub fn validate_read_only_sql(sql: &str) -> Result<String> {
             return Err(anyhow!("sql statement '{token}' is not allowed in sandbox"));
         }
     }
-    if !(upper.starts_with("SELECT") || upper.starts_with("WITH") || upper.starts_with("DESCRIBE")) {
+    if !(upper.starts_with("SELECT") || upper.starts_with("WITH") || upper.starts_with("DESCRIBE"))
+    {
         return Err(anyhow!("only SELECT/WITH/DESCRIBE queries are allowed"));
     }
     Ok(trimmed.to_string())

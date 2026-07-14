@@ -8,7 +8,7 @@ use serde_json::Value;
 use stdb_client::StdbClient;
 
 use super::{
-    low_stock,
+    distributor_controls, low_stock,
     manifest::{ExecutionLimits, RiskClass, SkillManifest},
     report_composer,
 };
@@ -67,6 +67,10 @@ pub async fn load_active_manifest(
     }
 
     let mut manifest = match skill_key.as_str() {
+        distributor_controls::CREDIT_HOLD_SKILL_KEY => distributor_controls::credit_hold_manifest(),
+        distributor_controls::DELIVERY_RUN_SKILL_KEY => {
+            distributor_controls::delivery_run_manifest()
+        }
         report_composer::REPORT_COMPOSER_SKILL_KEY => report_composer::manifest(),
         low_stock::LOW_STOCK_SKILL_KEY => low_stock::manifest(),
         _ => return Err("gateway has no executable adapter for this released skill".to_string()),

@@ -5,7 +5,7 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     ai_agent::{
-        ensure_allowed_action, ensure_model_allowed, enforce_chargeable_limits, record_ai_spend,
+        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, record_ai_spend,
         resolve_agent,
     },
     error::{AppError, AppResult},
@@ -400,19 +400,13 @@ pub async fn post_suggest(
 
     let prompt = build_suggestion_prompt(&req);
 
-    let agent = resolve_agent(
-        &state.stdb,
-        req.org_id,
-        req.agent_id,
-        req.team_member_id,
-    )
-    .await
-    .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    let agent = resolve_agent(&state.stdb, req.org_id, req.agent_id, req.team_member_id)
+        .await
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
 
     ensure_allowed_action(&agent, "form_suggest")
         .map_err(|e| AppError::Forbidden(e.to_string()))?;
-    ensure_model_allowed(&agent)
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    ensure_model_allowed(&agent).map_err(|e| AppError::BadRequest(e.to_string()))?;
     enforce_chargeable_limits(state.agent_rate_limiter.as_ref(), req.org_id, &agent)
         .map_err(|e| e.into_app_error())?;
 

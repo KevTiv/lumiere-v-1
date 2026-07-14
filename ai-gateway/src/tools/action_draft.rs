@@ -12,7 +12,11 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         .ok_or_else(|| anyhow::anyhow!("reducer_name is required"))?
         .to_string();
 
-    if !ctx.allowed_action_drafts.iter().any(|name| name == &reducer_name) {
+    if !ctx
+        .allowed_action_drafts
+        .iter()
+        .any(|name| name == &reducer_name)
+    {
         anyhow::bail!("reducer '{reducer_name}' is not allowed for this skill");
     }
 

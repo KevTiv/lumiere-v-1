@@ -1,6 +1,8 @@
 "use client"
 
 import { CrmDuplicateContacts } from "@/lib/crm-duplicate-contacts-panel"
+import { ContactIdentitiesPanel } from "./contact-identities-panel"
+import { ContactPaymentsAndMessagesPanel } from "./contact-payments-and-messages-panel"
 import { useCrmModuleSubscription } from "@/lib/module-subscription-hooks"
 import { phCapture } from "@/lib/posthog-browser"
 import {
@@ -1014,6 +1016,27 @@ function CrmClientLoaded({
       auditTableName: "contact",
       customTabs: [
         {
+          id: "phones-and-roles",
+          label: "Phones & roles",
+          content: (record) => (
+            <ContactIdentitiesPanel
+              organizationId={organizationId}
+              contactId={rowIdBigInt(record)}
+              companyId={rowCompanyId(record, operatingCompanyId)}
+            />
+          ),
+        },
+        {
+          id: "payments-and-messages",
+          label: "Payments & messages",
+          content: (record) => (
+            <ContactPaymentsAndMessagesPanel
+              organizationId={organizationId}
+              contactId={rowIdBigInt(record)}
+            />
+          ),
+        },
+        {
           id: "activity",
           label: t("crm.chatter.timeline"),
           content: (record) => (
@@ -1027,7 +1050,7 @@ function CrmClientLoaded({
         },
       ],
     }),
-    [t, organizationId],
+    [t, organizationId, operatingCompanyId],
   )
 
   const moduleConfig = useMemo((): ModuleConfig => {

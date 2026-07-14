@@ -7,11 +7,17 @@ use crate::error::ApiError;
 
 use super::{
     catalog::catalog_entry,
+    commercial::{
+        MonthlyOwnerReportV1, PaymentFeeSummaryReportV1, PurchaseSpendReportV1,
+        SalesByProductReportV1,
+    },
     common::ReportKey,
     daily_business_summary::DailyBusinessSummaryReportV1,
     financial_position::CashMobileMoneyReportV1,
+    low_stock::LowStockReportV1,
     open_balances::{CustomerBalancesReportV1, SupplierPayablesReportV1},
     service::ReportPreview,
+    stock_movement::StockMovementReportV1,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,7 +122,37 @@ pub fn mask_report_preview(
             envelope.report = mask_supplier_payables(envelope.report, field_access);
             ReportPreview::SupplierPayablesV1(envelope)
         }
+        ReportPreview::LowStockV1(mut envelope) => {
+            envelope.report = mask_low_stock(envelope.report, field_access);
+            ReportPreview::LowStockV1(envelope)
+        }
+        ReportPreview::StockMovementV1(mut envelope) => {
+            envelope.report = mask_stock_movement(envelope.report, field_access);
+            ReportPreview::StockMovementV1(envelope)
+        }
+        ReportPreview::SalesByProductV1(envelope) => ReportPreview::SalesByProductV1(envelope),
+        ReportPreview::PurchaseSpendV1(envelope) => ReportPreview::PurchaseSpendV1(envelope),
+        ReportPreview::PaymentFeeSummaryV1(envelope) => {
+            ReportPreview::PaymentFeeSummaryV1(envelope)
+        }
+        ReportPreview::MonthlyOwnerReportV1(envelope) => {
+            ReportPreview::MonthlyOwnerReportV1(envelope)
+        }
     }
+}
+
+fn mask_low_stock(
+    report: LowStockReportV1,
+    _field_access: &FieldAccessContext,
+) -> LowStockReportV1 {
+    report
+}
+
+fn mask_stock_movement(
+    report: StockMovementReportV1,
+    _field_access: &FieldAccessContext,
+) -> StockMovementReportV1 {
+    report
 }
 
 fn required_source_permissions(report_key: ReportKey) -> Vec<(&'static str, &'static str)> {
@@ -138,6 +174,7 @@ fn authoritative_source_permission(source: &str) -> Option<&'static str> {
         "payments" | "payment_transactions" | "payment_fees" => Some("payment_transaction"),
         "purchasing" | "purchases" | "bills" | "landed_costs" => Some("purchase_order"),
         "inventory" | "stock_quant" | "stock_move" | "replenishment" => Some("stock_quant"),
+        "stock_moves" => Some("stock_move"),
         "journals" => Some("account_journal"),
         "allocations" => Some("payment_reconciliation"),
         "account_move_lines" | "account_moves" => Some("account_move"),

@@ -212,7 +212,9 @@ async fn payment_accounts_get(
 
     let total = rows.len();
     let data: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
-    Ok(Json(json!({ "data": data, "meta": list_meta(total, offset, limit) })))
+    Ok(Json(
+        json!({ "data": data, "meta": list_meta(total, offset, limit) }),
+    ))
 }
 
 async fn payment_accounts_post(
@@ -253,7 +255,9 @@ async fn payment_account_put(
         .call_reducer("update_payment_account", json!([org_id, id, body]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Payment account updated successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Payment account updated successfully" } }),
+    ))
 }
 
 async fn payment_account_archive(
@@ -271,7 +275,9 @@ async fn payment_account_archive(
         .call_reducer("archive_payment_account", json!([org_id, id]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Payment account archived successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Payment account archived successfully" } }),
+    ))
 }
 
 fn payment_transaction_create_params(body: &Value) -> Result<Value, ApiError> {
@@ -336,7 +342,9 @@ async fn payment_transactions_get(
 
     let total = rows.len();
     let data: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
-    Ok(Json(json!({ "data": data, "meta": list_meta(total, offset, limit) })))
+    Ok(Json(
+        json!({ "data": data, "meta": list_meta(total, offset, limit) }),
+    ))
 }
 
 async fn payment_transactions_post(
@@ -377,7 +385,9 @@ async fn payment_transaction_put(
         .call_reducer("update_payment_transaction", json!([org_id, id, body]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Payment transaction updated successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Payment transaction updated successfully" } }),
+    ))
 }
 
 async fn payment_transaction_post(
@@ -395,7 +405,9 @@ async fn payment_transaction_post(
         .call_reducer("post_payment_transaction", json!([org_id, id]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Payment transaction posted successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Payment transaction posted successfully" } }),
+    ))
 }
 
 async fn payment_transaction_void(
@@ -413,7 +425,9 @@ async fn payment_transaction_void(
         .call_reducer("void_payment_transaction", json!([org_id, id]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Payment transaction voided successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Payment transaction voided successfully" } }),
+    ))
 }
 
 fn payment_fee_create_params(body: &Value) -> Result<Value, ApiError> {
@@ -495,7 +509,9 @@ async fn payment_transaction_reverse_post(
         .call_reducer("reverse_payment_transaction", json!([org_id, id, body]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Payment transaction reversed successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Payment transaction reversed successfully" } }),
+    ))
 }
 
 async fn payment_reconciliations_get(
@@ -522,7 +538,9 @@ async fn payment_reconciliations_get(
 
     let total = rows.len();
     let data: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
-    Ok(Json(json!({ "data": data, "meta": list_meta(total, offset, limit) })))
+    Ok(Json(
+        json!({ "data": data, "meta": list_meta(total, offset, limit) }),
+    ))
 }
 
 async fn payment_reversals_get(
@@ -549,7 +567,9 @@ async fn payment_reversals_get(
 
     let total = rows.len();
     let data: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
-    Ok(Json(json!({ "data": data, "meta": list_meta(total, offset, limit) })))
+    Ok(Json(
+        json!({ "data": data, "meta": list_meta(total, offset, limit) }),
+    ))
 }
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -562,10 +582,7 @@ pub fn router() -> Router<Arc<AppState>> {
             "/accounting/payment-accounts",
             get(payment_accounts_get).post(payment_accounts_post),
         )
-        .route(
-            "/accounting/payment-accounts/:id",
-            put(payment_account_put),
-        )
+        .route("/accounting/payment-accounts/:id", put(payment_account_put))
         .route(
             "/accounting/payment-accounts/:id/archive",
             post(payment_account_archive),
@@ -602,8 +619,5 @@ pub fn router() -> Router<Arc<AppState>> {
             "/accounting/payment-reconciliations",
             get(payment_reconciliations_get),
         )
-        .route(
-            "/accounting/payment-reversals",
-            get(payment_reversals_get),
-        )
+        .route("/accounting/payment-reversals", get(payment_reversals_get))
 }

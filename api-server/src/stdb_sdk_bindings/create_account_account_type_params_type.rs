@@ -2,12 +2,7 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{
-	self as __sdk,
-	__lib,
-	__sats,
-	__ws,
-};
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 use super::account_internal_group_type::AccountInternalGroup;
 
@@ -18,12 +13,10 @@ pub struct CreateAccountAccountTypeParams {
     pub r#type: String,
     pub internal_group: AccountInternalGroup,
     pub include_initial_balance: bool,
-    pub company_id: Option::<u64>,
-    pub metadata: Option::<String>,
+    pub company_id: Option<u64>,
+    pub metadata: Option<String>,
 }
-
 
 impl __sdk::InModule for CreateAccountAccountTypeParams {
     type Module = super::RemoteModule;
 }
-

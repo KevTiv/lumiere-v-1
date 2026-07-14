@@ -35,7 +35,10 @@ pub async fn export_stdb_table(
         sql.push_str(&format!(" AND {company_column} = {company_id}"));
     }
     if let Some(extra) = extra_where.as_deref().filter(|s| !s.trim().is_empty()) {
-        if !extra.chars().all(|c| c.is_ascii_alphanumeric() || " _=<>!.'\"(),".contains(c)) {
+        if !extra
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || " _=<>!.'\"(),".contains(c))
+        {
             anyhow::bail!("unsafe extra_where clause");
         }
         sql.push_str(" AND (");
@@ -44,15 +47,15 @@ pub async fn export_stdb_table(
     }
     sql.push_str(&format!(" LIMIT {limit}"));
 
-    let rows = stdb.query_sql(&sql).await.with_context(|| format!("export {key}"))?;
+    let rows = stdb
+        .query_sql(&sql)
+        .await
+        .with_context(|| format!("export {key}"))?;
     let table_name = dataset_table_name(key)?;
     Ok((table_name, rows))
 }
 
-pub fn export_input_rows(
-    spec: &DatasetSpec,
-    inputs: &Value,
-) -> Result<(String, Vec<Value>)> {
+pub fn export_input_rows(spec: &DatasetSpec, inputs: &Value) -> Result<(String, Vec<Value>)> {
     let DatasetSpec::Input { key, input_field } = spec else {
         anyhow::bail!("not an input spec");
     };
@@ -66,8 +69,5 @@ pub fn export_input_rows(
 }
 
 fn is_safe_identifier(value: &str) -> bool {
-    !value.is_empty()
-        && value
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    !value.is_empty() && value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }

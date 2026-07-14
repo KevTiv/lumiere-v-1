@@ -36,6 +36,9 @@ const OVERVIEW_WORKSPACE_RESOURCE_KEYS = [
   "tasks",
   "projects",
   "contacts",
+  "payment-transactions",
+  "payment-reconciliations",
+  "message-batches",
 ] as const
 
 const MAP_WORKSPACE_RESOURCE_KEYS = [

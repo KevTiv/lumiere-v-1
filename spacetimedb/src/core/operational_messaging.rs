@@ -5,10 +5,13 @@
 /// provider adapters.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::journal_entries::account_move;
 use crate::crm::contact_identities::contact_phone_identity;
+use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{
-    ContactVerificationState, MessageChannel, MessageBatchStatus, OperationalMessageStatus,
+    AccountMoveState, ContactVerificationState, MessageBatchStatus, MessageChannel, MoveType,
+    OperationalMessageStatus,
 };
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -195,6 +198,16 @@ pub struct CreateMessageBatchParams {
     pub metadata: Option<String>,
 }
 
+/// Select outstanding customer invoices and create a reviewable reminder batch.
+#[derive(SpacetimeType)]
+pub struct CreateInvoiceReminderBatchParams {
+    pub company_id: Option<u64>,
+    pub template_id: u64,
+    pub channel: MessageChannel,
+    pub invoice_ids: Vec<u64>,
+    pub metadata: Option<String>,
+}
+
 #[derive(SpacetimeType)]
 pub struct ReviewMessageBatchParams {
     pub approved: bool,
@@ -297,6 +310,34 @@ fn contact_can_receive(
     }
 }
 
+fn invoice_reminder_variables(
+    template: &MessageTemplate,
+    customer_name: &str,
+    invoice_number: &str,
+    amount_due: f64,
+    invoice_total: f64,
+) -> Result<Vec<MessageTemplateVariable>, String> {
+    let mut variables = Vec::with_capacity(template.allowed_variables.len());
+    for key in &template.allowed_variables {
+        let value = match key.as_str() {
+            "customer_name" => customer_name.to_string(),
+            "invoice_number" => invoice_number.to_string(),
+            "amount_due" => format!("{amount_due:.2}"),
+            "invoice_total" => format!("{invoice_total:.2}"),
+            other => {
+                return Err(format!(
+                    "Invoice reminder template variable '{other}' is not supported"
+                ))
+            }
+        };
+        variables.push(MessageTemplateVariable {
+            key: key.clone(),
+            value,
+        });
+    }
+    Ok(variables)
+}
+
 // ── Template reducers ─────────────────────────────────────────────────────────
 
 /// Create an operational message template.
@@ -379,8 +420,12 @@ pub fn update_message_template(
         name: params.name.unwrap_or(template.name),
         subject: params.subject.or(template.subject),
         body_template: params.body_template.unwrap_or(template.body_template),
-        allowed_variables: params.allowed_variables.unwrap_or(template.allowed_variables),
-        applicable_channels: params.applicable_channels.unwrap_or(template.applicable_channels),
+        allowed_variables: params
+            .allowed_variables
+            .unwrap_or(template.allowed_variables),
+        applicable_channels: params
+            .applicable_channels
+            .unwrap_or(template.applicable_channels),
         active: params.active.unwrap_or(template.active),
         review_state: params.review_state.unwrap_or(template.review_state),
         updated_at: ctx.timestamp,
@@ -521,15 +566,20 @@ pub fn record_message_copied(
     if message.organization_id != organization_id {
         return Err("Message belongs to a different organization".to_string());
     }
-    if message.status != OperationalMessageStatus::Draft && message.status != OperationalMessageStatus::Queued {
+    if message.status != OperationalMessageStatus::Draft
+        && message.status != OperationalMessageStatus::Queued
+    {
         return Err("Only draft or queued messages can be marked copied".to_string());
     }
 
-    ctx.db.operational_message().id().update(OperationalMessage {
-        status: OperationalMessageStatus::Copied,
-        copied_at: Some(ctx.timestamp),
-        ..message
-    });
+    ctx.db
+        .operational_message()
+        .id()
+        .update(OperationalMessage {
+            status: OperationalMessageStatus::Copied,
+            copied_at: Some(ctx.timestamp),
+            ..message
+        });
 
     write_audit_log_v2(
         ctx,
@@ -549,6 +599,171 @@ pub fn record_message_copied(
 }
 
 // ── Batch reducers ────────────────────────────────────────────────────────────
+
+/// Create invoice-linked reminder drafts for outstanding posted customer invoices.
+/// The batch remains pending until a user explicitly approves it.
+#[reducer]
+pub fn create_invoice_reminder_batch(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateInvoiceReminderBatchParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "message_batch", "create")?;
+    if params.invoice_ids.is_empty() {
+        return Err("select at least one invoice for a reminder batch".to_string());
+    }
+
+    let template = ctx
+        .db
+        .message_template()
+        .id()
+        .find(&params.template_id)
+        .ok_or("Message template not found")?;
+    if template.organization_id != organization_id {
+        return Err("Template belongs to a different organization".to_string());
+    }
+    require_active_template(&template)?;
+    if !channel_allowed(&template, &params.channel) {
+        return Err("Channel is not applicable for this template".to_string());
+    }
+
+    let mut included = Vec::with_capacity(params.invoice_ids.len());
+    let mut excluded = 0_u64;
+    let mut sample = Vec::with_capacity(3);
+    let mut seen = std::collections::BTreeSet::new();
+    for invoice_id in params.invoice_ids {
+        if !seen.insert(invoice_id) {
+            continue;
+        }
+        let Some(invoice) = ctx.db.account_move().id().find(&invoice_id) else {
+            excluded += 1;
+            continue;
+        };
+        let is_scoped_company =
+            params.company_id.is_none() || params.company_id == Some(invoice.company_id);
+        if invoice.organization_id != organization_id
+            || !is_scoped_company
+            || invoice.move_type != MoveType::OutInvoice
+            || invoice.state != AccountMoveState::Posted
+            || invoice.amount_residual <= 0.0
+        {
+            excluded += 1;
+            continue;
+        }
+        let Some(contact_id) = invoice.partner_id else {
+            excluded += 1;
+            continue;
+        };
+        let Some(customer) = ctx.db.contact().id().find(&contact_id) else {
+            excluded += 1;
+            continue;
+        };
+        if customer.organization_id != organization_id || customer.deleted_at.is_some() {
+            excluded += 1;
+            continue;
+        }
+        let (can_receive, phone_identity_id) =
+            contact_can_receive(ctx, contact_id, &params.channel);
+        let Some(phone_identity_id) = phone_identity_id.filter(|_| can_receive) else {
+            excluded += 1;
+            continue;
+        };
+        if sample.len() < 3 {
+            sample.push(phone_identity_id);
+        }
+        let variables = invoice_reminder_variables(
+            &template,
+            &customer.display_name,
+            &invoice.name,
+            invoice.amount_residual,
+            invoice.amount_total,
+        )?;
+        let rendered_body = render_template(&template, &variables)?;
+        let rendered_subject = render_subject(&template, &variables)?;
+        included.push((
+            invoice.id,
+            contact_id,
+            phone_identity_id,
+            variables,
+            rendered_subject,
+            rendered_body,
+        ));
+    }
+
+    let invoice_ids = included
+        .iter()
+        .map(|(invoice_id, ..)| *invoice_id)
+        .collect::<Vec<_>>();
+    let batch = ctx.db.message_batch().insert(MessageBatch {
+        id: 0,
+        organization_id,
+        company_id: params.company_id,
+        template_id: template.id,
+        channel: params.channel.clone(),
+        status: MessageBatchStatus::PendingApproval,
+        subject_model: "account_move".to_string(),
+        subject_query: Some(serde_json::json!({ "invoice_ids": invoice_ids }).to_string()),
+        recipient_count: included.len() as u64,
+        excluded_count: excluded,
+        preview_sample_ids: sample,
+        approved_by: None,
+        approved_at: None,
+        rejected_by: None,
+        rejected_at: None,
+        rejection_reason: None,
+        created_at: ctx.timestamp,
+        created_by: ctx.sender(),
+        metadata: params.metadata,
+    });
+
+    for (invoice_id, contact_id, phone_identity_id, variables, rendered_subject, rendered_body) in
+        included
+    {
+        ctx.db.operational_message().insert(OperationalMessage {
+            id: 0,
+            organization_id,
+            company_id: batch.company_id,
+            message_batch_id: batch.id,
+            template_id: batch.template_id,
+            contact_id,
+            phone_identity_id,
+            channel: batch.channel.clone(),
+            status: OperationalMessageStatus::Draft,
+            subject_model: batch.subject_model.clone(),
+            subject_id: invoice_id,
+            rendered_subject,
+            rendered_body,
+            variable_hash: hash_variables(&variables),
+            copied_at: None,
+            queued_at: None,
+            sent_at: None,
+            failed_at: None,
+            failure_reason: None,
+            created_at: ctx.timestamp,
+            created_by: ctx.sender(),
+            metadata: None,
+        });
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: batch.company_id,
+            table_name: "message_batch",
+            record_id: batch.id,
+            action: "CREATE_INVOICE_REMINDERS",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "recipient_count": batch.recipient_count, "excluded_count": batch.excluded_count })
+                    .to_string(),
+            ),
+            changed_fields: vec!["status".to_string(), "recipient_count".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
 
 /// Preview/create a message batch. Filters opted-out/no-phone contacts.
 #[reducer]
@@ -754,7 +969,9 @@ pub fn cancel_message_batch(
     if batch.organization_id != organization_id {
         return Err("Batch belongs to a different organization".to_string());
     }
-    if batch.status == MessageBatchStatus::Completed || batch.status == MessageBatchStatus::Cancelled {
+    if batch.status == MessageBatchStatus::Completed
+        || batch.status == MessageBatchStatus::Cancelled
+    {
         return Err("Batch is already finalized".to_string());
     }
 
@@ -773,10 +990,13 @@ pub fn cancel_message_batch(
     for message_id in child_ids {
         if let Some(message) = ctx.db.operational_message().id().find(&message_id) {
             if message.status == OperationalMessageStatus::Draft {
-                ctx.db.operational_message().id().update(OperationalMessage {
-                    status: OperationalMessageStatus::Cancelled,
-                    ..message
-                });
+                ctx.db
+                    .operational_message()
+                    .id()
+                    .update(OperationalMessage {
+                        status: OperationalMessageStatus::Cancelled,
+                        ..message
+                    });
             }
         }
     }
@@ -820,26 +1040,31 @@ pub fn set_contact_communication_preference(
         .collect();
 
     if let Some(pref) = existing.into_iter().find(|p| p.channel == channel) {
-        ctx.db.contact_communication_preference().id().update(ContactCommunicationPreference {
-            opted_in,
-            updated_at: ctx.timestamp,
-            updated_by: ctx.sender(),
-            ..pref
-        });
+        ctx.db
+            .contact_communication_preference()
+            .id()
+            .update(ContactCommunicationPreference {
+                opted_in,
+                updated_at: ctx.timestamp,
+                updated_by: ctx.sender(),
+                ..pref
+            });
     } else {
-        ctx.db.contact_communication_preference().insert(ContactCommunicationPreference {
-            id: 0,
-            organization_id,
-            company_id,
-            contact_id,
-            channel,
-            opted_in,
-            quiet_hours_start: None,
-            quiet_hours_end: None,
-            updated_at: ctx.timestamp,
-            updated_by: ctx.sender(),
-            metadata: None,
-        });
+        ctx.db
+            .contact_communication_preference()
+            .insert(ContactCommunicationPreference {
+                id: 0,
+                organization_id,
+                company_id,
+                contact_id,
+                channel,
+                opted_in,
+                quiet_hours_start: None,
+                quiet_hours_end: None,
+                updated_at: ctx.timestamp,
+                updated_by: ctx.sender(),
+                metadata: None,
+            });
     }
 
     write_audit_log_v2(

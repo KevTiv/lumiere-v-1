@@ -8,9 +8,12 @@
 
 
 import { messagesBffPost } from "@lumiere/stdb/commands"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import type { CreateInvoiceReminderBatchParams, CreateMessageBatchParams, CreateMessageTemplateParams, ReviewMessageBatchParams } from "@lumiere/stdb/types"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { useStdbQuery } from "./stdb"
 
 function toScalarU64(v: bigint | number | string): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
@@ -37,6 +40,78 @@ export function useMailMessages(
     queryFn: () => fetchQueryList('/api/query/mail-messages', 'Failed to fetch messages'),
     staleTime: 30_000,
     initialData,
+  })
+}
+
+export function useMessageTemplates(organizationId: bigint) {
+  return useStdbQuery("message-templates", organizationId)
+}
+
+export function useOperationalMessages(organizationId: bigint) {
+  return useStdbQuery("operational-messages", organizationId)
+}
+
+export function useMessageBatches(organizationId: bigint) {
+  return useStdbQuery("message-batches", organizationId)
+}
+
+function invalidateOperationalMessages(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
+  for (const resource of ["message-templates", "operational-messages", "message-batches", "contact-communication-preferences"]) {
+    qc.invalidateQueries({ queryKey: ["stdb", resource, String(organizationId)] })
+  }
+}
+
+export function useCreateMessageBatch(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreateMessageBatchParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = messagesBffPost("create_message_batch", [organizationId, stdbParamsToJson(params, "CreateMessageBatchParams")])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await response.text() || "Unable to create message batch")
+    },
+    onSuccess: () => invalidateOperationalMessages(qc, organizationId),
+  })
+}
+
+export function useCreateInvoiceReminderBatch(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreateInvoiceReminderBatchParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = messagesBffPost("create_invoice_reminder_batch", [
+        organizationId,
+        stdbParamsToJson(params, "CreateInvoiceReminderBatchParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await response.text() || "Unable to create invoice reminder batch")
+    },
+    onSuccess: () => invalidateOperationalMessages(qc, organizationId),
+  })
+}
+
+export function useCreateMessageTemplate(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreateMessageTemplateParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = messagesBffPost("create_message_template", [
+        organizationId,
+        stdbParamsToJson(params, "CreateMessageTemplateParams"),
+      ])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await response.text() || "Unable to create message template")
+    },
+    onSuccess: () => invalidateOperationalMessages(qc, organizationId),
+  })
+}
+
+export function useReviewMessageBatch(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { batchId: bigint; params: ReviewMessageBatchParams }>({
+    mutationFn: async ({ batchId, params }) => {
+      const { urlPath, init } = messagesBffPost("review_message_batch", [organizationId, batchId, stdbParamsToJson(params, "ReviewMessageBatchParams")])
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await response.text() || "Unable to review message batch")
+    },
+    onSuccess: () => invalidateOperationalMessages(qc, organizationId),
   })
 }
 

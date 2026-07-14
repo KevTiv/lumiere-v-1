@@ -9,6 +9,11 @@ test.describe("Phase 10 overview smoke", { tag: "@phase-10" }, () => {
     await expect(page.getByTestId("overview-widget-overview-stat-cards")).toBeVisible()
     await expect(page.getByTestId("overview-widget-overview-sales-trend")).toBeVisible()
     await expect(page.getByTestId("overview-widget-overview-needs-attention")).toBeVisible()
+    const controlLoop = page.getByTestId("owner-control-loop")
+    await expect(controlLoop).toBeVisible()
+    await expect(controlLoop.getByText("Reconciliation exceptions")).toBeVisible()
+    await expect(controlLoop.getByRole("link", { name: "Open inventory" })).toHaveAttribute("href", "/inventory")
+    await expect(controlLoop.getByRole("link", { name: "Review owner reports" })).toHaveAttribute("href", "/reports")
     await expectNoAppError(page)
   })
 

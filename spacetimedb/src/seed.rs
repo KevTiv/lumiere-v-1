@@ -7,7 +7,7 @@
 ///
 /// Idempotent: exits immediately if "Lumiere Demo Corp" org already exists.
 /// Safe to re-run after `spacetime publish --clear-database`.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{Identity, ReducerContext, Table};
 
 // ── Core ──────────────────────────────────────────────────────────────────────
 use crate::core::audit::{audit_log, audit_rule, AuditLog, AuditRule};
@@ -50,7 +50,7 @@ use crate::inventory::inventory_adjustments::{
     adjustment_reason, inventory_adjustment, stock_inventory, stock_inventory_line,
     AdjustmentReason, InventoryAdjustment, StockInventory, StockInventoryLine,
 };
-use crate::inventory::product::{product, Product};
+use crate::inventory::product::{product, product_variant, Product, ProductVariant};
 use crate::inventory::product_category::{product_category, ProductCategory};
 use crate::inventory::quality::{
     quality_alert, quality_alert_reason, quality_check, quality_point, quality_team, QualityAlert,
@@ -324,6 +324,107 @@ fn seed_system_skill(
         write_date: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"scope\":\"system\"}".to_string()),
     })
+}
+
+/// Seed a release-gated read-only harness skill with fixture evidence. The
+/// gateway still owns executable adapters; this is the organization-scoped
+/// approval evidence that permits an adapter to run.
+fn seed_promoted_harness_skill(
+    ctx: &ReducerContext,
+    org_id: u64,
+    company_id: u64,
+    seeder: Identity,
+    skill_key: &str,
+    name: &str,
+    description: &str,
+    resource: &str,
+    output_type: &str,
+    source_hash_char: char,
+    fixture_input: &str,
+    fixture_output: &str,
+) {
+    let skill = seed_system_skill(
+        ctx,
+        skill_key,
+        name,
+        description,
+        "operations",
+        vec!["named_resource_read".to_string()],
+        vec![],
+        "You are a reviewed, green, read-only distributor control. Summarize only the scoped operational records and request human review; never mutate ERP records.",
+        None,
+        vec![],
+    );
+    let hash = source_hash_char.to_string().repeat(64);
+    let manifest_json = format!(
+        r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["{output_type}"],"permissions":["report:read"],"resources":["{resource}"],"risk":"green","schema_version":1,"skill_key":"{skill_key}","source_hash":"sha256:{hash}","version":"1.0.0"}}"#,
+    );
+    let version = ctx.db.ai_skill_version().insert(AiSkillVersion {
+        id: 0,
+        version_key: format!("{org_id}:{}:1.0.0", skill.id),
+        organization_id: org_id,
+        skill_id: skill.id,
+        skill_key: skill_key.to_string(),
+        version: "1.0.0".to_string(),
+        manifest_schema_version: 1,
+        manifest_json,
+        source_hash: format!("sha256:{hash}"),
+        risk: AiSkillRisk::Green,
+        max_steps: 1,
+        max_tool_calls: 1,
+        permissions: vec!["report:read".to_string()],
+        resources: vec![resource.to_string()],
+        output_types: vec![output_type.to_string()],
+        reviewed_by: seeder,
+        reviewed_at: ctx.timestamp,
+        review_notes: Some("Seeded Phase 5 distributor read-only control".to_string()),
+        created_by: seeder,
+        created_at: ctx.timestamp,
+        metadata: Some(format!(
+            r#"{{"seed":true,"company_id":{company_id},"purpose":"distributor_control"}}"#
+        )),
+    });
+    let fixture = ctx.db.ai_skill_fixture().insert(AiSkillFixture {
+        id: 0,
+        fixture_key: format!("{org_id}:{}:{skill_key}-smoke", skill.id),
+        organization_id: org_id,
+        skill_id: skill.id,
+        name: format!("{name} smoke"),
+        description: Some("Canonical Phase 5 distributor control output".to_string()),
+        input_json: fixture_input.to_string(),
+        expected_output_json: fixture_output.to_string(),
+        created_by: seeder,
+        created_at: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+    let _ = ctx.db.ai_skill_test_run().insert(AiSkillTestRun {
+        id: 0,
+        organization_id: org_id,
+        skill_id: skill.id,
+        skill_version_id: version.id,
+        fixture_id: fixture.id,
+        status: AiSkillTestRunStatus::Passed,
+        actual_output_json: fixture.expected_output_json.clone(),
+        output_fingerprint: format!("fnv1a:seed-{skill_key}-smoke"),
+        failure_reason: None,
+        executed_by: seeder,
+        executed_at: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+    let _ = ctx.db.ai_skill_release().insert(AiSkillRelease {
+        id: 0,
+        organization_id: org_id,
+        skill_id: skill.id,
+        skill_version_id: version.id,
+        release_number: 1,
+        is_active: true,
+        action: "promote".to_string(),
+        previous_release_id: None,
+        rollback_target_release_id: None,
+        released_by: seeder,
+        released_at: ctx.timestamp,
+        reason: Some("Seeded Phase 5 distributor control release".to_string()),
+    });
 }
 
 #[spacetimedb::reducer]
@@ -1248,6 +1349,70 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_uid: seeder,
         write_date: ctx.timestamp,
         metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    // The low-stock report joins quant snapshots through product templates. Keep
+    // this fixture explicit so it remains deterministic when product creation
+    // is not exercised through the variant reducer.
+    ctx.db.product_variant().insert(ProductVariant {
+        id: 0,
+        organization_id: org_id,
+        product_tmpl_id: product_laptop.id,
+        name: product_laptop.name.clone(),
+        display_name: product_laptop.display_name.clone(),
+        default_code: product_laptop.default_code.clone(),
+        barcode: product_laptop.barcode.clone(),
+        combination_indices: None,
+        is_product_variant: true,
+        attribute_value_ids: vec![],
+        volume: product_laptop.volume,
+        weight: product_laptop.weight,
+        standard_price: product_laptop.standard_price,
+        lst_price: product_laptop.lst_price,
+        price: product_laptop.price,
+        price_extra: 0.0,
+        qty_available: 10.0,
+        virtual_available: 10.0,
+        incoming_qty: 0.0,
+        outgoing_qty: 0.0,
+        orderpoint_ids: vec![],
+        nbr_reordering_rules: 1,
+        reordering_min_qty: 10.0,
+        reordering_max_qty: 20.0,
+        product_template_attribute_value_ids: vec![],
+        combination_indices_dict: None,
+        is_active: true,
+        metadata: Some("{\"fixture\":\"distributor-v1\"}".to_string()),
+    });
+    ctx.db.product_variant().insert(ProductVariant {
+        id: 0,
+        organization_id: org_id,
+        product_tmpl_id: product_mouse.id,
+        name: product_mouse.name.clone(),
+        display_name: product_mouse.display_name.clone(),
+        default_code: product_mouse.default_code.clone(),
+        barcode: product_mouse.barcode.clone(),
+        combination_indices: None,
+        is_product_variant: true,
+        attribute_value_ids: vec![],
+        volume: product_mouse.volume,
+        weight: product_mouse.weight,
+        standard_price: product_mouse.standard_price,
+        lst_price: product_mouse.lst_price,
+        price: product_mouse.price,
+        price_extra: 0.0,
+        qty_available: 50.0,
+        virtual_available: 50.0,
+        incoming_qty: 0.0,
+        outgoing_qty: 0.0,
+        orderpoint_ids: vec![],
+        nbr_reordering_rules: 1,
+        reordering_min_qty: 20.0,
+        reordering_max_qty: 60.0,
+        product_template_attribute_value_ids: vec![],
+        combination_indices_dict: None,
+        is_active: true,
+        metadata: Some("{\"fixture\":\"distributor-v1\"}".to_string()),
     });
 
     let _ = ctx.db.product().insert(Product {
@@ -7020,6 +7185,36 @@ Prioritize high-severity findings and cite related records."#,
         reason: Some("Seeded Phase 1 harness low stock release".to_string()),
     });
 
+    // ── Phase 5 distributor read-only controls ────────────────────────────
+    seed_promoted_harness_skill(
+        ctx,
+        org_id,
+        company_id,
+        seeder,
+        "credit_hold_summary",
+        "Credit Exposure Review",
+        "Summarize outstanding customer receivables for a human credit-hold review; it cannot release a hold or change an order.",
+        "distributor.credit_exposure.v1",
+        "distributor.credit_exposure.result.v1",
+        'c',
+        r#"{"minimum_outstanding":0.01}"#,
+        r#"{"items":[]}"#,
+    );
+    seed_promoted_harness_skill(
+        ctx,
+        org_id,
+        company_id,
+        seeder,
+        "delivery_run_summary",
+        "Delivery Run Review",
+        "Summarize scoped outgoing pickings for a human delivery review; it cannot assign, validate, or cancel a picking.",
+        "distributor.delivery_run.v1",
+        "distributor.delivery_run.result.v1",
+        'd',
+        r#"{"include_done":false}"#,
+        r#"{"items":[]}"#,
+    );
+
     // =========================================================================
     // TIER 15 — COVERAGE ROWS FOR REMAINING PUBLIC TABLES
     // =========================================================================
@@ -7950,7 +8145,9 @@ Prioritize high-severity findings and cite related records."#,
         organization_id: org_id,
         name: "Weekly Seed Sales Digest".to_string(),
         description: Some("Coverage scheduled report".to_string()),
-        report_template_id: report_template.id,
+        report_template_id: Some(report_template.id),
+        owner_report_key: None,
+        timezone: None,
         model: "sale_order".to_string(),
         domain: Some("{\"state\":\"sale\"}".to_string()),
         frequency: "weekly".to_string(),
@@ -7959,6 +8156,7 @@ Prioritize high-severity findings and cite related records."#,
         hour: 8,
         minute: 0,
         recipients: vec!["ops@lumiere.demo".to_string()],
+        recipient_identities: vec![],
         subject: Some("Weekly sales digest".to_string()),
         body: Some("Attached is your weekly digest.".to_string()),
         attachment_format: "pdf".to_string(),

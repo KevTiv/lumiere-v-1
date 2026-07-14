@@ -1,0 +1,19 @@
+FROM node:22-alpine
+
+RUN corepack enable && corepack prepare pnpm@10.31.0 --activate
+
+WORKDIR /workspace/frontend
+
+# Docker copies these files into the named volume on its first mount;
+# subsequent starts reuse the dependency cache.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY mobile/package.json ./mobile/
+COPY web/package.json ./web/
+COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/erp-session/package.json ./packages/erp-session/
+COPY packages/erp-shared/package.json ./packages/erp-shared/
+COPY packages/query-hooks/package.json ./packages/query-hooks/
+COPY packages/stdb/package.json ./packages/stdb/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/i18n/package.json ./packages/i18n/
+RUN pnpm install --frozen-lockfile

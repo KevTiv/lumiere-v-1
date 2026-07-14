@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { Button } from "@lumiere/ui"
+import { Button, buttonVariants } from "@lumiere/ui/components/button"
 import {
   Card,
   CardContent,
@@ -42,9 +42,11 @@ import {
 
 import type {
   DailyBusinessSummaryReportV1,
+  LowStockReportV1,
   MoneyAmount,
   ReportCatalogEntry,
   ReportPreview,
+  StockMovementReportV1,
 } from "@lumiere/erp-shared/report-schemas"
 import { isReportPreviewAvailable } from "@lumiere/erp-shared/report-schemas"
 import {
@@ -52,7 +54,13 @@ import {
   useGeneratedOwnerReportHistory,
   useReportPdf,
   useReportPreview,
+  useCreateOwnerReportSchedule,
+  useOwnerReportScheduleRecipients,
+  useOwnerReportSchedules,
+  useRunOwnerReportSchedule,
+  useUpdateOwnerReportSchedule,
 } from "@lumiere/query-hooks/hooks/owner-reports"
+import { downloadPivotTableXlsx } from "@lumiere/query-hooks/hooks/templates"
 import { useToast } from "@/hooks/use-toast"
 
 interface OwnerReportsPanelProps {
@@ -86,6 +94,16 @@ function timezoneInputValue(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone
 }
 
+function ownerReportXlsxData(preview: ReportPreview): { title: string; headers: string[]; rows: (string | number)[][] } {
+  if (preview.reportKey === "low_stock_v1") return { title: "Low Stock Report", headers: ["Product", "SKU", "Available", "Reorder point", "Forecast"], rows: preview.report.lines.map((line) => [line.name, line.sku ?? "", line.available, line.reorderPoint, line.forecast]) }
+  if (preview.reportKey === "stock_movement_v1") return { title: "Stock Movement Report", headers: ["Product", "Source", "Destination", "Quantity", "Value"], rows: preview.report.lines.map((line) => [line.productName, line.sourceLocation, line.destinationLocation, line.quantity, line.valuationReference.minorUnits / 10 ** line.valuationReference.scale]) }
+  if (preview.reportKey === "sales_by_product_v1") return { title: "Sales by Product", headers: ["Product", "Quantity", "Gross sales", "Net sales", "Returns", "Margin"], rows: preview.report.lines.map((line) => [line.productName, line.quantity, line.grossSales.minorUnits / 10 ** line.grossSales.scale, line.netSales.minorUnits / 10 ** line.netSales.scale, line.returns.minorUnits / 10 ** line.returns.scale, line.margin.minorUnits / 10 ** line.margin.scale]) }
+  if (preview.reportKey === "purchase_spend_v1") return { title: "Purchase Spend", headers: ["Supplier", "Product", "Quantity", "Spend"], rows: preview.report.lines.map((line) => [line.supplierName, line.productName, line.quantity, line.spend.minorUnits / 10 ** line.spend.scale]) }
+  if (preview.reportKey === "payment_fee_summary_v1") return { title: "Payment Fee Summary", headers: ["Provider account", "Bearer", "Fee", "Tax", "Total"], rows: preview.report.lines.map((line) => [line.providerAccount, line.bearer, line.amount.minorUnits / 10 ** line.amount.scale, line.tax.minorUnits / 10 ** line.tax.scale, line.total.minorUnits / 10 ** line.total.scale]) }
+  if (preview.reportKey === "monthly_owner_report_v1") return { title: "Monthly Owner Report", headers: ["Sales", "Purchase spend", "Payment fees", "Stock movement value", "Stock movement count"], rows: [[preview.report.sales.minorUnits / 10 ** preview.report.sales.scale, preview.report.purchaseSpend.minorUnits / 10 ** preview.report.purchaseSpend.scale, preview.report.paymentFees.minorUnits / 10 ** preview.report.paymentFees.scale, preview.report.stockMovementValue.minorUnits / 10 ** preview.report.stockMovementValue.scale, preview.report.stockMovementCount]] }
+  return { title: preview.reportKey, headers: ["Generated at", "Watermark"], rows: [[preview.generatedAt, preview.watermark]] }
+}
+
 export function OwnerReportsPanel({
   organizationId,
   companies,
@@ -96,6 +114,10 @@ export function OwnerReportsPanel({
   const catalog = useReportCatalog(organizationId)
   const preview = useReportPreview(organizationId)
   const pdf = useReportPdf()
+  const createSchedule = useCreateOwnerReportSchedule(organizationId)
+  const updateSchedule = useUpdateOwnerReportSchedule()
+  const runSchedule = useRunOwnerReportSchedule()
+  const recipients = useOwnerReportScheduleRecipients(organizationId)
 
   const companyOptions = useMemo(
     () => companyRowsToSelectOptions(companies),
@@ -113,6 +135,15 @@ export function OwnerReportsPanel({
     ReportPreview | null
   >(null)
   const selectedCompanyNumber = Number(selectedCompanyId)
+  const schedules = useOwnerReportSchedules(
+    organizationId,
+    Number.isFinite(selectedCompanyNumber) ? selectedCompanyNumber : undefined,
+  )
+  const [scheduledReportKey, setScheduledReportKey] = useState<string>("")
+  const [scheduledFrequency, setScheduledFrequency] = useState<"daily" | "weekly" | "monthly">("daily")
+  const [scheduledHour, setScheduledHour] = useState("8")
+  const [scheduledMinute, setScheduledMinute] = useState("0")
+  const [scheduledRecipients, setScheduledRecipients] = useState<string[]>([])
   const history = useGeneratedOwnerReportHistory(
     organizationId,
     Number.isFinite(selectedCompanyNumber) ? selectedCompanyNumber : undefined,
@@ -123,6 +154,16 @@ export function OwnerReportsPanel({
       setSelectedCompanyId(String(defaultCompanyId))
     }
   }, [defaultCompanyId])
+
+  useEffect(() => {
+    const first = catalog.data?.reports[0]?.key
+    if (!scheduledReportKey && first) setScheduledReportKey(first)
+  }, [catalog.data?.reports, scheduledReportKey])
+
+  useEffect(() => {
+    if (scheduledRecipients.length || !recipients.data) return
+    setScheduledRecipients(recipients.data.flatMap((recipient) => [recipient.userIdentity ?? recipient.user_identity].filter(Boolean) as string[]))
+  }, [recipients.data, scheduledRecipients.length])
 
   useEffect(() => {
     if (!preview.error) return
@@ -165,6 +206,34 @@ export function OwnerReportsPanel({
     anchor.download = `${activePreview.reportKey}.pdf`
     anchor.click()
     URL.revokeObjectURL(url)
+  }
+
+  const handleXlsx = async () => {
+    if (!activePreview) return
+    const { title, headers, rows } = ownerReportXlsxData(activePreview)
+    await downloadPivotTableXlsx(title, headers, rows, `${activePreview.reportKey}.xlsx`)
+  }
+
+  const handleCreateSchedule = async () => {
+    const companyId = Number(selectedCompanyId)
+    if (!Number.isFinite(companyId) || companyId <= 0 || !scheduledReportKey || scheduledRecipients.length === 0) {
+      toast({ title: "Choose a report and at least one active recipient", variant: "destructive" })
+      return
+    }
+    const catalogEntry = entries.find((entry) => entry.key === scheduledReportKey)
+    await createSchedule.mutateAsync({
+      name: `${catalogEntry?.title ?? scheduledReportKey} schedule`,
+      companyId,
+      reportKey: scheduledReportKey as ReportPreview["reportKey"],
+      frequency: scheduledFrequency,
+      hour: Math.max(0, Math.min(23, Number(scheduledHour) || 0)),
+      minute: Math.max(0, Math.min(59, Number(scheduledMinute) || 0)),
+      timezone,
+      recipientIdentities: scheduledRecipients,
+      nextRun: new Date(Date.now() + 60_000).toISOString(),
+      isActive: true,
+    })
+    await schedules.refetch()
   }
 
   if (catalog.isLoading) {
@@ -249,6 +318,24 @@ export function OwnerReportsPanel({
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Scheduled delivery</CardTitle>
+          <CardDescription>PDF-only delivery creates an in-app notification with the immutable artifact attached.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <Field><FieldLabel>Report</FieldLabel><Select value={scheduledReportKey} onValueChange={setScheduledReportKey}><SelectTrigger><SelectValue placeholder="Choose report" /></SelectTrigger><SelectContent>{entries.map((entry) => <SelectItem key={entry.key} value={entry.key}>{entry.title}</SelectItem>)}</SelectContent></Select></Field>
+            <Field><FieldLabel>Cadence</FieldLabel><Select value={scheduledFrequency} onValueChange={(value) => setScheduledFrequency(value as "daily" | "weekly" | "monthly")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></Field>
+            <Field><FieldLabel>Hour</FieldLabel><InputGroup><InputGroupInput type="number" min="0" max="23" value={scheduledHour} onChange={(event) => setScheduledHour(event.target.value)} /></InputGroup></Field>
+            <Field><FieldLabel>Minute</FieldLabel><InputGroup><InputGroupInput type="number" min="0" max="59" value={scheduledMinute} onChange={(event) => setScheduledMinute(event.target.value)} /></InputGroup></Field>
+          </FieldGroup>
+          <Field><FieldLabel>Recipients</FieldLabel><div className="flex flex-wrap gap-3 text-sm">{recipients.data?.map((recipient) => { const identity = recipient.userIdentity ?? recipient.user_identity; if (!identity) return null; return <label key={identity} className="flex items-center gap-2"><input type="checkbox" checked={scheduledRecipients.includes(identity)} onChange={(event) => setScheduledRecipients((current) => event.target.checked ? [...current, identity] : current.filter((value) => value !== identity))} />{identity.slice(0, 16)}…</label> })}</div></Field>
+          <div><Button onClick={() => void handleCreateSchedule()} disabled={createSchedule.isPending || !scheduledReportKey}>Create schedule</Button></div>
+          {(schedules.data?.schedules.length ?? 0) > 0 && <div className="flex flex-col gap-2 text-sm">{schedules.data?.schedules.map((schedule) => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 rounded border p-3"><span>{schedule.ownerReportKey} · {schedule.frequency} · {String(schedule.hour).padStart(2, "0")}:{String(schedule.minute).padStart(2, "0")} · {schedule.isActive ? "active" : "paused"}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => void updateSchedule.mutateAsync({ scheduleId: schedule.id, input: { isActive: !schedule.isActive } }).then(() => schedules.refetch())}>{schedule.isActive ? "Pause" : "Resume"}</Button><Button size="sm" onClick={() => void runSchedule.mutateAsync(schedule.id).then(() => schedules.refetch())}>Run now</Button></div></div>)}</div>}
+        </CardContent>
+      </Card>
+
       {entries.length === 0 ? (
         <Alert>
           <FileText />
@@ -285,7 +372,7 @@ export function OwnerReportsPanel({
       )}
 
       {activePreview && !preview.isPending && (
-        <div className="flex flex-col gap-4"><div className="flex justify-end"><Button size="sm" onClick={() => void handlePdf()} disabled={pdf.isPending}><Download data-icon="inline-start" />PDF</Button></div><ReportPreviewPanel preview={activePreview} /></div>
+        <div className="flex flex-col gap-4"><div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={() => void handleXlsx()}>XLSX</Button><Button size="sm" onClick={() => void handlePdf()} disabled={pdf.isPending}><Download data-icon="inline-start" />PDF</Button></div><ReportPreviewPanel preview={activePreview} /></div>
       )}
 
       {!history.isLoading && (history.data?.length ?? 0) > 0 && (
@@ -298,7 +385,7 @@ export function OwnerReportsPanel({
             {history.data?.slice(0, 10).map((item) => (
               <div key={item.id} className="flex items-center justify-between gap-3 rounded border p-3">
                 <span>{item.reportKey} · v{item.schemaVersion}</span>
-                <div className="flex items-center gap-3"><span className="text-muted-foreground">{item.generatedAt}</span><Button size="sm" variant="outline" asChild><a href={`/api/reports/history/${item.id}/pdf`}>PDF</a></Button></div>
+                <div className="flex items-center gap-3"><span className="text-muted-foreground">{item.generatedAt}</span><a className={buttonVariants({ variant: "outline", size: "sm" })} href={`/api/reports/history/${item.id}/pdf`}>PDF</a></div>
               </div>
             ))}
           </CardContent>
@@ -513,6 +600,36 @@ function LedgerReportPreviewPanel({
   preview: Exclude<ReportPreview, { reportKey: "daily_business_summary_v1" }>
 }) {
   const { t } = useTranslation()
+  if (preview.reportKey === "low_stock_v1") {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h3 className="text-lg font-semibold tracking-tight">{t("reports.ownerReports.previewTitle")}</h3>
+          <p className="text-sm text-muted-foreground">{preview.reportKey} · v{preview.schemaVersion}</p>
+        </div>
+        <Alert variant="destructive"><AlertCircle /><AlertTitle>{t("reports.ownerReports.watermarkTitle")}</AlertTitle><AlertDescription>{preview.watermark}</AlertDescription></Alert>
+        <LowStockReportCard report={preview.report} />
+        <ReportMetadata preview={preview} />
+      </div>
+    )
+  }
+  if (preview.reportKey === "stock_movement_v1") {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h3 className="text-lg font-semibold tracking-tight">{t("reports.ownerReports.previewTitle")}</h3>
+          <p className="text-sm text-muted-foreground">{preview.reportKey} · v{preview.schemaVersion}</p>
+        </div>
+        <Alert variant="destructive"><AlertCircle /><AlertTitle>{t("reports.ownerReports.watermarkTitle")}</AlertTitle><AlertDescription>{preview.watermark}</AlertDescription></Alert>
+        <StockMovementReportCard report={preview.report} />
+        <ReportMetadata preview={preview} />
+      </div>
+    )
+  }
+  if (preview.reportKey === "sales_by_product_v1" || preview.reportKey === "purchase_spend_v1" || preview.reportKey === "payment_fee_summary_v1" || preview.reportKey === "monthly_owner_report_v1") {
+    const values = preview.reportKey === "sales_by_product_v1" ? [["Gross sales", formatMoney(preview.report.grossSales)], ["Net sales", formatMoney(preview.report.netSales)], ["Margin", formatMoney(preview.report.margin)]] : preview.reportKey === "purchase_spend_v1" ? [["Purchase spend", formatMoney(preview.report.totalSpend)], ["Quantity purchased", preview.report.quantityPurchased.toLocaleString()]] : preview.reportKey === "payment_fee_summary_v1" ? [["Fee groups", String(preview.report.feeCount)], ["Total fees", formatMoney(preview.report.total)]] : [["Sales", formatMoney(preview.report.sales)], ["Purchase spend", formatMoney(preview.report.purchaseSpend)], ["Payment fees", formatMoney(preview.report.paymentFees)], ["Stock movement", formatMoney(preview.report.stockMovementValue)]]
+    return <div className="flex flex-col gap-6"><div><h3 className="text-lg font-semibold tracking-tight">{t("reports.ownerReports.previewTitle")}</h3><p className="text-sm text-muted-foreground">{preview.reportKey} · v{preview.schemaVersion}</p></div><Alert variant="destructive"><AlertCircle /><AlertTitle>{t("reports.ownerReports.watermarkTitle")}</AlertTitle><AlertDescription>{preview.watermark}</AlertDescription></Alert><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{values.map(([label, value]) => <StatCard key={label} label={label} value={value} />)}</div><ReportMetadata preview={preview} /></div>
+  }
   const isCash = preview.reportKey === "cash_mobile_money_v1"
   return (
     <div className="flex flex-col gap-6">
@@ -612,10 +729,73 @@ function LedgerReportPreviewPanel({
   )
 }
 
+function LowStockReportCard({ report }: { report: LowStockReportV1 }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Low-stock alerts</CardTitle>
+        <CardDescription>{report.alertCount} products need replenishment attention.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        {report.lines.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No low-stock alerts in the current snapshot.</p>
+        ) : report.lines.map((line) => (
+          <div key={line.productId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+            <div>
+              <p className="font-medium">{line.name}</p>
+              <p className="text-sm text-muted-foreground">{line.sku ?? `Product ${line.productId}`} · {line.supplierHint}</p>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Badge variant={line.available <= 0 ? "destructive" : "secondary"}>Available {line.available}</Badge>
+              <span className="text-muted-foreground">Reorder {line.reorderPoint}</span>
+              {line.outdatedQuant ? <Badge variant="outline">Outdated count</Badge> : null}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+function StockMovementReportCard({ report }: { report: StockMovementReportV1 }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard label="Completed moves" value={String(report.movementCount)} />
+        <StatCard label="Quantity moved" value={report.quantityMoved.toLocaleString()} />
+        <StatCard label="Valuation reference" value={formatMoney(report.valuationReference)} />
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Movement detail</CardTitle>
+          <CardDescription>Newest completed moves in the selected local-day window.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          {report.lines.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No completed stock movements in this window.</p>
+          ) : report.lines.map((line) => (
+            <div key={line.moveId} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium">{line.productName}</p>
+                <p className="text-sm text-muted-foreground">{line.sku ?? `Product ${line.productId}`} · {line.sourceLocation} → {line.destinationLocation}</p>
+                <p className="text-xs text-muted-foreground">{line.reference ?? `Move #${line.moveId}`} · {line.movedAt ?? "Completed date unavailable"}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <Badge variant="secondary">Qty {line.quantity.toLocaleString()}</Badge>
+                <span className="text-muted-foreground">Value {formatMoney(line.valuationReference)}</span>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function CashReportStats({ report }: { report: Extract<ReportPreview, { reportKey: "cash_mobile_money_v1" }>['report'] }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      {[["Opening", report.opening], ["Receipts", report.receipts], ["Disbursements", report.disbursements], ["Fees", report.fees], ["Closing", report.closing]].map(([label, value]) => (
+      {([['Opening', report.opening], ['Receipts', report.receipts], ['Disbursements', report.disbursements], ['Fees', report.fees], ['Closing', report.closing]] satisfies Array<[string, MoneyAmount]>).map(([label, value]) => (
         <StatCard key={label} label={label} value={formatMoney(value)} />
       ))}
     </div>
@@ -630,14 +810,14 @@ function CustomerBalanceStats({
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[["Open", report.totalOpen], ["Overdue", report.overdue], ["Current", report.current]].map(
+        {([['Open', report.totalOpen], ['Overdue', report.overdue], ['Current', report.current]] satisfies Array<[string, MoneyAmount]>).map(
           ([label, value]) => (
             <StatCard key={label} label={label} value={formatMoney(value)} />
           ),
         )}
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {[["Within limit", report.creditStatus.withinLimit], ["Over limit", report.creditStatus.overLimit], ["Unknown", report.creditStatus.unknown]].map(
+        {([['Within limit', report.creditStatus.withinLimit], ['Over limit', report.creditStatus.overLimit], ['Unknown', report.creditStatus.unknown]] satisfies Array<[string, number]>).map(
           ([label, value]) => (
             <StatCard key={label} label={label} value={String(value)} />
           ),
@@ -654,7 +834,7 @@ function SupplierPayablesStats({
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      {[["Open", report.totalOpen], ["Overdue", report.overdue], ["Current", report.current], ["Paid", report.paidAmounts], ["Planned", report.plannedAmounts]].map(
+      {([['Open', report.totalOpen], ['Overdue', report.overdue], ['Current', report.current], ['Paid', report.paidAmounts], ['Planned', report.plannedAmounts]] satisfies Array<[string, MoneyAmount]>).map(
         ([label, value]) => (
           <StatCard key={label} label={label} value={formatMoney(value)} />
         ),

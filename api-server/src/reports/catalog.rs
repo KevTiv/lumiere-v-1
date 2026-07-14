@@ -113,7 +113,7 @@ pub const REPORT_CATALOG: [ReportCatalogEntry; 10] = [
             "supplier_hint",
         ],
         authoritative_sources: &["stock_quant", "stock_move", "replenishment"],
-        availability: ReportAvailability::Planned,
+        availability: ReportAvailability::Preview,
         max_window_days: 1,
     },
     ReportCatalogEntry {
@@ -129,8 +129,8 @@ pub const REPORT_CATALOG: [ReportCatalogEntry; 10] = [
             "quantity",
             "valuation_reference",
         ],
-        authoritative_sources: &["stock_moves", "stock_valuation"],
-        availability: ReportAvailability::Planned,
+        authoritative_sources: &["stock_moves"],
+        availability: ReportAvailability::Preview,
         max_window_days: 31,
     },
     ReportCatalogEntry {
@@ -140,7 +140,7 @@ pub const REPORT_CATALOG: [ReportCatalogEntry; 10] = [
         description: "Product quantities, sales, returns, and authoritative margin.",
         mandatory_sections: &["quantity", "gross_sales", "net_sales", "returns", "margin"],
         authoritative_sources: &["sales", "invoices", "returns"],
-        availability: ReportAvailability::Planned,
+        availability: ReportAvailability::Preview,
         max_window_days: 31,
     },
     ReportCatalogEntry {
@@ -156,7 +156,7 @@ pub const REPORT_CATALOG: [ReportCatalogEntry; 10] = [
             "landed_cost_policy",
         ],
         authoritative_sources: &["purchases", "bills", "landed_costs"],
-        availability: ReportAvailability::Planned,
+        availability: ReportAvailability::Preview,
         max_window_days: 31,
     },
     ReportCatalogEntry {
@@ -173,17 +173,18 @@ pub const REPORT_CATALOG: [ReportCatalogEntry; 10] = [
             "accounting_status",
         ],
         authoritative_sources: &["payment_fees", "account_moves"],
-        availability: ReportAvailability::Planned,
+        availability: ReportAvailability::Preview,
         max_window_days: 31,
     },
     ReportCatalogEntry {
         key: ReportKey::MonthlyOwnerReportV1,
         schema_version: 1,
         title: "Monthly Owner Report",
-        description: "Executive summary composed from approved owner report sections.",
+        description:
+            "Monthly operational owner summary across sales, purchasing, fees, and stock movement.",
         mandatory_sections: &["executive_summary", "selected_monthly_reports"],
-        authoritative_sources: &["owner_report_catalog"],
-        availability: ReportAvailability::Planned,
+        authoritative_sources: &["sales", "purchases", "payment_fees", "stock_moves"],
+        availability: ReportAvailability::Preview,
         max_window_days: 31,
     },
 ];
@@ -239,18 +240,24 @@ mod tests {
     }
 
     #[test]
-    fn phase_one_slice_exposes_four_previewable_reports() {
+    fn catalog_exposes_all_ten_previewable_reports() {
         let previewable: Vec<_> = REPORT_CATALOG
             .iter()
             .filter(|entry| entry.availability == ReportAvailability::Preview)
             .collect();
 
-        assert_eq!(previewable.len(), 4);
+        assert_eq!(previewable.len(), 10);
         let keys: Vec<_> = previewable.iter().map(|entry| entry.key).collect();
         assert!(keys.contains(&ReportKey::DailyBusinessSummaryV1));
         assert!(keys.contains(&ReportKey::CashMobileMoneyV1));
         assert!(keys.contains(&ReportKey::CustomerBalancesV1));
         assert!(keys.contains(&ReportKey::SupplierPayablesV1));
+        assert!(keys.contains(&ReportKey::LowStockV1));
+        assert!(keys.contains(&ReportKey::StockMovementV1));
+        assert!(keys.contains(&ReportKey::SalesByProductV1));
+        assert!(keys.contains(&ReportKey::PurchaseSpendV1));
+        assert!(keys.contains(&ReportKey::PaymentFeeSummaryV1));
+        assert!(keys.contains(&ReportKey::MonthlyOwnerReportV1));
         assert_eq!(
             catalog_entry(ReportKey::DailyBusinessSummaryV1).max_window_days,
             1

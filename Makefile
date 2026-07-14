@@ -1,4 +1,17 @@
-# SpacetimeDB: published database name(s). Override: `make publish STDB_MODULE=my-db`
+# Lumiere developer command surface.
+#
+# Prefer the scoped targets listed by `make help` (for example `local-publish`
+# and `stack-up`). The older short targets remain as compatibility aliases for
+# existing docs and CI. Override configuration at invocation time, e.g.:
+#   make local-publish STDB_MODULE=my-local-db
+#   make e2e-single E2E_SPEC=import-rollback.spec.ts
+
+.DEFAULT_GOAL := help
+SHELL := /bin/bash
+
+# ── Configuration ────────────────────────────────────────────────────────────
+
+# SpacetimeDB: published database name(s). Override: `make local-publish STDB_MODULE=my-db`
 STDB_MODULE        ?= lumiere-v1-j1uo0
 STDB_CLOUD_MODULE  ?= lumiere-v1-j1uo0
 # Local SpacetimeDB HTTP base (default maincloud; e2e-smoke overrides to local)
@@ -55,17 +68,23 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_workflow_definition_test \
 	run_subscription_plan_test
 
-.PHONY: help setup check check-env check-env-prod build \
-        start stop \
-        publish publish-clear test \
-        publish-cloud publish-cloud-clear \
-        call-tests logs \
-        call-tests-cloud logs-cloud \
-        seed-test-user e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
-        e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
-        generate-stdb-rust-sdk codegen check-codegen
+.PHONY: \
+	help help-e2e \
+	setup check check-env check-env-prod build \
+	start stop publish publish-clear test call-tests logs seed-test-user \
+	generate-stdb-ts-sdk generate-stdb-rust-sdk \
+	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
+	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
+	init-stack docker-dev docker-dev-iot \
+	codegen check-codegen api-server-run \
+	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
+	module-check module-build module-generate-ts module-generate-rust \
+	local-start local-stop local-publish local-reset local-test local-logs \
+	stack-init stack-up stack-up-iot stack-down \
+	codegen-all codegen-check api-run \
+	cloud-publish cloud-reset cloud-test cloud-logs
 
-help:
+help-legacy:
 	@echo "Usage: make <target>"
 	@echo ""
 	@echo "  setup                Install wasm32 target and wasm-opt (one-time)"
@@ -93,6 +112,9 @@ help:
 	@echo "  e2e-p2p              Wave 3 gate: procure-to-pay golden path (mvp-procure-to-pay.spec.ts)"
 	@echo "  e2e-mvp-golden       Both MVP golden paths (lead-to-cash + procure-to-pay, fresh DB)"
 	@echo "  generate-stdb-rust-sdk  Regenerate api-server Rust STDB client bindings (+ keyword fix)"
+	@echo "  init-stack              Create .env.docker, publish the local module, and configure service tokens"
+	@echo "  docker-dev              Start the OrbStack local development stack (.env.docker required)"
+	@echo "  docker-dev-iot          Start the OrbStack stack with the optional IoT gateway"
 	@echo "  codegen                 Emit query-registry, sql-columns, erp-org-sql, invalidation"
 	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI)"
 	@echo ""
@@ -101,6 +123,63 @@ help:
 	@echo "  publish-cloud-clear  Clear cloud DB and republish (destructive!)"
 	@echo "  call-tests-cloud     Call run_all_core_tests on cloud"
 	@echo "  logs-cloud           Tail logs from cloud"
+
+define print-command
+	@printf "  %-24s %s\n" "$(1)" "$(2)"
+endef
+
+help:
+	@printf "Usage: make <target> [VARIABLE=value]\n\n"
+	@printf "Setup and diagnostics\n"
+	$(call print-command,setup,Install the stable WASM target and wasm-opt.)
+	$(call print-command,check-env,Print the resolved SpacetimeDB module and host variables.)
+	$(call print-command,api-run,Run only the Rust API using api-server/.env.local.)
+	@printf "\n"
+	@printf "Module and local SpacetimeDB\n"
+	$(call print-command,module-check,Fast Rust type-check for the SpacetimeDB module.)
+	$(call print-command,module-build,Build the release WASM module.)
+	$(call print-command,local-start,Start the local SpacetimeDB server on port 3000.)
+	$(call print-command,local-stop,Stop the local SpacetimeDB server.)
+	$(call print-command,local-publish,Publish the module to the local server; preserves data.)
+	$(call print-command,local-reset,DESTRUCTIVE: clear the local database and republish.)
+	$(call print-command,local-test,Clear then republish and run core reducer tests.)
+	$(call print-command,local-logs,Tail logs for the local module.)
+	$(call print-command,seed-test-user,Seed the browser test user after fixture seeding.)
+	@printf "\nCode generation\n"
+	$(call print-command,module-generate-ts,Regenerate TypeScript client bindings from the module.)
+	$(call print-command,module-generate-rust,Regenerate Rust API-server bindings and apply keyword fixes.)
+	$(call print-command,codegen-all,Regenerate query registry and SQL metadata.)
+	$(call print-command,codegen-check,Fail when generated artifacts have drifted.)
+	@printf "\nDocker / OrbStack\n"
+	$(call print-command,stack-init,Create .env.docker then publish local SpacetimeDB and configure tokens.)
+	$(call print-command,stack-up,Start the development stack.)
+	$(call print-command,stack-up-iot,Start the development stack with the optional IoT gateway.)
+	$(call print-command,stack-down,Stop the development stack; preserves volumes.)
+	@printf "\nEnd-to-end testing\n"
+	$(call print-command,help-e2e,Show E2E commands and their important inputs.)
+	@printf "\nCloud / production\n"
+	$(call print-command,check-env-prod,Validate required production environment variables.)
+	$(call print-command,cloud-publish,Publish to SpacetimeDB Maincloud.)
+	$(call print-command,cloud-reset,DESTRUCTIVE: clear the Maincloud database and republish.)
+	$(call print-command,cloud-test,Run core reducer tests against Maincloud.)
+	$(call print-command,cloud-logs,Tail Maincloud module logs.)
+	@printf "\nCompatibility aliases: check, build, start, stop, publish, publish-clear, test, logs,\n"
+	@printf "generate-stdb-ts-sdk, generate-stdb-rust-sdk, init-stack, docker-dev, and publish-cloud.\n"
+
+help-e2e:
+	@printf "E2E commands (all use local SpacetimeDB and write logs under .tmp/e2e):\n"
+	$(call print-command,e2e-smoke,Full setup and Playwright run; E2E_SUITE=full|p0.)
+	$(call print-command,e2e-smoke-setup,Database publish plus reducer checks fixture seed and API only.)
+	$(call print-command,e2e-smoke-test,Build web and run Playwright; requires e2e-smoke-setup.)
+	$(call print-command,e2e-playwright-only,Run Playwright against already-running services.)
+	$(call print-command,e2e-single,Setup plus one spec; E2E_SPEC=<file> and E2E_GREP=<pattern>.)
+	$(call print-command,e2e-single-test,One spec against an existing E2E setup.)
+	$(call print-command,e2e-p2p,Procure-to-pay golden-path spec.)
+	$(call print-command,e2e-mvp-golden,Lead-to-cash and procure-to-pay gates.)
+	$(call print-command,e2e-wipe-local-stdb,DESTRUCTIVE: delete all local SpacetimeDB data.)
+	@printf "\nUseful inputs: E2E_CLEAR_DB=1, E2E_SUITE=p0, E2E_SPEC=<file>, E2E_GREP=<pattern>.\n"
+
+# ── Module build and environment checks ──────────────────────────────────────
 
 setup:
 	rustup target add wasm32-unknown-unknown --toolchain stable
@@ -140,7 +219,9 @@ generate-stdb-ts-sdk:
 publish-clear:
 	spacetime publish $(DB) --module-path $(MODULE) --server local --clear-database -y
 
-test: publish-clear call-tests logs
+# A test target must terminate. Use `local-logs` separately when diagnosis is
+# needed; `logs` intentionally tails forever.
+test: publish-clear call-tests
 
 call-tests:
 	spacetime call $(DB) run_all_core_tests --server local
@@ -150,6 +231,12 @@ logs:
 
 seed-test-user:
 	cd frontend/web && pnpm run seed-test-user
+
+# ── End-to-end integration workflows ─────────────────────────────────────────
+#
+# These recipes intentionally keep their orchestration in one Bash process so
+# setup state, temporary credentials, and cleanup traps remain scoped to the
+# command that created them. See `make help-e2e` for entry points and inputs.
 
 # Destructive: removes ALL local SpacetimeDB databases (fixes 403 "not authorized to reset database").
 e2e-wipe-local-stdb:
@@ -696,10 +783,19 @@ e2e-smoke:
 		echo "[e2e] Smoke tests passed."; \
 	'
 
-# --- API ----------------------------------------------------------------------
+# ── Bindings, code generation, and service entry points ───────────────────────
 generate-stdb-rust-sdk:
 	spacetime generate --lang rust --out-dir "api-server/src/stdb_sdk_bindings" --module-path $(MODULE)
 	bash scripts/fix-spacetimedb-rust-sdk-bindings.sh
+
+init-stack:
+	STDB_MODULE="$(STDB_MODULE)" bash scripts/init-stack.sh
+
+docker-dev:
+	docker compose --env-file .env.docker -f docker-compose.dev.yml up --build
+
+docker-dev-iot:
+	docker compose --env-file .env.docker -f docker-compose.dev.yml --profile iot up --build
 
 codegen:
 	cargo run -p lumiere-codegen
@@ -726,10 +822,11 @@ check-codegen: codegen
 		crates/stdb-auth/assets/query_exec_non_registry.json || \
 		(echo "Generated artifacts are out of date. Run: make generate-stdb-ts-sdk && make codegen" && exit 1)
 
+# Starts only the Rust API with its service-local environment file.
 api-server-run:
 	source api-server/.env.local && cargo run -p api-server
 
-# ── Cloud ─────────────────────────────────────────────────────────────────────
+# ── Cloud / production SpacetimeDB ───────────────────────────────────────────
 
 publish-cloud:
 	spacetime publish $(DB_CLOUD) --module-path $(MODULE) --server maincloud
@@ -742,3 +839,35 @@ call-tests-cloud:
 
 logs-cloud:
 	spacetime logs $(DB_CLOUD) --server maincloud
+
+# ── Scoped command names ─────────────────────────────────────────────────────
+#
+# Keep the original short names above for compatibility. New work should use
+# these names: each makes the target's subsystem and side effect explicit.
+
+module-check: check
+module-build: build
+module-generate-ts: generate-stdb-ts-sdk
+module-generate-rust: generate-stdb-rust-sdk
+
+local-start: start
+local-stop: stop
+local-publish: publish
+local-reset: publish-clear
+local-test: test
+local-logs: logs
+
+stack-init: init-stack
+stack-up: docker-dev
+stack-up-iot: docker-dev-iot
+stack-down:
+	docker compose --env-file .env.docker -f docker-compose.dev.yml down
+
+codegen-all: codegen
+codegen-check: check-codegen
+api-run: api-server-run
+
+cloud-publish: publish-cloud
+cloud-reset: publish-cloud-clear
+cloud-test: call-tests-cloud
+cloud-logs: logs-cloud

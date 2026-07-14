@@ -7,8 +7,9 @@ use serde_json::Value;
 use crate::{
     ai_agent::ResolvedAgentConfig,
     tools::{
-        analytics, erp_search, erp_snapshot, save_artifact, action_draft, web_search,
+        action_draft, analytics, erp_search, erp_snapshot, save_artifact,
         types::{hash_tool_input, ToolContext, ToolOutput},
+        web_search,
     },
 };
 

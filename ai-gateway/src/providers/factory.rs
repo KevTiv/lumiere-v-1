@@ -34,10 +34,7 @@ fn build_embedder(config: &Config) -> Result<Arc<dyn EmbedProvider>> {
             let key = config.google_api_key.as_deref().ok_or_else(|| {
                 anyhow::anyhow!("GOOGLE_API_KEY required when EMBEDDING_PROVIDER=gemini")
             })?;
-            Ok(Arc::new(GeminiEmbed::new(
-                key,
-                &config.gemini_embed_model,
-            )))
+            Ok(Arc::new(GeminiEmbed::new(key, &config.gemini_embed_model)))
         }
         _ => Ok(Arc::new(OllamaEmbed::new(
             &config.ollama_url,

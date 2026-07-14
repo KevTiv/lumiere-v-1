@@ -19,7 +19,8 @@ import {
   type AiSkillVersionRow,
 } from "@lumiere/query-hooks/hooks/ai-skill-registry"
 import type { AiSkillListItem } from "@lumiere/query-hooks/hooks/ai-skills"
-import { Button, Input, Textarea } from "@lumiere/ui"
+import { Button, Input } from "@lumiere/ui"
+import { Textarea } from "@lumiere/ui/components/textarea"
 
 const DEFAULT_MANIFEST = `{"limits":{"max_steps":8,"max_tool_calls":16},"output_types":["application/json"],"permissions":["report:read"],"resources":["reports.daily_business_summary.v1"],"risk":"green","schema_version":1,"skill_key":"report_composer","source_hash":"sha256:${"a".repeat(64)}","version":"1.0.1"}`
 
@@ -223,10 +224,10 @@ export function SkillRegistryPanel({ organizationId, skills }: SkillRegistryPane
                       `"skill_key":"${skillKey}"`,
                     )
                     await createVersion.mutateAsync({
-                      skillId: selectedSkillId,
+                      skillId: BigInt(selectedSkillId),
                       manifestJson: normalized,
                       reviewNotes: "Created from AI Skills admin",
-                      metadata: null,
+                      metadata: undefined,
                     })
                   })
                 }
@@ -264,14 +265,14 @@ export function SkillRegistryPanel({ organizationId, skills }: SkillRegistryPane
                               onClick={() =>
                                 void runAction(() =>
                                   recordTestRun.mutateAsync({
-                                    skillVersionId: vid,
-                                    fixtureId,
+                                    skillVersionId: BigInt(vid),
+                                    fixtureId: BigInt(fixtureId),
                                     actualOutputJson:
                                       fixture.expectedOutputJson ??
                                       fixture.expected_output_json ??
                                       "{}",
-                                    failureReason: null,
-                                    metadata: null,
+                                    failureReason: undefined,
+                                    metadata: undefined,
                                   }),
                                 )
                               }
@@ -311,13 +312,13 @@ export function SkillRegistryPanel({ organizationId, skills }: SkillRegistryPane
                 onClick={() =>
                   void runAction(() =>
                     createFixture.mutateAsync({
-                      skillId: selectedSkillId,
+                      skillId: BigInt(selectedSkillId),
                       fixtureKey,
                       name: fixtureName,
                       description: "Created from AI Skills admin",
                       inputJson: fixtureInputJson,
                       expectedOutputJson: fixtureExpectedJson,
-                      metadata: null,
+                      metadata: undefined,
                     }),
                   )
                 }

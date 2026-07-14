@@ -5,7 +5,7 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     ai_agent::{
-        ensure_allowed_action, ensure_model_allowed, enforce_chargeable_limits, record_ai_spend,
+        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, record_ai_spend,
         resolve_agent, AgentLimitViolation,
     },
     error::{AppError, AppResult},
@@ -299,20 +299,15 @@ async fn draft_actions_llm(
         .org_id
         .filter(|id| *id > 0)
         .ok_or_else(|| DraftActionsError::other("org_id is required for LLM draft generation"))?;
-    let entries = allowed_catalog_entries(&req.allowed_reducers)
-        .map_err(DraftActionsError::other)?;
+    let entries =
+        allowed_catalog_entries(&req.allowed_reducers).map_err(DraftActionsError::other)?;
     if entries.is_empty() {
         return Ok(Vec::new());
     }
 
-    let agent = resolve_agent(
-        &state.stdb,
-        org_id,
-        req.agent_id,
-        req.team_member_id,
-    )
-    .await
-    .map_err(|e| DraftActionsError::other(e.to_string()))?;
+    let agent = resolve_agent(&state.stdb, org_id, req.agent_id, req.team_member_id)
+        .await
+        .map_err(|e| DraftActionsError::other(e.to_string()))?;
 
     ensure_allowed_action(&agent, "action_draft")
         .map_err(|e| DraftActionsError::other(e.to_string()))?;
@@ -561,7 +556,8 @@ async fn fetch_grounding_snapshots(
     req: &ActionDraftRequest,
 ) -> Option<Vec<LiveSnapshot>> {
     let org_id = req.org_id.filter(|id| *id > 0)?;
-    let allowed = (!req.allowed_entity_types.is_empty()).then_some(req.allowed_entity_types.as_slice());
+    let allowed =
+        (!req.allowed_entity_types.is_empty()).then_some(req.allowed_entity_types.as_slice());
     let candidates = filter_entity_refs_by_allowed_types(
         snapshot_candidates_from_ui_context(req.ui_context.as_ref()),
         allowed,
@@ -638,13 +634,7 @@ pub async fn post_draft(
 
     let grounding_snapshots = fetch_grounding_snapshots(&state, &req).await;
 
-    let mut drafts = match draft_actions_llm(
-        &state,
-        &req,
-        grounding_snapshots.as_deref(),
-    )
-    .await
-    {
+    let mut drafts = match draft_actions_llm(&state, &req, grounding_snapshots.as_deref()).await {
         Ok(llm_drafts) if !llm_drafts.is_empty() => llm_drafts,
         Ok(_) => draft_actions_stub(&req).map_err(AppError::BadRequest)?,
         Err(DraftActionsError::Limit(violation)) => return Err(violation.into_app_error()),
@@ -715,7 +705,10 @@ mod tests {
                 "unexpected": true
             }),
         );
-        assert_eq!(params.get("name").and_then(Value::as_str), Some("Follow up"));
+        assert_eq!(
+            params.get("name").and_then(Value::as_str),
+            Some("Follow up")
+        );
         assert!(params.get("unexpected").is_none());
     }
 

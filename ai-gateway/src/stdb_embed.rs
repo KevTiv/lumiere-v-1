@@ -142,9 +142,7 @@ impl LumiereStdbExt for StdbClient {
     }
 
     async fn organization_id_for_company(&self, company_id: u64) -> anyhow::Result<Option<u64>> {
-        let sql = format!(
-            "SELECT organization_id FROM company WHERE id = {company_id} LIMIT 1"
-        );
+        let sql = format!("SELECT organization_id FROM company WHERE id = {company_id} LIMIT 1");
         let rows = self
             .query_sql(&sql)
             .await

@@ -27,20 +27,26 @@ test.describe("Owner reports e2e", { tag: "@dev-fixture" }, () => {
     return { date, timezone }
   }
 
-  test("catalog exposes four phase-1 preview reports", async ({ page }) => {
+  test("catalog exposes all ten owner-report previews", async ({ page }) => {
     const res = await page.request.get("/api/reports/catalog")
     expect(res.ok()).toBeTruthy()
     const catalog = (await res.json()) as {
       reports: Array<{ key: string; availability: string }>
     }
     const preview = catalog.reports.filter((entry) => entry.availability === "preview")
-    expect(preview).toHaveLength(4)
+    expect(preview).toHaveLength(10)
     expect(preview.map((entry) => entry.key).sort()).toEqual(
       [
         "cash_mobile_money_v1",
         "customer_balances_v1",
         "daily_business_summary_v1",
+        "low_stock_v1",
+        "stock_movement_v1",
         "supplier_payables_v1",
+        "sales_by_product_v1",
+        "purchase_spend_v1",
+        "payment_fee_summary_v1",
+        "monthly_owner_report_v1",
       ].sort(),
     )
   })
@@ -95,6 +101,32 @@ test.describe("Owner reports e2e", { tag: "@dev-fixture" }, () => {
     expect(preview.report.receipts.receiptTotal.minorUnits).toBeGreaterThan(0)
   })
 
+  test("stock movement preview returns completed-movement totals", async ({ page }) => {
+    const companyId = await fetchDefaultCompanyId(page)
+    const { date, timezone } = reportScopeInput()
+    const res = await page.request.post("/api/reports/stock_movement_v1/preview", {
+      data: { companyId, date, timezone },
+    })
+    expect(res.ok()).toBeTruthy()
+    const preview = (await res.json()) as {
+      reportKey: string
+      report: {
+        movementCount: number
+        quantityMoved: number
+        valuationReference: { minorUnits: number; scale: number }
+        lines: Array<{ sourceLocation: string; destinationLocation: string }>
+      }
+    }
+    expect(preview.reportKey).toBe("stock_movement_v1")
+    expect(preview.report.movementCount).toBeGreaterThanOrEqual(0)
+    expect(preview.report.quantityMoved).toBeGreaterThanOrEqual(0)
+    expect(preview.report.valuationReference.scale).toBe(2)
+    for (const line of preview.report.lines) {
+      expect(line.sourceLocation).not.toBe("")
+      expect(line.destinationLocation).not.toBe("")
+    }
+  })
+
   test("owner reports UI previews daily business summary", async ({ page }) => {
     test.setTimeout(120_000)
 
@@ -104,6 +136,7 @@ test.describe("Owner reports e2e", { tag: "@dev-fixture" }, () => {
     await expect(page.getByText("Daily Business Summary")).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText("Cash & Mobile Money Report")).toBeVisible()
     await expect(page.getByText("Unpaid Customer Balances")).toBeVisible()
+    await expect(page.getByText("Stock Movement Report")).toBeVisible()
 
     const dailyCard = page.locator('[class*="card"]').filter({ hasText: "Daily Business Summary" })
     await dailyCard.getByRole("button", { name: /preview/i }).click()

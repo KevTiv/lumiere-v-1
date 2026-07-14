@@ -29,6 +29,12 @@ pub struct Config {
     pub report_renderer_url: Option<String>,
     /// Mounted, durable object-store volume for opaque owner-report artifacts.
     pub report_artifact_dir: PathBuf,
+    /// Bounded polling interval for the scheduled owner-report worker.
+    pub owner_report_worker_poll_secs: u64,
+    /// Stable worker name used for queue registration and heartbeats.
+    pub owner_report_worker_name: String,
+    /// Internal health listener for the standalone owner-report worker.
+    pub owner_report_worker_port: u16,
 }
 
 impl Config {
@@ -140,6 +146,17 @@ impl Config {
         let report_artifact_dir = std::env::var("LUMIERE_REPORT_ARTIFACT_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("lumiere-owner-reports"));
+        let owner_report_worker_poll_secs = std::env::var("LUMIERE_OWNER_REPORT_WORKER_POLL_SECS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(15);
+        let owner_report_worker_name = std::env::var("LUMIERE_OWNER_REPORT_WORKER_NAME")
+            .unwrap_or_else(|_| "owner-report-worker-v1".to_string());
+        let owner_report_worker_port = std::env::var("LUMIERE_OWNER_REPORT_WORKER_PORT")
+            .ok()
+            .and_then(|value| value.parse::<u16>().ok())
+            .unwrap_or(8091);
 
         Ok(Config {
             port,
@@ -157,6 +174,9 @@ impl Config {
             cookie_secure,
             report_renderer_url,
             report_artifact_dir,
+            owner_report_worker_poll_secs,
+            owner_report_worker_name,
+            owner_report_worker_port,
         })
     }
 }

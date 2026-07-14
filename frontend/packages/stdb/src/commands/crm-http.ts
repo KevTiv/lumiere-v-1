@@ -34,6 +34,12 @@ export const CRM_BFF_REDUCERS = [
   "import_lead_csv",
   "import_opportunity_csv",
   "merge_contacts",
+  "create_contact_identity",
+  "update_contact_identity",
+  "verify_contact_identity",
+  "archive_contact_identity",
+  "assign_contact_role",
+  "end_contact_role",
 ] as const;
 
 export type CrmBffReducerKey = (typeof CRM_BFF_REDUCERS)[number];
@@ -95,6 +101,12 @@ export const CRM_COMMAND_SUBSCRIPTION_HINTS: Record<
   import_lead_csv: ["leads"],
   import_opportunity_csv: ["opportunities"],
   merge_contacts: ["contacts", "leads", "opportunities", "sale-orders"],
+  create_contact_identity: ["contact-phone-identities"],
+  update_contact_identity: ["contact-phone-identities"],
+  verify_contact_identity: ["contact-phone-identities"],
+  archive_contact_identity: ["contact-phone-identities"],
+  assign_contact_role: ["contact-role-assignments"],
+  end_contact_role: ["contact-role-assignments"],
 };
 
 export function crmCommandContract(

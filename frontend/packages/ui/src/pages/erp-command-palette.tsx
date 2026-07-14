@@ -30,6 +30,7 @@ import {
   ClipboardList,
   ClipboardCheck,
   Map as MapIcon,
+  Store,
 } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import { useRBAC } from "@/lib/rbac-context"
@@ -107,6 +108,7 @@ export function ErpCommandPalette({
       label: t("nav.groups.operations"),
       items: [
         { label: t("nav.inventory"), href: "/inventory", icon: Package, resource: "module:inventory" },
+        { label: t("nav.distributor"), href: "/distributor", icon: Store, resource: "module:inventory" },
         { label: t("nav.pos"), href: "/pos", icon: ShoppingCart, resource: "module:pos" },
         { label: t("nav.manufacturing"), href: "/manufacturing", icon: Factory, resource: "module:manufacturing" },
         { label: t("nav.map"), href: "/map", icon: MapIcon, resource: "module:map" },

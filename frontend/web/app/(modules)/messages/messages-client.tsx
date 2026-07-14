@@ -14,6 +14,7 @@ import {
 } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { messagesModuleConfig } from "@/lib/module-dashboard-configs"
+import { MessageBatchesPanel } from "./message-batches-panel"
 import { useMessagesModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useMailFollowers,
@@ -22,6 +23,8 @@ import {
   useSubscribeToRecord,
   useUnsubscribeFromRecord,
 } from "@lumiere/query-hooks/hooks/messages"
+import { useContacts } from "@lumiere/query-hooks/hooks/crm"
+import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
 import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { mailMessageRowsToSelectOptions } from "@/lib/form-lookup"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -81,12 +84,14 @@ export function MessagesClient(props: MessagesClientProps) {
 function MessagesClientLoaded({ initialMessages, initialFollowers, organizationId }: MessagesClientLoadedProps) {
   useMessagesModuleSubscription()
   const { t } = useTranslation()
-  const { identity } = useErpSession()
+  const { identity, activeCompanyId } = useErpSession()
   const moduleConfig = useMemo(() => messagesModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const { data: messages = [] } = useMailMessages(orgId, initialMessages)
   const { data: followers = [] } = useMailFollowers(orgId, initialFollowers)
+  const { data: contacts = [] } = useContacts(orgId)
+  const { data: accountMoves = [] } = useAccountMoves(orgId)
   const postMessage = usePostMessage(orgId)
   const subscribeToRecord = useSubscribeToRecord(orgId)
   const unsubscribeFromRecord = useUnsubscribeFromRecord(orgId)
@@ -175,10 +180,16 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
         if (tab.id === "messages" && tab.type === "entity") {
           return { ...tab, createForm: mailMessageFormConfig }
         }
+        if (tab.id === "message-batches") {
+          return {
+            ...tab,
+            customContent: <MessageBatchesPanel organizationId={organizationId} companyId={activeCompanyId != null ? BigInt(activeCompanyId) : 0n} contacts={contacts as Record<string, unknown>[]} invoices={accountMoves as Record<string, unknown>[]} />,
+          }
+        }
         return tab
       }),
     }),
-    [liveSections, moduleConfig, mailMessageFormConfig],
+    [accountMoves, activeCompanyId, contacts, liveSections, moduleConfig, mailMessageFormConfig, organizationId],
   )
 
   const data = useMemo(

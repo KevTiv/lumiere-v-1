@@ -573,7 +573,9 @@ async fn contact_identities_get(
 
     let total = rows.len();
     let data: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
-    Ok(Json(json!({ "data": data, "meta": { "total": total, "limit": limit, "offset": offset } })))
+    Ok(Json(
+        json!({ "data": data, "meta": { "total": total, "limit": limit, "offset": offset } }),
+    ))
 }
 
 async fn contact_identities_post(
@@ -615,7 +617,9 @@ async fn contact_identity_put(
         .call_reducer("update_contact_identity", json!([org_id, id, params]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Contact identity updated successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Contact identity updated successfully" } }),
+    ))
 }
 
 async fn contact_identity_verify(
@@ -640,7 +644,9 @@ async fn contact_identity_verify(
         )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Contact identity verified successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Contact identity verified successfully" } }),
+    ))
 }
 
 async fn contact_identity_archive(
@@ -658,7 +664,9 @@ async fn contact_identity_archive(
         .call_reducer("archive_contact_identity", json!([org_id, id]))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Contact identity archived successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Contact identity archived successfully" } }),
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -691,7 +699,9 @@ async fn contact_roles_get(
 
     let total = rows.len();
     let data: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
-    Ok(Json(json!({ "data": data, "meta": { "total": total, "limit": limit, "offset": offset } })))
+    Ok(Json(
+        json!({ "data": data, "meta": { "total": total, "limit": limit, "offset": offset } }),
+    ))
 }
 
 async fn contact_roles_post(
@@ -730,10 +740,15 @@ async fn contact_role_end(
     let reason = body.get("reason").cloned().unwrap_or(Value::Null);
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("end_contact_role", json!([org_id, id, { "reason": reason }]))
+        .call_reducer(
+            "end_contact_role",
+            json!([org_id, id, { "reason": reason }]),
+        )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(Json(json!({ "data": { "message": "Contact role ended successfully" } })))
+    Ok(Json(
+        json!({ "data": { "message": "Contact role ended successfully" } }),
+    ))
 }
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -748,10 +763,7 @@ pub fn router() -> Router<Arc<AppState>> {
             "/crm/contact-identities",
             get(contact_identities_get).post(contact_identities_post),
         )
-        .route(
-            "/crm/contact-identities/:id",
-            put(contact_identity_put),
-        )
+        .route("/crm/contact-identities/:id", put(contact_identity_put))
         .route(
             "/crm/contact-identities/:id/verify",
             post(contact_identity_verify),
@@ -760,6 +772,9 @@ pub fn router() -> Router<Arc<AppState>> {
             "/crm/contact-identities/:id/archive",
             post(contact_identity_archive),
         )
-        .route("/crm/contact-roles", get(contact_roles_get).post(contact_roles_post))
+        .route(
+            "/crm/contact-roles",
+            get(contact_roles_get).post(contact_roles_post),
+        )
         .route("/crm/contact-roles/:id/end", post(contact_role_end))
 }

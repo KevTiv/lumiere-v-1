@@ -2,23 +2,17 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{
-	self as __sdk,
-	__lib,
-	__sats,
-	__ws,
-};
-
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateContactParams {
     pub name: String,
     pub r#type: String,
-    pub email: Option::<String>,
-    pub phone: Option::<String>,
-    pub mobile: Option::<String>,
-    pub company_id: Option::<u64>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub mobile: Option<String>,
+    pub company_id: Option<u64>,
     pub is_customer: bool,
     pub is_vendor: bool,
     pub is_employee: bool,
@@ -26,35 +20,33 @@ pub struct CreateContactParams {
     pub is_partner: bool,
     pub customer_rank: i32,
     pub supplier_rank: i32,
-    pub display_name: Option::<String>,
-    pub first_name: Option::<String>,
-    pub last_name: Option::<String>,
-    pub title: Option::<String>,
-    pub email_secondary: Option::<String>,
-    pub fax: Option::<String>,
-    pub website: Option::<String>,
-    pub street: Option::<String>,
-    pub street_2: Option::<String>,
-    pub city: Option::<String>,
-    pub state_code: Option::<String>,
-    pub zip: Option::<String>,
-    pub country_code: Option::<String>,
-    pub tax_id: Option::<String>,
-    pub company_registry: Option::<String>,
-    pub industry: Option::<String>,
-    pub employees_count: Option::<i32>,
-    pub annual_revenue: Option::<f64>,
-    pub description: Option::<String>,
-    pub salesperson_id: Option::<__sdk::Identity>,
-    pub assigned_user_id: Option::<__sdk::Identity>,
-    pub parent_id: Option::<u64>,
-    pub user_id: Option::<__sdk::Identity>,
-    pub color: Option::<String>,
-    pub metadata: Option::<String>,
+    pub display_name: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub title: Option<String>,
+    pub email_secondary: Option<String>,
+    pub fax: Option<String>,
+    pub website: Option<String>,
+    pub street: Option<String>,
+    pub street_2: Option<String>,
+    pub city: Option<String>,
+    pub state_code: Option<String>,
+    pub zip: Option<String>,
+    pub country_code: Option<String>,
+    pub tax_id: Option<String>,
+    pub company_registry: Option<String>,
+    pub industry: Option<String>,
+    pub employees_count: Option<i32>,
+    pub annual_revenue: Option<f64>,
+    pub description: Option<String>,
+    pub salesperson_id: Option<__sdk::Identity>,
+    pub assigned_user_id: Option<__sdk::Identity>,
+    pub parent_id: Option<u64>,
+    pub user_id: Option<__sdk::Identity>,
+    pub color: Option<String>,
+    pub metadata: Option<String>,
 }
-
 
 impl __sdk::InModule for CreateContactParams {
     type Module = super::RemoteModule;
 }
-

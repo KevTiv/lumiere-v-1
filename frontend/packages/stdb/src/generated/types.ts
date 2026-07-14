@@ -1550,6 +1550,41 @@ export const BankMatchCandidate = __t.object("BankMatchCandidate", {
 });
 export type BankMatchCandidate = __Infer<typeof BankMatchCandidate>;
 
+export const BankStatementImport = __t.object("BankStatementImport", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  journalId: __t.u64(),
+  currencyId: __t.u64(),
+  fileName: __t.option(__t.string()),
+  idempotencyKey: __t.string(),
+  state: __t.string(),
+  openingBalance: __t.f64(),
+  totalRows: __t.u32(),
+  validRows: __t.u32(),
+  invalidRows: __t.u32(),
+  approvedStatementId: __t.option(__t.u64()),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  approvedAt: __t.option(__t.timestamp()),
+  approvedBy: __t.option(__t.identity()),
+});
+export type BankStatementImport = __Infer<typeof BankStatementImport>;
+
+export const BankStatementImportLine = __t.object("BankStatementImportLine", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  importId: __t.u64(),
+  rowNumber: __t.u32(),
+  date: __t.option(__t.timestamp()),
+  amount: __t.option(__t.f64()),
+  reference: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+  validationError: __t.option(__t.string()),
+  createdStatementLineId: __t.option(__t.u64()),
+});
+export type BankStatementImportLine = __Infer<typeof BankStatementImportLine>;
+
 // The tagged union or sum type for the algebraic type `BankStatementState`.
 export const BankStatementState = __t.enum("BankStatementState", {
   Open: __t.unit(),
@@ -1864,6 +1899,18 @@ export const CompanyScopeParams = __t.object("CompanyScopeParams", {
   companyId: __t.option(__t.u64()),
 });
 export type CompanyScopeParams = __Infer<typeof CompanyScopeParams>;
+
+export const CompanyVerticalPack = __t.object("CompanyVerticalPack", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  packKey: __t.string(),
+  enabled: __t.bool(),
+  configuration: __t.option(__t.string()),
+  updatedAt: __t.timestamp(),
+  updatedBy: __t.identity(),
+});
+export type CompanyVerticalPack = __Infer<typeof CompanyVerticalPack>;
 
 export const CompleteAiAgentRunParams = __t.object("CompleteAiAgentRunParams", {
   status: __t.string(),
@@ -3616,6 +3663,17 @@ export const CreateInvoiceFromSaleOrderParams = __t.object("CreateInvoiceFromSal
 });
 export type CreateInvoiceFromSaleOrderParams = __Infer<typeof CreateInvoiceFromSaleOrderParams>;
 
+export const CreateInvoiceReminderBatchParams = __t.object("CreateInvoiceReminderBatchParams", {
+  companyId: __t.option(__t.u64()),
+  templateId: __t.u64(),
+  get channel() {
+    return MessageChannel;
+  },
+  invoiceIds: __t.array(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateInvoiceReminderBatchParams = __Infer<typeof CreateInvoiceReminderBatchParams>;
+
 export const CreateJobPositionParams = __t.object("CreateJobPositionParams", {
   companyId: __t.option(__t.u64()),
   name: __t.string(),
@@ -4658,7 +4716,9 @@ export type CreateSavedReportParams = __Infer<typeof CreateSavedReportParams>;
 
 export const CreateScheduledReportParams = __t.object("CreateScheduledReportParams", {
   name: __t.string(),
-  reportTemplateId: __t.u64(),
+  reportTemplateId: __t.option(__t.u64()),
+  ownerReportKey: __t.option(__t.string()),
+  timezone: __t.option(__t.string()),
   model: __t.string(),
   frequency: __t.string(),
   hour: __t.u8(),
@@ -4667,6 +4727,7 @@ export const CreateScheduledReportParams = __t.object("CreateScheduledReportPara
   nextRun: __t.timestamp(),
   isActive: __t.bool(),
   recipients: __t.array(__t.string()),
+  recipientIdentities: __t.array(__t.string()),
   description: __t.option(__t.string()),
   domain: __t.option(__t.string()),
   dayOfWeek: __t.option(__t.u8()),
@@ -9952,7 +10013,9 @@ export const ScheduledReport = __t.object("ScheduledReport", {
   organizationId: __t.u64(),
   name: __t.string(),
   description: __t.option(__t.string()),
-  reportTemplateId: __t.u64(),
+  reportTemplateId: __t.option(__t.u64()),
+  ownerReportKey: __t.option(__t.string()),
+  timezone: __t.option(__t.string()),
   model: __t.string(),
   domain: __t.option(__t.string()),
   frequency: __t.string(),
@@ -9961,6 +10024,7 @@ export const ScheduledReport = __t.object("ScheduledReport", {
   hour: __t.u8(),
   minute: __t.u8(),
   recipients: __t.array(__t.string()),
+  recipientIdentities: __t.array(__t.string()),
   subject: __t.option(__t.string()),
   body: __t.option(__t.string()),
   attachmentFormat: __t.string(),
@@ -9976,6 +10040,23 @@ export const ScheduledReport = __t.object("ScheduledReport", {
   metadata: __t.option(__t.string()),
 });
 export type ScheduledReport = __Infer<typeof ScheduledReport>;
+
+export const ScheduledReportRun = __t.object("ScheduledReportRun", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  scheduledReportId: __t.u64(),
+  scheduledPeriod: __t.timestamp(),
+  queueJobId: __t.option(__t.u64()),
+  trigger: __t.string(),
+  status: __t.string(),
+  errorMessage: __t.option(__t.string()),
+  generatedOwnerReportId: __t.option(__t.u64()),
+  documentId: __t.option(__t.u64()),
+  notificationOutcome: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+  completedAt: __t.option(__t.timestamp()),
+});
+export type ScheduledReportRun = __Infer<typeof ScheduledReportRun>;
 
 export const SearchEmbedding = __t.object("SearchEmbedding", {
   id: __t.u64(),
@@ -10058,6 +10139,13 @@ export const SetArticlePublishedParams = __t.object("SetArticlePublishedParams",
 });
 export type SetArticlePublishedParams = __Infer<typeof SetArticlePublishedParams>;
 
+export const SetCompanyVerticalPackParams = __t.object("SetCompanyVerticalPackParams", {
+  packKey: __t.string(),
+  enabled: __t.bool(),
+  configuration: __t.option(__t.string()),
+});
+export type SetCompanyVerticalPackParams = __Infer<typeof SetCompanyVerticalPackParams>;
+
 export const SetConsolidationCompanyRateParams = __t.object("SetConsolidationCompanyRateParams", {
   companyId: __t.u64(),
   periodId: __t.u64(),
@@ -10117,6 +10205,25 @@ export const SplitMethod = __t.enum("SplitMethod", {
   ByVolume: __t.unit(),
 });
 export type SplitMethod = __Infer<typeof SplitMethod>;
+
+export const StageBankStatementImportLineParams = __t.object("StageBankStatementImportLineParams", {
+  rowNumber: __t.u32(),
+  date: __t.option(__t.timestamp()),
+  amount: __t.option(__t.f64()),
+  reference: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+});
+export type StageBankStatementImportLineParams = __Infer<typeof StageBankStatementImportLineParams>;
+
+export const StageBankStatementImportParams = __t.object("StageBankStatementImportParams", {
+  fileName: __t.option(__t.string()),
+  idempotencyKey: __t.string(),
+  openingBalance: __t.f64(),
+  get rows() {
+    return __t.array(StageBankStatementImportLineParams);
+  },
+});
+export type StageBankStatementImportParams = __Infer<typeof StageBankStatementImportParams>;
 
 export const StartTimesheetTimerParams = __t.object("StartTimesheetTimerParams", {
   companyId: __t.option(__t.u64()),
@@ -12008,6 +12115,18 @@ export const UpdateOrganizationParams = __t.object("UpdateOrganizationParams", {
   language: __t.option(__t.string()),
 });
 export type UpdateOrganizationParams = __Infer<typeof UpdateOrganizationParams>;
+
+export const UpdateOwnerReportScheduleParams = __t.object("UpdateOwnerReportScheduleParams", {
+  name: __t.option(__t.string()),
+  frequency: __t.option(__t.string()),
+  hour: __t.option(__t.u8()),
+  minute: __t.option(__t.u8()),
+  timezone: __t.option(__t.string()),
+  recipientIdentities: __t.option(__t.array(__t.string())),
+  isActive: __t.option(__t.bool()),
+  nextRun: __t.option(__t.timestamp()),
+});
+export type UpdateOwnerReportScheduleParams = __Infer<typeof UpdateOwnerReportScheduleParams>;
 
 export const UpdatePartnerBankParams = __t.object("UpdatePartnerBankParams", {
   accNumber: __t.option(__t.string()),
