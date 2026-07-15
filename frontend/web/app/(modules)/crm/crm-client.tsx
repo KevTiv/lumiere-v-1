@@ -7,6 +7,7 @@ import { ContactConsentPanel } from "./contact-consent-panel"
 import { ContactRelationshipsPanel } from "./contact-relationships-panel"
 import { OpportunityPresenceBanner } from "./opportunity-presence-banner"
 import { CrmPipelineAdminPanel } from "./crm-pipeline-admin-panel"
+import { CrmCountryPackPanel } from "./crm-country-pack-panel"
 import { LeadScorePanel } from "./lead-score-panel"
 import { CrmInboxPanel } from "./crm-inbox-panel"
 import { RelationshipInsightPanel } from "./relationship-insight-panel"
@@ -93,10 +94,6 @@ import {
   useClearOpportunityPresence,
   useOpportunityPresence,
   useUpdateOpportunityPresence,
-  useCreateOpportunityStage,
-  useCreateLeadSource,
-  useCreateAssignmentRule,
-  useAssignmentRules,
 } from "@lumiere/query-hooks/hooks/crm"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
@@ -1411,6 +1408,10 @@ function CrmClientLoaded({
             <div className="space-y-6">
               <CrmPipelineAdminPanel organizationId={organizationId} />
               <SegmentRulesPanel organizationId={organizationId} />
+              <CrmCountryPackPanel
+                organizationId={organizationId}
+                companyId={operatingCompanyId}
+              />
             </div>
           ),
         },

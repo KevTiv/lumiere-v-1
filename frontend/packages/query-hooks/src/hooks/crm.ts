@@ -28,18 +28,23 @@ import type {
   SetContactSegmentRulesParams,
   UpdateCrmConversationParams,
   CreateLeadParams,
+  CreateLeadLostReasonParams,
   CreateLeadSourceParams,
   CreateOpportunityLineParams,
   CreateOpportunityParams,
   CreateOpportunityStageParams,
+  UpdateAssignmentRuleParams,
   UpdateContactAddressParams,
   UpdateContactBusinessParams,
   UpdateContactDetailsParams,
   UpdateContactCoreParams,
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
+  UpdateLeadLostReasonParams,
   UpdateLeadRevenueParams,
+  UpdateLeadSourceParams,
   UpdateOpportunityParams,
+  UpdateOpportunityStageParams,
   MergeContactsParams,
   AssignContactRoleParams,
   CreateContactIdentityParams,
@@ -908,6 +913,20 @@ export function useCreateOpportunityStage(organizationId: bigint) {
   })
 }
 
+export function useLeadSources(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("lead-sources", organizationId, {
+    initialData,
+    staleTime: 60_000,
+  })
+}
+
+export function useLeadLostReasons(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("lead-lost-reasons", organizationId, {
+    initialData,
+    staleTime: 60_000,
+  })
+}
+
 export function useCreateLeadSource(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateLeadSourceParams>({
@@ -919,7 +938,108 @@ export function useCreateLeadSource(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create lead source")
     },
-    onSuccess: () => invalidateResourceQueries(qc, organizationId, ["leads"]),
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["lead-sources"]),
+  })
+}
+
+export function useUpdateOpportunityStage(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { stageId: ScalarId; params: UpdateOpportunityStageParams }
+  >({
+    mutationFn: async ({ stageId, params }) => {
+      const { urlPath, init } = crmBffPost("update_opportunity_stage", [
+        organizationId,
+        toScalarU64(stageId),
+        stdbParamsToJson(params as object, "UpdateOpportunityStageParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update opportunity stage")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["opportunity-stages"]),
+  })
+}
+
+export function useUpdateLeadSource(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { sourceId: ScalarId; params: UpdateLeadSourceParams }
+  >({
+    mutationFn: async ({ sourceId, params }) => {
+      const { urlPath, init } = crmBffPost("update_lead_source", [
+        organizationId,
+        toScalarU64(sourceId),
+        stdbParamsToJson(params as object, "UpdateLeadSourceParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update lead source")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["lead-sources"]),
+  })
+}
+
+export function useCreateLeadLostReason(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreateLeadLostReasonParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = crmBffPost("create_lead_lost_reason", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateLeadLostReasonParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create lead lost reason")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["lead-lost-reasons"]),
+  })
+}
+
+export function useUpdateLeadLostReason(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { lostReasonId: ScalarId; params: UpdateLeadLostReasonParams }
+  >({
+    mutationFn: async ({ lostReasonId, params }) => {
+      const { urlPath, init } = crmBffPost("update_lead_lost_reason", [
+        organizationId,
+        toScalarU64(lostReasonId),
+        stdbParamsToJson(params as object, "UpdateLeadLostReasonParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update lead lost reason")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["lead-lost-reasons"]),
+  })
+}
+
+export function useUpdateAssignmentRule(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { ruleId: ScalarId; params: UpdateAssignmentRuleParams }
+  >({
+    mutationFn: async ({ ruleId, params }) => {
+      const { urlPath, init } = crmBffPost("update_assignment_rule", [
+        organizationId,
+        toScalarU64(ruleId),
+        stdbParamsToJson(params as object, "UpdateAssignmentRuleParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update assignment rule")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["assignment-rules"]),
   })
 }
 
@@ -1170,10 +1290,12 @@ export type {
   SetContactSegmentRulesParams,
   UpdateCrmConversationParams,
   CreateLeadParams,
+  CreateLeadLostReasonParams,
   CreateLeadSourceParams,
   CreateOpportunityLineParams,
   CreateOpportunityParams,
   CreateOpportunityStageParams,
+  UpdateAssignmentRuleParams,
   UpdateContactAddressParams,
   UpdateContactBusinessParams,
   UpdateContactDetailsParams,
@@ -1183,6 +1305,9 @@ export type {
   EndContactRoleParams,
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
+  UpdateLeadLostReasonParams,
   UpdateLeadRevenueParams,
+  UpdateLeadSourceParams,
   UpdateOpportunityParams,
+  UpdateOpportunityStageParams,
 } from '@lumiere/stdb/types'

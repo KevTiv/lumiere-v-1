@@ -6,6 +6,8 @@ import type { SubscriptionQueryContext } from "../queries/erp-subscriptions";
  */
 export const CRM_WORKSPACE_RESOURCE_KEYS = [
   "leads",
+  "lead-sources",
+  "lead-lost-reasons",
   "opportunities",
   "opportunity-stages",
   "opportunity-lines",
