@@ -1551,6 +1551,17 @@
     "deleted_at",
     "metadata"
   ],
+  "CompanyCountryPack": [
+    "id",
+    "organization_id",
+    "company_id",
+    "pack_key",
+    "enabled",
+    "configuration",
+    "activated_at",
+    "updated_at",
+    "updated_by"
+  ],
   "CompanyScopeParams": [
     "company_id"
   ],
@@ -1860,6 +1871,25 @@
     "phone_code",
     "currency_code",
     "language_codes",
+    "is_active",
+    "metadata"
+  ],
+  "CountryPackDefinition": [
+    "pack_key",
+    "country_code",
+    "name",
+    "region",
+    "version",
+    "is_active",
+    "metadata"
+  ],
+  "CountryPackTaxRule": [
+    "id",
+    "pack_key",
+    "code",
+    "name",
+    "rate",
+    "tax_use",
     "is_active",
     "metadata"
   ],
@@ -3909,6 +3939,13 @@
     "amount",
     "metadata"
   ],
+  "CreateSodConflictRuleParams": [
+    "permission_a",
+    "permission_b",
+    "description",
+    "is_active",
+    "metadata"
+  ],
   "CreateStockInventoryLineParams": [
     "product_id",
     "product_variant_id",
@@ -4809,6 +4846,16 @@
     "created_by",
     "metadata"
   ],
+  "DelegatedAdminScope": [
+    "id",
+    "organization_id",
+    "company_id",
+    "user_identity",
+    "granted_by",
+    "granted_at",
+    "is_active",
+    "metadata"
+  ],
   "DeleteAccountMoveLineParams": [
     "company_id"
   ],
@@ -5234,6 +5281,10 @@
     "updated_at",
     "deleted_at",
     "created_by",
+    "metadata"
+  ],
+  "GrantDelegatedAdminScopeParams": [
+    "user_identity",
     "metadata"
   ],
   "GrantOrgPermissionParams": [
@@ -6465,6 +6516,14 @@
     "effect",
     "created_by",
     "created_at"
+  ],
+  "OrgSchemaMigration": [
+    "id",
+    "organization_id",
+    "version",
+    "name",
+    "applied_at",
+    "applied_by"
   ],
   "Organization": [
     "id",
@@ -8250,6 +8309,12 @@
     "created_at",
     "completed_at"
   ],
+  "SchemaMigration": [
+    "version",
+    "name",
+    "applied_at",
+    "applied_by"
+  ],
   "SearchEmbedding": [
     "id",
     "content_type",
@@ -8304,6 +8369,11 @@
     "is_published",
     "website_url"
   ],
+  "SetCompanyCountryPackParams": [
+    "pack_key",
+    "enabled",
+    "configuration"
+  ],
   "SetCompanyVerticalPackParams": [
     "pack_key",
     "enabled",
@@ -8347,6 +8417,16 @@
     "create_date",
     "write_uid",
     "write_date",
+    "metadata"
+  ],
+  "SodConflictRule": [
+    "id",
+    "organization_id",
+    "permission_a",
+    "permission_b",
+    "description",
+    "is_active",
+    "created_at",
     "metadata"
   ],
   "StageBankStatementImportLineParams": [

@@ -1984,3 +1984,39 @@ export function toCreateEliminationEntryParams(
     metadata: optionalTrimmedString(field(formData, 'metadata', 'metadata')),
   }
 }
+
+export function toRunFxRevaluationParamsFromForm(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const currencyCode = optionalTrimmedString(formData.currencyCode)?.toUpperCase()
+  const journalId = requiredBigIntU64(formData.journalId)
+  const accountId = requiredBigIntU64(formData.accountId)
+  const gainAccountId = requiredBigIntU64(formData.gainAccountId)
+  const lossAccountId = requiredBigIntU64(formData.lossAccountId)
+  const adjustment = Number(formData.adjustment)
+  if (
+    !currencyCode ||
+    journalId == null ||
+    accountId == null ||
+    gainAccountId == null ||
+    lossAccountId == null ||
+    !Number.isFinite(adjustment) ||
+    adjustment === 0
+  ) {
+    return null
+  }
+  return {
+    currencyCode,
+    asOfDate: timestampFromFormDate(formData.asOfDate),
+    journalId,
+    gainAccountId,
+    lossAccountId,
+    lines: [{ accountId, adjustment }],
+    reference: optionalTrimmedString(formData.reference),
+    metadata: undefined,
+  }
+}
+
+export function runFxRevaluationParamsToJson(params: Record<string, unknown>): Record<string, unknown> {
+  return stdbParamsToJson(params, 'RunFxRevaluationParams')
+}

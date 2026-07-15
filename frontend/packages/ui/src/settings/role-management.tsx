@@ -7,9 +7,12 @@ import {
   permissionsMapToStrings,
   useAddCasbinRule,
   useCreateRole,
+  useCreateSodConflictRule,
   useRemoveCasbinRule,
   useSettingsRoles,
+  useSodConflictRules,
   useUpdateRole,
+  useUpdateSodConflictRule,
 } from "@lumiere/query-hooks/hooks/auth"
 import { useErpSession } from "@lumiere/erp-session"
 import { hasValidOrganizationId } from "@/lib/org-scoped"
@@ -72,10 +75,18 @@ export function RoleManagement() {
   const updateRole = useUpdateRole(orgBigInt)
   const addCasbinRule = useAddCasbinRule(orgBigInt)
   const removeCasbinRule = useRemoveCasbinRule(orgBigInt)
+  const createSodRule = useCreateSodConflictRule(orgBigInt)
+  const updateSodRule = useUpdateSodConflictRule(orgBigInt)
+  const { data: sodRules = [], refetch: refetchSodRules } = useSodConflictRules(orgBigInt)
   const { checkPermission } = useRBAC()
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [casbinModal, setCasbinModal] = useState<"add" | "remove" | null>(null)
+  const [sodModalOpen, setSodModalOpen] = useState(false)
+  const [sodError, setSodError] = useState<string | null>(null)
+  const [sodPermissionA, setSodPermissionA] = useState("")
+  const [sodPermissionB, setSodPermissionB] = useState("")
+  const [sodDescription, setSodDescription] = useState("")
   const [casbinError, setCasbinError] = useState<string | null>(null)
   const [casbinRules, setCasbinRules] = useState<Record<string, unknown>[]>([])
   const [selectedPermissions, setSelectedPermissions] = useState<Map<string, Set<Action>>>(new Map())
@@ -355,6 +366,83 @@ export function RoleManagement() {
       {canManagePolicies && orgReady ? (
         <Card>
           <CardHeader>
+            <CardTitle className="text-base">{t("settings.roles.sod.cardTitle")}</CardTitle>
+            <CardDescription>{t("settings.roles.sod.cardDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSodError(null)
+                  setSodPermissionA("")
+                  setSodPermissionB("")
+                  setSodDescription("")
+                  setSodModalOpen(true)
+                }}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                {t("settings.roles.sod.addRule")}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => void refetchSodRules()}>
+                {t("common.refresh")}
+              </Button>
+            </div>
+            {sodRules.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("settings.roles.sod.empty")}</p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {sodRules.map((rule) => {
+                  const id = String(rule.id ?? "")
+                  const a = String(rule.permission_a ?? rule.permissionA ?? "")
+                  const b = String(rule.permission_b ?? rule.permissionB ?? "")
+                  const desc = String(rule.description ?? "")
+                  const isActive = rule.is_active !== false && rule.isActive !== false
+                  return (
+                    <li key={id} className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2 font-medium">
+                          <span>
+                            {a} ↔ {b}
+                          </span>
+                          {!isActive ? (
+                            <Badge variant="secondary">{t("settings.roles.sod.inactive")}</Badge>
+                          ) : null}
+                        </div>
+                        {desc ? <div className="text-muted-foreground">{desc}</div> : null}
+                      </div>
+                      {isActive ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={updateSodRule.isPending}
+                          onClick={() => {
+                            void updateSodRule
+                              .mutateAsync({ ruleId: id, params: { isActive: false } })
+                              .then(() => void refetchSodRules())
+                              .catch((error) => {
+                                setSodError(error instanceof Error ? error.message : String(error))
+                              })
+                          }}
+                        >
+                          {t("settings.roles.sod.deactivate")}
+                        </Button>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canManagePolicies && orgReady ? (
+        <Card>
+          <CardHeader>
             <CardTitle className="text-base">{t("settings.adminOps.casbin.cardTitle")}</CardTitle>
             <CardDescription>{t("settings.adminOps.casbin.cardDescription")}</CardDescription>
           </CardHeader>
@@ -521,6 +609,73 @@ export function RoleManagement() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {sodModalOpen ? (
+        <Dialog open onOpenChange={setSodModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t("settings.roles.sod.addTitle")}</DialogTitle>
+              <DialogDescription>{t("settings.roles.sod.addDescription")}</DialogDescription>
+            </DialogHeader>
+            <form
+              className="space-y-4"
+              onSubmit={async (event) => {
+                event.preventDefault()
+                setSodError(null)
+                try {
+                  await createSodRule.mutateAsync({
+                    permissionA: sodPermissionA,
+                    permissionB: sodPermissionB,
+                    description: sodDescription || undefined,
+                  })
+                  setSodModalOpen(false)
+                } catch (error) {
+                  setSodError(error instanceof Error ? error.message : String(error))
+                }
+              }}
+            >
+              <div className="space-y-2">
+                <Label htmlFor="sod-permission-a">{t("settings.roles.sod.permissionA")}</Label>
+                <Input
+                  id="sod-permission-a"
+                  value={sodPermissionA}
+                  onChange={(e) => setSodPermissionA(e.target.value)}
+                  placeholder="account_payment:create"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sod-permission-b">{t("settings.roles.sod.permissionB")}</Label>
+                <Input
+                  id="sod-permission-b"
+                  value={sodPermissionB}
+                  onChange={(e) => setSodPermissionB(e.target.value)}
+                  placeholder="account_payment:post"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sod-description">{t("settings.roles.sod.description")}</Label>
+                <Textarea
+                  id="sod-description"
+                  value={sodDescription}
+                  onChange={(e) => setSodDescription(e.target.value)}
+                  rows={2}
+                />
+              </div>
+              {sodError ? <p className="text-sm text-destructive">{sodError}</p> : null}
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setSodModalOpen(false)}>
+                  {t("common.cancel")}
+                </Button>
+                <Button type="submit" disabled={createSodRule.isPending}>
+                  {t("settings.roles.sod.submit")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       {casbinModal ? (
         <FormModal

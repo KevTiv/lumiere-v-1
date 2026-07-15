@@ -45,6 +45,11 @@ export const ACCOUNTING_WORKSPACE_RESOURCE_KEYS = [
   "tax-groups",
   "tax-jurisdictions",
   "tax-schedules",
+  "financial-reports",
+  "trial-balances",
+  "fx-revaluation-runs",
+  "deferred-revenue-schedules",
+  "deferred-revenue-lines",
 ] as const;
 
 export type AccountingWorkspaceResourceKey =

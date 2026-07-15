@@ -141,6 +141,19 @@ export function PeriodCloseChecklist({
     })
   }, [financialReports])
 
+  const trialBalanceReady = useMemo(() => {
+    return financialReports.some((r) => {
+      const raw = r.reportType ?? r.report_type
+      const tag =
+        raw != null && typeof raw === "object" && "tag" in raw
+          ? String((raw as { tag?: string }).tag ?? "")
+          : String(raw ?? "")
+      if (!tag.toLowerCase().includes("trial")) return false
+      const st = reportStateNormalized(r)
+      return st === "generated" || st === "exported" || st === "archived"
+    })
+  }, [financialReports])
+
   const openPeriodCount = useMemo(
     () =>
       companyPeriods.filter((p) => accountPeriodStateTag(p) === "Open").length,
@@ -159,6 +172,11 @@ export function PeriodCloseChecklist({
       : draftMoveCount === 0
         ? "done"
         : "pending"
+    const tbStatus: StepStatus = !fiscalConfigured
+      ? "blocked"
+      : trialBalanceReady
+        ? "done"
+        : "pending"
     const vatStatus: StepStatus = !fiscalConfigured
       ? "blocked"
       : vatReady
@@ -166,9 +184,11 @@ export function PeriodCloseChecklist({
         : "pending"
     const closeStatus: StepStatus = !fiscalConfigured
       ? "blocked"
-      : openPeriodCount === 0
-        ? "done"
-        : "pending"
+      : draftMoveCount > 0 || unreconciledBankLines > 0
+        ? "blocked"
+        : openPeriodCount === 0
+          ? "done"
+          : "pending"
 
     return [
       {
@@ -200,6 +220,14 @@ export function PeriodCloseChecklist({
         icon: <FileText className="h-5 w-5" />,
       },
       {
+        id: "trial-balance",
+        title: t("accounting.periodClose.steps.trialBalance.title"),
+        description: t("accounting.periodClose.steps.trialBalance.description"),
+        status: tbStatus,
+        href: "/reports",
+        icon: <FileText className="h-5 w-5" />,
+      },
+      {
         id: "vat-report",
         title: t("accounting.periodClose.steps.vatReport.title"),
         description: t("accounting.periodClose.steps.vatReport.description"),
@@ -222,6 +250,7 @@ export function PeriodCloseChecklist({
     fiscalConfigured,
     unreconciledBankLines,
     draftMoveCount,
+    trialBalanceReady,
     vatReady,
     openPeriodCount,
     t,

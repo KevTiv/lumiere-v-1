@@ -2392,6 +2392,34 @@ export function useImportAccountMoveLineCsv(organizationId: number, companyId: b
   })
 }
 
+/** FX revaluation run history for the organization. */
+export function useFxRevaluationRuns(
+  organizationId: bigint,
+  options?: { staleTime?: number; enabled?: boolean },
+) {
+  return useStdbQuery("fx-revaluation-runs", organizationId, options)
+}
+
+export function useRunFxRevaluation(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const { urlPath, init } = accountingBffPost("run_fx_revaluation", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params, "RunFxRevaluationParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["stdb", "fx-revaluation-runs", k] })
+      invalidateMoveQueries(qc, organizationId)
+    },
+  })
+}
+
 /** Chart / journal / tax / budget / analytic CSV imports for accounting UI toolbars. */
 export function useAccountingCsvImportMutations(organizationId: number, companyId: bigint) {
   return {

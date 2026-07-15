@@ -1895,6 +1895,19 @@ export const Company = __t.object("Company", {
 });
 export type Company = __Infer<typeof Company>;
 
+export const CompanyCountryPack = __t.object("CompanyCountryPack", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  packKey: __t.string(),
+  enabled: __t.bool(),
+  configuration: __t.option(__t.string()),
+  activatedAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  updatedBy: __t.identity(),
+});
+export type CompanyCountryPack = __Infer<typeof CompanyCountryPack>;
+
 export const CompanyScopeParams = __t.object("CompanyScopeParams", {
   companyId: __t.option(__t.u64()),
 });
@@ -2304,6 +2317,29 @@ export const Country = __t.object("Country", {
   metadata: __t.option(__t.string()),
 });
 export type Country = __Infer<typeof Country>;
+
+export const CountryPackDefinition = __t.object("CountryPackDefinition", {
+  packKey: __t.string(),
+  countryCode: __t.string(),
+  name: __t.string(),
+  region: __t.string(),
+  version: __t.string(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CountryPackDefinition = __Infer<typeof CountryPackDefinition>;
+
+export const CountryPackTaxRule = __t.object("CountryPackTaxRule", {
+  id: __t.u64(),
+  packKey: __t.string(),
+  code: __t.string(),
+  name: __t.string(),
+  rate: __t.f64(),
+  taxUse: __t.string(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CountryPackTaxRule = __Infer<typeof CountryPackTaxRule>;
 
 export const CreateAccountAccountParams = __t.object("CreateAccountAccountParams", {
   companyId: __t.option(__t.u64()),
@@ -4753,6 +4789,15 @@ export const CreateShippingMethodParams = __t.object("CreateShippingMethodParams
 });
 export type CreateShippingMethodParams = __Infer<typeof CreateShippingMethodParams>;
 
+export const CreateSodConflictRuleParams = __t.object("CreateSodConflictRuleParams", {
+  permissionA: __t.string(),
+  permissionB: __t.string(),
+  description: __t.option(__t.string()),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSodConflictRuleParams = __Infer<typeof CreateSodConflictRuleParams>;
+
 export const CreateStockInventoryLineParams = __t.object("CreateStockInventoryLineParams", {
   productId: __t.u64(),
   productVariantId: __t.option(__t.u64()),
@@ -5767,6 +5812,18 @@ export const DeferredRevenueSchedule = __t.object("DeferredRevenueSchedule", {
 });
 export type DeferredRevenueSchedule = __Infer<typeof DeferredRevenueSchedule>;
 
+export const DelegatedAdminScope = __t.object("DelegatedAdminScope", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  userIdentity: __t.identity(),
+  grantedBy: __t.identity(),
+  grantedAt: __t.timestamp(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type DelegatedAdminScope = __Infer<typeof DelegatedAdminScope>;
+
 export const DeleteAccountMoveLineParams = __t.object("DeleteAccountMoveLineParams", {
   companyId: __t.option(__t.u64()),
 });
@@ -6313,6 +6370,12 @@ export const GoogleDriveConnection = __t.object("GoogleDriveConnection", {
   metadata: __t.option(__t.string()),
 });
 export type GoogleDriveConnection = __Infer<typeof GoogleDriveConnection>;
+
+export const GrantDelegatedAdminScopeParams = __t.object("GrantDelegatedAdminScopeParams", {
+  userIdentity: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type GrantDelegatedAdminScopeParams = __Infer<typeof GrantDelegatedAdminScopeParams>;
 
 export const GrantOrgPermissionParams = __t.object("GrantOrgPermissionParams", {
   get subject() {
@@ -7802,6 +7865,16 @@ export const OrgPermission = __t.object("OrgPermission", {
   createdAt: __t.timestamp(),
 });
 export type OrgPermission = __Infer<typeof OrgPermission>;
+
+export const OrgSchemaMigration = __t.object("OrgSchemaMigration", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  version: __t.u64(),
+  name: __t.string(),
+  appliedAt: __t.timestamp(),
+  appliedBy: __t.identity(),
+});
+export type OrgSchemaMigration = __Infer<typeof OrgSchemaMigration>;
 
 export const Organization = __t.object("Organization", {
   id: __t.u64(),
@@ -10058,6 +10131,14 @@ export const ScheduledReportRun = __t.object("ScheduledReportRun", {
 });
 export type ScheduledReportRun = __Infer<typeof ScheduledReportRun>;
 
+export const SchemaMigration = __t.object("SchemaMigration", {
+  version: __t.u64(),
+  name: __t.string(),
+  appliedAt: __t.timestamp(),
+  appliedBy: __t.identity(),
+});
+export type SchemaMigration = __Infer<typeof SchemaMigration>;
+
 export const SearchEmbedding = __t.object("SearchEmbedding", {
   id: __t.u64(),
   contentType: __t.string(),
@@ -10139,6 +10220,13 @@ export const SetArticlePublishedParams = __t.object("SetArticlePublishedParams",
 });
 export type SetArticlePublishedParams = __Infer<typeof SetArticlePublishedParams>;
 
+export const SetCompanyCountryPackParams = __t.object("SetCompanyCountryPackParams", {
+  packKey: __t.string(),
+  enabled: __t.bool(),
+  configuration: __t.option(__t.string()),
+});
+export type SetCompanyCountryPackParams = __Infer<typeof SetCompanyCountryPackParams>;
+
 export const SetCompanyVerticalPackParams = __t.object("SetCompanyVerticalPackParams", {
   packKey: __t.string(),
   enabled: __t.bool(),
@@ -10195,6 +10283,18 @@ export const ShippingMethod = __t.object("ShippingMethod", {
   metadata: __t.option(__t.string()),
 });
 export type ShippingMethod = __Infer<typeof ShippingMethod>;
+
+export const SodConflictRule = __t.object("SodConflictRule", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  permissionA: __t.string(),
+  permissionB: __t.string(),
+  description: __t.option(__t.string()),
+  isActive: __t.bool(),
+  createdAt: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type SodConflictRule = __Infer<typeof SodConflictRule>;
 
 // The tagged union or sum type for the algebraic type `SplitMethod`.
 export const SplitMethod = __t.enum("SplitMethod", {

@@ -103,6 +103,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "reverse_payment_transaction",
   "refresh_tax_deadline_statuses",
   "register_payment_on_invoice",
+  "run_fx_revaluation",
   "retry_intercompany_transaction",
   "schedule_tax_deadline_updates",
   "setup_fiscal_calendar",

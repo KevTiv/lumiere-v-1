@@ -235,6 +235,7 @@ export * from "./accounting-components/period-close-checklist";
 export type { AccountAccount, AccountMove } from "./lib/accounting-types";
 export * from "./accounting-components/budgets-workspace";
 export * from "./accounting-components/consolidation-workspace";
+export * from "./accounting-components/fx-revaluation-panel";
 
 // Calendar components
 export * from "./calendar-components/calendar-view";

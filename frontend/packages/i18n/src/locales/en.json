@@ -734,6 +734,10 @@
           "title": "Draft moves cleared",
           "description": "{{count}} draft journal entry(ies) still open."
         },
+        "trialBalance": {
+          "title": "Trial balance generated",
+          "description": "Generate a trial balance for drill-down before close."
+        },
         "vatReport": {
           "title": "VAT report generated",
           "description": "Generate and review the EU VAT return for the period."
@@ -1010,6 +1014,41 @@
         "lineFormTitle": "Budget line",
         "lineFormDescription": "Add or edit a budget line for this analytic account.",
         "newLine": "New line"
+      }
+    },
+    "fxRevaluation": {
+      "tabLabel": "FX revaluation",
+      "panelTitle": "Foreign exchange revaluation",
+      "panelDescription": "Post unrealized currency adjustments and review prior runs for this company.",
+      "runAction": "Run revaluation",
+      "importRateHint": "Add exchange rate",
+      "runsTitle": "Recent runs",
+      "runsEmpty": "No FX revaluation runs recorded yet.",
+      "colCurrency": "Currency",
+      "colNet": "Net adjustment",
+      "colMove": "Journal entry",
+      "colReference": "Reference",
+      "rateModalDescription": "Record a spot rate before running revaluation for that currency pair.",
+      "invalidForm": "Fill currency, journal, accounts, and a non-zero adjustment.",
+      "runSuccess": "FX revaluation posted",
+      "rateSuccess": "Currency rate saved",
+      "form": {
+        "title": "Run FX revaluation",
+        "description": "Post an unrealized currency adjustment for one foreign-currency balance.",
+        "submitLabel": "Post adjustment",
+        "sections": {
+          "main": "Parameters"
+        },
+        "fields": {
+          "currencyCode": "Currency code",
+          "asOfDate": "As of",
+          "journalId": "Journal",
+          "accountId": "Revalued account",
+          "adjustment": "Adjustment amount",
+          "gainAccountId": "Unrealized gain account",
+          "lossAccountId": "Unrealized loss account",
+          "reference": "Reference (optional)"
+        }
       }
     },
     "consolidation": {
@@ -8944,7 +8983,21 @@
       "saveChanges": "Save Changes",
       "systemCannotDelete": "System roles cannot be deleted",
       "deleteConfirm": "Are you sure you want to delete this role?",
-      "fieldPolicyHint": "Use the field permissions editor when editing a role to restrict which API columns each role can read. Superusers and roles with permission *:* receive full columns."
+      "fieldPolicyHint": "Use the field permissions editor when editing a role to restrict which API columns each role can read. Superusers and roles with permission *:* receive full columns.",
+      "sod": {
+        "cardTitle": "Segregation of duties",
+        "cardDescription": "Define permission pairs that cannot be held by the same user (enforced on role assignment).",
+        "addRule": "Add conflict rule",
+        "empty": "No SoD conflict rules configured for this organization.",
+        "addTitle": "New SoD conflict rule",
+        "addDescription": "Users must not hold both permissions at once (including via multiple role assignments).",
+        "permissionA": "Permission A",
+        "permissionB": "Permission B",
+        "description": "Description",
+        "submit": "Create rule",
+        "deactivate": "Deactivate",
+        "inactive": "Inactive"
+      }
     },
     "fieldPermissions": {
       "title": "Field permissions",
@@ -9318,6 +9371,17 @@
         "saveBusiness": "Save identifiers",
         "saveBusinessSuccess": "Business identifiers updated"
       },
+      "countryPacks": {
+        "cardTitle": "Country / locale packs",
+        "cardDescription": "Enable jurisdiction-specific tax and compliance rules for the selected company.",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "toggleSuccess": "Country pack updated",
+        "toggleError": "Could not update country pack",
+        "emptyCatalog": "No country packs are available yet.",
+        "regionLabel": "Region: {{region}}",
+        "countryMismatch": "Company country ({{companyCountry}}) differs from pack ({{packCountry}})."
+      },
       "privacy": {
         "cardTitle": "Data privacy",
         "cardDescription": "Classifications label sensitivity; rules map tables or columns to a classification.",
@@ -9341,7 +9405,27 @@
         "noClassifications": "No classifications yet — create one above.",
         "noRules": "No rules yet.",
         "noClassificationsForRules": "Create at least one classification before adding rules.",
-        "ruleLevel": "L{{level}}"
+        "ruleLevel": "L{{level}}",
+        "delegatedAdminHeading": "Delegated administrators",
+        "delegatedAdminDescription": "Grant a user permission to manage roles and users for one company only.",
+        "delegatedAdminCompany": "Company",
+        "delegatedAdminCompanyPlaceholder": "Select company…",
+        "delegatedAdminIdentity": "User identity (hex)",
+        "delegatedAdminIdentityPlaceholder": "SpacetimeDB identity hex string",
+        "delegatedAdminGrant": "Grant scope",
+        "delegatedAdminGrantSuccess": "Delegated admin scope granted",
+        "delegatedAdminEmpty": "No delegated admin scopes for this organization.",
+        "delegatedAdminRevoke": "Revoke",
+        "delegatedAdminRevoked": "Revoked",
+        "delegatedAdminRevokeSuccess": "Delegated admin scope revoked",
+        "delegatedAdminRevokeError": "Could not revoke delegated admin scope",
+        "retentionPurgeHeading": "Retention purge",
+        "retentionPurgeDescription": "Delete rows past their classification retention window. This action cannot be undone.",
+        "retentionPurgeAction": "Run retention purge",
+        "retentionPurgeConfirm": "Permanently delete expired rows according to retention rules?",
+        "retentionPurgeRunning": "Purging…",
+        "retentionPurgeSuccess": "Retention purge completed",
+        "retentionPurgeError": "Retention purge failed"
       },
       "taxIdLabel": "Tax ID",
       "registrationLabel": "Company registry",

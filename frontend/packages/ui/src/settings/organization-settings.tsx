@@ -7,19 +7,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Building, Save, Loader2, Cloud, MessageCircle, ExternalLink, Upload, Trash2 } from "lucide-react"
-import { useUpdateGoogleDriveCredentials, useUpdateWhatsappCredentials } from "@lumiere/query-hooks/hooks/auth"
+import { useUpdateGoogleDriveCredentials, useUpdateWhatsappCredentials, useDelegatedAdminScopes, useGrantDelegatedAdminScope, useRevokeDelegatedAdminScope } from "@lumiere/query-hooks/hooks/auth"
 import { useOrgMasterCsvImportMutations } from "@lumiere/query-hooks/hooks/org-master-csv-imports"
 import {
   useCompanies,
+  useCompanyCountryPacks,
+  useCountryPackCatalog,
   useCreateCompany,
   useCreateDataClassification,
   useCreateDataClassificationRule,
   useDataClassificationRules,
   useDataClassifications,
   useDeleteCompany,
+  useExecuteRetentionPurge,
+  useSetCompanyCountryPack,
   useUpdateCompany,
   useUpdateCompanyAddress,
   useUpdateCompanyBusiness,
@@ -93,8 +99,14 @@ export function OrganizationSettings() {
   const updateCompanyBusiness = useUpdateCompanyBusiness()
   const updateCompanyHierarchy = useUpdateCompanyHierarchy()
   const deleteCompany = useDeleteCompany()
+  const setCompanyCountryPack = useSetCompanyCountryPack()
   const createDataClassification = useCreateDataClassification(orgId)
   const createDataClassificationRule = useCreateDataClassificationRule(orgId)
+  const executeRetentionPurge = useExecuteRetentionPurge(orgId)
+  const grantDelegatedAdmin = useGrantDelegatedAdminScope(orgBigInt)
+  const revokeDelegatedAdmin = useRevokeDelegatedAdminScope(orgBigInt)
+  const { data: delegatedAdminScopes = [], refetch: refetchDelegatedAdminScopes } =
+    useDelegatedAdminScopes(orgBigInt)
   const upsertOrganizationSettings = useUpsertOrganizationSettings(orgBigInt)
   const updateOrganization = useUpdateOrganization(orgBigInt)
   const createCountry = useCreateCountry()
@@ -104,11 +116,34 @@ export function OrganizationSettings() {
   const [selectedCompanyId, setSelectedCompanyId] = useState("")
   const [privacyDcFormKey, setPrivacyDcFormKey] = useState(0)
   const [privacyRuleFormKey, setPrivacyRuleFormKey] = useState(0)
+  const [delegatedAdminIdentity, setDelegatedAdminIdentity] = useState("")
+  const [delegatedAdminError, setDelegatedAdminError] = useState<string | null>(null)
 
   const selectedCompany = useMemo(
     () => companies.find((x) => String(x.id) === selectedCompanyId),
     [companies, selectedCompanyId],
   )
+
+  const selectedCompanyBigInt = useMemo(() => {
+    if (!selectedCompanyId) return 0n
+    try {
+      return BigInt(selectedCompanyId)
+    } catch {
+      return 0n
+    }
+  }, [selectedCompanyId])
+
+  const countryPackCatalog = useCountryPackCatalog(orgReady)
+  const companyCountryPacks = useCompanyCountryPacks(selectedCompanyBigInt, orgReady && selectedCompanyBigInt > 0n)
+
+  const countryPackEnabledByKey = useMemo(() => {
+    const map = new Map<string, boolean>()
+    for (const row of companyCountryPacks.data ?? []) {
+      const key = String(row.packKey ?? (row as { pack_key?: string }).pack_key ?? "").toLowerCase()
+      if (key) map.set(key, Boolean(row.enabled))
+    }
+    return map
+  }, [companyCountryPacks.data])
 
   const legalNameDefaults = useMemo(
     () => ({ name: strVal(selectedCompany?.name) }),
@@ -284,6 +319,7 @@ export function OrganizationSettings() {
   const countryFormConfig = useMemo(() => createCountryForm(t), [t])
   const currencyFormConfig = useMemo(() => createCurrencyForm(t), [t])
   const canManageReference = isAdmin() || checkPermission("admin:organization", "manage").allowed
+  const canManagePrivacyOps = isAdmin() || checkPermission("admin:organization", "manage").allowed
 
   // Integration hooks
   const updateGoogleDriveCredentials = useUpdateGoogleDriveCredentials(orgBigInt)
@@ -688,6 +724,93 @@ export function OrganizationSettings() {
         </Card>
       ) : null}
 
+      {orgReady && selectedCompanyId ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("settings.organization.countryPacks.cardTitle")}</CardTitle>
+            <CardDescription>{t("settings.organization.countryPacks.cardDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 max-w-xl">
+            {countryPackCatalog.isLoading || companyCountryPacks.isLoading ? (
+              <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+            ) : (countryPackCatalog.data ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("settings.organization.countryPacks.emptyCatalog")}</p>
+            ) : (
+              <ul className="divide-y rounded-md border">
+                {(countryPackCatalog.data ?? []).map((pack) => {
+                  const packKey = String(
+                    pack.packKey ?? (pack as { pack_key?: string }).pack_key ?? "",
+                  ).toLowerCase()
+                  const countryCode = String(
+                    pack.countryCode ?? (pack as { country_code?: string }).country_code ?? "",
+                  )
+                  const region = String(pack.region ?? "")
+                  const enabled = countryPackEnabledByKey.get(packKey) ?? false
+                  const companyCountry = strVal(selectedCompany?.addressCountryCode)
+                  const countryMismatch =
+                    companyCountry.length > 0 &&
+                    countryCode.length > 0 &&
+                    companyCountry.toUpperCase() !== countryCode.toUpperCase()
+                  return (
+                    <li
+                      key={packKey}
+                      className="flex items-center justify-between gap-4 px-4 py-3"
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium">{pack.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {countryCode}
+                          {region ? ` · ${t("settings.organization.countryPacks.regionLabel", { region })}` : ""}
+                        </p>
+                        {countryMismatch ? (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            {t("settings.organization.countryPacks.countryMismatch", {
+                              companyCountry,
+                              packCountry: countryCode,
+                            })}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge variant={enabled ? "default" : "secondary"}>
+                          {enabled
+                            ? t("settings.organization.countryPacks.enabled")
+                            : t("settings.organization.countryPacks.disabled")}
+                        </Badge>
+                        <Switch
+                          checked={enabled}
+                          disabled={setCompanyCountryPack.isPending}
+                          onCheckedChange={(checked) => {
+                            void setCompanyCountryPack
+                              .mutateAsync({
+                                companyId: selectedCompanyBigInt,
+                                organizationId: orgId,
+                                packKey,
+                                enabled: checked,
+                              })
+                              .then(() =>
+                                toast({ title: t("settings.organization.countryPacks.toggleSuccess") }),
+                              )
+                              .catch((e: unknown) =>
+                                toast({
+                                  title: t("settings.organization.countryPacks.toggleError"),
+                                  description: e instanceof Error ? e.message : String(e),
+                                  variant: "destructive",
+                                }),
+                              )
+                          }}
+                          aria-label={pack.name}
+                        />
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
       {orgReady ? (
         <Card>
           <CardHeader>
@@ -793,6 +916,162 @@ export function OrganizationSettings() {
             ) : (
               <p className="text-sm text-muted-foreground">{t("settings.organization.privacy.noRules")}</p>
             )}
+
+            {canManagePrivacyOps ? (
+              <div className="space-y-4 border-t border-border pt-6">
+                <div>
+                  <p className="font-medium">{t("settings.organization.privacy.delegatedAdminHeading")}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings.organization.privacy.delegatedAdminDescription")}
+                  </p>
+                </div>
+                <div className="grid max-w-xl gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="delegated-admin-company">{t("settings.organization.privacy.delegatedAdminCompany")}</Label>
+                    <select
+                      id="delegated-admin-company"
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                      value={selectedCompanyId}
+                      onChange={(e) => setSelectedCompanyId(e.target.value)}
+                    >
+                      <option value="">{t("settings.organization.privacy.delegatedAdminCompanyPlaceholder")}</option>
+                      {companies.map((c) => (
+                        <option key={String(c.id)} value={String(c.id)}>
+                          {strVal(c.name)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="delegated-admin-identity">{t("settings.organization.privacy.delegatedAdminIdentity")}</Label>
+                    <Input
+                      id="delegated-admin-identity"
+                      value={delegatedAdminIdentity}
+                      onChange={(e) => setDelegatedAdminIdentity(e.target.value)}
+                      placeholder={t("settings.organization.privacy.delegatedAdminIdentityPlaceholder")}
+                    />
+                  </div>
+                  {delegatedAdminError ? (
+                    <p className="text-sm text-destructive">{delegatedAdminError}</p>
+                  ) : null}
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!selectedCompanyId || !delegatedAdminIdentity.trim() || grantDelegatedAdmin.isPending}
+                    onClick={() => {
+                      setDelegatedAdminError(null)
+                      void grantDelegatedAdmin
+                        .mutateAsync({
+                          companyId: selectedCompanyId,
+                          userIdentity: delegatedAdminIdentity.trim(),
+                        })
+                        .then(() => {
+                          setDelegatedAdminIdentity("")
+                          void refetchDelegatedAdminScopes()
+                          toast({ title: t("settings.organization.privacy.delegatedAdminGrantSuccess") })
+                        })
+                        .catch((error) => {
+                          setDelegatedAdminError(error instanceof Error ? error.message : String(error))
+                        })
+                    }}
+                  >
+                    {t("settings.organization.privacy.delegatedAdminGrant")}
+                  </Button>
+                </div>
+                {delegatedAdminScopes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("settings.organization.privacy.delegatedAdminEmpty")}</p>
+                ) : (
+                  <ul className="space-y-2 text-sm">
+                    {delegatedAdminScopes.map((row) => {
+                      const scopeId = String(row.id ?? "")
+                      const companyId = String(row.company_id ?? row.companyId ?? "")
+                      const companyName =
+                        companies.find((c) => String(c.id) === companyId)?.name ?? companyId
+                      const identity = String(row.user_identity ?? row.userIdentity ?? "")
+                      const active = row.is_active !== false && row.isActive !== false
+                      return (
+                        <li
+                          key={scopeId}
+                          className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+                        >
+                          <div>
+                            <div className="font-medium">{strVal(companyName)}</div>
+                            <div className="font-mono text-xs text-muted-foreground">{identity}</div>
+                            {!active ? (
+                              <Badge variant="secondary" className="mt-1">
+                                {t("settings.organization.privacy.delegatedAdminRevoked")}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          {active ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={revokeDelegatedAdmin.isPending}
+                              onClick={() => {
+                                void revokeDelegatedAdmin
+                                  .mutateAsync(scopeId)
+                                  .then(() => {
+                                    void refetchDelegatedAdminScopes()
+                                    toast({ title: t("settings.organization.privacy.delegatedAdminRevokeSuccess") })
+                                  })
+                                  .catch((error) => {
+                                    toast({
+                                      title: t("settings.organization.privacy.delegatedAdminRevokeError"),
+                                      description: error instanceof Error ? error.message : String(error),
+                                      variant: "destructive",
+                                    })
+                                  })
+                              }}
+                            >
+                              {t("settings.organization.privacy.delegatedAdminRevoke")}
+                            </Button>
+                          ) : null}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+
+                <div className="space-y-2 border-t border-border pt-6">
+                  <p className="font-medium">{t("settings.organization.privacy.retentionPurgeHeading")}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings.organization.privacy.retentionPurgeDescription")}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    disabled={executeRetentionPurge.isPending}
+                    onClick={() => {
+                      if (!window.confirm(t("settings.organization.privacy.retentionPurgeConfirm"))) return
+                      void executeRetentionPurge
+                        .mutateAsync()
+                        .then(() => {
+                          toast({ title: t("settings.organization.privacy.retentionPurgeSuccess") })
+                        })
+                        .catch((error) => {
+                          toast({
+                            title: t("settings.organization.privacy.retentionPurgeError"),
+                            description: error instanceof Error ? error.message : String(error),
+                            variant: "destructive",
+                          })
+                        })
+                    }}
+                  >
+                    {executeRetentionPurge.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {t("settings.organization.privacy.retentionPurgeRunning")}
+                      </>
+                    ) : (
+                      t("settings.organization.privacy.retentionPurgeAction")
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

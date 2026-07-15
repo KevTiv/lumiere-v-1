@@ -11,6 +11,8 @@ export const ORGANIZATION_COMPANY_BFF_REDUCERS = [
   "create_data_classification",
   "create_data_classification_rule",
   "delete_company",
+  "execute_retention_purge",
+  "set_company_country_pack",
   "set_company_vertical_pack",
   "update_company",
   "update_company_address",
@@ -54,9 +56,11 @@ const ORGANIZATION_COMPANY_HINT_OVERRIDES: Partial<
   update_company_business: ["companies"],
   update_company_hierarchy: ["companies"],
   delete_company: ["companies"],
+  set_company_country_pack: ["companies"],
   set_company_vertical_pack: ["companies"],
   create_data_classification: ["data-classifications"],
   create_data_classification_rule: ["data-classification-rules"],
+  execute_retention_purge: ["data-classifications", "data-classification-rules"],
 };
 
 function organizationCompanyReducerHints(): Record<

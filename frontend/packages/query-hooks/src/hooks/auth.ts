@@ -9,6 +9,7 @@
 
 
 import { authBffPost, stdbBffPost } from "@lumiere/stdb/commands"
+import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
@@ -1008,6 +1009,150 @@ export function useRemoveCasbinRule(organizationId: bigint) {
     onSuccess: async () => {
       await invalidateAuthModule(qc, organizationId)
     },
+  })
+}
+
+export function useSodConflictRules(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ["sod-conflict-rules", rqBigIntKey(organizationId)],
+    queryFn: async () => {
+      const list = (await stdbBrowserQuery("sod-conflict-rules")) as QueryRows
+      return Array.isArray(list) ? list : []
+    },
+    enabled: organizationId > 0n,
+    staleTime: 30_000,
+  })
+}
+
+export function useCreateSodConflictRule(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (formData) => {
+      const permissionA = String(formData.permissionA ?? formData.permission_a ?? "").trim()
+      const permissionB = String(formData.permissionB ?? formData.permission_b ?? "").trim()
+      if (!permissionA || !permissionB) {
+        throw new Error("Both permissions are required")
+      }
+      const params = {
+        permission_a: permissionA,
+        permission_b: permissionB,
+        description: optionalStringField(formData.description),
+        is_active: formData.isActive !== false,
+        metadata: optionalStringField(formData.metadata),
+      }
+      const { urlPath, init } = stdbBffPost("create_sod_conflict_rule", [
+        organizationId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create SoD conflict rule")
+    },
+    onSuccess: async () => {
+      const org = rqBigIntKey(organizationId)
+      await Promise.all([
+        invalidateAuthModule(qc, organizationId),
+        qc.invalidateQueries({ queryKey: ["sod-conflict-rules", org] }),
+      ])
+    },
+  })
+}
+
+export function useUpdateSodConflictRule(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { ruleId: bigint | number | string; params: Record<string, unknown> }>({
+    mutationFn: async ({ ruleId, params: formData }) => {
+      const optionField = <T,>(
+        snake: string,
+        camel: string,
+        map: (raw: unknown) => T,
+      ): { some: T } | { none: [] } => {
+        if (!(snake in formData) && !(camel in formData)) return { none: [] }
+        const raw = formData[snake] ?? formData[camel]
+        if (raw === undefined) return { none: [] }
+        return { some: map(raw) }
+      }
+      const params = {
+        permission_a: optionField("permission_a", "permissionA", (v) => String(v).trim()),
+        permission_b: optionField("permission_b", "permissionB", (v) => String(v).trim()),
+        description: optionField("description", "description", (v) => {
+          const s = v == null ? "" : String(v).trim()
+          return s === "" ? null : s
+        }),
+        is_active: optionField("is_active", "isActive", (v) => Boolean(v)),
+        metadata: optionField("metadata", "metadata", (v) => {
+          const s = v == null ? "" : String(v).trim()
+          return s === "" ? null : s
+        }),
+      }
+      const { urlPath, init } = stdbBffPost("update_sod_conflict_rule", [
+        organizationId,
+        toScalarU64(ruleId),
+        params,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update SoD conflict rule")
+    },
+    onSuccess: async () => {
+      const org = rqBigIntKey(organizationId)
+      await Promise.all([
+        invalidateAuthModule(qc, organizationId),
+        qc.invalidateQueries({ queryKey: ["sod-conflict-rules", org] }),
+      ])
+    },
+  })
+}
+
+export function useGrantDelegatedAdminScope(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { companyId: bigint | number | string; userIdentity: string; metadata?: string }
+  >({
+    mutationFn: async ({ companyId, userIdentity, metadata }) => {
+      const { urlPath, init } = stdbBffPost("grant_delegated_admin_scope", [
+        organizationId,
+        toScalarU64(companyId),
+        stdbParamsToJson({
+          user_identity: identityForReducer(userIdentity),
+          metadata: metadata ?? null,
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to grant delegated admin scope")
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["delegated-admin-scopes", rqBigIntKey(organizationId)] })
+    },
+  })
+}
+
+export function useRevokeDelegatedAdminScope(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, bigint | number | string>({
+    mutationFn: async (scopeId) => {
+      const { urlPath, init } = stdbBffPost("revoke_delegated_admin_scope", [
+        organizationId,
+        toScalarU64(scopeId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to revoke delegated admin scope")
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["delegated-admin-scopes", rqBigIntKey(organizationId)] })
+    },
+  })
+}
+
+export function useDelegatedAdminScopes(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ["delegated-admin-scopes", rqBigIntKey(organizationId)],
+    queryFn: async () => {
+      const list = (await stdbBrowserQuery("delegated-admin-scopes")) as QueryRows
+      return Array.isArray(list) ? list : []
+    },
+    enabled: organizationId > 0n,
+    staleTime: 30_000,
   })
 }
 

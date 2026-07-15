@@ -141,6 +141,9 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "iot-telemetry",
   "iot-thresholds",
   "iot-pairing-tokens",
+  "sod-conflict-rules",
+  "fx-revaluation-runs",
+  "delegated-admin-scopes",
   "roles",
   "user-roles",
 ] as const;
@@ -221,6 +224,58 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("tax-schedules", "tax_schedule", id, fa, ""),
   "tax-deadlines": (id, fa) =>
     selectOrgScopedSql("tax-deadlines", "tax_deadline", id, fa, ""),
+  "bank-statements": (id, fa) =>
+    selectOrgScopedSql("bank-statements", "account_bank_statement", id, fa, ""),
+  "bank-statement-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "bank-statement-lines",
+      "account_bank_statement_line",
+      id,
+      fa,
+      "",
+      " ORDER BY id ASC",
+    ),
+  "bank-match-candidates": (id, fa) =>
+    selectOrgScopedSql("bank-match-candidates", "bank_match_candidate", id, fa, ""),
+  "account-reconciliation-widgets": (id, fa) =>
+    selectOrgScopedSql(
+      "account-reconciliation-widgets",
+      "account_reconciliation_widget",
+      id,
+      fa,
+      "",
+    ),
+  "account-payments": (id, fa) =>
+    selectOrgScopedSql("account-payments", "account_payment", id, fa, "", " ORDER BY id DESC"),
+  "account-payment-terms": (id, fa) =>
+    selectOrgScopedSql("account-payment-terms", "account_payment_term", id, fa, ""),
+  "payment-accounts": (id, fa) =>
+    selectOrgScopedSql("payment-accounts", "payment_account", id, fa, ""),
+  "payment-transactions": (id, fa) =>
+    selectOrgScopedSql(
+      "payment-transactions",
+      "payment_transaction",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "payment-fees": (id, fa) =>
+    selectOrgScopedSql("payment-fees", "payment_fee", id, fa, ""),
+  "payment-reconciliations": (id, fa) =>
+    selectOrgScopedSql("payment-reconciliations", "payment_reconciliation", id, fa, ""),
+  "payment-reversals": (id, fa) =>
+    selectOrgScopedSql("payment-reversals", "payment_reversal", id, fa, ""),
+  "analytic-lines": (id, fa) =>
+    selectOrgScopedSql("analytic-lines", "account_analytic_line", id, fa, ""),
+  "analytic-distribution-models": (id, fa) =>
+    selectOrgScopedSql(
+      "analytic-distribution-models",
+      "account_analytic_distribution_model",
+      id,
+      fa,
+      "",
+    ),
   "sale-orders": (id, fa) =>
     selectOrgScopedSql("sale-orders", "sale_order", id, fa, ""),
   "sale-order-lines": (id, fa) =>
@@ -391,6 +446,33 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("helpdesk-slas", "helpdesk_sla", id, fa, ""),
   subscriptions: (id, fa) =>
     selectOrgScopedSql("subscriptions", "subscription", id, fa, ""),
+  "sod-conflict-rules": (id, fa) =>
+    selectOrgScopedSql(
+      "sod-conflict-rules",
+      "sod_conflict_rule",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "fx-revaluation-runs": (id, fa) =>
+    selectOrgScopedSql(
+      "fx-revaluation-runs",
+      "fx_revaluation_run",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "delegated-admin-scopes": (id, fa) =>
+    selectOrgScopedSql(
+      "delegated-admin-scopes",
+      "delegated_admin_scope",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
   "subscription-plans": (id, fa) =>
     selectOrgScopedSql(
       "subscription-plans",
@@ -569,6 +651,31 @@ function subscriptionSqlForCompanyScopedResource(
     // Child of pos_config — no SQL subqueries; load pos-sessions via api-server query instead.
     return null
   }
+  if (resource === "fiscal-years") {
+    if (!ids?.length) return null
+    const c = resolveHttpSqlColumns("fiscal-years", fa).join(", ")
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM account_fiscal_year WHERE ${filter}`]
+  }
+  if (resource === "account-periods") {
+    if (!ids?.length) return null
+    const c = resolveHttpSqlColumns("account-periods", fa).join(", ")
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM account_period WHERE ${filter}`]
+  }
+  if (resource === "consolidation-elimination-entries") {
+    if (!ids?.length) return null
+    const c = resolveHttpSqlColumns("consolidation-elimination-entries", fa).join(", ")
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM consolidation_elimination_entry WHERE ${filter}`]
+  }
+  if (resource === "consolidation-journals") {
+    // Indexed company_ids vector — mirror journals that touch selected companies via elimination.
+    return null
+  }
+  if (resource === "consolidation-accounts") {
+    return null
+  }
   return undefined
 }
 
@@ -664,6 +771,11 @@ const EXTRA_COMPANY_SCOPED_ERP_KEYS = [
   "depreciation-lines",
   "intercompany-rules",
   "intercompany-transactions",
+  "fiscal-years",
+  "account-periods",
+  "consolidation-elimination-entries",
+  "consolidation-journals",
+  "consolidation-accounts",
   "pos-configs",
   "pos-sessions",
   "picking-batches",
