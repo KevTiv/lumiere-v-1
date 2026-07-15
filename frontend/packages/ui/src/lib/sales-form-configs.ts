@@ -78,6 +78,22 @@ export const newSaleOrderForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.newSaleOrder.fields.commitmentDate"),
           width: "1/2",
         },
+        {
+          id: "commissionRatePercent",
+          name: "commissionRatePercent",
+          type: "number",
+          label: t("sales.forms.newSaleOrder.fields.commissionRatePercent", {
+            defaultValue: "Commission rate %",
+          }),
+          description: t(
+            "sales.forms.newSaleOrder.fields.commissionRatePercentHelp",
+            {
+              defaultValue:
+                "Accrues when the customer invoice is posted (or via Accrue commission).",
+            },
+          ),
+          width: "1/2",
+        },
       ],
     },
     {
@@ -1283,6 +1299,15 @@ export const editSaleOrderForm = (t: TFunction): FormConfig => ({
           name: "incotermLocation",
           type: "text",
           label: t("sales.forms.editSaleOrder.fields.incotermLocation"),
+          width: "1/2",
+        },
+        {
+          id: "commissionRatePercent",
+          name: "commissionRatePercent",
+          type: "number",
+          label: t("sales.forms.editSaleOrder.fields.commissionRatePercent", {
+            defaultValue: "Commission rate %",
+          }),
           width: "1/2",
         },
       ],

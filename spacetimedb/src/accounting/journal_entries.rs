@@ -971,6 +971,16 @@ pub fn post_invoice(
         },
     );
 
+    if move_record.move_type == MoveType::OutInvoice {
+        if let Some(sale_order_id) = move_record.sale_order_id {
+            crate::sales::oms_extensions::maybe_accrue_commission_on_invoice_post(
+                ctx,
+                organization_id,
+                sale_order_id,
+            )?;
+        }
+    }
+
     Ok(())
 }
 

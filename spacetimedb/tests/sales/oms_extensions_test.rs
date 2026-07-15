@@ -417,13 +417,33 @@ pub fn test_incoterm_id_and_promotion_and_options(ctx: &ReducerContext) -> Resul
     }
 
     confirm_sales_order(ctx, org_id, order.id)?;
+    // Commission accrues on invoice post (or manual accrue), not on confirm.
+    let on_confirm = ctx
+        .db
+        .sale_commission()
+        .commission_by_order()
+        .filter(&order.id)
+        .count();
+    if on_confirm != 0 {
+        return Err(format!(
+            "expected no commission on confirm, got {on_confirm}"
+        ));
+    }
+    accrue_sale_commission(
+        ctx,
+        org_id,
+        order.id,
+        AccrueSaleCommissionParams {
+            rate_percent: 10.0,
+        },
+    )?;
     let commission = ctx
         .db
         .sale_commission()
         .commission_by_order()
         .filter(&order.id)
         .next()
-        .ok_or("commission not accrued on confirm")?;
+        .ok_or("commission not accrued after manual accrue")?;
     if commission.state != "accrued" {
         return Err(format!("expected accrued, got {}", commission.state));
     }

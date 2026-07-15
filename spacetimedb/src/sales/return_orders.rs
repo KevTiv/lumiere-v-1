@@ -777,6 +777,7 @@ pub fn create_credit_note_from_return_order(
     });
 
     let old_state = return_order.state.clone();
+    let clawback_sale_order_id = return_order.sale_order_id;
     ctx.db.return_order().id().update(ReturnOrder {
         credit_move_id: Some(move_record.id),
         state: "refunded".to_string(),
@@ -837,6 +838,15 @@ pub fn create_credit_note_from_return_order(
             metadata: None,
         },
     );
+
+    if let Some(sale_order_id) = clawback_sale_order_id {
+        crate::sales::oms_extensions::cancel_accrued_commissions_for_sale_order(
+            ctx,
+            organization_id,
+            sale_order_id,
+            "credit_note_from_return",
+        )?;
+    }
 
     Ok(())
 }

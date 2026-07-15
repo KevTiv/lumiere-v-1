@@ -54,7 +54,7 @@ Status snapshot of Lumiere sales / order management against a NetSuite *quality*
 
 **Adjacent oms-critical:** `create_invoice_from_sale_order`, `post_invoice` (+ `ensure_partner_credit_allows_invoice`), stock picking confirm/assign/validate/`done_stock_move`, `reserve_stock_quant` / `unreserve_stock_quant` / `move_stock_quant` (manual; **not** wired from SO confirm/validate), `convert_opportunity_to_sale_order`, payment reconcile updating SO `amount_paid` / `amount_residual`
 
-**Missing / unused:** send quotation, apply pricelist to lines, allocate/reserve on confirm, create backorder, dropship→PO, exchange order, commission settle, promotion/coupon engine (POS `coupon_id` field only), `SaleOrderOption` CRUD
+**Missing / unused:** allocate/reserve formulas beyond hard reservation, full CPQ configurator, reseller commission splits, SLA assignment in Ops
 
 ### 1.3 Subscriptions & queries
 
@@ -175,7 +175,7 @@ Fulfillment/invoices use inventory + accounting hooks outside the sales live set
 7. **Cancel pre-delivery** → cancel SO + cancel picking + unreserve (atomic)
 8. **Return** → RMA → receive → credit note → post (MVP e2e)
 9. **Exchange** → return + replacement SO linked (future)
-10. **Commission** → confirmed invoiced sale → accrue commission by rule (future)
+10. **Commission** → OutInvoice post with SO `commission_rate_percent` → accrue → `settle_sale_commissions` GL → Ops queue
 
 ### Acceptance scenarios (≥10)
 
@@ -267,15 +267,15 @@ Country packs today are **tax-seed + company-ID metadata**. Sales needs commerci
 - ~~CPQ / configurable products (`SaleOrderOption` → real engine)~~ **Done** (CPQ-lite: option CRUD + `apply_sale_order_options` materialises selected options as lines)
 - ~~Promotions engine (not only POS coupons)~~ **Done** (`SalePromotion` + `apply_sale_promotion_to_order`)
 - ~~Exchange orders with linked RMA + replacement~~ **Done** (`create_exchange_order_from_return`)
-- ~~Commission accrual + partner settlement~~ **Done** (accrual on confirm via `commission_rate_percent` metadata + `accrue_sale_commission`; settlement deferred)
+- ~~Commission accrual + partner settlement~~ **Done** (accrue on **OutInvoice post** from SO `commission_rate_percent` metadata, or manual `accrue_sale_commission`; settle via `settle_sale_commissions` GL Entry expense/payable; clawback on SO cancel / credit-note return; Ops queue settle UI)
 - ~~Multichannel fulfilment routing (POS / web / marketplace → allocation)~~ **Done** (picking metadata stamps `source_id` / `medium_id` / `route_ids`; line `route_id` preserved)
-- ~~Live ops workbench~~ **Partial** (exception queue cards on sales dashboard; full NetSuite-class cockpit still richer)
+- ~~Live ops workbench~~ **Done** (Sales → **Ops** tab: queue panels + SO drill-down; dashboard exception cards deep-link with `?tab=ops&filter=queue:…`)
 
 ---
 
 ## Bottom line
 
-Lumiere’s OMS spine now enforces inventory and credit consequences, applies pricing/tax/FX rules inside transactions, and covers the prior competitive/differentiating checklist at MVP depth (dropship PO, CPQ-lite options, promotions, exchange, commission accrual). Remaining depth is settlement/ops polish — not missing commitment plumbing.
+Lumiere’s OMS spine now enforces inventory and credit consequences, applies pricing/tax/FX rules inside transactions, and covers the prior competitive/differentiating checklist at MVP depth (dropship PO, CPQ-lite options, promotions, exchange, commission accrue→settle, Sales Ops queues). Remaining depth is SLA assignment and reseller commission splits — not missing commitment plumbing.
 
 ### Related docs
 

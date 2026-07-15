@@ -33,6 +33,7 @@ pub struct CreateSaleOrderParams {
     pub source_id: Option<u64>,
     pub commitment_date: Option<__sdk::Timestamp>,
     pub expected_date: Option<__sdk::Timestamp>,
+    pub incoterm_id: Option<u64>,
     pub incoterm: Option<String>,
     pub incoterm_location: Option<String>,
     pub carrier_id: Option<u64>,

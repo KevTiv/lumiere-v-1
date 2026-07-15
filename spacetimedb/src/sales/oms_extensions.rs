@@ -2,7 +2,9 @@
 //! SaleOrderOption CRUD, promotions, commissions, and exchange orders.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
+use crate::core::organization::company;
+use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::{product, product_supplier_info};
 use crate::purchasing::purchase_orders::{
     add_purchase_order_line, create_purchase_order, purchase_order, AddPurchaseOrderLineParams,
@@ -13,6 +15,7 @@ use crate::sales::sales_core::{
     create_sale_order, sale_order, sale_order_line, sale_order_option, CreateSaleOrderLineParams,
     CreateSaleOrderParams, SaleOrder, SaleOrderOption,
 };
+use crate::types::{AccountMoveState, MoveType, PaymentState};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -121,6 +124,11 @@ pub struct SaleCommission {
     pub amount: f64,
     /// `accrued` | `settled` | `cancelled`
     pub state: String,
+    /// Posted GL Entry move that settled this commission (expense / payable).
+    pub settle_move_id: Option<u64>,
+    pub settled_at: Option<Timestamp>,
+    /// Groups commissions settled in the same batch (typically settle move id).
+    pub settle_batch_id: Option<u64>,
     pub create_uid: Option<Identity>,
     pub create_date: Option<Timestamp>,
     pub write_uid: Option<Identity>,
@@ -199,6 +207,17 @@ pub struct ApplySalePromotionParams {
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct AccrueSaleCommissionParams {
     pub rate_percent: f64,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct SettleSaleCommissionsParams {
+    pub commission_ids: Vec<u64>,
+    pub journal_id: u64,
+    pub expense_account_id: u64,
+    pub payable_account_id: u64,
+    pub date: Timestamp,
+    pub reference: Option<String>,
+    pub metadata: Option<String>,
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -487,6 +506,9 @@ pub(crate) fn accrue_sale_commission_for_order(
         rate_percent,
         amount,
         state: "accrued".to_string(),
+        settle_move_id: None,
+        settled_at: None,
+        settle_batch_id: None,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
@@ -1088,6 +1110,644 @@ pub fn accrue_sale_commission(
         return Err("Commission can only accrue on confirmed sale orders".to_string());
     }
     accrue_sale_commission_for_order(ctx, organization_id, order_id, params.rate_percent)
+}
+
+/// Accrue from OutInvoice post when SO metadata has `commission_rate_percent` > 0.
+pub(crate) fn maybe_accrue_commission_on_invoice_post(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    sale_order_id: u64,
+) -> Result<(), String> {
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&sale_order_id)
+        .ok_or("Sale order not found for commission accrual")?;
+    if order.organization_id != organization_id {
+        return Err("Sale order does not belong to this organization".to_string());
+    }
+    let rate = order
+        .metadata
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|v| {
+            v.get("commission_rate_percent")
+                .and_then(|x| x.as_f64())
+        })
+        .unwrap_or(0.0);
+    if rate <= 0.0 {
+        return Ok(());
+    }
+    accrue_sale_commission_for_order(ctx, organization_id, sale_order_id, rate)
+}
+
+/// Cancel accrued commissions for an SO. Fails if any commission is already settled.
+pub(crate) fn cancel_accrued_commissions_for_sale_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    sale_order_id: u64,
+    reason: &str,
+) -> Result<(), String> {
+    let rows: Vec<_> = ctx
+        .db
+        .sale_commission()
+        .commission_by_order()
+        .filter(&sale_order_id)
+        .filter(|c| c.organization_id == organization_id)
+        .collect();
+
+    for row in &rows {
+        if row.state == "settled" {
+            return Err(format!(
+                "Cannot claw back settled commission {} for sale order {} — reverse settlement first ({})",
+                row.id, sale_order_id, reason
+            ));
+        }
+    }
+
+    for row in rows {
+        if row.state != "accrued" {
+            continue;
+        }
+        let company_id = row.company_id;
+        let id = row.id;
+        ctx.db.sale_commission().id().update(SaleCommission {
+            state: "cancelled".to_string(),
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            metadata: Some(
+                serde_json::json!({ "clawback_reason": reason })
+                    .to_string(),
+            ),
+            ..row
+        });
+        write_audit_log_v2(
+            ctx,
+            organization_id,
+            AuditLogParams {
+                company_id: Some(company_id),
+                table_name: "sale_commission",
+                record_id: id,
+                action: "UPDATE",
+                old_values: Some(serde_json::json!({ "state": "accrued" }).to_string()),
+                new_values: Some(
+                    serde_json::json!({ "state": "cancelled", "reason": reason }).to_string(),
+                ),
+                changed_fields: vec!["state".to_string()],
+                metadata: None,
+            },
+        );
+    }
+    Ok(())
+}
+
+fn insert_commission_settle_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    move_id: u64,
+    move_name: &str,
+    company_id: u64,
+    journal_id: u64,
+    currency_id: u64,
+    date: Timestamp,
+    account_id: u64,
+    line_name: &str,
+    debit: f64,
+    credit: f64,
+    sequence: u32,
+    metadata: Option<String>,
+) {
+    ctx.db.account_move_line().insert(AccountMoveLine {
+        id: 0,
+        organization_id,
+        move_id,
+        move_name: Some(move_name.to_string()),
+        date,
+        ref_: None,
+        parent_state: AccountMoveState::Posted,
+        journal_id,
+        company_id,
+        company_currency_id: currency_id,
+        sequence,
+        name: line_name.to_string(),
+        quantity: 0.0,
+        price_unit: 0.0,
+        price: 0.0,
+        price_subtotal: 0.0,
+        price_total: 0.0,
+        discount: 0.0,
+        balance: debit - credit,
+        currency_id,
+        amount_currency: 0.0,
+        amount_residual: 0.0,
+        amount_residual_currency: 0.0,
+        debit,
+        credit,
+        debit_currency: 0.0,
+        credit_currency: 0.0,
+        tax_base_amount: 0.0,
+        account_id,
+        account_internal_type: None,
+        account_internal_group: None,
+        account_root_id: None,
+        group_tax_id: None,
+        tax_line_id: None,
+        tax_group_id: None,
+        tax_ids: vec![],
+        tax_repartition_line_id: None,
+        tax_audit: None,
+        partner_id: None,
+        commercial_partner_id: None,
+        reconcile_model_id: None,
+        payment_id: None,
+        statement_line_id: None,
+        currency_id_field: None,
+        blocked: false,
+        matching_number: None,
+        matching_label: None,
+        is_matching: false,
+        expected_pay_date: None,
+        expected_pay_date_currency_id: None,
+        expected_pay_date_amount: 0.0,
+        expected_pay_date_residual: 0.0,
+        display_type: None,
+        is_downpayment: false,
+        exclude_from_invoice_tab: false,
+        analytic_account_id: None,
+        analytic_tag_ids: vec![],
+        product_id: None,
+        product_uom_id: None,
+        product_category_id: None,
+        cogs_amount: 0.0,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata,
+    });
+}
+
+#[reducer]
+pub fn settle_sale_commissions(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: SettleSaleCommissionsParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "sale_order", "write")?;
+    check_permission(ctx, organization_id, "account_move", "create")?;
+
+    if params.commission_ids.is_empty() {
+        return Err("At least one commission id is required".to_string());
+    }
+    if params.expense_account_id == params.payable_account_id {
+        return Err("Expense and payable accounts must differ".to_string());
+    }
+
+    let mut commissions = Vec::with_capacity(params.commission_ids.len());
+    for id in &params.commission_ids {
+        let row = ctx
+            .db
+            .sale_commission()
+            .id()
+            .find(id)
+            .ok_or_else(|| format!("Commission {id} not found"))?;
+        if row.organization_id != organization_id {
+            return Err(format!("Commission {id} does not belong to this organization"));
+        }
+        if row.company_id != company_id {
+            return Err(format!("Commission {id} does not belong to this company"));
+        }
+        if row.state != "accrued" {
+            return Err(format!(
+                "Commission {id} is not accrued (state={})",
+                row.state
+            ));
+        }
+        commissions.push(row);
+    }
+
+    let total: f64 = commissions.iter().map(|c| c.amount).sum();
+    if total <= 0.0 {
+        return Err("Settlement total must be positive".to_string());
+    }
+
+    let company_row = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+    let currency_id = company_row.currency_id;
+    let name = next_doc_number(ctx, "COMM");
+
+    let move_record = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        organization_id,
+        name: name.clone(),
+        ref_: params.reference.clone(),
+        move_type: MoveType::Entry,
+        auto_post: false,
+        state: AccountMoveState::Posted,
+        date: params.date,
+        invoice_date: None,
+        invoice_date_due: None,
+        invoice_payment_term_id: None,
+        invoice_origin: Some("sale_commission_settle".to_string()),
+        invoice_partner_display_name: None,
+        invoice_cash_rounding_id: None,
+        payment_reference: params.reference.clone(),
+        partner_shipping_id: None,
+        sale_order_id: None,
+        partner_id: None,
+        commercial_partner_id: None,
+        partner_bank_id: None,
+        fiscal_position_id: None,
+        invoice_user_id: None,
+        invoice_incoterm_id: None,
+        incoterm_location: None,
+        campaign_id: None,
+        source_id: None,
+        medium_id: None,
+        company_id,
+        journal_id: params.journal_id,
+        currency_id,
+        company_currency_id: currency_id,
+        amount_untaxed: total,
+        amount_tax: 0.0,
+        amount_total: total,
+        amount_residual: 0.0,
+        amount_untaxed_signed: total,
+        amount_tax_signed: 0.0,
+        amount_total_signed: total,
+        amount_total_in_currency_signed: total,
+        amount_residual_signed: 0.0,
+        to_check: false,
+        posted_before: true,
+        is_storno: false,
+        is_move_sent: false,
+        secure_sequence_number: None,
+        invoice_has_outstanding: false,
+        payment_state: PaymentState::Paid,
+        restrict_mode_hash_table: false,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some(
+            serde_json::json!({
+                "commission_ids": params.commission_ids,
+                "settle_kind": "commission",
+            })
+            .to_string(),
+        ),
+    });
+
+    insert_commission_settle_line(
+        ctx,
+        organization_id,
+        move_record.id,
+        &name,
+        company_id,
+        params.journal_id,
+        currency_id,
+        params.date,
+        params.expense_account_id,
+        "Commission expense",
+        total,
+        0.0,
+        1,
+        params.metadata.clone(),
+    );
+    insert_commission_settle_line(
+        ctx,
+        organization_id,
+        move_record.id,
+        &name,
+        company_id,
+        params.journal_id,
+        currency_id,
+        params.date,
+        params.payable_account_id,
+        "Commission payable",
+        0.0,
+        total,
+        2,
+        params.metadata.clone(),
+    );
+
+    for row in commissions {
+        let id = row.id;
+        ctx.db.sale_commission().id().update(SaleCommission {
+            state: "settled".to_string(),
+            settle_move_id: Some(move_record.id),
+            settled_at: Some(ctx.timestamp),
+            settle_batch_id: Some(move_record.id),
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            ..row
+        });
+        write_audit_log_v2(
+            ctx,
+            organization_id,
+            AuditLogParams {
+                company_id: Some(company_id),
+                table_name: "sale_commission",
+                record_id: id,
+                action: "UPDATE",
+                old_values: Some(serde_json::json!({ "state": "accrued" }).to_string()),
+                new_values: Some(
+                    serde_json::json!({
+                        "state": "settled",
+                        "settle_move_id": move_record.id,
+                    })
+                    .to_string(),
+                ),
+                changed_fields: vec![
+                    "state".to_string(),
+                    "settle_move_id".to_string(),
+                    "settled_at".to_string(),
+                ],
+                metadata: None,
+            },
+        );
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_move",
+            record_id: move_record.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": name,
+                    "amount_total": total,
+                    "settle_kind": "commission",
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["amount_total".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[reducer]
+pub fn cancel_sale_commission(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    commission_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "sale_order", "write")?;
+    let row = ctx
+        .db
+        .sale_commission()
+        .id()
+        .find(&commission_id)
+        .ok_or("Commission not found")?;
+    if row.organization_id != organization_id {
+        return Err("Commission does not belong to this organization".to_string());
+    }
+    if row.company_id != company_id {
+        return Err("Commission does not belong to this company".to_string());
+    }
+    if row.state != "accrued" {
+        return Err(format!(
+            "Only accrued commissions can be cancelled (state={})",
+            row.state
+        ));
+    }
+    ctx.db.sale_commission().id().update(SaleCommission {
+        state: "cancelled".to_string(),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..row
+    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "sale_commission",
+            record_id: commission_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": "accrued" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "cancelled" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+#[reducer]
+pub fn reverse_sale_commission_settlement(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    commission_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "sale_order", "write")?;
+    check_permission(ctx, organization_id, "account_move", "create")?;
+
+    let row = ctx
+        .db
+        .sale_commission()
+        .id()
+        .find(&commission_id)
+        .ok_or("Commission not found")?;
+    if row.organization_id != organization_id {
+        return Err("Commission does not belong to this organization".to_string());
+    }
+    if row.company_id != company_id {
+        return Err("Commission does not belong to this company".to_string());
+    }
+    if row.state != "settled" {
+        return Err(format!(
+            "Only settled commissions can be reversed (state={})",
+            row.state
+        ));
+    }
+    let settle_move_id = row
+        .settle_move_id
+        .ok_or("Settled commission is missing settle_move_id")?;
+    let settle_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&settle_move_id)
+        .ok_or("Settlement move not found")?;
+    if settle_move.company_id != company_id {
+        return Err("Settlement move does not belong to this company".to_string());
+    }
+
+    let amount = row.amount;
+    let company_row = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+    let currency_id = company_row.currency_id;
+    let name = next_doc_number(ctx, "COMMR");
+
+    // Find expense (debit) and payable (credit) accounts from original settle move.
+    let lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&settle_move_id)
+        .collect();
+    let expense_line = lines
+        .iter()
+        .find(|l| l.debit > 0.0)
+        .ok_or("Settlement move missing expense (debit) line")?;
+    let payable_line = lines
+        .iter()
+        .find(|l| l.credit > 0.0)
+        .ok_or("Settlement move missing payable (credit) line")?;
+
+    let reverse = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        organization_id,
+        name: name.clone(),
+        ref_: Some(format!("REV {}", settle_move.name)),
+        move_type: MoveType::Entry,
+        auto_post: false,
+        state: AccountMoveState::Posted,
+        date: ctx.timestamp,
+        invoice_date: None,
+        invoice_date_due: None,
+        invoice_payment_term_id: None,
+        invoice_origin: Some(format!("reverse_commission:{}", commission_id)),
+        invoice_partner_display_name: None,
+        invoice_cash_rounding_id: None,
+        payment_reference: None,
+        partner_shipping_id: None,
+        sale_order_id: None,
+        partner_id: None,
+        commercial_partner_id: None,
+        partner_bank_id: None,
+        fiscal_position_id: None,
+        invoice_user_id: None,
+        invoice_incoterm_id: None,
+        incoterm_location: None,
+        campaign_id: None,
+        source_id: None,
+        medium_id: None,
+        company_id,
+        journal_id: settle_move.journal_id,
+        currency_id,
+        company_currency_id: currency_id,
+        amount_untaxed: amount,
+        amount_tax: 0.0,
+        amount_total: amount,
+        amount_residual: 0.0,
+        amount_untaxed_signed: amount,
+        amount_tax_signed: 0.0,
+        amount_total_signed: amount,
+        amount_total_in_currency_signed: amount,
+        amount_residual_signed: 0.0,
+        to_check: false,
+        posted_before: true,
+        is_storno: true,
+        is_move_sent: false,
+        secure_sequence_number: None,
+        invoice_has_outstanding: false,
+        payment_state: PaymentState::Paid,
+        restrict_mode_hash_table: false,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some(
+            serde_json::json!({
+                "reverses_move_id": settle_move_id,
+                "commission_id": commission_id,
+            })
+            .to_string(),
+        ),
+    });
+
+    // Reverse: Dr payable / Cr expense
+    insert_commission_settle_line(
+        ctx,
+        organization_id,
+        reverse.id,
+        &name,
+        company_id,
+        settle_move.journal_id,
+        currency_id,
+        ctx.timestamp,
+        payable_line.account_id,
+        "Reverse commission payable",
+        amount,
+        0.0,
+        1,
+        None,
+    );
+    insert_commission_settle_line(
+        ctx,
+        organization_id,
+        reverse.id,
+        &name,
+        company_id,
+        settle_move.journal_id,
+        currency_id,
+        ctx.timestamp,
+        expense_line.account_id,
+        "Reverse commission expense",
+        0.0,
+        amount,
+        2,
+        None,
+    );
+
+    ctx.db.sale_commission().id().update(SaleCommission {
+        state: "cancelled".to_string(),
+        settle_move_id: Some(reverse.id),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some(
+            serde_json::json!({
+                "reversed_settle_move_id": settle_move_id,
+                "reverse_move_id": reverse.id,
+            })
+            .to_string(),
+        ),
+        ..row
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "sale_commission",
+            record_id: commission_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": "settled" }).to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "state": "cancelled",
+                    "reverse_move_id": reverse.id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["state".to_string(), "settle_move_id".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
 }
 
 // ── Reducers: Exchange ───────────────────────────────────────────────────────

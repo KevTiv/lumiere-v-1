@@ -1220,15 +1220,6 @@ pub fn confirm_sales_order_impl(
     let partner_id = order.partner_id;
     let company_id = order.company_id;
     let is_dropship = order.is_dropship;
-    let commission_rate = order
-        .metadata
-        .as_ref()
-        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
-        .and_then(|v| {
-            v.get("commission_rate_percent")
-                .and_then(|x| x.as_f64())
-        })
-        .unwrap_or(0.0);
 
     ctx.db.sale_order().id().update(SaleOrder {
         state: SaleState::Sale,
@@ -1271,15 +1262,6 @@ pub fn confirm_sales_order_impl(
         )?;
     } else {
         create_outgoing_pickings_for_confirmed_order(ctx, organization_id, order_id)?;
-    }
-
-    if commission_rate > 0.0 {
-        crate::sales::oms_extensions::accrue_sale_commission_for_order(
-            ctx,
-            organization_id,
-            order_id,
-            commission_rate,
-        )?;
     }
 
     // Increment customer_rank on the partner contact
@@ -1344,6 +1326,13 @@ pub fn cancel_sale_order(
     }
 
     let company_id = order.company_id;
+
+    crate::sales::oms_extensions::cancel_accrued_commissions_for_sale_order(
+        ctx,
+        organization_id,
+        order_id,
+        "sale_order_cancel",
+    )?;
 
     // Cancel open outbound pickings and release reservations for this SO.
     let open_pickings: Vec<_> = ctx

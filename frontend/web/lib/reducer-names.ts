@@ -11,6 +11,9 @@
  */
 export const ALL_REDUCER_NAMES = [
   'accrue_sale_commission',
+  'reverse_sale_commission_settlement',
+  'settle_sale_commissions',
+  'cancel_sale_commission',
   'acknowledge_insight',
   'acknowledge_iot_action',
   'activate_pos_config',

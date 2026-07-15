@@ -20,6 +20,7 @@ pub struct UpdateSaleOrderParams {
     pub picking_policy: Option<String>,
     pub validity_date: Option<__sdk::Timestamp>,
     pub carrier_id: Option<u64>,
+    pub incoterm_id: Option<u64>,
     pub incoterm: Option<String>,
     pub incoterm_location: Option<String>,
     pub customer_lead: Option<f64>,

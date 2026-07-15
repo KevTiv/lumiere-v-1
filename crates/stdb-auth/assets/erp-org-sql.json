@@ -211,6 +211,13 @@
   },
   {
     "extra_where": "",
+    "mapKey": "sale-commissions",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "sale-commissions",
+    "table": "sale_commission"
+  },
+  {
+    "extra_where": "",
     "mapKey": "return-orders",
     "order_by": " ORDER BY id DESC",
     "resource_key": "return-orders",
@@ -257,6 +264,20 @@
     "order_by": "",
     "resource_key": "leads",
     "table": "lead"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "lead-sources",
+    "order_by": " ORDER BY sequence ASC",
+    "resource_key": "lead-sources",
+    "table": "lead_source"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "lead-lost-reasons",
+    "order_by": "",
+    "resource_key": "lead-lost-reasons",
+    "table": "lead_lost_reason"
   },
   {
     "extra_where": "",

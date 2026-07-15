@@ -79,6 +79,7 @@ export default __t.row({
   shippingPolicy: __t.string().name("shipping_policy"),
   pickingPolicy: __t.string().name("picking_policy"),
   warehouseId: __t.u64().name("warehouse_id"),
+  incotermId: __t.option(__t.u64()).name("incoterm_id"),
   incoterm: __t.option(__t.string()),
   incotermLocation: __t.option(__t.string()).name("incoterm_location"),
   carrierId: __t.option(__t.u64()).name("carrier_id"),

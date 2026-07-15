@@ -59,6 +59,7 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "tax-schedules",
   "sale-orders",
   "sale-order-lines",
+  "sale-commissions",
   "return-orders",
   "return-order-lines",
   "pos-loyalty-programs",
@@ -66,6 +67,8 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "pricelists",
   "picking-batches",
   "leads",
+  "lead-sources",
+  "lead-lost-reasons",
   "opportunities",
   "opportunity-stages",
   "opportunity-lines",
@@ -307,6 +310,15 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("sale-orders", "sale_order", id, fa, ""),
   "sale-order-lines": (id, fa) =>
     selectOrgScopedSql("sale-order-lines", "sale_order_line", id, fa, ""),
+  "sale-commissions": (id, fa) =>
+    selectOrgScopedSql(
+      "sale-commissions",
+      "sale_commission",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
   "return-orders": (id, fa) =>
     selectOrgScopedSql("return-orders", "return_order", id, fa, "", " ORDER BY id DESC"),
   "return-order-lines": (id, fa) =>
@@ -348,6 +360,17 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       " ORDER BY pricelist_id ASC, sequence ASC",
     ),
   leads: (id, fa) => selectOrgScopedSql("leads", "lead", id, fa, ""),
+  "lead-sources": (id, fa) =>
+    selectOrgScopedSql(
+      "lead-sources",
+      "lead_source",
+      id,
+      fa,
+      "",
+      " ORDER BY sequence ASC",
+    ),
+  "lead-lost-reasons": (id, fa) =>
+    selectOrgScopedSql("lead-lost-reasons", "lead_lost_reason", id, fa, ""),
   opportunities: (id, fa) =>
     selectOrgScopedSql("opportunities", "opportunity", id, fa, ""),
   "opportunity-stages": (id, fa) =>

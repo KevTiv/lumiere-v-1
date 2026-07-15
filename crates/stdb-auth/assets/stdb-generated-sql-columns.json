@@ -260,6 +260,27 @@
     "write_date",
     "metadata"
   ],
+  "AccountFiscalPosition": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "is_active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "AccountFiscalPositionTax": [
+    "id",
+    "organization_id",
+    "fiscal_position_id",
+    "tax_src_id",
+    "tax_dest_id",
+    "sequence",
+    "metadata"
+  ],
   "AccountFiscalYear": [
     "id",
     "name",
@@ -288,6 +309,18 @@
     "level",
     "parent_id",
     "company_id",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "AccountIncoterm": [
+    "id",
+    "organization_id",
+    "code",
+    "name",
+    "is_active",
     "create_uid",
     "create_date",
     "write_uid",
@@ -569,6 +602,9 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "AccrueSaleCommissionParams": [
+    "rate_percent"
   ],
   "Activity": [
     "id",
@@ -1191,6 +1227,9 @@
     "provider_message_id",
     "operational_message_id",
     "metadata"
+  ],
+  "ApplySalePromotionParams": [
+    "promotion_code"
   ],
   "ApprovalRequest": [
     "id",
@@ -3025,6 +3064,19 @@
     "result_currency_id",
     "metadata"
   ],
+  "CreateFiscalPositionParams": [
+    "company_id",
+    "name",
+    "is_active",
+    "metadata"
+  ],
+  "CreateFiscalPositionTaxParams": [
+    "fiscal_position_id",
+    "tax_src_id",
+    "tax_dest_id",
+    "sequence",
+    "metadata"
+  ],
   "CreateFiscalYearParams": [
     "name",
     "date_from",
@@ -3085,6 +3137,12 @@
     "name",
     "description",
     "is_active"
+  ],
+  "CreateIncotermParams": [
+    "code",
+    "name",
+    "is_active",
+    "metadata"
   ],
   "CreateIntercompanyRuleParams": [
     "name",
@@ -3994,6 +4052,16 @@
     "customer_lead",
     "metadata"
   ],
+  "CreateSaleOrderOptionParams": [
+    "product_id",
+    "name",
+    "quantity",
+    "uom_id",
+    "price_unit",
+    "discount",
+    "is_present",
+    "metadata"
+  ],
   "CreateSaleOrderParams": [
     "company_id",
     "partner_id",
@@ -4019,6 +4087,7 @@
     "source_id",
     "commitment_date",
     "expected_date",
+    "incoterm_id",
     "incoterm",
     "incoterm_location",
     "carrier_id",
@@ -4032,6 +4101,18 @@
     "message_partner_ids",
     "message_channel_ids",
     "activity_ids",
+    "metadata"
+  ],
+  "CreateSalePromotionParams": [
+    "company_id",
+    "code",
+    "name",
+    "discount_percent",
+    "discount_fixed",
+    "min_amount",
+    "is_active",
+    "date_start",
+    "date_end",
     "metadata"
   ],
   "CreateSavedReportParams": [
@@ -8344,6 +8425,25 @@
     "reference",
     "metadata"
   ],
+  "SaleCommission": [
+    "id",
+    "organization_id",
+    "company_id",
+    "sale_order_id",
+    "salesperson_id",
+    "basis_amount",
+    "rate_percent",
+    "amount",
+    "state",
+    "settle_move_id",
+    "settled_at",
+    "settle_batch_id",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
   "SaleOrder": [
     "id",
     "organization_id",
@@ -8404,6 +8504,7 @@
     "shipping_policy",
     "picking_policy",
     "warehouse_id",
+    "incoterm_id",
     "incoterm",
     "incoterm_location",
     "carrier_id",
@@ -8524,6 +8625,24 @@
     "price_unit",
     "discount",
     "is_present",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "SalePromotion": [
+    "id",
+    "organization_id",
+    "company_id",
+    "code",
+    "name",
+    "discount_percent",
+    "discount_fixed",
+    "min_amount",
+    "is_active",
+    "date_start",
+    "date_end",
     "create_uid",
     "create_date",
     "write_uid",
@@ -8693,6 +8812,15 @@
     "model",
     "record_id",
     "entries"
+  ],
+  "SettleSaleCommissionsParams": [
+    "commission_ids",
+    "journal_id",
+    "expense_account_id",
+    "payable_account_id",
+    "date",
+    "reference",
+    "metadata"
   ],
   "SetupFiscalCalendarParams": [
     "fiscal_year_name",
@@ -10576,6 +10704,14 @@
     "permissions",
     "is_active"
   ],
+  "UpdateSaleOrderOptionParams": [
+    "name",
+    "quantity",
+    "price_unit",
+    "discount",
+    "is_present",
+    "metadata"
+  ],
   "UpdateSaleOrderParams": [
     "client_order_ref",
     "note",
@@ -10590,6 +10726,7 @@
     "picking_policy",
     "validity_date",
     "carrier_id",
+    "incoterm_id",
     "incoterm",
     "incoterm_location",
     "customer_lead",

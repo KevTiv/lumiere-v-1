@@ -136,6 +136,11 @@ import {
   useCancelReturnOrder,
   useCreateCreditNoteFromReturnOrder,
   useCreateExchangeOrderFromReturn,
+  useSaleCommissions,
+  useSettleSaleCommissions,
+  useCancelSaleCommission,
+  useReverseSaleCommissionSettlement,
+  useAccrueSaleCommission,
 } from '@lumiere/query-hooks/hooks/sales';
 import {
   useAccountMoves,
@@ -169,6 +174,13 @@ import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use
 import { useModuleTab } from '@/hooks/use-module-tab';
 import { useModuleFilters } from '@/hooks/use-module-filters';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
+import {
+  SalesOpsPanel,
+  parseOpsQueueFilter,
+  parseCommissionRatePercent,
+  mergeCommissionRateIntoMetadata,
+  type SalesOpsQueueId,
+} from './sales-ops-panel';
 import {
   contactRowsToPartnerSelectOptions,
   pricelistRowsToSelectOptions,
@@ -406,6 +418,14 @@ function SalesClientLoaded({
   const { data: stockMoves = [] } = useStockMoves(orgId);
   const { data: returnOrders = [] } = useReturnOrders(orgId, initialReturnOrders);
   const { data: returnOrderLines = [] } = useReturnOrderLines(orgId, initialReturnOrderLines);
+  const { data: saleCommissions = [] } = useSaleCommissions(orgId);
+  const settleSaleCommissions = useSettleSaleCommissions(orgId, operatingCompanyId);
+  const cancelSaleCommission = useCancelSaleCommission(orgId, operatingCompanyId);
+  const reverseSaleCommissionSettlement = useReverseSaleCommissionSettlement(
+    orgId,
+    operatingCompanyId,
+  );
+  const accrueSaleCommission = useAccrueSaleCommission(orgId);
 
   const createSaleOrder = useCreateSaleOrder(orgId, operatingCompanyId);
   const createPricelist = useCreatePricelist(orgId);
@@ -1175,6 +1195,26 @@ function SalesClientLoaded({
             },
           },
           {
+            id: 'accrue-commission',
+            label: t('sales.actions.accrueCommission', {
+              defaultValue: 'Accrue commission',
+            }),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                const row = r as Record<string, unknown>;
+                const st = saleOrderState(row);
+                if (st !== 'Sale' && st !== 'Done') continue;
+                const rate = parseCommissionRatePercent(row);
+                if (rate <= 0) continue;
+                void accrueSaleCommission.mutateAsync({
+                  orderId: row.id as string | number | bigint,
+                  ratePercent: rate,
+                });
+              }
+            },
+          },
+          {
             id: 'create-invoice',
             label: t('sales.actions.createInvoice'),
             requiresSelection: true,
@@ -1232,6 +1272,7 @@ function SalesClientLoaded({
     sendSaleOrderQuotation,
     cancelSaleOrder,
     computeSoTotals,
+    accrueSaleCommission,
     lockSaleOrder,
     unlockSaleOrder,
     setCsvKind,
@@ -1460,7 +1501,8 @@ function SalesClientLoaded({
                     value: String(awaitingApproval),
                     icon: 'FileText',
                     testId: 'sales-queue-to-approve',
-                    onClick: () => navigateToOrdersByState('ToApprove'),
+                    onClick: () =>
+                      navigateToSalesTab('ops', { queue: 'to_approve' }),
                   },
                   {
                     label: t('sales.dashboard.queues.sentQuotations', {
@@ -1469,7 +1511,8 @@ function SalesClientLoaded({
                     value: String(sentQuotes),
                     icon: 'CheckCircle',
                     testId: 'sales-queue-sent',
-                    onClick: () => navigateToOrdersByState('Sent'),
+                    onClick: () =>
+                      navigateToSalesTab('ops', { queue: 'sent_quotes' }),
                   },
                   {
                     label: t('sales.dashboard.queues.creditHolds', {
@@ -1478,7 +1521,8 @@ function SalesClientLoaded({
                     value: String(creditHolds),
                     icon: 'AlertCircle',
                     testId: 'sales-queue-credit',
-                    onClick: () => navigateToSalesTab('orders'),
+                    onClick: () =>
+                      navigateToSalesTab('ops', { queue: 'credit_holds' }),
                   },
                   {
                     label: t('sales.dashboard.queues.returnsToReceive', {
@@ -1487,7 +1531,8 @@ function SalesClientLoaded({
                     value: String(returnsToReceive),
                     icon: 'package',
                     testId: 'sales-queue-returns',
-                    onClick: () => navigateToSalesTab('returns'),
+                    onClick: () =>
+                      navigateToSalesTab('ops', { queue: 'returns_receive' }),
                   },
                   {
                     label: t('sales.dashboard.queues.openDeliveries', {
@@ -1496,7 +1541,79 @@ function SalesClientLoaded({
                     value: String(openDeliveries),
                     icon: 'cart',
                     testId: 'sales-queue-pickings',
-                    onClick: () => navigateToSalesTab('fulfillment'),
+                    onClick: () =>
+                      navigateToSalesTab('ops', { queue: 'open_deliveries' }),
+                  },
+                  {
+                    label: t('sales.dashboard.queues.commissionsToAccrue', {
+                      defaultValue: 'To accrue',
+                    }),
+                    value: String(
+                      orders.filter((o) => {
+                        const st = saleOrderState(o as Record<string, unknown>);
+                        if (st !== 'Sale' && st !== 'Done') return false;
+                        const rate = parseCommissionRatePercent(
+                          o as Record<string, unknown>,
+                        );
+                        if (rate <= 0) return false;
+                        const oid = String(
+                          (o as Record<string, unknown>).id ?? '',
+                        );
+                        return !saleCommissions.some((c) => {
+                          const row = c as Record<string, unknown>;
+                          const stc = String(row.state ?? '').toLowerCase();
+                          if (stc === 'cancelled') return false;
+                          return (
+                            String(row.saleOrderId ?? row.sale_order_id ?? '') ===
+                            oid
+                          );
+                        });
+                      }).length,
+                    ),
+                    icon: 'FileText',
+                    testId: 'sales-queue-commissions-to-accrue',
+                    onClick: () =>
+                      navigateToSalesTab('ops', {
+                        queue: 'commissions_to_accrue',
+                      }),
+                  },
+                  {
+                    label: t('sales.dashboard.queues.commissionsAccrued', {
+                      defaultValue: 'Commissions accrued',
+                    }),
+                    value: String(
+                      saleCommissions.filter(
+                        (c) =>
+                          String(
+                            (c as Record<string, unknown>).state ?? '',
+                          ).toLowerCase() === 'accrued',
+                      ).length,
+                    ),
+                    icon: 'FileText',
+                    testId: 'sales-queue-commissions',
+                    onClick: () =>
+                      navigateToSalesTab('ops', {
+                        queue: 'commissions_accrued',
+                      }),
+                  },
+                  {
+                    label: t('sales.dashboard.queues.commissionsSettled', {
+                      defaultValue: 'Commissions settled',
+                    }),
+                    value: String(
+                      saleCommissions.filter(
+                        (c) =>
+                          String(
+                            (c as Record<string, unknown>).state ?? '',
+                          ).toLowerCase() === 'settled',
+                      ).length,
+                    ),
+                    icon: 'CheckCircle',
+                    testId: 'sales-queue-commissions-settled',
+                    onClick: () =>
+                      navigateToSalesTab('ops', {
+                        queue: 'commissions_settled',
+                      }),
                   },
                 ],
               },
@@ -1667,6 +1784,7 @@ function SalesClientLoaded({
     partnerCreditControls,
     returnOrders,
     stockPickings,
+    saleCommissions,
     dashboardTimeRange,
   ]);
 
@@ -1783,6 +1901,76 @@ function SalesClientLoaded({
               ),
             };
           }
+          if (tab.id === 'ops') {
+            const opsQueue = parseOpsQueueFilter(urlFilters);
+            return {
+              ...tab,
+              type: 'custom' as const,
+              customContent: (
+                <SalesOpsPanel
+                  activeQueue={opsQueue}
+                  onQueueChange={(queue: SalesOpsQueueId) =>
+                    navigateToSalesTab('ops', { queue })
+                  }
+                  orders={orders as unknown as Record<string, unknown>[]}
+                  orderLines={orderLines as unknown as Record<string, unknown>[]}
+                  partnerCreditControls={
+                    partnerCreditControls as unknown as Record<string, unknown>[]
+                  }
+                  stockPickings={
+                    stockPickings as unknown as Record<string, unknown>[]
+                  }
+                  returnOrders={
+                    returnOrders as unknown as Record<string, unknown>[]
+                  }
+                  commissions={
+                    saleCommissions as unknown as Record<string, unknown>[]
+                  }
+                  accountMoves={
+                    accountMoves as unknown as Record<string, unknown>[]
+                  }
+                  accountJournals={
+                    accountJournals as unknown as Record<string, unknown>[]
+                  }
+                  accountAccounts={
+                    accountAccounts as unknown as Record<string, unknown>[]
+                  }
+                  settlePending={settleSaleCommissions.isPending}
+                  cancelPending={cancelSaleCommission.isPending}
+                  reversePending={reverseSaleCommissionSettlement.isPending}
+                  accruePending={accrueSaleCommission.isPending}
+                  onSettleCommissions={async (input) => {
+                    await settleSaleCommissions.mutateAsync({
+                      commissionIds: input.commissionIds,
+                      journalId: input.journalId,
+                      expenseAccountId: input.expenseAccountId,
+                      payableAccountId: input.payableAccountId,
+                    });
+                  }}
+                  onCancelCommissions={async (commissionIds) => {
+                    for (const commissionId of commissionIds) {
+                      await cancelSaleCommission.mutateAsync({ commissionId });
+                    }
+                  }}
+                  onReverseCommissions={async (commissionIds) => {
+                    for (const commissionId of commissionIds) {
+                      await reverseSaleCommissionSettlement.mutateAsync({
+                        commissionId,
+                      });
+                    }
+                  }}
+                  onAccrueCommissions={async (items) => {
+                    for (const item of items) {
+                      await accrueSaleCommission.mutateAsync(item);
+                    }
+                  }}
+                  onOpenOrdersTab={() => navigateToSalesTab('orders')}
+                  onOpenFulfillment={() => navigateToSalesTab('fulfillment')}
+                  onOpenReturns={() => navigateToSalesTab('returns')}
+                />
+              ),
+            };
+          }
           if (tab.id === 'loyalty-cards' && tab.type === 'entity') {
             return { ...tab, createForm: loyaltyCardFormConfig };
           }
@@ -1828,6 +2016,20 @@ function SalesClientLoaded({
       loyaltyCardFormConfig,
       t,
       setCsvKind,
+      urlFilters,
+      navigateToSalesTab,
+      orders,
+      orderLines,
+      partnerCreditControls,
+      stockPickings,
+      saleCommissions,
+      accountMoves,
+      accountJournals,
+      accountAccounts,
+      settleSaleCommissions,
+      cancelSaleCommission,
+      reverseSaleCommissionSettlement,
+      accrueSaleCommission,
       // New mutations
       updateSaleOrder,
       lockSaleOrder,
@@ -2249,6 +2451,8 @@ function SalesClientLoaded({
                 editSaleOrderTarget.incoterm_location ??
                 '',
             ),
+            commissionRatePercent:
+              parseCommissionRatePercent(editSaleOrderTarget) || '',
           })}
           closeOnSubmit={false}
           submitError={editSaleOrderError}
@@ -2258,6 +2462,15 @@ function SalesClientLoaded({
             const id = editSaleOrderTarget.id;
             if (id == null) return;
             try {
+              const rateRaw = formData.commissionRatePercent;
+              const rate =
+                rateRaw === '' || rateRaw == null
+                  ? null
+                  : Number(rateRaw);
+              const metadata = mergeCommissionRateIntoMetadata(
+                editSaleOrderTarget.metadata,
+                rate != null && Number.isFinite(rate) ? rate : null,
+              );
               await updateSaleOrder.mutateAsync({
                 orderId: id as string | number | bigint,
                 params: {
@@ -2272,6 +2485,7 @@ function SalesClientLoaded({
                     typeof formData.incotermLocation === 'string'
                       ? formData.incotermLocation
                       : undefined,
+                  metadata,
                 },
               });
               setEditSaleOrderTarget(null);

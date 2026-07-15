@@ -4771,5 +4771,10 @@
   "WorkflowWorkitem": [
     "wkf_evaled_condition",
     "metadata"
-  ]
+  ],
+  "SettleSaleCommissionsParams": [
+    "reference",
+    "metadata"
+  ],
+  "AccrueSaleCommissionParams": []
 }

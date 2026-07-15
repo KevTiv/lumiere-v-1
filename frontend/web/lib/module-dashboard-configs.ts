@@ -653,6 +653,11 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
       sections: salesDashboard.sections,
     },
     {
+      id: "ops",
+      label: "Ops",
+      type: "custom" as const,
+    },
+    {
       id: "orders",
       label: "Orders",
       type: "entity",

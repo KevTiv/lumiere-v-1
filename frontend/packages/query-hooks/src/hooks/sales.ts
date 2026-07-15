@@ -174,6 +174,16 @@ export function useReturnOrderLines(organizationId: bigint, initialData?: QueryR
   })
 }
 
+export function useSaleCommissions(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['sale-commissions', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/sale-commissions', 'Failed to fetch sale commissions'),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
@@ -864,6 +874,127 @@ export function useCreateLoyaltyCard(organizationId: bigint, companyId: bigint) 
       if (!r.ok) throw new Error('Failed to create loyalty card')
     },
     onSuccess: () => invalidateSalesLogistics(qc, organizationId, companyId),
+  })
+}
+
+export function useSettleSaleCommissions(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      commissionIds: Array<bigint | number | string>
+      journalId: bigint | number | string
+      expenseAccountId: bigint | number | string
+      payableAccountId: bigint | number | string
+      date?: Date | number | bigint
+      reference?: string | null
+      metadata?: string | null
+    }
+  >({
+    mutationFn: async (input) => {
+      const dateMicros =
+        input.date instanceof Date
+          ? BigInt(input.date.getTime()) * 1000n
+          : input.date != null
+            ? BigInt(input.date)
+            : BigInt(Date.now()) * 1000n
+      const encoded = stdbParamsToJson(
+        {
+          commissionIds: input.commissionIds.map((id) => toScalarU64(id)),
+          journalId: toScalarU64(input.journalId),
+          expenseAccountId: toScalarU64(input.expenseAccountId),
+          payableAccountId: toScalarU64(input.payableAccountId),
+          date: { microsSinceUnixEpoch: dateMicros },
+          reference: input.reference ?? null,
+          metadata: input.metadata ?? null,
+        },
+        "SettleSaleCommissionsParams",
+      )
+      const { urlPath, init } = salesBffPost("settle_sale_commissions", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['sale-commissions', k] })
+      void qc.invalidateQueries({ queryKey: ['account-moves', k] })
+    },
+  })
+}
+
+export function useCancelSaleCommission(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { commissionId: bigint | number | string }>({
+    mutationFn: async ({ commissionId }) => {
+      const { urlPath, init } = salesBffPost("cancel_sale_commission", [
+        organizationId,
+        companyId,
+        toScalarU64(commissionId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ['sale-commissions', rqBigIntKey(organizationId)],
+      })
+    },
+  })
+}
+
+export function useAccrueSaleCommission(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { orderId: bigint | number | string; ratePercent: number }
+  >({
+    mutationFn: async ({ orderId, ratePercent }) => {
+      const encoded = stdbParamsToJson(
+        { ratePercent },
+        "AccrueSaleCommissionParams",
+      )
+      const { urlPath, init } = salesBffPost("accrue_sale_commission", [
+        organizationId,
+        toScalarU64(orderId),
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ['sale-commissions', rqBigIntKey(organizationId)],
+      })
+    },
+  })
+}
+
+export function useReverseSaleCommissionSettlement(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { commissionId: bigint | number | string }>({
+    mutationFn: async ({ commissionId }) => {
+      const { urlPath, init } = salesBffPost("reverse_sale_commission_settlement", [
+        organizationId,
+        companyId,
+        toScalarU64(commissionId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['sale-commissions', k] })
+      void qc.invalidateQueries({ queryKey: ['account-moves', k] })
+    },
   })
 }
 

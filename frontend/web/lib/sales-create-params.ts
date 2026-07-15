@@ -92,6 +92,13 @@ export function toCreateSaleOrderParams(
   if (validityRaw != null && String(validityRaw).trim() !== "") {
     metadataObj.validityDate = validityRaw
   }
+  const commissionRateRaw = formData.commissionRatePercent
+  if (commissionRateRaw != null && String(commissionRateRaw).trim() !== "") {
+    const rate = Number(commissionRateRaw)
+    if (Number.isFinite(rate) && rate > 0) {
+      metadataObj.commission_rate_percent = rate
+    }
+  }
   const customMeta = optionalTrimmedString(formData.metadata)
   if (customMeta) {
     try {

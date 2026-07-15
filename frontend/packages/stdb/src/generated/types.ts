@@ -303,6 +303,31 @@ export const AccountBankStatementLine = __t.object("AccountBankStatementLine", {
 });
 export type AccountBankStatementLine = __Infer<typeof AccountBankStatementLine>;
 
+export const AccountFiscalPosition = __t.object("AccountFiscalPosition", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  name: __t.string(),
+  isActive: __t.bool(),
+  createUid: __t.option(__t.identity()),
+  createDate: __t.option(__t.timestamp()),
+  writeUid: __t.option(__t.identity()),
+  writeDate: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type AccountFiscalPosition = __Infer<typeof AccountFiscalPosition>;
+
+export const AccountFiscalPositionTax = __t.object("AccountFiscalPositionTax", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  fiscalPositionId: __t.u64(),
+  taxSrcId: __t.u64(),
+  taxDestId: __t.option(__t.u64()),
+  sequence: __t.u32(),
+  metadata: __t.option(__t.string()),
+});
+export type AccountFiscalPositionTax = __Infer<typeof AccountFiscalPositionTax>;
+
 export const AccountFiscalYear = __t.object("AccountFiscalYear", {
   id: __t.u64(),
   name: __t.string(),
@@ -342,6 +367,20 @@ export const AccountGroup = __t.object("AccountGroup", {
   metadata: __t.option(__t.string()),
 });
 export type AccountGroup = __Infer<typeof AccountGroup>;
+
+export const AccountIncoterm = __t.object("AccountIncoterm", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  code: __t.string(),
+  name: __t.string(),
+  isActive: __t.bool(),
+  createUid: __t.option(__t.identity()),
+  createDate: __t.option(__t.timestamp()),
+  writeUid: __t.option(__t.identity()),
+  writeDate: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type AccountIncoterm = __Infer<typeof AccountIncoterm>;
 
 // The tagged union or sum type for the algebraic type `AccountInternalGroup`.
 export const AccountInternalGroup = __t.enum("AccountInternalGroup", {
@@ -695,6 +734,11 @@ export const AccountTypeInternal = __t.enum("AccountTypeInternal", {
   Other: __t.unit(),
 });
 export type AccountTypeInternal = __Infer<typeof AccountTypeInternal>;
+
+export const AccrueSaleCommissionParams = __t.object("AccrueSaleCommissionParams", {
+  ratePercent: __t.f64(),
+});
+export type AccrueSaleCommissionParams = __Infer<typeof AccrueSaleCommissionParams>;
 
 export const Activity = __t.object("Activity", {
   id: __t.u64(),
@@ -1418,6 +1462,11 @@ export const AppendCrmConversationMessageParams = __t.object("AppendCrmConversat
   metadata: __t.option(__t.string()),
 });
 export type AppendCrmConversationMessageParams = __Infer<typeof AppendCrmConversationMessageParams>;
+
+export const ApplySalePromotionParams = __t.object("ApplySalePromotionParams", {
+  promotionCode: __t.string(),
+});
+export type ApplySalePromotionParams = __Infer<typeof ApplySalePromotionParams>;
 
 export const ApprovalRequest = __t.object("ApprovalRequest", {
   id: __t.u64(),
@@ -3689,6 +3738,23 @@ export const CreateFinancialReportParams = __t.object("CreateFinancialReportPara
 });
 export type CreateFinancialReportParams = __Infer<typeof CreateFinancialReportParams>;
 
+export const CreateFiscalPositionParams = __t.object("CreateFiscalPositionParams", {
+  companyId: __t.option(__t.u64()),
+  name: __t.string(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateFiscalPositionParams = __Infer<typeof CreateFiscalPositionParams>;
+
+export const CreateFiscalPositionTaxParams = __t.object("CreateFiscalPositionTaxParams", {
+  fiscalPositionId: __t.u64(),
+  taxSrcId: __t.u64(),
+  taxDestId: __t.option(__t.u64()),
+  sequence: __t.u32(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateFiscalPositionTaxParams = __Infer<typeof CreateFiscalPositionTaxParams>;
+
 export const CreateFiscalYearParams = __t.object("CreateFiscalYearParams", {
   name: __t.string(),
   dateFrom: __t.timestamp(),
@@ -3773,6 +3839,14 @@ export const CreateHelpdeskTeamParams = __t.object("CreateHelpdeskTeamParams", {
   isActive: __t.bool(),
 });
 export type CreateHelpdeskTeamParams = __Infer<typeof CreateHelpdeskTeamParams>;
+
+export const CreateIncotermParams = __t.object("CreateIncotermParams", {
+  code: __t.string(),
+  name: __t.string(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateIncotermParams = __Infer<typeof CreateIncotermParams>;
 
 export const CreateIntercompanyRuleParams = __t.object("CreateIntercompanyRuleParams", {
   name: __t.string(),
@@ -4864,6 +4938,18 @@ export const CreateSaleOrderLineParams = __t.object("CreateSaleOrderLineParams",
 });
 export type CreateSaleOrderLineParams = __Infer<typeof CreateSaleOrderLineParams>;
 
+export const CreateSaleOrderOptionParams = __t.object("CreateSaleOrderOptionParams", {
+  productId: __t.u64(),
+  name: __t.string(),
+  quantity: __t.f64(),
+  uomId: __t.u64(),
+  priceUnit: __t.f64(),
+  discount: __t.f64(),
+  isPresent: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSaleOrderOptionParams = __Infer<typeof CreateSaleOrderOptionParams>;
+
 export const CreateSaleOrderParams = __t.object("CreateSaleOrderParams", {
   companyId: __t.option(__t.u64()),
   partnerId: __t.u64(),
@@ -4891,6 +4977,7 @@ export const CreateSaleOrderParams = __t.object("CreateSaleOrderParams", {
   sourceId: __t.option(__t.u64()),
   commitmentDate: __t.option(__t.timestamp()),
   expectedDate: __t.option(__t.timestamp()),
+  incotermId: __t.option(__t.u64()),
   incoterm: __t.option(__t.string()),
   incotermLocation: __t.option(__t.string()),
   carrierId: __t.option(__t.u64()),
@@ -4907,6 +4994,20 @@ export const CreateSaleOrderParams = __t.object("CreateSaleOrderParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateSaleOrderParams = __Infer<typeof CreateSaleOrderParams>;
+
+export const CreateSalePromotionParams = __t.object("CreateSalePromotionParams", {
+  companyId: __t.option(__t.u64()),
+  code: __t.string(),
+  name: __t.string(),
+  discountPercent: __t.f64(),
+  discountFixed: __t.f64(),
+  minAmount: __t.f64(),
+  isActive: __t.bool(),
+  dateStart: __t.option(__t.timestamp()),
+  dateEnd: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSalePromotionParams = __Infer<typeof CreateSalePromotionParams>;
 
 export const CreateSavedReportParams = __t.object("CreateSavedReportParams", {
   name: __t.string(),
@@ -10197,6 +10298,27 @@ export const RunFxRevaluationParams = __t.object("RunFxRevaluationParams", {
 });
 export type RunFxRevaluationParams = __Infer<typeof RunFxRevaluationParams>;
 
+export const SaleCommission = __t.object("SaleCommission", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  saleOrderId: __t.u64(),
+  salespersonId: __t.identity(),
+  basisAmount: __t.f64(),
+  ratePercent: __t.f64(),
+  amount: __t.f64(),
+  state: __t.string(),
+  settleMoveId: __t.option(__t.u64()),
+  settledAt: __t.option(__t.timestamp()),
+  settleBatchId: __t.option(__t.u64()),
+  createUid: __t.option(__t.identity()),
+  createDate: __t.option(__t.timestamp()),
+  writeUid: __t.option(__t.identity()),
+  writeDate: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type SaleCommission = __Infer<typeof SaleCommission>;
+
 export const SaleOrder = __t.object("SaleOrder", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -10261,6 +10383,7 @@ export const SaleOrder = __t.object("SaleOrder", {
   shippingPolicy: __t.string(),
   pickingPolicy: __t.string(),
   warehouseId: __t.u64(),
+  incotermId: __t.option(__t.u64()),
   incoterm: __t.option(__t.string()),
   incotermLocation: __t.option(__t.string()),
   carrierId: __t.option(__t.u64()),
@@ -10396,6 +10519,26 @@ export const SaleOrderOption = __t.object("SaleOrderOption", {
   metadata: __t.option(__t.string()),
 });
 export type SaleOrderOption = __Infer<typeof SaleOrderOption>;
+
+export const SalePromotion = __t.object("SalePromotion", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  code: __t.string(),
+  name: __t.string(),
+  discountPercent: __t.f64(),
+  discountFixed: __t.f64(),
+  minAmount: __t.f64(),
+  isActive: __t.bool(),
+  dateStart: __t.option(__t.timestamp()),
+  dateEnd: __t.option(__t.timestamp()),
+  createUid: __t.option(__t.identity()),
+  createDate: __t.option(__t.timestamp()),
+  writeUid: __t.option(__t.identity()),
+  writeDate: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type SalePromotion = __Infer<typeof SalePromotion>;
 
 // The tagged union or sum type for the algebraic type `SaleState`.
 export const SaleState = __t.enum("SaleState", {
@@ -10650,6 +10793,17 @@ export const SetRecordCustomFieldValuesParams = __t.object("SetRecordCustomField
   },
 });
 export type SetRecordCustomFieldValuesParams = __Infer<typeof SetRecordCustomFieldValuesParams>;
+
+export const SettleSaleCommissionsParams = __t.object("SettleSaleCommissionsParams", {
+  commissionIds: __t.array(__t.u64()),
+  journalId: __t.u64(),
+  expenseAccountId: __t.u64(),
+  payableAccountId: __t.u64(),
+  date: __t.timestamp(),
+  reference: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type SettleSaleCommissionsParams = __Infer<typeof SettleSaleCommissionsParams>;
 
 export const SetupFiscalCalendarParams = __t.object("SetupFiscalCalendarParams", {
   fiscalYearName: __t.string(),
@@ -12907,6 +13061,16 @@ export const UpdateRoleParams = __t.object("UpdateRoleParams", {
 });
 export type UpdateRoleParams = __Infer<typeof UpdateRoleParams>;
 
+export const UpdateSaleOrderOptionParams = __t.object("UpdateSaleOrderOptionParams", {
+  name: __t.option(__t.string()),
+  quantity: __t.option(__t.f64()),
+  priceUnit: __t.option(__t.f64()),
+  discount: __t.option(__t.f64()),
+  isPresent: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateSaleOrderOptionParams = __Infer<typeof UpdateSaleOrderOptionParams>;
+
 export const UpdateSaleOrderParams = __t.object("UpdateSaleOrderParams", {
   clientOrderRef: __t.option(__t.string()),
   note: __t.option(__t.string()),
@@ -12921,6 +13085,7 @@ export const UpdateSaleOrderParams = __t.object("UpdateSaleOrderParams", {
   pickingPolicy: __t.option(__t.string()),
   validityDate: __t.option(__t.timestamp()),
   carrierId: __t.option(__t.u64()),
+  incotermId: __t.option(__t.u64()),
   incoterm: __t.option(__t.string()),
   incotermLocation: __t.option(__t.string()),
   customerLead: __t.option(__t.f64()),

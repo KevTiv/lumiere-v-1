@@ -3320,7 +3320,7 @@
     "admin": {
       "tabLabel": "Pipeline admin",
       "stagesTitle": "Opportunity stages",
-      "stagesDescription": "Add pipeline stages instead of seed-only configuration.",
+      "stagesDescription": "Create stages and toggle active status for the pipeline board.",
       "stageName": "Name",
       "stageProbability": "Probability %",
       "createStage": "Create stage",
@@ -3328,10 +3328,24 @@
       "sourcesDescription": "Named sources for inbound qualification tracking.",
       "sourceName": "Name",
       "createSource": "Create source",
+      "lostReasonsTitle": "Lost reasons",
+      "lostReasonsDescription": "Reasons recorded when a lead or opportunity is lost.",
+      "lostReasonName": "Name",
+      "createLostReason": "Create lost reason",
       "rulesTitle": "Assignment rules",
       "rulesDescription": "Route leads and opportunities (territories foundation).",
       "ruleName": "Name",
-      "createRule": "Create rule"
+      "createRule": "Create rule",
+      "active": "Active",
+      "inactive": "Off"
+    },
+    "countryPacks": {
+      "title": "Country packs",
+      "description": "Enable locale packs so contact tax IDs and addresses validate for this company.",
+      "needCompany": "Select an operating company to enable party-data validators (ABN, CNPJ, …).",
+      "empty": "No country packs available.",
+      "enabled": "On",
+      "disabled": "Off"
     },
     "scoring": {
       "tabLabel": "Score",
@@ -5781,10 +5795,42 @@
         "sentQuotations": "Sent quotations",
         "creditHolds": "Credit holds",
         "returnsToReceive": "Returns to receive",
-        "openDeliveries": "Open deliveries"
+        "openDeliveries": "Open deliveries",
+        "commissionsToAccrue": "To accrue",
+        "commissionsAccrued": "Commissions accrued",
+        "commissionsSettled": "Commissions settled"
       },
       "widgets": {
         "revenue": "Revenue"
+      }
+    },
+    "ops": {
+      "settleTitle": "Settle commissions",
+      "settleSubmit": "Post settlement",
+      "settleSelected": "Settle selected",
+      "cancelSelected": "Cancel selected",
+      "reverseSelected": "Reverse settlement",
+      "accrueSelected": "Accrue selected",
+      "accrueMissingRate": "Selected orders need a commission rate.",
+      "journal": "Journal",
+      "expenseAccount": "Expense account",
+      "payableAccount": "Payable account",
+      "emptyQueue": "No items in this queue",
+      "drillTitle": "Order drill-down",
+      "selectOrder": "Select a sale order from a queue to inspect.",
+      "lines": "Lines",
+      "pickings": "Pickings",
+      "moves": "AR moves",
+      "commissions": "Commissions",
+      "queues": {
+        "to_approve": "Awaiting approval",
+        "sent_quotes": "Sent quotations",
+        "credit_holds": "Credit holds",
+        "open_deliveries": "Open deliveries",
+        "returns_receive": "Returns to receive",
+        "commissions_to_accrue": "To accrue",
+        "commissions_accrued": "Commissions accrued",
+        "commissions_settled": "Commissions settled"
       }
     },
     "csvImport": {
@@ -6407,6 +6453,7 @@
       "editOrder": "Edit order",
       "cancelOrders": "Cancel orders",
       "recalculateTotals": "Recalculate totals",
+      "accrueCommission": "Accrue commission",
       "createInvoice": "Create invoice…",
       "lockOrders": "Lock",
       "unlockOrders": "Unlock",
