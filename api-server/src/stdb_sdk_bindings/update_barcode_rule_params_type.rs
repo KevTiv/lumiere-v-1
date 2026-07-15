@@ -2,22 +2,30 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
+
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct UpdateBarcodeRuleParams {
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub sequence: Option<i32>,
-    pub encoding: Option<String>,
-    pub pattern: Option<String>,
-    pub r#type: Option<String>,
-    pub alias: Option<String>,
-    pub is_active: Option<bool>,
-    pub metadata: Option<String>,
+    pub name: Option::<String>,
+    pub description: Option::<String>,
+    pub sequence: Option::<i32>,
+    pub encoding: Option::<String>,
+    pub pattern: Option::<String>,
+    pub r#type: Option::<String>,
+    pub alias: Option::<String>,
+    pub is_active: Option::<bool>,
+    pub metadata: Option::<String>,
 }
+
 
 impl __sdk::InModule for UpdateBarcodeRuleParams {
     type Module = super::RemoteModule;
 }
+

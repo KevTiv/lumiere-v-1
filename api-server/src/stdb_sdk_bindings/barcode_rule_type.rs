@@ -2,7 +2,13 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
+
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
@@ -10,21 +16,23 @@ pub struct BarcodeRule {
     pub id: u64,
     pub organization_id: u64,
     pub name: String,
-    pub description: Option<String>,
+    pub description: Option::<String>,
     pub sequence: i32,
     pub encoding: String,
     pub pattern: String,
     pub r#type: String,
-    pub alias: Option<String>,
+    pub alias: Option::<String>,
     pub is_active: bool,
     pub created_at: __sdk::Timestamp,
     pub updated_at: __sdk::Timestamp,
-    pub metadata: Option<String>,
+    pub metadata: Option::<String>,
 }
+
 
 impl __sdk::InModule for BarcodeRule {
     type Module = super::RemoteModule;
 }
+
 
 /// Column accessor struct for the table `BarcodeRule`.
 ///
@@ -33,16 +41,16 @@ pub struct BarcodeRuleCols {
     pub id: __sdk::__query_builder::Col<BarcodeRule, u64>,
     pub organization_id: __sdk::__query_builder::Col<BarcodeRule, u64>,
     pub name: __sdk::__query_builder::Col<BarcodeRule, String>,
-    pub description: __sdk::__query_builder::Col<BarcodeRule, Option<String>>,
+    pub description: __sdk::__query_builder::Col<BarcodeRule, Option::<String>>,
     pub sequence: __sdk::__query_builder::Col<BarcodeRule, i32>,
     pub encoding: __sdk::__query_builder::Col<BarcodeRule, String>,
     pub pattern: __sdk::__query_builder::Col<BarcodeRule, String>,
     pub r#type: __sdk::__query_builder::Col<BarcodeRule, String>,
-    pub alias: __sdk::__query_builder::Col<BarcodeRule, Option<String>>,
+    pub alias: __sdk::__query_builder::Col<BarcodeRule, Option::<String>>,
     pub is_active: __sdk::__query_builder::Col<BarcodeRule, bool>,
     pub created_at: __sdk::__query_builder::Col<BarcodeRule, __sdk::Timestamp>,
     pub updated_at: __sdk::__query_builder::Col<BarcodeRule, __sdk::Timestamp>,
-    pub metadata: __sdk::__query_builder::Col<BarcodeRule, Option<String>>,
+    pub metadata: __sdk::__query_builder::Col<BarcodeRule, Option::<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for BarcodeRule {
@@ -62,6 +70,7 @@ impl __sdk::__query_builder::HasCols for BarcodeRule {
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
+
         }
     }
 }
@@ -82,8 +91,10 @@ impl __sdk::__query_builder::HasIxCols for BarcodeRule {
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             r#type: __sdk::__query_builder::IxCol::new(table_name, "type"),
+
         }
     }
 }
 
 impl __sdk::__query_builder::CanBeLookupTable for BarcodeRule {}
+

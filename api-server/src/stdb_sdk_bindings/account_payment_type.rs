@@ -2,11 +2,16 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
 
-use super::partner_type_type::PartnerType;
 use super::payment_state_type::PaymentState;
 use super::payment_type_type::PaymentType;
+use super::partner_type_type::PartnerType;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
@@ -14,8 +19,8 @@ pub struct AccountPayment {
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
-    pub name: Option<String>,
-    pub move_id: Option<u64>,
+    pub name: Option::<String>,
+    pub move_id: Option::<u64>,
     pub payment_type: PaymentType,
     pub partner_type: PartnerType,
     pub partner_id: u64,
@@ -23,18 +28,20 @@ pub struct AccountPayment {
     pub currency_id: u64,
     pub date: __sdk::Timestamp,
     pub journal_id: u64,
-    pub r#ref: Option<String>,
-    pub memo: Option<String>,
-    pub reconciled_invoice_ids: Vec<u64>,
-    pub reconciled_bill_ids: Vec<u64>,
+    pub r#ref: Option::<String>,
+    pub memo: Option::<String>,
+    pub reconciled_invoice_ids: Vec::<u64>,
+    pub reconciled_bill_ids: Vec::<u64>,
     pub state: PaymentState,
     pub created_at: __sdk::Timestamp,
     pub create_uid: __sdk::Identity,
 }
 
+
 impl __sdk::InModule for AccountPayment {
     type Module = super::RemoteModule;
 }
+
 
 /// Column accessor struct for the table `AccountPayment`.
 ///
@@ -43,8 +50,8 @@ pub struct AccountPaymentCols {
     pub id: __sdk::__query_builder::Col<AccountPayment, u64>,
     pub organization_id: __sdk::__query_builder::Col<AccountPayment, u64>,
     pub company_id: __sdk::__query_builder::Col<AccountPayment, u64>,
-    pub name: __sdk::__query_builder::Col<AccountPayment, Option<String>>,
-    pub move_id: __sdk::__query_builder::Col<AccountPayment, Option<u64>>,
+    pub name: __sdk::__query_builder::Col<AccountPayment, Option::<String>>,
+    pub move_id: __sdk::__query_builder::Col<AccountPayment, Option::<u64>>,
     pub payment_type: __sdk::__query_builder::Col<AccountPayment, PaymentType>,
     pub partner_type: __sdk::__query_builder::Col<AccountPayment, PartnerType>,
     pub partner_id: __sdk::__query_builder::Col<AccountPayment, u64>,
@@ -52,10 +59,10 @@ pub struct AccountPaymentCols {
     pub currency_id: __sdk::__query_builder::Col<AccountPayment, u64>,
     pub date: __sdk::__query_builder::Col<AccountPayment, __sdk::Timestamp>,
     pub journal_id: __sdk::__query_builder::Col<AccountPayment, u64>,
-    pub r#ref: __sdk::__query_builder::Col<AccountPayment, Option<String>>,
-    pub memo: __sdk::__query_builder::Col<AccountPayment, Option<String>>,
-    pub reconciled_invoice_ids: __sdk::__query_builder::Col<AccountPayment, Vec<u64>>,
-    pub reconciled_bill_ids: __sdk::__query_builder::Col<AccountPayment, Vec<u64>>,
+    pub r#ref: __sdk::__query_builder::Col<AccountPayment, Option::<String>>,
+    pub memo: __sdk::__query_builder::Col<AccountPayment, Option::<String>>,
+    pub reconciled_invoice_ids: __sdk::__query_builder::Col<AccountPayment, Vec::<u64>>,
+    pub reconciled_bill_ids: __sdk::__query_builder::Col<AccountPayment, Vec::<u64>>,
     pub state: __sdk::__query_builder::Col<AccountPayment, PaymentState>,
     pub created_at: __sdk::__query_builder::Col<AccountPayment, __sdk::Timestamp>,
     pub create_uid: __sdk::__query_builder::Col<AccountPayment, __sdk::Identity>,
@@ -79,17 +86,12 @@ impl __sdk::__query_builder::HasCols for AccountPayment {
             journal_id: __sdk::__query_builder::Col::new(table_name, "journal_id"),
             r#ref: __sdk::__query_builder::Col::new(table_name, "ref"),
             memo: __sdk::__query_builder::Col::new(table_name, "memo"),
-            reconciled_invoice_ids: __sdk::__query_builder::Col::new(
-                table_name,
-                "reconciled_invoice_ids",
-            ),
-            reconciled_bill_ids: __sdk::__query_builder::Col::new(
-                table_name,
-                "reconciled_bill_ids",
-            ),
+            reconciled_invoice_ids: __sdk::__query_builder::Col::new(table_name, "reconciled_invoice_ids"),
+            reconciled_bill_ids: __sdk::__query_builder::Col::new(table_name, "reconciled_bill_ids"),
             state: __sdk::__query_builder::Col::new(table_name, "state"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
             create_uid: __sdk::__query_builder::Col::new(table_name, "create_uid"),
+
         }
     }
 }
@@ -112,8 +114,10 @@ impl __sdk::__query_builder::HasIxCols for AccountPayment {
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             partner_id: __sdk::__query_builder::IxCol::new(table_name, "partner_id"),
             state: __sdk::__query_builder::IxCol::new(table_name, "state"),
+
         }
     }
 }
 
 impl __sdk::__query_builder::CanBeLookupTable for AccountPayment {}
+

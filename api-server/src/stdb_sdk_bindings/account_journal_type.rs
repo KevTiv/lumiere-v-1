@@ -2,7 +2,12 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
 
 use super::journal_type_type::JournalType;
 
@@ -16,41 +21,43 @@ pub struct AccountJournal {
     pub active: bool,
     pub r#type: JournalType,
     pub company_id: u64,
-    pub currency_id: Option<u64>,
-    pub default_account_id: Option<u64>,
-    pub suspense_account_id: Option<u64>,
-    pub loss_account_id: Option<u64>,
-    pub profit_account_id: Option<u64>,
-    pub bank_account_id: Option<u64>,
-    pub invoice_reference_type: Option<String>,
-    pub invoice_reference_model: Option<String>,
-    pub payment_credit_account_id: Option<u64>,
-    pub payment_debit_account_id: Option<u64>,
-    pub sequence_id: Option<u64>,
-    pub refund_sequence_id: Option<u64>,
-    pub sequence_override_regex: Option<String>,
-    pub secure_sequence_id: Option<u64>,
-    pub alias_name: Option<String>,
-    pub alias_domain: Option<String>,
+    pub currency_id: Option::<u64>,
+    pub default_account_id: Option::<u64>,
+    pub suspense_account_id: Option::<u64>,
+    pub loss_account_id: Option::<u64>,
+    pub profit_account_id: Option::<u64>,
+    pub bank_account_id: Option::<u64>,
+    pub invoice_reference_type: Option::<String>,
+    pub invoice_reference_model: Option::<String>,
+    pub payment_credit_account_id: Option::<u64>,
+    pub payment_debit_account_id: Option::<u64>,
+    pub sequence_id: Option::<u64>,
+    pub refund_sequence_id: Option::<u64>,
+    pub sequence_override_regex: Option::<String>,
+    pub secure_sequence_id: Option::<u64>,
+    pub alias_name: Option::<String>,
+    pub alias_domain: Option::<String>,
     pub at_least_one_inbound: bool,
     pub at_least_one_outbound: bool,
-    pub dedicated_payment_method_ids: Vec<u64>,
-    pub sale_activity_type_id: Option<u64>,
-    pub sale_activity_user_id: Option<u64>,
-    pub sale_activity_note: Option<String>,
-    pub sale_activity_date_deadline: Option<__sdk::Timestamp>,
+    pub dedicated_payment_method_ids: Vec::<u64>,
+    pub sale_activity_type_id: Option::<u64>,
+    pub sale_activity_user_id: Option::<u64>,
+    pub sale_activity_note: Option::<String>,
+    pub sale_activity_date_deadline: Option::<__sdk::Timestamp>,
     pub sale_activity_done: bool,
     pub restrict_mode_hash_table: bool,
-    pub create_uid: Option<__sdk::Identity>,
-    pub create_date: Option<__sdk::Timestamp>,
-    pub write_uid: Option<__sdk::Identity>,
-    pub write_date: Option<__sdk::Timestamp>,
-    pub metadata: Option<String>,
+    pub create_uid: Option::<__sdk::Identity>,
+    pub create_date: Option::<__sdk::Timestamp>,
+    pub write_uid: Option::<__sdk::Identity>,
+    pub write_date: Option::<__sdk::Timestamp>,
+    pub metadata: Option::<String>,
 }
+
 
 impl __sdk::InModule for AccountJournal {
     type Module = super::RemoteModule;
 }
+
 
 /// Column accessor struct for the table `AccountJournal`.
 ///
@@ -63,37 +70,36 @@ pub struct AccountJournalCols {
     pub active: __sdk::__query_builder::Col<AccountJournal, bool>,
     pub r#type: __sdk::__query_builder::Col<AccountJournal, JournalType>,
     pub company_id: __sdk::__query_builder::Col<AccountJournal, u64>,
-    pub currency_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub default_account_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub suspense_account_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub loss_account_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub profit_account_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub bank_account_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub invoice_reference_type: __sdk::__query_builder::Col<AccountJournal, Option<String>>,
-    pub invoice_reference_model: __sdk::__query_builder::Col<AccountJournal, Option<String>>,
-    pub payment_credit_account_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub payment_debit_account_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub sequence_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub refund_sequence_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub sequence_override_regex: __sdk::__query_builder::Col<AccountJournal, Option<String>>,
-    pub secure_sequence_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub alias_name: __sdk::__query_builder::Col<AccountJournal, Option<String>>,
-    pub alias_domain: __sdk::__query_builder::Col<AccountJournal, Option<String>>,
+    pub currency_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub default_account_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub suspense_account_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub loss_account_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub profit_account_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub bank_account_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub invoice_reference_type: __sdk::__query_builder::Col<AccountJournal, Option::<String>>,
+    pub invoice_reference_model: __sdk::__query_builder::Col<AccountJournal, Option::<String>>,
+    pub payment_credit_account_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub payment_debit_account_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub sequence_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub refund_sequence_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub sequence_override_regex: __sdk::__query_builder::Col<AccountJournal, Option::<String>>,
+    pub secure_sequence_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub alias_name: __sdk::__query_builder::Col<AccountJournal, Option::<String>>,
+    pub alias_domain: __sdk::__query_builder::Col<AccountJournal, Option::<String>>,
     pub at_least_one_inbound: __sdk::__query_builder::Col<AccountJournal, bool>,
     pub at_least_one_outbound: __sdk::__query_builder::Col<AccountJournal, bool>,
-    pub dedicated_payment_method_ids: __sdk::__query_builder::Col<AccountJournal, Vec<u64>>,
-    pub sale_activity_type_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub sale_activity_user_id: __sdk::__query_builder::Col<AccountJournal, Option<u64>>,
-    pub sale_activity_note: __sdk::__query_builder::Col<AccountJournal, Option<String>>,
-    pub sale_activity_date_deadline:
-        __sdk::__query_builder::Col<AccountJournal, Option<__sdk::Timestamp>>,
+    pub dedicated_payment_method_ids: __sdk::__query_builder::Col<AccountJournal, Vec::<u64>>,
+    pub sale_activity_type_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub sale_activity_user_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
+    pub sale_activity_note: __sdk::__query_builder::Col<AccountJournal, Option::<String>>,
+    pub sale_activity_date_deadline: __sdk::__query_builder::Col<AccountJournal, Option::<__sdk::Timestamp>>,
     pub sale_activity_done: __sdk::__query_builder::Col<AccountJournal, bool>,
     pub restrict_mode_hash_table: __sdk::__query_builder::Col<AccountJournal, bool>,
-    pub create_uid: __sdk::__query_builder::Col<AccountJournal, Option<__sdk::Identity>>,
-    pub create_date: __sdk::__query_builder::Col<AccountJournal, Option<__sdk::Timestamp>>,
-    pub write_uid: __sdk::__query_builder::Col<AccountJournal, Option<__sdk::Identity>>,
-    pub write_date: __sdk::__query_builder::Col<AccountJournal, Option<__sdk::Timestamp>>,
-    pub metadata: __sdk::__query_builder::Col<AccountJournal, Option<String>>,
+    pub create_uid: __sdk::__query_builder::Col<AccountJournal, Option::<__sdk::Identity>>,
+    pub create_date: __sdk::__query_builder::Col<AccountJournal, Option::<__sdk::Timestamp>>,
+    pub write_uid: __sdk::__query_builder::Col<AccountJournal, Option::<__sdk::Identity>>,
+    pub write_date: __sdk::__query_builder::Col<AccountJournal, Option::<__sdk::Timestamp>>,
+    pub metadata: __sdk::__query_builder::Col<AccountJournal, Option::<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for AccountJournal {
@@ -109,73 +115,35 @@ impl __sdk::__query_builder::HasCols for AccountJournal {
             company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             currency_id: __sdk::__query_builder::Col::new(table_name, "currency_id"),
             default_account_id: __sdk::__query_builder::Col::new(table_name, "default_account_id"),
-            suspense_account_id: __sdk::__query_builder::Col::new(
-                table_name,
-                "suspense_account_id",
-            ),
+            suspense_account_id: __sdk::__query_builder::Col::new(table_name, "suspense_account_id"),
             loss_account_id: __sdk::__query_builder::Col::new(table_name, "loss_account_id"),
             profit_account_id: __sdk::__query_builder::Col::new(table_name, "profit_account_id"),
             bank_account_id: __sdk::__query_builder::Col::new(table_name, "bank_account_id"),
-            invoice_reference_type: __sdk::__query_builder::Col::new(
-                table_name,
-                "invoice_reference_type",
-            ),
-            invoice_reference_model: __sdk::__query_builder::Col::new(
-                table_name,
-                "invoice_reference_model",
-            ),
-            payment_credit_account_id: __sdk::__query_builder::Col::new(
-                table_name,
-                "payment_credit_account_id",
-            ),
-            payment_debit_account_id: __sdk::__query_builder::Col::new(
-                table_name,
-                "payment_debit_account_id",
-            ),
+            invoice_reference_type: __sdk::__query_builder::Col::new(table_name, "invoice_reference_type"),
+            invoice_reference_model: __sdk::__query_builder::Col::new(table_name, "invoice_reference_model"),
+            payment_credit_account_id: __sdk::__query_builder::Col::new(table_name, "payment_credit_account_id"),
+            payment_debit_account_id: __sdk::__query_builder::Col::new(table_name, "payment_debit_account_id"),
             sequence_id: __sdk::__query_builder::Col::new(table_name, "sequence_id"),
             refund_sequence_id: __sdk::__query_builder::Col::new(table_name, "refund_sequence_id"),
-            sequence_override_regex: __sdk::__query_builder::Col::new(
-                table_name,
-                "sequence_override_regex",
-            ),
+            sequence_override_regex: __sdk::__query_builder::Col::new(table_name, "sequence_override_regex"),
             secure_sequence_id: __sdk::__query_builder::Col::new(table_name, "secure_sequence_id"),
             alias_name: __sdk::__query_builder::Col::new(table_name, "alias_name"),
             alias_domain: __sdk::__query_builder::Col::new(table_name, "alias_domain"),
-            at_least_one_inbound: __sdk::__query_builder::Col::new(
-                table_name,
-                "at_least_one_inbound",
-            ),
-            at_least_one_outbound: __sdk::__query_builder::Col::new(
-                table_name,
-                "at_least_one_outbound",
-            ),
-            dedicated_payment_method_ids: __sdk::__query_builder::Col::new(
-                table_name,
-                "dedicated_payment_method_ids",
-            ),
-            sale_activity_type_id: __sdk::__query_builder::Col::new(
-                table_name,
-                "sale_activity_type_id",
-            ),
-            sale_activity_user_id: __sdk::__query_builder::Col::new(
-                table_name,
-                "sale_activity_user_id",
-            ),
+            at_least_one_inbound: __sdk::__query_builder::Col::new(table_name, "at_least_one_inbound"),
+            at_least_one_outbound: __sdk::__query_builder::Col::new(table_name, "at_least_one_outbound"),
+            dedicated_payment_method_ids: __sdk::__query_builder::Col::new(table_name, "dedicated_payment_method_ids"),
+            sale_activity_type_id: __sdk::__query_builder::Col::new(table_name, "sale_activity_type_id"),
+            sale_activity_user_id: __sdk::__query_builder::Col::new(table_name, "sale_activity_user_id"),
             sale_activity_note: __sdk::__query_builder::Col::new(table_name, "sale_activity_note"),
-            sale_activity_date_deadline: __sdk::__query_builder::Col::new(
-                table_name,
-                "sale_activity_date_deadline",
-            ),
+            sale_activity_date_deadline: __sdk::__query_builder::Col::new(table_name, "sale_activity_date_deadline"),
             sale_activity_done: __sdk::__query_builder::Col::new(table_name, "sale_activity_done"),
-            restrict_mode_hash_table: __sdk::__query_builder::Col::new(
-                table_name,
-                "restrict_mode_hash_table",
-            ),
+            restrict_mode_hash_table: __sdk::__query_builder::Col::new(table_name, "restrict_mode_hash_table"),
             create_uid: __sdk::__query_builder::Col::new(table_name, "create_uid"),
             create_date: __sdk::__query_builder::Col::new(table_name, "create_date"),
             write_uid: __sdk::__query_builder::Col::new(table_name, "write_uid"),
             write_date: __sdk::__query_builder::Col::new(table_name, "write_date"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
+
         }
     }
 }
@@ -198,8 +166,10 @@ impl __sdk::__query_builder::HasIxCols for AccountJournal {
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             r#type: __sdk::__query_builder::IxCol::new(table_name, "type"),
+
         }
     }
 }
 
 impl __sdk::__query_builder::CanBeLookupTable for AccountJournal {}
+

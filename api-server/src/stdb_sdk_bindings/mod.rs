@@ -4,144 +4,798 @@
 // This was generated using spacetimedb cli version 2.0.1 (commit a4d29daec8ed35ce4913a335b7210b9ae3933d00).
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
 
-pub mod account_account_table;
 pub mod account_account_type;
-pub mod account_account_type_table;
 pub mod account_account_type_type;
-pub mod account_analytic_account_table;
 pub mod account_analytic_account_type;
-pub mod account_analytic_distribution_model_table;
 pub mod account_analytic_distribution_model_type;
-pub mod account_analytic_line_table;
 pub mod account_analytic_line_type;
-pub mod account_asset_depreciation_line_table;
-pub mod account_asset_depreciation_line_type;
-pub mod account_asset_table;
 pub mod account_asset_type;
-pub mod account_bank_statement_line_table;
-pub mod account_bank_statement_line_type;
-pub mod account_bank_statement_table;
+pub mod account_asset_depreciation_line_type;
 pub mod account_bank_statement_type;
-pub mod account_fiscal_year_table;
+pub mod account_bank_statement_line_type;
 pub mod account_fiscal_year_type;
-pub mod account_group_table;
 pub mod account_group_type;
 pub mod account_internal_group_type;
-pub mod account_journal_table;
 pub mod account_journal_type;
-pub mod account_move_line_table;
+pub mod account_move_type;
 pub mod account_move_line_type;
 pub mod account_move_state_type;
-pub mod account_move_table;
-pub mod account_move_type;
-pub mod account_payment_table;
-pub mod account_payment_term_line_table;
-pub mod account_payment_term_line_type;
-pub mod account_payment_term_table;
-pub mod account_payment_term_type;
 pub mod account_payment_type;
-pub mod account_period_table;
+pub mod account_payment_term_type;
+pub mod account_payment_term_line_type;
 pub mod account_period_type;
-pub mod account_reconciliation_widget_table;
 pub mod account_reconciliation_widget_type;
-pub mod account_tax_group_table;
-pub mod account_tax_group_type;
-pub mod account_tax_table;
 pub mod account_tax_type;
+pub mod account_tax_group_type;
 pub mod account_type_internal_type;
+pub mod activity_type;
+pub mod activity_type_type;
+pub mod add_account_move_line_params_type;
+pub mod add_casbin_rule_params_type;
+pub mod add_document_version_params_type;
+pub mod add_landed_cost_line_params_type;
+pub mod add_org_member_params_type;
+pub mod add_purchase_order_line_params_type;
+pub mod add_user_to_organization_params_type;
+pub mod add_workflow_activity_params_type;
+pub mod add_workflow_transition_params_type;
+pub mod adjustment_reason_type;
+pub mod ai_action_draft_type;
+pub mod ai_agent_type;
+pub mod ai_agent_run_type;
+pub mod ai_agent_run_policy_snapshot_type;
+pub mod ai_agent_run_step_type;
+pub mod ai_chat_message_type;
+pub mod ai_chat_session_type;
+pub mod ai_document_processing_job_type;
+pub mod ai_insight_type;
+pub mod ai_reducer_allowlist_type;
+pub mod ai_skill_type;
+pub mod ai_skill_config_type;
+pub mod ai_skill_fixture_type;
+pub mod ai_skill_release_type;
+pub mod ai_skill_risk_type;
+pub mod ai_skill_test_run_type;
+pub mod ai_skill_test_run_status_type;
+pub mod ai_skill_version_type;
+pub mod ai_team_member_type;
+pub mod ai_team_member_skill_type;
+pub mod allocate_payment_params_type;
+pub mod analytics_metric_type;
+pub mod append_ai_agent_run_step_params_type;
+pub mod append_ai_chat_message_params_type;
+pub mod approval_request_type;
+pub mod approval_rule_type;
+pub mod asset_state_type;
+pub mod asset_type_type;
+pub mod assign_contact_role_params_type;
+pub mod assign_role_params_type;
+pub mod assign_team_member_skill_params_type;
+pub mod assign_user_to_picking_params_type;
+pub mod assignment_rule_type;
+pub mod audit_log_type;
+pub mod audit_rule_type;
+pub mod balance_sheet_line_type;
+pub mod bank_match_candidate_type;
+pub mod bank_statement_import_type;
+pub mod bank_statement_import_line_type;
+pub mod bank_statement_state_type;
+pub mod barcode_nomenclature_type;
+pub mod barcode_rule_type;
+pub mod barcode_scan_type;
+pub mod batch_state_type;
+pub mod bill_timesheets_params_type;
+pub mod billing_account_type;
+pub mod bom_explosion_result_type;
+pub mod bom_line_input_type;
+pub mod bom_type_type;
+pub mod bootstrap_new_tenant_params_type;
+pub mod budget_post_type;
+pub mod budget_state_type;
+pub mod calendar_event_type;
+pub mod cancel_intercompany_transaction_params_type;
+pub mod card_state_type;
+pub mod cartonization_result_type;
+pub mod casbin_rule_type;
+pub mod cash_flow_line_type;
+pub mod close_subscription_params_type;
+pub mod company_type;
+pub mod company_country_pack_type;
+pub mod company_scope_params_type;
+pub mod company_vertical_pack_type;
+pub mod complete_ai_agent_run_params_type;
+pub mod complete_document_processing_job_params_type;
+pub mod compute_price_type;
+pub mod confirm_payslip_params_type;
+pub mod consolidation_account_type;
+pub mod consolidation_company_rate_type;
+pub mod consolidation_elimination_entry_type;
+pub mod consolidation_journal_type;
+pub mod consolidation_state_type;
+pub mod contact_type;
+pub mod contact_category_type;
+pub mod contact_category_assignment_type;
+pub mod contact_communication_preference_type;
+pub mod contact_duplicate_candidate_type;
+pub mod contact_identity_kind_type;
+pub mod contact_phone_identity_type;
+pub mod contact_relationship_type;
+pub mod contact_role_assignment_type;
+pub mod contact_segment_type;
+pub mod contact_tag_type;
+pub mod contact_tag_assignment_type;
+pub mod contact_verification_state_type;
+pub mod contract_state_type;
+pub mod convert_lead_params_type;
+pub mod convert_opportunity_params_type;
+pub mod country_type;
+pub mod country_pack_definition_type;
+pub mod country_pack_tax_rule_type;
+pub mod create_account_account_params_type;
+pub mod create_account_account_type_params_type;
+pub mod create_account_asset_params_type;
+pub mod create_account_bank_statement_line_params_type;
+pub mod create_account_bank_statement_params_type;
+pub mod create_account_group_params_type;
+pub mod create_account_journal_params_type;
+pub mod create_account_move_params_type;
+pub mod create_account_period_params_type;
+pub mod create_account_reconciliation_widget_params_type;
+pub mod create_account_tax_group_params_type;
+pub mod create_account_tax_params_type;
+pub mod create_action_params_type;
+pub mod create_activity_params_type;
+pub mod create_adjustment_reason_params_type;
+pub mod create_ai_action_draft_params_type;
+pub mod create_ai_agent_params_type;
+pub mod create_ai_agent_run_params_type;
+pub mod create_ai_chat_session_params_type;
+pub mod create_ai_insight_params_type;
+pub mod create_ai_reducer_allowlist_params_type;
+pub mod create_ai_skill_fixture_params_type;
+pub mod create_ai_skill_params_type;
+pub mod create_ai_skill_version_params_type;
+pub mod create_ai_team_member_params_type;
+pub mod create_analytic_account_params_type;
+pub mod create_analytic_distribution_model_params_type;
+pub mod create_analytic_line_params_type;
+pub mod create_analytics_metric_params_type;
+pub mod create_approval_rule_params_type;
+pub mod create_audit_rule_params_type;
+pub mod create_barcode_nomenclature_params_type;
+pub mod create_barcode_rule_params_type;
+pub mod create_bill_from_purchase_order_params_type;
+pub mod create_billing_account_params_type;
+pub mod create_bom_params_type;
+pub mod create_budget_post_params_type;
+pub mod create_calendar_event_params_type;
+pub mod create_company_params_type;
+pub mod create_consolidation_account_params_type;
+pub mod create_consolidation_journal_params_type;
+pub mod create_contact_identity_params_type;
+pub mod create_contact_params_type;
+pub mod create_contact_segment_params_type;
+pub mod create_contact_tag_params_type;
+pub mod create_contract_params_type;
+pub mod create_country_params_type;
+pub mod create_credit_note_from_return_order_params_type;
+pub mod create_credit_note_params_type;
+pub mod create_crossovered_budget_line_params_type;
+pub mod create_crossovered_budget_params_type;
+pub mod create_currency_params_type;
+pub mod create_currency_rate_params_type;
+pub mod create_cycle_count_plan_params_type;
+pub mod create_dashboard_params_type;
+pub mod create_dashboard_widget_params_type;
+pub mod create_data_classification_params_type;
+pub mod create_data_classification_rule_params_type;
+pub mod create_deferred_revenue_schedule_params_type;
+pub mod create_delivery_carrier_params_type;
+pub mod create_delivery_price_rule_params_type;
+pub mod create_department_params_type;
+pub mod create_depreciation_line_params_type;
+pub mod create_document_folder_params_type;
+pub mod create_document_params_type;
+pub mod create_document_processing_job_params_type;
+pub mod create_document_template_params_type;
+pub mod create_elimination_entry_params_type;
+pub mod create_employee_params_type;
+pub mod create_expense_params_type;
+pub mod create_expense_sheet_params_type;
+pub mod create_financial_report_params_type;
+pub mod create_fiscal_year_params_type;
+pub mod create_form_config_params_type;
+pub mod create_form_field_params_type;
+pub mod create_helpdesk_sla_params_type;
+pub mod create_helpdesk_stage_params_type;
+pub mod create_helpdesk_team_params_type;
+pub mod create_intercompany_rule_params_type;
+pub mod create_intercompany_transaction_params_type;
+pub mod create_inventory_adjustment_params_type;
+pub mod create_invoice_from_sale_order_params_type;
+pub mod create_invoice_reminder_batch_params_type;
+pub mod create_job_position_params_type;
+pub mod create_knowledge_article_params_type;
+pub mod create_knowledge_category_params_type;
+pub mod create_landed_cost_params_type;
+pub mod create_lead_params_type;
+pub mod create_leave_request_params_type;
+pub mod create_leave_type_params_type;
+pub mod create_loyalty_program_params_type;
+pub mod create_mail_template_params_type;
+pub mod create_message_batch_params_type;
+pub mod create_message_template_params_type;
+pub mod create_mrp_production_params_type;
+pub mod create_operational_message_params_type;
+pub mod create_opportunity_line_params_type;
+pub mod create_opportunity_params_type;
+pub mod create_organization_params_type;
+pub mod create_partner_bank_params_type;
+pub mod create_payment_account_params_type;
+pub mod create_payment_fee_params_type;
+pub mod create_payment_method_params_type;
+pub mod create_payment_params_type;
+pub mod create_payment_term_line_params_type;
+pub mod create_payment_term_params_type;
+pub mod create_payment_transaction_params_type;
+pub mod create_payroll_structure_params_type;
+pub mod create_payslip_params_type;
+pub mod create_picking_batch_params_type;
+pub mod create_picking_wave_params_type;
+pub mod create_pos_config_params_type;
+pub mod create_pos_order_line_params_type;
+pub mod create_pos_order_params_type;
+pub mod create_pos_payment_params_type;
+pub mod create_pricelist_item_params_type;
+pub mod create_pricelist_params_type;
+pub mod create_product_category_params_type;
+pub mod create_product_packaging_params_type;
+pub mod create_product_params_type;
+pub mod create_product_supplier_info_params_type;
+pub mod create_product_variant_params_type;
+pub mod create_project_params_type;
+pub mod create_purchase_order_params_type;
+pub mod create_purchase_requisition_params_type;
+pub mod create_quality_alert_params_type;
+pub mod create_quality_alert_reason_params_type;
+pub mod create_quality_check_params_type;
+pub mod create_quality_point_params_type;
+pub mod create_quality_team_params_type;
+pub mod create_replenishment_rule_params_type;
+pub mod create_report_template_params_type;
+pub mod create_return_order_line_params_type;
+pub mod create_return_order_params_type;
+pub mod create_revenue_recognition_rule_params_type;
+pub mod create_role_config_params_type;
+pub mod create_role_params_type;
+pub mod create_routing_workcenter_params_type;
+pub mod create_salary_rule_params_type;
+pub mod create_sale_order_line_params_type;
+pub mod create_sale_order_params_type;
+pub mod create_saved_report_params_type;
+pub mod create_scheduled_report_params_type;
+pub mod create_shipping_method_params_type;
+pub mod create_sod_conflict_rule_params_type;
+pub mod create_stock_inventory_line_params_type;
+pub mod create_stock_inventory_params_type;
+pub mod create_stock_location_params_type;
+pub mod create_stock_move_params_type;
+pub mod create_stock_picking_params_type;
+pub mod create_stock_production_lot_params_type;
+pub mod create_stock_production_serial_params_type;
+pub mod create_stock_quant_params_type;
+pub mod create_stock_route_params_type;
+pub mod create_stock_rule_params_type;
+pub mod create_stock_traceability_report_params_type;
+pub mod create_subscription_from_sale_order_params_type;
+pub mod create_subscription_plan_params_type;
+pub mod create_task_params_type;
+pub mod create_tax_deadline_params_type;
+pub mod create_tax_jurisdiction_params_type;
+pub mod create_tax_schedule_params_type;
+pub mod create_ticket_params_type;
+pub mod create_traceability_record_params_type;
+pub mod create_trial_balance_entry_params_type;
+pub mod create_uom_category_params_type;
+pub mod create_uom_conversion_params_type;
+pub mod create_uom_params_type;
+pub mod create_user_custom_field_params_type;
+pub mod create_user_session_params_type;
+pub mod create_utm_campaign_params_type;
+pub mod create_utm_medium_params_type;
+pub mod create_utm_source_params_type;
+pub mod create_warehouse_3_d_zone_params_type;
+pub mod create_warehouse_params_type;
+pub mod create_warehouse_task_params_type;
+pub mod create_whats_app_business_account_params_type;
+pub mod create_workcenter_params_type;
+pub mod create_workcenter_productivity_params_type;
+pub mod create_workflow_params_type;
+pub mod create_workorder_params_type;
+pub mod crossovered_budget_type;
+pub mod crossovered_budget_lines_type;
+pub mod currency_type;
+pub mod currency_rate_type;
+pub mod dashboard_type;
+pub mod dashboard_widget_type;
+pub mod data_classification_type;
+pub mod data_classification_rule_type;
+pub mod deferred_revenue_line_type;
+pub mod deferred_revenue_schedule_type;
+pub mod delegated_admin_scope_type;
+pub mod delete_account_move_line_params_type;
+pub mod delivery_carrier_type;
+pub mod delivery_price_rule_type;
+pub mod deprecate_account_account_params_type;
+pub mod depreciation_method_type;
+pub mod device_sync_entry_type;
+pub mod discount_policy_type;
+pub mod dispose_account_asset_params_type;
+pub mod document_type;
+pub mod document_folder_type;
+pub mod document_sequence_type;
+pub mod document_template_type;
+pub mod document_version_type;
+pub mod done_stock_move_params_type;
+pub mod employment_type_type;
+pub mod end_contact_role_params_type;
+pub mod enqueue_job_params_type;
+pub mod error_intercompany_transaction_params_type;
+pub mod expense_sheet_state_type;
+pub mod expense_state_type;
+pub mod export_financial_report_params_type;
+pub mod field_option_type;
+pub mod field_type_type;
+pub mod field_validation_type;
+pub mod field_width_type;
+pub mod finalize_import_assistant_job_params_type;
+pub mod financial_report_type;
+pub mod fiscal_year_state_type;
+pub mod fleet_vehicle_type;
+pub mod form_config_type;
+pub mod form_config_field_type;
+pub mod form_role_config_type;
+pub mod generate_eu_vat_report_params_type;
+pub mod generate_subscription_invoice_params_type;
+pub mod generated_owner_report_type;
+pub mod google_drive_connection_type;
+pub mod grant_delegated_admin_scope_params_type;
+pub mod grant_org_permission_params_type;
+pub mod helpdesk_sla_type;
+pub mod helpdesk_stage_type;
+pub mod helpdesk_team_type;
+pub mod helpdesk_ticket_type;
+pub mod helpdesk_ticket_state_type;
+pub mod hr_contract_type;
+pub mod hr_department_type;
+pub mod hr_employee_type;
+pub mod hr_expense_type;
+pub mod hr_expense_sheet_type;
+pub mod hr_job_position_type;
+pub mod hr_leave_type;
+pub mod hr_leave_state_type;
+pub mod hr_leave_type_type;
+pub mod hr_payroll_structure_type;
+pub mod hr_payslip_type;
+pub mod hr_resource_type;
+pub mod hr_salary_rule_type;
+pub mod import_job_type;
+pub mod import_job_error_type;
+pub mod import_job_record_type;
+pub mod import_mapping_template_type;
+pub mod insight_severity_type;
+pub mod instance_state_type;
+pub mod intake_state_type;
+pub mod integration_status_type;
+pub mod integration_type_type;
+pub mod intercompany_rule_type;
+pub mod intercompany_state_type;
+pub mod intercompany_transaction_type;
+pub mod inventory_adjustment_type;
+pub mod inventory_valuation_type;
+pub mod invoice_status_type;
+pub mod io_t_action_type;
+pub mod io_t_alert_type;
+pub mod io_t_device_type;
+pub mod io_t_hub_type;
+pub mod io_t_pairing_token_type;
+pub mod io_t_telemetry_type;
+pub mod io_t_threshold_type;
+pub mod job_status_type;
+pub mod journal_type_type;
+pub mod knowledge_article_type;
+pub mod knowledge_article_category_type;
+pub mod landed_cost_state_type;
+pub mod lead_type;
+pub mod lead_lost_reason_type;
+pub mod lead_source_type;
+pub mod line_invoice_status_type;
+pub mod line_state_type;
+pub mod log_audit_event_params_type;
+pub mod log_timesheet_params_type;
+pub mod mail_follower_type;
+pub mod mail_message_type;
+pub mod mail_message_type_type;
+pub mod mail_template_type;
+pub mod merge_contacts_params_type;
+pub mod message_batch_type;
+pub mod message_batch_status_type;
+pub mod message_channel_type;
+pub mod message_template_type;
+pub mod message_template_variable_type;
+pub mod mo_state_type;
+pub mod module_config_input_type;
+pub mod move_stock_quant_params_type;
+pub mod move_type_type;
+pub mod mrp_bom_type;
+pub mod mrp_bom_line_type;
+pub mod mrp_production_type;
+pub mod mrp_routing_workcenter_type;
+pub mod mrp_workcenter_type;
+pub mod mrp_workcenter_productivity_type;
+pub mod mrp_workorder_type;
+pub mod operational_message_type;
+pub mod operational_message_status_type;
+pub mod opportunity_type;
+pub mod opportunity_line_type;
+pub mod opportunity_stage_type;
+pub mod org_permission_type;
+pub mod org_schema_migration_type;
+pub mod organization_type;
+pub mod organization_settings_type;
+pub mod packaging_material_type;
+pub mod partner_type_type;
+pub mod password_reset_token_type;
+pub mod payment_account_type;
+pub mod payment_direction_type;
+pub mod payment_fee_type;
+pub mod payment_fee_bearer_type;
+pub mod payment_method_type_type;
+pub mod payment_provider_code_type;
+pub mod payment_reconciliation_type;
+pub mod payment_reversal_type;
+pub mod payment_state_type;
+pub mod payment_status_type;
+pub mod payment_term_value_type;
+pub mod payment_transaction_type;
+pub mod payment_transaction_status_type;
+pub mod payment_type_type;
+pub mod payslip_state_type;
+pub mod period_state_type;
+pub mod permission_action_type;
+pub mod permission_effect_type;
+pub mod permission_subject_type;
+pub mod picking_wave_type;
+pub mod po_invoice_status_type;
+pub mod po_state_type;
+pub mod policy_action_grant_type;
+pub mod policy_field_permission_type;
+pub mod policy_snapshot_type;
+pub mod pos_config_type;
+pub mod pos_loyalty_card_type;
+pub mod pos_loyalty_program_type;
+pub mod pos_order_type;
+pub mod pos_order_line_type;
+pub mod pos_order_state_type;
+pub mod pos_payment_type;
+pub mod pos_payment_method_type;
+pub mod pos_session_type;
+pub mod pos_status_type;
+pub mod pos_terminal_type;
+pub mod pricelist_applied_on_type;
+pub mod privacy_consent_type;
+pub mod process_intercompany_transaction_params_type;
+pub mod product_type;
+pub mod product_attribute_type;
+pub mod product_attribute_line_type;
+pub mod product_attribute_value_type;
+pub mod product_category_type;
+pub mod product_packaging_type;
+pub mod product_pricelist_type;
+pub mod product_pricelist_item_type;
+pub mod product_supplier_info_type;
+pub mod product_variant_type;
+pub mod profit_loss_line_type;
+pub mod project_project_type;
+pub mod project_task_type;
+pub mod project_timesheet_type;
+pub mod proposal_type;
+pub mod proposal_comment_type;
+pub mod proposal_line_item_type;
+pub mod proposal_presence_type;
+pub mod proposal_section_type;
+pub mod proposal_source_doc_type;
+pub mod proposal_status_type;
+pub mod proposal_version_type;
+pub mod purchase_order_type;
+pub mod purchase_order_line_type;
+pub mod purchase_requisition_type;
+pub mod quality_alert_type;
+pub mod quality_alert_reason_type;
+pub mod quality_check_type;
+pub mod quality_point_type;
+pub mod quality_team_type;
+pub mod queue_job_type;
+pub mod queue_mail_from_template_params_type;
+pub mod queue_worker_type;
+pub mod recognize_deferred_revenue_params_type;
+pub mod reconcile_account_bank_statement_line_params_type;
+pub mod record_ai_skill_test_run_params_type;
+pub mod record_barcode_scan_params_type;
+pub mod record_custom_field_entry_type;
+pub mod record_custom_field_value_type;
+pub mod record_cycle_count_line_params_type;
+pub mod record_generated_owner_report_params_type;
+pub mod record_privacy_consent_params_type;
+pub mod record_telemetry_params_type;
+pub mod record_whats_app_health_check_params_type;
+pub mod register_device_params_type;
+pub mod register_hub_params_type;
+pub mod register_queue_worker_params_type;
+pub mod reject_approval_request_params_type;
+pub mod replenishment_rule_type;
+pub mod report_state_type;
+pub mod report_template_type;
+pub mod report_type_type;
+pub mod requisition_state_type;
+pub mod res_partner_bank_type;
+pub mod return_order_type;
+pub mod return_order_line_type;
+pub mod revenue_recognition_rule_type;
+pub mod reverse_payment_transaction_params_type;
+pub mod review_message_batch_params_type;
+pub mod role_type;
+pub mod rule_type_type;
+pub mod sale_order_type;
+pub mod sale_order_line_type;
+pub mod sale_order_option_type;
+pub mod sale_state_type;
+pub mod save_import_mapping_template_params_type;
+pub mod saved_report_type;
+pub mod scheduled_report_type;
+pub mod scheduled_report_run_type;
+pub mod schema_migration_type;
+pub mod search_embedding_type;
+pub mod section_status_type;
+pub mod segment_member_type;
+pub mod serial_lot_traceability_type;
+pub mod session_state_type;
+pub mod set_article_published_params_type;
+pub mod set_company_country_pack_params_type;
+pub mod set_company_vertical_pack_params_type;
+pub mod set_consolidation_company_rate_params_type;
+pub mod set_record_custom_field_values_params_type;
+pub mod setup_fiscal_calendar_params_type;
+pub mod shipping_method_type;
+pub mod sod_conflict_rule_type;
+pub mod split_method_type;
+pub mod stage_bank_statement_import_line_params_type;
+pub mod stage_bank_statement_import_params_type;
+pub mod start_timesheet_timer_params_type;
+pub mod stock_count_sheet_type;
+pub mod stock_cycle_count_type;
+pub mod stock_inventory_type;
+pub mod stock_inventory_line_type;
+pub mod stock_landed_cost_type;
+pub mod stock_landed_cost_lines_type;
+pub mod stock_location_type;
+pub mod stock_move_type;
+pub mod stock_move_line_type;
+pub mod stock_picking_type;
+pub mod stock_picking_batch_type;
+pub mod stock_production_lot_type;
+pub mod stock_production_serial_type;
+pub mod stock_quant_type;
+pub mod stock_quant_reserve_params_type;
+pub mod stock_quant_unreserve_params_type;
+pub mod stock_reorder_group_type;
+pub mod stock_route_type;
+pub mod stock_rule_type;
+pub mod stock_traceability_report_type;
+pub mod submit_expense_sheet_params_type;
+pub mod submit_supplier_intake_params_type;
+pub mod subscription_type;
+pub mod subscription_line_type;
+pub mod subscription_plan_type;
+pub mod supplier_intake_request_type;
+pub mod sync_direction_type;
+pub mod sync_status_type;
+pub mod task_state_type;
+pub mod tax_amount_type_type;
+pub mod tax_deadline_type;
+pub mod tax_deadline_reminder_type;
+pub mod tax_deadline_status_type;
+pub mod tax_deadline_status_job_type;
+pub mod tax_deadline_type_type;
+pub mod tax_jurisdiction_type;
+pub mod tax_schedule_type;
+pub mod tax_type_use_type;
+pub mod ticket_priority_type;
+pub mod trial_balance_type;
+pub mod unreconcile_account_bank_statement_line_params_type;
+pub mod uom_type;
+pub mod uom_category_type;
+pub mod uom_conversion_type;
+pub mod update_account_account_params_type;
+pub mod update_account_account_type_params_type;
+pub mod update_account_asset_params_type;
+pub mod update_account_bank_statement_line_params_type;
+pub mod update_account_bank_statement_params_type;
+pub mod update_account_group_params_type;
+pub mod update_account_journal_params_type;
+pub mod update_account_move_line_params_type;
+pub mod update_account_period_params_type;
+pub mod update_account_reconciliation_widget_params_type;
+pub mod update_account_tax_group_params_type;
+pub mod update_account_tax_params_type;
+pub mod update_ai_action_draft_params_params_type;
+pub mod update_ai_agent_params_type;
+pub mod update_ai_chat_session_title_params_type;
+pub mod update_ai_reducer_allowlist_params_type;
+pub mod update_analytic_account_params_type;
+pub mod update_analytic_distribution_model_params_type;
+pub mod update_analytic_line_params_type;
+pub mod update_approval_rule_params_type;
+pub mod update_audit_rule_params_type;
+pub mod update_barcode_nomenclature_params_type;
+pub mod update_barcode_rule_params_type;
+pub mod update_billing_account_params_type;
+pub mod update_bom_params_type;
+pub mod update_budget_line_actuals_params_type;
+pub mod update_budget_post_params_type;
+pub mod update_calendar_event_params_type;
+pub mod update_company_address_params_type;
+pub mod update_company_business_params_type;
+pub mod update_company_hierarchy_params_type;
+pub mod update_company_params_type;
+pub mod update_consolidation_account_params_type;
+pub mod update_contact_address_params_type;
+pub mod update_contact_business_params_type;
+pub mod update_contact_core_params_type;
+pub mod update_contact_details_params_type;
+pub mod update_contact_identity_params_type;
+pub mod update_contract_params_type;
+pub mod update_crossovered_budget_line_params_type;
+pub mod update_crossovered_budget_params_type;
+pub mod update_dashboard_share_params_type;
+pub mod update_department_params_type;
+pub mod update_document_params_type;
+pub mod update_document_template_params_type;
+pub mod update_employee_params_type;
+pub mod update_expense_params_type;
+pub mod update_financial_report_params_type;
+pub mod update_fiscal_year_params_type;
+pub mod update_form_field_params_type;
+pub mod update_intercompany_rule_params_type;
+pub mod update_job_position_params_type;
+pub mod update_knowledge_article_params_type;
+pub mod update_knowledge_category_params_type;
+pub mod update_landed_cost_params_type;
+pub mod update_lead_address_params_type;
+pub mod update_lead_details_params_type;
+pub mod update_lead_revenue_params_type;
+pub mod update_leave_type_params_type;
+pub mod update_mail_template_params_type;
+pub mod update_message_template_params_type;
+pub mod update_metric_values_params_type;
+pub mod update_opportunity_params_type;
+pub mod update_org_member_details_params_type;
+pub mod update_organization_params_type;
+pub mod update_owner_report_schedule_params_type;
+pub mod update_partner_bank_params_type;
+pub mod update_payment_account_params_type;
+pub mod update_payment_transaction_params_type;
+pub mod update_product_category_params_type;
+pub mod update_product_inventory_data_params_type;
+pub mod update_product_packaging_params_type;
+pub mod update_product_params_type;
+pub mod update_product_pricing_params_type;
+pub mod update_product_supplier_info_params_type;
+pub mod update_product_variant_params_type;
+pub mod update_project_params_type;
+pub mod update_proposal_source_doc_params_type;
+pub mod update_purchase_order_line_params_type;
+pub mod update_purchase_order_params_type;
+pub mod update_quality_alert_reason_params_type;
+pub mod update_quality_point_params_type;
+pub mod update_quality_team_params_type;
+pub mod update_report_template_params_type;
+pub mod update_role_params_type;
+pub mod update_sale_order_params_type;
+pub mod update_saved_report_params_type;
+pub mod update_stock_location_params_type;
+pub mod update_stock_production_lot_params_type;
+pub mod update_stock_production_serial_params_type;
+pub mod update_stock_quant_quantity_params_type;
+pub mod update_stock_route_params_type;
+pub mod update_stock_rule_params_type;
+pub mod update_supplier_intake_params_type;
+pub mod update_task_params_type;
+pub mod update_tax_deadline_params_type;
+pub mod update_tax_jurisdiction_params_type;
+pub mod update_tax_schedule_params_type;
+pub mod update_ticket_params_type;
+pub mod update_user_profile_params_type;
+pub mod update_utm_campaign_params_type;
+pub mod update_utm_medium_params_type;
+pub mod update_utm_source_params_type;
+pub mod update_warehouse_3_d_zone_params_type;
+pub mod update_warehouse_params_type;
+pub mod update_whats_app_business_account_params_type;
+pub mod update_whats_app_credentials_params_type;
+pub mod update_whats_app_verification_params_type;
+pub mod update_widget_layout_params_type;
+pub mod update_workcenter_params_type;
+pub mod upsert_ai_skill_config_params_type;
+pub mod upsert_ai_skill_params_type;
+pub mod upsert_organization_settings_params_type;
+pub mod upsert_search_embedding_params_type;
+pub mod user_credential_type;
+pub mod user_custom_field_type;
+pub mod user_invite_type;
+pub mod user_organization_type;
+pub mod user_profile_type;
+pub mod user_role_assignment_type;
+pub mod user_session_type;
+pub mod utm_campaign_type;
+pub mod utm_medium_type;
+pub mod utm_source_type;
+pub mod validate_timesheets_params_type;
+pub mod vehicle_status_type;
+pub mod verification_level_type;
+pub mod verification_status_type;
+pub mod warehouse_type;
+pub mod warehouse_3_d_zone_type;
+pub mod warehouse_geo_type;
+pub mod warehouse_task_type;
+pub mod whats_app_business_account_type;
+pub mod widget_type_type;
+pub mod workflow_type;
+pub mod workflow_activity_type;
+pub mod workflow_instance_type;
+pub mod workflow_transition_type;
+pub mod workflow_workitem_type;
+pub mod workitem_state_type;
+pub mod workorder_state_type;
+pub mod zone_display_type_type;
 pub mod acknowledge_insight_reducer;
 pub mod acknowledge_iot_action_reducer;
 pub mod activate_pos_config_reducer;
 pub mod activate_revenue_recognition_rule_reducer;
 pub mod activate_subscription_reducer;
-pub mod activity_table;
-pub mod activity_type;
-pub mod activity_type_table;
-pub mod activity_type_type;
-pub mod add_account_move_line_params_type;
 pub mod add_account_move_line_reducer;
 pub mod add_article_member_reducer;
-pub mod add_casbin_rule_params_type;
 pub mod add_casbin_rule_reducer;
 pub mod add_contact_to_segment_reducer;
-pub mod add_document_version_params_type;
 pub mod add_document_version_reducer;
 pub mod add_form_field_reducer;
-pub mod add_landed_cost_line_params_type;
 pub mod add_landed_cost_line_reducer;
 pub mod add_member_to_quality_team_reducer;
-pub mod add_org_member_params_type;
 pub mod add_org_member_reducer;
 pub mod add_proposal_comment_reducer;
 pub mod add_proposal_line_item_reducer;
 pub mod add_proposal_source_doc_reducer;
-pub mod add_purchase_order_line_params_type;
 pub mod add_purchase_order_line_reducer;
 pub mod add_rule_to_nomenclature_reducer;
 pub mod add_user_custom_field_reducer;
-pub mod add_user_to_organization_params_type;
 pub mod add_user_to_organization_reducer;
 pub mod add_widget_to_dashboard_reducer;
-pub mod add_workflow_activity_params_type;
 pub mod add_workflow_activity_reducer;
-pub mod add_workflow_transition_params_type;
 pub mod add_workflow_transition_reducer;
-pub mod adjustment_reason_table;
-pub mod adjustment_reason_type;
-pub mod ai_action_draft_table;
-pub mod ai_action_draft_type;
-pub mod ai_agent_run_policy_snapshot_table;
-pub mod ai_agent_run_policy_snapshot_type;
-pub mod ai_agent_run_step_table;
-pub mod ai_agent_run_step_type;
-pub mod ai_agent_run_table;
-pub mod ai_agent_run_type;
-pub mod ai_agent_table;
-pub mod ai_agent_type;
-pub mod ai_chat_message_table;
-pub mod ai_chat_message_type;
-pub mod ai_chat_session_table;
-pub mod ai_chat_session_type;
-pub mod ai_document_processing_job_table;
-pub mod ai_document_processing_job_type;
-pub mod ai_insight_table;
-pub mod ai_insight_type;
-pub mod ai_reducer_allowlist_table;
-pub mod ai_reducer_allowlist_type;
-pub mod ai_skill_config_table;
-pub mod ai_skill_config_type;
-pub mod ai_skill_fixture_table;
-pub mod ai_skill_fixture_type;
-pub mod ai_skill_release_table;
-pub mod ai_skill_release_type;
-pub mod ai_skill_risk_type;
-pub mod ai_skill_table;
-pub mod ai_skill_test_run_status_type;
-pub mod ai_skill_test_run_table;
-pub mod ai_skill_test_run_type;
-pub mod ai_skill_type;
-pub mod ai_skill_version_table;
-pub mod ai_skill_version_type;
-pub mod ai_team_member_skill_table;
-pub mod ai_team_member_skill_type;
-pub mod ai_team_member_table;
-pub mod ai_team_member_type;
-pub mod allocate_payment_params_type;
 pub mod allocate_payment_transaction_reducer;
-pub mod analytics_metric_table;
-pub mod analytics_metric_type;
-pub mod append_ai_agent_run_step_params_type;
 pub mod append_ai_agent_run_step_reducer;
-pub mod append_ai_chat_message_params_type;
 pub mod append_ai_chat_message_reducer;
+pub mod apply_global_migrations_reducer;
 pub mod apply_landed_costs_reducer;
+pub mod apply_org_migrations_reducer;
 pub mod apply_reconciliation_rules_reducer;
-pub mod approval_request_table;
-pub mod approval_request_type;
-pub mod approval_rule_table;
-pub mod approval_rule_type;
 pub mod approve_ai_action_draft_reducer;
 pub mod approve_approval_request_reducer;
 pub mod approve_bank_statement_import_reducer;
@@ -156,68 +810,26 @@ pub mod archive_contact_identity_reducer;
 pub mod archive_employee_reducer;
 pub mod archive_financial_report_reducer;
 pub mod archive_payment_account_reducer;
-pub mod asset_state_type;
-pub mod asset_type_type;
-pub mod assign_contact_role_params_type;
 pub mod assign_contact_role_reducer;
 pub mod assign_quality_alert_reducer;
-pub mod assign_role_params_type;
 pub mod assign_role_reducer;
 pub mod assign_stock_move_reducer;
 pub mod assign_stock_picking_reducer;
 pub mod assign_tag_to_contact_reducer;
 pub mod assign_task_users_reducer;
-pub mod assign_team_member_skill_params_type;
 pub mod assign_team_member_skill_reducer;
 pub mod assign_ticket_reducer;
-pub mod assign_user_to_picking_params_type;
 pub mod assign_user_to_picking_reducer;
-pub mod assignment_rule_table;
-pub mod assignment_rule_type;
-pub mod audit_log_table;
-pub mod audit_log_type;
-pub mod audit_rule_table;
-pub mod audit_rule_type;
 pub mod backfill_external_ids_reducer;
-pub mod balance_sheet_line_table;
-pub mod balance_sheet_line_type;
-pub mod bank_match_candidate_table;
-pub mod bank_match_candidate_type;
-pub mod bank_statement_import_line_table;
-pub mod bank_statement_import_line_type;
-pub mod bank_statement_import_table;
-pub mod bank_statement_import_type;
-pub mod bank_statement_state_type;
-pub mod barcode_nomenclature_table;
-pub mod barcode_nomenclature_type;
-pub mod barcode_rule_table;
-pub mod barcode_rule_type;
-pub mod barcode_scan_table;
-pub mod barcode_scan_type;
-pub mod batch_state_type;
-pub mod bill_timesheets_params_type;
 pub mod bill_timesheets_reducer;
-pub mod billing_account_table;
-pub mod billing_account_type;
 pub mod block_serial_reducer;
 pub mod block_workcenter_reducer;
-pub mod bom_explosion_result_table;
-pub mod bom_explosion_result_type;
-pub mod bom_line_input_type;
-pub mod bom_type_type;
-pub mod bootstrap_new_tenant_params_type;
 pub mod bootstrap_new_tenant_reducer;
-pub mod budget_post_table;
-pub mod budget_post_type;
-pub mod budget_state_type;
-pub mod calendar_event_table;
-pub mod calendar_event_type;
 pub mod cancel_account_move_reducer;
 pub mod cancel_ai_agent_run_reducer;
 pub mod cancel_budget_reducer;
 pub mod cancel_consolidation_reducer;
 pub mod cancel_contract_reducer;
-pub mod cancel_intercompany_transaction_params_type;
 pub mod cancel_intercompany_transaction_reducer;
 pub mod cancel_landed_cost_reducer;
 pub mod cancel_manufacturing_order_reducer;
@@ -233,13 +845,6 @@ pub mod cancel_sale_order_reducer;
 pub mod cancel_stock_move_reducer;
 pub mod cancel_stock_picking_reducer;
 pub mod cancel_workflow_instance_reducer;
-pub mod card_state_type;
-pub mod cartonization_result_table;
-pub mod cartonization_result_type;
-pub mod casbin_rule_table;
-pub mod casbin_rule_type;
-pub mod cash_flow_line_table;
-pub mod cash_flow_line_type;
 pub mod check_mo_availability_reducer;
 pub mod claim_hub_with_token_reducer;
 pub mod claim_queue_job_reducer;
@@ -249,18 +854,10 @@ pub mod close_account_period_reducer;
 pub mod close_fiscal_year_reducer;
 pub mod close_pos_session_reducer;
 pub mod close_purchase_requisition_reducer;
-pub mod close_subscription_params_type;
 pub mod close_subscription_reducer;
 pub mod close_ticket_reducer;
-pub mod company_scope_params_type;
-pub mod company_table;
-pub mod company_type;
-pub mod company_vertical_pack_table;
-pub mod company_vertical_pack_type;
 pub mod complete_activity_reducer;
-pub mod complete_ai_agent_run_params_type;
 pub mod complete_ai_agent_run_reducer;
-pub mod complete_document_processing_job_params_type;
 pub mod complete_document_processing_job_reducer;
 pub mod complete_intercompany_transaction_reducer;
 pub mod complete_picking_batch_reducer;
@@ -274,448 +871,208 @@ pub mod compute_depreciation_board_reducer;
 pub mod compute_invoice_totals_reducer;
 pub mod compute_landed_costs_reducer;
 pub mod compute_pos_session_totals_reducer;
-pub mod compute_price_type;
 pub mod compute_purchase_order_line_totals_reducer;
 pub mod compute_purchase_order_totals_reducer;
 pub mod compute_so_totals_reducer;
 pub mod confirm_account_asset_reducer;
 pub mod confirm_budget_reducer;
 pub mod confirm_manufacturing_order_reducer;
-pub mod confirm_payslip_params_type;
 pub mod confirm_payslip_reducer;
 pub mod confirm_purchase_order_reducer;
 pub mod confirm_return_order_reducer;
 pub mod confirm_sales_order_reducer;
 pub mod confirm_stock_move_reducer;
 pub mod confirm_stock_picking_reducer;
-pub mod consolidation_account_table;
-pub mod consolidation_account_type;
-pub mod consolidation_company_rate_table;
-pub mod consolidation_company_rate_type;
-pub mod consolidation_elimination_entry_table;
-pub mod consolidation_elimination_entry_type;
-pub mod consolidation_journal_table;
-pub mod consolidation_journal_type;
-pub mod consolidation_state_type;
 pub mod consume_mo_materials_reducer;
-pub mod contact_category_assignment_table;
-pub mod contact_category_assignment_type;
-pub mod contact_category_table;
-pub mod contact_category_type;
-pub mod contact_communication_preference_table;
-pub mod contact_communication_preference_type;
-pub mod contact_duplicate_candidate_table;
-pub mod contact_duplicate_candidate_type;
-pub mod contact_identity_kind_type;
-pub mod contact_phone_identity_table;
-pub mod contact_phone_identity_type;
-pub mod contact_relationship_table;
-pub mod contact_relationship_type;
-pub mod contact_role_assignment_table;
-pub mod contact_role_assignment_type;
-pub mod contact_segment_table;
-pub mod contact_segment_type;
-pub mod contact_table;
-pub mod contact_tag_assignment_table;
-pub mod contact_tag_assignment_type;
-pub mod contact_tag_table;
-pub mod contact_tag_type;
-pub mod contact_type;
-pub mod contact_verification_state_type;
-pub mod contract_state_type;
-pub mod convert_lead_params_type;
 pub mod convert_lead_to_customer_reducer;
-pub mod convert_opportunity_params_type;
 pub mod convert_opportunity_to_sale_order_reducer;
-pub mod country_table;
-pub mod country_type;
-pub mod create_account_account_params_type;
 pub mod create_account_account_reducer;
-pub mod create_account_account_type_params_type;
 pub mod create_account_account_type_reducer;
-pub mod create_account_asset_params_type;
 pub mod create_account_asset_reducer;
-pub mod create_account_bank_statement_line_params_type;
-pub mod create_account_bank_statement_line_reducer;
-pub mod create_account_bank_statement_params_type;
 pub mod create_account_bank_statement_reducer;
-pub mod create_account_group_params_type;
+pub mod create_account_bank_statement_line_reducer;
 pub mod create_account_group_reducer;
-pub mod create_account_journal_params_type;
 pub mod create_account_journal_reducer;
-pub mod create_account_move_params_type;
 pub mod create_account_move_reducer;
-pub mod create_account_period_params_type;
 pub mod create_account_period_reducer;
-pub mod create_account_reconciliation_widget_params_type;
 pub mod create_account_reconciliation_widget_reducer;
-pub mod create_account_tax_group_params_type;
-pub mod create_account_tax_group_reducer;
-pub mod create_account_tax_params_type;
 pub mod create_account_tax_reducer;
-pub mod create_action_params_type;
-pub mod create_activity_params_type;
+pub mod create_account_tax_group_reducer;
 pub mod create_activity_reducer;
-pub mod create_adjustment_reason_params_type;
 pub mod create_adjustment_reason_reducer;
-pub mod create_ai_action_draft_params_type;
 pub mod create_ai_action_draft_reducer;
-pub mod create_ai_agent_params_type;
 pub mod create_ai_agent_reducer;
-pub mod create_ai_agent_run_params_type;
 pub mod create_ai_agent_run_reducer;
-pub mod create_ai_chat_session_params_type;
 pub mod create_ai_chat_session_reducer;
-pub mod create_ai_insight_params_type;
 pub mod create_ai_insight_reducer;
-pub mod create_ai_reducer_allowlist_params_type;
 pub mod create_ai_reducer_allowlist_reducer;
-pub mod create_ai_skill_fixture_params_type;
-pub mod create_ai_skill_fixture_reducer;
-pub mod create_ai_skill_params_type;
 pub mod create_ai_skill_reducer;
-pub mod create_ai_skill_version_params_type;
+pub mod create_ai_skill_fixture_reducer;
 pub mod create_ai_skill_version_reducer;
-pub mod create_ai_team_member_params_type;
 pub mod create_ai_team_member_reducer;
-pub mod create_analytic_account_params_type;
 pub mod create_analytic_account_reducer;
-pub mod create_analytic_distribution_model_params_type;
 pub mod create_analytic_distribution_model_reducer;
-pub mod create_analytic_line_params_type;
 pub mod create_analytic_line_reducer;
-pub mod create_analytics_metric_params_type;
 pub mod create_analytics_metric_reducer;
-pub mod create_approval_rule_params_type;
 pub mod create_approval_rule_reducer;
-pub mod create_audit_rule_params_type;
 pub mod create_audit_rule_reducer;
-pub mod create_barcode_nomenclature_params_type;
 pub mod create_barcode_nomenclature_reducer;
-pub mod create_barcode_rule_params_type;
 pub mod create_barcode_rule_reducer;
-pub mod create_bill_from_purchase_order_params_type;
 pub mod create_bill_from_purchase_order_reducer;
-pub mod create_billing_account_params_type;
 pub mod create_billing_account_reducer;
-pub mod create_bom_params_type;
 pub mod create_bom_reducer;
 pub mod create_budget_line_reducer;
-pub mod create_budget_post_params_type;
 pub mod create_budget_post_reducer;
-pub mod create_calendar_event_params_type;
 pub mod create_calendar_event_reducer;
-pub mod create_company_params_type;
 pub mod create_company_reducer;
-pub mod create_consolidation_account_params_type;
 pub mod create_consolidation_account_reducer;
-pub mod create_consolidation_journal_params_type;
 pub mod create_consolidation_journal_reducer;
-pub mod create_contact_identity_params_type;
-pub mod create_contact_identity_reducer;
-pub mod create_contact_params_type;
 pub mod create_contact_reducer;
-pub mod create_contact_segment_params_type;
+pub mod create_contact_identity_reducer;
 pub mod create_contact_segment_reducer;
-pub mod create_contact_tag_params_type;
 pub mod create_contact_tag_reducer;
-pub mod create_contract_params_type;
 pub mod create_contract_reducer;
-pub mod create_country_params_type;
 pub mod create_country_reducer;
 pub mod create_credit_note_from_invoice_reducer;
-pub mod create_credit_note_from_return_order_params_type;
 pub mod create_credit_note_from_return_order_reducer;
-pub mod create_credit_note_params_type;
-pub mod create_crossovered_budget_line_params_type;
-pub mod create_crossovered_budget_params_type;
 pub mod create_crossovered_budget_reducer;
-pub mod create_currency_params_type;
-pub mod create_currency_rate_params_type;
-pub mod create_currency_rate_reducer;
 pub mod create_currency_reducer;
-pub mod create_cycle_count_plan_params_type;
+pub mod create_currency_rate_reducer;
 pub mod create_cycle_count_plan_reducer;
-pub mod create_dashboard_params_type;
 pub mod create_dashboard_reducer;
-pub mod create_dashboard_widget_params_type;
 pub mod create_dashboard_widget_reducer;
-pub mod create_data_classification_params_type;
 pub mod create_data_classification_reducer;
-pub mod create_data_classification_rule_params_type;
 pub mod create_data_classification_rule_reducer;
-pub mod create_deferred_revenue_schedule_params_type;
 pub mod create_deferred_revenue_schedule_reducer;
-pub mod create_delivery_carrier_params_type;
 pub mod create_delivery_carrier_reducer;
-pub mod create_delivery_price_rule_params_type;
 pub mod create_delivery_price_rule_reducer;
-pub mod create_department_params_type;
 pub mod create_department_reducer;
-pub mod create_depreciation_line_params_type;
 pub mod create_depreciation_line_reducer;
-pub mod create_document_folder_params_type;
-pub mod create_document_folder_reducer;
-pub mod create_document_params_type;
-pub mod create_document_processing_job_params_type;
-pub mod create_document_processing_job_reducer;
 pub mod create_document_reducer;
-pub mod create_document_template_params_type;
+pub mod create_document_folder_reducer;
+pub mod create_document_processing_job_reducer;
 pub mod create_document_template_reducer;
-pub mod create_elimination_entry_params_type;
 pub mod create_elimination_entry_reducer;
-pub mod create_employee_params_type;
 pub mod create_employee_reducer;
-pub mod create_expense_params_type;
 pub mod create_expense_reducer;
-pub mod create_expense_sheet_params_type;
 pub mod create_expense_sheet_reducer;
-pub mod create_financial_report_params_type;
 pub mod create_financial_report_reducer;
-pub mod create_fiscal_year_params_type;
 pub mod create_fiscal_year_reducer;
 pub mod create_fleet_vehicle_reducer;
-pub mod create_form_config_params_type;
 pub mod create_form_configuration_reducer;
-pub mod create_form_field_params_type;
 pub mod create_google_drive_connection_reducer;
-pub mod create_helpdesk_sla_params_type;
 pub mod create_helpdesk_sla_reducer;
-pub mod create_helpdesk_stage_params_type;
 pub mod create_helpdesk_stage_reducer;
-pub mod create_helpdesk_team_params_type;
 pub mod create_helpdesk_team_reducer;
-pub mod create_intercompany_rule_params_type;
 pub mod create_intercompany_rule_reducer;
-pub mod create_intercompany_transaction_params_type;
 pub mod create_intercompany_transaction_reducer;
-pub mod create_inventory_adjustment_params_type;
 pub mod create_inventory_adjustment_reducer;
-pub mod create_invoice_from_sale_order_params_type;
 pub mod create_invoice_from_sale_order_reducer;
-pub mod create_invoice_reminder_batch_params_type;
 pub mod create_invoice_reminder_batch_reducer;
 pub mod create_iot_action_reducer;
 pub mod create_iot_alert_reducer;
-pub mod create_job_position_params_type;
 pub mod create_job_position_reducer;
-pub mod create_knowledge_article_params_type;
 pub mod create_knowledge_article_reducer;
-pub mod create_knowledge_category_params_type;
 pub mod create_knowledge_category_reducer;
-pub mod create_landed_cost_params_type;
 pub mod create_landed_cost_reducer;
-pub mod create_lead_params_type;
 pub mod create_lead_reducer;
-pub mod create_leave_request_params_type;
 pub mod create_leave_request_reducer;
-pub mod create_leave_type_params_type;
 pub mod create_leave_type_reducer;
 pub mod create_loyalty_card_reducer;
-pub mod create_loyalty_program_params_type;
 pub mod create_loyalty_program_reducer;
-pub mod create_mail_template_params_type;
 pub mod create_mail_template_reducer;
 pub mod create_manufacturing_order_reducer;
-pub mod create_message_batch_params_type;
 pub mod create_message_batch_reducer;
-pub mod create_message_template_params_type;
 pub mod create_message_template_reducer;
-pub mod create_mrp_production_params_type;
-pub mod create_operational_message_params_type;
 pub mod create_operational_message_reducer;
-pub mod create_opportunity_line_params_type;
-pub mod create_opportunity_line_reducer;
-pub mod create_opportunity_params_type;
 pub mod create_opportunity_reducer;
-pub mod create_organization_params_type;
+pub mod create_opportunity_line_reducer;
 pub mod create_organization_reducer;
-pub mod create_partner_bank_params_type;
 pub mod create_partner_bank_reducer;
 pub mod create_password_reset_token_reducer;
-pub mod create_payment_account_params_type;
-pub mod create_payment_account_reducer;
-pub mod create_payment_fee_params_type;
-pub mod create_payment_fee_reducer;
-pub mod create_payment_method_params_type;
-pub mod create_payment_method_reducer;
-pub mod create_payment_params_type;
 pub mod create_payment_reducer;
-pub mod create_payment_term_line_params_type;
-pub mod create_payment_term_line_reducer;
-pub mod create_payment_term_params_type;
+pub mod create_payment_account_reducer;
+pub mod create_payment_fee_reducer;
+pub mod create_payment_method_reducer;
 pub mod create_payment_term_reducer;
-pub mod create_payment_transaction_params_type;
+pub mod create_payment_term_line_reducer;
 pub mod create_payment_transaction_reducer;
-pub mod create_payroll_structure_params_type;
 pub mod create_payroll_structure_reducer;
-pub mod create_payslip_params_type;
 pub mod create_payslip_reducer;
-pub mod create_picking_batch_params_type;
 pub mod create_picking_batch_reducer;
-pub mod create_picking_wave_params_type;
 pub mod create_picking_wave_reducer;
-pub mod create_pos_config_params_type;
 pub mod create_pos_config_reducer;
-pub mod create_pos_order_line_params_type;
-pub mod create_pos_order_params_type;
 pub mod create_pos_order_reducer;
-pub mod create_pos_payment_params_type;
 pub mod create_pos_terminal_reducer;
-pub mod create_pricelist_item_params_type;
-pub mod create_pricelist_item_reducer;
-pub mod create_pricelist_params_type;
 pub mod create_pricelist_reducer;
-pub mod create_product_category_params_type;
-pub mod create_product_category_reducer;
-pub mod create_product_packaging_params_type;
-pub mod create_product_packaging_reducer;
-pub mod create_product_params_type;
+pub mod create_pricelist_item_reducer;
 pub mod create_product_reducer;
-pub mod create_product_supplier_info_params_type;
+pub mod create_product_category_reducer;
+pub mod create_product_packaging_reducer;
 pub mod create_product_supplier_info_reducer;
-pub mod create_product_variant_params_type;
 pub mod create_product_variant_reducer;
-pub mod create_project_params_type;
 pub mod create_project_reducer;
 pub mod create_proposal_reducer;
-pub mod create_purchase_order_params_type;
 pub mod create_purchase_order_reducer;
-pub mod create_purchase_requisition_params_type;
 pub mod create_purchase_requisition_reducer;
-pub mod create_quality_alert_params_type;
-pub mod create_quality_alert_reason_params_type;
-pub mod create_quality_alert_reason_reducer;
 pub mod create_quality_alert_reducer;
-pub mod create_quality_check_params_type;
+pub mod create_quality_alert_reason_reducer;
 pub mod create_quality_check_reducer;
-pub mod create_quality_point_params_type;
 pub mod create_quality_point_reducer;
-pub mod create_quality_team_params_type;
 pub mod create_quality_team_reducer;
-pub mod create_replenishment_rule_params_type;
 pub mod create_replenishment_rule_reducer;
-pub mod create_report_template_params_type;
 pub mod create_report_template_reducer;
-pub mod create_return_order_line_params_type;
-pub mod create_return_order_params_type;
 pub mod create_return_order_reducer;
-pub mod create_revenue_recognition_rule_params_type;
 pub mod create_revenue_recognition_rule_reducer;
-pub mod create_role_config_params_type;
-pub mod create_role_params_type;
 pub mod create_role_reducer;
-pub mod create_routing_workcenter_params_type;
 pub mod create_routing_workcenter_reducer;
-pub mod create_salary_rule_params_type;
 pub mod create_salary_rule_reducer;
-pub mod create_sale_order_line_params_type;
-pub mod create_sale_order_line_reducer;
-pub mod create_sale_order_params_type;
 pub mod create_sale_order_reducer;
-pub mod create_saved_report_params_type;
+pub mod create_sale_order_line_reducer;
 pub mod create_saved_report_reducer;
-pub mod create_scheduled_report_params_type;
 pub mod create_scheduled_report_reducer;
-pub mod create_shipping_method_params_type;
 pub mod create_shipping_method_reducer;
-pub mod create_stock_inventory_line_params_type;
-pub mod create_stock_inventory_line_reducer;
-pub mod create_stock_inventory_params_type;
+pub mod create_sod_conflict_rule_reducer;
 pub mod create_stock_inventory_reducer;
-pub mod create_stock_location_params_type;
+pub mod create_stock_inventory_line_reducer;
 pub mod create_stock_location_reducer;
-pub mod create_stock_move_params_type;
 pub mod create_stock_move_reducer;
-pub mod create_stock_picking_params_type;
 pub mod create_stock_picking_reducer;
-pub mod create_stock_production_lot_params_type;
 pub mod create_stock_production_lot_reducer;
-pub mod create_stock_production_serial_params_type;
 pub mod create_stock_production_serial_reducer;
-pub mod create_stock_quant_params_type;
 pub mod create_stock_quant_reducer;
-pub mod create_stock_route_params_type;
 pub mod create_stock_route_reducer;
-pub mod create_stock_rule_params_type;
 pub mod create_stock_rule_reducer;
-pub mod create_stock_traceability_report_params_type;
-pub mod create_subscription_from_sale_order_params_type;
 pub mod create_subscription_from_sale_order_reducer;
-pub mod create_subscription_plan_params_type;
 pub mod create_subscription_plan_reducer;
-pub mod create_task_params_type;
 pub mod create_task_reducer;
-pub mod create_tax_deadline_params_type;
 pub mod create_tax_deadline_reducer;
-pub mod create_tax_jurisdiction_params_type;
 pub mod create_tax_jurisdiction_reducer;
-pub mod create_tax_schedule_params_type;
 pub mod create_tax_schedule_reducer;
-pub mod create_ticket_params_type;
 pub mod create_ticket_reducer;
-pub mod create_traceability_record_params_type;
 pub mod create_traceability_record_reducer;
 pub mod create_traceability_report_reducer;
-pub mod create_trial_balance_entry_params_type;
 pub mod create_trial_balance_entry_reducer;
-pub mod create_uom_category_params_type;
-pub mod create_uom_category_reducer;
-pub mod create_uom_conversion_params_type;
-pub mod create_uom_conversion_reducer;
-pub mod create_uom_params_type;
 pub mod create_uom_reducer;
-pub mod create_user_custom_field_params_type;
+pub mod create_uom_category_reducer;
+pub mod create_uom_conversion_reducer;
 pub mod create_user_invite_reducer;
-pub mod create_user_session_params_type;
 pub mod create_user_session_reducer;
-pub mod create_utm_campaign_params_type;
 pub mod create_utm_campaign_reducer;
-pub mod create_utm_medium_params_type;
 pub mod create_utm_medium_reducer;
-pub mod create_utm_source_params_type;
 pub mod create_utm_source_reducer;
-pub mod create_warehouse_3_d_zone_params_type;
-pub mod create_warehouse_3_d_zone_reducer;
-pub mod create_warehouse_params_type;
 pub mod create_warehouse_reducer;
-pub mod create_warehouse_task_params_type;
+pub mod create_warehouse_3_d_zone_reducer;
 pub mod create_warehouse_task_reducer;
-pub mod create_whats_app_business_account_params_type;
 pub mod create_whatsapp_business_account_reducer;
-pub mod create_workcenter_params_type;
-pub mod create_workcenter_productivity_params_type;
 pub mod create_workcenter_reducer;
-pub mod create_workflow_params_type;
 pub mod create_workflow_reducer;
-pub mod create_workorder_params_type;
 pub mod create_workorder_reducer;
-pub mod crossovered_budget_lines_table;
-pub mod crossovered_budget_lines_type;
-pub mod crossovered_budget_table;
-pub mod crossovered_budget_type;
-pub mod currency_rate_table;
-pub mod currency_rate_type;
-pub mod currency_table;
-pub mod currency_type;
-pub mod dashboard_table;
-pub mod dashboard_type;
-pub mod dashboard_widget_table;
-pub mod dashboard_widget_type;
-pub mod data_classification_rule_table;
-pub mod data_classification_rule_type;
-pub mod data_classification_table;
-pub mod data_classification_type;
 pub mod deactivate_pos_config_reducer;
 pub mod deactivate_revenue_recognition_rule_reducer;
-pub mod deferred_revenue_line_table;
-pub mod deferred_revenue_line_type;
-pub mod deferred_revenue_schedule_table;
-pub mod deferred_revenue_schedule_type;
 pub mod delete_account_asset_reducer;
-pub mod delete_account_bank_statement_line_reducer;
 pub mod delete_account_bank_statement_reducer;
-pub mod delete_account_move_line_params_type;
+pub mod delete_account_bank_statement_line_reducer;
 pub mod delete_account_move_line_reducer;
 pub mod delete_account_period_reducer;
 pub mod delete_account_reconciliation_widget_reducer;
@@ -743,12 +1100,12 @@ pub mod delete_knowledge_category_reducer;
 pub mod delete_landed_cost_reducer;
 pub mod delete_lead_reducer;
 pub mod delete_partner_bank_reducer;
-pub mod delete_payment_term_line_reducer;
 pub mod delete_payment_term_reducer;
-pub mod delete_pricelist_item_reducer;
+pub mod delete_payment_term_line_reducer;
 pub mod delete_pricelist_reducer;
-pub mod delete_product_category_reducer;
+pub mod delete_pricelist_item_reducer;
 pub mod delete_product_reducer;
+pub mod delete_product_category_reducer;
 pub mod delete_proposal_line_item_reducer;
 pub mod delete_proposal_section_reducer;
 pub mod delete_proposal_source_doc_reducer;
@@ -766,125 +1123,43 @@ pub mod delete_stock_rule_reducer;
 pub mod delete_supplier_intake_reducer;
 pub mod delete_tax_deadline_reducer;
 pub mod delete_user_custom_field_reducer;
-pub mod delete_warehouse_3_d_zone_reducer;
 pub mod delete_warehouse_reducer;
+pub mod delete_warehouse_3_d_zone_reducer;
 pub mod delete_whatsapp_business_account_reducer;
-pub mod delivery_carrier_table;
-pub mod delivery_carrier_type;
-pub mod delivery_price_rule_table;
-pub mod delivery_price_rule_type;
-pub mod deprecate_account_account_params_type;
 pub mod deprecate_account_account_reducer;
-pub mod depreciation_method_type;
 pub mod dev_promote_caller_superuser_reducer;
-pub mod device_sync_entry_type;
-pub mod discount_policy_type;
 pub mod dismiss_insight_reducer;
 pub mod dispatch_due_owner_reports_reducer;
-pub mod dispose_account_asset_params_type;
 pub mod dispose_account_asset_reducer;
-pub mod doc_folder_table;
-pub mod document_folder_type;
-pub mod document_sequence_table;
-pub mod document_sequence_type;
-pub mod document_table;
-pub mod document_template_table;
-pub mod document_template_type;
-pub mod document_type;
-pub mod document_version_table;
-pub mod document_version_type;
 pub mod done_budget_reducer;
-pub mod done_stock_move_params_type;
 pub mod done_stock_move_reducer;
-pub mod employment_type_type;
-pub mod end_contact_role_params_type;
 pub mod end_contact_role_reducer;
 pub mod end_user_session_reducer;
-pub mod enqueue_job_params_type;
 pub mod enqueue_job_reducer;
 pub mod ensure_dev_admin_reducer;
-pub mod error_intercompany_transaction_params_type;
 pub mod error_intercompany_transaction_reducer;
 pub mod execute_replenishment_rule_reducer;
-pub mod expense_sheet_state_type;
-pub mod expense_sheet_table;
-pub mod expense_state_type;
+pub mod execute_retention_purge_reducer;
 pub mod expire_ai_action_drafts_reducer;
 pub mod expire_contract_reducer;
 pub mod explode_bom_reducer;
-pub mod export_financial_report_params_type;
 pub mod export_financial_report_reducer;
 pub mod fail_iot_action_reducer;
 pub mod fail_quality_check_reducer;
 pub mod fail_scheduled_owner_report_run_reducer;
-pub mod field_option_type;
-pub mod field_type_type;
-pub mod field_validation_type;
-pub mod field_width_type;
-pub mod finalize_import_assistant_job_params_type;
 pub mod finalize_import_assistant_job_reducer;
-pub mod financial_report_table;
-pub mod financial_report_type;
 pub mod find_duplicate_contacts_reducer;
 pub mod finish_manufacturing_order_reducer;
 pub mod finish_workorder_reducer;
-pub mod fiscal_year_state_type;
-pub mod fleet_vehicle_table;
-pub mod fleet_vehicle_type;
-pub mod form_config_field_table;
-pub mod form_config_field_type;
-pub mod form_config_table;
-pub mod form_config_type;
-pub mod form_role_config_table;
-pub mod form_role_config_type;
-pub mod generate_eu_vat_report_params_type;
 pub mod generate_eu_vat_report_reducer;
 pub mod generate_financial_report_reducer;
 pub mod generate_hub_pairing_token_reducer;
-pub mod generate_subscription_invoice_params_type;
 pub mod generate_subscription_invoice_reducer;
-pub mod generated_owner_report_table;
-pub mod generated_owner_report_type;
 pub mod get_form_configuration_reducer;
 pub mod get_organization_form_configs_reducer;
-pub mod google_drive_connection_table;
-pub mod google_drive_connection_type;
-pub mod grant_org_permission_params_type;
+pub mod grant_delegated_admin_scope_reducer;
 pub mod grant_permission_reducer;
-pub mod helpdesk_sla_table;
-pub mod helpdesk_sla_type;
-pub mod helpdesk_stage_table;
-pub mod helpdesk_stage_type;
-pub mod helpdesk_team_table;
-pub mod helpdesk_team_type;
-pub mod helpdesk_ticket_state_type;
-pub mod helpdesk_ticket_table;
-pub mod helpdesk_ticket_type;
 pub mod hold_supplier_intake_reducer;
-pub mod hr_contract_table;
-pub mod hr_contract_type;
-pub mod hr_department_table;
-pub mod hr_department_type;
-pub mod hr_employee_table;
-pub mod hr_employee_type;
-pub mod hr_expense_sheet_type;
-pub mod hr_expense_table;
-pub mod hr_expense_type;
-pub mod hr_job_position_table;
-pub mod hr_job_position_type;
-pub mod hr_leave_state_type;
-pub mod hr_leave_table;
-pub mod hr_leave_type;
-pub mod hr_leave_type_table;
-pub mod hr_leave_type_type;
-pub mod hr_payroll_structure_table;
-pub mod hr_payroll_structure_type;
-pub mod hr_payslip_table;
-pub mod hr_payslip_type;
-pub mod hr_resource_table;
-pub mod hr_resource_type;
-pub mod hr_salary_rule_table;
-pub mod hr_salary_rule_type;
 pub mod import_account_csv_reducer;
 pub mod import_account_move_csv_reducer;
 pub mod import_account_move_line_csv_reducer;
@@ -916,19 +1191,11 @@ pub mod import_hr_payroll_structure_csv_reducer;
 pub mod import_hr_payslip_csv_reducer;
 pub mod import_hr_resource_csv_reducer;
 pub mod import_hr_salary_rule_csv_reducer;
-pub mod import_job_error_table;
-pub mod import_job_error_type;
-pub mod import_job_record_table;
-pub mod import_job_record_type;
-pub mod import_job_table;
-pub mod import_job_type;
 pub mod import_knowledge_article_csv_reducer;
 pub mod import_knowledge_category_csv_reducer;
 pub mod import_lead_csv_reducer;
 pub mod import_lot_csv_reducer;
 pub mod import_manufacturing_order_csv_reducer;
-pub mod import_mapping_template_table;
-pub mod import_mapping_template_type;
 pub mod import_opportunity_csv_reducer;
 pub mod import_product_category_csv_reducer;
 pub mod import_product_csv_reducer;
@@ -954,51 +1221,7 @@ pub mod import_warehouse_csv_reducer;
 pub mod import_workcenter_csv_reducer;
 pub mod import_workflow_csv_reducer;
 pub mod initialize_default_form_configs_reducer;
-pub mod insight_severity_type;
-pub mod instance_state_type;
-pub mod intake_state_type;
-pub mod integration_status_type;
-pub mod integration_type_type;
-pub mod intercompany_rule_table;
-pub mod intercompany_rule_type;
-pub mod intercompany_state_type;
-pub mod intercompany_transaction_table;
-pub mod intercompany_transaction_type;
-pub mod inventory_adjustment_table;
-pub mod inventory_adjustment_type;
-pub mod inventory_valuation_table;
-pub mod inventory_valuation_type;
 pub mod invoice_po_line_reducer;
-pub mod invoice_status_type;
-pub mod io_t_action_type;
-pub mod io_t_alert_type;
-pub mod io_t_device_type;
-pub mod io_t_hub_type;
-pub mod io_t_pairing_token_type;
-pub mod io_t_telemetry_type;
-pub mod io_t_threshold_type;
-pub mod iot_action_table;
-pub mod iot_alert_table;
-pub mod iot_device_table;
-pub mod iot_hub_table;
-pub mod iot_pairing_token_table;
-pub mod iot_telemetry_table;
-pub mod iot_threshold_table;
-pub mod job_status_type;
-pub mod journal_type_type;
-pub mod kb_category_table;
-pub mod knowledge_article_category_type;
-pub mod knowledge_article_table;
-pub mod knowledge_article_type;
-pub mod landed_cost_state_type;
-pub mod lead_lost_reason_table;
-pub mod lead_lost_reason_type;
-pub mod lead_source_table;
-pub mod lead_source_type;
-pub mod lead_table;
-pub mod lead_type;
-pub mod line_invoice_status_type;
-pub mod line_state_type;
 pub mod link_device_to_location_reducer;
 pub mod link_device_to_pos_reducer;
 pub mod link_device_to_quality_check_reducer;
@@ -1007,18 +1230,9 @@ pub mod link_workos_user_reducer;
 pub mod lock_document_reducer;
 pub mod lock_knowledge_article_reducer;
 pub mod lock_purchase_order_reducer;
-pub mod log_audit_event_params_type;
 pub mod log_audit_event_reducer;
-pub mod log_timesheet_params_type;
 pub mod log_timesheet_reducer;
 pub mod log_workcenter_productivity_reducer;
-pub mod mail_follower_table;
-pub mod mail_follower_type;
-pub mod mail_message_table;
-pub mod mail_message_type;
-pub mod mail_message_type_type;
-pub mod mail_template_table;
-pub mod mail_template_type;
 pub mod mark_action_sent_reducer;
 pub mod mark_embedding_synced_reducer;
 pub mod mark_invite_accepted_reducer;
@@ -1026,112 +1240,15 @@ pub mod mark_mail_message_delivered_reducer;
 pub mod mark_reset_token_used_reducer;
 pub mod match_bank_line_reducer;
 pub mod match_elimination_entries_reducer;
-pub mod merge_contacts_params_type;
 pub mod merge_contacts_reducer;
-pub mod message_batch_status_type;
-pub mod message_batch_table;
-pub mod message_batch_type;
-pub mod message_channel_type;
-pub mod message_template_table;
-pub mod message_template_type;
-pub mod message_template_variable_type;
 pub mod migrate_all_organizations_reducer;
-pub mod mo_state_type;
-pub mod module_config_input_type;
-pub mod move_stock_quant_params_type;
 pub mod move_stock_quant_reducer;
-pub mod move_type_type;
-pub mod mrp_bom_line_table;
-pub mod mrp_bom_line_type;
-pub mod mrp_bom_table;
-pub mod mrp_bom_type;
-pub mod mrp_production_table;
-pub mod mrp_production_type;
-pub mod mrp_routing_workcenter_table;
-pub mod mrp_routing_workcenter_type;
-pub mod mrp_workcenter_productivity_table;
-pub mod mrp_workcenter_productivity_type;
-pub mod mrp_workcenter_table;
-pub mod mrp_workcenter_type;
-pub mod mrp_workorder_table;
-pub mod mrp_workorder_type;
 pub mod open_account_period_reducer;
 pub mod open_contract_reducer;
 pub mod open_fiscal_year_reducer;
 pub mod open_pos_session_reducer;
 pub mod open_quality_alert_reducer;
-pub mod operational_message_status_type;
-pub mod operational_message_table;
-pub mod operational_message_type;
-pub mod opp_stage_table;
-pub mod opportunity_line_table;
-pub mod opportunity_line_type;
-pub mod opportunity_stage_type;
-pub mod opportunity_table;
-pub mod opportunity_type;
-pub mod org_permission_table;
-pub mod org_permission_type;
-pub mod organization_settings_table;
-pub mod organization_settings_type;
-pub mod organization_table;
-pub mod organization_type;
-pub mod packaging_material_table;
-pub mod packaging_material_type;
-pub mod partner_type_type;
 pub mod pass_quality_check_reducer;
-pub mod password_reset_token_type;
-pub mod payment_account_table;
-pub mod payment_account_type;
-pub mod payment_direction_type;
-pub mod payment_fee_bearer_type;
-pub mod payment_fee_table;
-pub mod payment_fee_type;
-pub mod payment_method_type_type;
-pub mod payment_provider_code_type;
-pub mod payment_reconciliation_table;
-pub mod payment_reconciliation_type;
-pub mod payment_reversal_table;
-pub mod payment_reversal_type;
-pub mod payment_state_type;
-pub mod payment_status_type;
-pub mod payment_term_value_type;
-pub mod payment_transaction_status_type;
-pub mod payment_transaction_table;
-pub mod payment_transaction_type;
-pub mod payment_type_type;
-pub mod payslip_state_type;
-pub mod period_state_type;
-pub mod permission_action_type;
-pub mod permission_effect_type;
-pub mod permission_subject_type;
-pub mod picking_wave_table;
-pub mod picking_wave_type;
-pub mod po_invoice_status_type;
-pub mod po_state_type;
-pub mod policy_action_grant_type;
-pub mod policy_field_permission_type;
-pub mod policy_snapshot_table;
-pub mod policy_snapshot_type;
-pub mod pos_config_table;
-pub mod pos_config_type;
-pub mod pos_loyalty_card_table;
-pub mod pos_loyalty_card_type;
-pub mod pos_loyalty_program_table;
-pub mod pos_loyalty_program_type;
-pub mod pos_order_line_table;
-pub mod pos_order_line_type;
-pub mod pos_order_state_type;
-pub mod pos_order_table;
-pub mod pos_order_type;
-pub mod pos_payment_method_table;
-pub mod pos_payment_method_type;
-pub mod pos_payment_table;
-pub mod pos_payment_type;
-pub mod pos_session_table;
-pub mod pos_session_type;
-pub mod pos_status_type;
-pub mod pos_terminal_table;
-pub mod pos_terminal_type;
 pub mod post_account_bank_statement_reducer;
 pub mod post_account_move_reducer;
 pub mod post_cycle_count_adjustments_reducer;
@@ -1142,126 +1259,42 @@ pub mod post_landed_costs_reducer;
 pub mod post_message_reducer;
 pub mod post_payment_reducer;
 pub mod post_payment_transaction_reducer;
-pub mod pricelist_applied_on_type;
-pub mod privacy_consent_table;
-pub mod privacy_consent_type;
 pub mod process_consolidation_reducer;
-pub mod process_intercompany_transaction_params_type;
 pub mod process_intercompany_transaction_reducer;
 pub mod process_inventory_adjustment_reducer;
 pub mod process_pending_scans_reducer;
 pub mod produce_manufacturing_order_reducer;
-pub mod product_attribute_line_table;
-pub mod product_attribute_line_type;
-pub mod product_attribute_table;
-pub mod product_attribute_type;
-pub mod product_attribute_value_table;
-pub mod product_attribute_value_type;
-pub mod product_category_table;
-pub mod product_category_type;
-pub mod product_packaging_table;
-pub mod product_packaging_type;
-pub mod product_pricelist_item_table;
-pub mod product_pricelist_item_type;
-pub mod product_pricelist_table;
-pub mod product_pricelist_type;
-pub mod product_supplier_info_table;
-pub mod product_supplier_info_type;
-pub mod product_table;
-pub mod product_type;
-pub mod product_variant_table;
-pub mod product_variant_type;
-pub mod profit_loss_line_table;
-pub mod profit_loss_line_type;
-pub mod project_project_table;
-pub mod project_project_type;
-pub mod project_task_table;
-pub mod project_task_type;
-pub mod project_timesheet_table;
-pub mod project_timesheet_type;
 pub mod promote_ai_skill_version_reducer;
-pub mod proposal_comment_table;
-pub mod proposal_comment_type;
-pub mod proposal_line_item_table;
-pub mod proposal_line_item_type;
-pub mod proposal_presence_table;
-pub mod proposal_presence_type;
-pub mod proposal_section_table;
-pub mod proposal_section_type;
-pub mod proposal_source_doc_table;
-pub mod proposal_source_doc_type;
-pub mod proposal_status_type;
-pub mod proposal_table;
-pub mod proposal_type;
-pub mod proposal_version_table;
-pub mod proposal_version_type;
-pub mod purchase_order_line_table;
-pub mod purchase_order_line_type;
-pub mod purchase_order_table;
-pub mod purchase_order_type;
-pub mod purchase_requisition_table;
-pub mod purchase_requisition_type;
-pub mod quality_alert_reason_table;
-pub mod quality_alert_reason_type;
-pub mod quality_alert_table;
-pub mod quality_alert_type;
-pub mod quality_check_table;
-pub mod quality_check_type;
-pub mod quality_point_table;
-pub mod quality_point_type;
-pub mod quality_team_table;
-pub mod quality_team_type;
-pub mod queue_job_table;
-pub mod queue_job_type;
-pub mod queue_mail_from_template_params_type;
 pub mod queue_mail_from_template_reducer;
-pub mod queue_worker_table;
-pub mod queue_worker_type;
 pub mod receive_po_line_reducer;
-pub mod recognize_deferred_revenue_params_type;
 pub mod recognize_deferred_revenue_reducer;
-pub mod reconcile_account_bank_statement_line_params_type;
 pub mod reconcile_account_bank_statement_line_reducer;
 pub mod reconcile_payment_with_invoice_reducer;
 pub mod record_ai_agent_run_policy_snapshot_reducer;
-pub mod record_ai_skill_test_run_params_type;
 pub mod record_ai_skill_test_run_reducer;
 pub mod record_ai_spend_reducer;
-pub mod record_barcode_scan_params_type;
 pub mod record_barcode_scan_reducer;
-pub mod record_custom_field_entry_type;
-pub mod record_custom_field_value_table;
-pub mod record_custom_field_value_type;
-pub mod record_cycle_count_line_params_type;
 pub mod record_cycle_count_line_reducer;
 pub mod record_document_view_reducer;
-pub mod record_generated_owner_report_params_type;
 pub mod record_generated_owner_report_reducer;
-pub mod record_google_drive_sync_error_reducer;
 pub mod record_google_drive_sync_reducer;
+pub mod record_google_drive_sync_error_reducer;
 pub mod record_message_copied_reducer;
-pub mod record_privacy_consent_params_type;
 pub mod record_privacy_consent_reducer;
 pub mod record_report_run_reducer;
-pub mod record_telemetry_batch_reducer;
-pub mod record_telemetry_params_type;
 pub mod record_telemetry_reducer;
-pub mod record_whats_app_health_check_params_type;
+pub mod record_telemetry_batch_reducer;
 pub mod record_whatsapp_health_check_reducer;
 pub mod record_whatsapp_message_sent_reducer;
 pub mod refresh_policy_snapshot_reducer;
 pub mod refresh_tax_deadline_statuses_reducer;
 pub mod refuse_expense_sheet_reducer;
 pub mod refuse_leave_reducer;
-pub mod register_device_params_type;
-pub mod register_hub_params_type;
 pub mod register_iot_device_reducer;
 pub mod register_iot_hub_reducer;
 pub mod register_payment_on_invoice_reducer;
-pub mod register_queue_worker_params_type;
 pub mod register_queue_worker_reducer;
 pub mod reject_ai_action_draft_reducer;
-pub mod reject_approval_request_params_type;
 pub mod reject_approval_request_reducer;
 pub mod reject_supplier_intake_reducer;
 pub mod remove_article_member_reducer;
@@ -1273,16 +1306,7 @@ pub mod remove_rule_from_nomenclature_reducer;
 pub mod remove_user_from_organization_reducer;
 pub mod reopen_ticket_reducer;
 pub mod reorder_proposal_line_items_reducer;
-pub mod replenishment_rule_table;
-pub mod replenishment_rule_type;
-pub mod report_state_type;
-pub mod report_template_table;
-pub mod report_template_type;
-pub mod report_type_type;
 pub mod request_embedding_job_reducer;
-pub mod requisition_state_type;
-pub mod res_partner_bank_table;
-pub mod res_partner_bank_type;
 pub mod reserve_serial_reducer;
 pub mod reserve_stock_quant_reducer;
 pub mod reset_leave_to_draft_reducer;
@@ -1291,24 +1315,14 @@ pub mod resolve_proposal_comment_reducer;
 pub mod restore_product_category_reducer;
 pub mod retry_intercompany_transaction_reducer;
 pub mod retry_iot_action_reducer;
-pub mod return_order_line_table;
-pub mod return_order_line_type;
-pub mod return_order_table;
-pub mod return_order_type;
-pub mod revenue_recognition_rule_table;
-pub mod revenue_recognition_rule_type;
-pub mod reverse_payment_transaction_params_type;
 pub mod reverse_payment_transaction_reducer;
-pub mod review_message_batch_params_type;
 pub mod review_message_batch_reducer;
 pub mod review_supplier_intake_reducer;
 pub mod revoke_permission_reducer;
 pub mod revoke_role_reducer;
-pub mod role_table;
-pub mod role_type;
 pub mod rollback_ai_skill_release_reducer;
 pub mod rollback_import_job_reducer;
-pub mod rule_type_type;
+pub mod run_accounting_ic_consolidation_test_reducer;
 pub mod run_accounting_payment_cancel_test_reducer;
 pub mod run_accounting_payment_management_test_reducer;
 pub mod run_accounting_payment_reconcile_test_reducer;
@@ -1325,6 +1339,8 @@ pub mod run_all_inventory_tests_reducer;
 pub mod run_all_platform_tests_reducer;
 pub mod run_all_sales_tests_reducer;
 pub mod run_core_operational_messaging_test_reducer;
+pub mod run_core_sod_test_reducer;
+pub mod run_country_pack_test_reducer;
 pub mod run_crm_contact_identity_test_reducer;
 pub mod run_crm_contact_update_delete_test_reducer;
 pub mod run_crm_opportunity_convert_test_reducer;
@@ -1345,157 +1361,59 @@ pub mod run_sales_order_delivery_test_reducer;
 pub mod run_sales_order_invoice_test_reducer;
 pub mod run_sales_order_update_test_reducer;
 pub mod run_subscription_plan_test_reducer;
+pub mod run_tenant_isolation_tests_reducer;
 pub mod run_traceability_report_reducer;
 pub mod run_workflow_definition_test_reducer;
-pub mod sale_order_line_table;
-pub mod sale_order_line_type;
-pub mod sale_order_option_table;
-pub mod sale_order_option_type;
-pub mod sale_order_table;
-pub mod sale_order_type;
-pub mod sale_state_type;
-pub mod save_import_mapping_template_params_type;
 pub mod save_import_mapping_template_reducer;
 pub mod save_proposal_version_reducer;
-pub mod saved_report_table;
-pub mod saved_report_type;
 pub mod schedule_tax_deadline_updates_reducer;
-pub mod scheduled_report_run_table;
-pub mod scheduled_report_run_type;
-pub mod scheduled_report_table;
-pub mod scheduled_report_type;
-pub mod search_embedding_table;
-pub mod search_embedding_type;
-pub mod section_status_type;
 pub mod seed_dev_data_reducer;
 pub mod seed_organization_form_configs_reducer;
-pub mod segment_member_table;
-pub mod segment_member_type;
 pub mod send_purchase_order_reducer;
-pub mod serial_lot_traceability_table;
-pub mod serial_lot_traceability_type;
-pub mod session_state_type;
 pub mod set_ai_agent_active_reducer;
 pub mod set_ai_reducer_allowlist_enabled_reducer;
 pub mod set_ai_skill_active_reducer;
 pub mod set_analytic_account_active_reducer;
 pub mod set_approval_rule_active_reducer;
-pub mod set_article_published_params_type;
 pub mod set_article_published_reducer;
 pub mod set_asset_active_reducer;
 pub mod set_billing_status_reducer;
-pub mod set_company_vertical_pack_params_type;
+pub mod set_company_country_pack_reducer;
 pub mod set_company_vertical_pack_reducer;
-pub mod set_consolidation_company_rate_params_type;
 pub mod set_consolidation_company_rate_reducer;
 pub mod set_contact_communication_preference_reducer;
 pub mod set_form_role_config_reducer;
 pub mod set_intercompany_rule_active_reducer;
 pub mod set_iot_threshold_reducer;
 pub mod set_project_active_reducer;
-pub mod set_record_custom_field_values_params_type;
 pub mod set_record_custom_field_values_reducer;
 pub mod set_task_parent_reducer;
 pub mod set_whatsapp_primary_account_reducer;
 pub mod set_workflow_active_reducer;
 pub mod set_workitem_exception_reducer;
-pub mod setup_fiscal_calendar_params_type;
 pub mod setup_fiscal_calendar_reducer;
 pub mod share_dashboard_reducer;
-pub mod shipping_method_table;
-pub mod shipping_method_type;
 pub mod signal_workflow_reducer;
 pub mod solve_quality_alert_reducer;
-pub mod split_method_type;
-pub mod stage_bank_statement_import_line_params_type;
-pub mod stage_bank_statement_import_params_type;
 pub mod stage_bank_statement_import_reducer;
 pub mod start_cycle_count_session_reducer;
 pub mod start_manufacturing_order_reducer;
 pub mod start_picking_batch_reducer;
 pub mod start_quality_check_reducer;
-pub mod start_timesheet_timer_params_type;
 pub mod start_timesheet_timer_reducer;
 pub mod start_workflow_reducer;
 pub mod start_workorder_reducer;
-pub mod stock_count_sheet_table;
-pub mod stock_count_sheet_type;
-pub mod stock_cycle_count_table;
-pub mod stock_cycle_count_type;
-pub mod stock_inventory_line_table;
-pub mod stock_inventory_line_type;
-pub mod stock_inventory_table;
-pub mod stock_inventory_type;
-pub mod stock_landed_cost_lines_table;
-pub mod stock_landed_cost_lines_type;
-pub mod stock_landed_cost_table;
-pub mod stock_landed_cost_type;
-pub mod stock_location_table;
-pub mod stock_location_type;
-pub mod stock_move_line_table;
-pub mod stock_move_line_type;
-pub mod stock_move_table;
-pub mod stock_move_type;
-pub mod stock_picking_batch_table;
-pub mod stock_picking_batch_type;
-pub mod stock_picking_table;
-pub mod stock_picking_type;
-pub mod stock_production_lot_table;
-pub mod stock_production_lot_type;
-pub mod stock_production_serial_table;
-pub mod stock_production_serial_type;
-pub mod stock_quant_reserve_params_type;
-pub mod stock_quant_table;
-pub mod stock_quant_type;
-pub mod stock_quant_unreserve_params_type;
-pub mod stock_reorder_group_table;
-pub mod stock_reorder_group_type;
-pub mod stock_route_table;
-pub mod stock_route_type;
-pub mod stock_rule_table;
-pub mod stock_rule_type;
-pub mod stock_traceability_report_table;
-pub mod stock_traceability_report_type;
 pub mod stop_timesheet_timer_reducer;
 pub mod store_sso_user_credential_reducer;
 pub mod store_user_credential_reducer;
 pub mod submit_expense_reducer;
-pub mod submit_expense_sheet_params_type;
 pub mod submit_expense_sheet_reducer;
 pub mod submit_purchase_requisition_reducer;
-pub mod submit_supplier_intake_params_type;
 pub mod submit_supplier_intake_reducer;
 pub mod subscribe_to_record_reducer;
-pub mod subscription_line_table;
-pub mod subscription_line_type;
-pub mod subscription_plan_table;
-pub mod subscription_plan_type;
-pub mod subscription_table;
-pub mod subscription_type;
-pub mod supplier_intake_request_table;
-pub mod supplier_intake_request_type;
-pub mod sync_direction_type;
 pub mod sync_hub_devices_reducer;
-pub mod sync_status_type;
-pub mod task_state_type;
-pub mod tax_amount_type_type;
-pub mod tax_deadline_reminder_table;
-pub mod tax_deadline_reminder_type;
-pub mod tax_deadline_status_job_type;
-pub mod tax_deadline_status_type;
-pub mod tax_deadline_table;
-pub mod tax_deadline_type;
-pub mod tax_deadline_type_type;
-pub mod tax_jurisdiction_table;
-pub mod tax_jurisdiction_type;
-pub mod tax_schedule_table;
-pub mod tax_schedule_type;
-pub mod tax_type_use_type;
 pub mod test_iot_device_reducer;
-pub mod ticket_priority_type;
 pub mod toggle_project_favorite_reducer;
-pub mod trial_balance_table;
-pub mod trial_balance_type;
 pub mod unassign_team_member_skill_reducer;
 pub mod unblock_workcenter_reducer;
 pub mod unlink_device_reducer;
@@ -1503,462 +1421,1506 @@ pub mod unlock_document_reducer;
 pub mod unlock_knowledge_article_reducer;
 pub mod unlock_purchase_order_reducer;
 pub mod unmatch_elimination_entry_reducer;
-pub mod unreconcile_account_bank_statement_line_params_type;
 pub mod unreconciled_account_bank_statement_line_reducer;
 pub mod unreserve_stock_quant_reducer;
 pub mod unsubscribe_from_record_reducer;
-pub mod uom_cat_table;
-pub mod uom_category_type;
-pub mod uom_conversion_table;
-pub mod uom_conversion_type;
-pub mod uom_table;
-pub mod uom_type;
-pub mod update_account_account_params_type;
 pub mod update_account_account_reducer;
-pub mod update_account_account_type_params_type;
 pub mod update_account_account_type_reducer;
-pub mod update_account_asset_params_type;
 pub mod update_account_asset_reducer;
-pub mod update_account_bank_statement_line_params_type;
-pub mod update_account_bank_statement_line_reducer;
-pub mod update_account_bank_statement_params_type;
 pub mod update_account_bank_statement_reducer;
-pub mod update_account_group_params_type;
+pub mod update_account_bank_statement_line_reducer;
 pub mod update_account_group_reducer;
-pub mod update_account_journal_params_type;
 pub mod update_account_journal_reducer;
-pub mod update_account_move_line_params_type;
 pub mod update_account_move_line_reducer;
-pub mod update_account_period_params_type;
 pub mod update_account_period_reducer;
-pub mod update_account_reconciliation_widget_params_type;
 pub mod update_account_reconciliation_widget_reducer;
-pub mod update_account_tax_group_params_type;
-pub mod update_account_tax_group_reducer;
-pub mod update_account_tax_params_type;
 pub mod update_account_tax_reducer;
-pub mod update_ai_action_draft_params_params_type;
+pub mod update_account_tax_group_reducer;
 pub mod update_ai_action_draft_params_reducer;
-pub mod update_ai_agent_params_type;
 pub mod update_ai_agent_reducer;
-pub mod update_ai_chat_session_title_params_type;
 pub mod update_ai_chat_session_title_reducer;
-pub mod update_ai_reducer_allowlist_params_type;
 pub mod update_ai_reducer_allowlist_reducer;
-pub mod update_analytic_account_params_type;
 pub mod update_analytic_account_reducer;
-pub mod update_analytic_distribution_model_params_type;
 pub mod update_analytic_distribution_model_reducer;
-pub mod update_analytic_line_params_type;
 pub mod update_analytic_line_reducer;
-pub mod update_approval_rule_params_type;
 pub mod update_approval_rule_reducer;
-pub mod update_audit_rule_params_type;
 pub mod update_audit_rule_reducer;
-pub mod update_barcode_nomenclature_params_type;
 pub mod update_barcode_nomenclature_reducer;
-pub mod update_barcode_rule_params_type;
 pub mod update_barcode_rule_reducer;
-pub mod update_billing_account_params_type;
 pub mod update_billing_account_reducer;
-pub mod update_bom_params_type;
 pub mod update_bom_reducer;
-pub mod update_budget_line_actuals_params_type;
-pub mod update_budget_line_actuals_reducer;
 pub mod update_budget_line_reducer;
-pub mod update_budget_post_params_type;
+pub mod update_budget_line_actuals_reducer;
 pub mod update_budget_post_reducer;
-pub mod update_calendar_event_params_type;
 pub mod update_calendar_event_reducer;
-pub mod update_company_address_params_type;
-pub mod update_company_address_reducer;
-pub mod update_company_business_params_type;
-pub mod update_company_business_reducer;
-pub mod update_company_hierarchy_params_type;
-pub mod update_company_hierarchy_reducer;
-pub mod update_company_params_type;
 pub mod update_company_reducer;
-pub mod update_consolidation_account_params_type;
+pub mod update_company_address_reducer;
+pub mod update_company_business_reducer;
+pub mod update_company_hierarchy_reducer;
 pub mod update_consolidation_account_reducer;
-pub mod update_contact_address_params_type;
-pub mod update_contact_address_reducer;
-pub mod update_contact_business_params_type;
-pub mod update_contact_business_reducer;
-pub mod update_contact_core_params_type;
-pub mod update_contact_details_params_type;
-pub mod update_contact_details_reducer;
-pub mod update_contact_identity_params_type;
-pub mod update_contact_identity_reducer;
 pub mod update_contact_reducer;
-pub mod update_contract_params_type;
+pub mod update_contact_address_reducer;
+pub mod update_contact_business_reducer;
+pub mod update_contact_details_reducer;
+pub mod update_contact_identity_reducer;
 pub mod update_contract_reducer;
-pub mod update_crossovered_budget_line_params_type;
-pub mod update_crossovered_budget_params_type;
 pub mod update_crossovered_budget_reducer;
-pub mod update_dashboard_share_params_type;
-pub mod update_department_params_type;
 pub mod update_department_reducer;
 pub mod update_device_status_reducer;
-pub mod update_document_params_type;
 pub mod update_document_reducer;
-pub mod update_document_template_params_type;
 pub mod update_document_template_reducer;
-pub mod update_employee_params_type;
 pub mod update_employee_reducer;
-pub mod update_expense_params_type;
 pub mod update_expense_reducer;
-pub mod update_financial_report_params_type;
 pub mod update_financial_report_reducer;
-pub mod update_fiscal_year_params_type;
 pub mod update_fiscal_year_reducer;
-pub mod update_form_field_params_type;
 pub mod update_form_field_reducer;
 pub mod update_google_drive_connection_reducer;
 pub mod update_google_drive_credentials_reducer;
 pub mod update_hub_heartbeat_reducer;
 pub mod update_integration_status_reducer;
-pub mod update_intercompany_rule_params_type;
 pub mod update_intercompany_rule_reducer;
-pub mod update_job_position_params_type;
 pub mod update_job_position_reducer;
-pub mod update_knowledge_article_params_type;
 pub mod update_knowledge_article_reducer;
-pub mod update_knowledge_category_params_type;
 pub mod update_knowledge_category_reducer;
-pub mod update_landed_cost_params_type;
 pub mod update_landed_cost_reducer;
-pub mod update_lead_address_params_type;
 pub mod update_lead_address_reducer;
-pub mod update_lead_details_params_type;
 pub mod update_lead_details_reducer;
-pub mod update_lead_revenue_params_type;
 pub mod update_lead_revenue_reducer;
-pub mod update_leave_type_params_type;
 pub mod update_leave_type_reducer;
-pub mod update_mail_template_params_type;
 pub mod update_mail_template_reducer;
-pub mod update_message_template_params_type;
 pub mod update_message_template_reducer;
-pub mod update_metric_values_params_type;
 pub mod update_metric_values_reducer;
-pub mod update_opportunity_params_type;
 pub mod update_opportunity_reducer;
-pub mod update_org_member_details_params_type;
 pub mod update_org_member_details_reducer;
 pub mod update_org_member_role_reducer;
-pub mod update_organization_params_type;
 pub mod update_organization_reducer;
-pub mod update_owner_report_schedule_params_type;
 pub mod update_owner_report_schedule_reducer;
-pub mod update_partner_bank_params_type;
 pub mod update_partner_bank_reducer;
-pub mod update_payment_account_params_type;
 pub mod update_payment_account_reducer;
-pub mod update_payment_term_line_reducer;
 pub mod update_payment_term_reducer;
-pub mod update_payment_transaction_params_type;
+pub mod update_payment_term_line_reducer;
 pub mod update_payment_transaction_reducer;
 pub mod update_po_invoice_status_reducer;
 pub mod update_po_receipt_status_reducer;
 pub mod update_pos_terminal_reducer;
 pub mod update_pricelist_reducer;
-pub mod update_product_category_params_type;
-pub mod update_product_category_reducer;
-pub mod update_product_inventory_data_params_type;
-pub mod update_product_inventory_data_reducer;
-pub mod update_product_packaging_params_type;
-pub mod update_product_packaging_reducer;
-pub mod update_product_params_type;
-pub mod update_product_pricing_params_type;
-pub mod update_product_pricing_reducer;
 pub mod update_product_reducer;
-pub mod update_product_supplier_info_params_type;
+pub mod update_product_category_reducer;
+pub mod update_product_inventory_data_reducer;
+pub mod update_product_packaging_reducer;
+pub mod update_product_pricing_reducer;
 pub mod update_product_supplier_info_reducer;
-pub mod update_product_variant_params_type;
 pub mod update_product_variant_reducer;
-pub mod update_project_params_type;
 pub mod update_project_reducer;
+pub mod update_proposal_reducer;
 pub mod update_proposal_line_item_reducer;
 pub mod update_proposal_presence_reducer;
-pub mod update_proposal_reducer;
-pub mod update_proposal_source_doc_params_type;
 pub mod update_proposal_source_doc_reducer;
 pub mod update_proposal_status_reducer;
-pub mod update_purchase_order_line_params_type;
-pub mod update_purchase_order_line_reducer;
-pub mod update_purchase_order_params_type;
 pub mod update_purchase_order_reducer;
-pub mod update_quality_alert_reason_params_type;
+pub mod update_purchase_order_line_reducer;
 pub mod update_quality_alert_reason_reducer;
-pub mod update_quality_point_params_type;
 pub mod update_quality_point_reducer;
-pub mod update_quality_team_params_type;
 pub mod update_quality_team_reducer;
-pub mod update_report_template_params_type;
 pub mod update_report_template_reducer;
-pub mod update_role_params_type;
 pub mod update_role_reducer;
-pub mod update_sale_order_params_type;
 pub mod update_sale_order_reducer;
-pub mod update_saved_report_params_type;
 pub mod update_saved_report_reducer;
 pub mod update_stock_inventory_state_reducer;
-pub mod update_stock_location_params_type;
 pub mod update_stock_location_reducer;
-pub mod update_stock_production_lot_params_type;
 pub mod update_stock_production_lot_reducer;
-pub mod update_stock_production_serial_params_type;
 pub mod update_stock_production_serial_reducer;
-pub mod update_stock_quant_quantity_params_type;
 pub mod update_stock_quant_quantity_reducer;
-pub mod update_stock_route_params_type;
 pub mod update_stock_route_reducer;
-pub mod update_stock_rule_params_type;
 pub mod update_stock_rule_reducer;
-pub mod update_supplier_intake_params_type;
 pub mod update_supplier_intake_reducer;
-pub mod update_task_params_type;
 pub mod update_task_reducer;
 pub mod update_task_state_reducer;
-pub mod update_tax_deadline_params_type;
 pub mod update_tax_deadline_reducer;
-pub mod update_tax_jurisdiction_params_type;
 pub mod update_tax_jurisdiction_reducer;
-pub mod update_tax_schedule_params_type;
 pub mod update_tax_schedule_reducer;
-pub mod update_ticket_params_type;
 pub mod update_ticket_reducer;
 pub mod update_user_email_reducer;
 pub mod update_user_organization_status_reducer;
 pub mod update_user_password_reducer;
-pub mod update_user_profile_params_type;
 pub mod update_user_profile_reducer;
-pub mod update_utm_campaign_params_type;
 pub mod update_utm_campaign_reducer;
-pub mod update_utm_medium_params_type;
 pub mod update_utm_medium_reducer;
-pub mod update_utm_source_params_type;
 pub mod update_utm_source_reducer;
 pub mod update_vehicle_position_reducer;
-pub mod update_warehouse_3_d_zone_params_type;
-pub mod update_warehouse_3_d_zone_reducer;
-pub mod update_warehouse_params_type;
 pub mod update_warehouse_reducer;
+pub mod update_warehouse_3_d_zone_reducer;
 pub mod update_warehouse_task_status_reducer;
-pub mod update_whats_app_business_account_params_type;
-pub mod update_whats_app_credentials_params_type;
-pub mod update_whats_app_verification_params_type;
 pub mod update_whatsapp_business_account_reducer;
 pub mod update_whatsapp_credentials_reducer;
 pub mod update_whatsapp_quality_score_reducer;
 pub mod update_whatsapp_verification_status_reducer;
-pub mod update_widget_layout_params_type;
 pub mod update_widget_layout_reducer;
-pub mod update_workcenter_params_type;
 pub mod update_workcenter_reducer;
-pub mod upsert_ai_skill_config_params_type;
-pub mod upsert_ai_skill_config_reducer;
-pub mod upsert_ai_skill_params_type;
 pub mod upsert_ai_skill_reducer;
-pub mod upsert_organization_settings_params_type;
+pub mod upsert_ai_skill_config_reducer;
 pub mod upsert_organization_settings_reducer;
 pub mod upsert_proposal_section_reducer;
-pub mod upsert_search_embedding_params_type;
 pub mod upsert_search_embedding_reducer;
 pub mod upsert_warehouse_geo_reducer;
 pub mod use_serial_reducer;
-pub mod user_credential_type;
-pub mod user_custom_field_table;
-pub mod user_custom_field_type;
-pub mod user_invite_type;
-pub mod user_organization_table;
-pub mod user_organization_type;
-pub mod user_profile_table;
-pub mod user_profile_type;
-pub mod user_role_assignment_table;
-pub mod user_role_assignment_type;
-pub mod user_session_table;
-pub mod user_session_type;
-pub mod utm_campaign_table;
-pub mod utm_campaign_type;
-pub mod utm_medium_table;
-pub mod utm_medium_type;
-pub mod utm_source_table;
-pub mod utm_source_type;
 pub mod validate_budget_reducer;
 pub mod validate_consolidation_reducer;
 pub mod validate_cycle_count_reducer;
 pub mod validate_stock_picking_reducer;
-pub mod validate_timesheets_params_type;
 pub mod validate_timesheets_reducer;
-pub mod vehicle_status_type;
-pub mod verification_level_type;
-pub mod verification_status_type;
 pub mod verify_contact_identity_reducer;
 pub mod void_payment_transaction_reducer;
 pub mod waive_tax_deadline_reducer;
-pub mod warehouse_3_d_zone_table;
-pub mod warehouse_3_d_zone_type;
-pub mod warehouse_geo_table;
-pub mod warehouse_geo_type;
-pub mod warehouse_table;
-pub mod warehouse_task_table;
-pub mod warehouse_task_type;
-pub mod warehouse_type;
-pub mod whats_app_business_account_type;
-pub mod whatsapp_business_account_table;
-pub mod widget_type_type;
 pub mod worker_heartbeat_reducer;
-pub mod workflow_activity_table;
-pub mod workflow_activity_type;
-pub mod workflow_instance_table;
-pub mod workflow_instance_type;
+pub mod account_account_table;
+pub mod account_account_type_table;
+pub mod account_analytic_account_table;
+pub mod account_analytic_distribution_model_table;
+pub mod account_analytic_line_table;
+pub mod account_asset_table;
+pub mod account_asset_depreciation_line_table;
+pub mod account_bank_statement_table;
+pub mod account_bank_statement_line_table;
+pub mod account_fiscal_year_table;
+pub mod account_group_table;
+pub mod account_journal_table;
+pub mod account_move_table;
+pub mod account_move_line_table;
+pub mod account_payment_table;
+pub mod account_payment_term_table;
+pub mod account_payment_term_line_table;
+pub mod account_period_table;
+pub mod account_reconciliation_widget_table;
+pub mod account_tax_table;
+pub mod account_tax_group_table;
+pub mod activity_table;
+pub mod activity_type_table;
+pub mod adjustment_reason_table;
+pub mod ai_action_draft_table;
+pub mod ai_agent_table;
+pub mod ai_agent_run_table;
+pub mod ai_agent_run_policy_snapshot_table;
+pub mod ai_agent_run_step_table;
+pub mod ai_chat_message_table;
+pub mod ai_chat_session_table;
+pub mod ai_document_processing_job_table;
+pub mod ai_insight_table;
+pub mod ai_reducer_allowlist_table;
+pub mod ai_skill_table;
+pub mod ai_skill_config_table;
+pub mod ai_skill_fixture_table;
+pub mod ai_skill_release_table;
+pub mod ai_skill_test_run_table;
+pub mod ai_skill_version_table;
+pub mod ai_team_member_table;
+pub mod ai_team_member_skill_table;
+pub mod analytics_metric_table;
+pub mod approval_request_table;
+pub mod approval_rule_table;
+pub mod assignment_rule_table;
+pub mod audit_log_table;
+pub mod audit_rule_table;
+pub mod balance_sheet_line_table;
+pub mod bank_match_candidate_table;
+pub mod bank_statement_import_table;
+pub mod bank_statement_import_line_table;
+pub mod barcode_nomenclature_table;
+pub mod barcode_rule_table;
+pub mod barcode_scan_table;
+pub mod billing_account_table;
+pub mod bom_explosion_result_table;
+pub mod budget_post_table;
+pub mod calendar_event_table;
+pub mod cartonization_result_table;
+pub mod casbin_rule_table;
+pub mod cash_flow_line_table;
+pub mod company_table;
+pub mod company_country_pack_table;
+pub mod company_vertical_pack_table;
+pub mod consolidation_account_table;
+pub mod consolidation_company_rate_table;
+pub mod consolidation_elimination_entry_table;
+pub mod consolidation_journal_table;
+pub mod contact_table;
+pub mod contact_category_table;
+pub mod contact_category_assignment_table;
+pub mod contact_communication_preference_table;
+pub mod contact_duplicate_candidate_table;
+pub mod contact_phone_identity_table;
+pub mod contact_relationship_table;
+pub mod contact_role_assignment_table;
+pub mod contact_segment_table;
+pub mod contact_tag_table;
+pub mod contact_tag_assignment_table;
+pub mod country_table;
+pub mod country_pack_definition_table;
+pub mod country_pack_tax_rule_table;
+pub mod crossovered_budget_table;
+pub mod crossovered_budget_lines_table;
+pub mod currency_table;
+pub mod currency_rate_table;
+pub mod dashboard_table;
+pub mod dashboard_widget_table;
+pub mod data_classification_table;
+pub mod data_classification_rule_table;
+pub mod deferred_revenue_line_table;
+pub mod deferred_revenue_schedule_table;
+pub mod delegated_admin_scope_table;
+pub mod delivery_carrier_table;
+pub mod delivery_price_rule_table;
+pub mod doc_folder_table;
+pub mod document_table;
+pub mod document_sequence_table;
+pub mod document_template_table;
+pub mod document_version_table;
+pub mod expense_sheet_table;
+pub mod financial_report_table;
+pub mod fleet_vehicle_table;
+pub mod form_config_table;
+pub mod form_config_field_table;
+pub mod form_role_config_table;
+pub mod generated_owner_report_table;
+pub mod google_drive_connection_table;
+pub mod helpdesk_sla_table;
+pub mod helpdesk_stage_table;
+pub mod helpdesk_team_table;
+pub mod helpdesk_ticket_table;
+pub mod hr_contract_table;
+pub mod hr_department_table;
+pub mod hr_employee_table;
+pub mod hr_expense_table;
+pub mod hr_job_position_table;
+pub mod hr_leave_table;
+pub mod hr_leave_type_table;
+pub mod hr_payroll_structure_table;
+pub mod hr_payslip_table;
+pub mod hr_resource_table;
+pub mod hr_salary_rule_table;
+pub mod import_job_table;
+pub mod import_job_error_table;
+pub mod import_job_record_table;
+pub mod import_mapping_template_table;
+pub mod intercompany_rule_table;
+pub mod intercompany_transaction_table;
+pub mod inventory_adjustment_table;
+pub mod inventory_valuation_table;
+pub mod iot_action_table;
+pub mod iot_alert_table;
+pub mod iot_device_table;
+pub mod iot_hub_table;
+pub mod iot_pairing_token_table;
+pub mod iot_telemetry_table;
+pub mod iot_threshold_table;
+pub mod kb_category_table;
+pub mod knowledge_article_table;
+pub mod lead_table;
+pub mod lead_lost_reason_table;
+pub mod lead_source_table;
+pub mod mail_follower_table;
+pub mod mail_message_table;
+pub mod mail_template_table;
+pub mod message_batch_table;
+pub mod message_template_table;
+pub mod mrp_bom_table;
+pub mod mrp_bom_line_table;
+pub mod mrp_production_table;
+pub mod mrp_routing_workcenter_table;
+pub mod mrp_workcenter_table;
+pub mod mrp_workcenter_productivity_table;
+pub mod mrp_workorder_table;
+pub mod operational_message_table;
+pub mod opp_stage_table;
+pub mod opportunity_table;
+pub mod opportunity_line_table;
+pub mod org_permission_table;
+pub mod org_schema_migration_table;
+pub mod organization_table;
+pub mod organization_settings_table;
+pub mod packaging_material_table;
+pub mod payment_account_table;
+pub mod payment_fee_table;
+pub mod payment_reconciliation_table;
+pub mod payment_reversal_table;
+pub mod payment_transaction_table;
+pub mod picking_wave_table;
+pub mod policy_snapshot_table;
+pub mod pos_config_table;
+pub mod pos_loyalty_card_table;
+pub mod pos_loyalty_program_table;
+pub mod pos_order_table;
+pub mod pos_order_line_table;
+pub mod pos_payment_table;
+pub mod pos_payment_method_table;
+pub mod pos_session_table;
+pub mod pos_terminal_table;
+pub mod privacy_consent_table;
+pub mod product_table;
+pub mod product_attribute_table;
+pub mod product_attribute_line_table;
+pub mod product_attribute_value_table;
+pub mod product_category_table;
+pub mod product_packaging_table;
+pub mod product_pricelist_table;
+pub mod product_pricelist_item_table;
+pub mod product_supplier_info_table;
+pub mod product_variant_table;
+pub mod profit_loss_line_table;
+pub mod project_project_table;
+pub mod project_task_table;
+pub mod project_timesheet_table;
+pub mod proposal_table;
+pub mod proposal_comment_table;
+pub mod proposal_line_item_table;
+pub mod proposal_presence_table;
+pub mod proposal_section_table;
+pub mod proposal_source_doc_table;
+pub mod proposal_version_table;
+pub mod purchase_order_table;
+pub mod purchase_order_line_table;
+pub mod purchase_requisition_table;
+pub mod quality_alert_table;
+pub mod quality_alert_reason_table;
+pub mod quality_check_table;
+pub mod quality_point_table;
+pub mod quality_team_table;
+pub mod queue_job_table;
+pub mod queue_worker_table;
+pub mod record_custom_field_value_table;
+pub mod replenishment_rule_table;
+pub mod report_template_table;
+pub mod res_partner_bank_table;
+pub mod return_order_table;
+pub mod return_order_line_table;
+pub mod revenue_recognition_rule_table;
+pub mod role_table;
+pub mod sale_order_table;
+pub mod sale_order_line_table;
+pub mod sale_order_option_table;
+pub mod saved_report_table;
+pub mod scheduled_report_table;
+pub mod scheduled_report_run_table;
+pub mod schema_migration_table;
+pub mod search_embedding_table;
+pub mod segment_member_table;
+pub mod serial_lot_traceability_table;
+pub mod shipping_method_table;
+pub mod sod_conflict_rule_table;
+pub mod stock_count_sheet_table;
+pub mod stock_cycle_count_table;
+pub mod stock_inventory_table;
+pub mod stock_inventory_line_table;
+pub mod stock_landed_cost_table;
+pub mod stock_landed_cost_lines_table;
+pub mod stock_location_table;
+pub mod stock_move_table;
+pub mod stock_move_line_table;
+pub mod stock_picking_table;
+pub mod stock_picking_batch_table;
+pub mod stock_production_lot_table;
+pub mod stock_production_serial_table;
+pub mod stock_quant_table;
+pub mod stock_reorder_group_table;
+pub mod stock_route_table;
+pub mod stock_rule_table;
+pub mod stock_traceability_report_table;
+pub mod subscription_table;
+pub mod subscription_line_table;
+pub mod subscription_plan_table;
+pub mod supplier_intake_request_table;
+pub mod tax_deadline_table;
+pub mod tax_deadline_reminder_table;
+pub mod tax_jurisdiction_table;
+pub mod tax_schedule_table;
+pub mod trial_balance_table;
+pub mod uom_table;
+pub mod uom_cat_table;
+pub mod uom_conversion_table;
+pub mod user_custom_field_table;
+pub mod user_organization_table;
+pub mod user_profile_table;
+pub mod user_role_assignment_table;
+pub mod user_session_table;
+pub mod utm_campaign_table;
+pub mod utm_medium_table;
+pub mod utm_source_table;
+pub mod warehouse_table;
+pub mod warehouse_3_d_zone_table;
+pub mod warehouse_geo_table;
+pub mod warehouse_task_table;
+pub mod whatsapp_business_account_table;
 pub mod workflow_table;
+pub mod workflow_activity_table;
+pub mod workflow_instance_table;
 pub mod workflow_transition_table;
-pub mod workflow_transition_type;
-pub mod workflow_type;
 pub mod workflow_workitem_table;
-pub mod workflow_workitem_type;
-pub mod workitem_state_type;
-pub mod workorder_state_type;
-pub mod zone_display_type_type;
 
-pub use account_account_table::*;
 pub use account_account_type::AccountAccount;
-pub use account_account_type_table::*;
 pub use account_account_type_type::AccountAccountType;
-pub use account_analytic_account_table::*;
 pub use account_analytic_account_type::AccountAnalyticAccount;
-pub use account_analytic_distribution_model_table::*;
 pub use account_analytic_distribution_model_type::AccountAnalyticDistributionModel;
-pub use account_analytic_line_table::*;
 pub use account_analytic_line_type::AccountAnalyticLine;
-pub use account_asset_depreciation_line_table::*;
-pub use account_asset_depreciation_line_type::AccountAssetDepreciationLine;
-pub use account_asset_table::*;
 pub use account_asset_type::AccountAsset;
-pub use account_bank_statement_line_table::*;
-pub use account_bank_statement_line_type::AccountBankStatementLine;
-pub use account_bank_statement_table::*;
+pub use account_asset_depreciation_line_type::AccountAssetDepreciationLine;
 pub use account_bank_statement_type::AccountBankStatement;
-pub use account_fiscal_year_table::*;
+pub use account_bank_statement_line_type::AccountBankStatementLine;
 pub use account_fiscal_year_type::AccountFiscalYear;
-pub use account_group_table::*;
 pub use account_group_type::AccountGroup;
 pub use account_internal_group_type::AccountInternalGroup;
-pub use account_journal_table::*;
 pub use account_journal_type::AccountJournal;
-pub use account_move_line_table::*;
+pub use account_move_type::AccountMove;
 pub use account_move_line_type::AccountMoveLine;
 pub use account_move_state_type::AccountMoveState;
-pub use account_move_table::*;
-pub use account_move_type::AccountMove;
-pub use account_payment_table::*;
-pub use account_payment_term_line_table::*;
-pub use account_payment_term_line_type::AccountPaymentTermLine;
-pub use account_payment_term_table::*;
-pub use account_payment_term_type::AccountPaymentTerm;
 pub use account_payment_type::AccountPayment;
-pub use account_period_table::*;
+pub use account_payment_term_type::AccountPaymentTerm;
+pub use account_payment_term_line_type::AccountPaymentTermLine;
 pub use account_period_type::AccountPeriod;
-pub use account_reconciliation_widget_table::*;
 pub use account_reconciliation_widget_type::AccountReconciliationWidget;
-pub use account_tax_group_table::*;
-pub use account_tax_group_type::AccountTaxGroup;
-pub use account_tax_table::*;
 pub use account_tax_type::AccountTax;
+pub use account_tax_group_type::AccountTaxGroup;
 pub use account_type_internal_type::AccountTypeInternal;
+pub use activity_type::Activity;
+pub use activity_type_type::ActivityType;
+pub use add_account_move_line_params_type::AddAccountMoveLineParams;
+pub use add_casbin_rule_params_type::AddCasbinRuleParams;
+pub use add_document_version_params_type::AddDocumentVersionParams;
+pub use add_landed_cost_line_params_type::AddLandedCostLineParams;
+pub use add_org_member_params_type::AddOrgMemberParams;
+pub use add_purchase_order_line_params_type::AddPurchaseOrderLineParams;
+pub use add_user_to_organization_params_type::AddUserToOrganizationParams;
+pub use add_workflow_activity_params_type::AddWorkflowActivityParams;
+pub use add_workflow_transition_params_type::AddWorkflowTransitionParams;
+pub use adjustment_reason_type::AdjustmentReason;
+pub use ai_action_draft_type::AiActionDraft;
+pub use ai_agent_type::AiAgent;
+pub use ai_agent_run_type::AiAgentRun;
+pub use ai_agent_run_policy_snapshot_type::AiAgentRunPolicySnapshot;
+pub use ai_agent_run_step_type::AiAgentRunStep;
+pub use ai_chat_message_type::AiChatMessage;
+pub use ai_chat_session_type::AiChatSession;
+pub use ai_document_processing_job_type::AiDocumentProcessingJob;
+pub use ai_insight_type::AiInsight;
+pub use ai_reducer_allowlist_type::AiReducerAllowlist;
+pub use ai_skill_type::AiSkill;
+pub use ai_skill_config_type::AiSkillConfig;
+pub use ai_skill_fixture_type::AiSkillFixture;
+pub use ai_skill_release_type::AiSkillRelease;
+pub use ai_skill_risk_type::AiSkillRisk;
+pub use ai_skill_test_run_type::AiSkillTestRun;
+pub use ai_skill_test_run_status_type::AiSkillTestRunStatus;
+pub use ai_skill_version_type::AiSkillVersion;
+pub use ai_team_member_type::AiTeamMember;
+pub use ai_team_member_skill_type::AiTeamMemberSkill;
+pub use allocate_payment_params_type::AllocatePaymentParams;
+pub use analytics_metric_type::AnalyticsMetric;
+pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
+pub use append_ai_chat_message_params_type::AppendAiChatMessageParams;
+pub use approval_request_type::ApprovalRequest;
+pub use approval_rule_type::ApprovalRule;
+pub use asset_state_type::AssetState;
+pub use asset_type_type::AssetType;
+pub use assign_contact_role_params_type::AssignContactRoleParams;
+pub use assign_role_params_type::AssignRoleParams;
+pub use assign_team_member_skill_params_type::AssignTeamMemberSkillParams;
+pub use assign_user_to_picking_params_type::AssignUserToPickingParams;
+pub use assignment_rule_type::AssignmentRule;
+pub use audit_log_type::AuditLog;
+pub use audit_rule_type::AuditRule;
+pub use balance_sheet_line_type::BalanceSheetLine;
+pub use bank_match_candidate_type::BankMatchCandidate;
+pub use bank_statement_import_type::BankStatementImport;
+pub use bank_statement_import_line_type::BankStatementImportLine;
+pub use bank_statement_state_type::BankStatementState;
+pub use barcode_nomenclature_type::BarcodeNomenclature;
+pub use barcode_rule_type::BarcodeRule;
+pub use barcode_scan_type::BarcodeScan;
+pub use batch_state_type::BatchState;
+pub use bill_timesheets_params_type::BillTimesheetsParams;
+pub use billing_account_type::BillingAccount;
+pub use bom_explosion_result_type::BomExplosionResult;
+pub use bom_line_input_type::BomLineInput;
+pub use bom_type_type::BomType;
+pub use bootstrap_new_tenant_params_type::BootstrapNewTenantParams;
+pub use budget_post_type::BudgetPost;
+pub use budget_state_type::BudgetState;
+pub use calendar_event_type::CalendarEvent;
+pub use cancel_intercompany_transaction_params_type::CancelIntercompanyTransactionParams;
+pub use card_state_type::CardState;
+pub use cartonization_result_type::CartonizationResult;
+pub use casbin_rule_type::CasbinRule;
+pub use cash_flow_line_type::CashFlowLine;
+pub use close_subscription_params_type::CloseSubscriptionParams;
+pub use company_type::Company;
+pub use company_country_pack_type::CompanyCountryPack;
+pub use company_scope_params_type::CompanyScopeParams;
+pub use company_vertical_pack_type::CompanyVerticalPack;
+pub use complete_ai_agent_run_params_type::CompleteAiAgentRunParams;
+pub use complete_document_processing_job_params_type::CompleteDocumentProcessingJobParams;
+pub use compute_price_type::ComputePrice;
+pub use confirm_payslip_params_type::ConfirmPayslipParams;
+pub use consolidation_account_type::ConsolidationAccount;
+pub use consolidation_company_rate_type::ConsolidationCompanyRate;
+pub use consolidation_elimination_entry_type::ConsolidationEliminationEntry;
+pub use consolidation_journal_type::ConsolidationJournal;
+pub use consolidation_state_type::ConsolidationState;
+pub use contact_type::Contact;
+pub use contact_category_type::ContactCategory;
+pub use contact_category_assignment_type::ContactCategoryAssignment;
+pub use contact_communication_preference_type::ContactCommunicationPreference;
+pub use contact_duplicate_candidate_type::ContactDuplicateCandidate;
+pub use contact_identity_kind_type::ContactIdentityKind;
+pub use contact_phone_identity_type::ContactPhoneIdentity;
+pub use contact_relationship_type::ContactRelationship;
+pub use contact_role_assignment_type::ContactRoleAssignment;
+pub use contact_segment_type::ContactSegment;
+pub use contact_tag_type::ContactTag;
+pub use contact_tag_assignment_type::ContactTagAssignment;
+pub use contact_verification_state_type::ContactVerificationState;
+pub use contract_state_type::ContractState;
+pub use convert_lead_params_type::ConvertLeadParams;
+pub use convert_opportunity_params_type::ConvertOpportunityParams;
+pub use country_type::Country;
+pub use country_pack_definition_type::CountryPackDefinition;
+pub use country_pack_tax_rule_type::CountryPackTaxRule;
+pub use create_account_account_params_type::CreateAccountAccountParams;
+pub use create_account_account_type_params_type::CreateAccountAccountTypeParams;
+pub use create_account_asset_params_type::CreateAccountAssetParams;
+pub use create_account_bank_statement_line_params_type::CreateAccountBankStatementLineParams;
+pub use create_account_bank_statement_params_type::CreateAccountBankStatementParams;
+pub use create_account_group_params_type::CreateAccountGroupParams;
+pub use create_account_journal_params_type::CreateAccountJournalParams;
+pub use create_account_move_params_type::CreateAccountMoveParams;
+pub use create_account_period_params_type::CreateAccountPeriodParams;
+pub use create_account_reconciliation_widget_params_type::CreateAccountReconciliationWidgetParams;
+pub use create_account_tax_group_params_type::CreateAccountTaxGroupParams;
+pub use create_account_tax_params_type::CreateAccountTaxParams;
+pub use create_action_params_type::CreateActionParams;
+pub use create_activity_params_type::CreateActivityParams;
+pub use create_adjustment_reason_params_type::CreateAdjustmentReasonParams;
+pub use create_ai_action_draft_params_type::CreateAiActionDraftParams;
+pub use create_ai_agent_params_type::CreateAiAgentParams;
+pub use create_ai_agent_run_params_type::CreateAiAgentRunParams;
+pub use create_ai_chat_session_params_type::CreateAiChatSessionParams;
+pub use create_ai_insight_params_type::CreateAiInsightParams;
+pub use create_ai_reducer_allowlist_params_type::CreateAiReducerAllowlistParams;
+pub use create_ai_skill_fixture_params_type::CreateAiSkillFixtureParams;
+pub use create_ai_skill_params_type::CreateAiSkillParams;
+pub use create_ai_skill_version_params_type::CreateAiSkillVersionParams;
+pub use create_ai_team_member_params_type::CreateAiTeamMemberParams;
+pub use create_analytic_account_params_type::CreateAnalyticAccountParams;
+pub use create_analytic_distribution_model_params_type::CreateAnalyticDistributionModelParams;
+pub use create_analytic_line_params_type::CreateAnalyticLineParams;
+pub use create_analytics_metric_params_type::CreateAnalyticsMetricParams;
+pub use create_approval_rule_params_type::CreateApprovalRuleParams;
+pub use create_audit_rule_params_type::CreateAuditRuleParams;
+pub use create_barcode_nomenclature_params_type::CreateBarcodeNomenclatureParams;
+pub use create_barcode_rule_params_type::CreateBarcodeRuleParams;
+pub use create_bill_from_purchase_order_params_type::CreateBillFromPurchaseOrderParams;
+pub use create_billing_account_params_type::CreateBillingAccountParams;
+pub use create_bom_params_type::CreateBomParams;
+pub use create_budget_post_params_type::CreateBudgetPostParams;
+pub use create_calendar_event_params_type::CreateCalendarEventParams;
+pub use create_company_params_type::CreateCompanyParams;
+pub use create_consolidation_account_params_type::CreateConsolidationAccountParams;
+pub use create_consolidation_journal_params_type::CreateConsolidationJournalParams;
+pub use create_contact_identity_params_type::CreateContactIdentityParams;
+pub use create_contact_params_type::CreateContactParams;
+pub use create_contact_segment_params_type::CreateContactSegmentParams;
+pub use create_contact_tag_params_type::CreateContactTagParams;
+pub use create_contract_params_type::CreateContractParams;
+pub use create_country_params_type::CreateCountryParams;
+pub use create_credit_note_from_return_order_params_type::CreateCreditNoteFromReturnOrderParams;
+pub use create_credit_note_params_type::CreateCreditNoteParams;
+pub use create_crossovered_budget_line_params_type::CreateCrossoveredBudgetLineParams;
+pub use create_crossovered_budget_params_type::CreateCrossoveredBudgetParams;
+pub use create_currency_params_type::CreateCurrencyParams;
+pub use create_currency_rate_params_type::CreateCurrencyRateParams;
+pub use create_cycle_count_plan_params_type::CreateCycleCountPlanParams;
+pub use create_dashboard_params_type::CreateDashboardParams;
+pub use create_dashboard_widget_params_type::CreateDashboardWidgetParams;
+pub use create_data_classification_params_type::CreateDataClassificationParams;
+pub use create_data_classification_rule_params_type::CreateDataClassificationRuleParams;
+pub use create_deferred_revenue_schedule_params_type::CreateDeferredRevenueScheduleParams;
+pub use create_delivery_carrier_params_type::CreateDeliveryCarrierParams;
+pub use create_delivery_price_rule_params_type::CreateDeliveryPriceRuleParams;
+pub use create_department_params_type::CreateDepartmentParams;
+pub use create_depreciation_line_params_type::CreateDepreciationLineParams;
+pub use create_document_folder_params_type::CreateDocumentFolderParams;
+pub use create_document_params_type::CreateDocumentParams;
+pub use create_document_processing_job_params_type::CreateDocumentProcessingJobParams;
+pub use create_document_template_params_type::CreateDocumentTemplateParams;
+pub use create_elimination_entry_params_type::CreateEliminationEntryParams;
+pub use create_employee_params_type::CreateEmployeeParams;
+pub use create_expense_params_type::CreateExpenseParams;
+pub use create_expense_sheet_params_type::CreateExpenseSheetParams;
+pub use create_financial_report_params_type::CreateFinancialReportParams;
+pub use create_fiscal_year_params_type::CreateFiscalYearParams;
+pub use create_form_config_params_type::CreateFormConfigParams;
+pub use create_form_field_params_type::CreateFormFieldParams;
+pub use create_helpdesk_sla_params_type::CreateHelpdeskSlaParams;
+pub use create_helpdesk_stage_params_type::CreateHelpdeskStageParams;
+pub use create_helpdesk_team_params_type::CreateHelpdeskTeamParams;
+pub use create_intercompany_rule_params_type::CreateIntercompanyRuleParams;
+pub use create_intercompany_transaction_params_type::CreateIntercompanyTransactionParams;
+pub use create_inventory_adjustment_params_type::CreateInventoryAdjustmentParams;
+pub use create_invoice_from_sale_order_params_type::CreateInvoiceFromSaleOrderParams;
+pub use create_invoice_reminder_batch_params_type::CreateInvoiceReminderBatchParams;
+pub use create_job_position_params_type::CreateJobPositionParams;
+pub use create_knowledge_article_params_type::CreateKnowledgeArticleParams;
+pub use create_knowledge_category_params_type::CreateKnowledgeCategoryParams;
+pub use create_landed_cost_params_type::CreateLandedCostParams;
+pub use create_lead_params_type::CreateLeadParams;
+pub use create_leave_request_params_type::CreateLeaveRequestParams;
+pub use create_leave_type_params_type::CreateLeaveTypeParams;
+pub use create_loyalty_program_params_type::CreateLoyaltyProgramParams;
+pub use create_mail_template_params_type::CreateMailTemplateParams;
+pub use create_message_batch_params_type::CreateMessageBatchParams;
+pub use create_message_template_params_type::CreateMessageTemplateParams;
+pub use create_mrp_production_params_type::CreateMrpProductionParams;
+pub use create_operational_message_params_type::CreateOperationalMessageParams;
+pub use create_opportunity_line_params_type::CreateOpportunityLineParams;
+pub use create_opportunity_params_type::CreateOpportunityParams;
+pub use create_organization_params_type::CreateOrganizationParams;
+pub use create_partner_bank_params_type::CreatePartnerBankParams;
+pub use create_payment_account_params_type::CreatePaymentAccountParams;
+pub use create_payment_fee_params_type::CreatePaymentFeeParams;
+pub use create_payment_method_params_type::CreatePaymentMethodParams;
+pub use create_payment_params_type::CreatePaymentParams;
+pub use create_payment_term_line_params_type::CreatePaymentTermLineParams;
+pub use create_payment_term_params_type::CreatePaymentTermParams;
+pub use create_payment_transaction_params_type::CreatePaymentTransactionParams;
+pub use create_payroll_structure_params_type::CreatePayrollStructureParams;
+pub use create_payslip_params_type::CreatePayslipParams;
+pub use create_picking_batch_params_type::CreatePickingBatchParams;
+pub use create_picking_wave_params_type::CreatePickingWaveParams;
+pub use create_pos_config_params_type::CreatePosConfigParams;
+pub use create_pos_order_line_params_type::CreatePosOrderLineParams;
+pub use create_pos_order_params_type::CreatePosOrderParams;
+pub use create_pos_payment_params_type::CreatePosPaymentParams;
+pub use create_pricelist_item_params_type::CreatePricelistItemParams;
+pub use create_pricelist_params_type::CreatePricelistParams;
+pub use create_product_category_params_type::CreateProductCategoryParams;
+pub use create_product_packaging_params_type::CreateProductPackagingParams;
+pub use create_product_params_type::CreateProductParams;
+pub use create_product_supplier_info_params_type::CreateProductSupplierInfoParams;
+pub use create_product_variant_params_type::CreateProductVariantParams;
+pub use create_project_params_type::CreateProjectParams;
+pub use create_purchase_order_params_type::CreatePurchaseOrderParams;
+pub use create_purchase_requisition_params_type::CreatePurchaseRequisitionParams;
+pub use create_quality_alert_params_type::CreateQualityAlertParams;
+pub use create_quality_alert_reason_params_type::CreateQualityAlertReasonParams;
+pub use create_quality_check_params_type::CreateQualityCheckParams;
+pub use create_quality_point_params_type::CreateQualityPointParams;
+pub use create_quality_team_params_type::CreateQualityTeamParams;
+pub use create_replenishment_rule_params_type::CreateReplenishmentRuleParams;
+pub use create_report_template_params_type::CreateReportTemplateParams;
+pub use create_return_order_line_params_type::CreateReturnOrderLineParams;
+pub use create_return_order_params_type::CreateReturnOrderParams;
+pub use create_revenue_recognition_rule_params_type::CreateRevenueRecognitionRuleParams;
+pub use create_role_config_params_type::CreateRoleConfigParams;
+pub use create_role_params_type::CreateRoleParams;
+pub use create_routing_workcenter_params_type::CreateRoutingWorkcenterParams;
+pub use create_salary_rule_params_type::CreateSalaryRuleParams;
+pub use create_sale_order_line_params_type::CreateSaleOrderLineParams;
+pub use create_sale_order_params_type::CreateSaleOrderParams;
+pub use create_saved_report_params_type::CreateSavedReportParams;
+pub use create_scheduled_report_params_type::CreateScheduledReportParams;
+pub use create_shipping_method_params_type::CreateShippingMethodParams;
+pub use create_sod_conflict_rule_params_type::CreateSodConflictRuleParams;
+pub use create_stock_inventory_line_params_type::CreateStockInventoryLineParams;
+pub use create_stock_inventory_params_type::CreateStockInventoryParams;
+pub use create_stock_location_params_type::CreateStockLocationParams;
+pub use create_stock_move_params_type::CreateStockMoveParams;
+pub use create_stock_picking_params_type::CreateStockPickingParams;
+pub use create_stock_production_lot_params_type::CreateStockProductionLotParams;
+pub use create_stock_production_serial_params_type::CreateStockProductionSerialParams;
+pub use create_stock_quant_params_type::CreateStockQuantParams;
+pub use create_stock_route_params_type::CreateStockRouteParams;
+pub use create_stock_rule_params_type::CreateStockRuleParams;
+pub use create_stock_traceability_report_params_type::CreateStockTraceabilityReportParams;
+pub use create_subscription_from_sale_order_params_type::CreateSubscriptionFromSaleOrderParams;
+pub use create_subscription_plan_params_type::CreateSubscriptionPlanParams;
+pub use create_task_params_type::CreateTaskParams;
+pub use create_tax_deadline_params_type::CreateTaxDeadlineParams;
+pub use create_tax_jurisdiction_params_type::CreateTaxJurisdictionParams;
+pub use create_tax_schedule_params_type::CreateTaxScheduleParams;
+pub use create_ticket_params_type::CreateTicketParams;
+pub use create_traceability_record_params_type::CreateTraceabilityRecordParams;
+pub use create_trial_balance_entry_params_type::CreateTrialBalanceEntryParams;
+pub use create_uom_category_params_type::CreateUomCategoryParams;
+pub use create_uom_conversion_params_type::CreateUomConversionParams;
+pub use create_uom_params_type::CreateUomParams;
+pub use create_user_custom_field_params_type::CreateUserCustomFieldParams;
+pub use create_user_session_params_type::CreateUserSessionParams;
+pub use create_utm_campaign_params_type::CreateUtmCampaignParams;
+pub use create_utm_medium_params_type::CreateUtmMediumParams;
+pub use create_utm_source_params_type::CreateUtmSourceParams;
+pub use create_warehouse_3_d_zone_params_type::CreateWarehouse3DZoneParams;
+pub use create_warehouse_params_type::CreateWarehouseParams;
+pub use create_warehouse_task_params_type::CreateWarehouseTaskParams;
+pub use create_whats_app_business_account_params_type::CreateWhatsAppBusinessAccountParams;
+pub use create_workcenter_params_type::CreateWorkcenterParams;
+pub use create_workcenter_productivity_params_type::CreateWorkcenterProductivityParams;
+pub use create_workflow_params_type::CreateWorkflowParams;
+pub use create_workorder_params_type::CreateWorkorderParams;
+pub use crossovered_budget_type::CrossoveredBudget;
+pub use crossovered_budget_lines_type::CrossoveredBudgetLines;
+pub use currency_type::Currency;
+pub use currency_rate_type::CurrencyRate;
+pub use dashboard_type::Dashboard;
+pub use dashboard_widget_type::DashboardWidget;
+pub use data_classification_type::DataClassification;
+pub use data_classification_rule_type::DataClassificationRule;
+pub use deferred_revenue_line_type::DeferredRevenueLine;
+pub use deferred_revenue_schedule_type::DeferredRevenueSchedule;
+pub use delegated_admin_scope_type::DelegatedAdminScope;
+pub use delete_account_move_line_params_type::DeleteAccountMoveLineParams;
+pub use delivery_carrier_type::DeliveryCarrier;
+pub use delivery_price_rule_type::DeliveryPriceRule;
+pub use deprecate_account_account_params_type::DeprecateAccountAccountParams;
+pub use depreciation_method_type::DepreciationMethod;
+pub use device_sync_entry_type::DeviceSyncEntry;
+pub use discount_policy_type::DiscountPolicy;
+pub use dispose_account_asset_params_type::DisposeAccountAssetParams;
+pub use document_type::Document;
+pub use document_folder_type::DocumentFolder;
+pub use document_sequence_type::DocumentSequence;
+pub use document_template_type::DocumentTemplate;
+pub use document_version_type::DocumentVersion;
+pub use done_stock_move_params_type::DoneStockMoveParams;
+pub use employment_type_type::EmploymentType;
+pub use end_contact_role_params_type::EndContactRoleParams;
+pub use enqueue_job_params_type::EnqueueJobParams;
+pub use error_intercompany_transaction_params_type::ErrorIntercompanyTransactionParams;
+pub use expense_sheet_state_type::ExpenseSheetState;
+pub use expense_state_type::ExpenseState;
+pub use export_financial_report_params_type::ExportFinancialReportParams;
+pub use field_option_type::FieldOption;
+pub use field_type_type::FieldType;
+pub use field_validation_type::FieldValidation;
+pub use field_width_type::FieldWidth;
+pub use finalize_import_assistant_job_params_type::FinalizeImportAssistantJobParams;
+pub use financial_report_type::FinancialReport;
+pub use fiscal_year_state_type::FiscalYearState;
+pub use fleet_vehicle_type::FleetVehicle;
+pub use form_config_type::FormConfig;
+pub use form_config_field_type::FormConfigField;
+pub use form_role_config_type::FormRoleConfig;
+pub use generate_eu_vat_report_params_type::GenerateEuVatReportParams;
+pub use generate_subscription_invoice_params_type::GenerateSubscriptionInvoiceParams;
+pub use generated_owner_report_type::GeneratedOwnerReport;
+pub use google_drive_connection_type::GoogleDriveConnection;
+pub use grant_delegated_admin_scope_params_type::GrantDelegatedAdminScopeParams;
+pub use grant_org_permission_params_type::GrantOrgPermissionParams;
+pub use helpdesk_sla_type::HelpdeskSla;
+pub use helpdesk_stage_type::HelpdeskStage;
+pub use helpdesk_team_type::HelpdeskTeam;
+pub use helpdesk_ticket_type::HelpdeskTicket;
+pub use helpdesk_ticket_state_type::HelpdeskTicketState;
+pub use hr_contract_type::HrContract;
+pub use hr_department_type::HrDepartment;
+pub use hr_employee_type::HrEmployee;
+pub use hr_expense_type::HrExpense;
+pub use hr_expense_sheet_type::HrExpenseSheet;
+pub use hr_job_position_type::HrJobPosition;
+pub use hr_leave_type::HrLeave;
+pub use hr_leave_state_type::HrLeaveState;
+pub use hr_leave_type_type::HrLeaveType;
+pub use hr_payroll_structure_type::HrPayrollStructure;
+pub use hr_payslip_type::HrPayslip;
+pub use hr_resource_type::HrResource;
+pub use hr_salary_rule_type::HrSalaryRule;
+pub use import_job_type::ImportJob;
+pub use import_job_error_type::ImportJobError;
+pub use import_job_record_type::ImportJobRecord;
+pub use import_mapping_template_type::ImportMappingTemplate;
+pub use insight_severity_type::InsightSeverity;
+pub use instance_state_type::InstanceState;
+pub use intake_state_type::IntakeState;
+pub use integration_status_type::IntegrationStatus;
+pub use integration_type_type::IntegrationType;
+pub use intercompany_rule_type::IntercompanyRule;
+pub use intercompany_state_type::IntercompanyState;
+pub use intercompany_transaction_type::IntercompanyTransaction;
+pub use inventory_adjustment_type::InventoryAdjustment;
+pub use inventory_valuation_type::InventoryValuation;
+pub use invoice_status_type::InvoiceStatus;
+pub use io_t_action_type::IoTAction;
+pub use io_t_alert_type::IoTAlert;
+pub use io_t_device_type::IoTDevice;
+pub use io_t_hub_type::IoTHub;
+pub use io_t_pairing_token_type::IoTPairingToken;
+pub use io_t_telemetry_type::IoTTelemetry;
+pub use io_t_threshold_type::IoTThreshold;
+pub use job_status_type::JobStatus;
+pub use journal_type_type::JournalType;
+pub use knowledge_article_type::KnowledgeArticle;
+pub use knowledge_article_category_type::KnowledgeArticleCategory;
+pub use landed_cost_state_type::LandedCostState;
+pub use lead_type::Lead;
+pub use lead_lost_reason_type::LeadLostReason;
+pub use lead_source_type::LeadSource;
+pub use line_invoice_status_type::LineInvoiceStatus;
+pub use line_state_type::LineState;
+pub use log_audit_event_params_type::LogAuditEventParams;
+pub use log_timesheet_params_type::LogTimesheetParams;
+pub use mail_follower_type::MailFollower;
+pub use mail_message_type::MailMessage;
+pub use mail_message_type_type::MailMessageType;
+pub use mail_template_type::MailTemplate;
+pub use merge_contacts_params_type::MergeContactsParams;
+pub use message_batch_type::MessageBatch;
+pub use message_batch_status_type::MessageBatchStatus;
+pub use message_channel_type::MessageChannel;
+pub use message_template_type::MessageTemplate;
+pub use message_template_variable_type::MessageTemplateVariable;
+pub use mo_state_type::MoState;
+pub use module_config_input_type::ModuleConfigInput;
+pub use move_stock_quant_params_type::MoveStockQuantParams;
+pub use move_type_type::MoveType;
+pub use mrp_bom_type::MrpBom;
+pub use mrp_bom_line_type::MrpBomLine;
+pub use mrp_production_type::MrpProduction;
+pub use mrp_routing_workcenter_type::MrpRoutingWorkcenter;
+pub use mrp_workcenter_type::MrpWorkcenter;
+pub use mrp_workcenter_productivity_type::MrpWorkcenterProductivity;
+pub use mrp_workorder_type::MrpWorkorder;
+pub use operational_message_type::OperationalMessage;
+pub use operational_message_status_type::OperationalMessageStatus;
+pub use opportunity_type::Opportunity;
+pub use opportunity_line_type::OpportunityLine;
+pub use opportunity_stage_type::OpportunityStage;
+pub use org_permission_type::OrgPermission;
+pub use org_schema_migration_type::OrgSchemaMigration;
+pub use organization_type::Organization;
+pub use organization_settings_type::OrganizationSettings;
+pub use packaging_material_type::PackagingMaterial;
+pub use partner_type_type::PartnerType;
+pub use password_reset_token_type::PasswordResetToken;
+pub use payment_account_type::PaymentAccount;
+pub use payment_direction_type::PaymentDirection;
+pub use payment_fee_type::PaymentFee;
+pub use payment_fee_bearer_type::PaymentFeeBearer;
+pub use payment_method_type_type::PaymentMethodType;
+pub use payment_provider_code_type::PaymentProviderCode;
+pub use payment_reconciliation_type::PaymentReconciliation;
+pub use payment_reversal_type::PaymentReversal;
+pub use payment_state_type::PaymentState;
+pub use payment_status_type::PaymentStatus;
+pub use payment_term_value_type::PaymentTermValue;
+pub use payment_transaction_type::PaymentTransaction;
+pub use payment_transaction_status_type::PaymentTransactionStatus;
+pub use payment_type_type::PaymentType;
+pub use payslip_state_type::PayslipState;
+pub use period_state_type::PeriodState;
+pub use permission_action_type::PermissionAction;
+pub use permission_effect_type::PermissionEffect;
+pub use permission_subject_type::PermissionSubject;
+pub use picking_wave_type::PickingWave;
+pub use po_invoice_status_type::PoInvoiceStatus;
+pub use po_state_type::PoState;
+pub use policy_action_grant_type::PolicyActionGrant;
+pub use policy_field_permission_type::PolicyFieldPermission;
+pub use policy_snapshot_type::PolicySnapshot;
+pub use pos_config_type::PosConfig;
+pub use pos_loyalty_card_type::PosLoyaltyCard;
+pub use pos_loyalty_program_type::PosLoyaltyProgram;
+pub use pos_order_type::PosOrder;
+pub use pos_order_line_type::PosOrderLine;
+pub use pos_order_state_type::PosOrderState;
+pub use pos_payment_type::PosPayment;
+pub use pos_payment_method_type::PosPaymentMethod;
+pub use pos_session_type::PosSession;
+pub use pos_status_type::PosStatus;
+pub use pos_terminal_type::PosTerminal;
+pub use pricelist_applied_on_type::PricelistAppliedOn;
+pub use privacy_consent_type::PrivacyConsent;
+pub use process_intercompany_transaction_params_type::ProcessIntercompanyTransactionParams;
+pub use product_type::Product;
+pub use product_attribute_type::ProductAttribute;
+pub use product_attribute_line_type::ProductAttributeLine;
+pub use product_attribute_value_type::ProductAttributeValue;
+pub use product_category_type::ProductCategory;
+pub use product_packaging_type::ProductPackaging;
+pub use product_pricelist_type::ProductPricelist;
+pub use product_pricelist_item_type::ProductPricelistItem;
+pub use product_supplier_info_type::ProductSupplierInfo;
+pub use product_variant_type::ProductVariant;
+pub use profit_loss_line_type::ProfitLossLine;
+pub use project_project_type::ProjectProject;
+pub use project_task_type::ProjectTask;
+pub use project_timesheet_type::ProjectTimesheet;
+pub use proposal_type::Proposal;
+pub use proposal_comment_type::ProposalComment;
+pub use proposal_line_item_type::ProposalLineItem;
+pub use proposal_presence_type::ProposalPresence;
+pub use proposal_section_type::ProposalSection;
+pub use proposal_source_doc_type::ProposalSourceDoc;
+pub use proposal_status_type::ProposalStatus;
+pub use proposal_version_type::ProposalVersion;
+pub use purchase_order_type::PurchaseOrder;
+pub use purchase_order_line_type::PurchaseOrderLine;
+pub use purchase_requisition_type::PurchaseRequisition;
+pub use quality_alert_type::QualityAlert;
+pub use quality_alert_reason_type::QualityAlertReason;
+pub use quality_check_type::QualityCheck;
+pub use quality_point_type::QualityPoint;
+pub use quality_team_type::QualityTeam;
+pub use queue_job_type::QueueJob;
+pub use queue_mail_from_template_params_type::QueueMailFromTemplateParams;
+pub use queue_worker_type::QueueWorker;
+pub use recognize_deferred_revenue_params_type::RecognizeDeferredRevenueParams;
+pub use reconcile_account_bank_statement_line_params_type::ReconcileAccountBankStatementLineParams;
+pub use record_ai_skill_test_run_params_type::RecordAiSkillTestRunParams;
+pub use record_barcode_scan_params_type::RecordBarcodeScanParams;
+pub use record_custom_field_entry_type::RecordCustomFieldEntry;
+pub use record_custom_field_value_type::RecordCustomFieldValue;
+pub use record_cycle_count_line_params_type::RecordCycleCountLineParams;
+pub use record_generated_owner_report_params_type::RecordGeneratedOwnerReportParams;
+pub use record_privacy_consent_params_type::RecordPrivacyConsentParams;
+pub use record_telemetry_params_type::RecordTelemetryParams;
+pub use record_whats_app_health_check_params_type::RecordWhatsAppHealthCheckParams;
+pub use register_device_params_type::RegisterDeviceParams;
+pub use register_hub_params_type::RegisterHubParams;
+pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
+pub use reject_approval_request_params_type::RejectApprovalRequestParams;
+pub use replenishment_rule_type::ReplenishmentRule;
+pub use report_state_type::ReportState;
+pub use report_template_type::ReportTemplate;
+pub use report_type_type::ReportType;
+pub use requisition_state_type::RequisitionState;
+pub use res_partner_bank_type::ResPartnerBank;
+pub use return_order_type::ReturnOrder;
+pub use return_order_line_type::ReturnOrderLine;
+pub use revenue_recognition_rule_type::RevenueRecognitionRule;
+pub use reverse_payment_transaction_params_type::ReversePaymentTransactionParams;
+pub use review_message_batch_params_type::ReviewMessageBatchParams;
+pub use role_type::Role;
+pub use rule_type_type::RuleType;
+pub use sale_order_type::SaleOrder;
+pub use sale_order_line_type::SaleOrderLine;
+pub use sale_order_option_type::SaleOrderOption;
+pub use sale_state_type::SaleState;
+pub use save_import_mapping_template_params_type::SaveImportMappingTemplateParams;
+pub use saved_report_type::SavedReport;
+pub use scheduled_report_type::ScheduledReport;
+pub use scheduled_report_run_type::ScheduledReportRun;
+pub use schema_migration_type::SchemaMigration;
+pub use search_embedding_type::SearchEmbedding;
+pub use section_status_type::SectionStatus;
+pub use segment_member_type::SegmentMember;
+pub use serial_lot_traceability_type::SerialLotTraceability;
+pub use session_state_type::SessionState;
+pub use set_article_published_params_type::SetArticlePublishedParams;
+pub use set_company_country_pack_params_type::SetCompanyCountryPackParams;
+pub use set_company_vertical_pack_params_type::SetCompanyVerticalPackParams;
+pub use set_consolidation_company_rate_params_type::SetConsolidationCompanyRateParams;
+pub use set_record_custom_field_values_params_type::SetRecordCustomFieldValuesParams;
+pub use setup_fiscal_calendar_params_type::SetupFiscalCalendarParams;
+pub use shipping_method_type::ShippingMethod;
+pub use sod_conflict_rule_type::SodConflictRule;
+pub use split_method_type::SplitMethod;
+pub use stage_bank_statement_import_line_params_type::StageBankStatementImportLineParams;
+pub use stage_bank_statement_import_params_type::StageBankStatementImportParams;
+pub use start_timesheet_timer_params_type::StartTimesheetTimerParams;
+pub use stock_count_sheet_type::StockCountSheet;
+pub use stock_cycle_count_type::StockCycleCount;
+pub use stock_inventory_type::StockInventory;
+pub use stock_inventory_line_type::StockInventoryLine;
+pub use stock_landed_cost_type::StockLandedCost;
+pub use stock_landed_cost_lines_type::StockLandedCostLines;
+pub use stock_location_type::StockLocation;
+pub use stock_move_type::StockMove;
+pub use stock_move_line_type::StockMoveLine;
+pub use stock_picking_type::StockPicking;
+pub use stock_picking_batch_type::StockPickingBatch;
+pub use stock_production_lot_type::StockProductionLot;
+pub use stock_production_serial_type::StockProductionSerial;
+pub use stock_quant_type::StockQuant;
+pub use stock_quant_reserve_params_type::StockQuantReserveParams;
+pub use stock_quant_unreserve_params_type::StockQuantUnreserveParams;
+pub use stock_reorder_group_type::StockReorderGroup;
+pub use stock_route_type::StockRoute;
+pub use stock_rule_type::StockRule;
+pub use stock_traceability_report_type::StockTraceabilityReport;
+pub use submit_expense_sheet_params_type::SubmitExpenseSheetParams;
+pub use submit_supplier_intake_params_type::SubmitSupplierIntakeParams;
+pub use subscription_type::Subscription;
+pub use subscription_line_type::SubscriptionLine;
+pub use subscription_plan_type::SubscriptionPlan;
+pub use supplier_intake_request_type::SupplierIntakeRequest;
+pub use sync_direction_type::SyncDirection;
+pub use sync_status_type::SyncStatus;
+pub use task_state_type::TaskState;
+pub use tax_amount_type_type::TaxAmountType;
+pub use tax_deadline_type::TaxDeadline;
+pub use tax_deadline_reminder_type::TaxDeadlineReminder;
+pub use tax_deadline_status_type::TaxDeadlineStatus;
+pub use tax_deadline_status_job_type::TaxDeadlineStatusJob;
+pub use tax_deadline_type_type::TaxDeadlineType;
+pub use tax_jurisdiction_type::TaxJurisdiction;
+pub use tax_schedule_type::TaxSchedule;
+pub use tax_type_use_type::TaxTypeUse;
+pub use ticket_priority_type::TicketPriority;
+pub use trial_balance_type::TrialBalance;
+pub use unreconcile_account_bank_statement_line_params_type::UnreconcileAccountBankStatementLineParams;
+pub use uom_type::Uom;
+pub use uom_category_type::UomCategory;
+pub use uom_conversion_type::UomConversion;
+pub use update_account_account_params_type::UpdateAccountAccountParams;
+pub use update_account_account_type_params_type::UpdateAccountAccountTypeParams;
+pub use update_account_asset_params_type::UpdateAccountAssetParams;
+pub use update_account_bank_statement_line_params_type::UpdateAccountBankStatementLineParams;
+pub use update_account_bank_statement_params_type::UpdateAccountBankStatementParams;
+pub use update_account_group_params_type::UpdateAccountGroupParams;
+pub use update_account_journal_params_type::UpdateAccountJournalParams;
+pub use update_account_move_line_params_type::UpdateAccountMoveLineParams;
+pub use update_account_period_params_type::UpdateAccountPeriodParams;
+pub use update_account_reconciliation_widget_params_type::UpdateAccountReconciliationWidgetParams;
+pub use update_account_tax_group_params_type::UpdateAccountTaxGroupParams;
+pub use update_account_tax_params_type::UpdateAccountTaxParams;
+pub use update_ai_action_draft_params_params_type::UpdateAiActionDraftParamsParams;
+pub use update_ai_agent_params_type::UpdateAiAgentParams;
+pub use update_ai_chat_session_title_params_type::UpdateAiChatSessionTitleParams;
+pub use update_ai_reducer_allowlist_params_type::UpdateAiReducerAllowlistParams;
+pub use update_analytic_account_params_type::UpdateAnalyticAccountParams;
+pub use update_analytic_distribution_model_params_type::UpdateAnalyticDistributionModelParams;
+pub use update_analytic_line_params_type::UpdateAnalyticLineParams;
+pub use update_approval_rule_params_type::UpdateApprovalRuleParams;
+pub use update_audit_rule_params_type::UpdateAuditRuleParams;
+pub use update_barcode_nomenclature_params_type::UpdateBarcodeNomenclatureParams;
+pub use update_barcode_rule_params_type::UpdateBarcodeRuleParams;
+pub use update_billing_account_params_type::UpdateBillingAccountParams;
+pub use update_bom_params_type::UpdateBomParams;
+pub use update_budget_line_actuals_params_type::UpdateBudgetLineActualsParams;
+pub use update_budget_post_params_type::UpdateBudgetPostParams;
+pub use update_calendar_event_params_type::UpdateCalendarEventParams;
+pub use update_company_address_params_type::UpdateCompanyAddressParams;
+pub use update_company_business_params_type::UpdateCompanyBusinessParams;
+pub use update_company_hierarchy_params_type::UpdateCompanyHierarchyParams;
+pub use update_company_params_type::UpdateCompanyParams;
+pub use update_consolidation_account_params_type::UpdateConsolidationAccountParams;
+pub use update_contact_address_params_type::UpdateContactAddressParams;
+pub use update_contact_business_params_type::UpdateContactBusinessParams;
+pub use update_contact_core_params_type::UpdateContactCoreParams;
+pub use update_contact_details_params_type::UpdateContactDetailsParams;
+pub use update_contact_identity_params_type::UpdateContactIdentityParams;
+pub use update_contract_params_type::UpdateContractParams;
+pub use update_crossovered_budget_line_params_type::UpdateCrossoveredBudgetLineParams;
+pub use update_crossovered_budget_params_type::UpdateCrossoveredBudgetParams;
+pub use update_dashboard_share_params_type::UpdateDashboardShareParams;
+pub use update_department_params_type::UpdateDepartmentParams;
+pub use update_document_params_type::UpdateDocumentParams;
+pub use update_document_template_params_type::UpdateDocumentTemplateParams;
+pub use update_employee_params_type::UpdateEmployeeParams;
+pub use update_expense_params_type::UpdateExpenseParams;
+pub use update_financial_report_params_type::UpdateFinancialReportParams;
+pub use update_fiscal_year_params_type::UpdateFiscalYearParams;
+pub use update_form_field_params_type::UpdateFormFieldParams;
+pub use update_intercompany_rule_params_type::UpdateIntercompanyRuleParams;
+pub use update_job_position_params_type::UpdateJobPositionParams;
+pub use update_knowledge_article_params_type::UpdateKnowledgeArticleParams;
+pub use update_knowledge_category_params_type::UpdateKnowledgeCategoryParams;
+pub use update_landed_cost_params_type::UpdateLandedCostParams;
+pub use update_lead_address_params_type::UpdateLeadAddressParams;
+pub use update_lead_details_params_type::UpdateLeadDetailsParams;
+pub use update_lead_revenue_params_type::UpdateLeadRevenueParams;
+pub use update_leave_type_params_type::UpdateLeaveTypeParams;
+pub use update_mail_template_params_type::UpdateMailTemplateParams;
+pub use update_message_template_params_type::UpdateMessageTemplateParams;
+pub use update_metric_values_params_type::UpdateMetricValuesParams;
+pub use update_opportunity_params_type::UpdateOpportunityParams;
+pub use update_org_member_details_params_type::UpdateOrgMemberDetailsParams;
+pub use update_organization_params_type::UpdateOrganizationParams;
+pub use update_owner_report_schedule_params_type::UpdateOwnerReportScheduleParams;
+pub use update_partner_bank_params_type::UpdatePartnerBankParams;
+pub use update_payment_account_params_type::UpdatePaymentAccountParams;
+pub use update_payment_transaction_params_type::UpdatePaymentTransactionParams;
+pub use update_product_category_params_type::UpdateProductCategoryParams;
+pub use update_product_inventory_data_params_type::UpdateProductInventoryDataParams;
+pub use update_product_packaging_params_type::UpdateProductPackagingParams;
+pub use update_product_params_type::UpdateProductParams;
+pub use update_product_pricing_params_type::UpdateProductPricingParams;
+pub use update_product_supplier_info_params_type::UpdateProductSupplierInfoParams;
+pub use update_product_variant_params_type::UpdateProductVariantParams;
+pub use update_project_params_type::UpdateProjectParams;
+pub use update_proposal_source_doc_params_type::UpdateProposalSourceDocParams;
+pub use update_purchase_order_line_params_type::UpdatePurchaseOrderLineParams;
+pub use update_purchase_order_params_type::UpdatePurchaseOrderParams;
+pub use update_quality_alert_reason_params_type::UpdateQualityAlertReasonParams;
+pub use update_quality_point_params_type::UpdateQualityPointParams;
+pub use update_quality_team_params_type::UpdateQualityTeamParams;
+pub use update_report_template_params_type::UpdateReportTemplateParams;
+pub use update_role_params_type::UpdateRoleParams;
+pub use update_sale_order_params_type::UpdateSaleOrderParams;
+pub use update_saved_report_params_type::UpdateSavedReportParams;
+pub use update_stock_location_params_type::UpdateStockLocationParams;
+pub use update_stock_production_lot_params_type::UpdateStockProductionLotParams;
+pub use update_stock_production_serial_params_type::UpdateStockProductionSerialParams;
+pub use update_stock_quant_quantity_params_type::UpdateStockQuantQuantityParams;
+pub use update_stock_route_params_type::UpdateStockRouteParams;
+pub use update_stock_rule_params_type::UpdateStockRuleParams;
+pub use update_supplier_intake_params_type::UpdateSupplierIntakeParams;
+pub use update_task_params_type::UpdateTaskParams;
+pub use update_tax_deadline_params_type::UpdateTaxDeadlineParams;
+pub use update_tax_jurisdiction_params_type::UpdateTaxJurisdictionParams;
+pub use update_tax_schedule_params_type::UpdateTaxScheduleParams;
+pub use update_ticket_params_type::UpdateTicketParams;
+pub use update_user_profile_params_type::UpdateUserProfileParams;
+pub use update_utm_campaign_params_type::UpdateUtmCampaignParams;
+pub use update_utm_medium_params_type::UpdateUtmMediumParams;
+pub use update_utm_source_params_type::UpdateUtmSourceParams;
+pub use update_warehouse_3_d_zone_params_type::UpdateWarehouse3DZoneParams;
+pub use update_warehouse_params_type::UpdateWarehouseParams;
+pub use update_whats_app_business_account_params_type::UpdateWhatsAppBusinessAccountParams;
+pub use update_whats_app_credentials_params_type::UpdateWhatsAppCredentialsParams;
+pub use update_whats_app_verification_params_type::UpdateWhatsAppVerificationParams;
+pub use update_widget_layout_params_type::UpdateWidgetLayoutParams;
+pub use update_workcenter_params_type::UpdateWorkcenterParams;
+pub use upsert_ai_skill_config_params_type::UpsertAiSkillConfigParams;
+pub use upsert_ai_skill_params_type::UpsertAiSkillParams;
+pub use upsert_organization_settings_params_type::UpsertOrganizationSettingsParams;
+pub use upsert_search_embedding_params_type::UpsertSearchEmbeddingParams;
+pub use user_credential_type::UserCredential;
+pub use user_custom_field_type::UserCustomField;
+pub use user_invite_type::UserInvite;
+pub use user_organization_type::UserOrganization;
+pub use user_profile_type::UserProfile;
+pub use user_role_assignment_type::UserRoleAssignment;
+pub use user_session_type::UserSession;
+pub use utm_campaign_type::UtmCampaign;
+pub use utm_medium_type::UtmMedium;
+pub use utm_source_type::UtmSource;
+pub use validate_timesheets_params_type::ValidateTimesheetsParams;
+pub use vehicle_status_type::VehicleStatus;
+pub use verification_level_type::VerificationLevel;
+pub use verification_status_type::VerificationStatus;
+pub use warehouse_type::Warehouse;
+pub use warehouse_3_d_zone_type::Warehouse3DZone;
+pub use warehouse_geo_type::WarehouseGeo;
+pub use warehouse_task_type::WarehouseTask;
+pub use whats_app_business_account_type::WhatsAppBusinessAccount;
+pub use widget_type_type::WidgetType;
+pub use workflow_type::Workflow;
+pub use workflow_activity_type::WorkflowActivity;
+pub use workflow_instance_type::WorkflowInstance;
+pub use workflow_transition_type::WorkflowTransition;
+pub use workflow_workitem_type::WorkflowWorkitem;
+pub use workitem_state_type::WorkitemState;
+pub use workorder_state_type::WorkorderState;
+pub use zone_display_type_type::ZoneDisplayType;
+pub use account_account_table::*;
+pub use account_account_type_table::*;
+pub use account_analytic_account_table::*;
+pub use account_analytic_distribution_model_table::*;
+pub use account_analytic_line_table::*;
+pub use account_asset_table::*;
+pub use account_asset_depreciation_line_table::*;
+pub use account_bank_statement_table::*;
+pub use account_bank_statement_line_table::*;
+pub use account_fiscal_year_table::*;
+pub use account_group_table::*;
+pub use account_journal_table::*;
+pub use account_move_table::*;
+pub use account_move_line_table::*;
+pub use account_payment_table::*;
+pub use account_payment_term_table::*;
+pub use account_payment_term_line_table::*;
+pub use account_period_table::*;
+pub use account_reconciliation_widget_table::*;
+pub use account_tax_table::*;
+pub use account_tax_group_table::*;
+pub use activity_table::*;
+pub use activity_type_table::*;
+pub use adjustment_reason_table::*;
+pub use ai_action_draft_table::*;
+pub use ai_agent_table::*;
+pub use ai_agent_run_table::*;
+pub use ai_agent_run_policy_snapshot_table::*;
+pub use ai_agent_run_step_table::*;
+pub use ai_chat_message_table::*;
+pub use ai_chat_session_table::*;
+pub use ai_document_processing_job_table::*;
+pub use ai_insight_table::*;
+pub use ai_reducer_allowlist_table::*;
+pub use ai_skill_table::*;
+pub use ai_skill_config_table::*;
+pub use ai_skill_fixture_table::*;
+pub use ai_skill_release_table::*;
+pub use ai_skill_test_run_table::*;
+pub use ai_skill_version_table::*;
+pub use ai_team_member_table::*;
+pub use ai_team_member_skill_table::*;
+pub use analytics_metric_table::*;
+pub use approval_request_table::*;
+pub use approval_rule_table::*;
+pub use assignment_rule_table::*;
+pub use audit_log_table::*;
+pub use audit_rule_table::*;
+pub use balance_sheet_line_table::*;
+pub use bank_match_candidate_table::*;
+pub use bank_statement_import_table::*;
+pub use bank_statement_import_line_table::*;
+pub use barcode_nomenclature_table::*;
+pub use barcode_rule_table::*;
+pub use barcode_scan_table::*;
+pub use billing_account_table::*;
+pub use bom_explosion_result_table::*;
+pub use budget_post_table::*;
+pub use calendar_event_table::*;
+pub use cartonization_result_table::*;
+pub use casbin_rule_table::*;
+pub use cash_flow_line_table::*;
+pub use company_table::*;
+pub use company_country_pack_table::*;
+pub use company_vertical_pack_table::*;
+pub use consolidation_account_table::*;
+pub use consolidation_company_rate_table::*;
+pub use consolidation_elimination_entry_table::*;
+pub use consolidation_journal_table::*;
+pub use contact_table::*;
+pub use contact_category_table::*;
+pub use contact_category_assignment_table::*;
+pub use contact_communication_preference_table::*;
+pub use contact_duplicate_candidate_table::*;
+pub use contact_phone_identity_table::*;
+pub use contact_relationship_table::*;
+pub use contact_role_assignment_table::*;
+pub use contact_segment_table::*;
+pub use contact_tag_table::*;
+pub use contact_tag_assignment_table::*;
+pub use country_table::*;
+pub use country_pack_definition_table::*;
+pub use country_pack_tax_rule_table::*;
+pub use crossovered_budget_table::*;
+pub use crossovered_budget_lines_table::*;
+pub use currency_table::*;
+pub use currency_rate_table::*;
+pub use dashboard_table::*;
+pub use dashboard_widget_table::*;
+pub use data_classification_table::*;
+pub use data_classification_rule_table::*;
+pub use deferred_revenue_line_table::*;
+pub use deferred_revenue_schedule_table::*;
+pub use delegated_admin_scope_table::*;
+pub use delivery_carrier_table::*;
+pub use delivery_price_rule_table::*;
+pub use doc_folder_table::*;
+pub use document_table::*;
+pub use document_sequence_table::*;
+pub use document_template_table::*;
+pub use document_version_table::*;
+pub use expense_sheet_table::*;
+pub use financial_report_table::*;
+pub use fleet_vehicle_table::*;
+pub use form_config_table::*;
+pub use form_config_field_table::*;
+pub use form_role_config_table::*;
+pub use generated_owner_report_table::*;
+pub use google_drive_connection_table::*;
+pub use helpdesk_sla_table::*;
+pub use helpdesk_stage_table::*;
+pub use helpdesk_team_table::*;
+pub use helpdesk_ticket_table::*;
+pub use hr_contract_table::*;
+pub use hr_department_table::*;
+pub use hr_employee_table::*;
+pub use hr_expense_table::*;
+pub use hr_job_position_table::*;
+pub use hr_leave_table::*;
+pub use hr_leave_type_table::*;
+pub use hr_payroll_structure_table::*;
+pub use hr_payslip_table::*;
+pub use hr_resource_table::*;
+pub use hr_salary_rule_table::*;
+pub use import_job_table::*;
+pub use import_job_error_table::*;
+pub use import_job_record_table::*;
+pub use import_mapping_template_table::*;
+pub use intercompany_rule_table::*;
+pub use intercompany_transaction_table::*;
+pub use inventory_adjustment_table::*;
+pub use inventory_valuation_table::*;
+pub use iot_action_table::*;
+pub use iot_alert_table::*;
+pub use iot_device_table::*;
+pub use iot_hub_table::*;
+pub use iot_pairing_token_table::*;
+pub use iot_telemetry_table::*;
+pub use iot_threshold_table::*;
+pub use kb_category_table::*;
+pub use knowledge_article_table::*;
+pub use lead_table::*;
+pub use lead_lost_reason_table::*;
+pub use lead_source_table::*;
+pub use mail_follower_table::*;
+pub use mail_message_table::*;
+pub use mail_template_table::*;
+pub use message_batch_table::*;
+pub use message_template_table::*;
+pub use mrp_bom_table::*;
+pub use mrp_bom_line_table::*;
+pub use mrp_production_table::*;
+pub use mrp_routing_workcenter_table::*;
+pub use mrp_workcenter_table::*;
+pub use mrp_workcenter_productivity_table::*;
+pub use mrp_workorder_table::*;
+pub use operational_message_table::*;
+pub use opp_stage_table::*;
+pub use opportunity_table::*;
+pub use opportunity_line_table::*;
+pub use org_permission_table::*;
+pub use org_schema_migration_table::*;
+pub use organization_table::*;
+pub use organization_settings_table::*;
+pub use packaging_material_table::*;
+pub use payment_account_table::*;
+pub use payment_fee_table::*;
+pub use payment_reconciliation_table::*;
+pub use payment_reversal_table::*;
+pub use payment_transaction_table::*;
+pub use picking_wave_table::*;
+pub use policy_snapshot_table::*;
+pub use pos_config_table::*;
+pub use pos_loyalty_card_table::*;
+pub use pos_loyalty_program_table::*;
+pub use pos_order_table::*;
+pub use pos_order_line_table::*;
+pub use pos_payment_table::*;
+pub use pos_payment_method_table::*;
+pub use pos_session_table::*;
+pub use pos_terminal_table::*;
+pub use privacy_consent_table::*;
+pub use product_table::*;
+pub use product_attribute_table::*;
+pub use product_attribute_line_table::*;
+pub use product_attribute_value_table::*;
+pub use product_category_table::*;
+pub use product_packaging_table::*;
+pub use product_pricelist_table::*;
+pub use product_pricelist_item_table::*;
+pub use product_supplier_info_table::*;
+pub use product_variant_table::*;
+pub use profit_loss_line_table::*;
+pub use project_project_table::*;
+pub use project_task_table::*;
+pub use project_timesheet_table::*;
+pub use proposal_table::*;
+pub use proposal_comment_table::*;
+pub use proposal_line_item_table::*;
+pub use proposal_presence_table::*;
+pub use proposal_section_table::*;
+pub use proposal_source_doc_table::*;
+pub use proposal_version_table::*;
+pub use purchase_order_table::*;
+pub use purchase_order_line_table::*;
+pub use purchase_requisition_table::*;
+pub use quality_alert_table::*;
+pub use quality_alert_reason_table::*;
+pub use quality_check_table::*;
+pub use quality_point_table::*;
+pub use quality_team_table::*;
+pub use queue_job_table::*;
+pub use queue_worker_table::*;
+pub use record_custom_field_value_table::*;
+pub use replenishment_rule_table::*;
+pub use report_template_table::*;
+pub use res_partner_bank_table::*;
+pub use return_order_table::*;
+pub use return_order_line_table::*;
+pub use revenue_recognition_rule_table::*;
+pub use role_table::*;
+pub use sale_order_table::*;
+pub use sale_order_line_table::*;
+pub use sale_order_option_table::*;
+pub use saved_report_table::*;
+pub use scheduled_report_table::*;
+pub use scheduled_report_run_table::*;
+pub use schema_migration_table::*;
+pub use search_embedding_table::*;
+pub use segment_member_table::*;
+pub use serial_lot_traceability_table::*;
+pub use shipping_method_table::*;
+pub use sod_conflict_rule_table::*;
+pub use stock_count_sheet_table::*;
+pub use stock_cycle_count_table::*;
+pub use stock_inventory_table::*;
+pub use stock_inventory_line_table::*;
+pub use stock_landed_cost_table::*;
+pub use stock_landed_cost_lines_table::*;
+pub use stock_location_table::*;
+pub use stock_move_table::*;
+pub use stock_move_line_table::*;
+pub use stock_picking_table::*;
+pub use stock_picking_batch_table::*;
+pub use stock_production_lot_table::*;
+pub use stock_production_serial_table::*;
+pub use stock_quant_table::*;
+pub use stock_reorder_group_table::*;
+pub use stock_route_table::*;
+pub use stock_rule_table::*;
+pub use stock_traceability_report_table::*;
+pub use subscription_table::*;
+pub use subscription_line_table::*;
+pub use subscription_plan_table::*;
+pub use supplier_intake_request_table::*;
+pub use tax_deadline_table::*;
+pub use tax_deadline_reminder_table::*;
+pub use tax_jurisdiction_table::*;
+pub use tax_schedule_table::*;
+pub use trial_balance_table::*;
+pub use uom_table::*;
+pub use uom_cat_table::*;
+pub use uom_conversion_table::*;
+pub use user_custom_field_table::*;
+pub use user_organization_table::*;
+pub use user_profile_table::*;
+pub use user_role_assignment_table::*;
+pub use user_session_table::*;
+pub use utm_campaign_table::*;
+pub use utm_medium_table::*;
+pub use utm_source_table::*;
+pub use warehouse_table::*;
+pub use warehouse_3_d_zone_table::*;
+pub use warehouse_geo_table::*;
+pub use warehouse_task_table::*;
+pub use whatsapp_business_account_table::*;
+pub use workflow_table::*;
+pub use workflow_activity_table::*;
+pub use workflow_instance_table::*;
+pub use workflow_transition_table::*;
+pub use workflow_workitem_table::*;
 pub use acknowledge_insight_reducer::acknowledge_insight;
 pub use acknowledge_iot_action_reducer::acknowledge_iot_action;
 pub use activate_pos_config_reducer::activate_pos_config;
 pub use activate_revenue_recognition_rule_reducer::activate_revenue_recognition_rule;
 pub use activate_subscription_reducer::activate_subscription;
-pub use activity_table::*;
-pub use activity_type::Activity;
-pub use activity_type_table::*;
-pub use activity_type_type::ActivityType;
-pub use add_account_move_line_params_type::AddAccountMoveLineParams;
 pub use add_account_move_line_reducer::add_account_move_line;
 pub use add_article_member_reducer::add_article_member;
-pub use add_casbin_rule_params_type::AddCasbinRuleParams;
 pub use add_casbin_rule_reducer::add_casbin_rule;
 pub use add_contact_to_segment_reducer::add_contact_to_segment;
-pub use add_document_version_params_type::AddDocumentVersionParams;
 pub use add_document_version_reducer::add_document_version;
 pub use add_form_field_reducer::add_form_field;
-pub use add_landed_cost_line_params_type::AddLandedCostLineParams;
 pub use add_landed_cost_line_reducer::add_landed_cost_line;
 pub use add_member_to_quality_team_reducer::add_member_to_quality_team;
-pub use add_org_member_params_type::AddOrgMemberParams;
 pub use add_org_member_reducer::add_org_member;
 pub use add_proposal_comment_reducer::add_proposal_comment;
 pub use add_proposal_line_item_reducer::add_proposal_line_item;
 pub use add_proposal_source_doc_reducer::add_proposal_source_doc;
-pub use add_purchase_order_line_params_type::AddPurchaseOrderLineParams;
 pub use add_purchase_order_line_reducer::add_purchase_order_line;
 pub use add_rule_to_nomenclature_reducer::add_rule_to_nomenclature;
 pub use add_user_custom_field_reducer::add_user_custom_field;
-pub use add_user_to_organization_params_type::AddUserToOrganizationParams;
 pub use add_user_to_organization_reducer::add_user_to_organization;
 pub use add_widget_to_dashboard_reducer::add_widget_to_dashboard;
-pub use add_workflow_activity_params_type::AddWorkflowActivityParams;
 pub use add_workflow_activity_reducer::add_workflow_activity;
-pub use add_workflow_transition_params_type::AddWorkflowTransitionParams;
 pub use add_workflow_transition_reducer::add_workflow_transition;
-pub use adjustment_reason_table::*;
-pub use adjustment_reason_type::AdjustmentReason;
-pub use ai_action_draft_table::*;
-pub use ai_action_draft_type::AiActionDraft;
-pub use ai_agent_run_policy_snapshot_table::*;
-pub use ai_agent_run_policy_snapshot_type::AiAgentRunPolicySnapshot;
-pub use ai_agent_run_step_table::*;
-pub use ai_agent_run_step_type::AiAgentRunStep;
-pub use ai_agent_run_table::*;
-pub use ai_agent_run_type::AiAgentRun;
-pub use ai_agent_table::*;
-pub use ai_agent_type::AiAgent;
-pub use ai_chat_message_table::*;
-pub use ai_chat_message_type::AiChatMessage;
-pub use ai_chat_session_table::*;
-pub use ai_chat_session_type::AiChatSession;
-pub use ai_document_processing_job_table::*;
-pub use ai_document_processing_job_type::AiDocumentProcessingJob;
-pub use ai_insight_table::*;
-pub use ai_insight_type::AiInsight;
-pub use ai_reducer_allowlist_table::*;
-pub use ai_reducer_allowlist_type::AiReducerAllowlist;
-pub use ai_skill_config_table::*;
-pub use ai_skill_config_type::AiSkillConfig;
-pub use ai_skill_fixture_table::*;
-pub use ai_skill_fixture_type::AiSkillFixture;
-pub use ai_skill_release_table::*;
-pub use ai_skill_release_type::AiSkillRelease;
-pub use ai_skill_risk_type::AiSkillRisk;
-pub use ai_skill_table::*;
-pub use ai_skill_test_run_status_type::AiSkillTestRunStatus;
-pub use ai_skill_test_run_table::*;
-pub use ai_skill_test_run_type::AiSkillTestRun;
-pub use ai_skill_type::AiSkill;
-pub use ai_skill_version_table::*;
-pub use ai_skill_version_type::AiSkillVersion;
-pub use ai_team_member_skill_table::*;
-pub use ai_team_member_skill_type::AiTeamMemberSkill;
-pub use ai_team_member_table::*;
-pub use ai_team_member_type::AiTeamMember;
-pub use allocate_payment_params_type::AllocatePaymentParams;
 pub use allocate_payment_transaction_reducer::allocate_payment_transaction;
-pub use analytics_metric_table::*;
-pub use analytics_metric_type::AnalyticsMetric;
-pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
 pub use append_ai_agent_run_step_reducer::append_ai_agent_run_step;
-pub use append_ai_chat_message_params_type::AppendAiChatMessageParams;
 pub use append_ai_chat_message_reducer::append_ai_chat_message;
+pub use apply_global_migrations_reducer::apply_global_migrations;
 pub use apply_landed_costs_reducer::apply_landed_costs;
+pub use apply_org_migrations_reducer::apply_org_migrations;
 pub use apply_reconciliation_rules_reducer::apply_reconciliation_rules;
-pub use approval_request_table::*;
-pub use approval_request_type::ApprovalRequest;
-pub use approval_rule_table::*;
-pub use approval_rule_type::ApprovalRule;
 pub use approve_ai_action_draft_reducer::approve_ai_action_draft;
 pub use approve_approval_request_reducer::approve_approval_request;
 pub use approve_bank_statement_import_reducer::approve_bank_statement_import;
@@ -1973,68 +2935,26 @@ pub use archive_contact_identity_reducer::archive_contact_identity;
 pub use archive_employee_reducer::archive_employee;
 pub use archive_financial_report_reducer::archive_financial_report;
 pub use archive_payment_account_reducer::archive_payment_account;
-pub use asset_state_type::AssetState;
-pub use asset_type_type::AssetType;
-pub use assign_contact_role_params_type::AssignContactRoleParams;
 pub use assign_contact_role_reducer::assign_contact_role;
 pub use assign_quality_alert_reducer::assign_quality_alert;
-pub use assign_role_params_type::AssignRoleParams;
 pub use assign_role_reducer::assign_role;
 pub use assign_stock_move_reducer::assign_stock_move;
 pub use assign_stock_picking_reducer::assign_stock_picking;
 pub use assign_tag_to_contact_reducer::assign_tag_to_contact;
 pub use assign_task_users_reducer::assign_task_users;
-pub use assign_team_member_skill_params_type::AssignTeamMemberSkillParams;
 pub use assign_team_member_skill_reducer::assign_team_member_skill;
 pub use assign_ticket_reducer::assign_ticket;
-pub use assign_user_to_picking_params_type::AssignUserToPickingParams;
 pub use assign_user_to_picking_reducer::assign_user_to_picking;
-pub use assignment_rule_table::*;
-pub use assignment_rule_type::AssignmentRule;
-pub use audit_log_table::*;
-pub use audit_log_type::AuditLog;
-pub use audit_rule_table::*;
-pub use audit_rule_type::AuditRule;
 pub use backfill_external_ids_reducer::backfill_external_ids;
-pub use balance_sheet_line_table::*;
-pub use balance_sheet_line_type::BalanceSheetLine;
-pub use bank_match_candidate_table::*;
-pub use bank_match_candidate_type::BankMatchCandidate;
-pub use bank_statement_import_line_table::*;
-pub use bank_statement_import_line_type::BankStatementImportLine;
-pub use bank_statement_import_table::*;
-pub use bank_statement_import_type::BankStatementImport;
-pub use bank_statement_state_type::BankStatementState;
-pub use barcode_nomenclature_table::*;
-pub use barcode_nomenclature_type::BarcodeNomenclature;
-pub use barcode_rule_table::*;
-pub use barcode_rule_type::BarcodeRule;
-pub use barcode_scan_table::*;
-pub use barcode_scan_type::BarcodeScan;
-pub use batch_state_type::BatchState;
-pub use bill_timesheets_params_type::BillTimesheetsParams;
 pub use bill_timesheets_reducer::bill_timesheets;
-pub use billing_account_table::*;
-pub use billing_account_type::BillingAccount;
 pub use block_serial_reducer::block_serial;
 pub use block_workcenter_reducer::block_workcenter;
-pub use bom_explosion_result_table::*;
-pub use bom_explosion_result_type::BomExplosionResult;
-pub use bom_line_input_type::BomLineInput;
-pub use bom_type_type::BomType;
-pub use bootstrap_new_tenant_params_type::BootstrapNewTenantParams;
 pub use bootstrap_new_tenant_reducer::bootstrap_new_tenant;
-pub use budget_post_table::*;
-pub use budget_post_type::BudgetPost;
-pub use budget_state_type::BudgetState;
-pub use calendar_event_table::*;
-pub use calendar_event_type::CalendarEvent;
 pub use cancel_account_move_reducer::cancel_account_move;
 pub use cancel_ai_agent_run_reducer::cancel_ai_agent_run;
 pub use cancel_budget_reducer::cancel_budget;
 pub use cancel_consolidation_reducer::cancel_consolidation;
 pub use cancel_contract_reducer::cancel_contract;
-pub use cancel_intercompany_transaction_params_type::CancelIntercompanyTransactionParams;
 pub use cancel_intercompany_transaction_reducer::cancel_intercompany_transaction;
 pub use cancel_landed_cost_reducer::cancel_landed_cost;
 pub use cancel_manufacturing_order_reducer::cancel_manufacturing_order;
@@ -2050,13 +2970,6 @@ pub use cancel_sale_order_reducer::cancel_sale_order;
 pub use cancel_stock_move_reducer::cancel_stock_move;
 pub use cancel_stock_picking_reducer::cancel_stock_picking;
 pub use cancel_workflow_instance_reducer::cancel_workflow_instance;
-pub use card_state_type::CardState;
-pub use cartonization_result_table::*;
-pub use cartonization_result_type::CartonizationResult;
-pub use casbin_rule_table::*;
-pub use casbin_rule_type::CasbinRule;
-pub use cash_flow_line_table::*;
-pub use cash_flow_line_type::CashFlowLine;
 pub use check_mo_availability_reducer::check_mo_availability;
 pub use claim_hub_with_token_reducer::claim_hub_with_token;
 pub use claim_queue_job_reducer::claim_queue_job;
@@ -2066,18 +2979,10 @@ pub use close_account_period_reducer::close_account_period;
 pub use close_fiscal_year_reducer::close_fiscal_year;
 pub use close_pos_session_reducer::close_pos_session;
 pub use close_purchase_requisition_reducer::close_purchase_requisition;
-pub use close_subscription_params_type::CloseSubscriptionParams;
 pub use close_subscription_reducer::close_subscription;
 pub use close_ticket_reducer::close_ticket;
-pub use company_scope_params_type::CompanyScopeParams;
-pub use company_table::*;
-pub use company_type::Company;
-pub use company_vertical_pack_table::*;
-pub use company_vertical_pack_type::CompanyVerticalPack;
 pub use complete_activity_reducer::complete_activity;
-pub use complete_ai_agent_run_params_type::CompleteAiAgentRunParams;
 pub use complete_ai_agent_run_reducer::complete_ai_agent_run;
-pub use complete_document_processing_job_params_type::CompleteDocumentProcessingJobParams;
 pub use complete_document_processing_job_reducer::complete_document_processing_job;
 pub use complete_intercompany_transaction_reducer::complete_intercompany_transaction;
 pub use complete_picking_batch_reducer::complete_picking_batch;
@@ -2091,448 +2996,208 @@ pub use compute_depreciation_board_reducer::compute_depreciation_board;
 pub use compute_invoice_totals_reducer::compute_invoice_totals;
 pub use compute_landed_costs_reducer::compute_landed_costs;
 pub use compute_pos_session_totals_reducer::compute_pos_session_totals;
-pub use compute_price_type::ComputePrice;
 pub use compute_purchase_order_line_totals_reducer::compute_purchase_order_line_totals;
 pub use compute_purchase_order_totals_reducer::compute_purchase_order_totals;
 pub use compute_so_totals_reducer::compute_so_totals;
 pub use confirm_account_asset_reducer::confirm_account_asset;
 pub use confirm_budget_reducer::confirm_budget;
 pub use confirm_manufacturing_order_reducer::confirm_manufacturing_order;
-pub use confirm_payslip_params_type::ConfirmPayslipParams;
 pub use confirm_payslip_reducer::confirm_payslip;
 pub use confirm_purchase_order_reducer::confirm_purchase_order;
 pub use confirm_return_order_reducer::confirm_return_order;
 pub use confirm_sales_order_reducer::confirm_sales_order;
 pub use confirm_stock_move_reducer::confirm_stock_move;
 pub use confirm_stock_picking_reducer::confirm_stock_picking;
-pub use consolidation_account_table::*;
-pub use consolidation_account_type::ConsolidationAccount;
-pub use consolidation_company_rate_table::*;
-pub use consolidation_company_rate_type::ConsolidationCompanyRate;
-pub use consolidation_elimination_entry_table::*;
-pub use consolidation_elimination_entry_type::ConsolidationEliminationEntry;
-pub use consolidation_journal_table::*;
-pub use consolidation_journal_type::ConsolidationJournal;
-pub use consolidation_state_type::ConsolidationState;
 pub use consume_mo_materials_reducer::consume_mo_materials;
-pub use contact_category_assignment_table::*;
-pub use contact_category_assignment_type::ContactCategoryAssignment;
-pub use contact_category_table::*;
-pub use contact_category_type::ContactCategory;
-pub use contact_communication_preference_table::*;
-pub use contact_communication_preference_type::ContactCommunicationPreference;
-pub use contact_duplicate_candidate_table::*;
-pub use contact_duplicate_candidate_type::ContactDuplicateCandidate;
-pub use contact_identity_kind_type::ContactIdentityKind;
-pub use contact_phone_identity_table::*;
-pub use contact_phone_identity_type::ContactPhoneIdentity;
-pub use contact_relationship_table::*;
-pub use contact_relationship_type::ContactRelationship;
-pub use contact_role_assignment_table::*;
-pub use contact_role_assignment_type::ContactRoleAssignment;
-pub use contact_segment_table::*;
-pub use contact_segment_type::ContactSegment;
-pub use contact_table::*;
-pub use contact_tag_assignment_table::*;
-pub use contact_tag_assignment_type::ContactTagAssignment;
-pub use contact_tag_table::*;
-pub use contact_tag_type::ContactTag;
-pub use contact_type::Contact;
-pub use contact_verification_state_type::ContactVerificationState;
-pub use contract_state_type::ContractState;
-pub use convert_lead_params_type::ConvertLeadParams;
 pub use convert_lead_to_customer_reducer::convert_lead_to_customer;
-pub use convert_opportunity_params_type::ConvertOpportunityParams;
 pub use convert_opportunity_to_sale_order_reducer::convert_opportunity_to_sale_order;
-pub use country_table::*;
-pub use country_type::Country;
-pub use create_account_account_params_type::CreateAccountAccountParams;
 pub use create_account_account_reducer::create_account_account;
-pub use create_account_account_type_params_type::CreateAccountAccountTypeParams;
 pub use create_account_account_type_reducer::create_account_account_type;
-pub use create_account_asset_params_type::CreateAccountAssetParams;
 pub use create_account_asset_reducer::create_account_asset;
-pub use create_account_bank_statement_line_params_type::CreateAccountBankStatementLineParams;
-pub use create_account_bank_statement_line_reducer::create_account_bank_statement_line;
-pub use create_account_bank_statement_params_type::CreateAccountBankStatementParams;
 pub use create_account_bank_statement_reducer::create_account_bank_statement;
-pub use create_account_group_params_type::CreateAccountGroupParams;
+pub use create_account_bank_statement_line_reducer::create_account_bank_statement_line;
 pub use create_account_group_reducer::create_account_group;
-pub use create_account_journal_params_type::CreateAccountJournalParams;
 pub use create_account_journal_reducer::create_account_journal;
-pub use create_account_move_params_type::CreateAccountMoveParams;
 pub use create_account_move_reducer::create_account_move;
-pub use create_account_period_params_type::CreateAccountPeriodParams;
 pub use create_account_period_reducer::create_account_period;
-pub use create_account_reconciliation_widget_params_type::CreateAccountReconciliationWidgetParams;
 pub use create_account_reconciliation_widget_reducer::create_account_reconciliation_widget;
-pub use create_account_tax_group_params_type::CreateAccountTaxGroupParams;
-pub use create_account_tax_group_reducer::create_account_tax_group;
-pub use create_account_tax_params_type::CreateAccountTaxParams;
 pub use create_account_tax_reducer::create_account_tax;
-pub use create_action_params_type::CreateActionParams;
-pub use create_activity_params_type::CreateActivityParams;
+pub use create_account_tax_group_reducer::create_account_tax_group;
 pub use create_activity_reducer::create_activity;
-pub use create_adjustment_reason_params_type::CreateAdjustmentReasonParams;
 pub use create_adjustment_reason_reducer::create_adjustment_reason;
-pub use create_ai_action_draft_params_type::CreateAiActionDraftParams;
 pub use create_ai_action_draft_reducer::create_ai_action_draft;
-pub use create_ai_agent_params_type::CreateAiAgentParams;
 pub use create_ai_agent_reducer::create_ai_agent;
-pub use create_ai_agent_run_params_type::CreateAiAgentRunParams;
 pub use create_ai_agent_run_reducer::create_ai_agent_run;
-pub use create_ai_chat_session_params_type::CreateAiChatSessionParams;
 pub use create_ai_chat_session_reducer::create_ai_chat_session;
-pub use create_ai_insight_params_type::CreateAiInsightParams;
 pub use create_ai_insight_reducer::create_ai_insight;
-pub use create_ai_reducer_allowlist_params_type::CreateAiReducerAllowlistParams;
 pub use create_ai_reducer_allowlist_reducer::create_ai_reducer_allowlist;
-pub use create_ai_skill_fixture_params_type::CreateAiSkillFixtureParams;
-pub use create_ai_skill_fixture_reducer::create_ai_skill_fixture;
-pub use create_ai_skill_params_type::CreateAiSkillParams;
 pub use create_ai_skill_reducer::create_ai_skill;
-pub use create_ai_skill_version_params_type::CreateAiSkillVersionParams;
+pub use create_ai_skill_fixture_reducer::create_ai_skill_fixture;
 pub use create_ai_skill_version_reducer::create_ai_skill_version;
-pub use create_ai_team_member_params_type::CreateAiTeamMemberParams;
 pub use create_ai_team_member_reducer::create_ai_team_member;
-pub use create_analytic_account_params_type::CreateAnalyticAccountParams;
 pub use create_analytic_account_reducer::create_analytic_account;
-pub use create_analytic_distribution_model_params_type::CreateAnalyticDistributionModelParams;
 pub use create_analytic_distribution_model_reducer::create_analytic_distribution_model;
-pub use create_analytic_line_params_type::CreateAnalyticLineParams;
 pub use create_analytic_line_reducer::create_analytic_line;
-pub use create_analytics_metric_params_type::CreateAnalyticsMetricParams;
 pub use create_analytics_metric_reducer::create_analytics_metric;
-pub use create_approval_rule_params_type::CreateApprovalRuleParams;
 pub use create_approval_rule_reducer::create_approval_rule;
-pub use create_audit_rule_params_type::CreateAuditRuleParams;
 pub use create_audit_rule_reducer::create_audit_rule;
-pub use create_barcode_nomenclature_params_type::CreateBarcodeNomenclatureParams;
 pub use create_barcode_nomenclature_reducer::create_barcode_nomenclature;
-pub use create_barcode_rule_params_type::CreateBarcodeRuleParams;
 pub use create_barcode_rule_reducer::create_barcode_rule;
-pub use create_bill_from_purchase_order_params_type::CreateBillFromPurchaseOrderParams;
 pub use create_bill_from_purchase_order_reducer::create_bill_from_purchase_order;
-pub use create_billing_account_params_type::CreateBillingAccountParams;
 pub use create_billing_account_reducer::create_billing_account;
-pub use create_bom_params_type::CreateBomParams;
 pub use create_bom_reducer::create_bom;
 pub use create_budget_line_reducer::create_budget_line;
-pub use create_budget_post_params_type::CreateBudgetPostParams;
 pub use create_budget_post_reducer::create_budget_post;
-pub use create_calendar_event_params_type::CreateCalendarEventParams;
 pub use create_calendar_event_reducer::create_calendar_event;
-pub use create_company_params_type::CreateCompanyParams;
 pub use create_company_reducer::create_company;
-pub use create_consolidation_account_params_type::CreateConsolidationAccountParams;
 pub use create_consolidation_account_reducer::create_consolidation_account;
-pub use create_consolidation_journal_params_type::CreateConsolidationJournalParams;
 pub use create_consolidation_journal_reducer::create_consolidation_journal;
-pub use create_contact_identity_params_type::CreateContactIdentityParams;
-pub use create_contact_identity_reducer::create_contact_identity;
-pub use create_contact_params_type::CreateContactParams;
 pub use create_contact_reducer::create_contact;
-pub use create_contact_segment_params_type::CreateContactSegmentParams;
+pub use create_contact_identity_reducer::create_contact_identity;
 pub use create_contact_segment_reducer::create_contact_segment;
-pub use create_contact_tag_params_type::CreateContactTagParams;
 pub use create_contact_tag_reducer::create_contact_tag;
-pub use create_contract_params_type::CreateContractParams;
 pub use create_contract_reducer::create_contract;
-pub use create_country_params_type::CreateCountryParams;
 pub use create_country_reducer::create_country;
 pub use create_credit_note_from_invoice_reducer::create_credit_note_from_invoice;
-pub use create_credit_note_from_return_order_params_type::CreateCreditNoteFromReturnOrderParams;
 pub use create_credit_note_from_return_order_reducer::create_credit_note_from_return_order;
-pub use create_credit_note_params_type::CreateCreditNoteParams;
-pub use create_crossovered_budget_line_params_type::CreateCrossoveredBudgetLineParams;
-pub use create_crossovered_budget_params_type::CreateCrossoveredBudgetParams;
 pub use create_crossovered_budget_reducer::create_crossovered_budget;
-pub use create_currency_params_type::CreateCurrencyParams;
-pub use create_currency_rate_params_type::CreateCurrencyRateParams;
-pub use create_currency_rate_reducer::create_currency_rate;
 pub use create_currency_reducer::create_currency;
-pub use create_cycle_count_plan_params_type::CreateCycleCountPlanParams;
+pub use create_currency_rate_reducer::create_currency_rate;
 pub use create_cycle_count_plan_reducer::create_cycle_count_plan;
-pub use create_dashboard_params_type::CreateDashboardParams;
 pub use create_dashboard_reducer::create_dashboard;
-pub use create_dashboard_widget_params_type::CreateDashboardWidgetParams;
 pub use create_dashboard_widget_reducer::create_dashboard_widget;
-pub use create_data_classification_params_type::CreateDataClassificationParams;
 pub use create_data_classification_reducer::create_data_classification;
-pub use create_data_classification_rule_params_type::CreateDataClassificationRuleParams;
 pub use create_data_classification_rule_reducer::create_data_classification_rule;
-pub use create_deferred_revenue_schedule_params_type::CreateDeferredRevenueScheduleParams;
 pub use create_deferred_revenue_schedule_reducer::create_deferred_revenue_schedule;
-pub use create_delivery_carrier_params_type::CreateDeliveryCarrierParams;
 pub use create_delivery_carrier_reducer::create_delivery_carrier;
-pub use create_delivery_price_rule_params_type::CreateDeliveryPriceRuleParams;
 pub use create_delivery_price_rule_reducer::create_delivery_price_rule;
-pub use create_department_params_type::CreateDepartmentParams;
 pub use create_department_reducer::create_department;
-pub use create_depreciation_line_params_type::CreateDepreciationLineParams;
 pub use create_depreciation_line_reducer::create_depreciation_line;
-pub use create_document_folder_params_type::CreateDocumentFolderParams;
-pub use create_document_folder_reducer::create_document_folder;
-pub use create_document_params_type::CreateDocumentParams;
-pub use create_document_processing_job_params_type::CreateDocumentProcessingJobParams;
-pub use create_document_processing_job_reducer::create_document_processing_job;
 pub use create_document_reducer::create_document;
-pub use create_document_template_params_type::CreateDocumentTemplateParams;
+pub use create_document_folder_reducer::create_document_folder;
+pub use create_document_processing_job_reducer::create_document_processing_job;
 pub use create_document_template_reducer::create_document_template;
-pub use create_elimination_entry_params_type::CreateEliminationEntryParams;
 pub use create_elimination_entry_reducer::create_elimination_entry;
-pub use create_employee_params_type::CreateEmployeeParams;
 pub use create_employee_reducer::create_employee;
-pub use create_expense_params_type::CreateExpenseParams;
 pub use create_expense_reducer::create_expense;
-pub use create_expense_sheet_params_type::CreateExpenseSheetParams;
 pub use create_expense_sheet_reducer::create_expense_sheet;
-pub use create_financial_report_params_type::CreateFinancialReportParams;
 pub use create_financial_report_reducer::create_financial_report;
-pub use create_fiscal_year_params_type::CreateFiscalYearParams;
 pub use create_fiscal_year_reducer::create_fiscal_year;
 pub use create_fleet_vehicle_reducer::create_fleet_vehicle;
-pub use create_form_config_params_type::CreateFormConfigParams;
 pub use create_form_configuration_reducer::create_form_configuration;
-pub use create_form_field_params_type::CreateFormFieldParams;
 pub use create_google_drive_connection_reducer::create_google_drive_connection;
-pub use create_helpdesk_sla_params_type::CreateHelpdeskSlaParams;
 pub use create_helpdesk_sla_reducer::create_helpdesk_sla;
-pub use create_helpdesk_stage_params_type::CreateHelpdeskStageParams;
 pub use create_helpdesk_stage_reducer::create_helpdesk_stage;
-pub use create_helpdesk_team_params_type::CreateHelpdeskTeamParams;
 pub use create_helpdesk_team_reducer::create_helpdesk_team;
-pub use create_intercompany_rule_params_type::CreateIntercompanyRuleParams;
 pub use create_intercompany_rule_reducer::create_intercompany_rule;
-pub use create_intercompany_transaction_params_type::CreateIntercompanyTransactionParams;
 pub use create_intercompany_transaction_reducer::create_intercompany_transaction;
-pub use create_inventory_adjustment_params_type::CreateInventoryAdjustmentParams;
 pub use create_inventory_adjustment_reducer::create_inventory_adjustment;
-pub use create_invoice_from_sale_order_params_type::CreateInvoiceFromSaleOrderParams;
 pub use create_invoice_from_sale_order_reducer::create_invoice_from_sale_order;
-pub use create_invoice_reminder_batch_params_type::CreateInvoiceReminderBatchParams;
 pub use create_invoice_reminder_batch_reducer::create_invoice_reminder_batch;
 pub use create_iot_action_reducer::create_iot_action;
 pub use create_iot_alert_reducer::create_iot_alert;
-pub use create_job_position_params_type::CreateJobPositionParams;
 pub use create_job_position_reducer::create_job_position;
-pub use create_knowledge_article_params_type::CreateKnowledgeArticleParams;
 pub use create_knowledge_article_reducer::create_knowledge_article;
-pub use create_knowledge_category_params_type::CreateKnowledgeCategoryParams;
 pub use create_knowledge_category_reducer::create_knowledge_category;
-pub use create_landed_cost_params_type::CreateLandedCostParams;
 pub use create_landed_cost_reducer::create_landed_cost;
-pub use create_lead_params_type::CreateLeadParams;
 pub use create_lead_reducer::create_lead;
-pub use create_leave_request_params_type::CreateLeaveRequestParams;
 pub use create_leave_request_reducer::create_leave_request;
-pub use create_leave_type_params_type::CreateLeaveTypeParams;
 pub use create_leave_type_reducer::create_leave_type;
 pub use create_loyalty_card_reducer::create_loyalty_card;
-pub use create_loyalty_program_params_type::CreateLoyaltyProgramParams;
 pub use create_loyalty_program_reducer::create_loyalty_program;
-pub use create_mail_template_params_type::CreateMailTemplateParams;
 pub use create_mail_template_reducer::create_mail_template;
 pub use create_manufacturing_order_reducer::create_manufacturing_order;
-pub use create_message_batch_params_type::CreateMessageBatchParams;
 pub use create_message_batch_reducer::create_message_batch;
-pub use create_message_template_params_type::CreateMessageTemplateParams;
 pub use create_message_template_reducer::create_message_template;
-pub use create_mrp_production_params_type::CreateMrpProductionParams;
-pub use create_operational_message_params_type::CreateOperationalMessageParams;
 pub use create_operational_message_reducer::create_operational_message;
-pub use create_opportunity_line_params_type::CreateOpportunityLineParams;
-pub use create_opportunity_line_reducer::create_opportunity_line;
-pub use create_opportunity_params_type::CreateOpportunityParams;
 pub use create_opportunity_reducer::create_opportunity;
-pub use create_organization_params_type::CreateOrganizationParams;
+pub use create_opportunity_line_reducer::create_opportunity_line;
 pub use create_organization_reducer::create_organization;
-pub use create_partner_bank_params_type::CreatePartnerBankParams;
 pub use create_partner_bank_reducer::create_partner_bank;
 pub use create_password_reset_token_reducer::create_password_reset_token;
-pub use create_payment_account_params_type::CreatePaymentAccountParams;
-pub use create_payment_account_reducer::create_payment_account;
-pub use create_payment_fee_params_type::CreatePaymentFeeParams;
-pub use create_payment_fee_reducer::create_payment_fee;
-pub use create_payment_method_params_type::CreatePaymentMethodParams;
-pub use create_payment_method_reducer::create_payment_method;
-pub use create_payment_params_type::CreatePaymentParams;
 pub use create_payment_reducer::create_payment;
-pub use create_payment_term_line_params_type::CreatePaymentTermLineParams;
-pub use create_payment_term_line_reducer::create_payment_term_line;
-pub use create_payment_term_params_type::CreatePaymentTermParams;
+pub use create_payment_account_reducer::create_payment_account;
+pub use create_payment_fee_reducer::create_payment_fee;
+pub use create_payment_method_reducer::create_payment_method;
 pub use create_payment_term_reducer::create_payment_term;
-pub use create_payment_transaction_params_type::CreatePaymentTransactionParams;
+pub use create_payment_term_line_reducer::create_payment_term_line;
 pub use create_payment_transaction_reducer::create_payment_transaction;
-pub use create_payroll_structure_params_type::CreatePayrollStructureParams;
 pub use create_payroll_structure_reducer::create_payroll_structure;
-pub use create_payslip_params_type::CreatePayslipParams;
 pub use create_payslip_reducer::create_payslip;
-pub use create_picking_batch_params_type::CreatePickingBatchParams;
 pub use create_picking_batch_reducer::create_picking_batch;
-pub use create_picking_wave_params_type::CreatePickingWaveParams;
 pub use create_picking_wave_reducer::create_picking_wave;
-pub use create_pos_config_params_type::CreatePosConfigParams;
 pub use create_pos_config_reducer::create_pos_config;
-pub use create_pos_order_line_params_type::CreatePosOrderLineParams;
-pub use create_pos_order_params_type::CreatePosOrderParams;
 pub use create_pos_order_reducer::create_pos_order;
-pub use create_pos_payment_params_type::CreatePosPaymentParams;
 pub use create_pos_terminal_reducer::create_pos_terminal;
-pub use create_pricelist_item_params_type::CreatePricelistItemParams;
-pub use create_pricelist_item_reducer::create_pricelist_item;
-pub use create_pricelist_params_type::CreatePricelistParams;
 pub use create_pricelist_reducer::create_pricelist;
-pub use create_product_category_params_type::CreateProductCategoryParams;
-pub use create_product_category_reducer::create_product_category;
-pub use create_product_packaging_params_type::CreateProductPackagingParams;
-pub use create_product_packaging_reducer::create_product_packaging;
-pub use create_product_params_type::CreateProductParams;
+pub use create_pricelist_item_reducer::create_pricelist_item;
 pub use create_product_reducer::create_product;
-pub use create_product_supplier_info_params_type::CreateProductSupplierInfoParams;
+pub use create_product_category_reducer::create_product_category;
+pub use create_product_packaging_reducer::create_product_packaging;
 pub use create_product_supplier_info_reducer::create_product_supplier_info;
-pub use create_product_variant_params_type::CreateProductVariantParams;
 pub use create_product_variant_reducer::create_product_variant;
-pub use create_project_params_type::CreateProjectParams;
 pub use create_project_reducer::create_project;
 pub use create_proposal_reducer::create_proposal;
-pub use create_purchase_order_params_type::CreatePurchaseOrderParams;
 pub use create_purchase_order_reducer::create_purchase_order;
-pub use create_purchase_requisition_params_type::CreatePurchaseRequisitionParams;
 pub use create_purchase_requisition_reducer::create_purchase_requisition;
-pub use create_quality_alert_params_type::CreateQualityAlertParams;
-pub use create_quality_alert_reason_params_type::CreateQualityAlertReasonParams;
-pub use create_quality_alert_reason_reducer::create_quality_alert_reason;
 pub use create_quality_alert_reducer::create_quality_alert;
-pub use create_quality_check_params_type::CreateQualityCheckParams;
+pub use create_quality_alert_reason_reducer::create_quality_alert_reason;
 pub use create_quality_check_reducer::create_quality_check;
-pub use create_quality_point_params_type::CreateQualityPointParams;
 pub use create_quality_point_reducer::create_quality_point;
-pub use create_quality_team_params_type::CreateQualityTeamParams;
 pub use create_quality_team_reducer::create_quality_team;
-pub use create_replenishment_rule_params_type::CreateReplenishmentRuleParams;
 pub use create_replenishment_rule_reducer::create_replenishment_rule;
-pub use create_report_template_params_type::CreateReportTemplateParams;
 pub use create_report_template_reducer::create_report_template;
-pub use create_return_order_line_params_type::CreateReturnOrderLineParams;
-pub use create_return_order_params_type::CreateReturnOrderParams;
 pub use create_return_order_reducer::create_return_order;
-pub use create_revenue_recognition_rule_params_type::CreateRevenueRecognitionRuleParams;
 pub use create_revenue_recognition_rule_reducer::create_revenue_recognition_rule;
-pub use create_role_config_params_type::CreateRoleConfigParams;
-pub use create_role_params_type::CreateRoleParams;
 pub use create_role_reducer::create_role;
-pub use create_routing_workcenter_params_type::CreateRoutingWorkcenterParams;
 pub use create_routing_workcenter_reducer::create_routing_workcenter;
-pub use create_salary_rule_params_type::CreateSalaryRuleParams;
 pub use create_salary_rule_reducer::create_salary_rule;
-pub use create_sale_order_line_params_type::CreateSaleOrderLineParams;
-pub use create_sale_order_line_reducer::create_sale_order_line;
-pub use create_sale_order_params_type::CreateSaleOrderParams;
 pub use create_sale_order_reducer::create_sale_order;
-pub use create_saved_report_params_type::CreateSavedReportParams;
+pub use create_sale_order_line_reducer::create_sale_order_line;
 pub use create_saved_report_reducer::create_saved_report;
-pub use create_scheduled_report_params_type::CreateScheduledReportParams;
 pub use create_scheduled_report_reducer::create_scheduled_report;
-pub use create_shipping_method_params_type::CreateShippingMethodParams;
 pub use create_shipping_method_reducer::create_shipping_method;
-pub use create_stock_inventory_line_params_type::CreateStockInventoryLineParams;
-pub use create_stock_inventory_line_reducer::create_stock_inventory_line;
-pub use create_stock_inventory_params_type::CreateStockInventoryParams;
+pub use create_sod_conflict_rule_reducer::create_sod_conflict_rule;
 pub use create_stock_inventory_reducer::create_stock_inventory;
-pub use create_stock_location_params_type::CreateStockLocationParams;
+pub use create_stock_inventory_line_reducer::create_stock_inventory_line;
 pub use create_stock_location_reducer::create_stock_location;
-pub use create_stock_move_params_type::CreateStockMoveParams;
 pub use create_stock_move_reducer::create_stock_move;
-pub use create_stock_picking_params_type::CreateStockPickingParams;
 pub use create_stock_picking_reducer::create_stock_picking;
-pub use create_stock_production_lot_params_type::CreateStockProductionLotParams;
 pub use create_stock_production_lot_reducer::create_stock_production_lot;
-pub use create_stock_production_serial_params_type::CreateStockProductionSerialParams;
 pub use create_stock_production_serial_reducer::create_stock_production_serial;
-pub use create_stock_quant_params_type::CreateStockQuantParams;
 pub use create_stock_quant_reducer::create_stock_quant;
-pub use create_stock_route_params_type::CreateStockRouteParams;
 pub use create_stock_route_reducer::create_stock_route;
-pub use create_stock_rule_params_type::CreateStockRuleParams;
 pub use create_stock_rule_reducer::create_stock_rule;
-pub use create_stock_traceability_report_params_type::CreateStockTraceabilityReportParams;
-pub use create_subscription_from_sale_order_params_type::CreateSubscriptionFromSaleOrderParams;
 pub use create_subscription_from_sale_order_reducer::create_subscription_from_sale_order;
-pub use create_subscription_plan_params_type::CreateSubscriptionPlanParams;
 pub use create_subscription_plan_reducer::create_subscription_plan;
-pub use create_task_params_type::CreateTaskParams;
 pub use create_task_reducer::create_task;
-pub use create_tax_deadline_params_type::CreateTaxDeadlineParams;
 pub use create_tax_deadline_reducer::create_tax_deadline;
-pub use create_tax_jurisdiction_params_type::CreateTaxJurisdictionParams;
 pub use create_tax_jurisdiction_reducer::create_tax_jurisdiction;
-pub use create_tax_schedule_params_type::CreateTaxScheduleParams;
 pub use create_tax_schedule_reducer::create_tax_schedule;
-pub use create_ticket_params_type::CreateTicketParams;
 pub use create_ticket_reducer::create_ticket;
-pub use create_traceability_record_params_type::CreateTraceabilityRecordParams;
 pub use create_traceability_record_reducer::create_traceability_record;
 pub use create_traceability_report_reducer::create_traceability_report;
-pub use create_trial_balance_entry_params_type::CreateTrialBalanceEntryParams;
 pub use create_trial_balance_entry_reducer::create_trial_balance_entry;
-pub use create_uom_category_params_type::CreateUomCategoryParams;
-pub use create_uom_category_reducer::create_uom_category;
-pub use create_uom_conversion_params_type::CreateUomConversionParams;
-pub use create_uom_conversion_reducer::create_uom_conversion;
-pub use create_uom_params_type::CreateUomParams;
 pub use create_uom_reducer::create_uom;
-pub use create_user_custom_field_params_type::CreateUserCustomFieldParams;
+pub use create_uom_category_reducer::create_uom_category;
+pub use create_uom_conversion_reducer::create_uom_conversion;
 pub use create_user_invite_reducer::create_user_invite;
-pub use create_user_session_params_type::CreateUserSessionParams;
 pub use create_user_session_reducer::create_user_session;
-pub use create_utm_campaign_params_type::CreateUtmCampaignParams;
 pub use create_utm_campaign_reducer::create_utm_campaign;
-pub use create_utm_medium_params_type::CreateUtmMediumParams;
 pub use create_utm_medium_reducer::create_utm_medium;
-pub use create_utm_source_params_type::CreateUtmSourceParams;
 pub use create_utm_source_reducer::create_utm_source;
-pub use create_warehouse_3_d_zone_params_type::CreateWarehouse3DZoneParams;
-pub use create_warehouse_3_d_zone_reducer::create_warehouse_3_d_zone;
-pub use create_warehouse_params_type::CreateWarehouseParams;
 pub use create_warehouse_reducer::create_warehouse;
-pub use create_warehouse_task_params_type::CreateWarehouseTaskParams;
+pub use create_warehouse_3_d_zone_reducer::create_warehouse_3_d_zone;
 pub use create_warehouse_task_reducer::create_warehouse_task;
-pub use create_whats_app_business_account_params_type::CreateWhatsAppBusinessAccountParams;
 pub use create_whatsapp_business_account_reducer::create_whatsapp_business_account;
-pub use create_workcenter_params_type::CreateWorkcenterParams;
-pub use create_workcenter_productivity_params_type::CreateWorkcenterProductivityParams;
 pub use create_workcenter_reducer::create_workcenter;
-pub use create_workflow_params_type::CreateWorkflowParams;
 pub use create_workflow_reducer::create_workflow;
-pub use create_workorder_params_type::CreateWorkorderParams;
 pub use create_workorder_reducer::create_workorder;
-pub use crossovered_budget_lines_table::*;
-pub use crossovered_budget_lines_type::CrossoveredBudgetLines;
-pub use crossovered_budget_table::*;
-pub use crossovered_budget_type::CrossoveredBudget;
-pub use currency_rate_table::*;
-pub use currency_rate_type::CurrencyRate;
-pub use currency_table::*;
-pub use currency_type::Currency;
-pub use dashboard_table::*;
-pub use dashboard_type::Dashboard;
-pub use dashboard_widget_table::*;
-pub use dashboard_widget_type::DashboardWidget;
-pub use data_classification_rule_table::*;
-pub use data_classification_rule_type::DataClassificationRule;
-pub use data_classification_table::*;
-pub use data_classification_type::DataClassification;
 pub use deactivate_pos_config_reducer::deactivate_pos_config;
 pub use deactivate_revenue_recognition_rule_reducer::deactivate_revenue_recognition_rule;
-pub use deferred_revenue_line_table::*;
-pub use deferred_revenue_line_type::DeferredRevenueLine;
-pub use deferred_revenue_schedule_table::*;
-pub use deferred_revenue_schedule_type::DeferredRevenueSchedule;
 pub use delete_account_asset_reducer::delete_account_asset;
-pub use delete_account_bank_statement_line_reducer::delete_account_bank_statement_line;
 pub use delete_account_bank_statement_reducer::delete_account_bank_statement;
-pub use delete_account_move_line_params_type::DeleteAccountMoveLineParams;
+pub use delete_account_bank_statement_line_reducer::delete_account_bank_statement_line;
 pub use delete_account_move_line_reducer::delete_account_move_line;
 pub use delete_account_period_reducer::delete_account_period;
 pub use delete_account_reconciliation_widget_reducer::delete_account_reconciliation_widget;
@@ -2560,12 +3225,12 @@ pub use delete_knowledge_category_reducer::delete_knowledge_category;
 pub use delete_landed_cost_reducer::delete_landed_cost;
 pub use delete_lead_reducer::delete_lead;
 pub use delete_partner_bank_reducer::delete_partner_bank;
-pub use delete_payment_term_line_reducer::delete_payment_term_line;
 pub use delete_payment_term_reducer::delete_payment_term;
-pub use delete_pricelist_item_reducer::delete_pricelist_item;
+pub use delete_payment_term_line_reducer::delete_payment_term_line;
 pub use delete_pricelist_reducer::delete_pricelist;
-pub use delete_product_category_reducer::delete_product_category;
+pub use delete_pricelist_item_reducer::delete_pricelist_item;
 pub use delete_product_reducer::delete_product;
+pub use delete_product_category_reducer::delete_product_category;
 pub use delete_proposal_line_item_reducer::delete_proposal_line_item;
 pub use delete_proposal_section_reducer::delete_proposal_section;
 pub use delete_proposal_source_doc_reducer::delete_proposal_source_doc;
@@ -2583,125 +3248,43 @@ pub use delete_stock_rule_reducer::delete_stock_rule;
 pub use delete_supplier_intake_reducer::delete_supplier_intake;
 pub use delete_tax_deadline_reducer::delete_tax_deadline;
 pub use delete_user_custom_field_reducer::delete_user_custom_field;
-pub use delete_warehouse_3_d_zone_reducer::delete_warehouse_3_d_zone;
 pub use delete_warehouse_reducer::delete_warehouse;
+pub use delete_warehouse_3_d_zone_reducer::delete_warehouse_3_d_zone;
 pub use delete_whatsapp_business_account_reducer::delete_whatsapp_business_account;
-pub use delivery_carrier_table::*;
-pub use delivery_carrier_type::DeliveryCarrier;
-pub use delivery_price_rule_table::*;
-pub use delivery_price_rule_type::DeliveryPriceRule;
-pub use deprecate_account_account_params_type::DeprecateAccountAccountParams;
 pub use deprecate_account_account_reducer::deprecate_account_account;
-pub use depreciation_method_type::DepreciationMethod;
 pub use dev_promote_caller_superuser_reducer::dev_promote_caller_superuser;
-pub use device_sync_entry_type::DeviceSyncEntry;
-pub use discount_policy_type::DiscountPolicy;
 pub use dismiss_insight_reducer::dismiss_insight;
 pub use dispatch_due_owner_reports_reducer::dispatch_due_owner_reports;
-pub use dispose_account_asset_params_type::DisposeAccountAssetParams;
 pub use dispose_account_asset_reducer::dispose_account_asset;
-pub use doc_folder_table::*;
-pub use document_folder_type::DocumentFolder;
-pub use document_sequence_table::*;
-pub use document_sequence_type::DocumentSequence;
-pub use document_table::*;
-pub use document_template_table::*;
-pub use document_template_type::DocumentTemplate;
-pub use document_type::Document;
-pub use document_version_table::*;
-pub use document_version_type::DocumentVersion;
 pub use done_budget_reducer::done_budget;
-pub use done_stock_move_params_type::DoneStockMoveParams;
 pub use done_stock_move_reducer::done_stock_move;
-pub use employment_type_type::EmploymentType;
-pub use end_contact_role_params_type::EndContactRoleParams;
 pub use end_contact_role_reducer::end_contact_role;
 pub use end_user_session_reducer::end_user_session;
-pub use enqueue_job_params_type::EnqueueJobParams;
 pub use enqueue_job_reducer::enqueue_job;
 pub use ensure_dev_admin_reducer::ensure_dev_admin;
-pub use error_intercompany_transaction_params_type::ErrorIntercompanyTransactionParams;
 pub use error_intercompany_transaction_reducer::error_intercompany_transaction;
 pub use execute_replenishment_rule_reducer::execute_replenishment_rule;
-pub use expense_sheet_state_type::ExpenseSheetState;
-pub use expense_sheet_table::*;
-pub use expense_state_type::ExpenseState;
+pub use execute_retention_purge_reducer::execute_retention_purge;
 pub use expire_ai_action_drafts_reducer::expire_ai_action_drafts;
 pub use expire_contract_reducer::expire_contract;
 pub use explode_bom_reducer::explode_bom;
-pub use export_financial_report_params_type::ExportFinancialReportParams;
 pub use export_financial_report_reducer::export_financial_report;
 pub use fail_iot_action_reducer::fail_iot_action;
 pub use fail_quality_check_reducer::fail_quality_check;
 pub use fail_scheduled_owner_report_run_reducer::fail_scheduled_owner_report_run;
-pub use field_option_type::FieldOption;
-pub use field_type_type::FieldType;
-pub use field_validation_type::FieldValidation;
-pub use field_width_type::FieldWidth;
-pub use finalize_import_assistant_job_params_type::FinalizeImportAssistantJobParams;
 pub use finalize_import_assistant_job_reducer::finalize_import_assistant_job;
-pub use financial_report_table::*;
-pub use financial_report_type::FinancialReport;
 pub use find_duplicate_contacts_reducer::find_duplicate_contacts;
 pub use finish_manufacturing_order_reducer::finish_manufacturing_order;
 pub use finish_workorder_reducer::finish_workorder;
-pub use fiscal_year_state_type::FiscalYearState;
-pub use fleet_vehicle_table::*;
-pub use fleet_vehicle_type::FleetVehicle;
-pub use form_config_field_table::*;
-pub use form_config_field_type::FormConfigField;
-pub use form_config_table::*;
-pub use form_config_type::FormConfig;
-pub use form_role_config_table::*;
-pub use form_role_config_type::FormRoleConfig;
-pub use generate_eu_vat_report_params_type::GenerateEuVatReportParams;
 pub use generate_eu_vat_report_reducer::generate_eu_vat_report;
 pub use generate_financial_report_reducer::generate_financial_report;
 pub use generate_hub_pairing_token_reducer::generate_hub_pairing_token;
-pub use generate_subscription_invoice_params_type::GenerateSubscriptionInvoiceParams;
 pub use generate_subscription_invoice_reducer::generate_subscription_invoice;
-pub use generated_owner_report_table::*;
-pub use generated_owner_report_type::GeneratedOwnerReport;
 pub use get_form_configuration_reducer::get_form_configuration;
 pub use get_organization_form_configs_reducer::get_organization_form_configs;
-pub use google_drive_connection_table::*;
-pub use google_drive_connection_type::GoogleDriveConnection;
-pub use grant_org_permission_params_type::GrantOrgPermissionParams;
+pub use grant_delegated_admin_scope_reducer::grant_delegated_admin_scope;
 pub use grant_permission_reducer::grant_permission;
-pub use helpdesk_sla_table::*;
-pub use helpdesk_sla_type::HelpdeskSla;
-pub use helpdesk_stage_table::*;
-pub use helpdesk_stage_type::HelpdeskStage;
-pub use helpdesk_team_table::*;
-pub use helpdesk_team_type::HelpdeskTeam;
-pub use helpdesk_ticket_state_type::HelpdeskTicketState;
-pub use helpdesk_ticket_table::*;
-pub use helpdesk_ticket_type::HelpdeskTicket;
 pub use hold_supplier_intake_reducer::hold_supplier_intake;
-pub use hr_contract_table::*;
-pub use hr_contract_type::HrContract;
-pub use hr_department_table::*;
-pub use hr_department_type::HrDepartment;
-pub use hr_employee_table::*;
-pub use hr_employee_type::HrEmployee;
-pub use hr_expense_sheet_type::HrExpenseSheet;
-pub use hr_expense_table::*;
-pub use hr_expense_type::HrExpense;
-pub use hr_job_position_table::*;
-pub use hr_job_position_type::HrJobPosition;
-pub use hr_leave_state_type::HrLeaveState;
-pub use hr_leave_table::*;
-pub use hr_leave_type::HrLeave;
-pub use hr_leave_type_table::*;
-pub use hr_leave_type_type::HrLeaveType;
-pub use hr_payroll_structure_table::*;
-pub use hr_payroll_structure_type::HrPayrollStructure;
-pub use hr_payslip_table::*;
-pub use hr_payslip_type::HrPayslip;
-pub use hr_resource_table::*;
-pub use hr_resource_type::HrResource;
-pub use hr_salary_rule_table::*;
-pub use hr_salary_rule_type::HrSalaryRule;
 pub use import_account_csv_reducer::import_account_csv;
 pub use import_account_move_csv_reducer::import_account_move_csv;
 pub use import_account_move_line_csv_reducer::import_account_move_line_csv;
@@ -2733,19 +3316,11 @@ pub use import_hr_payroll_structure_csv_reducer::import_hr_payroll_structure_csv
 pub use import_hr_payslip_csv_reducer::import_hr_payslip_csv;
 pub use import_hr_resource_csv_reducer::import_hr_resource_csv;
 pub use import_hr_salary_rule_csv_reducer::import_hr_salary_rule_csv;
-pub use import_job_error_table::*;
-pub use import_job_error_type::ImportJobError;
-pub use import_job_record_table::*;
-pub use import_job_record_type::ImportJobRecord;
-pub use import_job_table::*;
-pub use import_job_type::ImportJob;
 pub use import_knowledge_article_csv_reducer::import_knowledge_article_csv;
 pub use import_knowledge_category_csv_reducer::import_knowledge_category_csv;
 pub use import_lead_csv_reducer::import_lead_csv;
 pub use import_lot_csv_reducer::import_lot_csv;
 pub use import_manufacturing_order_csv_reducer::import_manufacturing_order_csv;
-pub use import_mapping_template_table::*;
-pub use import_mapping_template_type::ImportMappingTemplate;
 pub use import_opportunity_csv_reducer::import_opportunity_csv;
 pub use import_product_category_csv_reducer::import_product_category_csv;
 pub use import_product_csv_reducer::import_product_csv;
@@ -2771,51 +3346,7 @@ pub use import_warehouse_csv_reducer::import_warehouse_csv;
 pub use import_workcenter_csv_reducer::import_workcenter_csv;
 pub use import_workflow_csv_reducer::import_workflow_csv;
 pub use initialize_default_form_configs_reducer::initialize_default_form_configs;
-pub use insight_severity_type::InsightSeverity;
-pub use instance_state_type::InstanceState;
-pub use intake_state_type::IntakeState;
-pub use integration_status_type::IntegrationStatus;
-pub use integration_type_type::IntegrationType;
-pub use intercompany_rule_table::*;
-pub use intercompany_rule_type::IntercompanyRule;
-pub use intercompany_state_type::IntercompanyState;
-pub use intercompany_transaction_table::*;
-pub use intercompany_transaction_type::IntercompanyTransaction;
-pub use inventory_adjustment_table::*;
-pub use inventory_adjustment_type::InventoryAdjustment;
-pub use inventory_valuation_table::*;
-pub use inventory_valuation_type::InventoryValuation;
 pub use invoice_po_line_reducer::invoice_po_line;
-pub use invoice_status_type::InvoiceStatus;
-pub use io_t_action_type::IoTAction;
-pub use io_t_alert_type::IoTAlert;
-pub use io_t_device_type::IoTDevice;
-pub use io_t_hub_type::IoTHub;
-pub use io_t_pairing_token_type::IoTPairingToken;
-pub use io_t_telemetry_type::IoTTelemetry;
-pub use io_t_threshold_type::IoTThreshold;
-pub use iot_action_table::*;
-pub use iot_alert_table::*;
-pub use iot_device_table::*;
-pub use iot_hub_table::*;
-pub use iot_pairing_token_table::*;
-pub use iot_telemetry_table::*;
-pub use iot_threshold_table::*;
-pub use job_status_type::JobStatus;
-pub use journal_type_type::JournalType;
-pub use kb_category_table::*;
-pub use knowledge_article_category_type::KnowledgeArticleCategory;
-pub use knowledge_article_table::*;
-pub use knowledge_article_type::KnowledgeArticle;
-pub use landed_cost_state_type::LandedCostState;
-pub use lead_lost_reason_table::*;
-pub use lead_lost_reason_type::LeadLostReason;
-pub use lead_source_table::*;
-pub use lead_source_type::LeadSource;
-pub use lead_table::*;
-pub use lead_type::Lead;
-pub use line_invoice_status_type::LineInvoiceStatus;
-pub use line_state_type::LineState;
 pub use link_device_to_location_reducer::link_device_to_location;
 pub use link_device_to_pos_reducer::link_device_to_pos;
 pub use link_device_to_quality_check_reducer::link_device_to_quality_check;
@@ -2824,18 +3355,9 @@ pub use link_workos_user_reducer::link_workos_user;
 pub use lock_document_reducer::lock_document;
 pub use lock_knowledge_article_reducer::lock_knowledge_article;
 pub use lock_purchase_order_reducer::lock_purchase_order;
-pub use log_audit_event_params_type::LogAuditEventParams;
 pub use log_audit_event_reducer::log_audit_event;
-pub use log_timesheet_params_type::LogTimesheetParams;
 pub use log_timesheet_reducer::log_timesheet;
 pub use log_workcenter_productivity_reducer::log_workcenter_productivity;
-pub use mail_follower_table::*;
-pub use mail_follower_type::MailFollower;
-pub use mail_message_table::*;
-pub use mail_message_type::MailMessage;
-pub use mail_message_type_type::MailMessageType;
-pub use mail_template_table::*;
-pub use mail_template_type::MailTemplate;
 pub use mark_action_sent_reducer::mark_action_sent;
 pub use mark_embedding_synced_reducer::mark_embedding_synced;
 pub use mark_invite_accepted_reducer::mark_invite_accepted;
@@ -2843,112 +3365,15 @@ pub use mark_mail_message_delivered_reducer::mark_mail_message_delivered;
 pub use mark_reset_token_used_reducer::mark_reset_token_used;
 pub use match_bank_line_reducer::match_bank_line;
 pub use match_elimination_entries_reducer::match_elimination_entries;
-pub use merge_contacts_params_type::MergeContactsParams;
 pub use merge_contacts_reducer::merge_contacts;
-pub use message_batch_status_type::MessageBatchStatus;
-pub use message_batch_table::*;
-pub use message_batch_type::MessageBatch;
-pub use message_channel_type::MessageChannel;
-pub use message_template_table::*;
-pub use message_template_type::MessageTemplate;
-pub use message_template_variable_type::MessageTemplateVariable;
 pub use migrate_all_organizations_reducer::migrate_all_organizations;
-pub use mo_state_type::MoState;
-pub use module_config_input_type::ModuleConfigInput;
-pub use move_stock_quant_params_type::MoveStockQuantParams;
 pub use move_stock_quant_reducer::move_stock_quant;
-pub use move_type_type::MoveType;
-pub use mrp_bom_line_table::*;
-pub use mrp_bom_line_type::MrpBomLine;
-pub use mrp_bom_table::*;
-pub use mrp_bom_type::MrpBom;
-pub use mrp_production_table::*;
-pub use mrp_production_type::MrpProduction;
-pub use mrp_routing_workcenter_table::*;
-pub use mrp_routing_workcenter_type::MrpRoutingWorkcenter;
-pub use mrp_workcenter_productivity_table::*;
-pub use mrp_workcenter_productivity_type::MrpWorkcenterProductivity;
-pub use mrp_workcenter_table::*;
-pub use mrp_workcenter_type::MrpWorkcenter;
-pub use mrp_workorder_table::*;
-pub use mrp_workorder_type::MrpWorkorder;
 pub use open_account_period_reducer::open_account_period;
 pub use open_contract_reducer::open_contract;
 pub use open_fiscal_year_reducer::open_fiscal_year;
 pub use open_pos_session_reducer::open_pos_session;
 pub use open_quality_alert_reducer::open_quality_alert;
-pub use operational_message_status_type::OperationalMessageStatus;
-pub use operational_message_table::*;
-pub use operational_message_type::OperationalMessage;
-pub use opp_stage_table::*;
-pub use opportunity_line_table::*;
-pub use opportunity_line_type::OpportunityLine;
-pub use opportunity_stage_type::OpportunityStage;
-pub use opportunity_table::*;
-pub use opportunity_type::Opportunity;
-pub use org_permission_table::*;
-pub use org_permission_type::OrgPermission;
-pub use organization_settings_table::*;
-pub use organization_settings_type::OrganizationSettings;
-pub use organization_table::*;
-pub use organization_type::Organization;
-pub use packaging_material_table::*;
-pub use packaging_material_type::PackagingMaterial;
-pub use partner_type_type::PartnerType;
 pub use pass_quality_check_reducer::pass_quality_check;
-pub use password_reset_token_type::PasswordResetToken;
-pub use payment_account_table::*;
-pub use payment_account_type::PaymentAccount;
-pub use payment_direction_type::PaymentDirection;
-pub use payment_fee_bearer_type::PaymentFeeBearer;
-pub use payment_fee_table::*;
-pub use payment_fee_type::PaymentFee;
-pub use payment_method_type_type::PaymentMethodType;
-pub use payment_provider_code_type::PaymentProviderCode;
-pub use payment_reconciliation_table::*;
-pub use payment_reconciliation_type::PaymentReconciliation;
-pub use payment_reversal_table::*;
-pub use payment_reversal_type::PaymentReversal;
-pub use payment_state_type::PaymentState;
-pub use payment_status_type::PaymentStatus;
-pub use payment_term_value_type::PaymentTermValue;
-pub use payment_transaction_status_type::PaymentTransactionStatus;
-pub use payment_transaction_table::*;
-pub use payment_transaction_type::PaymentTransaction;
-pub use payment_type_type::PaymentType;
-pub use payslip_state_type::PayslipState;
-pub use period_state_type::PeriodState;
-pub use permission_action_type::PermissionAction;
-pub use permission_effect_type::PermissionEffect;
-pub use permission_subject_type::PermissionSubject;
-pub use picking_wave_table::*;
-pub use picking_wave_type::PickingWave;
-pub use po_invoice_status_type::PoInvoiceStatus;
-pub use po_state_type::PoState;
-pub use policy_action_grant_type::PolicyActionGrant;
-pub use policy_field_permission_type::PolicyFieldPermission;
-pub use policy_snapshot_table::*;
-pub use policy_snapshot_type::PolicySnapshot;
-pub use pos_config_table::*;
-pub use pos_config_type::PosConfig;
-pub use pos_loyalty_card_table::*;
-pub use pos_loyalty_card_type::PosLoyaltyCard;
-pub use pos_loyalty_program_table::*;
-pub use pos_loyalty_program_type::PosLoyaltyProgram;
-pub use pos_order_line_table::*;
-pub use pos_order_line_type::PosOrderLine;
-pub use pos_order_state_type::PosOrderState;
-pub use pos_order_table::*;
-pub use pos_order_type::PosOrder;
-pub use pos_payment_method_table::*;
-pub use pos_payment_method_type::PosPaymentMethod;
-pub use pos_payment_table::*;
-pub use pos_payment_type::PosPayment;
-pub use pos_session_table::*;
-pub use pos_session_type::PosSession;
-pub use pos_status_type::PosStatus;
-pub use pos_terminal_table::*;
-pub use pos_terminal_type::PosTerminal;
 pub use post_account_bank_statement_reducer::post_account_bank_statement;
 pub use post_account_move_reducer::post_account_move;
 pub use post_cycle_count_adjustments_reducer::post_cycle_count_adjustments;
@@ -2959,126 +3384,42 @@ pub use post_landed_costs_reducer::post_landed_costs;
 pub use post_message_reducer::post_message;
 pub use post_payment_reducer::post_payment;
 pub use post_payment_transaction_reducer::post_payment_transaction;
-pub use pricelist_applied_on_type::PricelistAppliedOn;
-pub use privacy_consent_table::*;
-pub use privacy_consent_type::PrivacyConsent;
 pub use process_consolidation_reducer::process_consolidation;
-pub use process_intercompany_transaction_params_type::ProcessIntercompanyTransactionParams;
 pub use process_intercompany_transaction_reducer::process_intercompany_transaction;
 pub use process_inventory_adjustment_reducer::process_inventory_adjustment;
 pub use process_pending_scans_reducer::process_pending_scans;
 pub use produce_manufacturing_order_reducer::produce_manufacturing_order;
-pub use product_attribute_line_table::*;
-pub use product_attribute_line_type::ProductAttributeLine;
-pub use product_attribute_table::*;
-pub use product_attribute_type::ProductAttribute;
-pub use product_attribute_value_table::*;
-pub use product_attribute_value_type::ProductAttributeValue;
-pub use product_category_table::*;
-pub use product_category_type::ProductCategory;
-pub use product_packaging_table::*;
-pub use product_packaging_type::ProductPackaging;
-pub use product_pricelist_item_table::*;
-pub use product_pricelist_item_type::ProductPricelistItem;
-pub use product_pricelist_table::*;
-pub use product_pricelist_type::ProductPricelist;
-pub use product_supplier_info_table::*;
-pub use product_supplier_info_type::ProductSupplierInfo;
-pub use product_table::*;
-pub use product_type::Product;
-pub use product_variant_table::*;
-pub use product_variant_type::ProductVariant;
-pub use profit_loss_line_table::*;
-pub use profit_loss_line_type::ProfitLossLine;
-pub use project_project_table::*;
-pub use project_project_type::ProjectProject;
-pub use project_task_table::*;
-pub use project_task_type::ProjectTask;
-pub use project_timesheet_table::*;
-pub use project_timesheet_type::ProjectTimesheet;
 pub use promote_ai_skill_version_reducer::promote_ai_skill_version;
-pub use proposal_comment_table::*;
-pub use proposal_comment_type::ProposalComment;
-pub use proposal_line_item_table::*;
-pub use proposal_line_item_type::ProposalLineItem;
-pub use proposal_presence_table::*;
-pub use proposal_presence_type::ProposalPresence;
-pub use proposal_section_table::*;
-pub use proposal_section_type::ProposalSection;
-pub use proposal_source_doc_table::*;
-pub use proposal_source_doc_type::ProposalSourceDoc;
-pub use proposal_status_type::ProposalStatus;
-pub use proposal_table::*;
-pub use proposal_type::Proposal;
-pub use proposal_version_table::*;
-pub use proposal_version_type::ProposalVersion;
-pub use purchase_order_line_table::*;
-pub use purchase_order_line_type::PurchaseOrderLine;
-pub use purchase_order_table::*;
-pub use purchase_order_type::PurchaseOrder;
-pub use purchase_requisition_table::*;
-pub use purchase_requisition_type::PurchaseRequisition;
-pub use quality_alert_reason_table::*;
-pub use quality_alert_reason_type::QualityAlertReason;
-pub use quality_alert_table::*;
-pub use quality_alert_type::QualityAlert;
-pub use quality_check_table::*;
-pub use quality_check_type::QualityCheck;
-pub use quality_point_table::*;
-pub use quality_point_type::QualityPoint;
-pub use quality_team_table::*;
-pub use quality_team_type::QualityTeam;
-pub use queue_job_table::*;
-pub use queue_job_type::QueueJob;
-pub use queue_mail_from_template_params_type::QueueMailFromTemplateParams;
 pub use queue_mail_from_template_reducer::queue_mail_from_template;
-pub use queue_worker_table::*;
-pub use queue_worker_type::QueueWorker;
 pub use receive_po_line_reducer::receive_po_line;
-pub use recognize_deferred_revenue_params_type::RecognizeDeferredRevenueParams;
 pub use recognize_deferred_revenue_reducer::recognize_deferred_revenue;
-pub use reconcile_account_bank_statement_line_params_type::ReconcileAccountBankStatementLineParams;
 pub use reconcile_account_bank_statement_line_reducer::reconcile_account_bank_statement_line;
 pub use reconcile_payment_with_invoice_reducer::reconcile_payment_with_invoice;
 pub use record_ai_agent_run_policy_snapshot_reducer::record_ai_agent_run_policy_snapshot;
-pub use record_ai_skill_test_run_params_type::RecordAiSkillTestRunParams;
 pub use record_ai_skill_test_run_reducer::record_ai_skill_test_run;
 pub use record_ai_spend_reducer::record_ai_spend;
-pub use record_barcode_scan_params_type::RecordBarcodeScanParams;
 pub use record_barcode_scan_reducer::record_barcode_scan;
-pub use record_custom_field_entry_type::RecordCustomFieldEntry;
-pub use record_custom_field_value_table::*;
-pub use record_custom_field_value_type::RecordCustomFieldValue;
-pub use record_cycle_count_line_params_type::RecordCycleCountLineParams;
 pub use record_cycle_count_line_reducer::record_cycle_count_line;
 pub use record_document_view_reducer::record_document_view;
-pub use record_generated_owner_report_params_type::RecordGeneratedOwnerReportParams;
 pub use record_generated_owner_report_reducer::record_generated_owner_report;
-pub use record_google_drive_sync_error_reducer::record_google_drive_sync_error;
 pub use record_google_drive_sync_reducer::record_google_drive_sync;
+pub use record_google_drive_sync_error_reducer::record_google_drive_sync_error;
 pub use record_message_copied_reducer::record_message_copied;
-pub use record_privacy_consent_params_type::RecordPrivacyConsentParams;
 pub use record_privacy_consent_reducer::record_privacy_consent;
 pub use record_report_run_reducer::record_report_run;
-pub use record_telemetry_batch_reducer::record_telemetry_batch;
-pub use record_telemetry_params_type::RecordTelemetryParams;
 pub use record_telemetry_reducer::record_telemetry;
-pub use record_whats_app_health_check_params_type::RecordWhatsAppHealthCheckParams;
+pub use record_telemetry_batch_reducer::record_telemetry_batch;
 pub use record_whatsapp_health_check_reducer::record_whatsapp_health_check;
 pub use record_whatsapp_message_sent_reducer::record_whatsapp_message_sent;
 pub use refresh_policy_snapshot_reducer::refresh_policy_snapshot;
 pub use refresh_tax_deadline_statuses_reducer::refresh_tax_deadline_statuses;
 pub use refuse_expense_sheet_reducer::refuse_expense_sheet;
 pub use refuse_leave_reducer::refuse_leave;
-pub use register_device_params_type::RegisterDeviceParams;
-pub use register_hub_params_type::RegisterHubParams;
 pub use register_iot_device_reducer::register_iot_device;
 pub use register_iot_hub_reducer::register_iot_hub;
 pub use register_payment_on_invoice_reducer::register_payment_on_invoice;
-pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
 pub use register_queue_worker_reducer::register_queue_worker;
 pub use reject_ai_action_draft_reducer::reject_ai_action_draft;
-pub use reject_approval_request_params_type::RejectApprovalRequestParams;
 pub use reject_approval_request_reducer::reject_approval_request;
 pub use reject_supplier_intake_reducer::reject_supplier_intake;
 pub use remove_article_member_reducer::remove_article_member;
@@ -3090,16 +3431,7 @@ pub use remove_rule_from_nomenclature_reducer::remove_rule_from_nomenclature;
 pub use remove_user_from_organization_reducer::remove_user_from_organization;
 pub use reopen_ticket_reducer::reopen_ticket;
 pub use reorder_proposal_line_items_reducer::reorder_proposal_line_items;
-pub use replenishment_rule_table::*;
-pub use replenishment_rule_type::ReplenishmentRule;
-pub use report_state_type::ReportState;
-pub use report_template_table::*;
-pub use report_template_type::ReportTemplate;
-pub use report_type_type::ReportType;
 pub use request_embedding_job_reducer::request_embedding_job;
-pub use requisition_state_type::RequisitionState;
-pub use res_partner_bank_table::*;
-pub use res_partner_bank_type::ResPartnerBank;
 pub use reserve_serial_reducer::reserve_serial;
 pub use reserve_stock_quant_reducer::reserve_stock_quant;
 pub use reset_leave_to_draft_reducer::reset_leave_to_draft;
@@ -3108,24 +3440,14 @@ pub use resolve_proposal_comment_reducer::resolve_proposal_comment;
 pub use restore_product_category_reducer::restore_product_category;
 pub use retry_intercompany_transaction_reducer::retry_intercompany_transaction;
 pub use retry_iot_action_reducer::retry_iot_action;
-pub use return_order_line_table::*;
-pub use return_order_line_type::ReturnOrderLine;
-pub use return_order_table::*;
-pub use return_order_type::ReturnOrder;
-pub use revenue_recognition_rule_table::*;
-pub use revenue_recognition_rule_type::RevenueRecognitionRule;
-pub use reverse_payment_transaction_params_type::ReversePaymentTransactionParams;
 pub use reverse_payment_transaction_reducer::reverse_payment_transaction;
-pub use review_message_batch_params_type::ReviewMessageBatchParams;
 pub use review_message_batch_reducer::review_message_batch;
 pub use review_supplier_intake_reducer::review_supplier_intake;
 pub use revoke_permission_reducer::revoke_permission;
 pub use revoke_role_reducer::revoke_role;
-pub use role_table::*;
-pub use role_type::Role;
 pub use rollback_ai_skill_release_reducer::rollback_ai_skill_release;
 pub use rollback_import_job_reducer::rollback_import_job;
-pub use rule_type_type::RuleType;
+pub use run_accounting_ic_consolidation_test_reducer::run_accounting_ic_consolidation_test;
 pub use run_accounting_payment_cancel_test_reducer::run_accounting_payment_cancel_test;
 pub use run_accounting_payment_management_test_reducer::run_accounting_payment_management_test;
 pub use run_accounting_payment_reconcile_test_reducer::run_accounting_payment_reconcile_test;
@@ -3142,6 +3464,8 @@ pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_platform_tests_reducer::run_all_platform_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
 pub use run_core_operational_messaging_test_reducer::run_core_operational_messaging_test;
+pub use run_core_sod_test_reducer::run_core_sod_test;
+pub use run_country_pack_test_reducer::run_country_pack_test;
 pub use run_crm_contact_identity_test_reducer::run_crm_contact_identity_test;
 pub use run_crm_contact_update_delete_test_reducer::run_crm_contact_update_delete_test;
 pub use run_crm_opportunity_convert_test_reducer::run_crm_opportunity_convert_test;
@@ -3162,157 +3486,59 @@ pub use run_sales_order_delivery_test_reducer::run_sales_order_delivery_test;
 pub use run_sales_order_invoice_test_reducer::run_sales_order_invoice_test;
 pub use run_sales_order_update_test_reducer::run_sales_order_update_test;
 pub use run_subscription_plan_test_reducer::run_subscription_plan_test;
+pub use run_tenant_isolation_tests_reducer::run_tenant_isolation_tests;
 pub use run_traceability_report_reducer::run_traceability_report;
 pub use run_workflow_definition_test_reducer::run_workflow_definition_test;
-pub use sale_order_line_table::*;
-pub use sale_order_line_type::SaleOrderLine;
-pub use sale_order_option_table::*;
-pub use sale_order_option_type::SaleOrderOption;
-pub use sale_order_table::*;
-pub use sale_order_type::SaleOrder;
-pub use sale_state_type::SaleState;
-pub use save_import_mapping_template_params_type::SaveImportMappingTemplateParams;
 pub use save_import_mapping_template_reducer::save_import_mapping_template;
 pub use save_proposal_version_reducer::save_proposal_version;
-pub use saved_report_table::*;
-pub use saved_report_type::SavedReport;
 pub use schedule_tax_deadline_updates_reducer::schedule_tax_deadline_updates;
-pub use scheduled_report_run_table::*;
-pub use scheduled_report_run_type::ScheduledReportRun;
-pub use scheduled_report_table::*;
-pub use scheduled_report_type::ScheduledReport;
-pub use search_embedding_table::*;
-pub use search_embedding_type::SearchEmbedding;
-pub use section_status_type::SectionStatus;
 pub use seed_dev_data_reducer::seed_dev_data;
 pub use seed_organization_form_configs_reducer::seed_organization_form_configs;
-pub use segment_member_table::*;
-pub use segment_member_type::SegmentMember;
 pub use send_purchase_order_reducer::send_purchase_order;
-pub use serial_lot_traceability_table::*;
-pub use serial_lot_traceability_type::SerialLotTraceability;
-pub use session_state_type::SessionState;
 pub use set_ai_agent_active_reducer::set_ai_agent_active;
 pub use set_ai_reducer_allowlist_enabled_reducer::set_ai_reducer_allowlist_enabled;
 pub use set_ai_skill_active_reducer::set_ai_skill_active;
 pub use set_analytic_account_active_reducer::set_analytic_account_active;
 pub use set_approval_rule_active_reducer::set_approval_rule_active;
-pub use set_article_published_params_type::SetArticlePublishedParams;
 pub use set_article_published_reducer::set_article_published;
 pub use set_asset_active_reducer::set_asset_active;
 pub use set_billing_status_reducer::set_billing_status;
-pub use set_company_vertical_pack_params_type::SetCompanyVerticalPackParams;
+pub use set_company_country_pack_reducer::set_company_country_pack;
 pub use set_company_vertical_pack_reducer::set_company_vertical_pack;
-pub use set_consolidation_company_rate_params_type::SetConsolidationCompanyRateParams;
 pub use set_consolidation_company_rate_reducer::set_consolidation_company_rate;
 pub use set_contact_communication_preference_reducer::set_contact_communication_preference;
 pub use set_form_role_config_reducer::set_form_role_config;
 pub use set_intercompany_rule_active_reducer::set_intercompany_rule_active;
 pub use set_iot_threshold_reducer::set_iot_threshold;
 pub use set_project_active_reducer::set_project_active;
-pub use set_record_custom_field_values_params_type::SetRecordCustomFieldValuesParams;
 pub use set_record_custom_field_values_reducer::set_record_custom_field_values;
 pub use set_task_parent_reducer::set_task_parent;
 pub use set_whatsapp_primary_account_reducer::set_whatsapp_primary_account;
 pub use set_workflow_active_reducer::set_workflow_active;
 pub use set_workitem_exception_reducer::set_workitem_exception;
-pub use setup_fiscal_calendar_params_type::SetupFiscalCalendarParams;
 pub use setup_fiscal_calendar_reducer::setup_fiscal_calendar;
 pub use share_dashboard_reducer::share_dashboard;
-pub use shipping_method_table::*;
-pub use shipping_method_type::ShippingMethod;
 pub use signal_workflow_reducer::signal_workflow;
 pub use solve_quality_alert_reducer::solve_quality_alert;
-pub use split_method_type::SplitMethod;
-pub use stage_bank_statement_import_line_params_type::StageBankStatementImportLineParams;
-pub use stage_bank_statement_import_params_type::StageBankStatementImportParams;
 pub use stage_bank_statement_import_reducer::stage_bank_statement_import;
 pub use start_cycle_count_session_reducer::start_cycle_count_session;
 pub use start_manufacturing_order_reducer::start_manufacturing_order;
 pub use start_picking_batch_reducer::start_picking_batch;
 pub use start_quality_check_reducer::start_quality_check;
-pub use start_timesheet_timer_params_type::StartTimesheetTimerParams;
 pub use start_timesheet_timer_reducer::start_timesheet_timer;
 pub use start_workflow_reducer::start_workflow;
 pub use start_workorder_reducer::start_workorder;
-pub use stock_count_sheet_table::*;
-pub use stock_count_sheet_type::StockCountSheet;
-pub use stock_cycle_count_table::*;
-pub use stock_cycle_count_type::StockCycleCount;
-pub use stock_inventory_line_table::*;
-pub use stock_inventory_line_type::StockInventoryLine;
-pub use stock_inventory_table::*;
-pub use stock_inventory_type::StockInventory;
-pub use stock_landed_cost_lines_table::*;
-pub use stock_landed_cost_lines_type::StockLandedCostLines;
-pub use stock_landed_cost_table::*;
-pub use stock_landed_cost_type::StockLandedCost;
-pub use stock_location_table::*;
-pub use stock_location_type::StockLocation;
-pub use stock_move_line_table::*;
-pub use stock_move_line_type::StockMoveLine;
-pub use stock_move_table::*;
-pub use stock_move_type::StockMove;
-pub use stock_picking_batch_table::*;
-pub use stock_picking_batch_type::StockPickingBatch;
-pub use stock_picking_table::*;
-pub use stock_picking_type::StockPicking;
-pub use stock_production_lot_table::*;
-pub use stock_production_lot_type::StockProductionLot;
-pub use stock_production_serial_table::*;
-pub use stock_production_serial_type::StockProductionSerial;
-pub use stock_quant_reserve_params_type::StockQuantReserveParams;
-pub use stock_quant_table::*;
-pub use stock_quant_type::StockQuant;
-pub use stock_quant_unreserve_params_type::StockQuantUnreserveParams;
-pub use stock_reorder_group_table::*;
-pub use stock_reorder_group_type::StockReorderGroup;
-pub use stock_route_table::*;
-pub use stock_route_type::StockRoute;
-pub use stock_rule_table::*;
-pub use stock_rule_type::StockRule;
-pub use stock_traceability_report_table::*;
-pub use stock_traceability_report_type::StockTraceabilityReport;
 pub use stop_timesheet_timer_reducer::stop_timesheet_timer;
 pub use store_sso_user_credential_reducer::store_sso_user_credential;
 pub use store_user_credential_reducer::store_user_credential;
 pub use submit_expense_reducer::submit_expense;
-pub use submit_expense_sheet_params_type::SubmitExpenseSheetParams;
 pub use submit_expense_sheet_reducer::submit_expense_sheet;
 pub use submit_purchase_requisition_reducer::submit_purchase_requisition;
-pub use submit_supplier_intake_params_type::SubmitSupplierIntakeParams;
 pub use submit_supplier_intake_reducer::submit_supplier_intake;
 pub use subscribe_to_record_reducer::subscribe_to_record;
-pub use subscription_line_table::*;
-pub use subscription_line_type::SubscriptionLine;
-pub use subscription_plan_table::*;
-pub use subscription_plan_type::SubscriptionPlan;
-pub use subscription_table::*;
-pub use subscription_type::Subscription;
-pub use supplier_intake_request_table::*;
-pub use supplier_intake_request_type::SupplierIntakeRequest;
-pub use sync_direction_type::SyncDirection;
 pub use sync_hub_devices_reducer::sync_hub_devices;
-pub use sync_status_type::SyncStatus;
-pub use task_state_type::TaskState;
-pub use tax_amount_type_type::TaxAmountType;
-pub use tax_deadline_reminder_table::*;
-pub use tax_deadline_reminder_type::TaxDeadlineReminder;
-pub use tax_deadline_status_job_type::TaxDeadlineStatusJob;
-pub use tax_deadline_status_type::TaxDeadlineStatus;
-pub use tax_deadline_table::*;
-pub use tax_deadline_type::TaxDeadline;
-pub use tax_deadline_type_type::TaxDeadlineType;
-pub use tax_jurisdiction_table::*;
-pub use tax_jurisdiction_type::TaxJurisdiction;
-pub use tax_schedule_table::*;
-pub use tax_schedule_type::TaxSchedule;
-pub use tax_type_use_type::TaxTypeUse;
 pub use test_iot_device_reducer::test_iot_device;
-pub use ticket_priority_type::TicketPriority;
 pub use toggle_project_favorite_reducer::toggle_project_favorite;
-pub use trial_balance_table::*;
-pub use trial_balance_type::TrialBalance;
 pub use unassign_team_member_skill_reducer::unassign_team_member_skill;
 pub use unblock_workcenter_reducer::unblock_workcenter;
 pub use unlink_device_reducer::unlink_device;
@@ -3320,325 +3546,158 @@ pub use unlock_document_reducer::unlock_document;
 pub use unlock_knowledge_article_reducer::unlock_knowledge_article;
 pub use unlock_purchase_order_reducer::unlock_purchase_order;
 pub use unmatch_elimination_entry_reducer::unmatch_elimination_entry;
-pub use unreconcile_account_bank_statement_line_params_type::UnreconcileAccountBankStatementLineParams;
 pub use unreconciled_account_bank_statement_line_reducer::unreconciled_account_bank_statement_line;
 pub use unreserve_stock_quant_reducer::unreserve_stock_quant;
 pub use unsubscribe_from_record_reducer::unsubscribe_from_record;
-pub use uom_cat_table::*;
-pub use uom_category_type::UomCategory;
-pub use uom_conversion_table::*;
-pub use uom_conversion_type::UomConversion;
-pub use uom_table::*;
-pub use uom_type::Uom;
-pub use update_account_account_params_type::UpdateAccountAccountParams;
 pub use update_account_account_reducer::update_account_account;
-pub use update_account_account_type_params_type::UpdateAccountAccountTypeParams;
 pub use update_account_account_type_reducer::update_account_account_type;
-pub use update_account_asset_params_type::UpdateAccountAssetParams;
 pub use update_account_asset_reducer::update_account_asset;
-pub use update_account_bank_statement_line_params_type::UpdateAccountBankStatementLineParams;
-pub use update_account_bank_statement_line_reducer::update_account_bank_statement_line;
-pub use update_account_bank_statement_params_type::UpdateAccountBankStatementParams;
 pub use update_account_bank_statement_reducer::update_account_bank_statement;
-pub use update_account_group_params_type::UpdateAccountGroupParams;
+pub use update_account_bank_statement_line_reducer::update_account_bank_statement_line;
 pub use update_account_group_reducer::update_account_group;
-pub use update_account_journal_params_type::UpdateAccountJournalParams;
 pub use update_account_journal_reducer::update_account_journal;
-pub use update_account_move_line_params_type::UpdateAccountMoveLineParams;
 pub use update_account_move_line_reducer::update_account_move_line;
-pub use update_account_period_params_type::UpdateAccountPeriodParams;
 pub use update_account_period_reducer::update_account_period;
-pub use update_account_reconciliation_widget_params_type::UpdateAccountReconciliationWidgetParams;
 pub use update_account_reconciliation_widget_reducer::update_account_reconciliation_widget;
-pub use update_account_tax_group_params_type::UpdateAccountTaxGroupParams;
-pub use update_account_tax_group_reducer::update_account_tax_group;
-pub use update_account_tax_params_type::UpdateAccountTaxParams;
 pub use update_account_tax_reducer::update_account_tax;
-pub use update_ai_action_draft_params_params_type::UpdateAiActionDraftParamsParams;
+pub use update_account_tax_group_reducer::update_account_tax_group;
 pub use update_ai_action_draft_params_reducer::update_ai_action_draft_params;
-pub use update_ai_agent_params_type::UpdateAiAgentParams;
 pub use update_ai_agent_reducer::update_ai_agent;
-pub use update_ai_chat_session_title_params_type::UpdateAiChatSessionTitleParams;
 pub use update_ai_chat_session_title_reducer::update_ai_chat_session_title;
-pub use update_ai_reducer_allowlist_params_type::UpdateAiReducerAllowlistParams;
 pub use update_ai_reducer_allowlist_reducer::update_ai_reducer_allowlist;
-pub use update_analytic_account_params_type::UpdateAnalyticAccountParams;
 pub use update_analytic_account_reducer::update_analytic_account;
-pub use update_analytic_distribution_model_params_type::UpdateAnalyticDistributionModelParams;
 pub use update_analytic_distribution_model_reducer::update_analytic_distribution_model;
-pub use update_analytic_line_params_type::UpdateAnalyticLineParams;
 pub use update_analytic_line_reducer::update_analytic_line;
-pub use update_approval_rule_params_type::UpdateApprovalRuleParams;
 pub use update_approval_rule_reducer::update_approval_rule;
-pub use update_audit_rule_params_type::UpdateAuditRuleParams;
 pub use update_audit_rule_reducer::update_audit_rule;
-pub use update_barcode_nomenclature_params_type::UpdateBarcodeNomenclatureParams;
 pub use update_barcode_nomenclature_reducer::update_barcode_nomenclature;
-pub use update_barcode_rule_params_type::UpdateBarcodeRuleParams;
 pub use update_barcode_rule_reducer::update_barcode_rule;
-pub use update_billing_account_params_type::UpdateBillingAccountParams;
 pub use update_billing_account_reducer::update_billing_account;
-pub use update_bom_params_type::UpdateBomParams;
 pub use update_bom_reducer::update_bom;
-pub use update_budget_line_actuals_params_type::UpdateBudgetLineActualsParams;
-pub use update_budget_line_actuals_reducer::update_budget_line_actuals;
 pub use update_budget_line_reducer::update_budget_line;
-pub use update_budget_post_params_type::UpdateBudgetPostParams;
+pub use update_budget_line_actuals_reducer::update_budget_line_actuals;
 pub use update_budget_post_reducer::update_budget_post;
-pub use update_calendar_event_params_type::UpdateCalendarEventParams;
 pub use update_calendar_event_reducer::update_calendar_event;
-pub use update_company_address_params_type::UpdateCompanyAddressParams;
-pub use update_company_address_reducer::update_company_address;
-pub use update_company_business_params_type::UpdateCompanyBusinessParams;
-pub use update_company_business_reducer::update_company_business;
-pub use update_company_hierarchy_params_type::UpdateCompanyHierarchyParams;
-pub use update_company_hierarchy_reducer::update_company_hierarchy;
-pub use update_company_params_type::UpdateCompanyParams;
 pub use update_company_reducer::update_company;
-pub use update_consolidation_account_params_type::UpdateConsolidationAccountParams;
+pub use update_company_address_reducer::update_company_address;
+pub use update_company_business_reducer::update_company_business;
+pub use update_company_hierarchy_reducer::update_company_hierarchy;
 pub use update_consolidation_account_reducer::update_consolidation_account;
-pub use update_contact_address_params_type::UpdateContactAddressParams;
-pub use update_contact_address_reducer::update_contact_address;
-pub use update_contact_business_params_type::UpdateContactBusinessParams;
-pub use update_contact_business_reducer::update_contact_business;
-pub use update_contact_core_params_type::UpdateContactCoreParams;
-pub use update_contact_details_params_type::UpdateContactDetailsParams;
-pub use update_contact_details_reducer::update_contact_details;
-pub use update_contact_identity_params_type::UpdateContactIdentityParams;
-pub use update_contact_identity_reducer::update_contact_identity;
 pub use update_contact_reducer::update_contact;
-pub use update_contract_params_type::UpdateContractParams;
+pub use update_contact_address_reducer::update_contact_address;
+pub use update_contact_business_reducer::update_contact_business;
+pub use update_contact_details_reducer::update_contact_details;
+pub use update_contact_identity_reducer::update_contact_identity;
 pub use update_contract_reducer::update_contract;
-pub use update_crossovered_budget_line_params_type::UpdateCrossoveredBudgetLineParams;
-pub use update_crossovered_budget_params_type::UpdateCrossoveredBudgetParams;
 pub use update_crossovered_budget_reducer::update_crossovered_budget;
-pub use update_dashboard_share_params_type::UpdateDashboardShareParams;
-pub use update_department_params_type::UpdateDepartmentParams;
 pub use update_department_reducer::update_department;
 pub use update_device_status_reducer::update_device_status;
-pub use update_document_params_type::UpdateDocumentParams;
 pub use update_document_reducer::update_document;
-pub use update_document_template_params_type::UpdateDocumentTemplateParams;
 pub use update_document_template_reducer::update_document_template;
-pub use update_employee_params_type::UpdateEmployeeParams;
 pub use update_employee_reducer::update_employee;
-pub use update_expense_params_type::UpdateExpenseParams;
 pub use update_expense_reducer::update_expense;
-pub use update_financial_report_params_type::UpdateFinancialReportParams;
 pub use update_financial_report_reducer::update_financial_report;
-pub use update_fiscal_year_params_type::UpdateFiscalYearParams;
 pub use update_fiscal_year_reducer::update_fiscal_year;
-pub use update_form_field_params_type::UpdateFormFieldParams;
 pub use update_form_field_reducer::update_form_field;
 pub use update_google_drive_connection_reducer::update_google_drive_connection;
 pub use update_google_drive_credentials_reducer::update_google_drive_credentials;
 pub use update_hub_heartbeat_reducer::update_hub_heartbeat;
 pub use update_integration_status_reducer::update_integration_status;
-pub use update_intercompany_rule_params_type::UpdateIntercompanyRuleParams;
 pub use update_intercompany_rule_reducer::update_intercompany_rule;
-pub use update_job_position_params_type::UpdateJobPositionParams;
 pub use update_job_position_reducer::update_job_position;
-pub use update_knowledge_article_params_type::UpdateKnowledgeArticleParams;
 pub use update_knowledge_article_reducer::update_knowledge_article;
-pub use update_knowledge_category_params_type::UpdateKnowledgeCategoryParams;
 pub use update_knowledge_category_reducer::update_knowledge_category;
-pub use update_landed_cost_params_type::UpdateLandedCostParams;
 pub use update_landed_cost_reducer::update_landed_cost;
-pub use update_lead_address_params_type::UpdateLeadAddressParams;
 pub use update_lead_address_reducer::update_lead_address;
-pub use update_lead_details_params_type::UpdateLeadDetailsParams;
 pub use update_lead_details_reducer::update_lead_details;
-pub use update_lead_revenue_params_type::UpdateLeadRevenueParams;
 pub use update_lead_revenue_reducer::update_lead_revenue;
-pub use update_leave_type_params_type::UpdateLeaveTypeParams;
 pub use update_leave_type_reducer::update_leave_type;
-pub use update_mail_template_params_type::UpdateMailTemplateParams;
 pub use update_mail_template_reducer::update_mail_template;
-pub use update_message_template_params_type::UpdateMessageTemplateParams;
 pub use update_message_template_reducer::update_message_template;
-pub use update_metric_values_params_type::UpdateMetricValuesParams;
 pub use update_metric_values_reducer::update_metric_values;
-pub use update_opportunity_params_type::UpdateOpportunityParams;
 pub use update_opportunity_reducer::update_opportunity;
-pub use update_org_member_details_params_type::UpdateOrgMemberDetailsParams;
 pub use update_org_member_details_reducer::update_org_member_details;
 pub use update_org_member_role_reducer::update_org_member_role;
-pub use update_organization_params_type::UpdateOrganizationParams;
 pub use update_organization_reducer::update_organization;
-pub use update_owner_report_schedule_params_type::UpdateOwnerReportScheduleParams;
 pub use update_owner_report_schedule_reducer::update_owner_report_schedule;
-pub use update_partner_bank_params_type::UpdatePartnerBankParams;
 pub use update_partner_bank_reducer::update_partner_bank;
-pub use update_payment_account_params_type::UpdatePaymentAccountParams;
 pub use update_payment_account_reducer::update_payment_account;
-pub use update_payment_term_line_reducer::update_payment_term_line;
 pub use update_payment_term_reducer::update_payment_term;
-pub use update_payment_transaction_params_type::UpdatePaymentTransactionParams;
+pub use update_payment_term_line_reducer::update_payment_term_line;
 pub use update_payment_transaction_reducer::update_payment_transaction;
 pub use update_po_invoice_status_reducer::update_po_invoice_status;
 pub use update_po_receipt_status_reducer::update_po_receipt_status;
 pub use update_pos_terminal_reducer::update_pos_terminal;
 pub use update_pricelist_reducer::update_pricelist;
-pub use update_product_category_params_type::UpdateProductCategoryParams;
-pub use update_product_category_reducer::update_product_category;
-pub use update_product_inventory_data_params_type::UpdateProductInventoryDataParams;
-pub use update_product_inventory_data_reducer::update_product_inventory_data;
-pub use update_product_packaging_params_type::UpdateProductPackagingParams;
-pub use update_product_packaging_reducer::update_product_packaging;
-pub use update_product_params_type::UpdateProductParams;
-pub use update_product_pricing_params_type::UpdateProductPricingParams;
-pub use update_product_pricing_reducer::update_product_pricing;
 pub use update_product_reducer::update_product;
-pub use update_product_supplier_info_params_type::UpdateProductSupplierInfoParams;
+pub use update_product_category_reducer::update_product_category;
+pub use update_product_inventory_data_reducer::update_product_inventory_data;
+pub use update_product_packaging_reducer::update_product_packaging;
+pub use update_product_pricing_reducer::update_product_pricing;
 pub use update_product_supplier_info_reducer::update_product_supplier_info;
-pub use update_product_variant_params_type::UpdateProductVariantParams;
 pub use update_product_variant_reducer::update_product_variant;
-pub use update_project_params_type::UpdateProjectParams;
 pub use update_project_reducer::update_project;
+pub use update_proposal_reducer::update_proposal;
 pub use update_proposal_line_item_reducer::update_proposal_line_item;
 pub use update_proposal_presence_reducer::update_proposal_presence;
-pub use update_proposal_reducer::update_proposal;
-pub use update_proposal_source_doc_params_type::UpdateProposalSourceDocParams;
 pub use update_proposal_source_doc_reducer::update_proposal_source_doc;
 pub use update_proposal_status_reducer::update_proposal_status;
-pub use update_purchase_order_line_params_type::UpdatePurchaseOrderLineParams;
-pub use update_purchase_order_line_reducer::update_purchase_order_line;
-pub use update_purchase_order_params_type::UpdatePurchaseOrderParams;
 pub use update_purchase_order_reducer::update_purchase_order;
-pub use update_quality_alert_reason_params_type::UpdateQualityAlertReasonParams;
+pub use update_purchase_order_line_reducer::update_purchase_order_line;
 pub use update_quality_alert_reason_reducer::update_quality_alert_reason;
-pub use update_quality_point_params_type::UpdateQualityPointParams;
 pub use update_quality_point_reducer::update_quality_point;
-pub use update_quality_team_params_type::UpdateQualityTeamParams;
 pub use update_quality_team_reducer::update_quality_team;
-pub use update_report_template_params_type::UpdateReportTemplateParams;
 pub use update_report_template_reducer::update_report_template;
-pub use update_role_params_type::UpdateRoleParams;
 pub use update_role_reducer::update_role;
-pub use update_sale_order_params_type::UpdateSaleOrderParams;
 pub use update_sale_order_reducer::update_sale_order;
-pub use update_saved_report_params_type::UpdateSavedReportParams;
 pub use update_saved_report_reducer::update_saved_report;
 pub use update_stock_inventory_state_reducer::update_stock_inventory_state;
-pub use update_stock_location_params_type::UpdateStockLocationParams;
 pub use update_stock_location_reducer::update_stock_location;
-pub use update_stock_production_lot_params_type::UpdateStockProductionLotParams;
 pub use update_stock_production_lot_reducer::update_stock_production_lot;
-pub use update_stock_production_serial_params_type::UpdateStockProductionSerialParams;
 pub use update_stock_production_serial_reducer::update_stock_production_serial;
-pub use update_stock_quant_quantity_params_type::UpdateStockQuantQuantityParams;
 pub use update_stock_quant_quantity_reducer::update_stock_quant_quantity;
-pub use update_stock_route_params_type::UpdateStockRouteParams;
 pub use update_stock_route_reducer::update_stock_route;
-pub use update_stock_rule_params_type::UpdateStockRuleParams;
 pub use update_stock_rule_reducer::update_stock_rule;
-pub use update_supplier_intake_params_type::UpdateSupplierIntakeParams;
 pub use update_supplier_intake_reducer::update_supplier_intake;
-pub use update_task_params_type::UpdateTaskParams;
 pub use update_task_reducer::update_task;
 pub use update_task_state_reducer::update_task_state;
-pub use update_tax_deadline_params_type::UpdateTaxDeadlineParams;
 pub use update_tax_deadline_reducer::update_tax_deadline;
-pub use update_tax_jurisdiction_params_type::UpdateTaxJurisdictionParams;
 pub use update_tax_jurisdiction_reducer::update_tax_jurisdiction;
-pub use update_tax_schedule_params_type::UpdateTaxScheduleParams;
 pub use update_tax_schedule_reducer::update_tax_schedule;
-pub use update_ticket_params_type::UpdateTicketParams;
 pub use update_ticket_reducer::update_ticket;
 pub use update_user_email_reducer::update_user_email;
 pub use update_user_organization_status_reducer::update_user_organization_status;
 pub use update_user_password_reducer::update_user_password;
-pub use update_user_profile_params_type::UpdateUserProfileParams;
 pub use update_user_profile_reducer::update_user_profile;
-pub use update_utm_campaign_params_type::UpdateUtmCampaignParams;
 pub use update_utm_campaign_reducer::update_utm_campaign;
-pub use update_utm_medium_params_type::UpdateUtmMediumParams;
 pub use update_utm_medium_reducer::update_utm_medium;
-pub use update_utm_source_params_type::UpdateUtmSourceParams;
 pub use update_utm_source_reducer::update_utm_source;
 pub use update_vehicle_position_reducer::update_vehicle_position;
-pub use update_warehouse_3_d_zone_params_type::UpdateWarehouse3DZoneParams;
-pub use update_warehouse_3_d_zone_reducer::update_warehouse_3_d_zone;
-pub use update_warehouse_params_type::UpdateWarehouseParams;
 pub use update_warehouse_reducer::update_warehouse;
+pub use update_warehouse_3_d_zone_reducer::update_warehouse_3_d_zone;
 pub use update_warehouse_task_status_reducer::update_warehouse_task_status;
-pub use update_whats_app_business_account_params_type::UpdateWhatsAppBusinessAccountParams;
-pub use update_whats_app_credentials_params_type::UpdateWhatsAppCredentialsParams;
-pub use update_whats_app_verification_params_type::UpdateWhatsAppVerificationParams;
 pub use update_whatsapp_business_account_reducer::update_whatsapp_business_account;
 pub use update_whatsapp_credentials_reducer::update_whatsapp_credentials;
 pub use update_whatsapp_quality_score_reducer::update_whatsapp_quality_score;
 pub use update_whatsapp_verification_status_reducer::update_whatsapp_verification_status;
-pub use update_widget_layout_params_type::UpdateWidgetLayoutParams;
 pub use update_widget_layout_reducer::update_widget_layout;
-pub use update_workcenter_params_type::UpdateWorkcenterParams;
 pub use update_workcenter_reducer::update_workcenter;
-pub use upsert_ai_skill_config_params_type::UpsertAiSkillConfigParams;
-pub use upsert_ai_skill_config_reducer::upsert_ai_skill_config;
-pub use upsert_ai_skill_params_type::UpsertAiSkillParams;
 pub use upsert_ai_skill_reducer::upsert_ai_skill;
-pub use upsert_organization_settings_params_type::UpsertOrganizationSettingsParams;
+pub use upsert_ai_skill_config_reducer::upsert_ai_skill_config;
 pub use upsert_organization_settings_reducer::upsert_organization_settings;
 pub use upsert_proposal_section_reducer::upsert_proposal_section;
-pub use upsert_search_embedding_params_type::UpsertSearchEmbeddingParams;
 pub use upsert_search_embedding_reducer::upsert_search_embedding;
 pub use upsert_warehouse_geo_reducer::upsert_warehouse_geo;
 pub use use_serial_reducer::use_serial;
-pub use user_credential_type::UserCredential;
-pub use user_custom_field_table::*;
-pub use user_custom_field_type::UserCustomField;
-pub use user_invite_type::UserInvite;
-pub use user_organization_table::*;
-pub use user_organization_type::UserOrganization;
-pub use user_profile_table::*;
-pub use user_profile_type::UserProfile;
-pub use user_role_assignment_table::*;
-pub use user_role_assignment_type::UserRoleAssignment;
-pub use user_session_table::*;
-pub use user_session_type::UserSession;
-pub use utm_campaign_table::*;
-pub use utm_campaign_type::UtmCampaign;
-pub use utm_medium_table::*;
-pub use utm_medium_type::UtmMedium;
-pub use utm_source_table::*;
-pub use utm_source_type::UtmSource;
 pub use validate_budget_reducer::validate_budget;
 pub use validate_consolidation_reducer::validate_consolidation;
 pub use validate_cycle_count_reducer::validate_cycle_count;
 pub use validate_stock_picking_reducer::validate_stock_picking;
-pub use validate_timesheets_params_type::ValidateTimesheetsParams;
 pub use validate_timesheets_reducer::validate_timesheets;
-pub use vehicle_status_type::VehicleStatus;
-pub use verification_level_type::VerificationLevel;
-pub use verification_status_type::VerificationStatus;
 pub use verify_contact_identity_reducer::verify_contact_identity;
 pub use void_payment_transaction_reducer::void_payment_transaction;
 pub use waive_tax_deadline_reducer::waive_tax_deadline;
-pub use warehouse_3_d_zone_table::*;
-pub use warehouse_3_d_zone_type::Warehouse3DZone;
-pub use warehouse_geo_table::*;
-pub use warehouse_geo_type::WarehouseGeo;
-pub use warehouse_table::*;
-pub use warehouse_task_table::*;
-pub use warehouse_task_type::WarehouseTask;
-pub use warehouse_type::Warehouse;
-pub use whats_app_business_account_type::WhatsAppBusinessAccount;
-pub use whatsapp_business_account_table::*;
-pub use widget_type_type::WidgetType;
 pub use worker_heartbeat_reducer::worker_heartbeat;
-pub use workflow_activity_table::*;
-pub use workflow_activity_type::WorkflowActivity;
-pub use workflow_instance_table::*;
-pub use workflow_instance_type::WorkflowInstance;
-pub use workflow_table::*;
-pub use workflow_transition_table::*;
-pub use workflow_transition_type::WorkflowTransition;
-pub use workflow_type::Workflow;
-pub use workflow_workitem_table::*;
-pub use workflow_workitem_type::WorkflowWorkitem;
-pub use workitem_state_type::WorkitemState;
-pub use workorder_state_type::WorkorderState;
-pub use zone_display_type_type::ZoneDisplayType;
 
 #[derive(Clone, PartialEq, Debug)]
 
@@ -3648,1355 +3707,1363 @@ pub use zone_display_type_type::ZoneDisplayType;
 /// to indicate which reducer caused the event.
 
 pub enum Reducer {
-    AcknowledgeInsight {
+        AcknowledgeInsight {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         insight_id: u64,
-        action_taken: Option<String>,
-    },
+        action_taken: Option::<String>,
+}    ,
     AcknowledgeIotAction {
         organization_id: u64,
         action_id: u64,
-        result_payload: Option<String>,
-    },
+        result_payload: Option::<String>,
+}    ,
     ActivatePosConfig {
         organization_id: u64,
         config_id: u64,
-    },
+}    ,
     ActivateRevenueRecognitionRule {
         organization_id: u64,
         company_id: u64,
         rule_id: u64,
-    },
+}    ,
     ActivateSubscription {
         organization_id: u64,
         company_id: u64,
         subscription_id: u64,
-    },
+}    ,
     AddAccountMoveLine {
         organization_id: u64,
         move_id: u64,
         params: AddAccountMoveLineParams,
-    },
+}    ,
     AddArticleMember {
         organization_id: u64,
         article_id: u64,
         member: __sdk::Identity,
-    },
+}    ,
     AddCasbinRule {
         organization_id: u64,
         params: AddCasbinRuleParams,
-    },
+}    ,
     AddContactToSegment {
         organization_id: u64,
         segment_id: u64,
         contact_id: u64,
-    },
+}    ,
     AddDocumentVersion {
         organization_id: u64,
         document_id: u64,
         params: AddDocumentVersionParams,
-    },
+}    ,
     AddFormField {
         organization_id: u64,
         configuration_id: u64,
         params: CreateFormFieldParams,
-    },
+}    ,
     AddLandedCostLine {
         organization_id: u64,
         landed_cost_id: u64,
         params: AddLandedCostLineParams,
-    },
+}    ,
     AddMemberToQualityTeam {
         organization_id: u64,
         team_id: u64,
         member_identity: __sdk::Identity,
-    },
+}    ,
     AddOrgMember {
         user_identity: __sdk::Identity,
         organization_id: u64,
         params: AddOrgMemberParams,
-    },
+}    ,
     AddProposalComment {
         proposal_id: u64,
         section_id: u64,
         content: String,
-        parent_id: Option<u64>,
+        parent_id: Option::<u64>,
         author_name: String,
-    },
+}    ,
     AddProposalLineItem {
         proposal_id: u64,
-        section_id: Option<u64>,
+        section_id: Option::<u64>,
         product_id: u64,
         product_name: String,
         quantity: f64,
         price_unit: f64,
         discount: f64,
-        notes: Option<String>,
-    },
+        notes: Option::<String>,
+}    ,
     AddProposalSourceDoc {
         proposal_id: u64,
         name: String,
         content: String,
         doc_type: String,
         word_count: u32,
-    },
+}    ,
     AddPurchaseOrderLine {
         organization_id: u64,
         order_id: u64,
         params: AddPurchaseOrderLineParams,
-    },
+}    ,
     AddRuleToNomenclature {
         organization_id: u64,
         nomenclature_id: u64,
         rule_id: u64,
-    },
+}    ,
     AddUserCustomField {
         organization_id: u64,
         params: CreateUserCustomFieldParams,
-    },
+}    ,
     AddUserToOrganization {
         user_identity: __sdk::Identity,
         organization_id: u64,
         params: AddUserToOrganizationParams,
-    },
+}    ,
     AddWidgetToDashboard {
         organization_id: u64,
         dashboard_id: u64,
         widget_id: u64,
-    },
+}    ,
     AddWorkflowActivity {
         organization_id: u64,
         workflow_id: u64,
         params: AddWorkflowActivityParams,
-    },
+}    ,
     AddWorkflowTransition {
         organization_id: u64,
         workflow_id: u64,
         activity_from: u64,
         activity_to: u64,
         params: AddWorkflowTransitionParams,
-    },
+}    ,
     AllocatePaymentTransaction {
         organization_id: u64,
         params: AllocatePaymentParams,
-    },
+}    ,
     AppendAiAgentRunStep {
         organization_id: u64,
         company_id: u64,
         run_id: u64,
         params: AppendAiAgentRunStepParams,
-    },
+}    ,
     AppendAiChatMessage {
         organization_id: u64,
         company_id: u64,
         params: AppendAiChatMessageParams,
-    },
+}    ,
+    ApplyGlobalMigrations ,
     ApplyLandedCosts {
         organization_id: u64,
         company_id: u64,
         landed_cost_id: u64,
-    },
+}    ,
+    ApplyOrgMigrations {
+        organization_id: u64,
+}    ,
     ApplyReconciliationRules {
         organization_id: u64,
         line_id: u64,
-        rule_id: Option<u64>,
-    },
+        rule_id: Option::<u64>,
+}    ,
     ApproveAiActionDraft {
         organization_id: u64,
         company_id: u64,
         draft_id: u64,
-    },
+}    ,
     ApproveApprovalRequest {
         organization_id: u64,
         company_id: u64,
         request_id: u64,
-    },
+}    ,
     ApproveBankStatementImport {
         organization_id: u64,
         import_id: u64,
-    },
+}    ,
     ApproveDocumentProcessingJob {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         job_id: u64,
-    },
+}    ,
     ApproveExpenseSheet {
         organization_id: u64,
         sheet_id: u64,
-    },
+}    ,
     ApproveIntercompanyTransaction {
         organization_id: u64,
         company_id: u64,
         transaction_id: u64,
-    },
+}    ,
     ApproveLeave {
         organization_id: u64,
         leave_id: u64,
-    },
+}    ,
     ApprovePurchaseRequisition {
         organization_id: u64,
         requisition_id: u64,
-    },
+}    ,
     ApproveSupplierIntake {
         organization_id: u64,
         intake_id: u64,
         partner_id: u64,
-    },
+}    ,
     ArchiveAiChatSession {
         organization_id: u64,
         company_id: u64,
         session_key: String,
         archived: bool,
-    },
+}    ,
     ArchiveContactIdentity {
         organization_id: u64,
         identity_id: u64,
-    },
+}    ,
     ArchiveEmployee {
         organization_id: u64,
         company_id: u64,
         employee_id: u64,
-        termination_date: Option<__sdk::Timestamp>,
-    },
+        termination_date: Option::<__sdk::Timestamp>,
+}    ,
     ArchiveFinancialReport {
         organization_id: u64,
         company_id: u64,
         report_id: u64,
-    },
+}    ,
     ArchivePaymentAccount {
         organization_id: u64,
         account_id: u64,
-    },
+}    ,
     AssignContactRole {
         organization_id: u64,
         params: AssignContactRoleParams,
-    },
+}    ,
     AssignQualityAlert {
         organization_id: u64,
         company_id: u64,
         alert_id: u64,
         user_id: __sdk::Identity,
-    },
+}    ,
     AssignRole {
         user_identity: __sdk::Identity,
         role_id: u64,
         organization_id: u64,
         params: AssignRoleParams,
-    },
+}    ,
     AssignStockMove {
         organization_id: u64,
         move_id: u64,
         params: CompanyScopeParams,
-    },
+}    ,
     AssignStockPicking {
         organization_id: u64,
         picking_id: u64,
         params: CompanyScopeParams,
-    },
+}    ,
     AssignTagToContact {
         organization_id: u64,
         contact_id: u64,
         tag_id: u64,
-        metadata: Option<String>,
-    },
+        metadata: Option::<String>,
+}    ,
     AssignTaskUsers {
         organization_id: u64,
         task_id: u64,
-        user_ids: Vec<__sdk::Identity>,
-    },
+        user_ids: Vec::<__sdk::Identity>,
+}    ,
     AssignTeamMemberSkill {
         organization_id: u64,
         params: AssignTeamMemberSkillParams,
-    },
+}    ,
     AssignTicket {
         organization_id: u64,
         ticket_id: u64,
         agent_id: __sdk::Identity,
-    },
+}    ,
     AssignUserToPicking {
         organization_id: u64,
         picking_id: u64,
         params: AssignUserToPickingParams,
-    },
-    BackfillExternalIds,
+}    ,
+    BackfillExternalIds ,
     BillTimesheets {
         organization_id: u64,
         params: BillTimesheetsParams,
-    },
+}    ,
     BlockSerial {
         organization_id: u64,
         serial_id: u64,
-        reason: Option<String>,
-    },
+        reason: Option::<String>,
+}    ,
     BlockWorkcenter {
         organization_id: u64,
         workcenter_id: u64,
         reason: String,
-    },
+}    ,
     BootstrapNewTenant {
         params: BootstrapNewTenantParams,
-    },
+}    ,
     CancelAccountMove {
         organization_id: u64,
         move_id: u64,
-    },
+}    ,
     CancelAiAgentRun {
         organization_id: u64,
         company_id: u64,
         run_id: u64,
-        reason: Option<String>,
-    },
+        reason: Option::<String>,
+}    ,
     CancelBudget {
         organization_id: u64,
         budget_id: u64,
-    },
+}    ,
     CancelConsolidation {
         organization_id: u64,
         journal_id: u64,
         reason: String,
-    },
+}    ,
     CancelContract {
         organization_id: u64,
         contract_id: u64,
-    },
+}    ,
     CancelIntercompanyTransaction {
         organization_id: u64,
         company_id: u64,
         transaction_id: u64,
         params: CancelIntercompanyTransactionParams,
-    },
+}    ,
     CancelLandedCost {
         organization_id: u64,
         landed_cost_id: u64,
-    },
+}    ,
     CancelManufacturingOrder {
         organization_id: u64,
         mo_id: u64,
-    },
+}    ,
     CancelMessageBatch {
         organization_id: u64,
         batch_id: u64,
-    },
+}    ,
     CancelPayment {
         organization_id: u64,
         payment_id: u64,
-    },
+}    ,
     CancelPayslip {
         organization_id: u64,
         company_id: u64,
         payslip_id: u64,
-    },
+}    ,
     CancelPickingBatch {
         organization_id: u64,
         batch_id: u64,
-    },
+}    ,
     CancelPurchaseOrder {
         organization_id: u64,
         order_id: u64,
-    },
+}    ,
     CancelPurchaseRequisition {
         organization_id: u64,
         requisition_id: u64,
-    },
+}    ,
     CancelQualityAlert {
         organization_id: u64,
         company_id: u64,
         alert_id: u64,
-        description: Option<String>,
-    },
+        description: Option::<String>,
+}    ,
     CancelReturnOrder {
         organization_id: u64,
         company_id: u64,
         return_order_id: u64,
-    },
+}    ,
     CancelSaleOrder {
         organization_id: u64,
         order_id: u64,
-        reason: Option<String>,
-    },
+        reason: Option::<String>,
+}    ,
     CancelStockMove {
         organization_id: u64,
         move_id: u64,
         params: CompanyScopeParams,
-    },
+}    ,
     CancelStockPicking {
         organization_id: u64,
         picking_id: u64,
         params: CompanyScopeParams,
-    },
+}    ,
     CancelWorkflowInstance {
         organization_id: u64,
         instance_id: u64,
-    },
+}    ,
     CheckMoAvailability {
         organization_id: u64,
         mo_id: u64,
-    },
+}    ,
     ClaimHubWithToken {
         token: String,
         serial: String,
         name: String,
-        ip_address: Option<String>,
-        firmware_version: Option<String>,
-    },
+        ip_address: Option::<String>,
+        firmware_version: Option::<String>,
+}    ,
     ClaimQueueJob {
         organization_id: u64,
         job_id: u64,
-    },
+}    ,
     ClearProposalPresence {
         proposal_id: u64,
-    },
+}    ,
     CloseAccountAsset {
         organization_id: u64,
         company_id: u64,
         asset_id: u64,
-    },
+}    ,
     CloseAccountPeriod {
         organization_id: u64,
         company_id: u64,
         period_id: u64,
-    },
+}    ,
     CloseFiscalYear {
         organization_id: u64,
         company_id: u64,
         fiscal_year_id: u64,
-    },
+}    ,
     ClosePosSession {
         organization_id: u64,
         session_id: u64,
         cash_register_balance_end_real: f64,
-    },
+}    ,
     ClosePurchaseRequisition {
         organization_id: u64,
         requisition_id: u64,
-    },
+}    ,
     CloseSubscription {
         organization_id: u64,
         company_id: u64,
         subscription_id: u64,
         params: CloseSubscriptionParams,
-    },
+}    ,
     CloseTicket {
         organization_id: u64,
         ticket_id: u64,
-    },
+}    ,
     CompleteActivity {
         organization_id: u64,
         activity_id: u64,
-    },
+}    ,
     CompleteAiAgentRun {
         organization_id: u64,
         company_id: u64,
         run_id: u64,
         params: CompleteAiAgentRunParams,
-    },
+}    ,
     CompleteDocumentProcessingJob {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         job_id: u64,
         params: CompleteDocumentProcessingJobParams,
-    },
+}    ,
     CompleteIntercompanyTransaction {
         organization_id: u64,
         company_id: u64,
         transaction_id: u64,
-    },
+}    ,
     CompletePickingBatch {
         organization_id: u64,
         batch_id: u64,
-    },
+}    ,
     CompletePickingWave {
         organization_id: u64,
         company_id: u64,
         wave_id: u64,
-    },
+}    ,
     CompleteProductivityLog {
         organization_id: u64,
         company_id: u64,
         log_id: u64,
-    },
+}    ,
     CompleteQueueJob {
         organization_id: u64,
         job_id: u64,
-        error_message: Option<String>,
-    },
+        error_message: Option::<String>,
+}    ,
     CompleteScheduledOwnerReportRun {
         organization_id: u64,
         run_id: u64,
         generated_owner_report_id: u64,
         document_id: u64,
-    },
+}    ,
     CompleteTaxDeadline {
         organization_id: u64,
         deadline_id: u64,
-    },
+}    ,
     ComputeBomCost {
         organization_id: u64,
         company_id: u64,
         bom_id: u64,
-    },
+}    ,
     ComputeDepreciationBoard {
         organization_id: u64,
         company_id: u64,
         asset_id: u64,
-    },
+}    ,
     ComputeInvoiceTotals {
         organization_id: u64,
         move_id: u64,
-    },
+}    ,
     ComputeLandedCosts {
         organization_id: u64,
         landed_cost_id: u64,
-    },
+}    ,
     ComputePosSessionTotals {
         organization_id: u64,
         session_id: u64,
-    },
+}    ,
     ComputePurchaseOrderLineTotals {
         organization_id: u64,
         order_id: u64,
-    },
+}    ,
     ComputePurchaseOrderTotals {
         organization_id: u64,
         order_id: u64,
-    },
+}    ,
     ComputeSoTotals {
         organization_id: u64,
         order_id: u64,
-    },
+}    ,
     ConfirmAccountAsset {
         organization_id: u64,
         company_id: u64,
         asset_id: u64,
-    },
+}    ,
     ConfirmBudget {
         organization_id: u64,
         budget_id: u64,
-    },
+}    ,
     ConfirmManufacturingOrder {
         organization_id: u64,
         mo_id: u64,
-    },
+}    ,
     ConfirmPayslip {
         organization_id: u64,
         payslip_id: u64,
         params: ConfirmPayslipParams,
-    },
+}    ,
     ConfirmPurchaseOrder {
         organization_id: u64,
         order_id: u64,
-    },
+}    ,
     ConfirmReturnOrder {
         organization_id: u64,
         company_id: u64,
         return_order_id: u64,
-    },
+}    ,
     ConfirmSalesOrder {
         organization_id: u64,
         order_id: u64,
-    },
+}    ,
     ConfirmStockMove {
         organization_id: u64,
         move_id: u64,
         params: CompanyScopeParams,
-    },
+}    ,
     ConfirmStockPicking {
         organization_id: u64,
         picking_id: u64,
         params: CompanyScopeParams,
-    },
+}    ,
     ConsumeMoMaterials {
         organization_id: u64,
         mo_id: u64,
-    },
+}    ,
     ConvertLeadToCustomer {
         organization_id: u64,
         lead_id: u64,
         params: ConvertLeadParams,
-    },
+}    ,
     ConvertOpportunityToSaleOrder {
         organization_id: u64,
         company_id: u64,
         opportunity_id: u64,
         params: ConvertOpportunityParams,
-    },
+}    ,
     CreateAccountAccount {
         organization_id: u64,
         params: CreateAccountAccountParams,
-    },
+}    ,
     CreateAccountAccountType {
         organization_id: u64,
         params: CreateAccountAccountTypeParams,
-    },
+}    ,
     CreateAccountAsset {
         organization_id: u64,
         company_id: u64,
         params: CreateAccountAssetParams,
-    },
+}    ,
     CreateAccountBankStatement {
         organization_id: u64,
         company_id: u64,
         journal_id: u64,
         params: CreateAccountBankStatementParams,
-    },
+}    ,
     CreateAccountBankStatementLine {
         organization_id: u64,
         company_id: u64,
         statement_id: u64,
         params: CreateAccountBankStatementLineParams,
-    },
+}    ,
     CreateAccountGroup {
         organization_id: u64,
         params: CreateAccountGroupParams,
-    },
+}    ,
     CreateAccountJournal {
         organization_id: u64,
         params: CreateAccountJournalParams,
-    },
+}    ,
     CreateAccountMove {
         organization_id: u64,
         params: CreateAccountMoveParams,
-    },
+}    ,
     CreateAccountPeriod {
         organization_id: u64,
         company_id: u64,
         params: CreateAccountPeriodParams,
-    },
+}    ,
     CreateAccountReconciliationWidget {
         organization_id: u64,
         company_id: u64,
         params: CreateAccountReconciliationWidgetParams,
-    },
+}    ,
     CreateAccountTax {
         organization_id: u64,
         company_id: u64,
         params: CreateAccountTaxParams,
-    },
+}    ,
     CreateAccountTaxGroup {
         organization_id: u64,
         company_id: u64,
         params: CreateAccountTaxGroupParams,
-    },
+}    ,
     CreateActivity {
         organization_id: u64,
         params: CreateActivityParams,
-    },
+}    ,
     CreateAdjustmentReason {
         organization_id: u64,
         params: CreateAdjustmentReasonParams,
-    },
+}    ,
     CreateAiActionDraft {
         organization_id: u64,
         company_id: u64,
         params: CreateAiActionDraftParams,
-    },
+}    ,
     CreateAiAgent {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateAiAgentParams,
-    },
+}    ,
     CreateAiAgentRun {
         organization_id: u64,
         params: CreateAiAgentRunParams,
-    },
+}    ,
     CreateAiChatSession {
         organization_id: u64,
         company_id: u64,
         params: CreateAiChatSessionParams,
-    },
+}    ,
     CreateAiInsight {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateAiInsightParams,
-    },
+}    ,
     CreateAiReducerAllowlist {
         organization_id: u64,
         params: CreateAiReducerAllowlistParams,
-    },
+}    ,
     CreateAiSkill {
         organization_id: u64,
         params: CreateAiSkillParams,
-    },
+}    ,
     CreateAiSkillFixture {
         organization_id: u64,
         params: CreateAiSkillFixtureParams,
-    },
+}    ,
     CreateAiSkillVersion {
         organization_id: u64,
         params: CreateAiSkillVersionParams,
-    },
+}    ,
     CreateAiTeamMember {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateAiTeamMemberParams,
-    },
+}    ,
     CreateAnalyticAccount {
         organization_id: u64,
         params: CreateAnalyticAccountParams,
-    },
+}    ,
     CreateAnalyticDistributionModel {
         organization_id: u64,
         params: CreateAnalyticDistributionModelParams,
-    },
+}    ,
     CreateAnalyticLine {
         organization_id: u64,
         params: CreateAnalyticLineParams,
-    },
+}    ,
     CreateAnalyticsMetric {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateAnalyticsMetricParams,
-    },
+}    ,
     CreateApprovalRule {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateApprovalRuleParams,
-    },
+}    ,
     CreateAuditRule {
         organization_id: u64,
         params: CreateAuditRuleParams,
-    },
+}    ,
     CreateBarcodeNomenclature {
         organization_id: u64,
         params: CreateBarcodeNomenclatureParams,
-    },
+}    ,
     CreateBarcodeRule {
         organization_id: u64,
         params: CreateBarcodeRuleParams,
-    },
+}    ,
     CreateBillFromPurchaseOrder {
         organization_id: u64,
         purchase_order_id: u64,
         params: CreateBillFromPurchaseOrderParams,
-    },
+}    ,
     CreateBillingAccount {
         organization_id: u64,
         params: CreateBillingAccountParams,
-    },
+}    ,
     CreateBom {
         organization_id: u64,
         params: CreateBomParams,
-    },
+}    ,
     CreateBudgetLine {
         organization_id: u64,
         budget_id: u64,
         params: CreateCrossoveredBudgetLineParams,
-    },
+}    ,
     CreateBudgetPost {
         organization_id: u64,
         params: CreateBudgetPostParams,
-    },
+}    ,
     CreateCalendarEvent {
         organization_id: u64,
         params: CreateCalendarEventParams,
-    },
+}    ,
     CreateCompany {
         organization_id: u64,
         params: CreateCompanyParams,
-    },
+}    ,
     CreateConsolidationAccount {
         organization_id: u64,
         params: CreateConsolidationAccountParams,
-    },
+}    ,
     CreateConsolidationJournal {
         organization_id: u64,
         params: CreateConsolidationJournalParams,
-    },
+}    ,
     CreateContact {
         organization_id: u64,
         params: CreateContactParams,
-    },
+}    ,
     CreateContactIdentity {
         organization_id: u64,
         params: CreateContactIdentityParams,
-    },
+}    ,
     CreateContactSegment {
         organization_id: u64,
         params: CreateContactSegmentParams,
-    },
+}    ,
     CreateContactTag {
         organization_id: u64,
         params: CreateContactTagParams,
-    },
+}    ,
     CreateContract {
         organization_id: u64,
         params: CreateContractParams,
-    },
+}    ,
     CreateCountry {
         code: String,
         params: CreateCountryParams,
-    },
+}    ,
     CreateCreditNoteFromInvoice {
         organization_id: u64,
         company_id: u64,
         invoice_id: u64,
         params: CreateCreditNoteParams,
-    },
+}    ,
     CreateCreditNoteFromReturnOrder {
         organization_id: u64,
         company_id: u64,
         return_order_id: u64,
         params: CreateCreditNoteFromReturnOrderParams,
-    },
+}    ,
     CreateCrossoveredBudget {
         organization_id: u64,
         params: CreateCrossoveredBudgetParams,
-    },
+}    ,
     CreateCurrency {
         code: String,
         params: CreateCurrencyParams,
-    },
+}    ,
     CreateCurrencyRate {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateCurrencyRateParams,
-    },
+}    ,
     CreateCycleCountPlan {
         organization_id: u64,
         company_id: u64,
         location_id: u64,
         params: CreateCycleCountPlanParams,
-    },
+}    ,
     CreateDashboard {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateDashboardParams,
-    },
+}    ,
     CreateDashboardWidget {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateDashboardWidgetParams,
-    },
+}    ,
     CreateDataClassification {
         organization_id: u64,
         params: CreateDataClassificationParams,
-    },
+}    ,
     CreateDataClassificationRule {
         organization_id: u64,
         params: CreateDataClassificationRuleParams,
-    },
+}    ,
     CreateDeferredRevenueSchedule {
         organization_id: u64,
         company_id: u64,
         params: CreateDeferredRevenueScheduleParams,
-    },
+}    ,
     CreateDeliveryCarrier {
         organization_id: u64,
         company_id: u64,
         params: CreateDeliveryCarrierParams,
-    },
+}    ,
     CreateDeliveryPriceRule {
         organization_id: u64,
         company_id: u64,
         params: CreateDeliveryPriceRuleParams,
-    },
+}    ,
     CreateDepartment {
         organization_id: u64,
         params: CreateDepartmentParams,
-    },
+}    ,
     CreateDepreciationLine {
         organization_id: u64,
         company_id: u64,
         params: CreateDepreciationLineParams,
-    },
+}    ,
     CreateDocument {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateDocumentParams,
-    },
+}    ,
     CreateDocumentFolder {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateDocumentFolderParams,
-    },
+}    ,
     CreateDocumentProcessingJob {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateDocumentProcessingJobParams,
-    },
+}    ,
     CreateDocumentTemplate {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateDocumentTemplateParams,
-    },
+}    ,
     CreateEliminationEntry {
         organization_id: u64,
         params: CreateEliminationEntryParams,
-    },
+}    ,
     CreateEmployee {
         organization_id: u64,
         params: CreateEmployeeParams,
-    },
+}    ,
     CreateExpense {
         organization_id: u64,
         params: CreateExpenseParams,
-    },
+}    ,
     CreateExpenseSheet {
         organization_id: u64,
         params: CreateExpenseSheetParams,
-    },
+}    ,
     CreateFinancialReport {
         organization_id: u64,
         company_id: u64,
         params: CreateFinancialReportParams,
-    },
+}    ,
     CreateFiscalYear {
         organization_id: u64,
         company_id: u64,
         params: CreateFiscalYearParams,
-    },
+}    ,
     CreateFleetVehicle {
         organization_id: u64,
         name: String,
         vehicle_type: String,
-        license_plate: Option<String>,
-        driver_name: Option<String>,
-    },
+        license_plate: Option::<String>,
+        driver_name: Option::<String>,
+}    ,
     CreateFormConfiguration {
         organization_id: u64,
         params: CreateFormConfigParams,
-    },
+}    ,
     CreateGoogleDriveConnection {
         organization_id: u64,
         name: String,
         account_email: String,
         account_id: String,
         credentials_reference: String,
-        root_folder_id: Option<String>,
-        shared_drive_id: Option<String>,
+        root_folder_id: Option::<String>,
+        shared_drive_id: Option::<String>,
         sync_enabled: bool,
         webhook_enabled: bool,
-        webhook_url: Option<String>,
-        webhook_secret_reference: Option<String>,
+        webhook_url: Option::<String>,
+        webhook_secret_reference: Option::<String>,
         sync_direction: SyncDirection,
         sync_frequency_minutes: u32,
-        allowed_file_types: Vec<String>,
+        allowed_file_types: Vec::<String>,
         max_file_size_mb: u32,
-    },
+}    ,
     CreateHelpdeskSla {
         organization_id: u64,
         params: CreateHelpdeskSlaParams,
-    },
+}    ,
     CreateHelpdeskStage {
         organization_id: u64,
         params: CreateHelpdeskStageParams,
-    },
+}    ,
     CreateHelpdeskTeam {
         organization_id: u64,
         params: CreateHelpdeskTeamParams,
-    },
+}    ,
     CreateIntercompanyRule {
         organization_id: u64,
         source_company_id: u64,
         destination_company_id: u64,
         params: CreateIntercompanyRuleParams,
-    },
+}    ,
     CreateIntercompanyTransaction {
         organization_id: u64,
         origin_company_id: u64,
         params: CreateIntercompanyTransactionParams,
-    },
+}    ,
     CreateInventoryAdjustment {
         organization_id: u64,
         params: CreateInventoryAdjustmentParams,
-    },
+}    ,
     CreateInvoiceFromSaleOrder {
         organization_id: u64,
         sale_order_id: u64,
         params: CreateInvoiceFromSaleOrderParams,
-    },
+}    ,
     CreateInvoiceReminderBatch {
         organization_id: u64,
         params: CreateInvoiceReminderBatchParams,
-    },
+}    ,
     CreateIotAction {
         organization_id: u64,
         device_id: u64,
         params: CreateActionParams,
-    },
+}    ,
     CreateIotAlert {
         organization_id: u64,
         device_id: u64,
         alert_type: String,
         severity: String,
         message: String,
-    },
+}    ,
     CreateJobPosition {
         organization_id: u64,
         params: CreateJobPositionParams,
-    },
+}    ,
     CreateKnowledgeArticle {
         organization_id: u64,
         params: CreateKnowledgeArticleParams,
-    },
+}    ,
     CreateKnowledgeCategory {
         organization_id: u64,
         params: CreateKnowledgeCategoryParams,
-    },
+}    ,
     CreateLandedCost {
         organization_id: u64,
         company_id: u64,
         params: CreateLandedCostParams,
-    },
+}    ,
     CreateLead {
         organization_id: u64,
         params: CreateLeadParams,
-    },
+}    ,
     CreateLeaveRequest {
         organization_id: u64,
         company_id: u64,
         params: CreateLeaveRequestParams,
-    },
+}    ,
     CreateLeaveType {
         organization_id: u64,
         company_id: u64,
         params: CreateLeaveTypeParams,
-    },
+}    ,
     CreateLoyaltyCard {
         organization_id: u64,
-        partner_id: Option<u64>,
+        partner_id: Option::<u64>,
         program_id: u64,
         code: String,
         points: f64,
-    },
+}    ,
     CreateLoyaltyProgram {
         organization_id: u64,
         params: CreateLoyaltyProgramParams,
-    },
+}    ,
     CreateMailTemplate {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateMailTemplateParams,
-    },
+}    ,
     CreateManufacturingOrder {
         organization_id: u64,
         params: CreateMrpProductionParams,
-    },
+}    ,
     CreateMessageBatch {
         organization_id: u64,
         params: CreateMessageBatchParams,
-    },
+}    ,
     CreateMessageTemplate {
         organization_id: u64,
         params: CreateMessageTemplateParams,
-    },
+}    ,
     CreateOperationalMessage {
         organization_id: u64,
         params: CreateOperationalMessageParams,
-    },
+}    ,
     CreateOpportunity {
         organization_id: u64,
         params: CreateOpportunityParams,
-    },
+}    ,
     CreateOpportunityLine {
         organization_id: u64,
         company_id: u64,
         opportunity_id: u64,
         params: CreateOpportunityLineParams,
-    },
+}    ,
     CreateOrganization {
         params: CreateOrganizationParams,
-    },
+}    ,
     CreatePartnerBank {
         organization_id: u64,
         params: CreatePartnerBankParams,
-    },
+}    ,
     CreatePasswordResetToken {
         target_identity: __sdk::Identity,
         token_hash: String,
         expires_at: __sdk::Timestamp,
-    },
+}    ,
     CreatePayment {
         organization_id: u64,
         params: CreatePaymentParams,
-    },
+}    ,
     CreatePaymentAccount {
         organization_id: u64,
         params: CreatePaymentAccountParams,
-    },
+}    ,
     CreatePaymentFee {
         organization_id: u64,
         params: CreatePaymentFeeParams,
-    },
+}    ,
     CreatePaymentMethod {
         organization_id: u64,
         company_id: u64,
         params: CreatePaymentMethodParams,
-    },
+}    ,
     CreatePaymentTerm {
         organization_id: u64,
         params: CreatePaymentTermParams,
-    },
+}    ,
     CreatePaymentTermLine {
         organization_id: u64,
         params: CreatePaymentTermLineParams,
-    },
+}    ,
     CreatePaymentTransaction {
         organization_id: u64,
         params: CreatePaymentTransactionParams,
-    },
+}    ,
     CreatePayrollStructure {
         organization_id: u64,
         params: CreatePayrollStructureParams,
-    },
+}    ,
     CreatePayslip {
         organization_id: u64,
         params: CreatePayslipParams,
-    },
+}    ,
     CreatePickingBatch {
         organization_id: u64,
         params: CreatePickingBatchParams,
-    },
+}    ,
     CreatePickingWave {
         organization_id: u64,
         company_id: u64,
         params: CreatePickingWaveParams,
-    },
+}    ,
     CreatePosConfig {
         organization_id: u64,
         company_id: u64,
         params: CreatePosConfigParams,
-    },
+}    ,
     CreatePosOrder {
         organization_id: u64,
         params: CreatePosOrderParams,
-    },
+}    ,
     CreatePosTerminal {
         organization_id: u64,
         name: String,
-        location_label: Option<String>,
-        latitude: Option<f64>,
-        longitude: Option<f64>,
-    },
+        location_label: Option::<String>,
+        latitude: Option::<f64>,
+        longitude: Option::<f64>,
+}    ,
     CreatePricelist {
         organization_id: u64,
         params: CreatePricelistParams,
-    },
+}    ,
     CreatePricelistItem {
         organization_id: u64,
         params: CreatePricelistItemParams,
-    },
+}    ,
     CreateProduct {
         organization_id: u64,
         params: CreateProductParams,
-    },
+}    ,
     CreateProductCategory {
         organization_id: u64,
         params: CreateProductCategoryParams,
-    },
+}    ,
     CreateProductPackaging {
         organization_id: u64,
         product_id: u64,
         params: CreateProductPackagingParams,
-    },
+}    ,
     CreateProductSupplierInfo {
         organization_id: u64,
         params: CreateProductSupplierInfoParams,
-    },
+}    ,
     CreateProductVariant {
         organization_id: u64,
         product_tmpl_id: u64,
         params: CreateProductVariantParams,
-    },
+}    ,
     CreateProject {
         organization_id: u64,
         params: CreateProjectParams,
-    },
+}    ,
     CreateProposal {
         organization_id: u64,
         title: String,
         client_name: String,
         value: f64,
-        deadline: Option<__sdk::Timestamp>,
-        description: Option<String>,
-        document_folder_id: Option<u64>,
-    },
+        deadline: Option::<__sdk::Timestamp>,
+        description: Option::<String>,
+        document_folder_id: Option::<u64>,
+}    ,
     CreatePurchaseOrder {
         organization_id: u64,
         params: CreatePurchaseOrderParams,
-    },
+}    ,
     CreatePurchaseRequisition {
         organization_id: u64,
         params: CreatePurchaseRequisitionParams,
-    },
+}    ,
     CreateQualityAlert {
         organization_id: u64,
         company_id: u64,
         team_id: u64,
         params: CreateQualityAlertParams,
-    },
+}    ,
     CreateQualityAlertReason {
         organization_id: u64,
         params: CreateQualityAlertReasonParams,
-    },
+}    ,
     CreateQualityCheck {
         organization_id: u64,
         company_id: u64,
         params: CreateQualityCheckParams,
-    },
+}    ,
     CreateQualityPoint {
         organization_id: u64,
         company_id: u64,
         params: CreateQualityPointParams,
-    },
+}    ,
     CreateQualityTeam {
         organization_id: u64,
         params: CreateQualityTeamParams,
-    },
+}    ,
     CreateReplenishmentRule {
         organization_id: u64,
         company_id: u64,
         params: CreateReplenishmentRuleParams,
-    },
+}    ,
     CreateReportTemplate {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateReportTemplateParams,
-    },
+}    ,
     CreateReturnOrder {
         organization_id: u64,
         company_id: u64,
         params: CreateReturnOrderParams,
-    },
+}    ,
     CreateRevenueRecognitionRule {
         organization_id: u64,
         company_id: u64,
         params: CreateRevenueRecognitionRuleParams,
-    },
+}    ,
     CreateRole {
         organization_id: u64,
         params: CreateRoleParams,
-    },
+}    ,
     CreateRoutingWorkcenter {
         organization_id: u64,
         company_id: u64,
         params: CreateRoutingWorkcenterParams,
-    },
+}    ,
     CreateSalaryRule {
         organization_id: u64,
         params: CreateSalaryRuleParams,
-    },
+}    ,
     CreateSaleOrder {
         organization_id: u64,
         params: CreateSaleOrderParams,
-    },
+}    ,
     CreateSaleOrderLine {
         organization_id: u64,
         order_id: u64,
         params: CreateSaleOrderLineParams,
-    },
+}    ,
     CreateSavedReport {
         organization_id: u64,
         company_id: u64,
         params: CreateSavedReportParams,
-    },
+}    ,
     CreateScheduledReport {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateScheduledReportParams,
-    },
+}    ,
     CreateShippingMethod {
         organization_id: u64,
         company_id: u64,
         params: CreateShippingMethodParams,
-    },
+}    ,
+    CreateSodConflictRule {
+        organization_id: u64,
+        params: CreateSodConflictRuleParams,
+}    ,
     CreateStockInventory {
         organization_id: u64,
         params: CreateStockInventoryParams,
-    },
+}    ,
     CreateStockInventoryLine {
         organization_id: u64,
         inventory_id: u64,
         params: CreateStockInventoryLineParams,
-    },
+}    ,
     CreateStockLocation {
         organization_id: u64,
         params: CreateStockLocationParams,
-    },
+}    ,
     CreateStockMove {
         organization_id: u64,
         params: CreateStockMoveParams,
-    },
+}    ,
     CreateStockPicking {
         organization_id: u64,
         params: CreateStockPickingParams,
-    },
+}    ,
     CreateStockProductionLot {
         organization_id: u64,
         params: CreateStockProductionLotParams,
-    },
+}    ,
     CreateStockProductionSerial {
         organization_id: u64,
         params: CreateStockProductionSerialParams,
-    },
+}    ,
     CreateStockQuant {
         organization_id: u64,
         params: CreateStockQuantParams,
-    },
+}    ,
     CreateStockRoute {
         organization_id: u64,
         params: CreateStockRouteParams,
-    },
+}    ,
     CreateStockRule {
         organization_id: u64,
         params: CreateStockRuleParams,
-    },
+}    ,
     CreateSubscriptionFromSaleOrder {
         organization_id: u64,
         params: CreateSubscriptionFromSaleOrderParams,
-    },
+}    ,
     CreateSubscriptionPlan {
         organization_id: u64,
         params: CreateSubscriptionPlanParams,
-    },
+}    ,
     CreateTask {
         organization_id: u64,
         params: CreateTaskParams,
-    },
+}    ,
     CreateTaxDeadline {
         organization_id: u64,
         params: CreateTaxDeadlineParams,
-    },
+}    ,
     CreateTaxJurisdiction {
         organization_id: u64,
         params: CreateTaxJurisdictionParams,
-    },
+}    ,
     CreateTaxSchedule {
         organization_id: u64,
         company_id: u64,
         params: CreateTaxScheduleParams,
-    },
+}    ,
     CreateTicket {
         organization_id: u64,
         params: CreateTicketParams,
-    },
+}    ,
     CreateTraceabilityRecord {
         organization_id: u64,
         params: CreateTraceabilityRecordParams,
-    },
+}    ,
     CreateTraceabilityReport {
         organization_id: u64,
         params: CreateStockTraceabilityReportParams,
-    },
+}    ,
     CreateTrialBalanceEntry {
         organization_id: u64,
         company_id: u64,
         params: CreateTrialBalanceEntryParams,
-    },
+}    ,
     CreateUom {
         organization_id: u64,
         params: CreateUomParams,
-    },
+}    ,
     CreateUomCategory {
         organization_id: u64,
         params: CreateUomCategoryParams,
-    },
+}    ,
     CreateUomConversion {
         organization_id: u64,
         category_id: u64,
         params: CreateUomConversionParams,
-    },
+}    ,
     CreateUserInvite {
         organization_id: u64,
         role_id: u64,
@@ -5004,2175 +5071,2192 @@ pub enum Reducer {
         token_hash: String,
         invited_by: __sdk::Identity,
         expires_at: __sdk::Timestamp,
-    },
+}    ,
     CreateUserSession {
         organization_id: u64,
         params: CreateUserSessionParams,
-    },
+}    ,
     CreateUtmCampaign {
         organization_id: u64,
         params: CreateUtmCampaignParams,
-    },
+}    ,
     CreateUtmMedium {
         organization_id: u64,
         params: CreateUtmMediumParams,
-    },
+}    ,
     CreateUtmSource {
         organization_id: u64,
         params: CreateUtmSourceParams,
-    },
+}    ,
     CreateWarehouse {
         organization_id: u64,
         company_id: u64,
         params: CreateWarehouseParams,
-    },
+}    ,
     CreateWarehouse3DZone {
         organization_id: u64,
         warehouse_id: u64,
         location_id: u64,
         params: CreateWarehouse3DZoneParams,
-    },
+}    ,
     CreateWarehouseTask {
         organization_id: u64,
         company_id: u64,
         params: CreateWarehouseTaskParams,
-    },
+}    ,
     CreateWhatsappBusinessAccount {
         organization_id: u64,
         params: CreateWhatsAppBusinessAccountParams,
-    },
+}    ,
     CreateWorkcenter {
         organization_id: u64,
         params: CreateWorkcenterParams,
-    },
+}    ,
     CreateWorkflow {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: CreateWorkflowParams,
-    },
+}    ,
     CreateWorkorder {
         organization_id: u64,
         params: CreateWorkorderParams,
-    },
+}    ,
     DeactivatePosConfig {
         organization_id: u64,
         config_id: u64,
-    },
+}    ,
     DeactivateRevenueRecognitionRule {
         organization_id: u64,
         company_id: u64,
         rule_id: u64,
-    },
+}    ,
     DeleteAccountAsset {
         organization_id: u64,
         company_id: u64,
         asset_id: u64,
-    },
+}    ,
     DeleteAccountBankStatement {
         organization_id: u64,
         company_id: u64,
         statement_id: u64,
-    },
+}    ,
     DeleteAccountBankStatementLine {
         organization_id: u64,
         company_id: u64,
         line_id: u64,
-    },
+}    ,
     DeleteAccountMoveLine {
         organization_id: u64,
         line_id: u64,
         params: DeleteAccountMoveLineParams,
-    },
+}    ,
     DeleteAccountPeriod {
         organization_id: u64,
         company_id: u64,
         period_id: u64,
-    },
+}    ,
     DeleteAccountReconciliationWidget {
         organization_id: u64,
         company_id: u64,
         widget_id: u64,
-    },
+}    ,
     DeleteAiReducerAllowlist {
         organization_id: u64,
         allowlist_id: u64,
-    },
+}    ,
     DeleteAnalyticLine {
         organization_id: u64,
         line_id: u64,
-    },
+}    ,
     DeleteApprovalRule {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         rule_id: u64,
-    },
+}    ,
     DeleteBarcodeNomenclature {
         organization_id: u64,
         nomenclature_id: u64,
-    },
+}    ,
     DeleteBarcodeRule {
         organization_id: u64,
         rule_id: u64,
-    },
+}    ,
     DeleteBom {
         organization_id: u64,
         company_id: u64,
         bom_id: u64,
-    },
+}    ,
     DeleteBudgetLine {
         organization_id: u64,
         line_id: u64,
-    },
+}    ,
     DeleteCalendarEvent {
         organization_id: u64,
         event_id: u64,
-    },
+}    ,
     DeleteCompany {
         company_id: u64,
-    },
+}    ,
     DeleteContact {
         organization_id: u64,
         contact_id: u64,
-    },
+}    ,
     DeleteDocument {
         organization_id: u64,
         document_id: u64,
-    },
+}    ,
     DeleteFinancialReport {
         organization_id: u64,
         company_id: u64,
         report_id: u64,
-    },
+}    ,
     DeleteFiscalYear {
         organization_id: u64,
         company_id: u64,
         fiscal_year_id: u64,
-    },
+}    ,
     DeleteFormField {
         organization_id: u64,
         configuration_id: u64,
         field_id: String,
-    },
+}    ,
     DeleteImportMappingTemplate {
         organization_id: u64,
         template_id: u64,
-    },
+}    ,
     DeleteIntegration {
         organization_id: u64,
         integration_id: u64,
         integration_type: IntegrationType,
-    },
+}    ,
     DeleteIntercompanyRule {
         organization_id: u64,
         company_id: u64,
         rule_id: u64,
-    },
+}    ,
     DeleteIotDevice {
         organization_id: u64,
         device_id: u64,
-    },
+}    ,
     DeleteIotHub {
         organization_id: u64,
         hub_id: u64,
-    },
+}    ,
     DeleteKnowledgeArticle {
         organization_id: u64,
         article_id: u64,
-    },
+}    ,
     DeleteKnowledgeCategory {
         organization_id: u64,
         category_id: u64,
-    },
+}    ,
     DeleteLandedCost {
         organization_id: u64,
         landed_cost_id: u64,
-    },
+}    ,
     DeleteLead {
         organization_id: u64,
         lead_id: u64,
-    },
+}    ,
     DeletePartnerBank {
         organization_id: u64,
         bank_id: u64,
-    },
+}    ,
     DeletePaymentTerm {
         organization_id: u64,
         term_id: u64,
-    },
+}    ,
     DeletePaymentTermLine {
         organization_id: u64,
         line_id: u64,
-    },
+}    ,
     DeletePricelist {
         organization_id: u64,
         pricelist_id: u64,
-    },
+}    ,
     DeletePricelistItem {
         organization_id: u64,
         item_id: u64,
-    },
+}    ,
     DeleteProduct {
         organization_id: u64,
         product_id: u64,
-    },
+}    ,
     DeleteProductCategory {
         organization_id: u64,
         category_id: u64,
-    },
+}    ,
     DeleteProposalLineItem {
         line_item_id: u64,
-    },
+}    ,
     DeleteProposalSection {
         section_id: u64,
-    },
+}    ,
     DeleteProposalSourceDoc {
         doc_id: u64,
-    },
+}    ,
     DeleteQualityAlertReason {
         organization_id: u64,
         reason_id: u64,
-    },
+}    ,
     DeleteQualityPoint {
         organization_id: u64,
         company_id: u64,
         point_id: u64,
-    },
+}    ,
     DeleteQualityTeam {
         organization_id: u64,
         team_id: u64,
-    },
+}    ,
     DeleteRecordCustomFieldValues {
         organization_id: u64,
         company_id: u64,
         model: String,
         record_id: u64,
-    },
+}    ,
     DeleteSavedReport {
         organization_id: u64,
         company_id: u64,
         saved_report_id: u64,
-    },
+}    ,
     DeleteSearchEmbedding {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         content_type: String,
         content_id: u64,
-    },
+}    ,
     DeleteStockLocation {
         organization_id: u64,
         location_id: u64,
-    },
+}    ,
     DeleteStockProductionLot {
         organization_id: u64,
         lot_id: u64,
-    },
+}    ,
     DeleteStockProductionSerial {
         organization_id: u64,
         serial_id: u64,
-    },
+}    ,
     DeleteStockRoute {
         organization_id: u64,
         route_id: u64,
-    },
+}    ,
     DeleteStockRule {
         organization_id: u64,
         rule_id: u64,
-    },
+}    ,
     DeleteSupplierIntake {
         organization_id: u64,
         intake_id: u64,
-    },
+}    ,
     DeleteTaxDeadline {
         organization_id: u64,
         deadline_id: u64,
-    },
+}    ,
     DeleteUserCustomField {
         organization_id: u64,
         custom_field_id: u64,
-    },
+}    ,
     DeleteWarehouse {
         organization_id: u64,
         company_id: u64,
         warehouse_id: u64,
-    },
+}    ,
     DeleteWarehouse3DZone {
         organization_id: u64,
         zone_id: u64,
-    },
+}    ,
     DeleteWhatsappBusinessAccount {
         organization_id: u64,
         account_id: u64,
-    },
+}    ,
     DeprecateAccountAccount {
         organization_id: u64,
         account_id: u64,
         params: DeprecateAccountAccountParams,
-    },
-    DevPromoteCallerSuperuser,
+}    ,
+    DevPromoteCallerSuperuser ,
     DismissInsight {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         insight_id: u64,
-    },
+}    ,
     DispatchDueOwnerReports {
         organization_id: u64,
-    },
+}    ,
     DisposeAccountAsset {
         organization_id: u64,
         company_id: u64,
         asset_id: u64,
         params: DisposeAccountAssetParams,
-    },
+}    ,
     DoneBudget {
         organization_id: u64,
         budget_id: u64,
-    },
+}    ,
     DoneStockMove {
         organization_id: u64,
         move_id: u64,
         params: DoneStockMoveParams,
-    },
+}    ,
     EndContactRole {
         organization_id: u64,
         assignment_id: u64,
         params: EndContactRoleParams,
-    },
+}    ,
     EndUserSession {
         session_id: u64,
-    },
+}    ,
     EnqueueJob {
         organization_id: u64,
         params: EnqueueJobParams,
-    },
-    EnsureDevAdmin,
+}    ,
+    EnsureDevAdmin ,
     ErrorIntercompanyTransaction {
         organization_id: u64,
         company_id: u64,
         transaction_id: u64,
         params: ErrorIntercompanyTransactionParams,
-    },
+}    ,
     ExecuteReplenishmentRule {
         organization_id: u64,
         company_id: u64,
         rule_id: u64,
-    },
+}    ,
+    ExecuteRetentionPurge {
+        organization_id: u64,
+}    ,
     ExpireAiActionDrafts {
         organization_id: u64,
         company_id: u64,
-    },
+}    ,
     ExpireContract {
         organization_id: u64,
         contract_id: u64,
-    },
+}    ,
     ExplodeBom {
         organization_id: u64,
         company_id: u64,
         bom_id: u64,
-    },
+}    ,
     ExportFinancialReport {
         organization_id: u64,
         company_id: u64,
         report_id: u64,
         params: ExportFinancialReportParams,
-    },
+}    ,
     FailIotAction {
         organization_id: u64,
         action_id: u64,
         error: String,
-    },
+}    ,
     FailQualityCheck {
         organization_id: u64,
         company_id: u64,
         check_id: u64,
         qty_failed: f64,
-        note: Option<String>,
-        picture_fail: Option<String>,
-        failure_location_id: Option<u64>,
-    },
+        note: Option::<String>,
+        picture_fail: Option::<String>,
+        failure_location_id: Option::<u64>,
+}    ,
     FailScheduledOwnerReportRun {
         organization_id: u64,
         run_id: u64,
         error_message: String,
-    },
+}    ,
     FinalizeImportAssistantJob {
         organization_id: u64,
         job_id: u64,
         params: FinalizeImportAssistantJobParams,
-    },
+}    ,
     FindDuplicateContacts {
         organization_id: u64,
         company_id: u64,
-    },
+}    ,
     FinishManufacturingOrder {
         organization_id: u64,
         mo_id: u64,
-    },
+}    ,
     FinishWorkorder {
         organization_id: u64,
         workorder_id: u64,
-    },
+}    ,
     GenerateEuVatReport {
         organization_id: u64,
         company_id: u64,
         params: GenerateEuVatReportParams,
-    },
+}    ,
     GenerateFinancialReport {
         organization_id: u64,
         company_id: u64,
         report_id: u64,
-    },
+}    ,
     GenerateHubPairingToken {
         organization_id: u64,
         company_id: u64,
-    },
+}    ,
     GenerateSubscriptionInvoice {
         organization_id: u64,
         company_id: u64,
         subscription_id: u64,
         params: GenerateSubscriptionInvoiceParams,
-    },
+}    ,
     GetFormConfiguration {
         organization_id: u64,
         module_id: String,
         form_id: String,
-    },
+}    ,
     GetOrganizationFormConfigs {
         organization_id: u64,
-    },
+}    ,
+    GrantDelegatedAdminScope {
+        organization_id: u64,
+        company_id: u64,
+        params: GrantDelegatedAdminScopeParams,
+}    ,
     GrantPermission {
         organization_id: u64,
         params: GrantOrgPermissionParams,
-    },
+}    ,
     HoldSupplierIntake {
         organization_id: u64,
         intake_id: u64,
-        notes: Option<String>,
-    },
+        notes: Option::<String>,
+}    ,
     ImportAccountCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportAccountMoveCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportAccountMoveLineCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportAiAgentCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportAnalyticAccountCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportAnalyticsMetricCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportBomCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportBomLineCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportBudgetCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportBudgetLineCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportCompanyCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportContactCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportCountryCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportCurrencyCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportCurrencyRateCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportExpenseCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportExpenseSheetCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHelpdeskSlaCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHelpdeskStageCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHelpdeskTeamCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHelpdeskTicketCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHrContractCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHrDepartmentCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHrEmployeeCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHrJobPositionCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHrLeaveCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHrLeaveTypeCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHrPayrollStructureCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHrPayslipCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHrResourceCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportHrSalaryRuleCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportKnowledgeArticleCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportKnowledgeCategoryCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportLeadCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportLotCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportManufacturingOrderCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportOpportunityCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportProductCategoryCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportProductCsv {
         organization_id: u64,
         currency_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportProductVariantCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportProjectCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportPurchaseOrderCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportPurchaseOrderLineCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportReportTemplateCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportRoleCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportSaleOrderCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportSaleOrderLineCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportStockLocationCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportStockQuantCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportSubscriptionCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportSubscriptionPlanCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportSupplierInfoCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportTaskCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportTaxRateCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportTimesheetCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportUomCategoryCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportUomCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportWarehouseCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportWorkcenterCsv {
         organization_id: u64,
         company_id: u64,
         csv_data: String,
-    },
+}    ,
     ImportWorkflowCsv {
         organization_id: u64,
         csv_data: String,
-    },
+}    ,
     InitializeDefaultFormConfigs {
         organization_id: u64,
-    },
+}    ,
     InvoicePoLine {
         organization_id: u64,
         line_id: u64,
         qty: f64,
-    },
+}    ,
     LinkDeviceToLocation {
         organization_id: u64,
         device_id: u64,
         location_id: u64,
-    },
+}    ,
     LinkDeviceToPos {
         organization_id: u64,
         device_id: u64,
         pos_config_id: u64,
-    },
+}    ,
     LinkDeviceToQualityCheck {
         organization_id: u64,
         device_id: u64,
         check_id: u64,
-    },
+}    ,
     LinkDeviceToWorkcenter {
         organization_id: u64,
         device_id: u64,
         workcenter_id: u64,
-    },
+}    ,
     LinkWorkosUser {
         target_identity: __sdk::Identity,
         workos_user_id: String,
-    },
+}    ,
     LockDocument {
         organization_id: u64,
         document_id: u64,
-    },
+}    ,
     LockKnowledgeArticle {
         organization_id: u64,
         article_id: u64,
-    },
+}    ,
     LockPurchaseOrder {
         organization_id: u64,
         order_id: u64,
-    },
+}    ,
     LogAuditEvent {
         organization_id: u64,
         params: LogAuditEventParams,
-    },
+}    ,
     LogTimesheet {
         organization_id: u64,
         params: LogTimesheetParams,
-    },
+}    ,
     LogWorkcenterProductivity {
         organization_id: u64,
         company_id: u64,
         workcenter_id: u64,
         params: CreateWorkcenterProductivityParams,
-    },
+}    ,
     MarkActionSent {
         organization_id: u64,
         action_id: u64,
-    },
+}    ,
     MarkEmbeddingSynced {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         embedding_id: u64,
         model: String,
         dim: u32,
-    },
+}    ,
     MarkInviteAccepted {
         invite_id: u64,
-    },
+}    ,
     MarkMailMessageDelivered {
         organization_id: u64,
         message_id: u64,
-        delivery_metadata: Option<String>,
-    },
+        delivery_metadata: Option::<String>,
+}    ,
     MarkResetTokenUsed {
         token_id: u64,
-    },
+}    ,
     MatchBankLine {
         organization_id: u64,
         line_id: u64,
-        rule_id: Option<u64>,
-    },
+        rule_id: Option::<u64>,
+}    ,
     MatchEliminationEntries {
         organization_id: u64,
         entry_id: u64,
         matched_entry_id: u64,
-    },
+}    ,
     MergeContacts {
         organization_id: u64,
         company_id: u64,
         source_contact_id: u64,
         params: MergeContactsParams,
-    },
-    MigrateAllOrganizations,
+}    ,
+    MigrateAllOrganizations ,
     MoveStockQuant {
         organization_id: u64,
         quant_id: u64,
         params: MoveStockQuantParams,
-    },
+}    ,
     OpenAccountPeriod {
         organization_id: u64,
         company_id: u64,
         period_id: u64,
-    },
+}    ,
     OpenContract {
         organization_id: u64,
         contract_id: u64,
-    },
+}    ,
     OpenFiscalYear {
         organization_id: u64,
         company_id: u64,
         fiscal_year_id: u64,
-    },
+}    ,
     OpenPosSession {
         organization_id: u64,
         config_id: u64,
         cash_register_balance_start: f64,
-    },
+}    ,
     OpenQualityAlert {
         organization_id: u64,
         company_id: u64,
         alert_id: u64,
-    },
+}    ,
     PassQualityCheck {
         organization_id: u64,
         company_id: u64,
         check_id: u64,
-        measure: Option<f64>,
-        note: Option<String>,
-        picture: Option<String>,
-    },
+        measure: Option::<f64>,
+        note: Option::<String>,
+        picture: Option::<String>,
+}    ,
     PostAccountBankStatement {
         organization_id: u64,
         company_id: u64,
         statement_id: u64,
-    },
+}    ,
     PostAccountMove {
         organization_id: u64,
         move_id: u64,
-    },
+}    ,
     PostCycleCountAdjustments {
         organization_id: u64,
         company_id: u64,
         cycle_count_id: u64,
-    },
+}    ,
     PostExpenseSheet {
         organization_id: u64,
         sheet_id: u64,
         accounting_date: __sdk::Timestamp,
-    },
+}    ,
     PostInternalNote {
         organization_id: u64,
         model: String,
         res_id: u64,
         body: String,
-    },
+}    ,
     PostInvoice {
         organization_id: u64,
         move_id: u64,
         cogs_account_id: u64,
         inventory_account_id: u64,
-    },
+}    ,
     PostLandedCosts {
         organization_id: u64,
         landed_cost_id: u64,
-    },
+}    ,
     PostMessage {
         organization_id: u64,
         model: String,
         res_id: u64,
         body: String,
-        parent_id: Option<u64>,
-        attachment_ids: Vec<u64>,
-    },
+        parent_id: Option::<u64>,
+        attachment_ids: Vec::<u64>,
+}    ,
     PostPayment {
         organization_id: u64,
         payment_id: u64,
-    },
+}    ,
     PostPaymentTransaction {
         organization_id: u64,
         transaction_id: u64,
-    },
+}    ,
     ProcessConsolidation {
         organization_id: u64,
         journal_id: u64,
-    },
+}    ,
     ProcessIntercompanyTransaction {
         organization_id: u64,
         company_id: u64,
         transaction_id: u64,
         params: ProcessIntercompanyTransactionParams,
-    },
+}    ,
     ProcessInventoryAdjustment {
         organization_id: u64,
         adjustment_id: u64,
-    },
+}    ,
     ProcessPendingScans {
         organization_id: u64,
-    },
+}    ,
     ProduceManufacturingOrder {
         organization_id: u64,
         mo_id: u64,
         qty_producing: f64,
-    },
+}    ,
     PromoteAiSkillVersion {
         organization_id: u64,
         skill_version_id: u64,
-        reason: Option<String>,
-    },
+        reason: Option::<String>,
+}    ,
     QueueMailFromTemplate {
         organization_id: u64,
         company_id: u64,
         params: QueueMailFromTemplateParams,
-    },
+}    ,
     ReceivePoLine {
         organization_id: u64,
         line_id: u64,
         qty: f64,
-    },
+}    ,
     RecognizeDeferredRevenue {
         organization_id: u64,
         company_id: u64,
         line_id: u64,
         params: RecognizeDeferredRevenueParams,
-    },
+}    ,
     ReconcileAccountBankStatementLine {
         organization_id: u64,
         company_id: u64,
         line_id: u64,
         params: ReconcileAccountBankStatementLineParams,
-    },
+}    ,
     ReconcilePaymentWithInvoice {
         organization_id: u64,
         payment_move_id: u64,
         invoice_move_id: u64,
-    },
+}    ,
     RecordAiAgentRunPolicySnapshot {
         organization_id: u64,
         company_id: u64,
         run_id: u64,
-        expected_release_id: Option<u64>,
-    },
+        expected_release_id: Option::<u64>,
+}    ,
     RecordAiSkillTestRun {
         organization_id: u64,
         params: RecordAiSkillTestRunParams,
-    },
+}    ,
     RecordAiSpend {
         organization_id: u64,
         agent_id: u64,
         tokens_used: u32,
-    },
+}    ,
     RecordBarcodeScan {
         organization_id: u64,
         params: RecordBarcodeScanParams,
-    },
+}    ,
     RecordCycleCountLine {
         organization_id: u64,
         company_id: u64,
         cycle_count_id: u64,
         params: RecordCycleCountLineParams,
-    },
+}    ,
     RecordDocumentView {
         organization_id: u64,
         document_id: u64,
-    },
+}    ,
     RecordGeneratedOwnerReport {
         organization_id: u64,
         company_id: u64,
         params: RecordGeneratedOwnerReportParams,
-    },
+}    ,
     RecordGoogleDriveSync {
         connection_id: u64,
         organization_id: u64,
-        next_sync_at: Option<__sdk::Timestamp>,
-    },
+        next_sync_at: Option::<__sdk::Timestamp>,
+}    ,
     RecordGoogleDriveSyncError {
         connection_id: u64,
         organization_id: u64,
         error_message: String,
-    },
+}    ,
     RecordMessageCopied {
         organization_id: u64,
         message_id: u64,
-    },
+}    ,
     RecordPrivacyConsent {
         organization_id: u64,
         params: RecordPrivacyConsentParams,
-    },
+}    ,
     RecordReportRun {
         organization_id: u64,
         report_id: u64,
         next_run: __sdk::Timestamp,
-    },
+}    ,
     RecordTelemetry {
         organization_id: u64,
         device_id: u64,
         params: RecordTelemetryParams,
-    },
+}    ,
     RecordTelemetryBatch {
         organization_id: u64,
         device_id: u64,
-        readings: Vec<RecordTelemetryParams>,
-    },
+        readings: Vec::<RecordTelemetryParams>,
+}    ,
     RecordWhatsappHealthCheck {
         organization_id: u64,
         account_id: u64,
         params: RecordWhatsAppHealthCheckParams,
-    },
+}    ,
     RecordWhatsappMessageSent {
         organization_id: u64,
         account_id: u64,
-    },
+}    ,
     RefreshPolicySnapshot {
         organization_id: u64,
-    },
+}    ,
     RefreshTaxDeadlineStatuses {
         organization_id: u64,
-    },
+}    ,
     RefuseExpenseSheet {
         organization_id: u64,
         sheet_id: u64,
-    },
+}    ,
     RefuseLeave {
         organization_id: u64,
         leave_id: u64,
-    },
+}    ,
     RegisterIotDevice {
         organization_id: u64,
         company_id: u64,
         hub_id: u64,
         params: RegisterDeviceParams,
-    },
+}    ,
     RegisterIotHub {
         organization_id: u64,
         company_id: u64,
         params: RegisterHubParams,
-    },
+}    ,
     RegisterPaymentOnInvoice {
         organization_id: u64,
         payment_id: u64,
-        invoice_ids: Vec<u64>,
+        invoice_ids: Vec::<u64>,
         is_bill: bool,
-    },
+}    ,
     RegisterQueueWorker {
         organization_id: u64,
         params: RegisterQueueWorkerParams,
-    },
+}    ,
     RejectAiActionDraft {
         organization_id: u64,
         company_id: u64,
         draft_id: u64,
         reason: String,
-    },
+}    ,
     RejectApprovalRequest {
         organization_id: u64,
         company_id: u64,
         request_id: u64,
         params: RejectApprovalRequestParams,
-    },
+}    ,
     RejectSupplierIntake {
         organization_id: u64,
         intake_id: u64,
         rejection_reason: String,
-    },
+}    ,
     RemoveArticleMember {
         organization_id: u64,
         article_id: u64,
         member: __sdk::Identity,
-    },
+}    ,
     RemoveCasbinRule {
         organization_id: u64,
         rule_id: u64,
-    },
+}    ,
     RemoveLandedCostLine {
         organization_id: u64,
         line_id: u64,
-    },
+}    ,
     RemoveMemberFromQualityTeam {
         organization_id: u64,
         team_id: u64,
         member_identity: __sdk::Identity,
-    },
+}    ,
     RemovePurchaseOrderLine {
         organization_id: u64,
         line_id: u64,
-    },
+}    ,
     RemoveRuleFromNomenclature {
         organization_id: u64,
         nomenclature_id: u64,
         rule_id: u64,
-    },
+}    ,
     RemoveUserFromOrganization {
         user_identity: __sdk::Identity,
         organization_id: u64,
-    },
+}    ,
     ReopenTicket {
         organization_id: u64,
         ticket_id: u64,
-    },
+}    ,
     ReorderProposalLineItems {
         proposal_id: u64,
-        ordered_ids: Vec<u64>,
-    },
+        ordered_ids: Vec::<u64>,
+}    ,
     RequestEmbeddingJob {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         content_type: String,
         content_id: u64,
         text: String,
-    },
+}    ,
     ReserveSerial {
         organization_id: u64,
         serial_id: u64,
-    },
+}    ,
     ReserveStockQuant {
         organization_id: u64,
         quant_id: u64,
         params: StockQuantReserveParams,
-    },
+}    ,
     ResetLeaveToDraft {
         organization_id: u64,
         leave_id: u64,
-    },
+}    ,
     ResolveIotAlert {
         organization_id: u64,
         alert_id: u64,
-    },
+}    ,
     ResolveProposalComment {
         comment_id: u64,
-    },
+}    ,
     RestoreProductCategory {
         organization_id: u64,
         category_id: u64,
-    },
+}    ,
     RetryIntercompanyTransaction {
         organization_id: u64,
         company_id: u64,
         transaction_id: u64,
-    },
+}    ,
     RetryIotAction {
         organization_id: u64,
         action_id: u64,
-    },
+}    ,
     ReversePaymentTransaction {
         organization_id: u64,
         transaction_id: u64,
         params: ReversePaymentTransactionParams,
-    },
+}    ,
     ReviewMessageBatch {
         organization_id: u64,
         batch_id: u64,
         params: ReviewMessageBatchParams,
-    },
+}    ,
     ReviewSupplierIntake {
         organization_id: u64,
         intake_id: u64,
-        notes: Option<String>,
-    },
+        notes: Option::<String>,
+}    ,
     RevokePermission {
         organization_id: u64,
         permission_id: u64,
-    },
+}    ,
     RevokeRole {
         organization_id: u64,
         assignment_id: u64,
-    },
+}    ,
     RollbackAiSkillRelease {
         organization_id: u64,
         skill_id: u64,
         target_release_id: u64,
         reason: String,
-    },
+}    ,
     RollbackImportJob {
         organization_id: u64,
         job_id: u64,
-    },
-    RunAccountingPaymentCancelTest,
-    RunAccountingPaymentManagementTest,
-    RunAccountingPaymentReconcileTest,
-    RunAccountingPaymentTermUpdateTest,
-    RunAccountingPeriodLockTest,
-    RunAccountingPostInvoiceTest,
-    RunAccountingPostedImmutabilityTest,
-    RunAccountingTrialBalanceTest,
-    RunAllAccountingTests,
-    RunAllCoreTests,
-    RunAllCrmTests,
-    RunAllDomainTests,
-    RunAllInventoryTests,
-    RunAllPlatformTests,
-    RunAllSalesTests,
-    RunCoreOperationalMessagingTest,
-    RunCrmContactIdentityTest,
-    RunCrmContactUpdateDeleteTest,
-    RunCrmOpportunityConvertTest,
-    RunDocumentsFolderTest,
-    RunHelpdeskTicketTest,
-    RunHrLeaveTypeTest,
-    RunInventoryAdjustmentTest,
-    RunInventoryDeliveryQuantTest,
-    RunInventoryProductCategoryTest,
-    RunInventoryProductUpdateTest,
-    RunInventoryReceiptQuantTest,
-    RunInventoryStockInventoryTest,
-    RunInventoryStockQuantTest,
-    RunManufacturingWorkcenterTest,
+}    ,
+    RunAccountingIcConsolidationTest ,
+    RunAccountingPaymentCancelTest ,
+    RunAccountingPaymentManagementTest ,
+    RunAccountingPaymentReconcileTest ,
+    RunAccountingPaymentTermUpdateTest ,
+    RunAccountingPeriodLockTest ,
+    RunAccountingPostInvoiceTest ,
+    RunAccountingPostedImmutabilityTest ,
+    RunAccountingTrialBalanceTest ,
+    RunAllAccountingTests ,
+    RunAllCoreTests ,
+    RunAllCrmTests ,
+    RunAllDomainTests ,
+    RunAllInventoryTests ,
+    RunAllPlatformTests ,
+    RunAllSalesTests ,
+    RunCoreOperationalMessagingTest ,
+    RunCoreSodTest ,
+    RunCountryPackTest ,
+    RunCrmContactIdentityTest ,
+    RunCrmContactUpdateDeleteTest ,
+    RunCrmOpportunityConvertTest ,
+    RunDocumentsFolderTest ,
+    RunHelpdeskTicketTest ,
+    RunHrLeaveTypeTest ,
+    RunInventoryAdjustmentTest ,
+    RunInventoryDeliveryQuantTest ,
+    RunInventoryProductCategoryTest ,
+    RunInventoryProductUpdateTest ,
+    RunInventoryReceiptQuantTest ,
+    RunInventoryStockInventoryTest ,
+    RunInventoryStockQuantTest ,
+    RunManufacturingWorkcenterTest ,
     RunOwnerReportSchedule {
         organization_id: u64,
         report_id: u64,
-    },
-    RunPurchasingBillBalancedTest,
-    RunSalesOrderDeliveryTest,
-    RunSalesOrderInvoiceTest,
-    RunSalesOrderUpdateTest,
-    RunSubscriptionPlanTest,
+}    ,
+    RunPurchasingBillBalancedTest ,
+    RunSalesOrderDeliveryTest ,
+    RunSalesOrderInvoiceTest ,
+    RunSalesOrderUpdateTest ,
+    RunSubscriptionPlanTest ,
+    RunTenantIsolationTests ,
     RunTraceabilityReport {
         organization_id: u64,
         report_id: u64,
-    },
-    RunWorkflowDefinitionTest,
+}    ,
+    RunWorkflowDefinitionTest ,
     SaveImportMappingTemplate {
         organization_id: u64,
-        template_id: Option<u64>,
+        template_id: Option::<u64>,
         params: SaveImportMappingTemplateParams,
-    },
+}    ,
     SaveProposalVersion {
         proposal_id: u64,
         message: String,
         sections_json: String,
-    },
+}    ,
     ScheduleTaxDeadlineUpdates {
-        organization_id: Option<u64>,
-    },
-    SeedDevData,
+        organization_id: Option::<u64>,
+}    ,
+    SeedDevData ,
     SeedOrganizationFormConfigs {
         organization_id: u64,
-    },
+}    ,
     SendPurchaseOrder {
         organization_id: u64,
         order_id: u64,
-    },
+}    ,
     SetAiAgentActive {
         organization_id: u64,
         agent_id: u64,
         is_active: bool,
-    },
+}    ,
     SetAiReducerAllowlistEnabled {
         organization_id: u64,
         allowlist_id: u64,
         enabled: bool,
-    },
+}    ,
     SetAiSkillActive {
         organization_id: u64,
         skill_id: u64,
         active: bool,
-    },
+}    ,
     SetAnalyticAccountActive {
         organization_id: u64,
         account_id: u64,
         active: bool,
-    },
+}    ,
     SetApprovalRuleActive {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         rule_id: u64,
         active: bool,
-    },
+}    ,
     SetArticlePublished {
         organization_id: u64,
         article_id: u64,
         params: SetArticlePublishedParams,
-    },
+}    ,
     SetAssetActive {
         organization_id: u64,
         company_id: u64,
         asset_id: u64,
         active: bool,
-    },
+}    ,
     SetBillingStatus {
         organization_id: u64,
         billing_account_id: u64,
         status: String,
-    },
+}    ,
+    SetCompanyCountryPack {
+        organization_id: u64,
+        company_id: u64,
+        params: SetCompanyCountryPackParams,
+}    ,
     SetCompanyVerticalPack {
         company_id: u64,
         params: SetCompanyVerticalPackParams,
-    },
+}    ,
     SetConsolidationCompanyRate {
         organization_id: u64,
         params: SetConsolidationCompanyRateParams,
-    },
+}    ,
     SetContactCommunicationPreference {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         contact_id: u64,
         channel: MessageChannel,
         opted_in: bool,
-    },
+}    ,
     SetFormRoleConfig {
         organization_id: u64,
         configuration_id: u64,
         params: CreateRoleConfigParams,
-    },
+}    ,
     SetIntercompanyRuleActive {
         organization_id: u64,
         company_id: u64,
         rule_id: u64,
         is_active: bool,
-    },
+}    ,
     SetIotThreshold {
         organization_id: u64,
         device_id: u64,
         sensor_type: String,
-        min_value: Option<f64>,
-        max_value: Option<f64>,
+        min_value: Option::<f64>,
+        max_value: Option::<f64>,
         severity: String,
-    },
+}    ,
     SetProjectActive {
         organization_id: u64,
         project_id: u64,
         active: bool,
-    },
+}    ,
     SetRecordCustomFieldValues {
         organization_id: u64,
         company_id: u64,
         params: SetRecordCustomFieldValuesParams,
-    },
+}    ,
     SetTaskParent {
         organization_id: u64,
         task_id: u64,
-        parent_id: Option<u64>,
-    },
+        parent_id: Option::<u64>,
+}    ,
     SetWhatsappPrimaryAccount {
         organization_id: u64,
         account_id: u64,
-    },
+}    ,
     SetWorkflowActive {
         organization_id: u64,
         workflow_id: u64,
         is_active: bool,
-    },
+}    ,
     SetWorkitemException {
         organization_id: u64,
         workitem_id: u64,
-    },
+}    ,
     SetupFiscalCalendar {
         organization_id: u64,
         company_id: u64,
         params: SetupFiscalCalendarParams,
-    },
+}    ,
     ShareDashboard {
         organization_id: u64,
         dashboard_id: u64,
         params: UpdateDashboardShareParams,
-    },
+}    ,
     SignalWorkflow {
         organization_id: u64,
         instance_id: u64,
         signal: String,
-    },
+}    ,
     SolveQualityAlert {
         organization_id: u64,
         company_id: u64,
         alert_id: u64,
-        description: Option<String>,
-    },
+        description: Option::<String>,
+}    ,
     StageBankStatementImport {
         organization_id: u64,
         company_id: u64,
         journal_id: u64,
         currency_id: u64,
         params: StageBankStatementImportParams,
-    },
+}    ,
     StartCycleCountSession {
         organization_id: u64,
         company_id: u64,
         cycle_count_id: u64,
-    },
+}    ,
     StartManufacturingOrder {
         organization_id: u64,
         mo_id: u64,
-    },
+}    ,
     StartPickingBatch {
         organization_id: u64,
         batch_id: u64,
-    },
+}    ,
     StartQualityCheck {
         organization_id: u64,
         company_id: u64,
         check_id: u64,
-    },
+}    ,
     StartTimesheetTimer {
         organization_id: u64,
         params: StartTimesheetTimerParams,
-    },
+}    ,
     StartWorkflow {
         organization_id: u64,
         workflow_id: u64,
         res_id: u64,
         res_type: String,
-    },
+}    ,
     StartWorkorder {
         organization_id: u64,
         workorder_id: u64,
-    },
+}    ,
     StopTimesheetTimer {
         organization_id: u64,
         timesheet_id: u64,
-    },
+}    ,
     StoreSsoUserCredential {
         new_identity: __sdk::Identity,
         email: String,
         stdb_token_enc: String,
         workos_user_id: String,
         email_verified: bool,
-    },
+}    ,
     StoreUserCredential {
         new_identity: __sdk::Identity,
         email: String,
         password_hash: String,
         stdb_token_enc: String,
-    },
+}    ,
     SubmitExpense {
         organization_id: u64,
         expense_id: u64,
         sheet_id: u64,
-    },
+}    ,
     SubmitExpenseSheet {
         organization_id: u64,
         sheet_id: u64,
         params: SubmitExpenseSheetParams,
-    },
+}    ,
     SubmitPurchaseRequisition {
         organization_id: u64,
         requisition_id: u64,
-    },
+}    ,
     SubmitSupplierIntake {
         organization_id: u64,
         params: SubmitSupplierIntakeParams,
-    },
+}    ,
     SubscribeToRecord {
         organization_id: u64,
         res_model: String,
         res_id: u64,
-        subtypes: Vec<String>,
-    },
+        subtypes: Vec::<String>,
+}    ,
     SyncHubDevices {
         organization_id: u64,
         hub_id: u64,
-        detected: Vec<DeviceSyncEntry>,
-    },
+        detected: Vec::<DeviceSyncEntry>,
+}    ,
     TestIotDevice {
         organization_id: u64,
         device_id: u64,
-    },
+}    ,
     ToggleProjectFavorite {
         organization_id: u64,
         project_id: u64,
-    },
+}    ,
     UnassignTeamMemberSkill {
         organization_id: u64,
         team_member_skill_id: u64,
-    },
+}    ,
     UnblockWorkcenter {
         organization_id: u64,
         workcenter_id: u64,
-    },
+}    ,
     UnlinkDevice {
         organization_id: u64,
         device_id: u64,
-    },
+}    ,
     UnlockDocument {
         organization_id: u64,
         document_id: u64,
-    },
+}    ,
     UnlockKnowledgeArticle {
         organization_id: u64,
         article_id: u64,
-    },
+}    ,
     UnlockPurchaseOrder {
         organization_id: u64,
         order_id: u64,
-    },
+}    ,
     UnmatchEliminationEntry {
         organization_id: u64,
         entry_id: u64,
-    },
+}    ,
     UnreconciledAccountBankStatementLine {
         organization_id: u64,
         company_id: u64,
         line_id: u64,
         params: UnreconcileAccountBankStatementLineParams,
-    },
+}    ,
     UnreserveStockQuant {
         organization_id: u64,
         quant_id: u64,
         params: StockQuantUnreserveParams,
-    },
+}    ,
     UnsubscribeFromRecord {
         organization_id: u64,
         res_model: String,
         res_id: u64,
-    },
+}    ,
     UpdateAccountAccount {
         organization_id: u64,
         account_id: u64,
         params: UpdateAccountAccountParams,
-    },
+}    ,
     UpdateAccountAccountType {
         organization_id: u64,
         type_id: u64,
         params: UpdateAccountAccountTypeParams,
-    },
+}    ,
     UpdateAccountAsset {
         organization_id: u64,
         company_id: u64,
         asset_id: u64,
         params: UpdateAccountAssetParams,
-    },
+}    ,
     UpdateAccountBankStatement {
         organization_id: u64,
         company_id: u64,
         statement_id: u64,
         params: UpdateAccountBankStatementParams,
-    },
+}    ,
     UpdateAccountBankStatementLine {
         organization_id: u64,
         company_id: u64,
         line_id: u64,
         params: UpdateAccountBankStatementLineParams,
-    },
+}    ,
     UpdateAccountGroup {
         organization_id: u64,
         group_id: u64,
         params: UpdateAccountGroupParams,
-    },
+}    ,
     UpdateAccountJournal {
         organization_id: u64,
         journal_id: u64,
         params: UpdateAccountJournalParams,
-    },
+}    ,
     UpdateAccountMoveLine {
         organization_id: u64,
         line_id: u64,
         params: UpdateAccountMoveLineParams,
-    },
+}    ,
     UpdateAccountPeriod {
         organization_id: u64,
         company_id: u64,
         period_id: u64,
         params: UpdateAccountPeriodParams,
-    },
+}    ,
     UpdateAccountReconciliationWidget {
         organization_id: u64,
         company_id: u64,
         widget_id: u64,
         params: UpdateAccountReconciliationWidgetParams,
-    },
+}    ,
     UpdateAccountTax {
         organization_id: u64,
         company_id: u64,
         tax_id: u64,
         params: UpdateAccountTaxParams,
-    },
+}    ,
     UpdateAccountTaxGroup {
         organization_id: u64,
         company_id: u64,
         group_id: u64,
         params: UpdateAccountTaxGroupParams,
-    },
+}    ,
     UpdateAiActionDraftParams {
         organization_id: u64,
         company_id: u64,
         draft_id: u64,
         params: UpdateAiActionDraftParamsParams,
-    },
+}    ,
     UpdateAiAgent {
         organization_id: u64,
         agent_id: u64,
         params: UpdateAiAgentParams,
-    },
+}    ,
     UpdateAiChatSessionTitle {
         organization_id: u64,
         company_id: u64,
         session_key: String,
         params: UpdateAiChatSessionTitleParams,
-    },
+}    ,
     UpdateAiReducerAllowlist {
         organization_id: u64,
         allowlist_id: u64,
         params: UpdateAiReducerAllowlistParams,
-    },
+}    ,
     UpdateAnalyticAccount {
         organization_id: u64,
         account_id: u64,
         params: UpdateAnalyticAccountParams,
-    },
+}    ,
     UpdateAnalyticDistributionModel {
         organization_id: u64,
         model_id: u64,
         params: UpdateAnalyticDistributionModelParams,
-    },
+}    ,
     UpdateAnalyticLine {
         organization_id: u64,
         line_id: u64,
         params: UpdateAnalyticLineParams,
-    },
+}    ,
     UpdateApprovalRule {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         rule_id: u64,
         params: UpdateApprovalRuleParams,
-    },
+}    ,
     UpdateAuditRule {
         rule_id: u64,
         params: UpdateAuditRuleParams,
-    },
+}    ,
     UpdateBarcodeNomenclature {
         organization_id: u64,
         nomenclature_id: u64,
         params: UpdateBarcodeNomenclatureParams,
-    },
+}    ,
     UpdateBarcodeRule {
         organization_id: u64,
         rule_id: u64,
         params: UpdateBarcodeRuleParams,
-    },
+}    ,
     UpdateBillingAccount {
         organization_id: u64,
         billing_account_id: u64,
         params: UpdateBillingAccountParams,
-    },
+}    ,
     UpdateBom {
         organization_id: u64,
         company_id: u64,
         bom_id: u64,
         params: UpdateBomParams,
-    },
+}    ,
     UpdateBudgetLine {
         organization_id: u64,
         line_id: u64,
         params: UpdateCrossoveredBudgetLineParams,
-    },
+}    ,
     UpdateBudgetLineActuals {
         organization_id: u64,
         line_id: u64,
         params: UpdateBudgetLineActualsParams,
-    },
+}    ,
     UpdateBudgetPost {
         organization_id: u64,
         post_id: u64,
         params: UpdateBudgetPostParams,
-    },
+}    ,
     UpdateCalendarEvent {
         organization_id: u64,
         event_id: u64,
         params: UpdateCalendarEventParams,
-    },
+}    ,
     UpdateCompany {
         company_id: u64,
         params: UpdateCompanyParams,
-    },
+}    ,
     UpdateCompanyAddress {
         company_id: u64,
         params: UpdateCompanyAddressParams,
-    },
+}    ,
     UpdateCompanyBusiness {
         company_id: u64,
         params: UpdateCompanyBusinessParams,
-    },
+}    ,
     UpdateCompanyHierarchy {
         company_id: u64,
         params: UpdateCompanyHierarchyParams,
-    },
+}    ,
     UpdateConsolidationAccount {
         organization_id: u64,
         account_id: u64,
         params: UpdateConsolidationAccountParams,
-    },
+}    ,
     UpdateContact {
         organization_id: u64,
         contact_id: u64,
         params: UpdateContactCoreParams,
-    },
+}    ,
     UpdateContactAddress {
         organization_id: u64,
         contact_id: u64,
         params: UpdateContactAddressParams,
-    },
+}    ,
     UpdateContactBusiness {
         organization_id: u64,
         contact_id: u64,
         params: UpdateContactBusinessParams,
-    },
+}    ,
     UpdateContactDetails {
         organization_id: u64,
         contact_id: u64,
         params: UpdateContactDetailsParams,
-    },
+}    ,
     UpdateContactIdentity {
         organization_id: u64,
         identity_id: u64,
         params: UpdateContactIdentityParams,
-    },
+}    ,
     UpdateContract {
         organization_id: u64,
         contract_id: u64,
         params: UpdateContractParams,
-    },
+}    ,
     UpdateCrossoveredBudget {
         organization_id: u64,
         budget_id: u64,
         params: UpdateCrossoveredBudgetParams,
-    },
+}    ,
     UpdateDepartment {
         organization_id: u64,
         department_id: u64,
         params: UpdateDepartmentParams,
-    },
+}    ,
     UpdateDeviceStatus {
         organization_id: u64,
         device_id: u64,
         status: String,
-    },
+}    ,
     UpdateDocument {
         organization_id: u64,
         document_id: u64,
         params: UpdateDocumentParams,
-    },
+}    ,
     UpdateDocumentTemplate {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         template_id: u64,
         params: UpdateDocumentTemplateParams,
-    },
+}    ,
     UpdateEmployee {
         organization_id: u64,
         company_id: u64,
         employee_id: u64,
         params: UpdateEmployeeParams,
-    },
+}    ,
     UpdateExpense {
         organization_id: u64,
         expense_id: u64,
         params: UpdateExpenseParams,
-    },
+}    ,
     UpdateFinancialReport {
         organization_id: u64,
         company_id: u64,
         report_id: u64,
         params: UpdateFinancialReportParams,
-    },
+}    ,
     UpdateFiscalYear {
         organization_id: u64,
         company_id: u64,
         fiscal_year_id: u64,
         params: UpdateFiscalYearParams,
-    },
+}    ,
     UpdateFormField {
         organization_id: u64,
         configuration_id: u64,
         field_id: String,
         params: UpdateFormFieldParams,
-    },
+}    ,
     UpdateGoogleDriveConnection {
         connection_id: u64,
         organization_id: u64,
-        name: Option<String>,
-        root_folder_id: Option<String>,
-        shared_drive_id: Option<String>,
-        sync_enabled: Option<bool>,
-        auto_sync_files: Option<bool>,
-        allowed_file_types: Option<Vec<String>>,
-        max_file_size_mb: Option<u32>,
-        webhook_enabled: Option<bool>,
-        webhook_url: Option<String>,
-        sync_direction: Option<SyncDirection>,
-        sync_frequency_minutes: Option<u32>,
-    },
+        name: Option::<String>,
+        root_folder_id: Option::<String>,
+        shared_drive_id: Option::<String>,
+        sync_enabled: Option::<bool>,
+        auto_sync_files: Option::<bool>,
+        allowed_file_types: Option::<Vec::<String>>,
+        max_file_size_mb: Option::<u32>,
+        webhook_enabled: Option::<bool>,
+        webhook_url: Option::<String>,
+        sync_direction: Option::<SyncDirection>,
+        sync_frequency_minutes: Option::<u32>,
+}    ,
     UpdateGoogleDriveCredentials {
         connection_id: u64,
         organization_id: u64,
         credentials_reference: String,
-    },
+}    ,
     UpdateHubHeartbeat {
         organization_id: u64,
         hub_id: u64,
-        ip_address: Option<String>,
-        firmware_version: Option<String>,
-        connectivity_quality: Option<String>,
-    },
+        ip_address: Option::<String>,
+        firmware_version: Option::<String>,
+        connectivity_quality: Option::<String>,
+}    ,
     UpdateIntegrationStatus {
         organization_id: u64,
         integration_id: u64,
         integration_type: IntegrationType,
         status: IntegrationStatus,
         sync_status: SyncStatus,
-        error_message: Option<String>,
-    },
+        error_message: Option::<String>,
+}    ,
     UpdateIntercompanyRule {
         organization_id: u64,
         company_id: u64,
         rule_id: u64,
         params: UpdateIntercompanyRuleParams,
-    },
+}    ,
     UpdateJobPosition {
         organization_id: u64,
         job_id: u64,
         params: UpdateJobPositionParams,
-    },
+}    ,
     UpdateKnowledgeArticle {
         organization_id: u64,
         article_id: u64,
         params: UpdateKnowledgeArticleParams,
-    },
+}    ,
     UpdateKnowledgeCategory {
         organization_id: u64,
         category_id: u64,
         params: UpdateKnowledgeCategoryParams,
-    },
+}    ,
     UpdateLandedCost {
         organization_id: u64,
         landed_cost_id: u64,
         params: UpdateLandedCostParams,
-    },
+}    ,
     UpdateLeadAddress {
         organization_id: u64,
         lead_id: u64,
         params: UpdateLeadAddressParams,
-    },
+}    ,
     UpdateLeadDetails {
         organization_id: u64,
         lead_id: u64,
         params: UpdateLeadDetailsParams,
-    },
+}    ,
     UpdateLeadRevenue {
         organization_id: u64,
         lead_id: u64,
         params: UpdateLeadRevenueParams,
-    },
+}    ,
     UpdateLeaveType {
         organization_id: u64,
         company_id: u64,
         leave_type_id: u64,
         params: UpdateLeaveTypeParams,
-    },
+}    ,
     UpdateMailTemplate {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         template_id: u64,
         params: UpdateMailTemplateParams,
-    },
+}    ,
     UpdateMessageTemplate {
         organization_id: u64,
         template_id: u64,
         params: UpdateMessageTemplateParams,
-    },
+}    ,
     UpdateMetricValues {
         organization_id: u64,
         metric_id: u64,
         params: UpdateMetricValuesParams,
-    },
+}    ,
     UpdateOpportunity {
         organization_id: u64,
         company_id: u64,
         opportunity_id: u64,
         params: UpdateOpportunityParams,
-    },
+}    ,
     UpdateOrgMemberDetails {
         user_org_id: u64,
         params: UpdateOrgMemberDetailsParams,
-    },
+}    ,
     UpdateOrgMemberRole {
         user_org_id: u64,
         role_name: String,
-    },
+}    ,
     UpdateOrganization {
         organization_id: u64,
         params: UpdateOrganizationParams,
-    },
+}    ,
     UpdateOwnerReportSchedule {
         organization_id: u64,
         report_id: u64,
         params: UpdateOwnerReportScheduleParams,
-    },
+}    ,
     UpdatePartnerBank {
         organization_id: u64,
         bank_id: u64,
         params: UpdatePartnerBankParams,
-    },
+}    ,
     UpdatePaymentAccount {
         organization_id: u64,
         account_id: u64,
         params: UpdatePaymentAccountParams,
-    },
+}    ,
     UpdatePaymentTerm {
         organization_id: u64,
         term_id: u64,
-        name: Option<String>,
-        note: Option<String>,
-        is_active: Option<bool>,
-    },
+        name: Option::<String>,
+        note: Option::<String>,
+        is_active: Option::<bool>,
+}    ,
     UpdatePaymentTermLine {
         organization_id: u64,
         line_id: u64,
-        value: Option<PaymentTermValue>,
-        value_amount: Option<f64>,
-        days: Option<u32>,
-        months: Option<u32>,
-        days_after_end_of_month: Option<bool>,
-        sequence: Option<u32>,
-    },
+        value: Option::<PaymentTermValue>,
+        value_amount: Option::<f64>,
+        days: Option::<u32>,
+        months: Option::<u32>,
+        days_after_end_of_month: Option::<bool>,
+        sequence: Option::<u32>,
+}    ,
     UpdatePaymentTransaction {
         organization_id: u64,
         transaction_id: u64,
         params: UpdatePaymentTransactionParams,
-    },
+}    ,
     UpdatePoInvoiceStatus {
         organization_id: u64,
         order_id: u64,
-    },
+}    ,
     UpdatePoReceiptStatus {
         organization_id: u64,
         order_id: u64,
-    },
+}    ,
     UpdatePosTerminal {
         terminal_id: u64,
         status: String,
         daily_revenue: f64,
         open_orders: u32,
-    },
+}    ,
     UpdatePricelist {
         organization_id: u64,
         pricelist_id: u64,
-        name: Option<String>,
-        currency_id: Option<u64>,
-        discount_policy: Option<DiscountPolicy>,
-        is_active: Option<bool>,
-    },
+        name: Option::<String>,
+        currency_id: Option::<u64>,
+        discount_policy: Option::<DiscountPolicy>,
+        is_active: Option::<bool>,
+}    ,
     UpdateProduct {
         organization_id: u64,
         product_id: u64,
         params: UpdateProductParams,
-    },
+}    ,
     UpdateProductCategory {
         organization_id: u64,
         category_id: u64,
         params: UpdateProductCategoryParams,
-    },
+}    ,
     UpdateProductInventoryData {
         organization_id: u64,
         product_id: u64,
         params: UpdateProductInventoryDataParams,
-    },
+}    ,
     UpdateProductPackaging {
         organization_id: u64,
         packaging_id: u64,
         params: UpdateProductPackagingParams,
-    },
+}    ,
     UpdateProductPricing {
         organization_id: u64,
         product_id: u64,
         params: UpdateProductPricingParams,
-    },
+}    ,
     UpdateProductSupplierInfo {
         organization_id: u64,
         supplier_info_id: u64,
         params: UpdateProductSupplierInfoParams,
-    },
+}    ,
     UpdateProductVariant {
         organization_id: u64,
         variant_id: u64,
         params: UpdateProductVariantParams,
-    },
+}    ,
     UpdateProject {
         organization_id: u64,
         project_id: u64,
         params: UpdateProjectParams,
-    },
+}    ,
     UpdateProposal {
         proposal_id: u64,
         title: String,
         client_name: String,
         value: f64,
-        deadline: Option<__sdk::Timestamp>,
-        description: Option<String>,
-    },
+        deadline: Option::<__sdk::Timestamp>,
+        description: Option::<String>,
+}    ,
     UpdateProposalLineItem {
         line_item_id: u64,
         quantity: f64,
         price_unit: f64,
         discount: f64,
-        notes: Option<String>,
-    },
+        notes: Option::<String>,
+}    ,
     UpdateProposalPresence {
         proposal_id: u64,
-        section_id: Option<u64>,
+        section_id: Option::<u64>,
         user_name: String,
-    },
+}    ,
     UpdateProposalSourceDoc {
         doc_id: u64,
         params: UpdateProposalSourceDocParams,
-    },
+}    ,
     UpdateProposalStatus {
         proposal_id: u64,
         status: String,
-    },
+}    ,
     UpdatePurchaseOrder {
         organization_id: u64,
         company_id: u64,
         order_id: u64,
         params: UpdatePurchaseOrderParams,
-    },
+}    ,
     UpdatePurchaseOrderLine {
         organization_id: u64,
         line_id: u64,
         params: UpdatePurchaseOrderLineParams,
-    },
+}    ,
     UpdateQualityAlertReason {
         organization_id: u64,
         reason_id: u64,
         params: UpdateQualityAlertReasonParams,
-    },
+}    ,
     UpdateQualityPoint {
         organization_id: u64,
         company_id: u64,
         point_id: u64,
         params: UpdateQualityPointParams,
-    },
+}    ,
     UpdateQualityTeam {
         organization_id: u64,
         team_id: u64,
         params: UpdateQualityTeamParams,
-    },
+}    ,
     UpdateReportTemplate {
         organization_id: u64,
         template_id: u64,
         params: UpdateReportTemplateParams,
-    },
+}    ,
     UpdateRole {
         role_id: u64,
         params: UpdateRoleParams,
-    },
+}    ,
     UpdateSaleOrder {
         organization_id: u64,
         company_id: u64,
         order_id: u64,
         params: UpdateSaleOrderParams,
-    },
+}    ,
     UpdateSavedReport {
         organization_id: u64,
         company_id: u64,
         saved_report_id: u64,
         params: UpdateSavedReportParams,
-    },
+}    ,
     UpdateStockInventoryState {
         organization_id: u64,
         inventory_id: u64,
         new_state: String,
-    },
+}    ,
     UpdateStockLocation {
         organization_id: u64,
         location_id: u64,
         params: UpdateStockLocationParams,
-    },
+}    ,
     UpdateStockProductionLot {
         organization_id: u64,
         lot_id: u64,
         params: UpdateStockProductionLotParams,
-    },
+}    ,
     UpdateStockProductionSerial {
         organization_id: u64,
         serial_id: u64,
         params: UpdateStockProductionSerialParams,
-    },
+}    ,
     UpdateStockQuantQuantity {
         organization_id: u64,
         quant_id: u64,
         params: UpdateStockQuantQuantityParams,
-    },
+}    ,
     UpdateStockRoute {
         organization_id: u64,
         route_id: u64,
         params: UpdateStockRouteParams,
-    },
+}    ,
     UpdateStockRule {
         organization_id: u64,
         rule_id: u64,
         params: UpdateStockRuleParams,
-    },
+}    ,
     UpdateSupplierIntake {
         organization_id: u64,
         intake_id: u64,
         params: UpdateSupplierIntakeParams,
-    },
+}    ,
     UpdateTask {
         organization_id: u64,
         task_id: u64,
         params: UpdateTaskParams,
-    },
+}    ,
     UpdateTaskState {
         organization_id: u64,
         task_id: u64,
         state: TaskState,
-    },
+}    ,
     UpdateTaxDeadline {
         organization_id: u64,
         deadline_id: u64,
         params: UpdateTaxDeadlineParams,
-    },
+}    ,
     UpdateTaxJurisdiction {
         organization_id: u64,
         jurisdiction_id: u64,
         params: UpdateTaxJurisdictionParams,
-    },
+}    ,
     UpdateTaxSchedule {
         organization_id: u64,
         company_id: u64,
         schedule_id: u64,
         params: UpdateTaxScheduleParams,
-    },
+}    ,
     UpdateTicket {
         organization_id: u64,
         ticket_id: u64,
         params: UpdateTicketParams,
-    },
+}    ,
     UpdateUserEmail {
         email: String,
         email_verified: bool,
-    },
+}    ,
     UpdateUserOrganizationStatus {
         user_org_id: u64,
         is_active: bool,
         is_default: bool,
-    },
+}    ,
     UpdateUserPassword {
         target_identity: __sdk::Identity,
         new_password_hash: String,
-    },
+}    ,
     UpdateUserProfile {
         params: UpdateUserProfileParams,
-    },
+}    ,
     UpdateUtmCampaign {
         organization_id: u64,
         campaign_id: u64,
         params: UpdateUtmCampaignParams,
-    },
+}    ,
     UpdateUtmMedium {
         organization_id: u64,
         medium_id: u64,
         params: UpdateUtmMediumParams,
-    },
+}    ,
     UpdateUtmSource {
         organization_id: u64,
         source_id: u64,
         params: UpdateUtmSourceParams,
-    },
+}    ,
     UpdateVehiclePosition {
         vehicle_id: u64,
         latitude: f64,
@@ -7180,66 +7264,66 @@ pub enum Reducer {
         speed_kmh: f64,
         heading: f64,
         status: String,
-    },
+}    ,
     UpdateWarehouse {
         organization_id: u64,
         company_id: u64,
         warehouse_id: u64,
         params: UpdateWarehouseParams,
-    },
+}    ,
     UpdateWarehouse3DZone {
         organization_id: u64,
         zone_id: u64,
         params: UpdateWarehouse3DZoneParams,
-    },
+}    ,
     UpdateWarehouseTaskStatus {
         organization_id: u64,
         company_id: u64,
         task_id: u64,
         new_status: String,
-    },
+}    ,
     UpdateWhatsappBusinessAccount {
         organization_id: u64,
         account_id: u64,
         params: UpdateWhatsAppBusinessAccountParams,
-    },
+}    ,
     UpdateWhatsappCredentials {
         organization_id: u64,
         account_id: u64,
         params: UpdateWhatsAppCredentialsParams,
-    },
+}    ,
     UpdateWhatsappQualityScore {
         organization_id: u64,
         account_id: u64,
         quality_score: String,
-    },
+}    ,
     UpdateWhatsappVerificationStatus {
         organization_id: u64,
         account_id: u64,
         params: UpdateWhatsAppVerificationParams,
-    },
+}    ,
     UpdateWidgetLayout {
         organization_id: u64,
         widget_id: u64,
         params: UpdateWidgetLayoutParams,
-    },
+}    ,
     UpdateWorkcenter {
         organization_id: u64,
         workcenter_id: u64,
         params: UpdateWorkcenterParams,
-    },
+}    ,
     UpsertAiSkill {
         organization_id: u64,
         params: UpsertAiSkillParams,
-    },
+}    ,
     UpsertAiSkillConfig {
         organization_id: u64,
         params: UpsertAiSkillConfigParams,
-    },
+}    ,
     UpsertOrganizationSettings {
         organization_id: u64,
         params: UpsertOrganizationSettingsParams,
-    },
+}    ,
     UpsertProposalSection {
         proposal_id: u64,
         section_id: u64,
@@ -7247,67 +7331,68 @@ pub enum Reducer {
         content: String,
         status: String,
         sequence: u32,
-        ai_suggestion: Option<String>,
-    },
+        ai_suggestion: Option::<String>,
+}    ,
     UpsertSearchEmbedding {
         organization_id: u64,
-        company_id: Option<u64>,
+        company_id: Option::<u64>,
         params: UpsertSearchEmbeddingParams,
-    },
+}    ,
     UpsertWarehouseGeo {
         organization_id: u64,
         warehouse_id: u64,
         latitude: f64,
         longitude: f64,
-        address: Option<String>,
-        city: Option<String>,
-        country_code: Option<String>,
-        manager_name: Option<String>,
-    },
+        address: Option::<String>,
+        city: Option::<String>,
+        country_code: Option::<String>,
+        manager_name: Option::<String>,
+}    ,
     UseSerial {
         organization_id: u64,
         serial_id: u64,
-    },
+}    ,
     ValidateBudget {
         organization_id: u64,
         budget_id: u64,
-    },
+}    ,
     ValidateConsolidation {
         organization_id: u64,
         journal_id: u64,
-    },
+}    ,
     ValidateCycleCount {
         organization_id: u64,
         company_id: u64,
         cycle_count_id: u64,
-    },
+}    ,
     ValidateStockPicking {
         organization_id: u64,
         picking_id: u64,
         params: CompanyScopeParams,
-    },
+}    ,
     ValidateTimesheets {
         organization_id: u64,
         params: ValidateTimesheetsParams,
-    },
+}    ,
     VerifyContactIdentity {
         organization_id: u64,
         identity_id: u64,
         state: ContactVerificationState,
-    },
+}    ,
     VoidPaymentTransaction {
         organization_id: u64,
         transaction_id: u64,
-    },
+}    ,
     WaiveTaxDeadline {
         organization_id: u64,
         deadline_id: u64,
-    },
+}    ,
     WorkerHeartbeat {
         organization_id: u64,
         worker_id: u64,
-    },
+}    ,
 }
+
 
 impl __sdk::InModule for Reducer {
     type Module = RemoteModule;
@@ -7316,7 +7401,7 @@ impl __sdk::InModule for Reducer {
 impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
-            Reducer::AcknowledgeInsight { .. } => "acknowledge_insight",
+                        Reducer::AcknowledgeInsight { .. } => "acknowledge_insight",
             Reducer::AcknowledgeIotAction { .. } => "acknowledge_iot_action",
             Reducer::ActivatePosConfig { .. } => "activate_pos_config",
             Reducer::ActivateRevenueRecognitionRule { .. } => "activate_revenue_recognition_rule",
@@ -7343,7 +7428,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::AllocatePaymentTransaction { .. } => "allocate_payment_transaction",
             Reducer::AppendAiAgentRunStep { .. } => "append_ai_agent_run_step",
             Reducer::AppendAiChatMessage { .. } => "append_ai_chat_message",
+            Reducer::ApplyGlobalMigrations => "apply_global_migrations",
             Reducer::ApplyLandedCosts { .. } => "apply_landed_costs",
+            Reducer::ApplyOrgMigrations { .. } => "apply_org_migrations",
             Reducer::ApplyReconciliationRules { .. } => "apply_reconciliation_rules",
             Reducer::ApproveAiActionDraft { .. } => "approve_ai_action_draft",
             Reducer::ApproveApprovalRequest { .. } => "approve_approval_request",
@@ -7413,9 +7500,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CompletePickingWave { .. } => "complete_picking_wave",
             Reducer::CompleteProductivityLog { .. } => "complete_productivity_log",
             Reducer::CompleteQueueJob { .. } => "complete_queue_job",
-            Reducer::CompleteScheduledOwnerReportRun { .. } => {
-                "complete_scheduled_owner_report_run"
-            }
+            Reducer::CompleteScheduledOwnerReportRun { .. } => "complete_scheduled_owner_report_run",
             Reducer::CompleteTaxDeadline { .. } => "complete_tax_deadline",
             Reducer::ComputeBomCost { .. } => "compute_bom_cost",
             Reducer::ComputeDepreciationBoard { .. } => "compute_depreciation_board",
@@ -7446,9 +7531,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateAccountJournal { .. } => "create_account_journal",
             Reducer::CreateAccountMove { .. } => "create_account_move",
             Reducer::CreateAccountPeriod { .. } => "create_account_period",
-            Reducer::CreateAccountReconciliationWidget { .. } => {
-                "create_account_reconciliation_widget"
-            }
+            Reducer::CreateAccountReconciliationWidget { .. } => "create_account_reconciliation_widget",
             Reducer::CreateAccountTax { .. } => "create_account_tax",
             Reducer::CreateAccountTaxGroup { .. } => "create_account_tax_group",
             Reducer::CreateActivity { .. } => "create_activity",
@@ -7487,9 +7570,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateContract { .. } => "create_contract",
             Reducer::CreateCountry { .. } => "create_country",
             Reducer::CreateCreditNoteFromInvoice { .. } => "create_credit_note_from_invoice",
-            Reducer::CreateCreditNoteFromReturnOrder { .. } => {
-                "create_credit_note_from_return_order"
-            }
+            Reducer::CreateCreditNoteFromReturnOrder { .. } => "create_credit_note_from_return_order",
             Reducer::CreateCrossoveredBudget { .. } => "create_crossovered_budget",
             Reducer::CreateCurrency { .. } => "create_currency",
             Reducer::CreateCurrencyRate { .. } => "create_currency_rate",
@@ -7587,6 +7668,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateSavedReport { .. } => "create_saved_report",
             Reducer::CreateScheduledReport { .. } => "create_scheduled_report",
             Reducer::CreateShippingMethod { .. } => "create_shipping_method",
+            Reducer::CreateSodConflictRule { .. } => "create_sod_conflict_rule",
             Reducer::CreateStockInventory { .. } => "create_stock_inventory",
             Reducer::CreateStockInventoryLine { .. } => "create_stock_inventory_line",
             Reducer::CreateStockLocation { .. } => "create_stock_location",
@@ -7597,9 +7679,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateStockQuant { .. } => "create_stock_quant",
             Reducer::CreateStockRoute { .. } => "create_stock_route",
             Reducer::CreateStockRule { .. } => "create_stock_rule",
-            Reducer::CreateSubscriptionFromSaleOrder { .. } => {
-                "create_subscription_from_sale_order"
-            }
+            Reducer::CreateSubscriptionFromSaleOrder { .. } => "create_subscription_from_sale_order",
             Reducer::CreateSubscriptionPlan { .. } => "create_subscription_plan",
             Reducer::CreateTask { .. } => "create_task",
             Reducer::CreateTaxDeadline { .. } => "create_tax_deadline",
@@ -7625,17 +7705,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateWorkflow { .. } => "create_workflow",
             Reducer::CreateWorkorder { .. } => "create_workorder",
             Reducer::DeactivatePosConfig { .. } => "deactivate_pos_config",
-            Reducer::DeactivateRevenueRecognitionRule { .. } => {
-                "deactivate_revenue_recognition_rule"
-            }
+            Reducer::DeactivateRevenueRecognitionRule { .. } => "deactivate_revenue_recognition_rule",
             Reducer::DeleteAccountAsset { .. } => "delete_account_asset",
             Reducer::DeleteAccountBankStatement { .. } => "delete_account_bank_statement",
             Reducer::DeleteAccountBankStatementLine { .. } => "delete_account_bank_statement_line",
             Reducer::DeleteAccountMoveLine { .. } => "delete_account_move_line",
             Reducer::DeleteAccountPeriod { .. } => "delete_account_period",
-            Reducer::DeleteAccountReconciliationWidget { .. } => {
-                "delete_account_reconciliation_widget"
-            }
+            Reducer::DeleteAccountReconciliationWidget { .. } => "delete_account_reconciliation_widget",
             Reducer::DeleteAiReducerAllowlist { .. } => "delete_ai_reducer_allowlist",
             Reducer::DeleteAnalyticLine { .. } => "delete_analytic_line",
             Reducer::DeleteApprovalRule { .. } => "delete_approval_rule",
@@ -7699,6 +7775,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::EnsureDevAdmin => "ensure_dev_admin",
             Reducer::ErrorIntercompanyTransaction { .. } => "error_intercompany_transaction",
             Reducer::ExecuteReplenishmentRule { .. } => "execute_replenishment_rule",
+            Reducer::ExecuteRetentionPurge { .. } => "execute_retention_purge",
             Reducer::ExpireAiActionDrafts { .. } => "expire_ai_action_drafts",
             Reducer::ExpireContract { .. } => "expire_contract",
             Reducer::ExplodeBom { .. } => "explode_bom",
@@ -7716,6 +7793,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::GenerateSubscriptionInvoice { .. } => "generate_subscription_invoice",
             Reducer::GetFormConfiguration { .. } => "get_form_configuration",
             Reducer::GetOrganizationFormConfigs { .. } => "get_organization_form_configs",
+            Reducer::GrantDelegatedAdminScope { .. } => "grant_delegated_admin_scope",
             Reducer::GrantPermission { .. } => "grant_permission",
             Reducer::HoldSupplierIntake { .. } => "hold_supplier_intake",
             Reducer::ImportAccountCsv { .. } => "import_account_csv",
@@ -7826,9 +7904,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::QueueMailFromTemplate { .. } => "queue_mail_from_template",
             Reducer::ReceivePoLine { .. } => "receive_po_line",
             Reducer::RecognizeDeferredRevenue { .. } => "recognize_deferred_revenue",
-            Reducer::ReconcileAccountBankStatementLine { .. } => {
-                "reconcile_account_bank_statement_line"
-            }
+            Reducer::ReconcileAccountBankStatementLine { .. } => "reconcile_account_bank_statement_line",
             Reducer::ReconcilePaymentWithInvoice { .. } => "reconcile_payment_with_invoice",
             Reducer::RecordAiAgentRunPolicySnapshot { .. } => "record_ai_agent_run_policy_snapshot",
             Reducer::RecordAiSkillTestRun { .. } => "record_ai_skill_test_run",
@@ -7882,17 +7958,14 @@ impl __sdk::Reducer for Reducer {
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::RollbackAiSkillRelease { .. } => "rollback_ai_skill_release",
             Reducer::RollbackImportJob { .. } => "rollback_import_job",
+            Reducer::RunAccountingIcConsolidationTest => "run_accounting_ic_consolidation_test",
             Reducer::RunAccountingPaymentCancelTest => "run_accounting_payment_cancel_test",
             Reducer::RunAccountingPaymentManagementTest => "run_accounting_payment_management_test",
             Reducer::RunAccountingPaymentReconcileTest => "run_accounting_payment_reconcile_test",
-            Reducer::RunAccountingPaymentTermUpdateTest => {
-                "run_accounting_payment_term_update_test"
-            }
+            Reducer::RunAccountingPaymentTermUpdateTest => "run_accounting_payment_term_update_test",
             Reducer::RunAccountingPeriodLockTest => "run_accounting_period_lock_test",
             Reducer::RunAccountingPostInvoiceTest => "run_accounting_post_invoice_test",
-            Reducer::RunAccountingPostedImmutabilityTest => {
-                "run_accounting_posted_immutability_test"
-            }
+            Reducer::RunAccountingPostedImmutabilityTest => "run_accounting_posted_immutability_test",
             Reducer::RunAccountingTrialBalanceTest => "run_accounting_trial_balance_test",
             Reducer::RunAllAccountingTests => "run_all_accounting_tests",
             Reducer::RunAllCoreTests => "run_all_core_tests",
@@ -7902,6 +7975,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllPlatformTests => "run_all_platform_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
             Reducer::RunCoreOperationalMessagingTest => "run_core_operational_messaging_test",
+            Reducer::RunCoreSodTest => "run_core_sod_test",
+            Reducer::RunCountryPackTest => "run_country_pack_test",
             Reducer::RunCrmContactIdentityTest => "run_crm_contact_identity_test",
             Reducer::RunCrmContactUpdateDeleteTest => "run_crm_contact_update_delete_test",
             Reducer::RunCrmOpportunityConvertTest => "run_crm_opportunity_convert_test",
@@ -7922,6 +7997,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunSalesOrderInvoiceTest => "run_sales_order_invoice_test",
             Reducer::RunSalesOrderUpdateTest => "run_sales_order_update_test",
             Reducer::RunSubscriptionPlanTest => "run_subscription_plan_test",
+            Reducer::RunTenantIsolationTests => "run_tenant_isolation_tests",
             Reducer::RunTraceabilityReport { .. } => "run_traceability_report",
             Reducer::RunWorkflowDefinitionTest => "run_workflow_definition_test",
             Reducer::SaveImportMappingTemplate { .. } => "save_import_mapping_template",
@@ -7938,11 +8014,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetArticlePublished { .. } => "set_article_published",
             Reducer::SetAssetActive { .. } => "set_asset_active",
             Reducer::SetBillingStatus { .. } => "set_billing_status",
+            Reducer::SetCompanyCountryPack { .. } => "set_company_country_pack",
             Reducer::SetCompanyVerticalPack { .. } => "set_company_vertical_pack",
             Reducer::SetConsolidationCompanyRate { .. } => "set_consolidation_company_rate",
-            Reducer::SetContactCommunicationPreference { .. } => {
-                "set_contact_communication_preference"
-            }
+            Reducer::SetContactCommunicationPreference { .. } => "set_contact_communication_preference",
             Reducer::SetFormRoleConfig { .. } => "set_form_role_config",
             Reducer::SetIntercompanyRuleActive { .. } => "set_intercompany_rule_active",
             Reducer::SetIotThreshold { .. } => "set_iot_threshold",
@@ -7982,9 +8057,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UnlockKnowledgeArticle { .. } => "unlock_knowledge_article",
             Reducer::UnlockPurchaseOrder { .. } => "unlock_purchase_order",
             Reducer::UnmatchEliminationEntry { .. } => "unmatch_elimination_entry",
-            Reducer::UnreconciledAccountBankStatementLine { .. } => {
-                "unreconciled_account_bank_statement_line"
-            }
+            Reducer::UnreconciledAccountBankStatementLine { .. } => "unreconciled_account_bank_statement_line",
             Reducer::UnreserveStockQuant { .. } => "unreserve_stock_quant",
             Reducer::UnsubscribeFromRecord { .. } => "unsubscribe_from_record",
             Reducer::UpdateAccountAccount { .. } => "update_account_account",
@@ -7996,9 +8069,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateAccountJournal { .. } => "update_account_journal",
             Reducer::UpdateAccountMoveLine { .. } => "update_account_move_line",
             Reducer::UpdateAccountPeriod { .. } => "update_account_period",
-            Reducer::UpdateAccountReconciliationWidget { .. } => {
-                "update_account_reconciliation_widget"
-            }
+            Reducer::UpdateAccountReconciliationWidget { .. } => "update_account_reconciliation_widget",
             Reducer::UpdateAccountTax { .. } => "update_account_tax",
             Reducer::UpdateAccountTaxGroup { .. } => "update_account_tax_group",
             Reducer::UpdateAiActionDraftParams { .. } => "update_ai_action_draft_params",
@@ -8119,9 +8190,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateWhatsappBusinessAccount { .. } => "update_whatsapp_business_account",
             Reducer::UpdateWhatsappCredentials { .. } => "update_whatsapp_credentials",
             Reducer::UpdateWhatsappQualityScore { .. } => "update_whatsapp_quality_score",
-            Reducer::UpdateWhatsappVerificationStatus { .. } => {
-                "update_whatsapp_verification_status"
-            }
+            Reducer::UpdateWhatsappVerificationStatus { .. } => "update_whatsapp_verification_status",
             Reducer::UpdateWidgetLayout { .. } => "update_widget_layout",
             Reducer::UpdateWorkcenter { .. } => "update_workcenter",
             Reducer::UpsertAiSkill { .. } => "upsert_ai_skill",
@@ -8141,10 +8210,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::WaiveTaxDeadline { .. } => "waive_tax_deadline",
             Reducer::WorkerHeartbeat { .. } => "worker_heartbeat",
             _ => unreachable!(),
-        }
-    }
+}
+}
     #[allow(clippy::clone_on_copy)]
-    fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
+fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
         match self {
                         Reducer::AcknowledgeInsight{
                 organization_id,
@@ -8407,7 +8476,9 @@ impl __sdk::Reducer for Reducer {
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
-            Reducer::ApplyLandedCosts{
+            Reducer::ApplyGlobalMigrations => __sats::bsatn::to_vec(&apply_global_migrations_reducer::ApplyGlobalMigrationsArgs {
+                }),
+Reducer::ApplyLandedCosts{
                 organization_id,
                 company_id,
                 landed_cost_id,
@@ -8415,6 +8486,11 @@ impl __sdk::Reducer for Reducer {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 landed_cost_id: landed_cost_id.clone(),
+}),
+            Reducer::ApplyOrgMigrations{
+                organization_id,
+}             => __sats::bsatn::to_vec(&apply_org_migrations_reducer::ApplyOrgMigrationsArgs {
+                organization_id: organization_id.clone(),
 }),
             Reducer::ApplyReconciliationRules{
                 organization_id,
@@ -10388,6 +10464,13 @@ Reducer::BillTimesheets{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateSodConflictRule{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_sod_conflict_rule_reducer::CreateSodConflictRuleArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateStockInventory{
                 organization_id,
                 params,
@@ -11194,6 +11277,11 @@ Reducer::ErrorIntercompanyTransaction{
                 company_id: company_id.clone(),
                 rule_id: rule_id.clone(),
 }),
+            Reducer::ExecuteRetentionPurge{
+                organization_id,
+}             => __sats::bsatn::to_vec(&execute_retention_purge_reducer::ExecuteRetentionPurgeArgs {
+                organization_id: organization_id.clone(),
+}),
             Reducer::ExpireAiActionDrafts{
                 organization_id,
                 company_id,
@@ -11342,6 +11430,15 @@ Reducer::ErrorIntercompanyTransaction{
                 organization_id,
 }             => __sats::bsatn::to_vec(&get_organization_form_configs_reducer::GetOrganizationFormConfigsArgs {
                 organization_id: organization_id.clone(),
+}),
+            Reducer::GrantDelegatedAdminScope{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&grant_delegated_admin_scope_reducer::GrantDelegatedAdminScopeArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
 }),
             Reducer::GrantPermission{
                 organization_id,
@@ -12686,7 +12783,9 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 job_id: job_id.clone(),
 }),
-            Reducer::RunAccountingPaymentCancelTest => __sats::bsatn::to_vec(&run_accounting_payment_cancel_test_reducer::RunAccountingPaymentCancelTestArgs {
+            Reducer::RunAccountingIcConsolidationTest => __sats::bsatn::to_vec(&run_accounting_ic_consolidation_test_reducer::RunAccountingIcConsolidationTestArgs {
+                }),
+Reducer::RunAccountingPaymentCancelTest => __sats::bsatn::to_vec(&run_accounting_payment_cancel_test_reducer::RunAccountingPaymentCancelTestArgs {
                 }),
 Reducer::RunAccountingPaymentManagementTest => __sats::bsatn::to_vec(&run_accounting_payment_management_test_reducer::RunAccountingPaymentManagementTestArgs {
                 }),
@@ -12717,6 +12816,10 @@ Reducer::RunAllPlatformTests => __sats::bsatn::to_vec(&run_all_platform_tests_re
 Reducer::RunAllSalesTests => __sats::bsatn::to_vec(&run_all_sales_tests_reducer::RunAllSalesTestsArgs {
                 }),
 Reducer::RunCoreOperationalMessagingTest => __sats::bsatn::to_vec(&run_core_operational_messaging_test_reducer::RunCoreOperationalMessagingTestArgs {
+                }),
+Reducer::RunCoreSodTest => __sats::bsatn::to_vec(&run_core_sod_test_reducer::RunCoreSodTestArgs {
+                }),
+Reducer::RunCountryPackTest => __sats::bsatn::to_vec(&run_country_pack_test_reducer::RunCountryPackTestArgs {
                 }),
 Reducer::RunCrmContactIdentityTest => __sats::bsatn::to_vec(&run_crm_contact_identity_test_reducer::RunCrmContactIdentityTestArgs {
                 }),
@@ -12762,6 +12865,8 @@ Reducer::RunSalesOrderInvoiceTest => __sats::bsatn::to_vec(&run_sales_order_invo
 Reducer::RunSalesOrderUpdateTest => __sats::bsatn::to_vec(&run_sales_order_update_test_reducer::RunSalesOrderUpdateTestArgs {
                 }),
 Reducer::RunSubscriptionPlanTest => __sats::bsatn::to_vec(&run_subscription_plan_test_reducer::RunSubscriptionPlanTestArgs {
+                }),
+Reducer::RunTenantIsolationTests => __sats::bsatn::to_vec(&run_tenant_isolation_tests_reducer::RunTenantIsolationTestsArgs {
                 }),
 Reducer::RunTraceabilityReport{
                 organization_id,
@@ -12884,6 +12989,15 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 billing_account_id: billing_account_id.clone(),
                 status: status.clone(),
+}),
+            Reducer::SetCompanyCountryPack{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_company_country_pack_reducer::SetCompanyCountryPackArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
 }),
             Reducer::SetCompanyVerticalPack{
                 company_id,
@@ -14709,14 +14823,14 @@ Reducer::SeedOrganizationFormConfigs{
 }),
             _ => unreachable!(),
 }
-    }
+}
 }
 
 #[derive(Default)]
 #[allow(non_snake_case)]
 #[doc(hidden)]
 pub struct DbUpdate {
-    account_account: __sdk::TableUpdate<AccountAccount>,
+        account_account: __sdk::TableUpdate<AccountAccount>,
     account_account_type: __sdk::TableUpdate<AccountAccountType>,
     account_analytic_account: __sdk::TableUpdate<AccountAnalyticAccount>,
     account_analytic_distribution_model: __sdk::TableUpdate<AccountAnalyticDistributionModel>,
@@ -14779,6 +14893,7 @@ pub struct DbUpdate {
     casbin_rule: __sdk::TableUpdate<CasbinRule>,
     cash_flow_line: __sdk::TableUpdate<CashFlowLine>,
     company: __sdk::TableUpdate<Company>,
+    company_country_pack: __sdk::TableUpdate<CompanyCountryPack>,
     company_vertical_pack: __sdk::TableUpdate<CompanyVerticalPack>,
     consolidation_account: __sdk::TableUpdate<ConsolidationAccount>,
     consolidation_company_rate: __sdk::TableUpdate<ConsolidationCompanyRate>,
@@ -14796,6 +14911,8 @@ pub struct DbUpdate {
     contact_tag: __sdk::TableUpdate<ContactTag>,
     contact_tag_assignment: __sdk::TableUpdate<ContactTagAssignment>,
     country: __sdk::TableUpdate<Country>,
+    country_pack_definition: __sdk::TableUpdate<CountryPackDefinition>,
+    country_pack_tax_rule: __sdk::TableUpdate<CountryPackTaxRule>,
     crossovered_budget: __sdk::TableUpdate<CrossoveredBudget>,
     crossovered_budget_lines: __sdk::TableUpdate<CrossoveredBudgetLines>,
     currency: __sdk::TableUpdate<Currency>,
@@ -14806,6 +14923,7 @@ pub struct DbUpdate {
     data_classification_rule: __sdk::TableUpdate<DataClassificationRule>,
     deferred_revenue_line: __sdk::TableUpdate<DeferredRevenueLine>,
     deferred_revenue_schedule: __sdk::TableUpdate<DeferredRevenueSchedule>,
+    delegated_admin_scope: __sdk::TableUpdate<DelegatedAdminScope>,
     delivery_carrier: __sdk::TableUpdate<DeliveryCarrier>,
     delivery_price_rule: __sdk::TableUpdate<DeliveryPriceRule>,
     doc_folder: __sdk::TableUpdate<DocumentFolder>,
@@ -14873,6 +14991,7 @@ pub struct DbUpdate {
     opportunity: __sdk::TableUpdate<Opportunity>,
     opportunity_line: __sdk::TableUpdate<OpportunityLine>,
     org_permission: __sdk::TableUpdate<OrgPermission>,
+    org_schema_migration: __sdk::TableUpdate<OrgSchemaMigration>,
     organization: __sdk::TableUpdate<Organization>,
     organization_settings: __sdk::TableUpdate<OrganizationSettings>,
     packaging_material: __sdk::TableUpdate<PackagingMaterial>,
@@ -14938,10 +15057,12 @@ pub struct DbUpdate {
     saved_report: __sdk::TableUpdate<SavedReport>,
     scheduled_report: __sdk::TableUpdate<ScheduledReport>,
     scheduled_report_run: __sdk::TableUpdate<ScheduledReportRun>,
+    schema_migration: __sdk::TableUpdate<SchemaMigration>,
     search_embedding: __sdk::TableUpdate<SearchEmbedding>,
     segment_member: __sdk::TableUpdate<SegmentMember>,
     serial_lot_traceability: __sdk::TableUpdate<SerialLotTraceability>,
     shipping_method: __sdk::TableUpdate<ShippingMethod>,
+    sod_conflict_rule: __sdk::TableUpdate<SodConflictRule>,
     stock_count_sheet: __sdk::TableUpdate<StockCountSheet>,
     stock_cycle_count: __sdk::TableUpdate<StockCycleCount>,
     stock_inventory: __sdk::TableUpdate<StockInventory>,
@@ -14992,852 +15113,302 @@ pub struct DbUpdate {
     workflow_workitem: __sdk::TableUpdate<WorkflowWorkitem>,
 }
 
+
 impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     type Error = __sdk::Error;
     fn try_from(raw: __ws::v2::TransactionUpdate) -> Result<Self, Self::Error> {
         let mut db_update = DbUpdate::default();
         for table_update in __sdk::transaction_update_iter_table_updates(raw) {
             match &table_update.table_name[..] {
-                "account_account" => db_update
-                    .account_account
-                    .append(account_account_table::parse_table_update(table_update)?),
-                "account_account_type" => db_update.account_account_type.append(
-                    account_account_type_table::parse_table_update(table_update)?,
-                ),
-                "account_analytic_account" => db_update.account_analytic_account.append(
-                    account_analytic_account_table::parse_table_update(table_update)?,
-                ),
-                "account_analytic_distribution_model" => {
-                    db_update.account_analytic_distribution_model.append(
-                        account_analytic_distribution_model_table::parse_table_update(
-                            table_update,
-                        )?,
-                    )
-                }
-                "account_analytic_line" => db_update.account_analytic_line.append(
-                    account_analytic_line_table::parse_table_update(table_update)?,
-                ),
-                "account_asset" => db_update
-                    .account_asset
-                    .append(account_asset_table::parse_table_update(table_update)?),
-                "account_asset_depreciation_line" => {
-                    db_update.account_asset_depreciation_line.append(
-                        account_asset_depreciation_line_table::parse_table_update(table_update)?,
-                    )
-                }
-                "account_bank_statement" => db_update.account_bank_statement.append(
-                    account_bank_statement_table::parse_table_update(table_update)?,
-                ),
-                "account_bank_statement_line" => db_update.account_bank_statement_line.append(
-                    account_bank_statement_line_table::parse_table_update(table_update)?,
-                ),
-                "account_fiscal_year" => db_update
-                    .account_fiscal_year
-                    .append(account_fiscal_year_table::parse_table_update(table_update)?),
-                "account_group" => db_update
-                    .account_group
-                    .append(account_group_table::parse_table_update(table_update)?),
-                "account_journal" => db_update
-                    .account_journal
-                    .append(account_journal_table::parse_table_update(table_update)?),
-                "account_move" => db_update
-                    .account_move
-                    .append(account_move_table::parse_table_update(table_update)?),
-                "account_move_line" => db_update
-                    .account_move_line
-                    .append(account_move_line_table::parse_table_update(table_update)?),
-                "account_payment" => db_update
-                    .account_payment
-                    .append(account_payment_table::parse_table_update(table_update)?),
-                "account_payment_term" => db_update.account_payment_term.append(
-                    account_payment_term_table::parse_table_update(table_update)?,
-                ),
-                "account_payment_term_line" => db_update.account_payment_term_line.append(
-                    account_payment_term_line_table::parse_table_update(table_update)?,
-                ),
-                "account_period" => db_update
-                    .account_period
-                    .append(account_period_table::parse_table_update(table_update)?),
-                "account_reconciliation_widget" => db_update.account_reconciliation_widget.append(
-                    account_reconciliation_widget_table::parse_table_update(table_update)?,
-                ),
-                "account_tax" => db_update
-                    .account_tax
-                    .append(account_tax_table::parse_table_update(table_update)?),
-                "account_tax_group" => db_update
-                    .account_tax_group
-                    .append(account_tax_group_table::parse_table_update(table_update)?),
-                "activity" => db_update
-                    .activity
-                    .append(activity_table::parse_table_update(table_update)?),
-                "activity_type" => db_update
-                    .activity_type
-                    .append(activity_type_table::parse_table_update(table_update)?),
-                "adjustment_reason" => db_update
-                    .adjustment_reason
-                    .append(adjustment_reason_table::parse_table_update(table_update)?),
-                "ai_action_draft" => db_update
-                    .ai_action_draft
-                    .append(ai_action_draft_table::parse_table_update(table_update)?),
-                "ai_agent" => db_update
-                    .ai_agent
-                    .append(ai_agent_table::parse_table_update(table_update)?),
-                "ai_agent_run" => db_update
-                    .ai_agent_run
-                    .append(ai_agent_run_table::parse_table_update(table_update)?),
-                "ai_agent_run_policy_snapshot" => db_update.ai_agent_run_policy_snapshot.append(
-                    ai_agent_run_policy_snapshot_table::parse_table_update(table_update)?,
-                ),
-                "ai_agent_run_step" => db_update
-                    .ai_agent_run_step
-                    .append(ai_agent_run_step_table::parse_table_update(table_update)?),
-                "ai_chat_message" => db_update
-                    .ai_chat_message
-                    .append(ai_chat_message_table::parse_table_update(table_update)?),
-                "ai_chat_session" => db_update
-                    .ai_chat_session
-                    .append(ai_chat_session_table::parse_table_update(table_update)?),
-                "ai_document_processing_job" => db_update.ai_document_processing_job.append(
-                    ai_document_processing_job_table::parse_table_update(table_update)?,
-                ),
-                "ai_insight" => db_update
-                    .ai_insight
-                    .append(ai_insight_table::parse_table_update(table_update)?),
-                "ai_reducer_allowlist" => db_update.ai_reducer_allowlist.append(
-                    ai_reducer_allowlist_table::parse_table_update(table_update)?,
-                ),
-                "ai_skill" => db_update
-                    .ai_skill
-                    .append(ai_skill_table::parse_table_update(table_update)?),
-                "ai_skill_config" => db_update
-                    .ai_skill_config
-                    .append(ai_skill_config_table::parse_table_update(table_update)?),
-                "ai_skill_fixture" => db_update
-                    .ai_skill_fixture
-                    .append(ai_skill_fixture_table::parse_table_update(table_update)?),
-                "ai_skill_release" => db_update
-                    .ai_skill_release
-                    .append(ai_skill_release_table::parse_table_update(table_update)?),
-                "ai_skill_test_run" => db_update
-                    .ai_skill_test_run
-                    .append(ai_skill_test_run_table::parse_table_update(table_update)?),
-                "ai_skill_version" => db_update
-                    .ai_skill_version
-                    .append(ai_skill_version_table::parse_table_update(table_update)?),
-                "ai_team_member" => db_update
-                    .ai_team_member
-                    .append(ai_team_member_table::parse_table_update(table_update)?),
-                "ai_team_member_skill" => db_update.ai_team_member_skill.append(
-                    ai_team_member_skill_table::parse_table_update(table_update)?,
-                ),
-                "analytics_metric" => db_update
-                    .analytics_metric
-                    .append(analytics_metric_table::parse_table_update(table_update)?),
-                "approval_request" => db_update
-                    .approval_request
-                    .append(approval_request_table::parse_table_update(table_update)?),
-                "approval_rule" => db_update
-                    .approval_rule
-                    .append(approval_rule_table::parse_table_update(table_update)?),
-                "assignment_rule" => db_update
-                    .assignment_rule
-                    .append(assignment_rule_table::parse_table_update(table_update)?),
-                "audit_log" => db_update
-                    .audit_log
-                    .append(audit_log_table::parse_table_update(table_update)?),
-                "audit_rule" => db_update
-                    .audit_rule
-                    .append(audit_rule_table::parse_table_update(table_update)?),
-                "balance_sheet_line" => db_update
-                    .balance_sheet_line
-                    .append(balance_sheet_line_table::parse_table_update(table_update)?),
-                "bank_match_candidate" => db_update.bank_match_candidate.append(
-                    bank_match_candidate_table::parse_table_update(table_update)?,
-                ),
-                "bank_statement_import" => db_update.bank_statement_import.append(
-                    bank_statement_import_table::parse_table_update(table_update)?,
-                ),
-                "bank_statement_import_line" => db_update.bank_statement_import_line.append(
-                    bank_statement_import_line_table::parse_table_update(table_update)?,
-                ),
-                "barcode_nomenclature" => db_update.barcode_nomenclature.append(
-                    barcode_nomenclature_table::parse_table_update(table_update)?,
-                ),
-                "barcode_rule" => db_update
-                    .barcode_rule
-                    .append(barcode_rule_table::parse_table_update(table_update)?),
-                "barcode_scan" => db_update
-                    .barcode_scan
-                    .append(barcode_scan_table::parse_table_update(table_update)?),
-                "billing_account" => db_update
-                    .billing_account
-                    .append(billing_account_table::parse_table_update(table_update)?),
-                "bom_explosion_result" => db_update.bom_explosion_result.append(
-                    bom_explosion_result_table::parse_table_update(table_update)?,
-                ),
-                "budget_post" => db_update
-                    .budget_post
-                    .append(budget_post_table::parse_table_update(table_update)?),
-                "calendar_event" => db_update
-                    .calendar_event
-                    .append(calendar_event_table::parse_table_update(table_update)?),
-                "cartonization_result" => db_update.cartonization_result.append(
-                    cartonization_result_table::parse_table_update(table_update)?,
-                ),
-                "casbin_rule" => db_update
-                    .casbin_rule
-                    .append(casbin_rule_table::parse_table_update(table_update)?),
-                "cash_flow_line" => db_update
-                    .cash_flow_line
-                    .append(cash_flow_line_table::parse_table_update(table_update)?),
-                "company" => db_update
-                    .company
-                    .append(company_table::parse_table_update(table_update)?),
-                "company_vertical_pack" => db_update.company_vertical_pack.append(
-                    company_vertical_pack_table::parse_table_update(table_update)?,
-                ),
-                "consolidation_account" => db_update.consolidation_account.append(
-                    consolidation_account_table::parse_table_update(table_update)?,
-                ),
-                "consolidation_company_rate" => db_update.consolidation_company_rate.append(
-                    consolidation_company_rate_table::parse_table_update(table_update)?,
-                ),
-                "consolidation_elimination_entry" => {
-                    db_update.consolidation_elimination_entry.append(
-                        consolidation_elimination_entry_table::parse_table_update(table_update)?,
-                    )
-                }
-                "consolidation_journal" => db_update.consolidation_journal.append(
-                    consolidation_journal_table::parse_table_update(table_update)?,
-                ),
-                "contact" => db_update
-                    .contact
-                    .append(contact_table::parse_table_update(table_update)?),
-                "contact_category" => db_update
-                    .contact_category
-                    .append(contact_category_table::parse_table_update(table_update)?),
-                "contact_category_assignment" => db_update.contact_category_assignment.append(
-                    contact_category_assignment_table::parse_table_update(table_update)?,
-                ),
-                "contact_communication_preference" => {
-                    db_update.contact_communication_preference.append(
-                        contact_communication_preference_table::parse_table_update(table_update)?,
-                    )
-                }
-                "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(
-                    contact_duplicate_candidate_table::parse_table_update(table_update)?,
-                ),
-                "contact_phone_identity" => db_update.contact_phone_identity.append(
-                    contact_phone_identity_table::parse_table_update(table_update)?,
-                ),
-                "contact_relationship" => db_update.contact_relationship.append(
-                    contact_relationship_table::parse_table_update(table_update)?,
-                ),
-                "contact_role_assignment" => db_update.contact_role_assignment.append(
-                    contact_role_assignment_table::parse_table_update(table_update)?,
-                ),
-                "contact_segment" => db_update
-                    .contact_segment
-                    .append(contact_segment_table::parse_table_update(table_update)?),
-                "contact_tag" => db_update
-                    .contact_tag
-                    .append(contact_tag_table::parse_table_update(table_update)?),
-                "contact_tag_assignment" => db_update.contact_tag_assignment.append(
-                    contact_tag_assignment_table::parse_table_update(table_update)?,
-                ),
-                "country" => db_update
-                    .country
-                    .append(country_table::parse_table_update(table_update)?),
-                "crossovered_budget" => db_update
-                    .crossovered_budget
-                    .append(crossovered_budget_table::parse_table_update(table_update)?),
-                "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(
-                    crossovered_budget_lines_table::parse_table_update(table_update)?,
-                ),
-                "currency" => db_update
-                    .currency
-                    .append(currency_table::parse_table_update(table_update)?),
-                "currency_rate" => db_update
-                    .currency_rate
-                    .append(currency_rate_table::parse_table_update(table_update)?),
-                "dashboard" => db_update
-                    .dashboard
-                    .append(dashboard_table::parse_table_update(table_update)?),
-                "dashboard_widget" => db_update
-                    .dashboard_widget
-                    .append(dashboard_widget_table::parse_table_update(table_update)?),
-                "data_classification" => db_update
-                    .data_classification
-                    .append(data_classification_table::parse_table_update(table_update)?),
-                "data_classification_rule" => db_update.data_classification_rule.append(
-                    data_classification_rule_table::parse_table_update(table_update)?,
-                ),
-                "deferred_revenue_line" => db_update.deferred_revenue_line.append(
-                    deferred_revenue_line_table::parse_table_update(table_update)?,
-                ),
-                "deferred_revenue_schedule" => db_update.deferred_revenue_schedule.append(
-                    deferred_revenue_schedule_table::parse_table_update(table_update)?,
-                ),
-                "delivery_carrier" => db_update
-                    .delivery_carrier
-                    .append(delivery_carrier_table::parse_table_update(table_update)?),
-                "delivery_price_rule" => db_update
-                    .delivery_price_rule
-                    .append(delivery_price_rule_table::parse_table_update(table_update)?),
-                "doc_folder" => db_update
-                    .doc_folder
-                    .append(doc_folder_table::parse_table_update(table_update)?),
-                "document" => db_update
-                    .document
-                    .append(document_table::parse_table_update(table_update)?),
-                "document_sequence" => db_update
-                    .document_sequence
-                    .append(document_sequence_table::parse_table_update(table_update)?),
-                "document_template" => db_update
-                    .document_template
-                    .append(document_template_table::parse_table_update(table_update)?),
-                "document_version" => db_update
-                    .document_version
-                    .append(document_version_table::parse_table_update(table_update)?),
-                "expense_sheet" => db_update
-                    .expense_sheet
-                    .append(expense_sheet_table::parse_table_update(table_update)?),
-                "financial_report" => db_update
-                    .financial_report
-                    .append(financial_report_table::parse_table_update(table_update)?),
-                "fleet_vehicle" => db_update
-                    .fleet_vehicle
-                    .append(fleet_vehicle_table::parse_table_update(table_update)?),
-                "form_config" => db_update
-                    .form_config
-                    .append(form_config_table::parse_table_update(table_update)?),
-                "form_config_field" => db_update
-                    .form_config_field
-                    .append(form_config_field_table::parse_table_update(table_update)?),
-                "form_role_config" => db_update
-                    .form_role_config
-                    .append(form_role_config_table::parse_table_update(table_update)?),
-                "generated_owner_report" => db_update.generated_owner_report.append(
-                    generated_owner_report_table::parse_table_update(table_update)?,
-                ),
-                "google_drive_connection" => db_update.google_drive_connection.append(
-                    google_drive_connection_table::parse_table_update(table_update)?,
-                ),
-                "helpdesk_sla" => db_update
-                    .helpdesk_sla
-                    .append(helpdesk_sla_table::parse_table_update(table_update)?),
-                "helpdesk_stage" => db_update
-                    .helpdesk_stage
-                    .append(helpdesk_stage_table::parse_table_update(table_update)?),
-                "helpdesk_team" => db_update
-                    .helpdesk_team
-                    .append(helpdesk_team_table::parse_table_update(table_update)?),
-                "helpdesk_ticket" => db_update
-                    .helpdesk_ticket
-                    .append(helpdesk_ticket_table::parse_table_update(table_update)?),
-                "hr_contract" => db_update
-                    .hr_contract
-                    .append(hr_contract_table::parse_table_update(table_update)?),
-                "hr_department" => db_update
-                    .hr_department
-                    .append(hr_department_table::parse_table_update(table_update)?),
-                "hr_employee" => db_update
-                    .hr_employee
-                    .append(hr_employee_table::parse_table_update(table_update)?),
-                "hr_expense" => db_update
-                    .hr_expense
-                    .append(hr_expense_table::parse_table_update(table_update)?),
-                "hr_job_position" => db_update
-                    .hr_job_position
-                    .append(hr_job_position_table::parse_table_update(table_update)?),
-                "hr_leave" => db_update
-                    .hr_leave
-                    .append(hr_leave_table::parse_table_update(table_update)?),
-                "hr_leave_type" => db_update
-                    .hr_leave_type
-                    .append(hr_leave_type_table::parse_table_update(table_update)?),
-                "hr_payroll_structure" => db_update.hr_payroll_structure.append(
-                    hr_payroll_structure_table::parse_table_update(table_update)?,
-                ),
-                "hr_payslip" => db_update
-                    .hr_payslip
-                    .append(hr_payslip_table::parse_table_update(table_update)?),
-                "hr_resource" => db_update
-                    .hr_resource
-                    .append(hr_resource_table::parse_table_update(table_update)?),
-                "hr_salary_rule" => db_update
-                    .hr_salary_rule
-                    .append(hr_salary_rule_table::parse_table_update(table_update)?),
-                "import_job" => db_update
-                    .import_job
-                    .append(import_job_table::parse_table_update(table_update)?),
-                "import_job_error" => db_update
-                    .import_job_error
-                    .append(import_job_error_table::parse_table_update(table_update)?),
-                "import_job_record" => db_update
-                    .import_job_record
-                    .append(import_job_record_table::parse_table_update(table_update)?),
-                "import_mapping_template" => db_update.import_mapping_template.append(
-                    import_mapping_template_table::parse_table_update(table_update)?,
-                ),
-                "intercompany_rule" => db_update
-                    .intercompany_rule
-                    .append(intercompany_rule_table::parse_table_update(table_update)?),
-                "intercompany_transaction" => db_update.intercompany_transaction.append(
-                    intercompany_transaction_table::parse_table_update(table_update)?,
-                ),
-                "inventory_adjustment" => db_update.inventory_adjustment.append(
-                    inventory_adjustment_table::parse_table_update(table_update)?,
-                ),
-                "inventory_valuation" => db_update
-                    .inventory_valuation
-                    .append(inventory_valuation_table::parse_table_update(table_update)?),
-                "iot_action" => db_update
-                    .iot_action
-                    .append(iot_action_table::parse_table_update(table_update)?),
-                "iot_alert" => db_update
-                    .iot_alert
-                    .append(iot_alert_table::parse_table_update(table_update)?),
-                "iot_device" => db_update
-                    .iot_device
-                    .append(iot_device_table::parse_table_update(table_update)?),
-                "iot_hub" => db_update
-                    .iot_hub
-                    .append(iot_hub_table::parse_table_update(table_update)?),
-                "iot_pairing_token" => db_update
-                    .iot_pairing_token
-                    .append(iot_pairing_token_table::parse_table_update(table_update)?),
-                "iot_telemetry" => db_update
-                    .iot_telemetry
-                    .append(iot_telemetry_table::parse_table_update(table_update)?),
-                "iot_threshold" => db_update
-                    .iot_threshold
-                    .append(iot_threshold_table::parse_table_update(table_update)?),
-                "kb_category" => db_update
-                    .kb_category
-                    .append(kb_category_table::parse_table_update(table_update)?),
-                "knowledge_article" => db_update
-                    .knowledge_article
-                    .append(knowledge_article_table::parse_table_update(table_update)?),
-                "lead" => db_update
-                    .lead
-                    .append(lead_table::parse_table_update(table_update)?),
-                "lead_lost_reason" => db_update
-                    .lead_lost_reason
-                    .append(lead_lost_reason_table::parse_table_update(table_update)?),
-                "lead_source" => db_update
-                    .lead_source
-                    .append(lead_source_table::parse_table_update(table_update)?),
-                "mail_follower" => db_update
-                    .mail_follower
-                    .append(mail_follower_table::parse_table_update(table_update)?),
-                "mail_message" => db_update
-                    .mail_message
-                    .append(mail_message_table::parse_table_update(table_update)?),
-                "mail_template" => db_update
-                    .mail_template
-                    .append(mail_template_table::parse_table_update(table_update)?),
-                "message_batch" => db_update
-                    .message_batch
-                    .append(message_batch_table::parse_table_update(table_update)?),
-                "message_template" => db_update
-                    .message_template
-                    .append(message_template_table::parse_table_update(table_update)?),
-                "mrp_bom" => db_update
-                    .mrp_bom
-                    .append(mrp_bom_table::parse_table_update(table_update)?),
-                "mrp_bom_line" => db_update
-                    .mrp_bom_line
-                    .append(mrp_bom_line_table::parse_table_update(table_update)?),
-                "mrp_production" => db_update
-                    .mrp_production
-                    .append(mrp_production_table::parse_table_update(table_update)?),
-                "mrp_routing_workcenter" => db_update.mrp_routing_workcenter.append(
-                    mrp_routing_workcenter_table::parse_table_update(table_update)?,
-                ),
-                "mrp_workcenter" => db_update
-                    .mrp_workcenter
-                    .append(mrp_workcenter_table::parse_table_update(table_update)?),
-                "mrp_workcenter_productivity" => db_update.mrp_workcenter_productivity.append(
-                    mrp_workcenter_productivity_table::parse_table_update(table_update)?,
-                ),
-                "mrp_workorder" => db_update
-                    .mrp_workorder
-                    .append(mrp_workorder_table::parse_table_update(table_update)?),
-                "operational_message" => db_update
-                    .operational_message
-                    .append(operational_message_table::parse_table_update(table_update)?),
-                "opp_stage" => db_update
-                    .opp_stage
-                    .append(opp_stage_table::parse_table_update(table_update)?),
-                "opportunity" => db_update
-                    .opportunity
-                    .append(opportunity_table::parse_table_update(table_update)?),
-                "opportunity_line" => db_update
-                    .opportunity_line
-                    .append(opportunity_line_table::parse_table_update(table_update)?),
-                "org_permission" => db_update
-                    .org_permission
-                    .append(org_permission_table::parse_table_update(table_update)?),
-                "organization" => db_update
-                    .organization
-                    .append(organization_table::parse_table_update(table_update)?),
-                "organization_settings" => db_update.organization_settings.append(
-                    organization_settings_table::parse_table_update(table_update)?,
-                ),
-                "packaging_material" => db_update
-                    .packaging_material
-                    .append(packaging_material_table::parse_table_update(table_update)?),
-                "payment_account" => db_update
-                    .payment_account
-                    .append(payment_account_table::parse_table_update(table_update)?),
-                "payment_fee" => db_update
-                    .payment_fee
-                    .append(payment_fee_table::parse_table_update(table_update)?),
-                "payment_reconciliation" => db_update.payment_reconciliation.append(
-                    payment_reconciliation_table::parse_table_update(table_update)?,
-                ),
-                "payment_reversal" => db_update
-                    .payment_reversal
-                    .append(payment_reversal_table::parse_table_update(table_update)?),
-                "payment_transaction" => db_update
-                    .payment_transaction
-                    .append(payment_transaction_table::parse_table_update(table_update)?),
-                "picking_wave" => db_update
-                    .picking_wave
-                    .append(picking_wave_table::parse_table_update(table_update)?),
-                "policy_snapshot" => db_update
-                    .policy_snapshot
-                    .append(policy_snapshot_table::parse_table_update(table_update)?),
-                "pos_config" => db_update
-                    .pos_config
-                    .append(pos_config_table::parse_table_update(table_update)?),
-                "pos_loyalty_card" => db_update
-                    .pos_loyalty_card
-                    .append(pos_loyalty_card_table::parse_table_update(table_update)?),
-                "pos_loyalty_program" => db_update
-                    .pos_loyalty_program
-                    .append(pos_loyalty_program_table::parse_table_update(table_update)?),
-                "pos_order" => db_update
-                    .pos_order
-                    .append(pos_order_table::parse_table_update(table_update)?),
-                "pos_order_line" => db_update
-                    .pos_order_line
-                    .append(pos_order_line_table::parse_table_update(table_update)?),
-                "pos_payment" => db_update
-                    .pos_payment
-                    .append(pos_payment_table::parse_table_update(table_update)?),
-                "pos_payment_method" => db_update
-                    .pos_payment_method
-                    .append(pos_payment_method_table::parse_table_update(table_update)?),
-                "pos_session" => db_update
-                    .pos_session
-                    .append(pos_session_table::parse_table_update(table_update)?),
-                "pos_terminal" => db_update
-                    .pos_terminal
-                    .append(pos_terminal_table::parse_table_update(table_update)?),
-                "privacy_consent" => db_update
-                    .privacy_consent
-                    .append(privacy_consent_table::parse_table_update(table_update)?),
-                "product" => db_update
-                    .product
-                    .append(product_table::parse_table_update(table_update)?),
-                "product_attribute" => db_update
-                    .product_attribute
-                    .append(product_attribute_table::parse_table_update(table_update)?),
-                "product_attribute_line" => db_update.product_attribute_line.append(
-                    product_attribute_line_table::parse_table_update(table_update)?,
-                ),
-                "product_attribute_value" => db_update.product_attribute_value.append(
-                    product_attribute_value_table::parse_table_update(table_update)?,
-                ),
-                "product_category" => db_update
-                    .product_category
-                    .append(product_category_table::parse_table_update(table_update)?),
-                "product_packaging" => db_update
-                    .product_packaging
-                    .append(product_packaging_table::parse_table_update(table_update)?),
-                "product_pricelist" => db_update
-                    .product_pricelist
-                    .append(product_pricelist_table::parse_table_update(table_update)?),
-                "product_pricelist_item" => db_update.product_pricelist_item.append(
-                    product_pricelist_item_table::parse_table_update(table_update)?,
-                ),
-                "product_supplier_info" => db_update.product_supplier_info.append(
-                    product_supplier_info_table::parse_table_update(table_update)?,
-                ),
-                "product_variant" => db_update
-                    .product_variant
-                    .append(product_variant_table::parse_table_update(table_update)?),
-                "profit_loss_line" => db_update
-                    .profit_loss_line
-                    .append(profit_loss_line_table::parse_table_update(table_update)?),
-                "project_project" => db_update
-                    .project_project
-                    .append(project_project_table::parse_table_update(table_update)?),
-                "project_task" => db_update
-                    .project_task
-                    .append(project_task_table::parse_table_update(table_update)?),
-                "project_timesheet" => db_update
-                    .project_timesheet
-                    .append(project_timesheet_table::parse_table_update(table_update)?),
-                "proposal" => db_update
-                    .proposal
-                    .append(proposal_table::parse_table_update(table_update)?),
-                "proposal_comment" => db_update
-                    .proposal_comment
-                    .append(proposal_comment_table::parse_table_update(table_update)?),
-                "proposal_line_item" => db_update
-                    .proposal_line_item
-                    .append(proposal_line_item_table::parse_table_update(table_update)?),
-                "proposal_presence" => db_update
-                    .proposal_presence
-                    .append(proposal_presence_table::parse_table_update(table_update)?),
-                "proposal_section" => db_update
-                    .proposal_section
-                    .append(proposal_section_table::parse_table_update(table_update)?),
-                "proposal_source_doc" => db_update
-                    .proposal_source_doc
-                    .append(proposal_source_doc_table::parse_table_update(table_update)?),
-                "proposal_version" => db_update
-                    .proposal_version
-                    .append(proposal_version_table::parse_table_update(table_update)?),
-                "purchase_order" => db_update
-                    .purchase_order
-                    .append(purchase_order_table::parse_table_update(table_update)?),
-                "purchase_order_line" => db_update
-                    .purchase_order_line
-                    .append(purchase_order_line_table::parse_table_update(table_update)?),
-                "purchase_requisition" => db_update.purchase_requisition.append(
-                    purchase_requisition_table::parse_table_update(table_update)?,
-                ),
-                "quality_alert" => db_update
-                    .quality_alert
-                    .append(quality_alert_table::parse_table_update(table_update)?),
-                "quality_alert_reason" => db_update.quality_alert_reason.append(
-                    quality_alert_reason_table::parse_table_update(table_update)?,
-                ),
-                "quality_check" => db_update
-                    .quality_check
-                    .append(quality_check_table::parse_table_update(table_update)?),
-                "quality_point" => db_update
-                    .quality_point
-                    .append(quality_point_table::parse_table_update(table_update)?),
-                "quality_team" => db_update
-                    .quality_team
-                    .append(quality_team_table::parse_table_update(table_update)?),
-                "queue_job" => db_update
-                    .queue_job
-                    .append(queue_job_table::parse_table_update(table_update)?),
-                "queue_worker" => db_update
-                    .queue_worker
-                    .append(queue_worker_table::parse_table_update(table_update)?),
-                "record_custom_field_value" => db_update.record_custom_field_value.append(
-                    record_custom_field_value_table::parse_table_update(table_update)?,
-                ),
-                "replenishment_rule" => db_update
-                    .replenishment_rule
-                    .append(replenishment_rule_table::parse_table_update(table_update)?),
-                "report_template" => db_update
-                    .report_template
-                    .append(report_template_table::parse_table_update(table_update)?),
-                "res_partner_bank" => db_update
-                    .res_partner_bank
-                    .append(res_partner_bank_table::parse_table_update(table_update)?),
-                "return_order" => db_update
-                    .return_order
-                    .append(return_order_table::parse_table_update(table_update)?),
-                "return_order_line" => db_update
-                    .return_order_line
-                    .append(return_order_line_table::parse_table_update(table_update)?),
-                "revenue_recognition_rule" => db_update.revenue_recognition_rule.append(
-                    revenue_recognition_rule_table::parse_table_update(table_update)?,
-                ),
-                "role" => db_update
-                    .role
-                    .append(role_table::parse_table_update(table_update)?),
-                "sale_order" => db_update
-                    .sale_order
-                    .append(sale_order_table::parse_table_update(table_update)?),
-                "sale_order_line" => db_update
-                    .sale_order_line
-                    .append(sale_order_line_table::parse_table_update(table_update)?),
-                "sale_order_option" => db_update
-                    .sale_order_option
-                    .append(sale_order_option_table::parse_table_update(table_update)?),
-                "saved_report" => db_update
-                    .saved_report
-                    .append(saved_report_table::parse_table_update(table_update)?),
-                "scheduled_report" => db_update
-                    .scheduled_report
-                    .append(scheduled_report_table::parse_table_update(table_update)?),
-                "scheduled_report_run" => db_update.scheduled_report_run.append(
-                    scheduled_report_run_table::parse_table_update(table_update)?,
-                ),
-                "search_embedding" => db_update
-                    .search_embedding
-                    .append(search_embedding_table::parse_table_update(table_update)?),
-                "segment_member" => db_update
-                    .segment_member
-                    .append(segment_member_table::parse_table_update(table_update)?),
-                "serial_lot_traceability" => db_update.serial_lot_traceability.append(
-                    serial_lot_traceability_table::parse_table_update(table_update)?,
-                ),
-                "shipping_method" => db_update
-                    .shipping_method
-                    .append(shipping_method_table::parse_table_update(table_update)?),
-                "stock_count_sheet" => db_update
-                    .stock_count_sheet
-                    .append(stock_count_sheet_table::parse_table_update(table_update)?),
-                "stock_cycle_count" => db_update
-                    .stock_cycle_count
-                    .append(stock_cycle_count_table::parse_table_update(table_update)?),
-                "stock_inventory" => db_update
-                    .stock_inventory
-                    .append(stock_inventory_table::parse_table_update(table_update)?),
-                "stock_inventory_line" => db_update.stock_inventory_line.append(
-                    stock_inventory_line_table::parse_table_update(table_update)?,
-                ),
-                "stock_landed_cost" => db_update
-                    .stock_landed_cost
-                    .append(stock_landed_cost_table::parse_table_update(table_update)?),
-                "stock_landed_cost_lines" => db_update.stock_landed_cost_lines.append(
-                    stock_landed_cost_lines_table::parse_table_update(table_update)?,
-                ),
-                "stock_location" => db_update
-                    .stock_location
-                    .append(stock_location_table::parse_table_update(table_update)?),
-                "stock_move" => db_update
-                    .stock_move
-                    .append(stock_move_table::parse_table_update(table_update)?),
-                "stock_move_line" => db_update
-                    .stock_move_line
-                    .append(stock_move_line_table::parse_table_update(table_update)?),
-                "stock_picking" => db_update
-                    .stock_picking
-                    .append(stock_picking_table::parse_table_update(table_update)?),
-                "stock_picking_batch" => db_update
-                    .stock_picking_batch
-                    .append(stock_picking_batch_table::parse_table_update(table_update)?),
-                "stock_production_lot" => db_update.stock_production_lot.append(
-                    stock_production_lot_table::parse_table_update(table_update)?,
-                ),
-                "stock_production_serial" => db_update.stock_production_serial.append(
-                    stock_production_serial_table::parse_table_update(table_update)?,
-                ),
-                "stock_quant" => db_update
-                    .stock_quant
-                    .append(stock_quant_table::parse_table_update(table_update)?),
-                "stock_reorder_group" => db_update
-                    .stock_reorder_group
-                    .append(stock_reorder_group_table::parse_table_update(table_update)?),
-                "stock_route" => db_update
-                    .stock_route
-                    .append(stock_route_table::parse_table_update(table_update)?),
-                "stock_rule" => db_update
-                    .stock_rule
-                    .append(stock_rule_table::parse_table_update(table_update)?),
-                "stock_traceability_report" => db_update.stock_traceability_report.append(
-                    stock_traceability_report_table::parse_table_update(table_update)?,
-                ),
-                "subscription" => db_update
-                    .subscription
-                    .append(subscription_table::parse_table_update(table_update)?),
-                "subscription_line" => db_update
-                    .subscription_line
-                    .append(subscription_line_table::parse_table_update(table_update)?),
-                "subscription_plan" => db_update
-                    .subscription_plan
-                    .append(subscription_plan_table::parse_table_update(table_update)?),
-                "supplier_intake_request" => db_update.supplier_intake_request.append(
-                    supplier_intake_request_table::parse_table_update(table_update)?,
-                ),
-                "tax_deadline" => db_update
-                    .tax_deadline
-                    .append(tax_deadline_table::parse_table_update(table_update)?),
-                "tax_deadline_reminder" => db_update.tax_deadline_reminder.append(
-                    tax_deadline_reminder_table::parse_table_update(table_update)?,
-                ),
-                "tax_jurisdiction" => db_update
-                    .tax_jurisdiction
-                    .append(tax_jurisdiction_table::parse_table_update(table_update)?),
-                "tax_schedule" => db_update
-                    .tax_schedule
-                    .append(tax_schedule_table::parse_table_update(table_update)?),
-                "trial_balance" => db_update
-                    .trial_balance
-                    .append(trial_balance_table::parse_table_update(table_update)?),
-                "uom" => db_update
-                    .uom
-                    .append(uom_table::parse_table_update(table_update)?),
-                "uom_cat" => db_update
-                    .uom_cat
-                    .append(uom_cat_table::parse_table_update(table_update)?),
-                "uom_conversion" => db_update
-                    .uom_conversion
-                    .append(uom_conversion_table::parse_table_update(table_update)?),
-                "user_custom_field" => db_update
-                    .user_custom_field
-                    .append(user_custom_field_table::parse_table_update(table_update)?),
-                "user_organization" => db_update
-                    .user_organization
-                    .append(user_organization_table::parse_table_update(table_update)?),
-                "user_profile" => db_update
-                    .user_profile
-                    .append(user_profile_table::parse_table_update(table_update)?),
-                "user_role_assignment" => db_update.user_role_assignment.append(
-                    user_role_assignment_table::parse_table_update(table_update)?,
-                ),
-                "user_session" => db_update
-                    .user_session
-                    .append(user_session_table::parse_table_update(table_update)?),
-                "utm_campaign" => db_update
-                    .utm_campaign
-                    .append(utm_campaign_table::parse_table_update(table_update)?),
-                "utm_medium" => db_update
-                    .utm_medium
-                    .append(utm_medium_table::parse_table_update(table_update)?),
-                "utm_source" => db_update
-                    .utm_source
-                    .append(utm_source_table::parse_table_update(table_update)?),
-                "warehouse" => db_update
-                    .warehouse
-                    .append(warehouse_table::parse_table_update(table_update)?),
-                "warehouse_3_d_zone" => db_update
-                    .warehouse_3_d_zone
-                    .append(warehouse_3_d_zone_table::parse_table_update(table_update)?),
-                "warehouse_geo" => db_update
-                    .warehouse_geo
-                    .append(warehouse_geo_table::parse_table_update(table_update)?),
-                "warehouse_task" => db_update
-                    .warehouse_task
-                    .append(warehouse_task_table::parse_table_update(table_update)?),
-                "whatsapp_business_account" => db_update.whatsapp_business_account.append(
-                    whatsapp_business_account_table::parse_table_update(table_update)?,
-                ),
-                "workflow" => db_update
-                    .workflow
-                    .append(workflow_table::parse_table_update(table_update)?),
-                "workflow_activity" => db_update
-                    .workflow_activity
-                    .append(workflow_activity_table::parse_table_update(table_update)?),
-                "workflow_instance" => db_update
-                    .workflow_instance
-                    .append(workflow_instance_table::parse_table_update(table_update)?),
-                "workflow_transition" => db_update
-                    .workflow_transition
-                    .append(workflow_transition_table::parse_table_update(table_update)?),
-                "workflow_workitem" => db_update
-                    .workflow_workitem
-                    .append(workflow_workitem_table::parse_table_update(table_update)?),
+
+        "account_account" => db_update.account_account.append(account_account_table::parse_table_update(table_update)?),
+    "account_account_type" => db_update.account_account_type.append(account_account_type_table::parse_table_update(table_update)?),
+    "account_analytic_account" => db_update.account_analytic_account.append(account_analytic_account_table::parse_table_update(table_update)?),
+    "account_analytic_distribution_model" => db_update.account_analytic_distribution_model.append(account_analytic_distribution_model_table::parse_table_update(table_update)?),
+    "account_analytic_line" => db_update.account_analytic_line.append(account_analytic_line_table::parse_table_update(table_update)?),
+    "account_asset" => db_update.account_asset.append(account_asset_table::parse_table_update(table_update)?),
+    "account_asset_depreciation_line" => db_update.account_asset_depreciation_line.append(account_asset_depreciation_line_table::parse_table_update(table_update)?),
+    "account_bank_statement" => db_update.account_bank_statement.append(account_bank_statement_table::parse_table_update(table_update)?),
+    "account_bank_statement_line" => db_update.account_bank_statement_line.append(account_bank_statement_line_table::parse_table_update(table_update)?),
+    "account_fiscal_year" => db_update.account_fiscal_year.append(account_fiscal_year_table::parse_table_update(table_update)?),
+    "account_group" => db_update.account_group.append(account_group_table::parse_table_update(table_update)?),
+    "account_journal" => db_update.account_journal.append(account_journal_table::parse_table_update(table_update)?),
+    "account_move" => db_update.account_move.append(account_move_table::parse_table_update(table_update)?),
+    "account_move_line" => db_update.account_move_line.append(account_move_line_table::parse_table_update(table_update)?),
+    "account_payment" => db_update.account_payment.append(account_payment_table::parse_table_update(table_update)?),
+    "account_payment_term" => db_update.account_payment_term.append(account_payment_term_table::parse_table_update(table_update)?),
+    "account_payment_term_line" => db_update.account_payment_term_line.append(account_payment_term_line_table::parse_table_update(table_update)?),
+    "account_period" => db_update.account_period.append(account_period_table::parse_table_update(table_update)?),
+    "account_reconciliation_widget" => db_update.account_reconciliation_widget.append(account_reconciliation_widget_table::parse_table_update(table_update)?),
+    "account_tax" => db_update.account_tax.append(account_tax_table::parse_table_update(table_update)?),
+    "account_tax_group" => db_update.account_tax_group.append(account_tax_group_table::parse_table_update(table_update)?),
+    "activity" => db_update.activity.append(activity_table::parse_table_update(table_update)?),
+    "activity_type" => db_update.activity_type.append(activity_type_table::parse_table_update(table_update)?),
+    "adjustment_reason" => db_update.adjustment_reason.append(adjustment_reason_table::parse_table_update(table_update)?),
+    "ai_action_draft" => db_update.ai_action_draft.append(ai_action_draft_table::parse_table_update(table_update)?),
+    "ai_agent" => db_update.ai_agent.append(ai_agent_table::parse_table_update(table_update)?),
+    "ai_agent_run" => db_update.ai_agent_run.append(ai_agent_run_table::parse_table_update(table_update)?),
+    "ai_agent_run_policy_snapshot" => db_update.ai_agent_run_policy_snapshot.append(ai_agent_run_policy_snapshot_table::parse_table_update(table_update)?),
+    "ai_agent_run_step" => db_update.ai_agent_run_step.append(ai_agent_run_step_table::parse_table_update(table_update)?),
+    "ai_chat_message" => db_update.ai_chat_message.append(ai_chat_message_table::parse_table_update(table_update)?),
+    "ai_chat_session" => db_update.ai_chat_session.append(ai_chat_session_table::parse_table_update(table_update)?),
+    "ai_document_processing_job" => db_update.ai_document_processing_job.append(ai_document_processing_job_table::parse_table_update(table_update)?),
+    "ai_insight" => db_update.ai_insight.append(ai_insight_table::parse_table_update(table_update)?),
+    "ai_reducer_allowlist" => db_update.ai_reducer_allowlist.append(ai_reducer_allowlist_table::parse_table_update(table_update)?),
+    "ai_skill" => db_update.ai_skill.append(ai_skill_table::parse_table_update(table_update)?),
+    "ai_skill_config" => db_update.ai_skill_config.append(ai_skill_config_table::parse_table_update(table_update)?),
+    "ai_skill_fixture" => db_update.ai_skill_fixture.append(ai_skill_fixture_table::parse_table_update(table_update)?),
+    "ai_skill_release" => db_update.ai_skill_release.append(ai_skill_release_table::parse_table_update(table_update)?),
+    "ai_skill_test_run" => db_update.ai_skill_test_run.append(ai_skill_test_run_table::parse_table_update(table_update)?),
+    "ai_skill_version" => db_update.ai_skill_version.append(ai_skill_version_table::parse_table_update(table_update)?),
+    "ai_team_member" => db_update.ai_team_member.append(ai_team_member_table::parse_table_update(table_update)?),
+    "ai_team_member_skill" => db_update.ai_team_member_skill.append(ai_team_member_skill_table::parse_table_update(table_update)?),
+    "analytics_metric" => db_update.analytics_metric.append(analytics_metric_table::parse_table_update(table_update)?),
+    "approval_request" => db_update.approval_request.append(approval_request_table::parse_table_update(table_update)?),
+    "approval_rule" => db_update.approval_rule.append(approval_rule_table::parse_table_update(table_update)?),
+    "assignment_rule" => db_update.assignment_rule.append(assignment_rule_table::parse_table_update(table_update)?),
+    "audit_log" => db_update.audit_log.append(audit_log_table::parse_table_update(table_update)?),
+    "audit_rule" => db_update.audit_rule.append(audit_rule_table::parse_table_update(table_update)?),
+    "balance_sheet_line" => db_update.balance_sheet_line.append(balance_sheet_line_table::parse_table_update(table_update)?),
+    "bank_match_candidate" => db_update.bank_match_candidate.append(bank_match_candidate_table::parse_table_update(table_update)?),
+    "bank_statement_import" => db_update.bank_statement_import.append(bank_statement_import_table::parse_table_update(table_update)?),
+    "bank_statement_import_line" => db_update.bank_statement_import_line.append(bank_statement_import_line_table::parse_table_update(table_update)?),
+    "barcode_nomenclature" => db_update.barcode_nomenclature.append(barcode_nomenclature_table::parse_table_update(table_update)?),
+    "barcode_rule" => db_update.barcode_rule.append(barcode_rule_table::parse_table_update(table_update)?),
+    "barcode_scan" => db_update.barcode_scan.append(barcode_scan_table::parse_table_update(table_update)?),
+    "billing_account" => db_update.billing_account.append(billing_account_table::parse_table_update(table_update)?),
+    "bom_explosion_result" => db_update.bom_explosion_result.append(bom_explosion_result_table::parse_table_update(table_update)?),
+    "budget_post" => db_update.budget_post.append(budget_post_table::parse_table_update(table_update)?),
+    "calendar_event" => db_update.calendar_event.append(calendar_event_table::parse_table_update(table_update)?),
+    "cartonization_result" => db_update.cartonization_result.append(cartonization_result_table::parse_table_update(table_update)?),
+    "casbin_rule" => db_update.casbin_rule.append(casbin_rule_table::parse_table_update(table_update)?),
+    "cash_flow_line" => db_update.cash_flow_line.append(cash_flow_line_table::parse_table_update(table_update)?),
+    "company" => db_update.company.append(company_table::parse_table_update(table_update)?),
+    "company_country_pack" => db_update.company_country_pack.append(company_country_pack_table::parse_table_update(table_update)?),
+    "company_vertical_pack" => db_update.company_vertical_pack.append(company_vertical_pack_table::parse_table_update(table_update)?),
+    "consolidation_account" => db_update.consolidation_account.append(consolidation_account_table::parse_table_update(table_update)?),
+    "consolidation_company_rate" => db_update.consolidation_company_rate.append(consolidation_company_rate_table::parse_table_update(table_update)?),
+    "consolidation_elimination_entry" => db_update.consolidation_elimination_entry.append(consolidation_elimination_entry_table::parse_table_update(table_update)?),
+    "consolidation_journal" => db_update.consolidation_journal.append(consolidation_journal_table::parse_table_update(table_update)?),
+    "contact" => db_update.contact.append(contact_table::parse_table_update(table_update)?),
+    "contact_category" => db_update.contact_category.append(contact_category_table::parse_table_update(table_update)?),
+    "contact_category_assignment" => db_update.contact_category_assignment.append(contact_category_assignment_table::parse_table_update(table_update)?),
+    "contact_communication_preference" => db_update.contact_communication_preference.append(contact_communication_preference_table::parse_table_update(table_update)?),
+    "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(contact_duplicate_candidate_table::parse_table_update(table_update)?),
+    "contact_phone_identity" => db_update.contact_phone_identity.append(contact_phone_identity_table::parse_table_update(table_update)?),
+    "contact_relationship" => db_update.contact_relationship.append(contact_relationship_table::parse_table_update(table_update)?),
+    "contact_role_assignment" => db_update.contact_role_assignment.append(contact_role_assignment_table::parse_table_update(table_update)?),
+    "contact_segment" => db_update.contact_segment.append(contact_segment_table::parse_table_update(table_update)?),
+    "contact_tag" => db_update.contact_tag.append(contact_tag_table::parse_table_update(table_update)?),
+    "contact_tag_assignment" => db_update.contact_tag_assignment.append(contact_tag_assignment_table::parse_table_update(table_update)?),
+    "country" => db_update.country.append(country_table::parse_table_update(table_update)?),
+    "country_pack_definition" => db_update.country_pack_definition.append(country_pack_definition_table::parse_table_update(table_update)?),
+    "country_pack_tax_rule" => db_update.country_pack_tax_rule.append(country_pack_tax_rule_table::parse_table_update(table_update)?),
+    "crossovered_budget" => db_update.crossovered_budget.append(crossovered_budget_table::parse_table_update(table_update)?),
+    "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(crossovered_budget_lines_table::parse_table_update(table_update)?),
+    "currency" => db_update.currency.append(currency_table::parse_table_update(table_update)?),
+    "currency_rate" => db_update.currency_rate.append(currency_rate_table::parse_table_update(table_update)?),
+    "dashboard" => db_update.dashboard.append(dashboard_table::parse_table_update(table_update)?),
+    "dashboard_widget" => db_update.dashboard_widget.append(dashboard_widget_table::parse_table_update(table_update)?),
+    "data_classification" => db_update.data_classification.append(data_classification_table::parse_table_update(table_update)?),
+    "data_classification_rule" => db_update.data_classification_rule.append(data_classification_rule_table::parse_table_update(table_update)?),
+    "deferred_revenue_line" => db_update.deferred_revenue_line.append(deferred_revenue_line_table::parse_table_update(table_update)?),
+    "deferred_revenue_schedule" => db_update.deferred_revenue_schedule.append(deferred_revenue_schedule_table::parse_table_update(table_update)?),
+    "delegated_admin_scope" => db_update.delegated_admin_scope.append(delegated_admin_scope_table::parse_table_update(table_update)?),
+    "delivery_carrier" => db_update.delivery_carrier.append(delivery_carrier_table::parse_table_update(table_update)?),
+    "delivery_price_rule" => db_update.delivery_price_rule.append(delivery_price_rule_table::parse_table_update(table_update)?),
+    "doc_folder" => db_update.doc_folder.append(doc_folder_table::parse_table_update(table_update)?),
+    "document" => db_update.document.append(document_table::parse_table_update(table_update)?),
+    "document_sequence" => db_update.document_sequence.append(document_sequence_table::parse_table_update(table_update)?),
+    "document_template" => db_update.document_template.append(document_template_table::parse_table_update(table_update)?),
+    "document_version" => db_update.document_version.append(document_version_table::parse_table_update(table_update)?),
+    "expense_sheet" => db_update.expense_sheet.append(expense_sheet_table::parse_table_update(table_update)?),
+    "financial_report" => db_update.financial_report.append(financial_report_table::parse_table_update(table_update)?),
+    "fleet_vehicle" => db_update.fleet_vehicle.append(fleet_vehicle_table::parse_table_update(table_update)?),
+    "form_config" => db_update.form_config.append(form_config_table::parse_table_update(table_update)?),
+    "form_config_field" => db_update.form_config_field.append(form_config_field_table::parse_table_update(table_update)?),
+    "form_role_config" => db_update.form_role_config.append(form_role_config_table::parse_table_update(table_update)?),
+    "generated_owner_report" => db_update.generated_owner_report.append(generated_owner_report_table::parse_table_update(table_update)?),
+    "google_drive_connection" => db_update.google_drive_connection.append(google_drive_connection_table::parse_table_update(table_update)?),
+    "helpdesk_sla" => db_update.helpdesk_sla.append(helpdesk_sla_table::parse_table_update(table_update)?),
+    "helpdesk_stage" => db_update.helpdesk_stage.append(helpdesk_stage_table::parse_table_update(table_update)?),
+    "helpdesk_team" => db_update.helpdesk_team.append(helpdesk_team_table::parse_table_update(table_update)?),
+    "helpdesk_ticket" => db_update.helpdesk_ticket.append(helpdesk_ticket_table::parse_table_update(table_update)?),
+    "hr_contract" => db_update.hr_contract.append(hr_contract_table::parse_table_update(table_update)?),
+    "hr_department" => db_update.hr_department.append(hr_department_table::parse_table_update(table_update)?),
+    "hr_employee" => db_update.hr_employee.append(hr_employee_table::parse_table_update(table_update)?),
+    "hr_expense" => db_update.hr_expense.append(hr_expense_table::parse_table_update(table_update)?),
+    "hr_job_position" => db_update.hr_job_position.append(hr_job_position_table::parse_table_update(table_update)?),
+    "hr_leave" => db_update.hr_leave.append(hr_leave_table::parse_table_update(table_update)?),
+    "hr_leave_type" => db_update.hr_leave_type.append(hr_leave_type_table::parse_table_update(table_update)?),
+    "hr_payroll_structure" => db_update.hr_payroll_structure.append(hr_payroll_structure_table::parse_table_update(table_update)?),
+    "hr_payslip" => db_update.hr_payslip.append(hr_payslip_table::parse_table_update(table_update)?),
+    "hr_resource" => db_update.hr_resource.append(hr_resource_table::parse_table_update(table_update)?),
+    "hr_salary_rule" => db_update.hr_salary_rule.append(hr_salary_rule_table::parse_table_update(table_update)?),
+    "import_job" => db_update.import_job.append(import_job_table::parse_table_update(table_update)?),
+    "import_job_error" => db_update.import_job_error.append(import_job_error_table::parse_table_update(table_update)?),
+    "import_job_record" => db_update.import_job_record.append(import_job_record_table::parse_table_update(table_update)?),
+    "import_mapping_template" => db_update.import_mapping_template.append(import_mapping_template_table::parse_table_update(table_update)?),
+    "intercompany_rule" => db_update.intercompany_rule.append(intercompany_rule_table::parse_table_update(table_update)?),
+    "intercompany_transaction" => db_update.intercompany_transaction.append(intercompany_transaction_table::parse_table_update(table_update)?),
+    "inventory_adjustment" => db_update.inventory_adjustment.append(inventory_adjustment_table::parse_table_update(table_update)?),
+    "inventory_valuation" => db_update.inventory_valuation.append(inventory_valuation_table::parse_table_update(table_update)?),
+    "iot_action" => db_update.iot_action.append(iot_action_table::parse_table_update(table_update)?),
+    "iot_alert" => db_update.iot_alert.append(iot_alert_table::parse_table_update(table_update)?),
+    "iot_device" => db_update.iot_device.append(iot_device_table::parse_table_update(table_update)?),
+    "iot_hub" => db_update.iot_hub.append(iot_hub_table::parse_table_update(table_update)?),
+    "iot_pairing_token" => db_update.iot_pairing_token.append(iot_pairing_token_table::parse_table_update(table_update)?),
+    "iot_telemetry" => db_update.iot_telemetry.append(iot_telemetry_table::parse_table_update(table_update)?),
+    "iot_threshold" => db_update.iot_threshold.append(iot_threshold_table::parse_table_update(table_update)?),
+    "kb_category" => db_update.kb_category.append(kb_category_table::parse_table_update(table_update)?),
+    "knowledge_article" => db_update.knowledge_article.append(knowledge_article_table::parse_table_update(table_update)?),
+    "lead" => db_update.lead.append(lead_table::parse_table_update(table_update)?),
+    "lead_lost_reason" => db_update.lead_lost_reason.append(lead_lost_reason_table::parse_table_update(table_update)?),
+    "lead_source" => db_update.lead_source.append(lead_source_table::parse_table_update(table_update)?),
+    "mail_follower" => db_update.mail_follower.append(mail_follower_table::parse_table_update(table_update)?),
+    "mail_message" => db_update.mail_message.append(mail_message_table::parse_table_update(table_update)?),
+    "mail_template" => db_update.mail_template.append(mail_template_table::parse_table_update(table_update)?),
+    "message_batch" => db_update.message_batch.append(message_batch_table::parse_table_update(table_update)?),
+    "message_template" => db_update.message_template.append(message_template_table::parse_table_update(table_update)?),
+    "mrp_bom" => db_update.mrp_bom.append(mrp_bom_table::parse_table_update(table_update)?),
+    "mrp_bom_line" => db_update.mrp_bom_line.append(mrp_bom_line_table::parse_table_update(table_update)?),
+    "mrp_production" => db_update.mrp_production.append(mrp_production_table::parse_table_update(table_update)?),
+    "mrp_routing_workcenter" => db_update.mrp_routing_workcenter.append(mrp_routing_workcenter_table::parse_table_update(table_update)?),
+    "mrp_workcenter" => db_update.mrp_workcenter.append(mrp_workcenter_table::parse_table_update(table_update)?),
+    "mrp_workcenter_productivity" => db_update.mrp_workcenter_productivity.append(mrp_workcenter_productivity_table::parse_table_update(table_update)?),
+    "mrp_workorder" => db_update.mrp_workorder.append(mrp_workorder_table::parse_table_update(table_update)?),
+    "operational_message" => db_update.operational_message.append(operational_message_table::parse_table_update(table_update)?),
+    "opp_stage" => db_update.opp_stage.append(opp_stage_table::parse_table_update(table_update)?),
+    "opportunity" => db_update.opportunity.append(opportunity_table::parse_table_update(table_update)?),
+    "opportunity_line" => db_update.opportunity_line.append(opportunity_line_table::parse_table_update(table_update)?),
+    "org_permission" => db_update.org_permission.append(org_permission_table::parse_table_update(table_update)?),
+    "org_schema_migration" => db_update.org_schema_migration.append(org_schema_migration_table::parse_table_update(table_update)?),
+    "organization" => db_update.organization.append(organization_table::parse_table_update(table_update)?),
+    "organization_settings" => db_update.organization_settings.append(organization_settings_table::parse_table_update(table_update)?),
+    "packaging_material" => db_update.packaging_material.append(packaging_material_table::parse_table_update(table_update)?),
+    "payment_account" => db_update.payment_account.append(payment_account_table::parse_table_update(table_update)?),
+    "payment_fee" => db_update.payment_fee.append(payment_fee_table::parse_table_update(table_update)?),
+    "payment_reconciliation" => db_update.payment_reconciliation.append(payment_reconciliation_table::parse_table_update(table_update)?),
+    "payment_reversal" => db_update.payment_reversal.append(payment_reversal_table::parse_table_update(table_update)?),
+    "payment_transaction" => db_update.payment_transaction.append(payment_transaction_table::parse_table_update(table_update)?),
+    "picking_wave" => db_update.picking_wave.append(picking_wave_table::parse_table_update(table_update)?),
+    "policy_snapshot" => db_update.policy_snapshot.append(policy_snapshot_table::parse_table_update(table_update)?),
+    "pos_config" => db_update.pos_config.append(pos_config_table::parse_table_update(table_update)?),
+    "pos_loyalty_card" => db_update.pos_loyalty_card.append(pos_loyalty_card_table::parse_table_update(table_update)?),
+    "pos_loyalty_program" => db_update.pos_loyalty_program.append(pos_loyalty_program_table::parse_table_update(table_update)?),
+    "pos_order" => db_update.pos_order.append(pos_order_table::parse_table_update(table_update)?),
+    "pos_order_line" => db_update.pos_order_line.append(pos_order_line_table::parse_table_update(table_update)?),
+    "pos_payment" => db_update.pos_payment.append(pos_payment_table::parse_table_update(table_update)?),
+    "pos_payment_method" => db_update.pos_payment_method.append(pos_payment_method_table::parse_table_update(table_update)?),
+    "pos_session" => db_update.pos_session.append(pos_session_table::parse_table_update(table_update)?),
+    "pos_terminal" => db_update.pos_terminal.append(pos_terminal_table::parse_table_update(table_update)?),
+    "privacy_consent" => db_update.privacy_consent.append(privacy_consent_table::parse_table_update(table_update)?),
+    "product" => db_update.product.append(product_table::parse_table_update(table_update)?),
+    "product_attribute" => db_update.product_attribute.append(product_attribute_table::parse_table_update(table_update)?),
+    "product_attribute_line" => db_update.product_attribute_line.append(product_attribute_line_table::parse_table_update(table_update)?),
+    "product_attribute_value" => db_update.product_attribute_value.append(product_attribute_value_table::parse_table_update(table_update)?),
+    "product_category" => db_update.product_category.append(product_category_table::parse_table_update(table_update)?),
+    "product_packaging" => db_update.product_packaging.append(product_packaging_table::parse_table_update(table_update)?),
+    "product_pricelist" => db_update.product_pricelist.append(product_pricelist_table::parse_table_update(table_update)?),
+    "product_pricelist_item" => db_update.product_pricelist_item.append(product_pricelist_item_table::parse_table_update(table_update)?),
+    "product_supplier_info" => db_update.product_supplier_info.append(product_supplier_info_table::parse_table_update(table_update)?),
+    "product_variant" => db_update.product_variant.append(product_variant_table::parse_table_update(table_update)?),
+    "profit_loss_line" => db_update.profit_loss_line.append(profit_loss_line_table::parse_table_update(table_update)?),
+    "project_project" => db_update.project_project.append(project_project_table::parse_table_update(table_update)?),
+    "project_task" => db_update.project_task.append(project_task_table::parse_table_update(table_update)?),
+    "project_timesheet" => db_update.project_timesheet.append(project_timesheet_table::parse_table_update(table_update)?),
+    "proposal" => db_update.proposal.append(proposal_table::parse_table_update(table_update)?),
+    "proposal_comment" => db_update.proposal_comment.append(proposal_comment_table::parse_table_update(table_update)?),
+    "proposal_line_item" => db_update.proposal_line_item.append(proposal_line_item_table::parse_table_update(table_update)?),
+    "proposal_presence" => db_update.proposal_presence.append(proposal_presence_table::parse_table_update(table_update)?),
+    "proposal_section" => db_update.proposal_section.append(proposal_section_table::parse_table_update(table_update)?),
+    "proposal_source_doc" => db_update.proposal_source_doc.append(proposal_source_doc_table::parse_table_update(table_update)?),
+    "proposal_version" => db_update.proposal_version.append(proposal_version_table::parse_table_update(table_update)?),
+    "purchase_order" => db_update.purchase_order.append(purchase_order_table::parse_table_update(table_update)?),
+    "purchase_order_line" => db_update.purchase_order_line.append(purchase_order_line_table::parse_table_update(table_update)?),
+    "purchase_requisition" => db_update.purchase_requisition.append(purchase_requisition_table::parse_table_update(table_update)?),
+    "quality_alert" => db_update.quality_alert.append(quality_alert_table::parse_table_update(table_update)?),
+    "quality_alert_reason" => db_update.quality_alert_reason.append(quality_alert_reason_table::parse_table_update(table_update)?),
+    "quality_check" => db_update.quality_check.append(quality_check_table::parse_table_update(table_update)?),
+    "quality_point" => db_update.quality_point.append(quality_point_table::parse_table_update(table_update)?),
+    "quality_team" => db_update.quality_team.append(quality_team_table::parse_table_update(table_update)?),
+    "queue_job" => db_update.queue_job.append(queue_job_table::parse_table_update(table_update)?),
+    "queue_worker" => db_update.queue_worker.append(queue_worker_table::parse_table_update(table_update)?),
+    "record_custom_field_value" => db_update.record_custom_field_value.append(record_custom_field_value_table::parse_table_update(table_update)?),
+    "replenishment_rule" => db_update.replenishment_rule.append(replenishment_rule_table::parse_table_update(table_update)?),
+    "report_template" => db_update.report_template.append(report_template_table::parse_table_update(table_update)?),
+    "res_partner_bank" => db_update.res_partner_bank.append(res_partner_bank_table::parse_table_update(table_update)?),
+    "return_order" => db_update.return_order.append(return_order_table::parse_table_update(table_update)?),
+    "return_order_line" => db_update.return_order_line.append(return_order_line_table::parse_table_update(table_update)?),
+    "revenue_recognition_rule" => db_update.revenue_recognition_rule.append(revenue_recognition_rule_table::parse_table_update(table_update)?),
+    "role" => db_update.role.append(role_table::parse_table_update(table_update)?),
+    "sale_order" => db_update.sale_order.append(sale_order_table::parse_table_update(table_update)?),
+    "sale_order_line" => db_update.sale_order_line.append(sale_order_line_table::parse_table_update(table_update)?),
+    "sale_order_option" => db_update.sale_order_option.append(sale_order_option_table::parse_table_update(table_update)?),
+    "saved_report" => db_update.saved_report.append(saved_report_table::parse_table_update(table_update)?),
+    "scheduled_report" => db_update.scheduled_report.append(scheduled_report_table::parse_table_update(table_update)?),
+    "scheduled_report_run" => db_update.scheduled_report_run.append(scheduled_report_run_table::parse_table_update(table_update)?),
+    "schema_migration" => db_update.schema_migration.append(schema_migration_table::parse_table_update(table_update)?),
+    "search_embedding" => db_update.search_embedding.append(search_embedding_table::parse_table_update(table_update)?),
+    "segment_member" => db_update.segment_member.append(segment_member_table::parse_table_update(table_update)?),
+    "serial_lot_traceability" => db_update.serial_lot_traceability.append(serial_lot_traceability_table::parse_table_update(table_update)?),
+    "shipping_method" => db_update.shipping_method.append(shipping_method_table::parse_table_update(table_update)?),
+    "sod_conflict_rule" => db_update.sod_conflict_rule.append(sod_conflict_rule_table::parse_table_update(table_update)?),
+    "stock_count_sheet" => db_update.stock_count_sheet.append(stock_count_sheet_table::parse_table_update(table_update)?),
+    "stock_cycle_count" => db_update.stock_cycle_count.append(stock_cycle_count_table::parse_table_update(table_update)?),
+    "stock_inventory" => db_update.stock_inventory.append(stock_inventory_table::parse_table_update(table_update)?),
+    "stock_inventory_line" => db_update.stock_inventory_line.append(stock_inventory_line_table::parse_table_update(table_update)?),
+    "stock_landed_cost" => db_update.stock_landed_cost.append(stock_landed_cost_table::parse_table_update(table_update)?),
+    "stock_landed_cost_lines" => db_update.stock_landed_cost_lines.append(stock_landed_cost_lines_table::parse_table_update(table_update)?),
+    "stock_location" => db_update.stock_location.append(stock_location_table::parse_table_update(table_update)?),
+    "stock_move" => db_update.stock_move.append(stock_move_table::parse_table_update(table_update)?),
+    "stock_move_line" => db_update.stock_move_line.append(stock_move_line_table::parse_table_update(table_update)?),
+    "stock_picking" => db_update.stock_picking.append(stock_picking_table::parse_table_update(table_update)?),
+    "stock_picking_batch" => db_update.stock_picking_batch.append(stock_picking_batch_table::parse_table_update(table_update)?),
+    "stock_production_lot" => db_update.stock_production_lot.append(stock_production_lot_table::parse_table_update(table_update)?),
+    "stock_production_serial" => db_update.stock_production_serial.append(stock_production_serial_table::parse_table_update(table_update)?),
+    "stock_quant" => db_update.stock_quant.append(stock_quant_table::parse_table_update(table_update)?),
+    "stock_reorder_group" => db_update.stock_reorder_group.append(stock_reorder_group_table::parse_table_update(table_update)?),
+    "stock_route" => db_update.stock_route.append(stock_route_table::parse_table_update(table_update)?),
+    "stock_rule" => db_update.stock_rule.append(stock_rule_table::parse_table_update(table_update)?),
+    "stock_traceability_report" => db_update.stock_traceability_report.append(stock_traceability_report_table::parse_table_update(table_update)?),
+    "subscription" => db_update.subscription.append(subscription_table::parse_table_update(table_update)?),
+    "subscription_line" => db_update.subscription_line.append(subscription_line_table::parse_table_update(table_update)?),
+    "subscription_plan" => db_update.subscription_plan.append(subscription_plan_table::parse_table_update(table_update)?),
+    "supplier_intake_request" => db_update.supplier_intake_request.append(supplier_intake_request_table::parse_table_update(table_update)?),
+    "tax_deadline" => db_update.tax_deadline.append(tax_deadline_table::parse_table_update(table_update)?),
+    "tax_deadline_reminder" => db_update.tax_deadline_reminder.append(tax_deadline_reminder_table::parse_table_update(table_update)?),
+    "tax_jurisdiction" => db_update.tax_jurisdiction.append(tax_jurisdiction_table::parse_table_update(table_update)?),
+    "tax_schedule" => db_update.tax_schedule.append(tax_schedule_table::parse_table_update(table_update)?),
+    "trial_balance" => db_update.trial_balance.append(trial_balance_table::parse_table_update(table_update)?),
+    "uom" => db_update.uom.append(uom_table::parse_table_update(table_update)?),
+    "uom_cat" => db_update.uom_cat.append(uom_cat_table::parse_table_update(table_update)?),
+    "uom_conversion" => db_update.uom_conversion.append(uom_conversion_table::parse_table_update(table_update)?),
+    "user_custom_field" => db_update.user_custom_field.append(user_custom_field_table::parse_table_update(table_update)?),
+    "user_organization" => db_update.user_organization.append(user_organization_table::parse_table_update(table_update)?),
+    "user_profile" => db_update.user_profile.append(user_profile_table::parse_table_update(table_update)?),
+    "user_role_assignment" => db_update.user_role_assignment.append(user_role_assignment_table::parse_table_update(table_update)?),
+    "user_session" => db_update.user_session.append(user_session_table::parse_table_update(table_update)?),
+    "utm_campaign" => db_update.utm_campaign.append(utm_campaign_table::parse_table_update(table_update)?),
+    "utm_medium" => db_update.utm_medium.append(utm_medium_table::parse_table_update(table_update)?),
+    "utm_source" => db_update.utm_source.append(utm_source_table::parse_table_update(table_update)?),
+    "warehouse" => db_update.warehouse.append(warehouse_table::parse_table_update(table_update)?),
+    "warehouse_3_d_zone" => db_update.warehouse_3_d_zone.append(warehouse_3_d_zone_table::parse_table_update(table_update)?),
+    "warehouse_geo" => db_update.warehouse_geo.append(warehouse_geo_table::parse_table_update(table_update)?),
+    "warehouse_task" => db_update.warehouse_task.append(warehouse_task_table::parse_table_update(table_update)?),
+    "whatsapp_business_account" => db_update.whatsapp_business_account.append(whatsapp_business_account_table::parse_table_update(table_update)?),
+    "workflow" => db_update.workflow.append(workflow_table::parse_table_update(table_update)?),
+    "workflow_activity" => db_update.workflow_activity.append(workflow_activity_table::parse_table_update(table_update)?),
+    "workflow_instance" => db_update.workflow_instance.append(workflow_instance_table::parse_table_update(table_update)?),
+    "workflow_transition" => db_update.workflow_transition.append(workflow_transition_table::parse_table_update(table_update)?),
+    "workflow_workitem" => db_update.workflow_workitem.append(workflow_workitem_table::parse_table_update(table_update)?),
 
                 unknown => {
                     return Err(__sdk::InternalError::unknown_name(
                         "table",
                         unknown,
                         "DatabaseUpdate",
-                    )
-                    .into());
+                    ).into());
                 }
             }
         }
@@ -15850,2758 +15421,879 @@ impl __sdk::InModule for DbUpdate {
 }
 
 impl __sdk::DbUpdate for DbUpdate {
-    fn apply_to_client_cache(
-        &self,
-        cache: &mut __sdk::ClientCache<RemoteModule>,
-    ) -> AppliedDiff<'_> {
-        let mut diff = AppliedDiff::default();
+    fn apply_to_client_cache(&self, cache: &mut __sdk::ClientCache<RemoteModule>) -> AppliedDiff<'_> {
+                    let mut diff = AppliedDiff::default();
+                
+                diff.account_account = cache.apply_diff_to_table::<AccountAccount>("account_account", &self.account_account).with_updates_by_pk(|row| &row.id);
+        diff.account_account_type = cache.apply_diff_to_table::<AccountAccountType>("account_account_type", &self.account_account_type).with_updates_by_pk(|row| &row.id);
+        diff.account_analytic_account = cache.apply_diff_to_table::<AccountAnalyticAccount>("account_analytic_account", &self.account_analytic_account).with_updates_by_pk(|row| &row.id);
+        diff.account_analytic_distribution_model = cache.apply_diff_to_table::<AccountAnalyticDistributionModel>("account_analytic_distribution_model", &self.account_analytic_distribution_model).with_updates_by_pk(|row| &row.id);
+        diff.account_analytic_line = cache.apply_diff_to_table::<AccountAnalyticLine>("account_analytic_line", &self.account_analytic_line).with_updates_by_pk(|row| &row.id);
+        diff.account_asset = cache.apply_diff_to_table::<AccountAsset>("account_asset", &self.account_asset).with_updates_by_pk(|row| &row.id);
+        diff.account_asset_depreciation_line = cache.apply_diff_to_table::<AccountAssetDepreciationLine>("account_asset_depreciation_line", &self.account_asset_depreciation_line).with_updates_by_pk(|row| &row.id);
+        diff.account_bank_statement = cache.apply_diff_to_table::<AccountBankStatement>("account_bank_statement", &self.account_bank_statement).with_updates_by_pk(|row| &row.id);
+        diff.account_bank_statement_line = cache.apply_diff_to_table::<AccountBankStatementLine>("account_bank_statement_line", &self.account_bank_statement_line).with_updates_by_pk(|row| &row.id);
+        diff.account_fiscal_year = cache.apply_diff_to_table::<AccountFiscalYear>("account_fiscal_year", &self.account_fiscal_year).with_updates_by_pk(|row| &row.id);
+        diff.account_group = cache.apply_diff_to_table::<AccountGroup>("account_group", &self.account_group).with_updates_by_pk(|row| &row.id);
+        diff.account_journal = cache.apply_diff_to_table::<AccountJournal>("account_journal", &self.account_journal).with_updates_by_pk(|row| &row.id);
+        diff.account_move = cache.apply_diff_to_table::<AccountMove>("account_move", &self.account_move).with_updates_by_pk(|row| &row.id);
+        diff.account_move_line = cache.apply_diff_to_table::<AccountMoveLine>("account_move_line", &self.account_move_line).with_updates_by_pk(|row| &row.id);
+        diff.account_payment = cache.apply_diff_to_table::<AccountPayment>("account_payment", &self.account_payment).with_updates_by_pk(|row| &row.id);
+        diff.account_payment_term = cache.apply_diff_to_table::<AccountPaymentTerm>("account_payment_term", &self.account_payment_term).with_updates_by_pk(|row| &row.id);
+        diff.account_payment_term_line = cache.apply_diff_to_table::<AccountPaymentTermLine>("account_payment_term_line", &self.account_payment_term_line).with_updates_by_pk(|row| &row.id);
+        diff.account_period = cache.apply_diff_to_table::<AccountPeriod>("account_period", &self.account_period).with_updates_by_pk(|row| &row.id);
+        diff.account_reconciliation_widget = cache.apply_diff_to_table::<AccountReconciliationWidget>("account_reconciliation_widget", &self.account_reconciliation_widget).with_updates_by_pk(|row| &row.id);
+        diff.account_tax = cache.apply_diff_to_table::<AccountTax>("account_tax", &self.account_tax).with_updates_by_pk(|row| &row.id);
+        diff.account_tax_group = cache.apply_diff_to_table::<AccountTaxGroup>("account_tax_group", &self.account_tax_group).with_updates_by_pk(|row| &row.id);
+        diff.activity = cache.apply_diff_to_table::<Activity>("activity", &self.activity).with_updates_by_pk(|row| &row.id);
+        diff.activity_type = cache.apply_diff_to_table::<ActivityType>("activity_type", &self.activity_type).with_updates_by_pk(|row| &row.id);
+        diff.adjustment_reason = cache.apply_diff_to_table::<AdjustmentReason>("adjustment_reason", &self.adjustment_reason).with_updates_by_pk(|row| &row.id);
+        diff.ai_action_draft = cache.apply_diff_to_table::<AiActionDraft>("ai_action_draft", &self.ai_action_draft).with_updates_by_pk(|row| &row.id);
+        diff.ai_agent = cache.apply_diff_to_table::<AiAgent>("ai_agent", &self.ai_agent).with_updates_by_pk(|row| &row.id);
+        diff.ai_agent_run = cache.apply_diff_to_table::<AiAgentRun>("ai_agent_run", &self.ai_agent_run).with_updates_by_pk(|row| &row.id);
+        diff.ai_agent_run_policy_snapshot = cache.apply_diff_to_table::<AiAgentRunPolicySnapshot>("ai_agent_run_policy_snapshot", &self.ai_agent_run_policy_snapshot).with_updates_by_pk(|row| &row.id);
+        diff.ai_agent_run_step = cache.apply_diff_to_table::<AiAgentRunStep>("ai_agent_run_step", &self.ai_agent_run_step).with_updates_by_pk(|row| &row.id);
+        diff.ai_chat_message = cache.apply_diff_to_table::<AiChatMessage>("ai_chat_message", &self.ai_chat_message).with_updates_by_pk(|row| &row.id);
+        diff.ai_chat_session = cache.apply_diff_to_table::<AiChatSession>("ai_chat_session", &self.ai_chat_session).with_updates_by_pk(|row| &row.id);
+        diff.ai_document_processing_job = cache.apply_diff_to_table::<AiDocumentProcessingJob>("ai_document_processing_job", &self.ai_document_processing_job).with_updates_by_pk(|row| &row.id);
+        diff.ai_insight = cache.apply_diff_to_table::<AiInsight>("ai_insight", &self.ai_insight).with_updates_by_pk(|row| &row.id);
+        diff.ai_reducer_allowlist = cache.apply_diff_to_table::<AiReducerAllowlist>("ai_reducer_allowlist", &self.ai_reducer_allowlist).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill = cache.apply_diff_to_table::<AiSkill>("ai_skill", &self.ai_skill).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_config = cache.apply_diff_to_table::<AiSkillConfig>("ai_skill_config", &self.ai_skill_config).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_fixture = cache.apply_diff_to_table::<AiSkillFixture>("ai_skill_fixture", &self.ai_skill_fixture).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_release = cache.apply_diff_to_table::<AiSkillRelease>("ai_skill_release", &self.ai_skill_release).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_test_run = cache.apply_diff_to_table::<AiSkillTestRun>("ai_skill_test_run", &self.ai_skill_test_run).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_version = cache.apply_diff_to_table::<AiSkillVersion>("ai_skill_version", &self.ai_skill_version).with_updates_by_pk(|row| &row.id);
+        diff.ai_team_member = cache.apply_diff_to_table::<AiTeamMember>("ai_team_member", &self.ai_team_member).with_updates_by_pk(|row| &row.id);
+        diff.ai_team_member_skill = cache.apply_diff_to_table::<AiTeamMemberSkill>("ai_team_member_skill", &self.ai_team_member_skill).with_updates_by_pk(|row| &row.id);
+        diff.analytics_metric = cache.apply_diff_to_table::<AnalyticsMetric>("analytics_metric", &self.analytics_metric).with_updates_by_pk(|row| &row.id);
+        diff.approval_request = cache.apply_diff_to_table::<ApprovalRequest>("approval_request", &self.approval_request).with_updates_by_pk(|row| &row.id);
+        diff.approval_rule = cache.apply_diff_to_table::<ApprovalRule>("approval_rule", &self.approval_rule).with_updates_by_pk(|row| &row.id);
+        diff.assignment_rule = cache.apply_diff_to_table::<AssignmentRule>("assignment_rule", &self.assignment_rule).with_updates_by_pk(|row| &row.id);
+        diff.audit_log = cache.apply_diff_to_table::<AuditLog>("audit_log", &self.audit_log).with_updates_by_pk(|row| &row.id);
+        diff.audit_rule = cache.apply_diff_to_table::<AuditRule>("audit_rule", &self.audit_rule).with_updates_by_pk(|row| &row.id);
+        diff.balance_sheet_line = cache.apply_diff_to_table::<BalanceSheetLine>("balance_sheet_line", &self.balance_sheet_line).with_updates_by_pk(|row| &row.id);
+        diff.bank_match_candidate = cache.apply_diff_to_table::<BankMatchCandidate>("bank_match_candidate", &self.bank_match_candidate).with_updates_by_pk(|row| &row.id);
+        diff.bank_statement_import = cache.apply_diff_to_table::<BankStatementImport>("bank_statement_import", &self.bank_statement_import).with_updates_by_pk(|row| &row.id);
+        diff.bank_statement_import_line = cache.apply_diff_to_table::<BankStatementImportLine>("bank_statement_import_line", &self.bank_statement_import_line).with_updates_by_pk(|row| &row.id);
+        diff.barcode_nomenclature = cache.apply_diff_to_table::<BarcodeNomenclature>("barcode_nomenclature", &self.barcode_nomenclature).with_updates_by_pk(|row| &row.id);
+        diff.barcode_rule = cache.apply_diff_to_table::<BarcodeRule>("barcode_rule", &self.barcode_rule).with_updates_by_pk(|row| &row.id);
+        diff.barcode_scan = cache.apply_diff_to_table::<BarcodeScan>("barcode_scan", &self.barcode_scan).with_updates_by_pk(|row| &row.id);
+        diff.billing_account = cache.apply_diff_to_table::<BillingAccount>("billing_account", &self.billing_account).with_updates_by_pk(|row| &row.id);
+        diff.bom_explosion_result = cache.apply_diff_to_table::<BomExplosionResult>("bom_explosion_result", &self.bom_explosion_result).with_updates_by_pk(|row| &row.id);
+        diff.budget_post = cache.apply_diff_to_table::<BudgetPost>("budget_post", &self.budget_post).with_updates_by_pk(|row| &row.id);
+        diff.calendar_event = cache.apply_diff_to_table::<CalendarEvent>("calendar_event", &self.calendar_event).with_updates_by_pk(|row| &row.id);
+        diff.cartonization_result = cache.apply_diff_to_table::<CartonizationResult>("cartonization_result", &self.cartonization_result).with_updates_by_pk(|row| &row.id);
+        diff.casbin_rule = cache.apply_diff_to_table::<CasbinRule>("casbin_rule", &self.casbin_rule).with_updates_by_pk(|row| &row.id);
+        diff.cash_flow_line = cache.apply_diff_to_table::<CashFlowLine>("cash_flow_line", &self.cash_flow_line).with_updates_by_pk(|row| &row.id);
+        diff.company = cache.apply_diff_to_table::<Company>("company", &self.company).with_updates_by_pk(|row| &row.id);
+        diff.company_country_pack = cache.apply_diff_to_table::<CompanyCountryPack>("company_country_pack", &self.company_country_pack).with_updates_by_pk(|row| &row.id);
+        diff.company_vertical_pack = cache.apply_diff_to_table::<CompanyVerticalPack>("company_vertical_pack", &self.company_vertical_pack).with_updates_by_pk(|row| &row.id);
+        diff.consolidation_account = cache.apply_diff_to_table::<ConsolidationAccount>("consolidation_account", &self.consolidation_account).with_updates_by_pk(|row| &row.id);
+        diff.consolidation_company_rate = cache.apply_diff_to_table::<ConsolidationCompanyRate>("consolidation_company_rate", &self.consolidation_company_rate).with_updates_by_pk(|row| &row.id);
+        diff.consolidation_elimination_entry = cache.apply_diff_to_table::<ConsolidationEliminationEntry>("consolidation_elimination_entry", &self.consolidation_elimination_entry).with_updates_by_pk(|row| &row.id);
+        diff.consolidation_journal = cache.apply_diff_to_table::<ConsolidationJournal>("consolidation_journal", &self.consolidation_journal).with_updates_by_pk(|row| &row.id);
+        diff.contact = cache.apply_diff_to_table::<Contact>("contact", &self.contact).with_updates_by_pk(|row| &row.id);
+        diff.contact_category = cache.apply_diff_to_table::<ContactCategory>("contact_category", &self.contact_category).with_updates_by_pk(|row| &row.id);
+        diff.contact_category_assignment = cache.apply_diff_to_table::<ContactCategoryAssignment>("contact_category_assignment", &self.contact_category_assignment).with_updates_by_pk(|row| &row.id);
+        diff.contact_communication_preference = cache.apply_diff_to_table::<ContactCommunicationPreference>("contact_communication_preference", &self.contact_communication_preference).with_updates_by_pk(|row| &row.id);
+        diff.contact_duplicate_candidate = cache.apply_diff_to_table::<ContactDuplicateCandidate>("contact_duplicate_candidate", &self.contact_duplicate_candidate).with_updates_by_pk(|row| &row.id);
+        diff.contact_phone_identity = cache.apply_diff_to_table::<ContactPhoneIdentity>("contact_phone_identity", &self.contact_phone_identity).with_updates_by_pk(|row| &row.id);
+        diff.contact_relationship = cache.apply_diff_to_table::<ContactRelationship>("contact_relationship", &self.contact_relationship).with_updates_by_pk(|row| &row.id);
+        diff.contact_role_assignment = cache.apply_diff_to_table::<ContactRoleAssignment>("contact_role_assignment", &self.contact_role_assignment).with_updates_by_pk(|row| &row.id);
+        diff.contact_segment = cache.apply_diff_to_table::<ContactSegment>("contact_segment", &self.contact_segment).with_updates_by_pk(|row| &row.id);
+        diff.contact_tag = cache.apply_diff_to_table::<ContactTag>("contact_tag", &self.contact_tag).with_updates_by_pk(|row| &row.id);
+        diff.contact_tag_assignment = cache.apply_diff_to_table::<ContactTagAssignment>("contact_tag_assignment", &self.contact_tag_assignment).with_updates_by_pk(|row| &row.id);
+        diff.country = cache.apply_diff_to_table::<Country>("country", &self.country).with_updates_by_pk(|row| &row.code);
+        diff.country_pack_definition = cache.apply_diff_to_table::<CountryPackDefinition>("country_pack_definition", &self.country_pack_definition).with_updates_by_pk(|row| &row.pack_key);
+        diff.country_pack_tax_rule = cache.apply_diff_to_table::<CountryPackTaxRule>("country_pack_tax_rule", &self.country_pack_tax_rule).with_updates_by_pk(|row| &row.id);
+        diff.crossovered_budget = cache.apply_diff_to_table::<CrossoveredBudget>("crossovered_budget", &self.crossovered_budget).with_updates_by_pk(|row| &row.id);
+        diff.crossovered_budget_lines = cache.apply_diff_to_table::<CrossoveredBudgetLines>("crossovered_budget_lines", &self.crossovered_budget_lines).with_updates_by_pk(|row| &row.id);
+        diff.currency = cache.apply_diff_to_table::<Currency>("currency", &self.currency).with_updates_by_pk(|row| &row.code);
+        diff.currency_rate = cache.apply_diff_to_table::<CurrencyRate>("currency_rate", &self.currency_rate).with_updates_by_pk(|row| &row.id);
+        diff.dashboard = cache.apply_diff_to_table::<Dashboard>("dashboard", &self.dashboard).with_updates_by_pk(|row| &row.id);
+        diff.dashboard_widget = cache.apply_diff_to_table::<DashboardWidget>("dashboard_widget", &self.dashboard_widget).with_updates_by_pk(|row| &row.id);
+        diff.data_classification = cache.apply_diff_to_table::<DataClassification>("data_classification", &self.data_classification).with_updates_by_pk(|row| &row.id);
+        diff.data_classification_rule = cache.apply_diff_to_table::<DataClassificationRule>("data_classification_rule", &self.data_classification_rule).with_updates_by_pk(|row| &row.id);
+        diff.deferred_revenue_line = cache.apply_diff_to_table::<DeferredRevenueLine>("deferred_revenue_line", &self.deferred_revenue_line).with_updates_by_pk(|row| &row.id);
+        diff.deferred_revenue_schedule = cache.apply_diff_to_table::<DeferredRevenueSchedule>("deferred_revenue_schedule", &self.deferred_revenue_schedule).with_updates_by_pk(|row| &row.id);
+        diff.delegated_admin_scope = cache.apply_diff_to_table::<DelegatedAdminScope>("delegated_admin_scope", &self.delegated_admin_scope).with_updates_by_pk(|row| &row.id);
+        diff.delivery_carrier = cache.apply_diff_to_table::<DeliveryCarrier>("delivery_carrier", &self.delivery_carrier).with_updates_by_pk(|row| &row.id);
+        diff.delivery_price_rule = cache.apply_diff_to_table::<DeliveryPriceRule>("delivery_price_rule", &self.delivery_price_rule).with_updates_by_pk(|row| &row.id);
+        diff.doc_folder = cache.apply_diff_to_table::<DocumentFolder>("doc_folder", &self.doc_folder).with_updates_by_pk(|row| &row.id);
+        diff.document = cache.apply_diff_to_table::<Document>("document", &self.document).with_updates_by_pk(|row| &row.id);
+        diff.document_sequence = cache.apply_diff_to_table::<DocumentSequence>("document_sequence", &self.document_sequence).with_updates_by_pk(|row| &row.doc_type);
+        diff.document_template = cache.apply_diff_to_table::<DocumentTemplate>("document_template", &self.document_template).with_updates_by_pk(|row| &row.id);
+        diff.document_version = cache.apply_diff_to_table::<DocumentVersion>("document_version", &self.document_version).with_updates_by_pk(|row| &row.id);
+        diff.expense_sheet = cache.apply_diff_to_table::<HrExpenseSheet>("expense_sheet", &self.expense_sheet).with_updates_by_pk(|row| &row.id);
+        diff.financial_report = cache.apply_diff_to_table::<FinancialReport>("financial_report", &self.financial_report).with_updates_by_pk(|row| &row.id);
+        diff.fleet_vehicle = cache.apply_diff_to_table::<FleetVehicle>("fleet_vehicle", &self.fleet_vehicle).with_updates_by_pk(|row| &row.id);
+        diff.form_config = cache.apply_diff_to_table::<FormConfig>("form_config", &self.form_config).with_updates_by_pk(|row| &row.id);
+        diff.form_config_field = cache.apply_diff_to_table::<FormConfigField>("form_config_field", &self.form_config_field).with_updates_by_pk(|row| &row.id);
+        diff.form_role_config = cache.apply_diff_to_table::<FormRoleConfig>("form_role_config", &self.form_role_config).with_updates_by_pk(|row| &row.id);
+        diff.generated_owner_report = cache.apply_diff_to_table::<GeneratedOwnerReport>("generated_owner_report", &self.generated_owner_report).with_updates_by_pk(|row| &row.id);
+        diff.google_drive_connection = cache.apply_diff_to_table::<GoogleDriveConnection>("google_drive_connection", &self.google_drive_connection).with_updates_by_pk(|row| &row.id);
+        diff.helpdesk_sla = cache.apply_diff_to_table::<HelpdeskSla>("helpdesk_sla", &self.helpdesk_sla).with_updates_by_pk(|row| &row.id);
+        diff.helpdesk_stage = cache.apply_diff_to_table::<HelpdeskStage>("helpdesk_stage", &self.helpdesk_stage).with_updates_by_pk(|row| &row.id);
+        diff.helpdesk_team = cache.apply_diff_to_table::<HelpdeskTeam>("helpdesk_team", &self.helpdesk_team).with_updates_by_pk(|row| &row.id);
+        diff.helpdesk_ticket = cache.apply_diff_to_table::<HelpdeskTicket>("helpdesk_ticket", &self.helpdesk_ticket).with_updates_by_pk(|row| &row.id);
+        diff.hr_contract = cache.apply_diff_to_table::<HrContract>("hr_contract", &self.hr_contract).with_updates_by_pk(|row| &row.id);
+        diff.hr_department = cache.apply_diff_to_table::<HrDepartment>("hr_department", &self.hr_department).with_updates_by_pk(|row| &row.id);
+        diff.hr_employee = cache.apply_diff_to_table::<HrEmployee>("hr_employee", &self.hr_employee).with_updates_by_pk(|row| &row.id);
+        diff.hr_expense = cache.apply_diff_to_table::<HrExpense>("hr_expense", &self.hr_expense).with_updates_by_pk(|row| &row.id);
+        diff.hr_job_position = cache.apply_diff_to_table::<HrJobPosition>("hr_job_position", &self.hr_job_position).with_updates_by_pk(|row| &row.id);
+        diff.hr_leave = cache.apply_diff_to_table::<HrLeave>("hr_leave", &self.hr_leave).with_updates_by_pk(|row| &row.id);
+        diff.hr_leave_type = cache.apply_diff_to_table::<HrLeaveType>("hr_leave_type", &self.hr_leave_type).with_updates_by_pk(|row| &row.id);
+        diff.hr_payroll_structure = cache.apply_diff_to_table::<HrPayrollStructure>("hr_payroll_structure", &self.hr_payroll_structure).with_updates_by_pk(|row| &row.id);
+        diff.hr_payslip = cache.apply_diff_to_table::<HrPayslip>("hr_payslip", &self.hr_payslip).with_updates_by_pk(|row| &row.id);
+        diff.hr_resource = cache.apply_diff_to_table::<HrResource>("hr_resource", &self.hr_resource).with_updates_by_pk(|row| &row.id);
+        diff.hr_salary_rule = cache.apply_diff_to_table::<HrSalaryRule>("hr_salary_rule", &self.hr_salary_rule).with_updates_by_pk(|row| &row.id);
+        diff.import_job = cache.apply_diff_to_table::<ImportJob>("import_job", &self.import_job).with_updates_by_pk(|row| &row.id);
+        diff.import_job_error = cache.apply_diff_to_table::<ImportJobError>("import_job_error", &self.import_job_error).with_updates_by_pk(|row| &row.id);
+        diff.import_job_record = cache.apply_diff_to_table::<ImportJobRecord>("import_job_record", &self.import_job_record).with_updates_by_pk(|row| &row.id);
+        diff.import_mapping_template = cache.apply_diff_to_table::<ImportMappingTemplate>("import_mapping_template", &self.import_mapping_template).with_updates_by_pk(|row| &row.id);
+        diff.intercompany_rule = cache.apply_diff_to_table::<IntercompanyRule>("intercompany_rule", &self.intercompany_rule).with_updates_by_pk(|row| &row.id);
+        diff.intercompany_transaction = cache.apply_diff_to_table::<IntercompanyTransaction>("intercompany_transaction", &self.intercompany_transaction).with_updates_by_pk(|row| &row.id);
+        diff.inventory_adjustment = cache.apply_diff_to_table::<InventoryAdjustment>("inventory_adjustment", &self.inventory_adjustment).with_updates_by_pk(|row| &row.id);
+        diff.inventory_valuation = cache.apply_diff_to_table::<InventoryValuation>("inventory_valuation", &self.inventory_valuation).with_updates_by_pk(|row| &row.id);
+        diff.iot_action = cache.apply_diff_to_table::<IoTAction>("iot_action", &self.iot_action).with_updates_by_pk(|row| &row.id);
+        diff.iot_alert = cache.apply_diff_to_table::<IoTAlert>("iot_alert", &self.iot_alert).with_updates_by_pk(|row| &row.id);
+        diff.iot_device = cache.apply_diff_to_table::<IoTDevice>("iot_device", &self.iot_device).with_updates_by_pk(|row| &row.id);
+        diff.iot_hub = cache.apply_diff_to_table::<IoTHub>("iot_hub", &self.iot_hub).with_updates_by_pk(|row| &row.id);
+        diff.iot_pairing_token = cache.apply_diff_to_table::<IoTPairingToken>("iot_pairing_token", &self.iot_pairing_token).with_updates_by_pk(|row| &row.token);
+        diff.iot_telemetry = cache.apply_diff_to_table::<IoTTelemetry>("iot_telemetry", &self.iot_telemetry).with_updates_by_pk(|row| &row.id);
+        diff.iot_threshold = cache.apply_diff_to_table::<IoTThreshold>("iot_threshold", &self.iot_threshold).with_updates_by_pk(|row| &row.id);
+        diff.kb_category = cache.apply_diff_to_table::<KnowledgeArticleCategory>("kb_category", &self.kb_category).with_updates_by_pk(|row| &row.id);
+        diff.knowledge_article = cache.apply_diff_to_table::<KnowledgeArticle>("knowledge_article", &self.knowledge_article).with_updates_by_pk(|row| &row.id);
+        diff.lead = cache.apply_diff_to_table::<Lead>("lead", &self.lead).with_updates_by_pk(|row| &row.id);
+        diff.lead_lost_reason = cache.apply_diff_to_table::<LeadLostReason>("lead_lost_reason", &self.lead_lost_reason).with_updates_by_pk(|row| &row.id);
+        diff.lead_source = cache.apply_diff_to_table::<LeadSource>("lead_source", &self.lead_source).with_updates_by_pk(|row| &row.id);
+        diff.mail_follower = cache.apply_diff_to_table::<MailFollower>("mail_follower", &self.mail_follower).with_updates_by_pk(|row| &row.id);
+        diff.mail_message = cache.apply_diff_to_table::<MailMessage>("mail_message", &self.mail_message).with_updates_by_pk(|row| &row.id);
+        diff.mail_template = cache.apply_diff_to_table::<MailTemplate>("mail_template", &self.mail_template).with_updates_by_pk(|row| &row.id);
+        diff.message_batch = cache.apply_diff_to_table::<MessageBatch>("message_batch", &self.message_batch).with_updates_by_pk(|row| &row.id);
+        diff.message_template = cache.apply_diff_to_table::<MessageTemplate>("message_template", &self.message_template).with_updates_by_pk(|row| &row.id);
+        diff.mrp_bom = cache.apply_diff_to_table::<MrpBom>("mrp_bom", &self.mrp_bom).with_updates_by_pk(|row| &row.id);
+        diff.mrp_bom_line = cache.apply_diff_to_table::<MrpBomLine>("mrp_bom_line", &self.mrp_bom_line).with_updates_by_pk(|row| &row.id);
+        diff.mrp_production = cache.apply_diff_to_table::<MrpProduction>("mrp_production", &self.mrp_production).with_updates_by_pk(|row| &row.id);
+        diff.mrp_routing_workcenter = cache.apply_diff_to_table::<MrpRoutingWorkcenter>("mrp_routing_workcenter", &self.mrp_routing_workcenter).with_updates_by_pk(|row| &row.id);
+        diff.mrp_workcenter = cache.apply_diff_to_table::<MrpWorkcenter>("mrp_workcenter", &self.mrp_workcenter).with_updates_by_pk(|row| &row.id);
+        diff.mrp_workcenter_productivity = cache.apply_diff_to_table::<MrpWorkcenterProductivity>("mrp_workcenter_productivity", &self.mrp_workcenter_productivity).with_updates_by_pk(|row| &row.id);
+        diff.mrp_workorder = cache.apply_diff_to_table::<MrpWorkorder>("mrp_workorder", &self.mrp_workorder).with_updates_by_pk(|row| &row.id);
+        diff.operational_message = cache.apply_diff_to_table::<OperationalMessage>("operational_message", &self.operational_message).with_updates_by_pk(|row| &row.id);
+        diff.opp_stage = cache.apply_diff_to_table::<OpportunityStage>("opp_stage", &self.opp_stage).with_updates_by_pk(|row| &row.id);
+        diff.opportunity = cache.apply_diff_to_table::<Opportunity>("opportunity", &self.opportunity).with_updates_by_pk(|row| &row.id);
+        diff.opportunity_line = cache.apply_diff_to_table::<OpportunityLine>("opportunity_line", &self.opportunity_line).with_updates_by_pk(|row| &row.id);
+        diff.org_permission = cache.apply_diff_to_table::<OrgPermission>("org_permission", &self.org_permission).with_updates_by_pk(|row| &row.id);
+        diff.org_schema_migration = cache.apply_diff_to_table::<OrgSchemaMigration>("org_schema_migration", &self.org_schema_migration).with_updates_by_pk(|row| &row.id);
+        diff.organization = cache.apply_diff_to_table::<Organization>("organization", &self.organization).with_updates_by_pk(|row| &row.id);
+        diff.organization_settings = cache.apply_diff_to_table::<OrganizationSettings>("organization_settings", &self.organization_settings).with_updates_by_pk(|row| &row.organization_id);
+        diff.packaging_material = cache.apply_diff_to_table::<PackagingMaterial>("packaging_material", &self.packaging_material).with_updates_by_pk(|row| &row.id);
+        diff.payment_account = cache.apply_diff_to_table::<PaymentAccount>("payment_account", &self.payment_account).with_updates_by_pk(|row| &row.id);
+        diff.payment_fee = cache.apply_diff_to_table::<PaymentFee>("payment_fee", &self.payment_fee).with_updates_by_pk(|row| &row.id);
+        diff.payment_reconciliation = cache.apply_diff_to_table::<PaymentReconciliation>("payment_reconciliation", &self.payment_reconciliation).with_updates_by_pk(|row| &row.id);
+        diff.payment_reversal = cache.apply_diff_to_table::<PaymentReversal>("payment_reversal", &self.payment_reversal).with_updates_by_pk(|row| &row.id);
+        diff.payment_transaction = cache.apply_diff_to_table::<PaymentTransaction>("payment_transaction", &self.payment_transaction).with_updates_by_pk(|row| &row.id);
+        diff.picking_wave = cache.apply_diff_to_table::<PickingWave>("picking_wave", &self.picking_wave).with_updates_by_pk(|row| &row.id);
+        diff.policy_snapshot = cache.apply_diff_to_table::<PolicySnapshot>("policy_snapshot", &self.policy_snapshot).with_updates_by_pk(|row| &row.id);
+        diff.pos_config = cache.apply_diff_to_table::<PosConfig>("pos_config", &self.pos_config).with_updates_by_pk(|row| &row.id);
+        diff.pos_loyalty_card = cache.apply_diff_to_table::<PosLoyaltyCard>("pos_loyalty_card", &self.pos_loyalty_card).with_updates_by_pk(|row| &row.id);
+        diff.pos_loyalty_program = cache.apply_diff_to_table::<PosLoyaltyProgram>("pos_loyalty_program", &self.pos_loyalty_program).with_updates_by_pk(|row| &row.id);
+        diff.pos_order = cache.apply_diff_to_table::<PosOrder>("pos_order", &self.pos_order).with_updates_by_pk(|row| &row.id);
+        diff.pos_order_line = cache.apply_diff_to_table::<PosOrderLine>("pos_order_line", &self.pos_order_line).with_updates_by_pk(|row| &row.id);
+        diff.pos_payment = cache.apply_diff_to_table::<PosPayment>("pos_payment", &self.pos_payment).with_updates_by_pk(|row| &row.id);
+        diff.pos_payment_method = cache.apply_diff_to_table::<PosPaymentMethod>("pos_payment_method", &self.pos_payment_method).with_updates_by_pk(|row| &row.id);
+        diff.pos_session = cache.apply_diff_to_table::<PosSession>("pos_session", &self.pos_session).with_updates_by_pk(|row| &row.id);
+        diff.pos_terminal = cache.apply_diff_to_table::<PosTerminal>("pos_terminal", &self.pos_terminal).with_updates_by_pk(|row| &row.id);
+        diff.privacy_consent = cache.apply_diff_to_table::<PrivacyConsent>("privacy_consent", &self.privacy_consent).with_updates_by_pk(|row| &row.id);
+        diff.product = cache.apply_diff_to_table::<Product>("product", &self.product).with_updates_by_pk(|row| &row.id);
+        diff.product_attribute = cache.apply_diff_to_table::<ProductAttribute>("product_attribute", &self.product_attribute).with_updates_by_pk(|row| &row.id);
+        diff.product_attribute_line = cache.apply_diff_to_table::<ProductAttributeLine>("product_attribute_line", &self.product_attribute_line).with_updates_by_pk(|row| &row.id);
+        diff.product_attribute_value = cache.apply_diff_to_table::<ProductAttributeValue>("product_attribute_value", &self.product_attribute_value).with_updates_by_pk(|row| &row.id);
+        diff.product_category = cache.apply_diff_to_table::<ProductCategory>("product_category", &self.product_category).with_updates_by_pk(|row| &row.id);
+        diff.product_packaging = cache.apply_diff_to_table::<ProductPackaging>("product_packaging", &self.product_packaging).with_updates_by_pk(|row| &row.id);
+        diff.product_pricelist = cache.apply_diff_to_table::<ProductPricelist>("product_pricelist", &self.product_pricelist).with_updates_by_pk(|row| &row.id);
+        diff.product_pricelist_item = cache.apply_diff_to_table::<ProductPricelistItem>("product_pricelist_item", &self.product_pricelist_item).with_updates_by_pk(|row| &row.id);
+        diff.product_supplier_info = cache.apply_diff_to_table::<ProductSupplierInfo>("product_supplier_info", &self.product_supplier_info).with_updates_by_pk(|row| &row.id);
+        diff.product_variant = cache.apply_diff_to_table::<ProductVariant>("product_variant", &self.product_variant).with_updates_by_pk(|row| &row.id);
+        diff.profit_loss_line = cache.apply_diff_to_table::<ProfitLossLine>("profit_loss_line", &self.profit_loss_line).with_updates_by_pk(|row| &row.id);
+        diff.project_project = cache.apply_diff_to_table::<ProjectProject>("project_project", &self.project_project).with_updates_by_pk(|row| &row.id);
+        diff.project_task = cache.apply_diff_to_table::<ProjectTask>("project_task", &self.project_task).with_updates_by_pk(|row| &row.id);
+        diff.project_timesheet = cache.apply_diff_to_table::<ProjectTimesheet>("project_timesheet", &self.project_timesheet).with_updates_by_pk(|row| &row.id);
+        diff.proposal = cache.apply_diff_to_table::<Proposal>("proposal", &self.proposal).with_updates_by_pk(|row| &row.id);
+        diff.proposal_comment = cache.apply_diff_to_table::<ProposalComment>("proposal_comment", &self.proposal_comment).with_updates_by_pk(|row| &row.id);
+        diff.proposal_line_item = cache.apply_diff_to_table::<ProposalLineItem>("proposal_line_item", &self.proposal_line_item).with_updates_by_pk(|row| &row.id);
+        diff.proposal_presence = cache.apply_diff_to_table::<ProposalPresence>("proposal_presence", &self.proposal_presence).with_updates_by_pk(|row| &row.id);
+        diff.proposal_section = cache.apply_diff_to_table::<ProposalSection>("proposal_section", &self.proposal_section).with_updates_by_pk(|row| &row.id);
+        diff.proposal_source_doc = cache.apply_diff_to_table::<ProposalSourceDoc>("proposal_source_doc", &self.proposal_source_doc).with_updates_by_pk(|row| &row.id);
+        diff.proposal_version = cache.apply_diff_to_table::<ProposalVersion>("proposal_version", &self.proposal_version).with_updates_by_pk(|row| &row.id);
+        diff.purchase_order = cache.apply_diff_to_table::<PurchaseOrder>("purchase_order", &self.purchase_order).with_updates_by_pk(|row| &row.id);
+        diff.purchase_order_line = cache.apply_diff_to_table::<PurchaseOrderLine>("purchase_order_line", &self.purchase_order_line).with_updates_by_pk(|row| &row.id);
+        diff.purchase_requisition = cache.apply_diff_to_table::<PurchaseRequisition>("purchase_requisition", &self.purchase_requisition).with_updates_by_pk(|row| &row.id);
+        diff.quality_alert = cache.apply_diff_to_table::<QualityAlert>("quality_alert", &self.quality_alert).with_updates_by_pk(|row| &row.id);
+        diff.quality_alert_reason = cache.apply_diff_to_table::<QualityAlertReason>("quality_alert_reason", &self.quality_alert_reason).with_updates_by_pk(|row| &row.id);
+        diff.quality_check = cache.apply_diff_to_table::<QualityCheck>("quality_check", &self.quality_check).with_updates_by_pk(|row| &row.id);
+        diff.quality_point = cache.apply_diff_to_table::<QualityPoint>("quality_point", &self.quality_point).with_updates_by_pk(|row| &row.id);
+        diff.quality_team = cache.apply_diff_to_table::<QualityTeam>("quality_team", &self.quality_team).with_updates_by_pk(|row| &row.id);
+        diff.queue_job = cache.apply_diff_to_table::<QueueJob>("queue_job", &self.queue_job).with_updates_by_pk(|row| &row.id);
+        diff.queue_worker = cache.apply_diff_to_table::<QueueWorker>("queue_worker", &self.queue_worker).with_updates_by_pk(|row| &row.id);
+        diff.record_custom_field_value = cache.apply_diff_to_table::<RecordCustomFieldValue>("record_custom_field_value", &self.record_custom_field_value).with_updates_by_pk(|row| &row.id);
+        diff.replenishment_rule = cache.apply_diff_to_table::<ReplenishmentRule>("replenishment_rule", &self.replenishment_rule).with_updates_by_pk(|row| &row.id);
+        diff.report_template = cache.apply_diff_to_table::<ReportTemplate>("report_template", &self.report_template).with_updates_by_pk(|row| &row.id);
+        diff.res_partner_bank = cache.apply_diff_to_table::<ResPartnerBank>("res_partner_bank", &self.res_partner_bank).with_updates_by_pk(|row| &row.id);
+        diff.return_order = cache.apply_diff_to_table::<ReturnOrder>("return_order", &self.return_order).with_updates_by_pk(|row| &row.id);
+        diff.return_order_line = cache.apply_diff_to_table::<ReturnOrderLine>("return_order_line", &self.return_order_line).with_updates_by_pk(|row| &row.id);
+        diff.revenue_recognition_rule = cache.apply_diff_to_table::<RevenueRecognitionRule>("revenue_recognition_rule", &self.revenue_recognition_rule).with_updates_by_pk(|row| &row.id);
+        diff.role = cache.apply_diff_to_table::<Role>("role", &self.role).with_updates_by_pk(|row| &row.id);
+        diff.sale_order = cache.apply_diff_to_table::<SaleOrder>("sale_order", &self.sale_order).with_updates_by_pk(|row| &row.id);
+        diff.sale_order_line = cache.apply_diff_to_table::<SaleOrderLine>("sale_order_line", &self.sale_order_line).with_updates_by_pk(|row| &row.id);
+        diff.sale_order_option = cache.apply_diff_to_table::<SaleOrderOption>("sale_order_option", &self.sale_order_option).with_updates_by_pk(|row| &row.id);
+        diff.saved_report = cache.apply_diff_to_table::<SavedReport>("saved_report", &self.saved_report).with_updates_by_pk(|row| &row.id);
+        diff.scheduled_report = cache.apply_diff_to_table::<ScheduledReport>("scheduled_report", &self.scheduled_report).with_updates_by_pk(|row| &row.id);
+        diff.scheduled_report_run = cache.apply_diff_to_table::<ScheduledReportRun>("scheduled_report_run", &self.scheduled_report_run).with_updates_by_pk(|row| &row.id);
+        diff.schema_migration = cache.apply_diff_to_table::<SchemaMigration>("schema_migration", &self.schema_migration).with_updates_by_pk(|row| &row.version);
+        diff.search_embedding = cache.apply_diff_to_table::<SearchEmbedding>("search_embedding", &self.search_embedding).with_updates_by_pk(|row| &row.id);
+        diff.segment_member = cache.apply_diff_to_table::<SegmentMember>("segment_member", &self.segment_member).with_updates_by_pk(|row| &row.id);
+        diff.serial_lot_traceability = cache.apply_diff_to_table::<SerialLotTraceability>("serial_lot_traceability", &self.serial_lot_traceability).with_updates_by_pk(|row| &row.id);
+        diff.shipping_method = cache.apply_diff_to_table::<ShippingMethod>("shipping_method", &self.shipping_method).with_updates_by_pk(|row| &row.id);
+        diff.sod_conflict_rule = cache.apply_diff_to_table::<SodConflictRule>("sod_conflict_rule", &self.sod_conflict_rule).with_updates_by_pk(|row| &row.id);
+        diff.stock_count_sheet = cache.apply_diff_to_table::<StockCountSheet>("stock_count_sheet", &self.stock_count_sheet).with_updates_by_pk(|row| &row.id);
+        diff.stock_cycle_count = cache.apply_diff_to_table::<StockCycleCount>("stock_cycle_count", &self.stock_cycle_count).with_updates_by_pk(|row| &row.id);
+        diff.stock_inventory = cache.apply_diff_to_table::<StockInventory>("stock_inventory", &self.stock_inventory).with_updates_by_pk(|row| &row.id);
+        diff.stock_inventory_line = cache.apply_diff_to_table::<StockInventoryLine>("stock_inventory_line", &self.stock_inventory_line).with_updates_by_pk(|row| &row.id);
+        diff.stock_landed_cost = cache.apply_diff_to_table::<StockLandedCost>("stock_landed_cost", &self.stock_landed_cost).with_updates_by_pk(|row| &row.id);
+        diff.stock_landed_cost_lines = cache.apply_diff_to_table::<StockLandedCostLines>("stock_landed_cost_lines", &self.stock_landed_cost_lines).with_updates_by_pk(|row| &row.id);
+        diff.stock_location = cache.apply_diff_to_table::<StockLocation>("stock_location", &self.stock_location).with_updates_by_pk(|row| &row.id);
+        diff.stock_move = cache.apply_diff_to_table::<StockMove>("stock_move", &self.stock_move).with_updates_by_pk(|row| &row.id);
+        diff.stock_move_line = cache.apply_diff_to_table::<StockMoveLine>("stock_move_line", &self.stock_move_line).with_updates_by_pk(|row| &row.id);
+        diff.stock_picking = cache.apply_diff_to_table::<StockPicking>("stock_picking", &self.stock_picking).with_updates_by_pk(|row| &row.id);
+        diff.stock_picking_batch = cache.apply_diff_to_table::<StockPickingBatch>("stock_picking_batch", &self.stock_picking_batch).with_updates_by_pk(|row| &row.id);
+        diff.stock_production_lot = cache.apply_diff_to_table::<StockProductionLot>("stock_production_lot", &self.stock_production_lot).with_updates_by_pk(|row| &row.id);
+        diff.stock_production_serial = cache.apply_diff_to_table::<StockProductionSerial>("stock_production_serial", &self.stock_production_serial).with_updates_by_pk(|row| &row.id);
+        diff.stock_quant = cache.apply_diff_to_table::<StockQuant>("stock_quant", &self.stock_quant).with_updates_by_pk(|row| &row.id);
+        diff.stock_reorder_group = cache.apply_diff_to_table::<StockReorderGroup>("stock_reorder_group", &self.stock_reorder_group).with_updates_by_pk(|row| &row.id);
+        diff.stock_route = cache.apply_diff_to_table::<StockRoute>("stock_route", &self.stock_route).with_updates_by_pk(|row| &row.id);
+        diff.stock_rule = cache.apply_diff_to_table::<StockRule>("stock_rule", &self.stock_rule).with_updates_by_pk(|row| &row.id);
+        diff.stock_traceability_report = cache.apply_diff_to_table::<StockTraceabilityReport>("stock_traceability_report", &self.stock_traceability_report).with_updates_by_pk(|row| &row.id);
+        diff.subscription = cache.apply_diff_to_table::<Subscription>("subscription", &self.subscription).with_updates_by_pk(|row| &row.id);
+        diff.subscription_line = cache.apply_diff_to_table::<SubscriptionLine>("subscription_line", &self.subscription_line).with_updates_by_pk(|row| &row.id);
+        diff.subscription_plan = cache.apply_diff_to_table::<SubscriptionPlan>("subscription_plan", &self.subscription_plan).with_updates_by_pk(|row| &row.id);
+        diff.supplier_intake_request = cache.apply_diff_to_table::<SupplierIntakeRequest>("supplier_intake_request", &self.supplier_intake_request).with_updates_by_pk(|row| &row.id);
+        diff.tax_deadline = cache.apply_diff_to_table::<TaxDeadline>("tax_deadline", &self.tax_deadline).with_updates_by_pk(|row| &row.id);
+        diff.tax_deadline_reminder = cache.apply_diff_to_table::<TaxDeadlineReminder>("tax_deadline_reminder", &self.tax_deadline_reminder).with_updates_by_pk(|row| &row.id);
+        diff.tax_jurisdiction = cache.apply_diff_to_table::<TaxJurisdiction>("tax_jurisdiction", &self.tax_jurisdiction).with_updates_by_pk(|row| &row.id);
+        diff.tax_schedule = cache.apply_diff_to_table::<TaxSchedule>("tax_schedule", &self.tax_schedule).with_updates_by_pk(|row| &row.id);
+        diff.trial_balance = cache.apply_diff_to_table::<TrialBalance>("trial_balance", &self.trial_balance).with_updates_by_pk(|row| &row.id);
+        diff.uom = cache.apply_diff_to_table::<Uom>("uom", &self.uom).with_updates_by_pk(|row| &row.id);
+        diff.uom_cat = cache.apply_diff_to_table::<UomCategory>("uom_cat", &self.uom_cat).with_updates_by_pk(|row| &row.id);
+        diff.uom_conversion = cache.apply_diff_to_table::<UomConversion>("uom_conversion", &self.uom_conversion).with_updates_by_pk(|row| &row.id);
+        diff.user_custom_field = cache.apply_diff_to_table::<UserCustomField>("user_custom_field", &self.user_custom_field).with_updates_by_pk(|row| &row.id);
+        diff.user_organization = cache.apply_diff_to_table::<UserOrganization>("user_organization", &self.user_organization).with_updates_by_pk(|row| &row.id);
+        diff.user_profile = cache.apply_diff_to_table::<UserProfile>("user_profile", &self.user_profile).with_updates_by_pk(|row| &row.identity);
+        diff.user_role_assignment = cache.apply_diff_to_table::<UserRoleAssignment>("user_role_assignment", &self.user_role_assignment).with_updates_by_pk(|row| &row.id);
+        diff.user_session = cache.apply_diff_to_table::<UserSession>("user_session", &self.user_session).with_updates_by_pk(|row| &row.id);
+        diff.utm_campaign = cache.apply_diff_to_table::<UtmCampaign>("utm_campaign", &self.utm_campaign).with_updates_by_pk(|row| &row.id);
+        diff.utm_medium = cache.apply_diff_to_table::<UtmMedium>("utm_medium", &self.utm_medium).with_updates_by_pk(|row| &row.id);
+        diff.utm_source = cache.apply_diff_to_table::<UtmSource>("utm_source", &self.utm_source).with_updates_by_pk(|row| &row.id);
+        diff.warehouse = cache.apply_diff_to_table::<Warehouse>("warehouse", &self.warehouse).with_updates_by_pk(|row| &row.id);
+        diff.warehouse_3_d_zone = cache.apply_diff_to_table::<Warehouse3DZone>("warehouse_3_d_zone", &self.warehouse_3_d_zone).with_updates_by_pk(|row| &row.id);
+        diff.warehouse_geo = cache.apply_diff_to_table::<WarehouseGeo>("warehouse_geo", &self.warehouse_geo).with_updates_by_pk(|row| &row.id);
+        diff.warehouse_task = cache.apply_diff_to_table::<WarehouseTask>("warehouse_task", &self.warehouse_task).with_updates_by_pk(|row| &row.id);
+        diff.whatsapp_business_account = cache.apply_diff_to_table::<WhatsAppBusinessAccount>("whatsapp_business_account", &self.whatsapp_business_account).with_updates_by_pk(|row| &row.id);
+        diff.workflow = cache.apply_diff_to_table::<Workflow>("workflow", &self.workflow).with_updates_by_pk(|row| &row.id);
+        diff.workflow_activity = cache.apply_diff_to_table::<WorkflowActivity>("workflow_activity", &self.workflow_activity).with_updates_by_pk(|row| &row.id);
+        diff.workflow_instance = cache.apply_diff_to_table::<WorkflowInstance>("workflow_instance", &self.workflow_instance).with_updates_by_pk(|row| &row.id);
+        diff.workflow_transition = cache.apply_diff_to_table::<WorkflowTransition>("workflow_transition", &self.workflow_transition).with_updates_by_pk(|row| &row.id);
+        diff.workflow_workitem = cache.apply_diff_to_table::<WorkflowWorkitem>("workflow_workitem", &self.workflow_workitem).with_updates_by_pk(|row| &row.id);
 
-        diff.account_account = cache
-            .apply_diff_to_table::<AccountAccount>("account_account", &self.account_account)
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_account_type = cache
-            .apply_diff_to_table::<AccountAccountType>(
-                "account_account_type",
-                &self.account_account_type,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_analytic_account = cache
-            .apply_diff_to_table::<AccountAnalyticAccount>(
-                "account_analytic_account",
-                &self.account_analytic_account,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_analytic_distribution_model = cache
-            .apply_diff_to_table::<AccountAnalyticDistributionModel>(
-                "account_analytic_distribution_model",
-                &self.account_analytic_distribution_model,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_analytic_line = cache
-            .apply_diff_to_table::<AccountAnalyticLine>(
-                "account_analytic_line",
-                &self.account_analytic_line,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_asset = cache
-            .apply_diff_to_table::<AccountAsset>("account_asset", &self.account_asset)
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_asset_depreciation_line = cache
-            .apply_diff_to_table::<AccountAssetDepreciationLine>(
-                "account_asset_depreciation_line",
-                &self.account_asset_depreciation_line,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_bank_statement = cache
-            .apply_diff_to_table::<AccountBankStatement>(
-                "account_bank_statement",
-                &self.account_bank_statement,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_bank_statement_line = cache
-            .apply_diff_to_table::<AccountBankStatementLine>(
-                "account_bank_statement_line",
-                &self.account_bank_statement_line,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_fiscal_year = cache
-            .apply_diff_to_table::<AccountFiscalYear>(
-                "account_fiscal_year",
-                &self.account_fiscal_year,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_group = cache
-            .apply_diff_to_table::<AccountGroup>("account_group", &self.account_group)
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_journal = cache
-            .apply_diff_to_table::<AccountJournal>("account_journal", &self.account_journal)
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_move = cache
-            .apply_diff_to_table::<AccountMove>("account_move", &self.account_move)
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_move_line = cache
-            .apply_diff_to_table::<AccountMoveLine>("account_move_line", &self.account_move_line)
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_payment = cache
-            .apply_diff_to_table::<AccountPayment>("account_payment", &self.account_payment)
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_payment_term = cache
-            .apply_diff_to_table::<AccountPaymentTerm>(
-                "account_payment_term",
-                &self.account_payment_term,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_payment_term_line = cache
-            .apply_diff_to_table::<AccountPaymentTermLine>(
-                "account_payment_term_line",
-                &self.account_payment_term_line,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_period = cache
-            .apply_diff_to_table::<AccountPeriod>("account_period", &self.account_period)
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_reconciliation_widget = cache
-            .apply_diff_to_table::<AccountReconciliationWidget>(
-                "account_reconciliation_widget",
-                &self.account_reconciliation_widget,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_tax = cache
-            .apply_diff_to_table::<AccountTax>("account_tax", &self.account_tax)
-            .with_updates_by_pk(|row| &row.id);
-        diff.account_tax_group = cache
-            .apply_diff_to_table::<AccountTaxGroup>("account_tax_group", &self.account_tax_group)
-            .with_updates_by_pk(|row| &row.id);
-        diff.activity = cache
-            .apply_diff_to_table::<Activity>("activity", &self.activity)
-            .with_updates_by_pk(|row| &row.id);
-        diff.activity_type = cache
-            .apply_diff_to_table::<ActivityType>("activity_type", &self.activity_type)
-            .with_updates_by_pk(|row| &row.id);
-        diff.adjustment_reason = cache
-            .apply_diff_to_table::<AdjustmentReason>("adjustment_reason", &self.adjustment_reason)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_action_draft = cache
-            .apply_diff_to_table::<AiActionDraft>("ai_action_draft", &self.ai_action_draft)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_agent = cache
-            .apply_diff_to_table::<AiAgent>("ai_agent", &self.ai_agent)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_agent_run = cache
-            .apply_diff_to_table::<AiAgentRun>("ai_agent_run", &self.ai_agent_run)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_agent_run_policy_snapshot = cache
-            .apply_diff_to_table::<AiAgentRunPolicySnapshot>(
-                "ai_agent_run_policy_snapshot",
-                &self.ai_agent_run_policy_snapshot,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_agent_run_step = cache
-            .apply_diff_to_table::<AiAgentRunStep>("ai_agent_run_step", &self.ai_agent_run_step)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_chat_message = cache
-            .apply_diff_to_table::<AiChatMessage>("ai_chat_message", &self.ai_chat_message)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_chat_session = cache
-            .apply_diff_to_table::<AiChatSession>("ai_chat_session", &self.ai_chat_session)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_document_processing_job = cache
-            .apply_diff_to_table::<AiDocumentProcessingJob>(
-                "ai_document_processing_job",
-                &self.ai_document_processing_job,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_insight = cache
-            .apply_diff_to_table::<AiInsight>("ai_insight", &self.ai_insight)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_reducer_allowlist = cache
-            .apply_diff_to_table::<AiReducerAllowlist>(
-                "ai_reducer_allowlist",
-                &self.ai_reducer_allowlist,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_skill = cache
-            .apply_diff_to_table::<AiSkill>("ai_skill", &self.ai_skill)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_skill_config = cache
-            .apply_diff_to_table::<AiSkillConfig>("ai_skill_config", &self.ai_skill_config)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_skill_fixture = cache
-            .apply_diff_to_table::<AiSkillFixture>("ai_skill_fixture", &self.ai_skill_fixture)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_skill_release = cache
-            .apply_diff_to_table::<AiSkillRelease>("ai_skill_release", &self.ai_skill_release)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_skill_test_run = cache
-            .apply_diff_to_table::<AiSkillTestRun>("ai_skill_test_run", &self.ai_skill_test_run)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_skill_version = cache
-            .apply_diff_to_table::<AiSkillVersion>("ai_skill_version", &self.ai_skill_version)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_team_member = cache
-            .apply_diff_to_table::<AiTeamMember>("ai_team_member", &self.ai_team_member)
-            .with_updates_by_pk(|row| &row.id);
-        diff.ai_team_member_skill = cache
-            .apply_diff_to_table::<AiTeamMemberSkill>(
-                "ai_team_member_skill",
-                &self.ai_team_member_skill,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.analytics_metric = cache
-            .apply_diff_to_table::<AnalyticsMetric>("analytics_metric", &self.analytics_metric)
-            .with_updates_by_pk(|row| &row.id);
-        diff.approval_request = cache
-            .apply_diff_to_table::<ApprovalRequest>("approval_request", &self.approval_request)
-            .with_updates_by_pk(|row| &row.id);
-        diff.approval_rule = cache
-            .apply_diff_to_table::<ApprovalRule>("approval_rule", &self.approval_rule)
-            .with_updates_by_pk(|row| &row.id);
-        diff.assignment_rule = cache
-            .apply_diff_to_table::<AssignmentRule>("assignment_rule", &self.assignment_rule)
-            .with_updates_by_pk(|row| &row.id);
-        diff.audit_log = cache
-            .apply_diff_to_table::<AuditLog>("audit_log", &self.audit_log)
-            .with_updates_by_pk(|row| &row.id);
-        diff.audit_rule = cache
-            .apply_diff_to_table::<AuditRule>("audit_rule", &self.audit_rule)
-            .with_updates_by_pk(|row| &row.id);
-        diff.balance_sheet_line = cache
-            .apply_diff_to_table::<BalanceSheetLine>("balance_sheet_line", &self.balance_sheet_line)
-            .with_updates_by_pk(|row| &row.id);
-        diff.bank_match_candidate = cache
-            .apply_diff_to_table::<BankMatchCandidate>(
-                "bank_match_candidate",
-                &self.bank_match_candidate,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.bank_statement_import = cache
-            .apply_diff_to_table::<BankStatementImport>(
-                "bank_statement_import",
-                &self.bank_statement_import,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.bank_statement_import_line = cache
-            .apply_diff_to_table::<BankStatementImportLine>(
-                "bank_statement_import_line",
-                &self.bank_statement_import_line,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.barcode_nomenclature = cache
-            .apply_diff_to_table::<BarcodeNomenclature>(
-                "barcode_nomenclature",
-                &self.barcode_nomenclature,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.barcode_rule = cache
-            .apply_diff_to_table::<BarcodeRule>("barcode_rule", &self.barcode_rule)
-            .with_updates_by_pk(|row| &row.id);
-        diff.barcode_scan = cache
-            .apply_diff_to_table::<BarcodeScan>("barcode_scan", &self.barcode_scan)
-            .with_updates_by_pk(|row| &row.id);
-        diff.billing_account = cache
-            .apply_diff_to_table::<BillingAccount>("billing_account", &self.billing_account)
-            .with_updates_by_pk(|row| &row.id);
-        diff.bom_explosion_result = cache
-            .apply_diff_to_table::<BomExplosionResult>(
-                "bom_explosion_result",
-                &self.bom_explosion_result,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.budget_post = cache
-            .apply_diff_to_table::<BudgetPost>("budget_post", &self.budget_post)
-            .with_updates_by_pk(|row| &row.id);
-        diff.calendar_event = cache
-            .apply_diff_to_table::<CalendarEvent>("calendar_event", &self.calendar_event)
-            .with_updates_by_pk(|row| &row.id);
-        diff.cartonization_result = cache
-            .apply_diff_to_table::<CartonizationResult>(
-                "cartonization_result",
-                &self.cartonization_result,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.casbin_rule = cache
-            .apply_diff_to_table::<CasbinRule>("casbin_rule", &self.casbin_rule)
-            .with_updates_by_pk(|row| &row.id);
-        diff.cash_flow_line = cache
-            .apply_diff_to_table::<CashFlowLine>("cash_flow_line", &self.cash_flow_line)
-            .with_updates_by_pk(|row| &row.id);
-        diff.company = cache
-            .apply_diff_to_table::<Company>("company", &self.company)
-            .with_updates_by_pk(|row| &row.id);
-        diff.company_vertical_pack = cache
-            .apply_diff_to_table::<CompanyVerticalPack>(
-                "company_vertical_pack",
-                &self.company_vertical_pack,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.consolidation_account = cache
-            .apply_diff_to_table::<ConsolidationAccount>(
-                "consolidation_account",
-                &self.consolidation_account,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.consolidation_company_rate = cache
-            .apply_diff_to_table::<ConsolidationCompanyRate>(
-                "consolidation_company_rate",
-                &self.consolidation_company_rate,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.consolidation_elimination_entry = cache
-            .apply_diff_to_table::<ConsolidationEliminationEntry>(
-                "consolidation_elimination_entry",
-                &self.consolidation_elimination_entry,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.consolidation_journal = cache
-            .apply_diff_to_table::<ConsolidationJournal>(
-                "consolidation_journal",
-                &self.consolidation_journal,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.contact = cache
-            .apply_diff_to_table::<Contact>("contact", &self.contact)
-            .with_updates_by_pk(|row| &row.id);
-        diff.contact_category = cache
-            .apply_diff_to_table::<ContactCategory>("contact_category", &self.contact_category)
-            .with_updates_by_pk(|row| &row.id);
-        diff.contact_category_assignment = cache
-            .apply_diff_to_table::<ContactCategoryAssignment>(
-                "contact_category_assignment",
-                &self.contact_category_assignment,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.contact_communication_preference = cache
-            .apply_diff_to_table::<ContactCommunicationPreference>(
-                "contact_communication_preference",
-                &self.contact_communication_preference,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.contact_duplicate_candidate = cache
-            .apply_diff_to_table::<ContactDuplicateCandidate>(
-                "contact_duplicate_candidate",
-                &self.contact_duplicate_candidate,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.contact_phone_identity = cache
-            .apply_diff_to_table::<ContactPhoneIdentity>(
-                "contact_phone_identity",
-                &self.contact_phone_identity,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.contact_relationship = cache
-            .apply_diff_to_table::<ContactRelationship>(
-                "contact_relationship",
-                &self.contact_relationship,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.contact_role_assignment = cache
-            .apply_diff_to_table::<ContactRoleAssignment>(
-                "contact_role_assignment",
-                &self.contact_role_assignment,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.contact_segment = cache
-            .apply_diff_to_table::<ContactSegment>("contact_segment", &self.contact_segment)
-            .with_updates_by_pk(|row| &row.id);
-        diff.contact_tag = cache
-            .apply_diff_to_table::<ContactTag>("contact_tag", &self.contact_tag)
-            .with_updates_by_pk(|row| &row.id);
-        diff.contact_tag_assignment = cache
-            .apply_diff_to_table::<ContactTagAssignment>(
-                "contact_tag_assignment",
-                &self.contact_tag_assignment,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.country = cache
-            .apply_diff_to_table::<Country>("country", &self.country)
-            .with_updates_by_pk(|row| &row.code);
-        diff.crossovered_budget = cache
-            .apply_diff_to_table::<CrossoveredBudget>(
-                "crossovered_budget",
-                &self.crossovered_budget,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.crossovered_budget_lines = cache
-            .apply_diff_to_table::<CrossoveredBudgetLines>(
-                "crossovered_budget_lines",
-                &self.crossovered_budget_lines,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.currency = cache
-            .apply_diff_to_table::<Currency>("currency", &self.currency)
-            .with_updates_by_pk(|row| &row.code);
-        diff.currency_rate = cache
-            .apply_diff_to_table::<CurrencyRate>("currency_rate", &self.currency_rate)
-            .with_updates_by_pk(|row| &row.id);
-        diff.dashboard = cache
-            .apply_diff_to_table::<Dashboard>("dashboard", &self.dashboard)
-            .with_updates_by_pk(|row| &row.id);
-        diff.dashboard_widget = cache
-            .apply_diff_to_table::<DashboardWidget>("dashboard_widget", &self.dashboard_widget)
-            .with_updates_by_pk(|row| &row.id);
-        diff.data_classification = cache
-            .apply_diff_to_table::<DataClassification>(
-                "data_classification",
-                &self.data_classification,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.data_classification_rule = cache
-            .apply_diff_to_table::<DataClassificationRule>(
-                "data_classification_rule",
-                &self.data_classification_rule,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.deferred_revenue_line = cache
-            .apply_diff_to_table::<DeferredRevenueLine>(
-                "deferred_revenue_line",
-                &self.deferred_revenue_line,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.deferred_revenue_schedule = cache
-            .apply_diff_to_table::<DeferredRevenueSchedule>(
-                "deferred_revenue_schedule",
-                &self.deferred_revenue_schedule,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.delivery_carrier = cache
-            .apply_diff_to_table::<DeliveryCarrier>("delivery_carrier", &self.delivery_carrier)
-            .with_updates_by_pk(|row| &row.id);
-        diff.delivery_price_rule = cache
-            .apply_diff_to_table::<DeliveryPriceRule>(
-                "delivery_price_rule",
-                &self.delivery_price_rule,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.doc_folder = cache
-            .apply_diff_to_table::<DocumentFolder>("doc_folder", &self.doc_folder)
-            .with_updates_by_pk(|row| &row.id);
-        diff.document = cache
-            .apply_diff_to_table::<Document>("document", &self.document)
-            .with_updates_by_pk(|row| &row.id);
-        diff.document_sequence = cache
-            .apply_diff_to_table::<DocumentSequence>("document_sequence", &self.document_sequence)
-            .with_updates_by_pk(|row| &row.doc_type);
-        diff.document_template = cache
-            .apply_diff_to_table::<DocumentTemplate>("document_template", &self.document_template)
-            .with_updates_by_pk(|row| &row.id);
-        diff.document_version = cache
-            .apply_diff_to_table::<DocumentVersion>("document_version", &self.document_version)
-            .with_updates_by_pk(|row| &row.id);
-        diff.expense_sheet = cache
-            .apply_diff_to_table::<HrExpenseSheet>("expense_sheet", &self.expense_sheet)
-            .with_updates_by_pk(|row| &row.id);
-        diff.financial_report = cache
-            .apply_diff_to_table::<FinancialReport>("financial_report", &self.financial_report)
-            .with_updates_by_pk(|row| &row.id);
-        diff.fleet_vehicle = cache
-            .apply_diff_to_table::<FleetVehicle>("fleet_vehicle", &self.fleet_vehicle)
-            .with_updates_by_pk(|row| &row.id);
-        diff.form_config = cache
-            .apply_diff_to_table::<FormConfig>("form_config", &self.form_config)
-            .with_updates_by_pk(|row| &row.id);
-        diff.form_config_field = cache
-            .apply_diff_to_table::<FormConfigField>("form_config_field", &self.form_config_field)
-            .with_updates_by_pk(|row| &row.id);
-        diff.form_role_config = cache
-            .apply_diff_to_table::<FormRoleConfig>("form_role_config", &self.form_role_config)
-            .with_updates_by_pk(|row| &row.id);
-        diff.generated_owner_report = cache
-            .apply_diff_to_table::<GeneratedOwnerReport>(
-                "generated_owner_report",
-                &self.generated_owner_report,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.google_drive_connection = cache
-            .apply_diff_to_table::<GoogleDriveConnection>(
-                "google_drive_connection",
-                &self.google_drive_connection,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.helpdesk_sla = cache
-            .apply_diff_to_table::<HelpdeskSla>("helpdesk_sla", &self.helpdesk_sla)
-            .with_updates_by_pk(|row| &row.id);
-        diff.helpdesk_stage = cache
-            .apply_diff_to_table::<HelpdeskStage>("helpdesk_stage", &self.helpdesk_stage)
-            .with_updates_by_pk(|row| &row.id);
-        diff.helpdesk_team = cache
-            .apply_diff_to_table::<HelpdeskTeam>("helpdesk_team", &self.helpdesk_team)
-            .with_updates_by_pk(|row| &row.id);
-        diff.helpdesk_ticket = cache
-            .apply_diff_to_table::<HelpdeskTicket>("helpdesk_ticket", &self.helpdesk_ticket)
-            .with_updates_by_pk(|row| &row.id);
-        diff.hr_contract = cache
-            .apply_diff_to_table::<HrContract>("hr_contract", &self.hr_contract)
-            .with_updates_by_pk(|row| &row.id);
-        diff.hr_department = cache
-            .apply_diff_to_table::<HrDepartment>("hr_department", &self.hr_department)
-            .with_updates_by_pk(|row| &row.id);
-        diff.hr_employee = cache
-            .apply_diff_to_table::<HrEmployee>("hr_employee", &self.hr_employee)
-            .with_updates_by_pk(|row| &row.id);
-        diff.hr_expense = cache
-            .apply_diff_to_table::<HrExpense>("hr_expense", &self.hr_expense)
-            .with_updates_by_pk(|row| &row.id);
-        diff.hr_job_position = cache
-            .apply_diff_to_table::<HrJobPosition>("hr_job_position", &self.hr_job_position)
-            .with_updates_by_pk(|row| &row.id);
-        diff.hr_leave = cache
-            .apply_diff_to_table::<HrLeave>("hr_leave", &self.hr_leave)
-            .with_updates_by_pk(|row| &row.id);
-        diff.hr_leave_type = cache
-            .apply_diff_to_table::<HrLeaveType>("hr_leave_type", &self.hr_leave_type)
-            .with_updates_by_pk(|row| &row.id);
-        diff.hr_payroll_structure = cache
-            .apply_diff_to_table::<HrPayrollStructure>(
-                "hr_payroll_structure",
-                &self.hr_payroll_structure,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.hr_payslip = cache
-            .apply_diff_to_table::<HrPayslip>("hr_payslip", &self.hr_payslip)
-            .with_updates_by_pk(|row| &row.id);
-        diff.hr_resource = cache
-            .apply_diff_to_table::<HrResource>("hr_resource", &self.hr_resource)
-            .with_updates_by_pk(|row| &row.id);
-        diff.hr_salary_rule = cache
-            .apply_diff_to_table::<HrSalaryRule>("hr_salary_rule", &self.hr_salary_rule)
-            .with_updates_by_pk(|row| &row.id);
-        diff.import_job = cache
-            .apply_diff_to_table::<ImportJob>("import_job", &self.import_job)
-            .with_updates_by_pk(|row| &row.id);
-        diff.import_job_error = cache
-            .apply_diff_to_table::<ImportJobError>("import_job_error", &self.import_job_error)
-            .with_updates_by_pk(|row| &row.id);
-        diff.import_job_record = cache
-            .apply_diff_to_table::<ImportJobRecord>("import_job_record", &self.import_job_record)
-            .with_updates_by_pk(|row| &row.id);
-        diff.import_mapping_template = cache
-            .apply_diff_to_table::<ImportMappingTemplate>(
-                "import_mapping_template",
-                &self.import_mapping_template,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.intercompany_rule = cache
-            .apply_diff_to_table::<IntercompanyRule>("intercompany_rule", &self.intercompany_rule)
-            .with_updates_by_pk(|row| &row.id);
-        diff.intercompany_transaction = cache
-            .apply_diff_to_table::<IntercompanyTransaction>(
-                "intercompany_transaction",
-                &self.intercompany_transaction,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.inventory_adjustment = cache
-            .apply_diff_to_table::<InventoryAdjustment>(
-                "inventory_adjustment",
-                &self.inventory_adjustment,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.inventory_valuation = cache
-            .apply_diff_to_table::<InventoryValuation>(
-                "inventory_valuation",
-                &self.inventory_valuation,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.iot_action = cache
-            .apply_diff_to_table::<IoTAction>("iot_action", &self.iot_action)
-            .with_updates_by_pk(|row| &row.id);
-        diff.iot_alert = cache
-            .apply_diff_to_table::<IoTAlert>("iot_alert", &self.iot_alert)
-            .with_updates_by_pk(|row| &row.id);
-        diff.iot_device = cache
-            .apply_diff_to_table::<IoTDevice>("iot_device", &self.iot_device)
-            .with_updates_by_pk(|row| &row.id);
-        diff.iot_hub = cache
-            .apply_diff_to_table::<IoTHub>("iot_hub", &self.iot_hub)
-            .with_updates_by_pk(|row| &row.id);
-        diff.iot_pairing_token = cache
-            .apply_diff_to_table::<IoTPairingToken>("iot_pairing_token", &self.iot_pairing_token)
-            .with_updates_by_pk(|row| &row.token);
-        diff.iot_telemetry = cache
-            .apply_diff_to_table::<IoTTelemetry>("iot_telemetry", &self.iot_telemetry)
-            .with_updates_by_pk(|row| &row.id);
-        diff.iot_threshold = cache
-            .apply_diff_to_table::<IoTThreshold>("iot_threshold", &self.iot_threshold)
-            .with_updates_by_pk(|row| &row.id);
-        diff.kb_category = cache
-            .apply_diff_to_table::<KnowledgeArticleCategory>("kb_category", &self.kb_category)
-            .with_updates_by_pk(|row| &row.id);
-        diff.knowledge_article = cache
-            .apply_diff_to_table::<KnowledgeArticle>("knowledge_article", &self.knowledge_article)
-            .with_updates_by_pk(|row| &row.id);
-        diff.lead = cache
-            .apply_diff_to_table::<Lead>("lead", &self.lead)
-            .with_updates_by_pk(|row| &row.id);
-        diff.lead_lost_reason = cache
-            .apply_diff_to_table::<LeadLostReason>("lead_lost_reason", &self.lead_lost_reason)
-            .with_updates_by_pk(|row| &row.id);
-        diff.lead_source = cache
-            .apply_diff_to_table::<LeadSource>("lead_source", &self.lead_source)
-            .with_updates_by_pk(|row| &row.id);
-        diff.mail_follower = cache
-            .apply_diff_to_table::<MailFollower>("mail_follower", &self.mail_follower)
-            .with_updates_by_pk(|row| &row.id);
-        diff.mail_message = cache
-            .apply_diff_to_table::<MailMessage>("mail_message", &self.mail_message)
-            .with_updates_by_pk(|row| &row.id);
-        diff.mail_template = cache
-            .apply_diff_to_table::<MailTemplate>("mail_template", &self.mail_template)
-            .with_updates_by_pk(|row| &row.id);
-        diff.message_batch = cache
-            .apply_diff_to_table::<MessageBatch>("message_batch", &self.message_batch)
-            .with_updates_by_pk(|row| &row.id);
-        diff.message_template = cache
-            .apply_diff_to_table::<MessageTemplate>("message_template", &self.message_template)
-            .with_updates_by_pk(|row| &row.id);
-        diff.mrp_bom = cache
-            .apply_diff_to_table::<MrpBom>("mrp_bom", &self.mrp_bom)
-            .with_updates_by_pk(|row| &row.id);
-        diff.mrp_bom_line = cache
-            .apply_diff_to_table::<MrpBomLine>("mrp_bom_line", &self.mrp_bom_line)
-            .with_updates_by_pk(|row| &row.id);
-        diff.mrp_production = cache
-            .apply_diff_to_table::<MrpProduction>("mrp_production", &self.mrp_production)
-            .with_updates_by_pk(|row| &row.id);
-        diff.mrp_routing_workcenter = cache
-            .apply_diff_to_table::<MrpRoutingWorkcenter>(
-                "mrp_routing_workcenter",
-                &self.mrp_routing_workcenter,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.mrp_workcenter = cache
-            .apply_diff_to_table::<MrpWorkcenter>("mrp_workcenter", &self.mrp_workcenter)
-            .with_updates_by_pk(|row| &row.id);
-        diff.mrp_workcenter_productivity = cache
-            .apply_diff_to_table::<MrpWorkcenterProductivity>(
-                "mrp_workcenter_productivity",
-                &self.mrp_workcenter_productivity,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.mrp_workorder = cache
-            .apply_diff_to_table::<MrpWorkorder>("mrp_workorder", &self.mrp_workorder)
-            .with_updates_by_pk(|row| &row.id);
-        diff.operational_message = cache
-            .apply_diff_to_table::<OperationalMessage>(
-                "operational_message",
-                &self.operational_message,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.opp_stage = cache
-            .apply_diff_to_table::<OpportunityStage>("opp_stage", &self.opp_stage)
-            .with_updates_by_pk(|row| &row.id);
-        diff.opportunity = cache
-            .apply_diff_to_table::<Opportunity>("opportunity", &self.opportunity)
-            .with_updates_by_pk(|row| &row.id);
-        diff.opportunity_line = cache
-            .apply_diff_to_table::<OpportunityLine>("opportunity_line", &self.opportunity_line)
-            .with_updates_by_pk(|row| &row.id);
-        diff.org_permission = cache
-            .apply_diff_to_table::<OrgPermission>("org_permission", &self.org_permission)
-            .with_updates_by_pk(|row| &row.id);
-        diff.organization = cache
-            .apply_diff_to_table::<Organization>("organization", &self.organization)
-            .with_updates_by_pk(|row| &row.id);
-        diff.organization_settings = cache
-            .apply_diff_to_table::<OrganizationSettings>(
-                "organization_settings",
-                &self.organization_settings,
-            )
-            .with_updates_by_pk(|row| &row.organization_id);
-        diff.packaging_material = cache
-            .apply_diff_to_table::<PackagingMaterial>(
-                "packaging_material",
-                &self.packaging_material,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.payment_account = cache
-            .apply_diff_to_table::<PaymentAccount>("payment_account", &self.payment_account)
-            .with_updates_by_pk(|row| &row.id);
-        diff.payment_fee = cache
-            .apply_diff_to_table::<PaymentFee>("payment_fee", &self.payment_fee)
-            .with_updates_by_pk(|row| &row.id);
-        diff.payment_reconciliation = cache
-            .apply_diff_to_table::<PaymentReconciliation>(
-                "payment_reconciliation",
-                &self.payment_reconciliation,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.payment_reversal = cache
-            .apply_diff_to_table::<PaymentReversal>("payment_reversal", &self.payment_reversal)
-            .with_updates_by_pk(|row| &row.id);
-        diff.payment_transaction = cache
-            .apply_diff_to_table::<PaymentTransaction>(
-                "payment_transaction",
-                &self.payment_transaction,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.picking_wave = cache
-            .apply_diff_to_table::<PickingWave>("picking_wave", &self.picking_wave)
-            .with_updates_by_pk(|row| &row.id);
-        diff.policy_snapshot = cache
-            .apply_diff_to_table::<PolicySnapshot>("policy_snapshot", &self.policy_snapshot)
-            .with_updates_by_pk(|row| &row.id);
-        diff.pos_config = cache
-            .apply_diff_to_table::<PosConfig>("pos_config", &self.pos_config)
-            .with_updates_by_pk(|row| &row.id);
-        diff.pos_loyalty_card = cache
-            .apply_diff_to_table::<PosLoyaltyCard>("pos_loyalty_card", &self.pos_loyalty_card)
-            .with_updates_by_pk(|row| &row.id);
-        diff.pos_loyalty_program = cache
-            .apply_diff_to_table::<PosLoyaltyProgram>(
-                "pos_loyalty_program",
-                &self.pos_loyalty_program,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.pos_order = cache
-            .apply_diff_to_table::<PosOrder>("pos_order", &self.pos_order)
-            .with_updates_by_pk(|row| &row.id);
-        diff.pos_order_line = cache
-            .apply_diff_to_table::<PosOrderLine>("pos_order_line", &self.pos_order_line)
-            .with_updates_by_pk(|row| &row.id);
-        diff.pos_payment = cache
-            .apply_diff_to_table::<PosPayment>("pos_payment", &self.pos_payment)
-            .with_updates_by_pk(|row| &row.id);
-        diff.pos_payment_method = cache
-            .apply_diff_to_table::<PosPaymentMethod>("pos_payment_method", &self.pos_payment_method)
-            .with_updates_by_pk(|row| &row.id);
-        diff.pos_session = cache
-            .apply_diff_to_table::<PosSession>("pos_session", &self.pos_session)
-            .with_updates_by_pk(|row| &row.id);
-        diff.pos_terminal = cache
-            .apply_diff_to_table::<PosTerminal>("pos_terminal", &self.pos_terminal)
-            .with_updates_by_pk(|row| &row.id);
-        diff.privacy_consent = cache
-            .apply_diff_to_table::<PrivacyConsent>("privacy_consent", &self.privacy_consent)
-            .with_updates_by_pk(|row| &row.id);
-        diff.product = cache
-            .apply_diff_to_table::<Product>("product", &self.product)
-            .with_updates_by_pk(|row| &row.id);
-        diff.product_attribute = cache
-            .apply_diff_to_table::<ProductAttribute>("product_attribute", &self.product_attribute)
-            .with_updates_by_pk(|row| &row.id);
-        diff.product_attribute_line = cache
-            .apply_diff_to_table::<ProductAttributeLine>(
-                "product_attribute_line",
-                &self.product_attribute_line,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.product_attribute_value = cache
-            .apply_diff_to_table::<ProductAttributeValue>(
-                "product_attribute_value",
-                &self.product_attribute_value,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.product_category = cache
-            .apply_diff_to_table::<ProductCategory>("product_category", &self.product_category)
-            .with_updates_by_pk(|row| &row.id);
-        diff.product_packaging = cache
-            .apply_diff_to_table::<ProductPackaging>("product_packaging", &self.product_packaging)
-            .with_updates_by_pk(|row| &row.id);
-        diff.product_pricelist = cache
-            .apply_diff_to_table::<ProductPricelist>("product_pricelist", &self.product_pricelist)
-            .with_updates_by_pk(|row| &row.id);
-        diff.product_pricelist_item = cache
-            .apply_diff_to_table::<ProductPricelistItem>(
-                "product_pricelist_item",
-                &self.product_pricelist_item,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.product_supplier_info = cache
-            .apply_diff_to_table::<ProductSupplierInfo>(
-                "product_supplier_info",
-                &self.product_supplier_info,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.product_variant = cache
-            .apply_diff_to_table::<ProductVariant>("product_variant", &self.product_variant)
-            .with_updates_by_pk(|row| &row.id);
-        diff.profit_loss_line = cache
-            .apply_diff_to_table::<ProfitLossLine>("profit_loss_line", &self.profit_loss_line)
-            .with_updates_by_pk(|row| &row.id);
-        diff.project_project = cache
-            .apply_diff_to_table::<ProjectProject>("project_project", &self.project_project)
-            .with_updates_by_pk(|row| &row.id);
-        diff.project_task = cache
-            .apply_diff_to_table::<ProjectTask>("project_task", &self.project_task)
-            .with_updates_by_pk(|row| &row.id);
-        diff.project_timesheet = cache
-            .apply_diff_to_table::<ProjectTimesheet>("project_timesheet", &self.project_timesheet)
-            .with_updates_by_pk(|row| &row.id);
-        diff.proposal = cache
-            .apply_diff_to_table::<Proposal>("proposal", &self.proposal)
-            .with_updates_by_pk(|row| &row.id);
-        diff.proposal_comment = cache
-            .apply_diff_to_table::<ProposalComment>("proposal_comment", &self.proposal_comment)
-            .with_updates_by_pk(|row| &row.id);
-        diff.proposal_line_item = cache
-            .apply_diff_to_table::<ProposalLineItem>("proposal_line_item", &self.proposal_line_item)
-            .with_updates_by_pk(|row| &row.id);
-        diff.proposal_presence = cache
-            .apply_diff_to_table::<ProposalPresence>("proposal_presence", &self.proposal_presence)
-            .with_updates_by_pk(|row| &row.id);
-        diff.proposal_section = cache
-            .apply_diff_to_table::<ProposalSection>("proposal_section", &self.proposal_section)
-            .with_updates_by_pk(|row| &row.id);
-        diff.proposal_source_doc = cache
-            .apply_diff_to_table::<ProposalSourceDoc>(
-                "proposal_source_doc",
-                &self.proposal_source_doc,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.proposal_version = cache
-            .apply_diff_to_table::<ProposalVersion>("proposal_version", &self.proposal_version)
-            .with_updates_by_pk(|row| &row.id);
-        diff.purchase_order = cache
-            .apply_diff_to_table::<PurchaseOrder>("purchase_order", &self.purchase_order)
-            .with_updates_by_pk(|row| &row.id);
-        diff.purchase_order_line = cache
-            .apply_diff_to_table::<PurchaseOrderLine>(
-                "purchase_order_line",
-                &self.purchase_order_line,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.purchase_requisition = cache
-            .apply_diff_to_table::<PurchaseRequisition>(
-                "purchase_requisition",
-                &self.purchase_requisition,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.quality_alert = cache
-            .apply_diff_to_table::<QualityAlert>("quality_alert", &self.quality_alert)
-            .with_updates_by_pk(|row| &row.id);
-        diff.quality_alert_reason = cache
-            .apply_diff_to_table::<QualityAlertReason>(
-                "quality_alert_reason",
-                &self.quality_alert_reason,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.quality_check = cache
-            .apply_diff_to_table::<QualityCheck>("quality_check", &self.quality_check)
-            .with_updates_by_pk(|row| &row.id);
-        diff.quality_point = cache
-            .apply_diff_to_table::<QualityPoint>("quality_point", &self.quality_point)
-            .with_updates_by_pk(|row| &row.id);
-        diff.quality_team = cache
-            .apply_diff_to_table::<QualityTeam>("quality_team", &self.quality_team)
-            .with_updates_by_pk(|row| &row.id);
-        diff.queue_job = cache
-            .apply_diff_to_table::<QueueJob>("queue_job", &self.queue_job)
-            .with_updates_by_pk(|row| &row.id);
-        diff.queue_worker = cache
-            .apply_diff_to_table::<QueueWorker>("queue_worker", &self.queue_worker)
-            .with_updates_by_pk(|row| &row.id);
-        diff.record_custom_field_value = cache
-            .apply_diff_to_table::<RecordCustomFieldValue>(
-                "record_custom_field_value",
-                &self.record_custom_field_value,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.replenishment_rule = cache
-            .apply_diff_to_table::<ReplenishmentRule>(
-                "replenishment_rule",
-                &self.replenishment_rule,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.report_template = cache
-            .apply_diff_to_table::<ReportTemplate>("report_template", &self.report_template)
-            .with_updates_by_pk(|row| &row.id);
-        diff.res_partner_bank = cache
-            .apply_diff_to_table::<ResPartnerBank>("res_partner_bank", &self.res_partner_bank)
-            .with_updates_by_pk(|row| &row.id);
-        diff.return_order = cache
-            .apply_diff_to_table::<ReturnOrder>("return_order", &self.return_order)
-            .with_updates_by_pk(|row| &row.id);
-        diff.return_order_line = cache
-            .apply_diff_to_table::<ReturnOrderLine>("return_order_line", &self.return_order_line)
-            .with_updates_by_pk(|row| &row.id);
-        diff.revenue_recognition_rule = cache
-            .apply_diff_to_table::<RevenueRecognitionRule>(
-                "revenue_recognition_rule",
-                &self.revenue_recognition_rule,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.role = cache
-            .apply_diff_to_table::<Role>("role", &self.role)
-            .with_updates_by_pk(|row| &row.id);
-        diff.sale_order = cache
-            .apply_diff_to_table::<SaleOrder>("sale_order", &self.sale_order)
-            .with_updates_by_pk(|row| &row.id);
-        diff.sale_order_line = cache
-            .apply_diff_to_table::<SaleOrderLine>("sale_order_line", &self.sale_order_line)
-            .with_updates_by_pk(|row| &row.id);
-        diff.sale_order_option = cache
-            .apply_diff_to_table::<SaleOrderOption>("sale_order_option", &self.sale_order_option)
-            .with_updates_by_pk(|row| &row.id);
-        diff.saved_report = cache
-            .apply_diff_to_table::<SavedReport>("saved_report", &self.saved_report)
-            .with_updates_by_pk(|row| &row.id);
-        diff.scheduled_report = cache
-            .apply_diff_to_table::<ScheduledReport>("scheduled_report", &self.scheduled_report)
-            .with_updates_by_pk(|row| &row.id);
-        diff.scheduled_report_run = cache
-            .apply_diff_to_table::<ScheduledReportRun>(
-                "scheduled_report_run",
-                &self.scheduled_report_run,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.search_embedding = cache
-            .apply_diff_to_table::<SearchEmbedding>("search_embedding", &self.search_embedding)
-            .with_updates_by_pk(|row| &row.id);
-        diff.segment_member = cache
-            .apply_diff_to_table::<SegmentMember>("segment_member", &self.segment_member)
-            .with_updates_by_pk(|row| &row.id);
-        diff.serial_lot_traceability = cache
-            .apply_diff_to_table::<SerialLotTraceability>(
-                "serial_lot_traceability",
-                &self.serial_lot_traceability,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.shipping_method = cache
-            .apply_diff_to_table::<ShippingMethod>("shipping_method", &self.shipping_method)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_count_sheet = cache
-            .apply_diff_to_table::<StockCountSheet>("stock_count_sheet", &self.stock_count_sheet)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_cycle_count = cache
-            .apply_diff_to_table::<StockCycleCount>("stock_cycle_count", &self.stock_cycle_count)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_inventory = cache
-            .apply_diff_to_table::<StockInventory>("stock_inventory", &self.stock_inventory)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_inventory_line = cache
-            .apply_diff_to_table::<StockInventoryLine>(
-                "stock_inventory_line",
-                &self.stock_inventory_line,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_landed_cost = cache
-            .apply_diff_to_table::<StockLandedCost>("stock_landed_cost", &self.stock_landed_cost)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_landed_cost_lines = cache
-            .apply_diff_to_table::<StockLandedCostLines>(
-                "stock_landed_cost_lines",
-                &self.stock_landed_cost_lines,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_location = cache
-            .apply_diff_to_table::<StockLocation>("stock_location", &self.stock_location)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_move = cache
-            .apply_diff_to_table::<StockMove>("stock_move", &self.stock_move)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_move_line = cache
-            .apply_diff_to_table::<StockMoveLine>("stock_move_line", &self.stock_move_line)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_picking = cache
-            .apply_diff_to_table::<StockPicking>("stock_picking", &self.stock_picking)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_picking_batch = cache
-            .apply_diff_to_table::<StockPickingBatch>(
-                "stock_picking_batch",
-                &self.stock_picking_batch,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_production_lot = cache
-            .apply_diff_to_table::<StockProductionLot>(
-                "stock_production_lot",
-                &self.stock_production_lot,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_production_serial = cache
-            .apply_diff_to_table::<StockProductionSerial>(
-                "stock_production_serial",
-                &self.stock_production_serial,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_quant = cache
-            .apply_diff_to_table::<StockQuant>("stock_quant", &self.stock_quant)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_reorder_group = cache
-            .apply_diff_to_table::<StockReorderGroup>(
-                "stock_reorder_group",
-                &self.stock_reorder_group,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_route = cache
-            .apply_diff_to_table::<StockRoute>("stock_route", &self.stock_route)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_rule = cache
-            .apply_diff_to_table::<StockRule>("stock_rule", &self.stock_rule)
-            .with_updates_by_pk(|row| &row.id);
-        diff.stock_traceability_report = cache
-            .apply_diff_to_table::<StockTraceabilityReport>(
-                "stock_traceability_report",
-                &self.stock_traceability_report,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.subscription = cache
-            .apply_diff_to_table::<Subscription>("subscription", &self.subscription)
-            .with_updates_by_pk(|row| &row.id);
-        diff.subscription_line = cache
-            .apply_diff_to_table::<SubscriptionLine>("subscription_line", &self.subscription_line)
-            .with_updates_by_pk(|row| &row.id);
-        diff.subscription_plan = cache
-            .apply_diff_to_table::<SubscriptionPlan>("subscription_plan", &self.subscription_plan)
-            .with_updates_by_pk(|row| &row.id);
-        diff.supplier_intake_request = cache
-            .apply_diff_to_table::<SupplierIntakeRequest>(
-                "supplier_intake_request",
-                &self.supplier_intake_request,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.tax_deadline = cache
-            .apply_diff_to_table::<TaxDeadline>("tax_deadline", &self.tax_deadline)
-            .with_updates_by_pk(|row| &row.id);
-        diff.tax_deadline_reminder = cache
-            .apply_diff_to_table::<TaxDeadlineReminder>(
-                "tax_deadline_reminder",
-                &self.tax_deadline_reminder,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.tax_jurisdiction = cache
-            .apply_diff_to_table::<TaxJurisdiction>("tax_jurisdiction", &self.tax_jurisdiction)
-            .with_updates_by_pk(|row| &row.id);
-        diff.tax_schedule = cache
-            .apply_diff_to_table::<TaxSchedule>("tax_schedule", &self.tax_schedule)
-            .with_updates_by_pk(|row| &row.id);
-        diff.trial_balance = cache
-            .apply_diff_to_table::<TrialBalance>("trial_balance", &self.trial_balance)
-            .with_updates_by_pk(|row| &row.id);
-        diff.uom = cache
-            .apply_diff_to_table::<Uom>("uom", &self.uom)
-            .with_updates_by_pk(|row| &row.id);
-        diff.uom_cat = cache
-            .apply_diff_to_table::<UomCategory>("uom_cat", &self.uom_cat)
-            .with_updates_by_pk(|row| &row.id);
-        diff.uom_conversion = cache
-            .apply_diff_to_table::<UomConversion>("uom_conversion", &self.uom_conversion)
-            .with_updates_by_pk(|row| &row.id);
-        diff.user_custom_field = cache
-            .apply_diff_to_table::<UserCustomField>("user_custom_field", &self.user_custom_field)
-            .with_updates_by_pk(|row| &row.id);
-        diff.user_organization = cache
-            .apply_diff_to_table::<UserOrganization>("user_organization", &self.user_organization)
-            .with_updates_by_pk(|row| &row.id);
-        diff.user_profile = cache
-            .apply_diff_to_table::<UserProfile>("user_profile", &self.user_profile)
-            .with_updates_by_pk(|row| &row.identity);
-        diff.user_role_assignment = cache
-            .apply_diff_to_table::<UserRoleAssignment>(
-                "user_role_assignment",
-                &self.user_role_assignment,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.user_session = cache
-            .apply_diff_to_table::<UserSession>("user_session", &self.user_session)
-            .with_updates_by_pk(|row| &row.id);
-        diff.utm_campaign = cache
-            .apply_diff_to_table::<UtmCampaign>("utm_campaign", &self.utm_campaign)
-            .with_updates_by_pk(|row| &row.id);
-        diff.utm_medium = cache
-            .apply_diff_to_table::<UtmMedium>("utm_medium", &self.utm_medium)
-            .with_updates_by_pk(|row| &row.id);
-        diff.utm_source = cache
-            .apply_diff_to_table::<UtmSource>("utm_source", &self.utm_source)
-            .with_updates_by_pk(|row| &row.id);
-        diff.warehouse = cache
-            .apply_diff_to_table::<Warehouse>("warehouse", &self.warehouse)
-            .with_updates_by_pk(|row| &row.id);
-        diff.warehouse_3_d_zone = cache
-            .apply_diff_to_table::<Warehouse3DZone>("warehouse_3_d_zone", &self.warehouse_3_d_zone)
-            .with_updates_by_pk(|row| &row.id);
-        diff.warehouse_geo = cache
-            .apply_diff_to_table::<WarehouseGeo>("warehouse_geo", &self.warehouse_geo)
-            .with_updates_by_pk(|row| &row.id);
-        diff.warehouse_task = cache
-            .apply_diff_to_table::<WarehouseTask>("warehouse_task", &self.warehouse_task)
-            .with_updates_by_pk(|row| &row.id);
-        diff.whatsapp_business_account = cache
-            .apply_diff_to_table::<WhatsAppBusinessAccount>(
-                "whatsapp_business_account",
-                &self.whatsapp_business_account,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.workflow = cache
-            .apply_diff_to_table::<Workflow>("workflow", &self.workflow)
-            .with_updates_by_pk(|row| &row.id);
-        diff.workflow_activity = cache
-            .apply_diff_to_table::<WorkflowActivity>("workflow_activity", &self.workflow_activity)
-            .with_updates_by_pk(|row| &row.id);
-        diff.workflow_instance = cache
-            .apply_diff_to_table::<WorkflowInstance>("workflow_instance", &self.workflow_instance)
-            .with_updates_by_pk(|row| &row.id);
-        diff.workflow_transition = cache
-            .apply_diff_to_table::<WorkflowTransition>(
-                "workflow_transition",
-                &self.workflow_transition,
-            )
-            .with_updates_by_pk(|row| &row.id);
-        diff.workflow_workitem = cache
-            .apply_diff_to_table::<WorkflowWorkitem>("workflow_workitem", &self.workflow_workitem)
-            .with_updates_by_pk(|row| &row.id);
-
-        diff
-    }
-    fn parse_initial_rows(raw: __ws::v2::QueryRows) -> __sdk::Result<Self> {
-        let mut db_update = DbUpdate::default();
-        for table_rows in raw.tables {
-            match &table_rows.table[..] {
-                "account_account" => db_update
-                    .account_account
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_account_type" => db_update
-                    .account_account_type
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_analytic_account" => db_update
-                    .account_analytic_account
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_analytic_distribution_model" => db_update
-                    .account_analytic_distribution_model
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_analytic_line" => db_update
-                    .account_analytic_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_asset" => db_update
-                    .account_asset
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_asset_depreciation_line" => db_update
-                    .account_asset_depreciation_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_bank_statement" => db_update
-                    .account_bank_statement
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_bank_statement_line" => db_update
-                    .account_bank_statement_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_fiscal_year" => db_update
-                    .account_fiscal_year
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_group" => db_update
-                    .account_group
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_journal" => db_update
-                    .account_journal
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_move" => db_update
-                    .account_move
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_move_line" => db_update
-                    .account_move_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_payment" => db_update
-                    .account_payment
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_payment_term" => db_update
-                    .account_payment_term
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_payment_term_line" => db_update
-                    .account_payment_term_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_period" => db_update
-                    .account_period
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_reconciliation_widget" => db_update
-                    .account_reconciliation_widget
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_tax" => db_update
-                    .account_tax
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "account_tax_group" => db_update
-                    .account_tax_group
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "activity" => db_update
-                    .activity
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "activity_type" => db_update
-                    .activity_type
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "adjustment_reason" => db_update
-                    .adjustment_reason
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_action_draft" => db_update
-                    .ai_action_draft
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_agent" => db_update
-                    .ai_agent
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_agent_run" => db_update
-                    .ai_agent_run
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_agent_run_policy_snapshot" => db_update
-                    .ai_agent_run_policy_snapshot
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_agent_run_step" => db_update
-                    .ai_agent_run_step
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_chat_message" => db_update
-                    .ai_chat_message
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_chat_session" => db_update
-                    .ai_chat_session
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_document_processing_job" => db_update
-                    .ai_document_processing_job
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_insight" => db_update
-                    .ai_insight
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_reducer_allowlist" => db_update
-                    .ai_reducer_allowlist
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_skill" => db_update
-                    .ai_skill
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_skill_config" => db_update
-                    .ai_skill_config
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_skill_fixture" => db_update
-                    .ai_skill_fixture
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_skill_release" => db_update
-                    .ai_skill_release
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_skill_test_run" => db_update
-                    .ai_skill_test_run
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_skill_version" => db_update
-                    .ai_skill_version
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_team_member" => db_update
-                    .ai_team_member
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "ai_team_member_skill" => db_update
-                    .ai_team_member_skill
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "analytics_metric" => db_update
-                    .analytics_metric
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "approval_request" => db_update
-                    .approval_request
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "approval_rule" => db_update
-                    .approval_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "assignment_rule" => db_update
-                    .assignment_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "audit_log" => db_update
-                    .audit_log
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "audit_rule" => db_update
-                    .audit_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "balance_sheet_line" => db_update
-                    .balance_sheet_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "bank_match_candidate" => db_update
-                    .bank_match_candidate
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "bank_statement_import" => db_update
-                    .bank_statement_import
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "bank_statement_import_line" => db_update
-                    .bank_statement_import_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "barcode_nomenclature" => db_update
-                    .barcode_nomenclature
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "barcode_rule" => db_update
-                    .barcode_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "barcode_scan" => db_update
-                    .barcode_scan
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "billing_account" => db_update
-                    .billing_account
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "bom_explosion_result" => db_update
-                    .bom_explosion_result
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "budget_post" => db_update
-                    .budget_post
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "calendar_event" => db_update
-                    .calendar_event
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "cartonization_result" => db_update
-                    .cartonization_result
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "casbin_rule" => db_update
-                    .casbin_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "cash_flow_line" => db_update
-                    .cash_flow_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "company" => db_update
-                    .company
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "company_vertical_pack" => db_update
-                    .company_vertical_pack
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "consolidation_account" => db_update
-                    .consolidation_account
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "consolidation_company_rate" => db_update
-                    .consolidation_company_rate
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "consolidation_elimination_entry" => db_update
-                    .consolidation_elimination_entry
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "consolidation_journal" => db_update
-                    .consolidation_journal
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "contact" => db_update
-                    .contact
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "contact_category" => db_update
-                    .contact_category
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "contact_category_assignment" => db_update
-                    .contact_category_assignment
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "contact_communication_preference" => db_update
-                    .contact_communication_preference
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "contact_duplicate_candidate" => db_update
-                    .contact_duplicate_candidate
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "contact_phone_identity" => db_update
-                    .contact_phone_identity
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "contact_relationship" => db_update
-                    .contact_relationship
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "contact_role_assignment" => db_update
-                    .contact_role_assignment
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "contact_segment" => db_update
-                    .contact_segment
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "contact_tag" => db_update
-                    .contact_tag
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "contact_tag_assignment" => db_update
-                    .contact_tag_assignment
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "country" => db_update
-                    .country
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "crossovered_budget" => db_update
-                    .crossovered_budget
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "crossovered_budget_lines" => db_update
-                    .crossovered_budget_lines
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "currency" => db_update
-                    .currency
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "currency_rate" => db_update
-                    .currency_rate
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "dashboard" => db_update
-                    .dashboard
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "dashboard_widget" => db_update
-                    .dashboard_widget
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "data_classification" => db_update
-                    .data_classification
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "data_classification_rule" => db_update
-                    .data_classification_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "deferred_revenue_line" => db_update
-                    .deferred_revenue_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "deferred_revenue_schedule" => db_update
-                    .deferred_revenue_schedule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "delivery_carrier" => db_update
-                    .delivery_carrier
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "delivery_price_rule" => db_update
-                    .delivery_price_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "doc_folder" => db_update
-                    .doc_folder
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "document" => db_update
-                    .document
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "document_sequence" => db_update
-                    .document_sequence
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "document_template" => db_update
-                    .document_template
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "document_version" => db_update
-                    .document_version
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "expense_sheet" => db_update
-                    .expense_sheet
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "financial_report" => db_update
-                    .financial_report
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "fleet_vehicle" => db_update
-                    .fleet_vehicle
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "form_config" => db_update
-                    .form_config
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "form_config_field" => db_update
-                    .form_config_field
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "form_role_config" => db_update
-                    .form_role_config
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "generated_owner_report" => db_update
-                    .generated_owner_report
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "google_drive_connection" => db_update
-                    .google_drive_connection
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "helpdesk_sla" => db_update
-                    .helpdesk_sla
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "helpdesk_stage" => db_update
-                    .helpdesk_stage
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "helpdesk_team" => db_update
-                    .helpdesk_team
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "helpdesk_ticket" => db_update
-                    .helpdesk_ticket
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "hr_contract" => db_update
-                    .hr_contract
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "hr_department" => db_update
-                    .hr_department
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "hr_employee" => db_update
-                    .hr_employee
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "hr_expense" => db_update
-                    .hr_expense
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "hr_job_position" => db_update
-                    .hr_job_position
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "hr_leave" => db_update
-                    .hr_leave
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "hr_leave_type" => db_update
-                    .hr_leave_type
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "hr_payroll_structure" => db_update
-                    .hr_payroll_structure
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "hr_payslip" => db_update
-                    .hr_payslip
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "hr_resource" => db_update
-                    .hr_resource
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "hr_salary_rule" => db_update
-                    .hr_salary_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "import_job" => db_update
-                    .import_job
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "import_job_error" => db_update
-                    .import_job_error
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "import_job_record" => db_update
-                    .import_job_record
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "import_mapping_template" => db_update
-                    .import_mapping_template
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "intercompany_rule" => db_update
-                    .intercompany_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "intercompany_transaction" => db_update
-                    .intercompany_transaction
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "inventory_adjustment" => db_update
-                    .inventory_adjustment
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "inventory_valuation" => db_update
-                    .inventory_valuation
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "iot_action" => db_update
-                    .iot_action
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "iot_alert" => db_update
-                    .iot_alert
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "iot_device" => db_update
-                    .iot_device
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "iot_hub" => db_update
-                    .iot_hub
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "iot_pairing_token" => db_update
-                    .iot_pairing_token
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "iot_telemetry" => db_update
-                    .iot_telemetry
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "iot_threshold" => db_update
-                    .iot_threshold
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "kb_category" => db_update
-                    .kb_category
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "knowledge_article" => db_update
-                    .knowledge_article
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "lead" => db_update
-                    .lead
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "lead_lost_reason" => db_update
-                    .lead_lost_reason
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "lead_source" => db_update
-                    .lead_source
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "mail_follower" => db_update
-                    .mail_follower
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "mail_message" => db_update
-                    .mail_message
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "mail_template" => db_update
-                    .mail_template
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "message_batch" => db_update
-                    .message_batch
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "message_template" => db_update
-                    .message_template
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "mrp_bom" => db_update
-                    .mrp_bom
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "mrp_bom_line" => db_update
-                    .mrp_bom_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "mrp_production" => db_update
-                    .mrp_production
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "mrp_routing_workcenter" => db_update
-                    .mrp_routing_workcenter
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "mrp_workcenter" => db_update
-                    .mrp_workcenter
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "mrp_workcenter_productivity" => db_update
-                    .mrp_workcenter_productivity
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "mrp_workorder" => db_update
-                    .mrp_workorder
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "operational_message" => db_update
-                    .operational_message
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "opp_stage" => db_update
-                    .opp_stage
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "opportunity" => db_update
-                    .opportunity
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "opportunity_line" => db_update
-                    .opportunity_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "org_permission" => db_update
-                    .org_permission
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "organization" => db_update
-                    .organization
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "organization_settings" => db_update
-                    .organization_settings
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "packaging_material" => db_update
-                    .packaging_material
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "payment_account" => db_update
-                    .payment_account
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "payment_fee" => db_update
-                    .payment_fee
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "payment_reconciliation" => db_update
-                    .payment_reconciliation
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "payment_reversal" => db_update
-                    .payment_reversal
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "payment_transaction" => db_update
-                    .payment_transaction
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "picking_wave" => db_update
-                    .picking_wave
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "policy_snapshot" => db_update
-                    .policy_snapshot
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "pos_config" => db_update
-                    .pos_config
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "pos_loyalty_card" => db_update
-                    .pos_loyalty_card
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "pos_loyalty_program" => db_update
-                    .pos_loyalty_program
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "pos_order" => db_update
-                    .pos_order
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "pos_order_line" => db_update
-                    .pos_order_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "pos_payment" => db_update
-                    .pos_payment
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "pos_payment_method" => db_update
-                    .pos_payment_method
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "pos_session" => db_update
-                    .pos_session
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "pos_terminal" => db_update
-                    .pos_terminal
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "privacy_consent" => db_update
-                    .privacy_consent
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "product" => db_update
-                    .product
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "product_attribute" => db_update
-                    .product_attribute
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "product_attribute_line" => db_update
-                    .product_attribute_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "product_attribute_value" => db_update
-                    .product_attribute_value
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "product_category" => db_update
-                    .product_category
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "product_packaging" => db_update
-                    .product_packaging
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "product_pricelist" => db_update
-                    .product_pricelist
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "product_pricelist_item" => db_update
-                    .product_pricelist_item
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "product_supplier_info" => db_update
-                    .product_supplier_info
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "product_variant" => db_update
-                    .product_variant
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "profit_loss_line" => db_update
-                    .profit_loss_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "project_project" => db_update
-                    .project_project
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "project_task" => db_update
-                    .project_task
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "project_timesheet" => db_update
-                    .project_timesheet
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "proposal" => db_update
-                    .proposal
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "proposal_comment" => db_update
-                    .proposal_comment
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "proposal_line_item" => db_update
-                    .proposal_line_item
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "proposal_presence" => db_update
-                    .proposal_presence
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "proposal_section" => db_update
-                    .proposal_section
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "proposal_source_doc" => db_update
-                    .proposal_source_doc
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "proposal_version" => db_update
-                    .proposal_version
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "purchase_order" => db_update
-                    .purchase_order
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "purchase_order_line" => db_update
-                    .purchase_order_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "purchase_requisition" => db_update
-                    .purchase_requisition
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "quality_alert" => db_update
-                    .quality_alert
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "quality_alert_reason" => db_update
-                    .quality_alert_reason
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "quality_check" => db_update
-                    .quality_check
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "quality_point" => db_update
-                    .quality_point
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "quality_team" => db_update
-                    .quality_team
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "queue_job" => db_update
-                    .queue_job
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "queue_worker" => db_update
-                    .queue_worker
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "record_custom_field_value" => db_update
-                    .record_custom_field_value
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "replenishment_rule" => db_update
-                    .replenishment_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "report_template" => db_update
-                    .report_template
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "res_partner_bank" => db_update
-                    .res_partner_bank
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "return_order" => db_update
-                    .return_order
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "return_order_line" => db_update
-                    .return_order_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "revenue_recognition_rule" => db_update
-                    .revenue_recognition_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "role" => db_update
-                    .role
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "sale_order" => db_update
-                    .sale_order
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "sale_order_line" => db_update
-                    .sale_order_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "sale_order_option" => db_update
-                    .sale_order_option
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "saved_report" => db_update
-                    .saved_report
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "scheduled_report" => db_update
-                    .scheduled_report
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "scheduled_report_run" => db_update
-                    .scheduled_report_run
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "search_embedding" => db_update
-                    .search_embedding
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "segment_member" => db_update
-                    .segment_member
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "serial_lot_traceability" => db_update
-                    .serial_lot_traceability
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "shipping_method" => db_update
-                    .shipping_method
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_count_sheet" => db_update
-                    .stock_count_sheet
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_cycle_count" => db_update
-                    .stock_cycle_count
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_inventory" => db_update
-                    .stock_inventory
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_inventory_line" => db_update
-                    .stock_inventory_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_landed_cost" => db_update
-                    .stock_landed_cost
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_landed_cost_lines" => db_update
-                    .stock_landed_cost_lines
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_location" => db_update
-                    .stock_location
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_move" => db_update
-                    .stock_move
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_move_line" => db_update
-                    .stock_move_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_picking" => db_update
-                    .stock_picking
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_picking_batch" => db_update
-                    .stock_picking_batch
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_production_lot" => db_update
-                    .stock_production_lot
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_production_serial" => db_update
-                    .stock_production_serial
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_quant" => db_update
-                    .stock_quant
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_reorder_group" => db_update
-                    .stock_reorder_group
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_route" => db_update
-                    .stock_route
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_rule" => db_update
-                    .stock_rule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "stock_traceability_report" => db_update
-                    .stock_traceability_report
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "subscription" => db_update
-                    .subscription
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "subscription_line" => db_update
-                    .subscription_line
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "subscription_plan" => db_update
-                    .subscription_plan
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "supplier_intake_request" => db_update
-                    .supplier_intake_request
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "tax_deadline" => db_update
-                    .tax_deadline
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "tax_deadline_reminder" => db_update
-                    .tax_deadline_reminder
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "tax_jurisdiction" => db_update
-                    .tax_jurisdiction
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "tax_schedule" => db_update
-                    .tax_schedule
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "trial_balance" => db_update
-                    .trial_balance
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "uom" => db_update
-                    .uom
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "uom_cat" => db_update
-                    .uom_cat
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "uom_conversion" => db_update
-                    .uom_conversion
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "user_custom_field" => db_update
-                    .user_custom_field
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "user_organization" => db_update
-                    .user_organization
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "user_profile" => db_update
-                    .user_profile
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "user_role_assignment" => db_update
-                    .user_role_assignment
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "user_session" => db_update
-                    .user_session
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "utm_campaign" => db_update
-                    .utm_campaign
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "utm_medium" => db_update
-                    .utm_medium
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "utm_source" => db_update
-                    .utm_source
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "warehouse" => db_update
-                    .warehouse
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "warehouse_3_d_zone" => db_update
-                    .warehouse_3_d_zone
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "warehouse_geo" => db_update
-                    .warehouse_geo
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "warehouse_task" => db_update
-                    .warehouse_task
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "whatsapp_business_account" => db_update
-                    .whatsapp_business_account
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "workflow" => db_update
-                    .workflow
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "workflow_activity" => db_update
-                    .workflow_activity
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "workflow_instance" => db_update
-                    .workflow_instance
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "workflow_transition" => db_update
-                    .workflow_transition
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "workflow_workitem" => db_update
-                    .workflow_workitem
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                unknown => {
-                    return Err(
-                        __sdk::InternalError::unknown_name("table", unknown, "QueryRows").into(),
-                    );
+                    diff
                 }
-            }
-        }
-        Ok(db_update)
-    }
-    fn parse_unsubscribe_rows(raw: __ws::v2::QueryRows) -> __sdk::Result<Self> {
-        let mut db_update = DbUpdate::default();
-        for table_rows in raw.tables {
+fn parse_initial_rows(raw: __ws::v2::QueryRows) -> __sdk::Result<Self> {
+                let mut db_update = DbUpdate::default();
+for table_rows in raw.tables {
             match &table_rows.table[..] {
-                "account_account" => db_update
-                    .account_account
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_account_type" => db_update
-                    .account_account_type
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_analytic_account" => db_update
-                    .account_analytic_account
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_analytic_distribution_model" => db_update
-                    .account_analytic_distribution_model
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_analytic_line" => db_update
-                    .account_analytic_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_asset" => db_update
-                    .account_asset
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_asset_depreciation_line" => db_update
-                    .account_asset_depreciation_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_bank_statement" => db_update
-                    .account_bank_statement
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_bank_statement_line" => db_update
-                    .account_bank_statement_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_fiscal_year" => db_update
-                    .account_fiscal_year
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_group" => db_update
-                    .account_group
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_journal" => db_update
-                    .account_journal
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_move" => db_update
-                    .account_move
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_move_line" => db_update
-                    .account_move_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_payment" => db_update
-                    .account_payment
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_payment_term" => db_update
-                    .account_payment_term
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_payment_term_line" => db_update
-                    .account_payment_term_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_period" => db_update
-                    .account_period
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_reconciliation_widget" => db_update
-                    .account_reconciliation_widget
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_tax" => db_update
-                    .account_tax
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "account_tax_group" => db_update
-                    .account_tax_group
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "activity" => db_update
-                    .activity
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "activity_type" => db_update
-                    .activity_type
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "adjustment_reason" => db_update
-                    .adjustment_reason
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_action_draft" => db_update
-                    .ai_action_draft
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_agent" => db_update
-                    .ai_agent
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_agent_run" => db_update
-                    .ai_agent_run
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_agent_run_policy_snapshot" => db_update
-                    .ai_agent_run_policy_snapshot
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_agent_run_step" => db_update
-                    .ai_agent_run_step
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_chat_message" => db_update
-                    .ai_chat_message
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_chat_session" => db_update
-                    .ai_chat_session
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_document_processing_job" => db_update
-                    .ai_document_processing_job
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_insight" => db_update
-                    .ai_insight
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_reducer_allowlist" => db_update
-                    .ai_reducer_allowlist
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_skill" => db_update
-                    .ai_skill
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_skill_config" => db_update
-                    .ai_skill_config
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_skill_fixture" => db_update
-                    .ai_skill_fixture
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_skill_release" => db_update
-                    .ai_skill_release
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_skill_test_run" => db_update
-                    .ai_skill_test_run
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_skill_version" => db_update
-                    .ai_skill_version
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_team_member" => db_update
-                    .ai_team_member
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "ai_team_member_skill" => db_update
-                    .ai_team_member_skill
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "analytics_metric" => db_update
-                    .analytics_metric
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "approval_request" => db_update
-                    .approval_request
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "approval_rule" => db_update
-                    .approval_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "assignment_rule" => db_update
-                    .assignment_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "audit_log" => db_update
-                    .audit_log
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "audit_rule" => db_update
-                    .audit_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "balance_sheet_line" => db_update
-                    .balance_sheet_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "bank_match_candidate" => db_update
-                    .bank_match_candidate
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "bank_statement_import" => db_update
-                    .bank_statement_import
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "bank_statement_import_line" => db_update
-                    .bank_statement_import_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "barcode_nomenclature" => db_update
-                    .barcode_nomenclature
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "barcode_rule" => db_update
-                    .barcode_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "barcode_scan" => db_update
-                    .barcode_scan
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "billing_account" => db_update
-                    .billing_account
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "bom_explosion_result" => db_update
-                    .bom_explosion_result
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "budget_post" => db_update
-                    .budget_post
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "calendar_event" => db_update
-                    .calendar_event
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "cartonization_result" => db_update
-                    .cartonization_result
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "casbin_rule" => db_update
-                    .casbin_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "cash_flow_line" => db_update
-                    .cash_flow_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "company" => db_update
-                    .company
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "company_vertical_pack" => db_update
-                    .company_vertical_pack
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "consolidation_account" => db_update
-                    .consolidation_account
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "consolidation_company_rate" => db_update
-                    .consolidation_company_rate
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "consolidation_elimination_entry" => db_update
-                    .consolidation_elimination_entry
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "consolidation_journal" => db_update
-                    .consolidation_journal
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "contact" => db_update
-                    .contact
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "contact_category" => db_update
-                    .contact_category
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "contact_category_assignment" => db_update
-                    .contact_category_assignment
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "contact_communication_preference" => db_update
-                    .contact_communication_preference
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "contact_duplicate_candidate" => db_update
-                    .contact_duplicate_candidate
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "contact_phone_identity" => db_update
-                    .contact_phone_identity
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "contact_relationship" => db_update
-                    .contact_relationship
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "contact_role_assignment" => db_update
-                    .contact_role_assignment
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "contact_segment" => db_update
-                    .contact_segment
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "contact_tag" => db_update
-                    .contact_tag
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "contact_tag_assignment" => db_update
-                    .contact_tag_assignment
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "country" => db_update
-                    .country
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "crossovered_budget" => db_update
-                    .crossovered_budget
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "crossovered_budget_lines" => db_update
-                    .crossovered_budget_lines
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "currency" => db_update
-                    .currency
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "currency_rate" => db_update
-                    .currency_rate
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "dashboard" => db_update
-                    .dashboard
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "dashboard_widget" => db_update
-                    .dashboard_widget
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "data_classification" => db_update
-                    .data_classification
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "data_classification_rule" => db_update
-                    .data_classification_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "deferred_revenue_line" => db_update
-                    .deferred_revenue_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "deferred_revenue_schedule" => db_update
-                    .deferred_revenue_schedule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "delivery_carrier" => db_update
-                    .delivery_carrier
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "delivery_price_rule" => db_update
-                    .delivery_price_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "doc_folder" => db_update
-                    .doc_folder
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "document" => db_update
-                    .document
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "document_sequence" => db_update
-                    .document_sequence
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "document_template" => db_update
-                    .document_template
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "document_version" => db_update
-                    .document_version
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "expense_sheet" => db_update
-                    .expense_sheet
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "financial_report" => db_update
-                    .financial_report
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "fleet_vehicle" => db_update
-                    .fleet_vehicle
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "form_config" => db_update
-                    .form_config
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "form_config_field" => db_update
-                    .form_config_field
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "form_role_config" => db_update
-                    .form_role_config
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "generated_owner_report" => db_update
-                    .generated_owner_report
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "google_drive_connection" => db_update
-                    .google_drive_connection
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "helpdesk_sla" => db_update
-                    .helpdesk_sla
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "helpdesk_stage" => db_update
-                    .helpdesk_stage
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "helpdesk_team" => db_update
-                    .helpdesk_team
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "helpdesk_ticket" => db_update
-                    .helpdesk_ticket
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "hr_contract" => db_update
-                    .hr_contract
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "hr_department" => db_update
-                    .hr_department
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "hr_employee" => db_update
-                    .hr_employee
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "hr_expense" => db_update
-                    .hr_expense
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "hr_job_position" => db_update
-                    .hr_job_position
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "hr_leave" => db_update
-                    .hr_leave
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "hr_leave_type" => db_update
-                    .hr_leave_type
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "hr_payroll_structure" => db_update
-                    .hr_payroll_structure
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "hr_payslip" => db_update
-                    .hr_payslip
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "hr_resource" => db_update
-                    .hr_resource
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "hr_salary_rule" => db_update
-                    .hr_salary_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "import_job" => db_update
-                    .import_job
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "import_job_error" => db_update
-                    .import_job_error
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "import_job_record" => db_update
-                    .import_job_record
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "import_mapping_template" => db_update
-                    .import_mapping_template
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "intercompany_rule" => db_update
-                    .intercompany_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "intercompany_transaction" => db_update
-                    .intercompany_transaction
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "inventory_adjustment" => db_update
-                    .inventory_adjustment
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "inventory_valuation" => db_update
-                    .inventory_valuation
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "iot_action" => db_update
-                    .iot_action
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "iot_alert" => db_update
-                    .iot_alert
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "iot_device" => db_update
-                    .iot_device
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "iot_hub" => db_update
-                    .iot_hub
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "iot_pairing_token" => db_update
-                    .iot_pairing_token
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "iot_telemetry" => db_update
-                    .iot_telemetry
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "iot_threshold" => db_update
-                    .iot_threshold
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "kb_category" => db_update
-                    .kb_category
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "knowledge_article" => db_update
-                    .knowledge_article
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "lead" => db_update
-                    .lead
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "lead_lost_reason" => db_update
-                    .lead_lost_reason
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "lead_source" => db_update
-                    .lead_source
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "mail_follower" => db_update
-                    .mail_follower
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "mail_message" => db_update
-                    .mail_message
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "mail_template" => db_update
-                    .mail_template
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "message_batch" => db_update
-                    .message_batch
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "message_template" => db_update
-                    .message_template
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "mrp_bom" => db_update
-                    .mrp_bom
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "mrp_bom_line" => db_update
-                    .mrp_bom_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "mrp_production" => db_update
-                    .mrp_production
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "mrp_routing_workcenter" => db_update
-                    .mrp_routing_workcenter
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "mrp_workcenter" => db_update
-                    .mrp_workcenter
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "mrp_workcenter_productivity" => db_update
-                    .mrp_workcenter_productivity
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "mrp_workorder" => db_update
-                    .mrp_workorder
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "operational_message" => db_update
-                    .operational_message
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "opp_stage" => db_update
-                    .opp_stage
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "opportunity" => db_update
-                    .opportunity
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "opportunity_line" => db_update
-                    .opportunity_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "org_permission" => db_update
-                    .org_permission
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "organization" => db_update
-                    .organization
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "organization_settings" => db_update
-                    .organization_settings
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "packaging_material" => db_update
-                    .packaging_material
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "payment_account" => db_update
-                    .payment_account
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "payment_fee" => db_update
-                    .payment_fee
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "payment_reconciliation" => db_update
-                    .payment_reconciliation
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "payment_reversal" => db_update
-                    .payment_reversal
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "payment_transaction" => db_update
-                    .payment_transaction
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "picking_wave" => db_update
-                    .picking_wave
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "policy_snapshot" => db_update
-                    .policy_snapshot
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "pos_config" => db_update
-                    .pos_config
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "pos_loyalty_card" => db_update
-                    .pos_loyalty_card
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "pos_loyalty_program" => db_update
-                    .pos_loyalty_program
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "pos_order" => db_update
-                    .pos_order
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "pos_order_line" => db_update
-                    .pos_order_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "pos_payment" => db_update
-                    .pos_payment
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "pos_payment_method" => db_update
-                    .pos_payment_method
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "pos_session" => db_update
-                    .pos_session
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "pos_terminal" => db_update
-                    .pos_terminal
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "privacy_consent" => db_update
-                    .privacy_consent
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "product" => db_update
-                    .product
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "product_attribute" => db_update
-                    .product_attribute
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "product_attribute_line" => db_update
-                    .product_attribute_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "product_attribute_value" => db_update
-                    .product_attribute_value
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "product_category" => db_update
-                    .product_category
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "product_packaging" => db_update
-                    .product_packaging
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "product_pricelist" => db_update
-                    .product_pricelist
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "product_pricelist_item" => db_update
-                    .product_pricelist_item
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "product_supplier_info" => db_update
-                    .product_supplier_info
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "product_variant" => db_update
-                    .product_variant
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "profit_loss_line" => db_update
-                    .profit_loss_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "project_project" => db_update
-                    .project_project
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "project_task" => db_update
-                    .project_task
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "project_timesheet" => db_update
-                    .project_timesheet
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "proposal" => db_update
-                    .proposal
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "proposal_comment" => db_update
-                    .proposal_comment
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "proposal_line_item" => db_update
-                    .proposal_line_item
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "proposal_presence" => db_update
-                    .proposal_presence
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "proposal_section" => db_update
-                    .proposal_section
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "proposal_source_doc" => db_update
-                    .proposal_source_doc
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "proposal_version" => db_update
-                    .proposal_version
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "purchase_order" => db_update
-                    .purchase_order
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "purchase_order_line" => db_update
-                    .purchase_order_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "purchase_requisition" => db_update
-                    .purchase_requisition
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "quality_alert" => db_update
-                    .quality_alert
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "quality_alert_reason" => db_update
-                    .quality_alert_reason
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "quality_check" => db_update
-                    .quality_check
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "quality_point" => db_update
-                    .quality_point
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "quality_team" => db_update
-                    .quality_team
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "queue_job" => db_update
-                    .queue_job
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "queue_worker" => db_update
-                    .queue_worker
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "record_custom_field_value" => db_update
-                    .record_custom_field_value
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "replenishment_rule" => db_update
-                    .replenishment_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "report_template" => db_update
-                    .report_template
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "res_partner_bank" => db_update
-                    .res_partner_bank
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "return_order" => db_update
-                    .return_order
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "return_order_line" => db_update
-                    .return_order_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "revenue_recognition_rule" => db_update
-                    .revenue_recognition_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "role" => db_update
-                    .role
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "sale_order" => db_update
-                    .sale_order
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "sale_order_line" => db_update
-                    .sale_order_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "sale_order_option" => db_update
-                    .sale_order_option
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "saved_report" => db_update
-                    .saved_report
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "scheduled_report" => db_update
-                    .scheduled_report
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "scheduled_report_run" => db_update
-                    .scheduled_report_run
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "search_embedding" => db_update
-                    .search_embedding
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "segment_member" => db_update
-                    .segment_member
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "serial_lot_traceability" => db_update
-                    .serial_lot_traceability
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "shipping_method" => db_update
-                    .shipping_method
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_count_sheet" => db_update
-                    .stock_count_sheet
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_cycle_count" => db_update
-                    .stock_cycle_count
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_inventory" => db_update
-                    .stock_inventory
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_inventory_line" => db_update
-                    .stock_inventory_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_landed_cost" => db_update
-                    .stock_landed_cost
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_landed_cost_lines" => db_update
-                    .stock_landed_cost_lines
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_location" => db_update
-                    .stock_location
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_move" => db_update
-                    .stock_move
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_move_line" => db_update
-                    .stock_move_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_picking" => db_update
-                    .stock_picking
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_picking_batch" => db_update
-                    .stock_picking_batch
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_production_lot" => db_update
-                    .stock_production_lot
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_production_serial" => db_update
-                    .stock_production_serial
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_quant" => db_update
-                    .stock_quant
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_reorder_group" => db_update
-                    .stock_reorder_group
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_route" => db_update
-                    .stock_route
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_rule" => db_update
-                    .stock_rule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "stock_traceability_report" => db_update
-                    .stock_traceability_report
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "subscription" => db_update
-                    .subscription
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "subscription_line" => db_update
-                    .subscription_line
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "subscription_plan" => db_update
-                    .subscription_plan
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "supplier_intake_request" => db_update
-                    .supplier_intake_request
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "tax_deadline" => db_update
-                    .tax_deadline
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "tax_deadline_reminder" => db_update
-                    .tax_deadline_reminder
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "tax_jurisdiction" => db_update
-                    .tax_jurisdiction
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "tax_schedule" => db_update
-                    .tax_schedule
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "trial_balance" => db_update
-                    .trial_balance
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "uom" => db_update
-                    .uom
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "uom_cat" => db_update
-                    .uom_cat
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "uom_conversion" => db_update
-                    .uom_conversion
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "user_custom_field" => db_update
-                    .user_custom_field
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "user_organization" => db_update
-                    .user_organization
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "user_profile" => db_update
-                    .user_profile
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "user_role_assignment" => db_update
-                    .user_role_assignment
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "user_session" => db_update
-                    .user_session
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "utm_campaign" => db_update
-                    .utm_campaign
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "utm_medium" => db_update
-                    .utm_medium
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "utm_source" => db_update
-                    .utm_source
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "warehouse" => db_update
-                    .warehouse
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "warehouse_3_d_zone" => db_update
-                    .warehouse_3_d_zone
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "warehouse_geo" => db_update
-                    .warehouse_geo
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "warehouse_task" => db_update
-                    .warehouse_task
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "whatsapp_business_account" => db_update
-                    .whatsapp_business_account
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "workflow" => db_update
-                    .workflow
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "workflow_activity" => db_update
-                    .workflow_activity
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "workflow_instance" => db_update
-                    .workflow_instance
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "workflow_transition" => db_update
-                    .workflow_transition
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "workflow_workitem" => db_update
-                    .workflow_workitem
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                unknown => {
-                    return Err(
-                        __sdk::InternalError::unknown_name("table", unknown, "QueryRows").into(),
-                    );
-                }
-            }
-        }
-        Ok(db_update)
-    }
+                                "account_account" => db_update.account_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_account_type" => db_update.account_account_type.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_analytic_account" => db_update.account_analytic_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_analytic_distribution_model" => db_update.account_analytic_distribution_model.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_analytic_line" => db_update.account_analytic_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_asset" => db_update.account_asset.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_asset_depreciation_line" => db_update.account_asset_depreciation_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_bank_statement" => db_update.account_bank_statement.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_bank_statement_line" => db_update.account_bank_statement_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_fiscal_year" => db_update.account_fiscal_year.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_group" => db_update.account_group.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_journal" => db_update.account_journal.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_move" => db_update.account_move.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_move_line" => db_update.account_move_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_payment" => db_update.account_payment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_payment_term" => db_update.account_payment_term.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_payment_term_line" => db_update.account_payment_term_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_period" => db_update.account_period.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_reconciliation_widget" => db_update.account_reconciliation_widget.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_tax" => db_update.account_tax.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "account_tax_group" => db_update.account_tax_group.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "activity" => db_update.activity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "activity_type" => db_update.activity_type.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "adjustment_reason" => db_update.adjustment_reason.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_action_draft" => db_update.ai_action_draft.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_agent" => db_update.ai_agent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_agent_run" => db_update.ai_agent_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_agent_run_policy_snapshot" => db_update.ai_agent_run_policy_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_agent_run_step" => db_update.ai_agent_run_step.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_chat_message" => db_update.ai_chat_message.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_chat_session" => db_update.ai_chat_session.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_document_processing_job" => db_update.ai_document_processing_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_insight" => db_update.ai_insight.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_reducer_allowlist" => db_update.ai_reducer_allowlist.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill" => db_update.ai_skill.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_config" => db_update.ai_skill_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_fixture" => db_update.ai_skill_fixture.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_release" => db_update.ai_skill_release.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_test_run" => db_update.ai_skill_test_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_version" => db_update.ai_skill_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_team_member" => db_update.ai_team_member.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_team_member_skill" => db_update.ai_team_member_skill.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "analytics_metric" => db_update.analytics_metric.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "approval_request" => db_update.approval_request.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "approval_rule" => db_update.approval_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "assignment_rule" => db_update.assignment_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "audit_log" => db_update.audit_log.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "audit_rule" => db_update.audit_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "balance_sheet_line" => db_update.balance_sheet_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "bank_match_candidate" => db_update.bank_match_candidate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "bank_statement_import" => db_update.bank_statement_import.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "bank_statement_import_line" => db_update.bank_statement_import_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "barcode_nomenclature" => db_update.barcode_nomenclature.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "barcode_rule" => db_update.barcode_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "barcode_scan" => db_update.barcode_scan.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "billing_account" => db_update.billing_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "bom_explosion_result" => db_update.bom_explosion_result.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "budget_post" => db_update.budget_post.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "calendar_event" => db_update.calendar_event.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "cartonization_result" => db_update.cartonization_result.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "casbin_rule" => db_update.casbin_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "cash_flow_line" => db_update.cash_flow_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "company" => db_update.company.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "company_country_pack" => db_update.company_country_pack.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "company_vertical_pack" => db_update.company_vertical_pack.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "consolidation_account" => db_update.consolidation_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "consolidation_company_rate" => db_update.consolidation_company_rate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "consolidation_elimination_entry" => db_update.consolidation_elimination_entry.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "consolidation_journal" => db_update.consolidation_journal.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact" => db_update.contact.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_category" => db_update.contact_category.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_category_assignment" => db_update.contact_category_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_communication_preference" => db_update.contact_communication_preference.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_phone_identity" => db_update.contact_phone_identity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_relationship" => db_update.contact_relationship.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_role_assignment" => db_update.contact_role_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_segment" => db_update.contact_segment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_tag" => db_update.contact_tag.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_tag_assignment" => db_update.contact_tag_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "country" => db_update.country.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "country_pack_definition" => db_update.country_pack_definition.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "country_pack_tax_rule" => db_update.country_pack_tax_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crossovered_budget" => db_update.crossovered_budget.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "currency" => db_update.currency.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "currency_rate" => db_update.currency_rate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "dashboard" => db_update.dashboard.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "dashboard_widget" => db_update.dashboard_widget.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "data_classification" => db_update.data_classification.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "data_classification_rule" => db_update.data_classification_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "deferred_revenue_line" => db_update.deferred_revenue_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "deferred_revenue_schedule" => db_update.deferred_revenue_schedule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "delegated_admin_scope" => db_update.delegated_admin_scope.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "delivery_carrier" => db_update.delivery_carrier.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "delivery_price_rule" => db_update.delivery_price_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "doc_folder" => db_update.doc_folder.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "document" => db_update.document.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "document_version" => db_update.document_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "expense_sheet" => db_update.expense_sheet.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "financial_report" => db_update.financial_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "fleet_vehicle" => db_update.fleet_vehicle.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "form_config" => db_update.form_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "form_config_field" => db_update.form_config_field.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "form_role_config" => db_update.form_role_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "generated_owner_report" => db_update.generated_owner_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "google_drive_connection" => db_update.google_drive_connection.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "helpdesk_sla" => db_update.helpdesk_sla.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "helpdesk_stage" => db_update.helpdesk_stage.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "helpdesk_team" => db_update.helpdesk_team.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "helpdesk_ticket" => db_update.helpdesk_ticket.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_contract" => db_update.hr_contract.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_department" => db_update.hr_department.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_employee" => db_update.hr_employee.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_expense" => db_update.hr_expense.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_job_position" => db_update.hr_job_position.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_leave" => db_update.hr_leave.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_leave_type" => db_update.hr_leave_type.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_payroll_structure" => db_update.hr_payroll_structure.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_payslip" => db_update.hr_payslip.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_resource" => db_update.hr_resource.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_salary_rule" => db_update.hr_salary_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "import_job" => db_update.import_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "import_job_error" => db_update.import_job_error.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "import_job_record" => db_update.import_job_record.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "import_mapping_template" => db_update.import_mapping_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "intercompany_rule" => db_update.intercompany_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "intercompany_transaction" => db_update.intercompany_transaction.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "inventory_adjustment" => db_update.inventory_adjustment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "inventory_valuation" => db_update.inventory_valuation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "iot_action" => db_update.iot_action.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "iot_alert" => db_update.iot_alert.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "iot_device" => db_update.iot_device.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "iot_hub" => db_update.iot_hub.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "iot_pairing_token" => db_update.iot_pairing_token.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "iot_telemetry" => db_update.iot_telemetry.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "iot_threshold" => db_update.iot_threshold.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "kb_category" => db_update.kb_category.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "knowledge_article" => db_update.knowledge_article.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "lead" => db_update.lead.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "lead_lost_reason" => db_update.lead_lost_reason.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "lead_source" => db_update.lead_source.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mail_follower" => db_update.mail_follower.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mail_message" => db_update.mail_message.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mail_template" => db_update.mail_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "message_batch" => db_update.message_batch.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "message_template" => db_update.message_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mrp_bom" => db_update.mrp_bom.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mrp_bom_line" => db_update.mrp_bom_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mrp_production" => db_update.mrp_production.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mrp_routing_workcenter" => db_update.mrp_routing_workcenter.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mrp_workcenter" => db_update.mrp_workcenter.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mrp_workcenter_productivity" => db_update.mrp_workcenter_productivity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mrp_workorder" => db_update.mrp_workorder.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "operational_message" => db_update.operational_message.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "opp_stage" => db_update.opp_stage.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "opportunity" => db_update.opportunity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "opportunity_line" => db_update.opportunity_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "org_permission" => db_update.org_permission.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "org_schema_migration" => db_update.org_schema_migration.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "organization" => db_update.organization.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "organization_settings" => db_update.organization_settings.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "packaging_material" => db_update.packaging_material.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "payment_account" => db_update.payment_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "payment_fee" => db_update.payment_fee.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "payment_reconciliation" => db_update.payment_reconciliation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "payment_reversal" => db_update.payment_reversal.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "payment_transaction" => db_update.payment_transaction.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "picking_wave" => db_update.picking_wave.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "policy_snapshot" => db_update.policy_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "pos_config" => db_update.pos_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "pos_loyalty_card" => db_update.pos_loyalty_card.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "pos_loyalty_program" => db_update.pos_loyalty_program.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "pos_order" => db_update.pos_order.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "pos_order_line" => db_update.pos_order_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "pos_payment" => db_update.pos_payment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "pos_payment_method" => db_update.pos_payment_method.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "pos_session" => db_update.pos_session.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "pos_terminal" => db_update.pos_terminal.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "privacy_consent" => db_update.privacy_consent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "product" => db_update.product.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "product_attribute" => db_update.product_attribute.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "product_attribute_line" => db_update.product_attribute_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "product_attribute_value" => db_update.product_attribute_value.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "product_category" => db_update.product_category.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "product_packaging" => db_update.product_packaging.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "product_pricelist" => db_update.product_pricelist.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "product_pricelist_item" => db_update.product_pricelist_item.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "product_supplier_info" => db_update.product_supplier_info.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "product_variant" => db_update.product_variant.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "profit_loss_line" => db_update.profit_loss_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_project" => db_update.project_project.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_task" => db_update.project_task.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_timesheet" => db_update.project_timesheet.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal" => db_update.proposal.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_comment" => db_update.proposal_comment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_line_item" => db_update.proposal_line_item.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_presence" => db_update.proposal_presence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_section" => db_update.proposal_section.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_source_doc" => db_update.proposal_source_doc.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_version" => db_update.proposal_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_order" => db_update.purchase_order.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_order_line" => db_update.purchase_order_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_requisition" => db_update.purchase_requisition.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "quality_alert" => db_update.quality_alert.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "quality_alert_reason" => db_update.quality_alert_reason.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "quality_check" => db_update.quality_check.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "quality_point" => db_update.quality_point.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "quality_team" => db_update.quality_team.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "queue_job" => db_update.queue_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "queue_worker" => db_update.queue_worker.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "record_custom_field_value" => db_update.record_custom_field_value.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "replenishment_rule" => db_update.replenishment_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "report_template" => db_update.report_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "res_partner_bank" => db_update.res_partner_bank.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "return_order" => db_update.return_order.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "return_order_line" => db_update.return_order_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "revenue_recognition_rule" => db_update.revenue_recognition_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "role" => db_update.role.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "sale_order" => db_update.sale_order.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "sale_order_line" => db_update.sale_order_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "sale_order_option" => db_update.sale_order_option.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "saved_report" => db_update.saved_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "scheduled_report" => db_update.scheduled_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "scheduled_report_run" => db_update.scheduled_report_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "schema_migration" => db_update.schema_migration.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "search_embedding" => db_update.search_embedding.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "segment_member" => db_update.segment_member.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "serial_lot_traceability" => db_update.serial_lot_traceability.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "shipping_method" => db_update.shipping_method.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "sod_conflict_rule" => db_update.sod_conflict_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_count_sheet" => db_update.stock_count_sheet.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_cycle_count" => db_update.stock_cycle_count.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_inventory" => db_update.stock_inventory.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_inventory_line" => db_update.stock_inventory_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_landed_cost" => db_update.stock_landed_cost.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_landed_cost_lines" => db_update.stock_landed_cost_lines.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_location" => db_update.stock_location.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_move" => db_update.stock_move.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_move_line" => db_update.stock_move_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_picking" => db_update.stock_picking.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_picking_batch" => db_update.stock_picking_batch.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_production_lot" => db_update.stock_production_lot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_production_serial" => db_update.stock_production_serial.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_quant" => db_update.stock_quant.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_reorder_group" => db_update.stock_reorder_group.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_route" => db_update.stock_route.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_rule" => db_update.stock_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_traceability_report" => db_update.stock_traceability_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription" => db_update.subscription.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_line" => db_update.subscription_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_plan" => db_update.subscription_plan.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "supplier_intake_request" => db_update.supplier_intake_request.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "tax_deadline" => db_update.tax_deadline.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "tax_deadline_reminder" => db_update.tax_deadline_reminder.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "tax_jurisdiction" => db_update.tax_jurisdiction.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "tax_schedule" => db_update.tax_schedule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "trial_balance" => db_update.trial_balance.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "uom" => db_update.uom.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "uom_cat" => db_update.uom_cat.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "uom_conversion" => db_update.uom_conversion.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "user_custom_field" => db_update.user_custom_field.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "user_organization" => db_update.user_organization.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "user_profile" => db_update.user_profile.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "user_role_assignment" => db_update.user_role_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "user_session" => db_update.user_session.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "utm_campaign" => db_update.utm_campaign.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "utm_medium" => db_update.utm_medium.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "utm_source" => db_update.utm_source.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "warehouse" => db_update.warehouse.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "warehouse_3_d_zone" => db_update.warehouse_3_d_zone.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "warehouse_geo" => db_update.warehouse_geo.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "warehouse_task" => db_update.warehouse_task.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "whatsapp_business_account" => db_update.whatsapp_business_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow" => db_update.workflow.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_activity" => db_update.workflow_activity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_instance" => db_update.workflow_instance.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_transition" => db_update.workflow_transition.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_workitem" => db_update.workflow_workitem.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                unknown => { return Err(__sdk::InternalError::unknown_name("table", unknown, "QueryRows").into()); }
+}}        Ok(db_update)
+}
+fn parse_unsubscribe_rows(raw: __ws::v2::QueryRows) -> __sdk::Result<Self> {
+                let mut db_update = DbUpdate::default();
+for table_rows in raw.tables {
+            match &table_rows.table[..] {
+                                "account_account" => db_update.account_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_account_type" => db_update.account_account_type.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_analytic_account" => db_update.account_analytic_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_analytic_distribution_model" => db_update.account_analytic_distribution_model.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_analytic_line" => db_update.account_analytic_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_asset" => db_update.account_asset.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_asset_depreciation_line" => db_update.account_asset_depreciation_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_bank_statement" => db_update.account_bank_statement.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_bank_statement_line" => db_update.account_bank_statement_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_fiscal_year" => db_update.account_fiscal_year.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_group" => db_update.account_group.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_journal" => db_update.account_journal.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_move" => db_update.account_move.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_move_line" => db_update.account_move_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_payment" => db_update.account_payment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_payment_term" => db_update.account_payment_term.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_payment_term_line" => db_update.account_payment_term_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_period" => db_update.account_period.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_reconciliation_widget" => db_update.account_reconciliation_widget.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_tax" => db_update.account_tax.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "account_tax_group" => db_update.account_tax_group.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "activity" => db_update.activity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "activity_type" => db_update.activity_type.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "adjustment_reason" => db_update.adjustment_reason.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_action_draft" => db_update.ai_action_draft.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_agent" => db_update.ai_agent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_agent_run" => db_update.ai_agent_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_agent_run_policy_snapshot" => db_update.ai_agent_run_policy_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_agent_run_step" => db_update.ai_agent_run_step.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_chat_message" => db_update.ai_chat_message.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_chat_session" => db_update.ai_chat_session.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_document_processing_job" => db_update.ai_document_processing_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_insight" => db_update.ai_insight.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_reducer_allowlist" => db_update.ai_reducer_allowlist.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill" => db_update.ai_skill.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_config" => db_update.ai_skill_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_fixture" => db_update.ai_skill_fixture.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_release" => db_update.ai_skill_release.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_test_run" => db_update.ai_skill_test_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_version" => db_update.ai_skill_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_team_member" => db_update.ai_team_member.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_team_member_skill" => db_update.ai_team_member_skill.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "analytics_metric" => db_update.analytics_metric.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "approval_request" => db_update.approval_request.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "approval_rule" => db_update.approval_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "assignment_rule" => db_update.assignment_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "audit_log" => db_update.audit_log.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "audit_rule" => db_update.audit_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "balance_sheet_line" => db_update.balance_sheet_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "bank_match_candidate" => db_update.bank_match_candidate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "bank_statement_import" => db_update.bank_statement_import.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "bank_statement_import_line" => db_update.bank_statement_import_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "barcode_nomenclature" => db_update.barcode_nomenclature.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "barcode_rule" => db_update.barcode_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "barcode_scan" => db_update.barcode_scan.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "billing_account" => db_update.billing_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "bom_explosion_result" => db_update.bom_explosion_result.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "budget_post" => db_update.budget_post.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "calendar_event" => db_update.calendar_event.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "cartonization_result" => db_update.cartonization_result.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "casbin_rule" => db_update.casbin_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "cash_flow_line" => db_update.cash_flow_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "company" => db_update.company.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "company_country_pack" => db_update.company_country_pack.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "company_vertical_pack" => db_update.company_vertical_pack.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "consolidation_account" => db_update.consolidation_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "consolidation_company_rate" => db_update.consolidation_company_rate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "consolidation_elimination_entry" => db_update.consolidation_elimination_entry.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "consolidation_journal" => db_update.consolidation_journal.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact" => db_update.contact.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_category" => db_update.contact_category.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_category_assignment" => db_update.contact_category_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_communication_preference" => db_update.contact_communication_preference.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_phone_identity" => db_update.contact_phone_identity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_relationship" => db_update.contact_relationship.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_role_assignment" => db_update.contact_role_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_segment" => db_update.contact_segment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_tag" => db_update.contact_tag.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_tag_assignment" => db_update.contact_tag_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "country" => db_update.country.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "country_pack_definition" => db_update.country_pack_definition.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "country_pack_tax_rule" => db_update.country_pack_tax_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crossovered_budget" => db_update.crossovered_budget.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "currency" => db_update.currency.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "currency_rate" => db_update.currency_rate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "dashboard" => db_update.dashboard.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "dashboard_widget" => db_update.dashboard_widget.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "data_classification" => db_update.data_classification.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "data_classification_rule" => db_update.data_classification_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "deferred_revenue_line" => db_update.deferred_revenue_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "deferred_revenue_schedule" => db_update.deferred_revenue_schedule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "delegated_admin_scope" => db_update.delegated_admin_scope.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "delivery_carrier" => db_update.delivery_carrier.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "delivery_price_rule" => db_update.delivery_price_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "doc_folder" => db_update.doc_folder.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "document" => db_update.document.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "document_version" => db_update.document_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "expense_sheet" => db_update.expense_sheet.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "financial_report" => db_update.financial_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "fleet_vehicle" => db_update.fleet_vehicle.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "form_config" => db_update.form_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "form_config_field" => db_update.form_config_field.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "form_role_config" => db_update.form_role_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "generated_owner_report" => db_update.generated_owner_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "google_drive_connection" => db_update.google_drive_connection.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "helpdesk_sla" => db_update.helpdesk_sla.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "helpdesk_stage" => db_update.helpdesk_stage.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "helpdesk_team" => db_update.helpdesk_team.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "helpdesk_ticket" => db_update.helpdesk_ticket.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_contract" => db_update.hr_contract.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_department" => db_update.hr_department.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_employee" => db_update.hr_employee.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_expense" => db_update.hr_expense.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_job_position" => db_update.hr_job_position.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_leave" => db_update.hr_leave.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_leave_type" => db_update.hr_leave_type.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_payroll_structure" => db_update.hr_payroll_structure.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_payslip" => db_update.hr_payslip.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_resource" => db_update.hr_resource.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_salary_rule" => db_update.hr_salary_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "import_job" => db_update.import_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "import_job_error" => db_update.import_job_error.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "import_job_record" => db_update.import_job_record.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "import_mapping_template" => db_update.import_mapping_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "intercompany_rule" => db_update.intercompany_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "intercompany_transaction" => db_update.intercompany_transaction.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "inventory_adjustment" => db_update.inventory_adjustment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "inventory_valuation" => db_update.inventory_valuation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "iot_action" => db_update.iot_action.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "iot_alert" => db_update.iot_alert.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "iot_device" => db_update.iot_device.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "iot_hub" => db_update.iot_hub.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "iot_pairing_token" => db_update.iot_pairing_token.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "iot_telemetry" => db_update.iot_telemetry.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "iot_threshold" => db_update.iot_threshold.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "kb_category" => db_update.kb_category.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "knowledge_article" => db_update.knowledge_article.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "lead" => db_update.lead.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "lead_lost_reason" => db_update.lead_lost_reason.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "lead_source" => db_update.lead_source.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mail_follower" => db_update.mail_follower.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mail_message" => db_update.mail_message.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mail_template" => db_update.mail_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "message_batch" => db_update.message_batch.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "message_template" => db_update.message_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mrp_bom" => db_update.mrp_bom.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mrp_bom_line" => db_update.mrp_bom_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mrp_production" => db_update.mrp_production.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mrp_routing_workcenter" => db_update.mrp_routing_workcenter.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mrp_workcenter" => db_update.mrp_workcenter.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mrp_workcenter_productivity" => db_update.mrp_workcenter_productivity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mrp_workorder" => db_update.mrp_workorder.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "operational_message" => db_update.operational_message.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "opp_stage" => db_update.opp_stage.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "opportunity" => db_update.opportunity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "opportunity_line" => db_update.opportunity_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "org_permission" => db_update.org_permission.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "org_schema_migration" => db_update.org_schema_migration.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "organization" => db_update.organization.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "organization_settings" => db_update.organization_settings.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "packaging_material" => db_update.packaging_material.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "payment_account" => db_update.payment_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "payment_fee" => db_update.payment_fee.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "payment_reconciliation" => db_update.payment_reconciliation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "payment_reversal" => db_update.payment_reversal.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "payment_transaction" => db_update.payment_transaction.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "picking_wave" => db_update.picking_wave.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "policy_snapshot" => db_update.policy_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "pos_config" => db_update.pos_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "pos_loyalty_card" => db_update.pos_loyalty_card.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "pos_loyalty_program" => db_update.pos_loyalty_program.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "pos_order" => db_update.pos_order.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "pos_order_line" => db_update.pos_order_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "pos_payment" => db_update.pos_payment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "pos_payment_method" => db_update.pos_payment_method.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "pos_session" => db_update.pos_session.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "pos_terminal" => db_update.pos_terminal.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "privacy_consent" => db_update.privacy_consent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "product" => db_update.product.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "product_attribute" => db_update.product_attribute.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "product_attribute_line" => db_update.product_attribute_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "product_attribute_value" => db_update.product_attribute_value.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "product_category" => db_update.product_category.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "product_packaging" => db_update.product_packaging.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "product_pricelist" => db_update.product_pricelist.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "product_pricelist_item" => db_update.product_pricelist_item.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "product_supplier_info" => db_update.product_supplier_info.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "product_variant" => db_update.product_variant.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "profit_loss_line" => db_update.profit_loss_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_project" => db_update.project_project.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_task" => db_update.project_task.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_timesheet" => db_update.project_timesheet.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal" => db_update.proposal.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_comment" => db_update.proposal_comment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_line_item" => db_update.proposal_line_item.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_presence" => db_update.proposal_presence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_section" => db_update.proposal_section.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_source_doc" => db_update.proposal_source_doc.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_version" => db_update.proposal_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_order" => db_update.purchase_order.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_order_line" => db_update.purchase_order_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_requisition" => db_update.purchase_requisition.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "quality_alert" => db_update.quality_alert.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "quality_alert_reason" => db_update.quality_alert_reason.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "quality_check" => db_update.quality_check.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "quality_point" => db_update.quality_point.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "quality_team" => db_update.quality_team.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "queue_job" => db_update.queue_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "queue_worker" => db_update.queue_worker.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "record_custom_field_value" => db_update.record_custom_field_value.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "replenishment_rule" => db_update.replenishment_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "report_template" => db_update.report_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "res_partner_bank" => db_update.res_partner_bank.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "return_order" => db_update.return_order.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "return_order_line" => db_update.return_order_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "revenue_recognition_rule" => db_update.revenue_recognition_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "role" => db_update.role.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "sale_order" => db_update.sale_order.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "sale_order_line" => db_update.sale_order_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "sale_order_option" => db_update.sale_order_option.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "saved_report" => db_update.saved_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "scheduled_report" => db_update.scheduled_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "scheduled_report_run" => db_update.scheduled_report_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "schema_migration" => db_update.schema_migration.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "search_embedding" => db_update.search_embedding.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "segment_member" => db_update.segment_member.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "serial_lot_traceability" => db_update.serial_lot_traceability.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "shipping_method" => db_update.shipping_method.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "sod_conflict_rule" => db_update.sod_conflict_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_count_sheet" => db_update.stock_count_sheet.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_cycle_count" => db_update.stock_cycle_count.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_inventory" => db_update.stock_inventory.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_inventory_line" => db_update.stock_inventory_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_landed_cost" => db_update.stock_landed_cost.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_landed_cost_lines" => db_update.stock_landed_cost_lines.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_location" => db_update.stock_location.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_move" => db_update.stock_move.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_move_line" => db_update.stock_move_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_picking" => db_update.stock_picking.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_picking_batch" => db_update.stock_picking_batch.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_production_lot" => db_update.stock_production_lot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_production_serial" => db_update.stock_production_serial.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_quant" => db_update.stock_quant.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_reorder_group" => db_update.stock_reorder_group.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_route" => db_update.stock_route.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_rule" => db_update.stock_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_traceability_report" => db_update.stock_traceability_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription" => db_update.subscription.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_line" => db_update.subscription_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_plan" => db_update.subscription_plan.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "supplier_intake_request" => db_update.supplier_intake_request.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "tax_deadline" => db_update.tax_deadline.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "tax_deadline_reminder" => db_update.tax_deadline_reminder.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "tax_jurisdiction" => db_update.tax_jurisdiction.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "tax_schedule" => db_update.tax_schedule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "trial_balance" => db_update.trial_balance.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "uom" => db_update.uom.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "uom_cat" => db_update.uom_cat.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "uom_conversion" => db_update.uom_conversion.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "user_custom_field" => db_update.user_custom_field.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "user_organization" => db_update.user_organization.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "user_profile" => db_update.user_profile.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "user_role_assignment" => db_update.user_role_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "user_session" => db_update.user_session.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "utm_campaign" => db_update.utm_campaign.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "utm_medium" => db_update.utm_medium.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "utm_source" => db_update.utm_source.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "warehouse" => db_update.warehouse.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "warehouse_3_d_zone" => db_update.warehouse_3_d_zone.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "warehouse_geo" => db_update.warehouse_geo.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "warehouse_task" => db_update.warehouse_task.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "whatsapp_business_account" => db_update.whatsapp_business_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow" => db_update.workflow.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_activity" => db_update.workflow_activity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_instance" => db_update.workflow_instance.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_transition" => db_update.workflow_transition.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_workitem" => db_update.workflow_workitem.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                unknown => { return Err(__sdk::InternalError::unknown_name("table", unknown, "QueryRows").into()); }
+}}        Ok(db_update)
+}
 }
 
 #[derive(Default)]
 #[allow(non_snake_case)]
 #[doc(hidden)]
 pub struct AppliedDiff<'r> {
-    account_account: __sdk::TableAppliedDiff<'r, AccountAccount>,
+        account_account: __sdk::TableAppliedDiff<'r, AccountAccount>,
     account_account_type: __sdk::TableAppliedDiff<'r, AccountAccountType>,
     account_analytic_account: __sdk::TableAppliedDiff<'r, AccountAnalyticAccount>,
-    account_analytic_distribution_model:
-        __sdk::TableAppliedDiff<'r, AccountAnalyticDistributionModel>,
+    account_analytic_distribution_model: __sdk::TableAppliedDiff<'r, AccountAnalyticDistributionModel>,
     account_analytic_line: __sdk::TableAppliedDiff<'r, AccountAnalyticLine>,
     account_asset: __sdk::TableAppliedDiff<'r, AccountAsset>,
     account_asset_depreciation_line: __sdk::TableAppliedDiff<'r, AccountAssetDepreciationLine>,
@@ -18661,6 +16353,7 @@ pub struct AppliedDiff<'r> {
     casbin_rule: __sdk::TableAppliedDiff<'r, CasbinRule>,
     cash_flow_line: __sdk::TableAppliedDiff<'r, CashFlowLine>,
     company: __sdk::TableAppliedDiff<'r, Company>,
+    company_country_pack: __sdk::TableAppliedDiff<'r, CompanyCountryPack>,
     company_vertical_pack: __sdk::TableAppliedDiff<'r, CompanyVerticalPack>,
     consolidation_account: __sdk::TableAppliedDiff<'r, ConsolidationAccount>,
     consolidation_company_rate: __sdk::TableAppliedDiff<'r, ConsolidationCompanyRate>,
@@ -18678,6 +16371,8 @@ pub struct AppliedDiff<'r> {
     contact_tag: __sdk::TableAppliedDiff<'r, ContactTag>,
     contact_tag_assignment: __sdk::TableAppliedDiff<'r, ContactTagAssignment>,
     country: __sdk::TableAppliedDiff<'r, Country>,
+    country_pack_definition: __sdk::TableAppliedDiff<'r, CountryPackDefinition>,
+    country_pack_tax_rule: __sdk::TableAppliedDiff<'r, CountryPackTaxRule>,
     crossovered_budget: __sdk::TableAppliedDiff<'r, CrossoveredBudget>,
     crossovered_budget_lines: __sdk::TableAppliedDiff<'r, CrossoveredBudgetLines>,
     currency: __sdk::TableAppliedDiff<'r, Currency>,
@@ -18688,6 +16383,7 @@ pub struct AppliedDiff<'r> {
     data_classification_rule: __sdk::TableAppliedDiff<'r, DataClassificationRule>,
     deferred_revenue_line: __sdk::TableAppliedDiff<'r, DeferredRevenueLine>,
     deferred_revenue_schedule: __sdk::TableAppliedDiff<'r, DeferredRevenueSchedule>,
+    delegated_admin_scope: __sdk::TableAppliedDiff<'r, DelegatedAdminScope>,
     delivery_carrier: __sdk::TableAppliedDiff<'r, DeliveryCarrier>,
     delivery_price_rule: __sdk::TableAppliedDiff<'r, DeliveryPriceRule>,
     doc_folder: __sdk::TableAppliedDiff<'r, DocumentFolder>,
@@ -18755,6 +16451,7 @@ pub struct AppliedDiff<'r> {
     opportunity: __sdk::TableAppliedDiff<'r, Opportunity>,
     opportunity_line: __sdk::TableAppliedDiff<'r, OpportunityLine>,
     org_permission: __sdk::TableAppliedDiff<'r, OrgPermission>,
+    org_schema_migration: __sdk::TableAppliedDiff<'r, OrgSchemaMigration>,
     organization: __sdk::TableAppliedDiff<'r, Organization>,
     organization_settings: __sdk::TableAppliedDiff<'r, OrganizationSettings>,
     packaging_material: __sdk::TableAppliedDiff<'r, PackagingMaterial>,
@@ -18820,10 +16517,12 @@ pub struct AppliedDiff<'r> {
     saved_report: __sdk::TableAppliedDiff<'r, SavedReport>,
     scheduled_report: __sdk::TableAppliedDiff<'r, ScheduledReport>,
     scheduled_report_run: __sdk::TableAppliedDiff<'r, ScheduledReportRun>,
+    schema_migration: __sdk::TableAppliedDiff<'r, SchemaMigration>,
     search_embedding: __sdk::TableAppliedDiff<'r, SearchEmbedding>,
     segment_member: __sdk::TableAppliedDiff<'r, SegmentMember>,
     serial_lot_traceability: __sdk::TableAppliedDiff<'r, SerialLotTraceability>,
     shipping_method: __sdk::TableAppliedDiff<'r, ShippingMethod>,
+    sod_conflict_rule: __sdk::TableAppliedDiff<'r, SodConflictRule>,
     stock_count_sheet: __sdk::TableAppliedDiff<'r, StockCountSheet>,
     stock_cycle_count: __sdk::TableAppliedDiff<'r, StockCycleCount>,
     stock_inventory: __sdk::TableAppliedDiff<'r, StockInventory>,
@@ -18875,1184 +16574,297 @@ pub struct AppliedDiff<'r> {
     __unused: std::marker::PhantomData<&'r ()>,
 }
 
+
 impl __sdk::InModule for AppliedDiff<'_> {
     type Module = RemoteModule;
 }
 
 impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
-    fn invoke_row_callbacks(
-        &self,
-        event: &EventContext,
-        callbacks: &mut __sdk::DbCallbacks<RemoteModule>,
-    ) {
-        callbacks.invoke_table_row_callbacks::<AccountAccount>(
-            "account_account",
-            &self.account_account,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountAccountType>(
-            "account_account_type",
-            &self.account_account_type,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountAnalyticAccount>(
-            "account_analytic_account",
-            &self.account_analytic_account,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountAnalyticDistributionModel>(
-            "account_analytic_distribution_model",
-            &self.account_analytic_distribution_model,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountAnalyticLine>(
-            "account_analytic_line",
-            &self.account_analytic_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountAsset>(
-            "account_asset",
-            &self.account_asset,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountAssetDepreciationLine>(
-            "account_asset_depreciation_line",
-            &self.account_asset_depreciation_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountBankStatement>(
-            "account_bank_statement",
-            &self.account_bank_statement,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountBankStatementLine>(
-            "account_bank_statement_line",
-            &self.account_bank_statement_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountFiscalYear>(
-            "account_fiscal_year",
-            &self.account_fiscal_year,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountGroup>(
-            "account_group",
-            &self.account_group,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountJournal>(
-            "account_journal",
-            &self.account_journal,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountMove>(
-            "account_move",
-            &self.account_move,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountMoveLine>(
-            "account_move_line",
-            &self.account_move_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountPayment>(
-            "account_payment",
-            &self.account_payment,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountPaymentTerm>(
-            "account_payment_term",
-            &self.account_payment_term,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountPaymentTermLine>(
-            "account_payment_term_line",
-            &self.account_payment_term_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountPeriod>(
-            "account_period",
-            &self.account_period,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AccountReconciliationWidget>(
-            "account_reconciliation_widget",
-            &self.account_reconciliation_widget,
-            event,
-        );
+    fn invoke_row_callbacks(&self, event: &EventContext, callbacks: &mut __sdk::DbCallbacks<RemoteModule>) {
+                callbacks.invoke_table_row_callbacks::<AccountAccount>("account_account", &self.account_account, event);
+        callbacks.invoke_table_row_callbacks::<AccountAccountType>("account_account_type", &self.account_account_type, event);
+        callbacks.invoke_table_row_callbacks::<AccountAnalyticAccount>("account_analytic_account", &self.account_analytic_account, event);
+        callbacks.invoke_table_row_callbacks::<AccountAnalyticDistributionModel>("account_analytic_distribution_model", &self.account_analytic_distribution_model, event);
+        callbacks.invoke_table_row_callbacks::<AccountAnalyticLine>("account_analytic_line", &self.account_analytic_line, event);
+        callbacks.invoke_table_row_callbacks::<AccountAsset>("account_asset", &self.account_asset, event);
+        callbacks.invoke_table_row_callbacks::<AccountAssetDepreciationLine>("account_asset_depreciation_line", &self.account_asset_depreciation_line, event);
+        callbacks.invoke_table_row_callbacks::<AccountBankStatement>("account_bank_statement", &self.account_bank_statement, event);
+        callbacks.invoke_table_row_callbacks::<AccountBankStatementLine>("account_bank_statement_line", &self.account_bank_statement_line, event);
+        callbacks.invoke_table_row_callbacks::<AccountFiscalYear>("account_fiscal_year", &self.account_fiscal_year, event);
+        callbacks.invoke_table_row_callbacks::<AccountGroup>("account_group", &self.account_group, event);
+        callbacks.invoke_table_row_callbacks::<AccountJournal>("account_journal", &self.account_journal, event);
+        callbacks.invoke_table_row_callbacks::<AccountMove>("account_move", &self.account_move, event);
+        callbacks.invoke_table_row_callbacks::<AccountMoveLine>("account_move_line", &self.account_move_line, event);
+        callbacks.invoke_table_row_callbacks::<AccountPayment>("account_payment", &self.account_payment, event);
+        callbacks.invoke_table_row_callbacks::<AccountPaymentTerm>("account_payment_term", &self.account_payment_term, event);
+        callbacks.invoke_table_row_callbacks::<AccountPaymentTermLine>("account_payment_term_line", &self.account_payment_term_line, event);
+        callbacks.invoke_table_row_callbacks::<AccountPeriod>("account_period", &self.account_period, event);
+        callbacks.invoke_table_row_callbacks::<AccountReconciliationWidget>("account_reconciliation_widget", &self.account_reconciliation_widget, event);
         callbacks.invoke_table_row_callbacks::<AccountTax>("account_tax", &self.account_tax, event);
-        callbacks.invoke_table_row_callbacks::<AccountTaxGroup>(
-            "account_tax_group",
-            &self.account_tax_group,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<AccountTaxGroup>("account_tax_group", &self.account_tax_group, event);
         callbacks.invoke_table_row_callbacks::<Activity>("activity", &self.activity, event);
-        callbacks.invoke_table_row_callbacks::<ActivityType>(
-            "activity_type",
-            &self.activity_type,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AdjustmentReason>(
-            "adjustment_reason",
-            &self.adjustment_reason,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiActionDraft>(
-            "ai_action_draft",
-            &self.ai_action_draft,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<ActivityType>("activity_type", &self.activity_type, event);
+        callbacks.invoke_table_row_callbacks::<AdjustmentReason>("adjustment_reason", &self.adjustment_reason, event);
+        callbacks.invoke_table_row_callbacks::<AiActionDraft>("ai_action_draft", &self.ai_action_draft, event);
         callbacks.invoke_table_row_callbacks::<AiAgent>("ai_agent", &self.ai_agent, event);
-        callbacks.invoke_table_row_callbacks::<AiAgentRun>(
-            "ai_agent_run",
-            &self.ai_agent_run,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiAgentRunPolicySnapshot>(
-            "ai_agent_run_policy_snapshot",
-            &self.ai_agent_run_policy_snapshot,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiAgentRunStep>(
-            "ai_agent_run_step",
-            &self.ai_agent_run_step,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiChatMessage>(
-            "ai_chat_message",
-            &self.ai_chat_message,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiChatSession>(
-            "ai_chat_session",
-            &self.ai_chat_session,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiDocumentProcessingJob>(
-            "ai_document_processing_job",
-            &self.ai_document_processing_job,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<AiAgentRun>("ai_agent_run", &self.ai_agent_run, event);
+        callbacks.invoke_table_row_callbacks::<AiAgentRunPolicySnapshot>("ai_agent_run_policy_snapshot", &self.ai_agent_run_policy_snapshot, event);
+        callbacks.invoke_table_row_callbacks::<AiAgentRunStep>("ai_agent_run_step", &self.ai_agent_run_step, event);
+        callbacks.invoke_table_row_callbacks::<AiChatMessage>("ai_chat_message", &self.ai_chat_message, event);
+        callbacks.invoke_table_row_callbacks::<AiChatSession>("ai_chat_session", &self.ai_chat_session, event);
+        callbacks.invoke_table_row_callbacks::<AiDocumentProcessingJob>("ai_document_processing_job", &self.ai_document_processing_job, event);
         callbacks.invoke_table_row_callbacks::<AiInsight>("ai_insight", &self.ai_insight, event);
-        callbacks.invoke_table_row_callbacks::<AiReducerAllowlist>(
-            "ai_reducer_allowlist",
-            &self.ai_reducer_allowlist,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<AiReducerAllowlist>("ai_reducer_allowlist", &self.ai_reducer_allowlist, event);
         callbacks.invoke_table_row_callbacks::<AiSkill>("ai_skill", &self.ai_skill, event);
-        callbacks.invoke_table_row_callbacks::<AiSkillConfig>(
-            "ai_skill_config",
-            &self.ai_skill_config,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiSkillFixture>(
-            "ai_skill_fixture",
-            &self.ai_skill_fixture,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiSkillRelease>(
-            "ai_skill_release",
-            &self.ai_skill_release,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiSkillTestRun>(
-            "ai_skill_test_run",
-            &self.ai_skill_test_run,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiSkillVersion>(
-            "ai_skill_version",
-            &self.ai_skill_version,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiTeamMember>(
-            "ai_team_member",
-            &self.ai_team_member,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AiTeamMemberSkill>(
-            "ai_team_member_skill",
-            &self.ai_team_member_skill,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AnalyticsMetric>(
-            "analytics_metric",
-            &self.analytics_metric,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ApprovalRequest>(
-            "approval_request",
-            &self.approval_request,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ApprovalRule>(
-            "approval_rule",
-            &self.approval_rule,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AssignmentRule>(
-            "assignment_rule",
-            &self.assignment_rule,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<AiSkillConfig>("ai_skill_config", &self.ai_skill_config, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillFixture>("ai_skill_fixture", &self.ai_skill_fixture, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillRelease>("ai_skill_release", &self.ai_skill_release, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillTestRun>("ai_skill_test_run", &self.ai_skill_test_run, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillVersion>("ai_skill_version", &self.ai_skill_version, event);
+        callbacks.invoke_table_row_callbacks::<AiTeamMember>("ai_team_member", &self.ai_team_member, event);
+        callbacks.invoke_table_row_callbacks::<AiTeamMemberSkill>("ai_team_member_skill", &self.ai_team_member_skill, event);
+        callbacks.invoke_table_row_callbacks::<AnalyticsMetric>("analytics_metric", &self.analytics_metric, event);
+        callbacks.invoke_table_row_callbacks::<ApprovalRequest>("approval_request", &self.approval_request, event);
+        callbacks.invoke_table_row_callbacks::<ApprovalRule>("approval_rule", &self.approval_rule, event);
+        callbacks.invoke_table_row_callbacks::<AssignmentRule>("assignment_rule", &self.assignment_rule, event);
         callbacks.invoke_table_row_callbacks::<AuditLog>("audit_log", &self.audit_log, event);
         callbacks.invoke_table_row_callbacks::<AuditRule>("audit_rule", &self.audit_rule, event);
-        callbacks.invoke_table_row_callbacks::<BalanceSheetLine>(
-            "balance_sheet_line",
-            &self.balance_sheet_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<BankMatchCandidate>(
-            "bank_match_candidate",
-            &self.bank_match_candidate,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<BankStatementImport>(
-            "bank_statement_import",
-            &self.bank_statement_import,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<BankStatementImportLine>(
-            "bank_statement_import_line",
-            &self.bank_statement_import_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<BarcodeNomenclature>(
-            "barcode_nomenclature",
-            &self.barcode_nomenclature,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<BarcodeRule>(
-            "barcode_rule",
-            &self.barcode_rule,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<BarcodeScan>(
-            "barcode_scan",
-            &self.barcode_scan,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<BillingAccount>(
-            "billing_account",
-            &self.billing_account,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<BomExplosionResult>(
-            "bom_explosion_result",
-            &self.bom_explosion_result,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<BalanceSheetLine>("balance_sheet_line", &self.balance_sheet_line, event);
+        callbacks.invoke_table_row_callbacks::<BankMatchCandidate>("bank_match_candidate", &self.bank_match_candidate, event);
+        callbacks.invoke_table_row_callbacks::<BankStatementImport>("bank_statement_import", &self.bank_statement_import, event);
+        callbacks.invoke_table_row_callbacks::<BankStatementImportLine>("bank_statement_import_line", &self.bank_statement_import_line, event);
+        callbacks.invoke_table_row_callbacks::<BarcodeNomenclature>("barcode_nomenclature", &self.barcode_nomenclature, event);
+        callbacks.invoke_table_row_callbacks::<BarcodeRule>("barcode_rule", &self.barcode_rule, event);
+        callbacks.invoke_table_row_callbacks::<BarcodeScan>("barcode_scan", &self.barcode_scan, event);
+        callbacks.invoke_table_row_callbacks::<BillingAccount>("billing_account", &self.billing_account, event);
+        callbacks.invoke_table_row_callbacks::<BomExplosionResult>("bom_explosion_result", &self.bom_explosion_result, event);
         callbacks.invoke_table_row_callbacks::<BudgetPost>("budget_post", &self.budget_post, event);
-        callbacks.invoke_table_row_callbacks::<CalendarEvent>(
-            "calendar_event",
-            &self.calendar_event,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<CartonizationResult>(
-            "cartonization_result",
-            &self.cartonization_result,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<CalendarEvent>("calendar_event", &self.calendar_event, event);
+        callbacks.invoke_table_row_callbacks::<CartonizationResult>("cartonization_result", &self.cartonization_result, event);
         callbacks.invoke_table_row_callbacks::<CasbinRule>("casbin_rule", &self.casbin_rule, event);
-        callbacks.invoke_table_row_callbacks::<CashFlowLine>(
-            "cash_flow_line",
-            &self.cash_flow_line,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<CashFlowLine>("cash_flow_line", &self.cash_flow_line, event);
         callbacks.invoke_table_row_callbacks::<Company>("company", &self.company, event);
-        callbacks.invoke_table_row_callbacks::<CompanyVerticalPack>(
-            "company_vertical_pack",
-            &self.company_vertical_pack,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ConsolidationAccount>(
-            "consolidation_account",
-            &self.consolidation_account,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ConsolidationCompanyRate>(
-            "consolidation_company_rate",
-            &self.consolidation_company_rate,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ConsolidationEliminationEntry>(
-            "consolidation_elimination_entry",
-            &self.consolidation_elimination_entry,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ConsolidationJournal>(
-            "consolidation_journal",
-            &self.consolidation_journal,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<CompanyCountryPack>("company_country_pack", &self.company_country_pack, event);
+        callbacks.invoke_table_row_callbacks::<CompanyVerticalPack>("company_vertical_pack", &self.company_vertical_pack, event);
+        callbacks.invoke_table_row_callbacks::<ConsolidationAccount>("consolidation_account", &self.consolidation_account, event);
+        callbacks.invoke_table_row_callbacks::<ConsolidationCompanyRate>("consolidation_company_rate", &self.consolidation_company_rate, event);
+        callbacks.invoke_table_row_callbacks::<ConsolidationEliminationEntry>("consolidation_elimination_entry", &self.consolidation_elimination_entry, event);
+        callbacks.invoke_table_row_callbacks::<ConsolidationJournal>("consolidation_journal", &self.consolidation_journal, event);
         callbacks.invoke_table_row_callbacks::<Contact>("contact", &self.contact, event);
-        callbacks.invoke_table_row_callbacks::<ContactCategory>(
-            "contact_category",
-            &self.contact_category,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ContactCategoryAssignment>(
-            "contact_category_assignment",
-            &self.contact_category_assignment,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ContactCommunicationPreference>(
-            "contact_communication_preference",
-            &self.contact_communication_preference,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ContactDuplicateCandidate>(
-            "contact_duplicate_candidate",
-            &self.contact_duplicate_candidate,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ContactPhoneIdentity>(
-            "contact_phone_identity",
-            &self.contact_phone_identity,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ContactRelationship>(
-            "contact_relationship",
-            &self.contact_relationship,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ContactRoleAssignment>(
-            "contact_role_assignment",
-            &self.contact_role_assignment,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ContactSegment>(
-            "contact_segment",
-            &self.contact_segment,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<ContactCategory>("contact_category", &self.contact_category, event);
+        callbacks.invoke_table_row_callbacks::<ContactCategoryAssignment>("contact_category_assignment", &self.contact_category_assignment, event);
+        callbacks.invoke_table_row_callbacks::<ContactCommunicationPreference>("contact_communication_preference", &self.contact_communication_preference, event);
+        callbacks.invoke_table_row_callbacks::<ContactDuplicateCandidate>("contact_duplicate_candidate", &self.contact_duplicate_candidate, event);
+        callbacks.invoke_table_row_callbacks::<ContactPhoneIdentity>("contact_phone_identity", &self.contact_phone_identity, event);
+        callbacks.invoke_table_row_callbacks::<ContactRelationship>("contact_relationship", &self.contact_relationship, event);
+        callbacks.invoke_table_row_callbacks::<ContactRoleAssignment>("contact_role_assignment", &self.contact_role_assignment, event);
+        callbacks.invoke_table_row_callbacks::<ContactSegment>("contact_segment", &self.contact_segment, event);
         callbacks.invoke_table_row_callbacks::<ContactTag>("contact_tag", &self.contact_tag, event);
-        callbacks.invoke_table_row_callbacks::<ContactTagAssignment>(
-            "contact_tag_assignment",
-            &self.contact_tag_assignment,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<ContactTagAssignment>("contact_tag_assignment", &self.contact_tag_assignment, event);
         callbacks.invoke_table_row_callbacks::<Country>("country", &self.country, event);
-        callbacks.invoke_table_row_callbacks::<CrossoveredBudget>(
-            "crossovered_budget",
-            &self.crossovered_budget,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<CrossoveredBudgetLines>(
-            "crossovered_budget_lines",
-            &self.crossovered_budget_lines,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<CountryPackDefinition>("country_pack_definition", &self.country_pack_definition, event);
+        callbacks.invoke_table_row_callbacks::<CountryPackTaxRule>("country_pack_tax_rule", &self.country_pack_tax_rule, event);
+        callbacks.invoke_table_row_callbacks::<CrossoveredBudget>("crossovered_budget", &self.crossovered_budget, event);
+        callbacks.invoke_table_row_callbacks::<CrossoveredBudgetLines>("crossovered_budget_lines", &self.crossovered_budget_lines, event);
         callbacks.invoke_table_row_callbacks::<Currency>("currency", &self.currency, event);
-        callbacks.invoke_table_row_callbacks::<CurrencyRate>(
-            "currency_rate",
-            &self.currency_rate,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<CurrencyRate>("currency_rate", &self.currency_rate, event);
         callbacks.invoke_table_row_callbacks::<Dashboard>("dashboard", &self.dashboard, event);
-        callbacks.invoke_table_row_callbacks::<DashboardWidget>(
-            "dashboard_widget",
-            &self.dashboard_widget,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<DataClassification>(
-            "data_classification",
-            &self.data_classification,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<DataClassificationRule>(
-            "data_classification_rule",
-            &self.data_classification_rule,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<DeferredRevenueLine>(
-            "deferred_revenue_line",
-            &self.deferred_revenue_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<DeferredRevenueSchedule>(
-            "deferred_revenue_schedule",
-            &self.deferred_revenue_schedule,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<DeliveryCarrier>(
-            "delivery_carrier",
-            &self.delivery_carrier,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<DeliveryPriceRule>(
-            "delivery_price_rule",
-            &self.delivery_price_rule,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<DocumentFolder>(
-            "doc_folder",
-            &self.doc_folder,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<DashboardWidget>("dashboard_widget", &self.dashboard_widget, event);
+        callbacks.invoke_table_row_callbacks::<DataClassification>("data_classification", &self.data_classification, event);
+        callbacks.invoke_table_row_callbacks::<DataClassificationRule>("data_classification_rule", &self.data_classification_rule, event);
+        callbacks.invoke_table_row_callbacks::<DeferredRevenueLine>("deferred_revenue_line", &self.deferred_revenue_line, event);
+        callbacks.invoke_table_row_callbacks::<DeferredRevenueSchedule>("deferred_revenue_schedule", &self.deferred_revenue_schedule, event);
+        callbacks.invoke_table_row_callbacks::<DelegatedAdminScope>("delegated_admin_scope", &self.delegated_admin_scope, event);
+        callbacks.invoke_table_row_callbacks::<DeliveryCarrier>("delivery_carrier", &self.delivery_carrier, event);
+        callbacks.invoke_table_row_callbacks::<DeliveryPriceRule>("delivery_price_rule", &self.delivery_price_rule, event);
+        callbacks.invoke_table_row_callbacks::<DocumentFolder>("doc_folder", &self.doc_folder, event);
         callbacks.invoke_table_row_callbacks::<Document>("document", &self.document, event);
-        callbacks.invoke_table_row_callbacks::<DocumentSequence>(
-            "document_sequence",
-            &self.document_sequence,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<DocumentTemplate>(
-            "document_template",
-            &self.document_template,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<DocumentVersion>(
-            "document_version",
-            &self.document_version,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<HrExpenseSheet>(
-            "expense_sheet",
-            &self.expense_sheet,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<FinancialReport>(
-            "financial_report",
-            &self.financial_report,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<FleetVehicle>(
-            "fleet_vehicle",
-            &self.fleet_vehicle,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<DocumentSequence>("document_sequence", &self.document_sequence, event);
+        callbacks.invoke_table_row_callbacks::<DocumentTemplate>("document_template", &self.document_template, event);
+        callbacks.invoke_table_row_callbacks::<DocumentVersion>("document_version", &self.document_version, event);
+        callbacks.invoke_table_row_callbacks::<HrExpenseSheet>("expense_sheet", &self.expense_sheet, event);
+        callbacks.invoke_table_row_callbacks::<FinancialReport>("financial_report", &self.financial_report, event);
+        callbacks.invoke_table_row_callbacks::<FleetVehicle>("fleet_vehicle", &self.fleet_vehicle, event);
         callbacks.invoke_table_row_callbacks::<FormConfig>("form_config", &self.form_config, event);
-        callbacks.invoke_table_row_callbacks::<FormConfigField>(
-            "form_config_field",
-            &self.form_config_field,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<FormRoleConfig>(
-            "form_role_config",
-            &self.form_role_config,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<GeneratedOwnerReport>(
-            "generated_owner_report",
-            &self.generated_owner_report,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<GoogleDriveConnection>(
-            "google_drive_connection",
-            &self.google_drive_connection,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<HelpdeskSla>(
-            "helpdesk_sla",
-            &self.helpdesk_sla,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<HelpdeskStage>(
-            "helpdesk_stage",
-            &self.helpdesk_stage,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<HelpdeskTeam>(
-            "helpdesk_team",
-            &self.helpdesk_team,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<HelpdeskTicket>(
-            "helpdesk_ticket",
-            &self.helpdesk_ticket,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<FormConfigField>("form_config_field", &self.form_config_field, event);
+        callbacks.invoke_table_row_callbacks::<FormRoleConfig>("form_role_config", &self.form_role_config, event);
+        callbacks.invoke_table_row_callbacks::<GeneratedOwnerReport>("generated_owner_report", &self.generated_owner_report, event);
+        callbacks.invoke_table_row_callbacks::<GoogleDriveConnection>("google_drive_connection", &self.google_drive_connection, event);
+        callbacks.invoke_table_row_callbacks::<HelpdeskSla>("helpdesk_sla", &self.helpdesk_sla, event);
+        callbacks.invoke_table_row_callbacks::<HelpdeskStage>("helpdesk_stage", &self.helpdesk_stage, event);
+        callbacks.invoke_table_row_callbacks::<HelpdeskTeam>("helpdesk_team", &self.helpdesk_team, event);
+        callbacks.invoke_table_row_callbacks::<HelpdeskTicket>("helpdesk_ticket", &self.helpdesk_ticket, event);
         callbacks.invoke_table_row_callbacks::<HrContract>("hr_contract", &self.hr_contract, event);
-        callbacks.invoke_table_row_callbacks::<HrDepartment>(
-            "hr_department",
-            &self.hr_department,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<HrDepartment>("hr_department", &self.hr_department, event);
         callbacks.invoke_table_row_callbacks::<HrEmployee>("hr_employee", &self.hr_employee, event);
         callbacks.invoke_table_row_callbacks::<HrExpense>("hr_expense", &self.hr_expense, event);
-        callbacks.invoke_table_row_callbacks::<HrJobPosition>(
-            "hr_job_position",
-            &self.hr_job_position,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<HrJobPosition>("hr_job_position", &self.hr_job_position, event);
         callbacks.invoke_table_row_callbacks::<HrLeave>("hr_leave", &self.hr_leave, event);
-        callbacks.invoke_table_row_callbacks::<HrLeaveType>(
-            "hr_leave_type",
-            &self.hr_leave_type,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<HrPayrollStructure>(
-            "hr_payroll_structure",
-            &self.hr_payroll_structure,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<HrLeaveType>("hr_leave_type", &self.hr_leave_type, event);
+        callbacks.invoke_table_row_callbacks::<HrPayrollStructure>("hr_payroll_structure", &self.hr_payroll_structure, event);
         callbacks.invoke_table_row_callbacks::<HrPayslip>("hr_payslip", &self.hr_payslip, event);
         callbacks.invoke_table_row_callbacks::<HrResource>("hr_resource", &self.hr_resource, event);
-        callbacks.invoke_table_row_callbacks::<HrSalaryRule>(
-            "hr_salary_rule",
-            &self.hr_salary_rule,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<HrSalaryRule>("hr_salary_rule", &self.hr_salary_rule, event);
         callbacks.invoke_table_row_callbacks::<ImportJob>("import_job", &self.import_job, event);
-        callbacks.invoke_table_row_callbacks::<ImportJobError>(
-            "import_job_error",
-            &self.import_job_error,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ImportJobRecord>(
-            "import_job_record",
-            &self.import_job_record,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ImportMappingTemplate>(
-            "import_mapping_template",
-            &self.import_mapping_template,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<IntercompanyRule>(
-            "intercompany_rule",
-            &self.intercompany_rule,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<IntercompanyTransaction>(
-            "intercompany_transaction",
-            &self.intercompany_transaction,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<InventoryAdjustment>(
-            "inventory_adjustment",
-            &self.inventory_adjustment,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<InventoryValuation>(
-            "inventory_valuation",
-            &self.inventory_valuation,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<ImportJobError>("import_job_error", &self.import_job_error, event);
+        callbacks.invoke_table_row_callbacks::<ImportJobRecord>("import_job_record", &self.import_job_record, event);
+        callbacks.invoke_table_row_callbacks::<ImportMappingTemplate>("import_mapping_template", &self.import_mapping_template, event);
+        callbacks.invoke_table_row_callbacks::<IntercompanyRule>("intercompany_rule", &self.intercompany_rule, event);
+        callbacks.invoke_table_row_callbacks::<IntercompanyTransaction>("intercompany_transaction", &self.intercompany_transaction, event);
+        callbacks.invoke_table_row_callbacks::<InventoryAdjustment>("inventory_adjustment", &self.inventory_adjustment, event);
+        callbacks.invoke_table_row_callbacks::<InventoryValuation>("inventory_valuation", &self.inventory_valuation, event);
         callbacks.invoke_table_row_callbacks::<IoTAction>("iot_action", &self.iot_action, event);
         callbacks.invoke_table_row_callbacks::<IoTAlert>("iot_alert", &self.iot_alert, event);
         callbacks.invoke_table_row_callbacks::<IoTDevice>("iot_device", &self.iot_device, event);
         callbacks.invoke_table_row_callbacks::<IoTHub>("iot_hub", &self.iot_hub, event);
-        callbacks.invoke_table_row_callbacks::<IoTPairingToken>(
-            "iot_pairing_token",
-            &self.iot_pairing_token,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<IoTTelemetry>(
-            "iot_telemetry",
-            &self.iot_telemetry,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<IoTThreshold>(
-            "iot_threshold",
-            &self.iot_threshold,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<KnowledgeArticleCategory>(
-            "kb_category",
-            &self.kb_category,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<KnowledgeArticle>(
-            "knowledge_article",
-            &self.knowledge_article,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<IoTPairingToken>("iot_pairing_token", &self.iot_pairing_token, event);
+        callbacks.invoke_table_row_callbacks::<IoTTelemetry>("iot_telemetry", &self.iot_telemetry, event);
+        callbacks.invoke_table_row_callbacks::<IoTThreshold>("iot_threshold", &self.iot_threshold, event);
+        callbacks.invoke_table_row_callbacks::<KnowledgeArticleCategory>("kb_category", &self.kb_category, event);
+        callbacks.invoke_table_row_callbacks::<KnowledgeArticle>("knowledge_article", &self.knowledge_article, event);
         callbacks.invoke_table_row_callbacks::<Lead>("lead", &self.lead, event);
-        callbacks.invoke_table_row_callbacks::<LeadLostReason>(
-            "lead_lost_reason",
-            &self.lead_lost_reason,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<LeadLostReason>("lead_lost_reason", &self.lead_lost_reason, event);
         callbacks.invoke_table_row_callbacks::<LeadSource>("lead_source", &self.lead_source, event);
-        callbacks.invoke_table_row_callbacks::<MailFollower>(
-            "mail_follower",
-            &self.mail_follower,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<MailMessage>(
-            "mail_message",
-            &self.mail_message,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<MailTemplate>(
-            "mail_template",
-            &self.mail_template,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<MessageBatch>(
-            "message_batch",
-            &self.message_batch,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<MessageTemplate>(
-            "message_template",
-            &self.message_template,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<MailFollower>("mail_follower", &self.mail_follower, event);
+        callbacks.invoke_table_row_callbacks::<MailMessage>("mail_message", &self.mail_message, event);
+        callbacks.invoke_table_row_callbacks::<MailTemplate>("mail_template", &self.mail_template, event);
+        callbacks.invoke_table_row_callbacks::<MessageBatch>("message_batch", &self.message_batch, event);
+        callbacks.invoke_table_row_callbacks::<MessageTemplate>("message_template", &self.message_template, event);
         callbacks.invoke_table_row_callbacks::<MrpBom>("mrp_bom", &self.mrp_bom, event);
-        callbacks.invoke_table_row_callbacks::<MrpBomLine>(
-            "mrp_bom_line",
-            &self.mrp_bom_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<MrpProduction>(
-            "mrp_production",
-            &self.mrp_production,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<MrpRoutingWorkcenter>(
-            "mrp_routing_workcenter",
-            &self.mrp_routing_workcenter,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<MrpWorkcenter>(
-            "mrp_workcenter",
-            &self.mrp_workcenter,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<MrpWorkcenterProductivity>(
-            "mrp_workcenter_productivity",
-            &self.mrp_workcenter_productivity,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<MrpWorkorder>(
-            "mrp_workorder",
-            &self.mrp_workorder,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<OperationalMessage>(
-            "operational_message",
-            &self.operational_message,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<OpportunityStage>(
-            "opp_stage",
-            &self.opp_stage,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<Opportunity>(
-            "opportunity",
-            &self.opportunity,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<OpportunityLine>(
-            "opportunity_line",
-            &self.opportunity_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<OrgPermission>(
-            "org_permission",
-            &self.org_permission,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<Organization>(
-            "organization",
-            &self.organization,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<OrganizationSettings>(
-            "organization_settings",
-            &self.organization_settings,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<PackagingMaterial>(
-            "packaging_material",
-            &self.packaging_material,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<PaymentAccount>(
-            "payment_account",
-            &self.payment_account,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<MrpBomLine>("mrp_bom_line", &self.mrp_bom_line, event);
+        callbacks.invoke_table_row_callbacks::<MrpProduction>("mrp_production", &self.mrp_production, event);
+        callbacks.invoke_table_row_callbacks::<MrpRoutingWorkcenter>("mrp_routing_workcenter", &self.mrp_routing_workcenter, event);
+        callbacks.invoke_table_row_callbacks::<MrpWorkcenter>("mrp_workcenter", &self.mrp_workcenter, event);
+        callbacks.invoke_table_row_callbacks::<MrpWorkcenterProductivity>("mrp_workcenter_productivity", &self.mrp_workcenter_productivity, event);
+        callbacks.invoke_table_row_callbacks::<MrpWorkorder>("mrp_workorder", &self.mrp_workorder, event);
+        callbacks.invoke_table_row_callbacks::<OperationalMessage>("operational_message", &self.operational_message, event);
+        callbacks.invoke_table_row_callbacks::<OpportunityStage>("opp_stage", &self.opp_stage, event);
+        callbacks.invoke_table_row_callbacks::<Opportunity>("opportunity", &self.opportunity, event);
+        callbacks.invoke_table_row_callbacks::<OpportunityLine>("opportunity_line", &self.opportunity_line, event);
+        callbacks.invoke_table_row_callbacks::<OrgPermission>("org_permission", &self.org_permission, event);
+        callbacks.invoke_table_row_callbacks::<OrgSchemaMigration>("org_schema_migration", &self.org_schema_migration, event);
+        callbacks.invoke_table_row_callbacks::<Organization>("organization", &self.organization, event);
+        callbacks.invoke_table_row_callbacks::<OrganizationSettings>("organization_settings", &self.organization_settings, event);
+        callbacks.invoke_table_row_callbacks::<PackagingMaterial>("packaging_material", &self.packaging_material, event);
+        callbacks.invoke_table_row_callbacks::<PaymentAccount>("payment_account", &self.payment_account, event);
         callbacks.invoke_table_row_callbacks::<PaymentFee>("payment_fee", &self.payment_fee, event);
-        callbacks.invoke_table_row_callbacks::<PaymentReconciliation>(
-            "payment_reconciliation",
-            &self.payment_reconciliation,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<PaymentReversal>(
-            "payment_reversal",
-            &self.payment_reversal,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<PaymentTransaction>(
-            "payment_transaction",
-            &self.payment_transaction,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<PickingWave>(
-            "picking_wave",
-            &self.picking_wave,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<PolicySnapshot>(
-            "policy_snapshot",
-            &self.policy_snapshot,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<PaymentReconciliation>("payment_reconciliation", &self.payment_reconciliation, event);
+        callbacks.invoke_table_row_callbacks::<PaymentReversal>("payment_reversal", &self.payment_reversal, event);
+        callbacks.invoke_table_row_callbacks::<PaymentTransaction>("payment_transaction", &self.payment_transaction, event);
+        callbacks.invoke_table_row_callbacks::<PickingWave>("picking_wave", &self.picking_wave, event);
+        callbacks.invoke_table_row_callbacks::<PolicySnapshot>("policy_snapshot", &self.policy_snapshot, event);
         callbacks.invoke_table_row_callbacks::<PosConfig>("pos_config", &self.pos_config, event);
-        callbacks.invoke_table_row_callbacks::<PosLoyaltyCard>(
-            "pos_loyalty_card",
-            &self.pos_loyalty_card,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<PosLoyaltyProgram>(
-            "pos_loyalty_program",
-            &self.pos_loyalty_program,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<PosLoyaltyCard>("pos_loyalty_card", &self.pos_loyalty_card, event);
+        callbacks.invoke_table_row_callbacks::<PosLoyaltyProgram>("pos_loyalty_program", &self.pos_loyalty_program, event);
         callbacks.invoke_table_row_callbacks::<PosOrder>("pos_order", &self.pos_order, event);
-        callbacks.invoke_table_row_callbacks::<PosOrderLine>(
-            "pos_order_line",
-            &self.pos_order_line,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<PosOrderLine>("pos_order_line", &self.pos_order_line, event);
         callbacks.invoke_table_row_callbacks::<PosPayment>("pos_payment", &self.pos_payment, event);
-        callbacks.invoke_table_row_callbacks::<PosPaymentMethod>(
-            "pos_payment_method",
-            &self.pos_payment_method,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<PosPaymentMethod>("pos_payment_method", &self.pos_payment_method, event);
         callbacks.invoke_table_row_callbacks::<PosSession>("pos_session", &self.pos_session, event);
-        callbacks.invoke_table_row_callbacks::<PosTerminal>(
-            "pos_terminal",
-            &self.pos_terminal,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<PrivacyConsent>(
-            "privacy_consent",
-            &self.privacy_consent,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<PosTerminal>("pos_terminal", &self.pos_terminal, event);
+        callbacks.invoke_table_row_callbacks::<PrivacyConsent>("privacy_consent", &self.privacy_consent, event);
         callbacks.invoke_table_row_callbacks::<Product>("product", &self.product, event);
-        callbacks.invoke_table_row_callbacks::<ProductAttribute>(
-            "product_attribute",
-            &self.product_attribute,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProductAttributeLine>(
-            "product_attribute_line",
-            &self.product_attribute_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProductAttributeValue>(
-            "product_attribute_value",
-            &self.product_attribute_value,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProductCategory>(
-            "product_category",
-            &self.product_category,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProductPackaging>(
-            "product_packaging",
-            &self.product_packaging,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProductPricelist>(
-            "product_pricelist",
-            &self.product_pricelist,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProductPricelistItem>(
-            "product_pricelist_item",
-            &self.product_pricelist_item,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProductSupplierInfo>(
-            "product_supplier_info",
-            &self.product_supplier_info,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProductVariant>(
-            "product_variant",
-            &self.product_variant,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProfitLossLine>(
-            "profit_loss_line",
-            &self.profit_loss_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProjectProject>(
-            "project_project",
-            &self.project_project,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProjectTask>(
-            "project_task",
-            &self.project_task,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProjectTimesheet>(
-            "project_timesheet",
-            &self.project_timesheet,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<ProductAttribute>("product_attribute", &self.product_attribute, event);
+        callbacks.invoke_table_row_callbacks::<ProductAttributeLine>("product_attribute_line", &self.product_attribute_line, event);
+        callbacks.invoke_table_row_callbacks::<ProductAttributeValue>("product_attribute_value", &self.product_attribute_value, event);
+        callbacks.invoke_table_row_callbacks::<ProductCategory>("product_category", &self.product_category, event);
+        callbacks.invoke_table_row_callbacks::<ProductPackaging>("product_packaging", &self.product_packaging, event);
+        callbacks.invoke_table_row_callbacks::<ProductPricelist>("product_pricelist", &self.product_pricelist, event);
+        callbacks.invoke_table_row_callbacks::<ProductPricelistItem>("product_pricelist_item", &self.product_pricelist_item, event);
+        callbacks.invoke_table_row_callbacks::<ProductSupplierInfo>("product_supplier_info", &self.product_supplier_info, event);
+        callbacks.invoke_table_row_callbacks::<ProductVariant>("product_variant", &self.product_variant, event);
+        callbacks.invoke_table_row_callbacks::<ProfitLossLine>("profit_loss_line", &self.profit_loss_line, event);
+        callbacks.invoke_table_row_callbacks::<ProjectProject>("project_project", &self.project_project, event);
+        callbacks.invoke_table_row_callbacks::<ProjectTask>("project_task", &self.project_task, event);
+        callbacks.invoke_table_row_callbacks::<ProjectTimesheet>("project_timesheet", &self.project_timesheet, event);
         callbacks.invoke_table_row_callbacks::<Proposal>("proposal", &self.proposal, event);
-        callbacks.invoke_table_row_callbacks::<ProposalComment>(
-            "proposal_comment",
-            &self.proposal_comment,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProposalLineItem>(
-            "proposal_line_item",
-            &self.proposal_line_item,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProposalPresence>(
-            "proposal_presence",
-            &self.proposal_presence,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProposalSection>(
-            "proposal_section",
-            &self.proposal_section,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProposalSourceDoc>(
-            "proposal_source_doc",
-            &self.proposal_source_doc,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ProposalVersion>(
-            "proposal_version",
-            &self.proposal_version,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<PurchaseOrder>(
-            "purchase_order",
-            &self.purchase_order,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<PurchaseOrderLine>(
-            "purchase_order_line",
-            &self.purchase_order_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<PurchaseRequisition>(
-            "purchase_requisition",
-            &self.purchase_requisition,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<QualityAlert>(
-            "quality_alert",
-            &self.quality_alert,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<QualityAlertReason>(
-            "quality_alert_reason",
-            &self.quality_alert_reason,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<QualityCheck>(
-            "quality_check",
-            &self.quality_check,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<QualityPoint>(
-            "quality_point",
-            &self.quality_point,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<QualityTeam>(
-            "quality_team",
-            &self.quality_team,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<ProposalComment>("proposal_comment", &self.proposal_comment, event);
+        callbacks.invoke_table_row_callbacks::<ProposalLineItem>("proposal_line_item", &self.proposal_line_item, event);
+        callbacks.invoke_table_row_callbacks::<ProposalPresence>("proposal_presence", &self.proposal_presence, event);
+        callbacks.invoke_table_row_callbacks::<ProposalSection>("proposal_section", &self.proposal_section, event);
+        callbacks.invoke_table_row_callbacks::<ProposalSourceDoc>("proposal_source_doc", &self.proposal_source_doc, event);
+        callbacks.invoke_table_row_callbacks::<ProposalVersion>("proposal_version", &self.proposal_version, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseOrder>("purchase_order", &self.purchase_order, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseOrderLine>("purchase_order_line", &self.purchase_order_line, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseRequisition>("purchase_requisition", &self.purchase_requisition, event);
+        callbacks.invoke_table_row_callbacks::<QualityAlert>("quality_alert", &self.quality_alert, event);
+        callbacks.invoke_table_row_callbacks::<QualityAlertReason>("quality_alert_reason", &self.quality_alert_reason, event);
+        callbacks.invoke_table_row_callbacks::<QualityCheck>("quality_check", &self.quality_check, event);
+        callbacks.invoke_table_row_callbacks::<QualityPoint>("quality_point", &self.quality_point, event);
+        callbacks.invoke_table_row_callbacks::<QualityTeam>("quality_team", &self.quality_team, event);
         callbacks.invoke_table_row_callbacks::<QueueJob>("queue_job", &self.queue_job, event);
-        callbacks.invoke_table_row_callbacks::<QueueWorker>(
-            "queue_worker",
-            &self.queue_worker,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<RecordCustomFieldValue>(
-            "record_custom_field_value",
-            &self.record_custom_field_value,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ReplenishmentRule>(
-            "replenishment_rule",
-            &self.replenishment_rule,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ReportTemplate>(
-            "report_template",
-            &self.report_template,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ResPartnerBank>(
-            "res_partner_bank",
-            &self.res_partner_bank,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ReturnOrder>(
-            "return_order",
-            &self.return_order,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ReturnOrderLine>(
-            "return_order_line",
-            &self.return_order_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<RevenueRecognitionRule>(
-            "revenue_recognition_rule",
-            &self.revenue_recognition_rule,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<QueueWorker>("queue_worker", &self.queue_worker, event);
+        callbacks.invoke_table_row_callbacks::<RecordCustomFieldValue>("record_custom_field_value", &self.record_custom_field_value, event);
+        callbacks.invoke_table_row_callbacks::<ReplenishmentRule>("replenishment_rule", &self.replenishment_rule, event);
+        callbacks.invoke_table_row_callbacks::<ReportTemplate>("report_template", &self.report_template, event);
+        callbacks.invoke_table_row_callbacks::<ResPartnerBank>("res_partner_bank", &self.res_partner_bank, event);
+        callbacks.invoke_table_row_callbacks::<ReturnOrder>("return_order", &self.return_order, event);
+        callbacks.invoke_table_row_callbacks::<ReturnOrderLine>("return_order_line", &self.return_order_line, event);
+        callbacks.invoke_table_row_callbacks::<RevenueRecognitionRule>("revenue_recognition_rule", &self.revenue_recognition_rule, event);
         callbacks.invoke_table_row_callbacks::<Role>("role", &self.role, event);
         callbacks.invoke_table_row_callbacks::<SaleOrder>("sale_order", &self.sale_order, event);
-        callbacks.invoke_table_row_callbacks::<SaleOrderLine>(
-            "sale_order_line",
-            &self.sale_order_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<SaleOrderOption>(
-            "sale_order_option",
-            &self.sale_order_option,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<SavedReport>(
-            "saved_report",
-            &self.saved_report,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ScheduledReport>(
-            "scheduled_report",
-            &self.scheduled_report,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ScheduledReportRun>(
-            "scheduled_report_run",
-            &self.scheduled_report_run,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<SearchEmbedding>(
-            "search_embedding",
-            &self.search_embedding,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<SegmentMember>(
-            "segment_member",
-            &self.segment_member,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<SerialLotTraceability>(
-            "serial_lot_traceability",
-            &self.serial_lot_traceability,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<ShippingMethod>(
-            "shipping_method",
-            &self.shipping_method,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<StockCountSheet>(
-            "stock_count_sheet",
-            &self.stock_count_sheet,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<StockCycleCount>(
-            "stock_cycle_count",
-            &self.stock_cycle_count,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<StockInventory>(
-            "stock_inventory",
-            &self.stock_inventory,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<StockInventoryLine>(
-            "stock_inventory_line",
-            &self.stock_inventory_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<StockLandedCost>(
-            "stock_landed_cost",
-            &self.stock_landed_cost,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<StockLandedCostLines>(
-            "stock_landed_cost_lines",
-            &self.stock_landed_cost_lines,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<StockLocation>(
-            "stock_location",
-            &self.stock_location,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<SaleOrderLine>("sale_order_line", &self.sale_order_line, event);
+        callbacks.invoke_table_row_callbacks::<SaleOrderOption>("sale_order_option", &self.sale_order_option, event);
+        callbacks.invoke_table_row_callbacks::<SavedReport>("saved_report", &self.saved_report, event);
+        callbacks.invoke_table_row_callbacks::<ScheduledReport>("scheduled_report", &self.scheduled_report, event);
+        callbacks.invoke_table_row_callbacks::<ScheduledReportRun>("scheduled_report_run", &self.scheduled_report_run, event);
+        callbacks.invoke_table_row_callbacks::<SchemaMigration>("schema_migration", &self.schema_migration, event);
+        callbacks.invoke_table_row_callbacks::<SearchEmbedding>("search_embedding", &self.search_embedding, event);
+        callbacks.invoke_table_row_callbacks::<SegmentMember>("segment_member", &self.segment_member, event);
+        callbacks.invoke_table_row_callbacks::<SerialLotTraceability>("serial_lot_traceability", &self.serial_lot_traceability, event);
+        callbacks.invoke_table_row_callbacks::<ShippingMethod>("shipping_method", &self.shipping_method, event);
+        callbacks.invoke_table_row_callbacks::<SodConflictRule>("sod_conflict_rule", &self.sod_conflict_rule, event);
+        callbacks.invoke_table_row_callbacks::<StockCountSheet>("stock_count_sheet", &self.stock_count_sheet, event);
+        callbacks.invoke_table_row_callbacks::<StockCycleCount>("stock_cycle_count", &self.stock_cycle_count, event);
+        callbacks.invoke_table_row_callbacks::<StockInventory>("stock_inventory", &self.stock_inventory, event);
+        callbacks.invoke_table_row_callbacks::<StockInventoryLine>("stock_inventory_line", &self.stock_inventory_line, event);
+        callbacks.invoke_table_row_callbacks::<StockLandedCost>("stock_landed_cost", &self.stock_landed_cost, event);
+        callbacks.invoke_table_row_callbacks::<StockLandedCostLines>("stock_landed_cost_lines", &self.stock_landed_cost_lines, event);
+        callbacks.invoke_table_row_callbacks::<StockLocation>("stock_location", &self.stock_location, event);
         callbacks.invoke_table_row_callbacks::<StockMove>("stock_move", &self.stock_move, event);
-        callbacks.invoke_table_row_callbacks::<StockMoveLine>(
-            "stock_move_line",
-            &self.stock_move_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<StockPicking>(
-            "stock_picking",
-            &self.stock_picking,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<StockPickingBatch>(
-            "stock_picking_batch",
-            &self.stock_picking_batch,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<StockProductionLot>(
-            "stock_production_lot",
-            &self.stock_production_lot,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<StockProductionSerial>(
-            "stock_production_serial",
-            &self.stock_production_serial,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<StockMoveLine>("stock_move_line", &self.stock_move_line, event);
+        callbacks.invoke_table_row_callbacks::<StockPicking>("stock_picking", &self.stock_picking, event);
+        callbacks.invoke_table_row_callbacks::<StockPickingBatch>("stock_picking_batch", &self.stock_picking_batch, event);
+        callbacks.invoke_table_row_callbacks::<StockProductionLot>("stock_production_lot", &self.stock_production_lot, event);
+        callbacks.invoke_table_row_callbacks::<StockProductionSerial>("stock_production_serial", &self.stock_production_serial, event);
         callbacks.invoke_table_row_callbacks::<StockQuant>("stock_quant", &self.stock_quant, event);
-        callbacks.invoke_table_row_callbacks::<StockReorderGroup>(
-            "stock_reorder_group",
-            &self.stock_reorder_group,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<StockReorderGroup>("stock_reorder_group", &self.stock_reorder_group, event);
         callbacks.invoke_table_row_callbacks::<StockRoute>("stock_route", &self.stock_route, event);
         callbacks.invoke_table_row_callbacks::<StockRule>("stock_rule", &self.stock_rule, event);
-        callbacks.invoke_table_row_callbacks::<StockTraceabilityReport>(
-            "stock_traceability_report",
-            &self.stock_traceability_report,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<Subscription>(
-            "subscription",
-            &self.subscription,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<SubscriptionLine>(
-            "subscription_line",
-            &self.subscription_line,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<SubscriptionPlan>(
-            "subscription_plan",
-            &self.subscription_plan,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<SupplierIntakeRequest>(
-            "supplier_intake_request",
-            &self.supplier_intake_request,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<TaxDeadline>(
-            "tax_deadline",
-            &self.tax_deadline,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<TaxDeadlineReminder>(
-            "tax_deadline_reminder",
-            &self.tax_deadline_reminder,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<TaxJurisdiction>(
-            "tax_jurisdiction",
-            &self.tax_jurisdiction,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<TaxSchedule>(
-            "tax_schedule",
-            &self.tax_schedule,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<TrialBalance>(
-            "trial_balance",
-            &self.trial_balance,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<StockTraceabilityReport>("stock_traceability_report", &self.stock_traceability_report, event);
+        callbacks.invoke_table_row_callbacks::<Subscription>("subscription", &self.subscription, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionLine>("subscription_line", &self.subscription_line, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionPlan>("subscription_plan", &self.subscription_plan, event);
+        callbacks.invoke_table_row_callbacks::<SupplierIntakeRequest>("supplier_intake_request", &self.supplier_intake_request, event);
+        callbacks.invoke_table_row_callbacks::<TaxDeadline>("tax_deadline", &self.tax_deadline, event);
+        callbacks.invoke_table_row_callbacks::<TaxDeadlineReminder>("tax_deadline_reminder", &self.tax_deadline_reminder, event);
+        callbacks.invoke_table_row_callbacks::<TaxJurisdiction>("tax_jurisdiction", &self.tax_jurisdiction, event);
+        callbacks.invoke_table_row_callbacks::<TaxSchedule>("tax_schedule", &self.tax_schedule, event);
+        callbacks.invoke_table_row_callbacks::<TrialBalance>("trial_balance", &self.trial_balance, event);
         callbacks.invoke_table_row_callbacks::<Uom>("uom", &self.uom, event);
         callbacks.invoke_table_row_callbacks::<UomCategory>("uom_cat", &self.uom_cat, event);
-        callbacks.invoke_table_row_callbacks::<UomConversion>(
-            "uom_conversion",
-            &self.uom_conversion,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<UserCustomField>(
-            "user_custom_field",
-            &self.user_custom_field,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<UserOrganization>(
-            "user_organization",
-            &self.user_organization,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<UserProfile>(
-            "user_profile",
-            &self.user_profile,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<UserRoleAssignment>(
-            "user_role_assignment",
-            &self.user_role_assignment,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<UserSession>(
-            "user_session",
-            &self.user_session,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<UtmCampaign>(
-            "utm_campaign",
-            &self.utm_campaign,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<UomConversion>("uom_conversion", &self.uom_conversion, event);
+        callbacks.invoke_table_row_callbacks::<UserCustomField>("user_custom_field", &self.user_custom_field, event);
+        callbacks.invoke_table_row_callbacks::<UserOrganization>("user_organization", &self.user_organization, event);
+        callbacks.invoke_table_row_callbacks::<UserProfile>("user_profile", &self.user_profile, event);
+        callbacks.invoke_table_row_callbacks::<UserRoleAssignment>("user_role_assignment", &self.user_role_assignment, event);
+        callbacks.invoke_table_row_callbacks::<UserSession>("user_session", &self.user_session, event);
+        callbacks.invoke_table_row_callbacks::<UtmCampaign>("utm_campaign", &self.utm_campaign, event);
         callbacks.invoke_table_row_callbacks::<UtmMedium>("utm_medium", &self.utm_medium, event);
         callbacks.invoke_table_row_callbacks::<UtmSource>("utm_source", &self.utm_source, event);
         callbacks.invoke_table_row_callbacks::<Warehouse>("warehouse", &self.warehouse, event);
-        callbacks.invoke_table_row_callbacks::<Warehouse3DZone>(
-            "warehouse_3_d_zone",
-            &self.warehouse_3_d_zone,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<WarehouseGeo>(
-            "warehouse_geo",
-            &self.warehouse_geo,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<WarehouseTask>(
-            "warehouse_task",
-            &self.warehouse_task,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<WhatsAppBusinessAccount>(
-            "whatsapp_business_account",
-            &self.whatsapp_business_account,
-            event,
-        );
+        callbacks.invoke_table_row_callbacks::<Warehouse3DZone>("warehouse_3_d_zone", &self.warehouse_3_d_zone, event);
+        callbacks.invoke_table_row_callbacks::<WarehouseGeo>("warehouse_geo", &self.warehouse_geo, event);
+        callbacks.invoke_table_row_callbacks::<WarehouseTask>("warehouse_task", &self.warehouse_task, event);
+        callbacks.invoke_table_row_callbacks::<WhatsAppBusinessAccount>("whatsapp_business_account", &self.whatsapp_business_account, event);
         callbacks.invoke_table_row_callbacks::<Workflow>("workflow", &self.workflow, event);
-        callbacks.invoke_table_row_callbacks::<WorkflowActivity>(
-            "workflow_activity",
-            &self.workflow_activity,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<WorkflowInstance>(
-            "workflow_instance",
-            &self.workflow_instance,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<WorkflowTransition>(
-            "workflow_transition",
-            &self.workflow_transition,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<WorkflowWorkitem>(
-            "workflow_workitem",
-            &self.workflow_workitem,
-            event,
-        );
-    }
+        callbacks.invoke_table_row_callbacks::<WorkflowActivity>("workflow_activity", &self.workflow_activity, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowInstance>("workflow_instance", &self.workflow_instance, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowTransition>("workflow_transition", &self.workflow_transition, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowWorkitem>("workflow_workitem", &self.workflow_workitem, event);
 }
+}
+
 
 #[doc(hidden)]
 pub struct RemoteModule;
@@ -20281,6 +17093,7 @@ impl __sdk::SubscriptionHandle for SubscriptionHandle {
     fn unsubscribe(self) -> __sdk::Result<()> {
         self.imp.unsubscribe_then(None)
     }
+
 }
 
 /// Alias trait for a [`__sdk::DbContext`] connected to this module,
@@ -20288,23 +17101,17 @@ impl __sdk::SubscriptionHandle for SubscriptionHandle {
 ///
 /// Users can use this trait as a boundary on definitions which should accept
 /// either a [`DbConnection`] or an [`EventContext`] and operate on either.
-pub trait RemoteDbContext:
-    __sdk::DbContext<
+pub trait RemoteDbContext: __sdk::DbContext<
     DbView = RemoteTables,
     Reducers = RemoteReducers,
     SubscriptionBuilder = __sdk::SubscriptionBuilder<RemoteModule>,
->
-{
-}
-impl<
-        Ctx: __sdk::DbContext<
-            DbView = RemoteTables,
-            Reducers = RemoteReducers,
-            SubscriptionBuilder = __sdk::SubscriptionBuilder<RemoteModule>,
-        >,
-    > RemoteDbContext for Ctx
-{
-}
+> {}
+impl<Ctx: __sdk::DbContext<
+    DbView = RemoteTables,
+    Reducers = RemoteReducers,
+    SubscriptionBuilder = __sdk::SubscriptionBuilder<RemoteModule>,
+>> RemoteDbContext for Ctx {}
+
 
 /// An [`__sdk::DbContext`] augmented with a [`__sdk::Event`],
 /// passed to [`__sdk::Table::on_insert`], [`__sdk::Table::on_delete`] and [`__sdk::TableWithPrimaryKey::on_update`] callbacks.
@@ -20679,6 +17486,7 @@ impl __sdk::DbContext for ErrorContext {
 impl __sdk::ErrorContext for ErrorContext {}
 
 impl __sdk::SpacetimeModule for RemoteModule {
+    
     type DbConnection = DbConnection;
     type EventContext = EventContext;
     type ReducerEventContext = ReducerEventContext;
@@ -20694,8 +17502,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
     type SubscriptionHandle = SubscriptionHandle;
     type QueryBuilder = __sdk::QueryBuilder;
 
-    fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
-        account_account_table::register_table(client_cache);
+fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
+                account_account_table::register_table(client_cache);
         account_account_type_table::register_table(client_cache);
         account_analytic_account_table::register_table(client_cache);
         account_analytic_distribution_model_table::register_table(client_cache);
@@ -20758,6 +17566,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         casbin_rule_table::register_table(client_cache);
         cash_flow_line_table::register_table(client_cache);
         company_table::register_table(client_cache);
+        company_country_pack_table::register_table(client_cache);
         company_vertical_pack_table::register_table(client_cache);
         consolidation_account_table::register_table(client_cache);
         consolidation_company_rate_table::register_table(client_cache);
@@ -20775,6 +17584,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         contact_tag_table::register_table(client_cache);
         contact_tag_assignment_table::register_table(client_cache);
         country_table::register_table(client_cache);
+        country_pack_definition_table::register_table(client_cache);
+        country_pack_tax_rule_table::register_table(client_cache);
         crossovered_budget_table::register_table(client_cache);
         crossovered_budget_lines_table::register_table(client_cache);
         currency_table::register_table(client_cache);
@@ -20785,6 +17596,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         data_classification_rule_table::register_table(client_cache);
         deferred_revenue_line_table::register_table(client_cache);
         deferred_revenue_schedule_table::register_table(client_cache);
+        delegated_admin_scope_table::register_table(client_cache);
         delivery_carrier_table::register_table(client_cache);
         delivery_price_rule_table::register_table(client_cache);
         doc_folder_table::register_table(client_cache);
@@ -20852,6 +17664,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         opportunity_table::register_table(client_cache);
         opportunity_line_table::register_table(client_cache);
         org_permission_table::register_table(client_cache);
+        org_schema_migration_table::register_table(client_cache);
         organization_table::register_table(client_cache);
         organization_settings_table::register_table(client_cache);
         packaging_material_table::register_table(client_cache);
@@ -20917,10 +17730,12 @@ impl __sdk::SpacetimeModule for RemoteModule {
         saved_report_table::register_table(client_cache);
         scheduled_report_table::register_table(client_cache);
         scheduled_report_run_table::register_table(client_cache);
+        schema_migration_table::register_table(client_cache);
         search_embedding_table::register_table(client_cache);
         segment_member_table::register_table(client_cache);
         serial_lot_traceability_table::register_table(client_cache);
         shipping_method_table::register_table(client_cache);
+        sod_conflict_rule_table::register_table(client_cache);
         stock_count_sheet_table::register_table(client_cache);
         stock_cycle_count_table::register_table(client_cache);
         stock_inventory_table::register_table(client_cache);
@@ -20969,9 +17784,9 @@ impl __sdk::SpacetimeModule for RemoteModule {
         workflow_instance_table::register_table(client_cache);
         workflow_transition_table::register_table(client_cache);
         workflow_workitem_table::register_table(client_cache);
-    }
-    const ALL_TABLE_NAMES: &'static [&'static str] = &[
-        "account_account",
+}
+const ALL_TABLE_NAMES: &'static [&'static str] = &[
+                "account_account",
         "account_account_type",
         "account_analytic_account",
         "account_analytic_distribution_model",
@@ -21034,6 +17849,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "casbin_rule",
         "cash_flow_line",
         "company",
+        "company_country_pack",
         "company_vertical_pack",
         "consolidation_account",
         "consolidation_company_rate",
@@ -21051,6 +17867,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "contact_tag",
         "contact_tag_assignment",
         "country",
+        "country_pack_definition",
+        "country_pack_tax_rule",
         "crossovered_budget",
         "crossovered_budget_lines",
         "currency",
@@ -21061,6 +17879,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "data_classification_rule",
         "deferred_revenue_line",
         "deferred_revenue_schedule",
+        "delegated_admin_scope",
         "delivery_carrier",
         "delivery_price_rule",
         "doc_folder",
@@ -21128,6 +17947,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "opportunity",
         "opportunity_line",
         "org_permission",
+        "org_schema_migration",
         "organization",
         "organization_settings",
         "packaging_material",
@@ -21193,10 +18013,12 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "saved_report",
         "scheduled_report",
         "scheduled_report_run",
+        "schema_migration",
         "search_embedding",
         "segment_member",
         "serial_lot_traceability",
         "shipping_method",
+        "sod_conflict_rule",
         "stock_count_sheet",
         "stock_cycle_count",
         "stock_inventory",
@@ -21245,5 +18067,5 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "workflow_instance",
         "workflow_transition",
         "workflow_workitem",
-    ];
+];
 }
