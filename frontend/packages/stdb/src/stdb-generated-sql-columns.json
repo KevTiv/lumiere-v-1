@@ -1099,6 +1099,41 @@
     "write_off_account_id",
     "metadata"
   ],
+  "AmortizationLine": [
+    "id",
+    "organization_id",
+    "company_id",
+    "schedule_id",
+    "sequence",
+    "recognition_date",
+    "amount",
+    "recognized",
+    "move_id",
+    "create_uid",
+    "create_date",
+    "metadata"
+  ],
+  "AmortizationSchedule": [
+    "id",
+    "organization_id",
+    "company_id",
+    "schedule_kind",
+    "description",
+    "journal_id",
+    "balance_sheet_account_id",
+    "pl_account_id",
+    "currency_id",
+    "total_amount",
+    "recognized_amount",
+    "remaining_amount",
+    "start_date",
+    "end_date",
+    "recognition_period",
+    "state",
+    "create_uid",
+    "create_date",
+    "metadata"
+  ],
   "AnalyticsMetric": [
     "id",
     "organization_id",
@@ -2272,6 +2307,19 @@
     "personality",
     "metadata"
   ],
+  "CreateAmortizationScheduleParams": [
+    "schedule_kind",
+    "description",
+    "journal_id",
+    "balance_sheet_account_id",
+    "pl_account_id",
+    "currency_id",
+    "total_amount",
+    "start_date",
+    "end_date",
+    "recognition_period",
+    "metadata"
+  ],
   "CreateAnalyticAccountParams": [
     "company_id",
     "name",
@@ -2368,6 +2416,17 @@
     "log_deletes",
     "log_logins",
     "is_active",
+    "metadata"
+  ],
+  "CreateBadDebtWriteOffParams": [
+    "partner_id",
+    "move_id",
+    "amount",
+    "journal_id",
+    "receivable_account_id",
+    "write_off_account_id",
+    "date",
+    "reference",
     "metadata"
   ],
   "CreateBarcodeNomenclatureParams": [
@@ -5225,6 +5284,26 @@
     "created_at",
     "updated_at"
   ],
+  "FxRevaluationLineParams": [
+    "account_id",
+    "adjustment"
+  ],
+  "FxRevaluationRun": [
+    "id",
+    "organization_id",
+    "company_id",
+    "currency_code",
+    "as_of_date",
+    "move_id",
+    "journal_id",
+    "total_gain",
+    "total_loss",
+    "net_adjustment",
+    "reference",
+    "create_uid",
+    "create_date",
+    "metadata"
+  ],
   "GenerateEuVatReportParams": [
     "name",
     "date_from",
@@ -6570,6 +6649,20 @@
     "created_at",
     "metadata"
   ],
+  "PartnerCreditControl": [
+    "id",
+    "organization_id",
+    "company_id",
+    "partner_id",
+    "credit_limit",
+    "payment_hold",
+    "notes",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
   "PasswordResetToken": [
     "id",
     "identity",
@@ -7019,6 +7112,19 @@
     "create_date",
     "write_uid",
     "write_date",
+    "metadata"
+  ],
+  "PostRealizedFxParams": [
+    "payment_id",
+    "invoice_move_id",
+    "payment_amount_functional",
+    "invoice_residual_functional",
+    "journal_id",
+    "gain_account_id",
+    "loss_account_id",
+    "clearing_account_id",
+    "date",
+    "reference",
     "metadata"
   ],
   "PrivacyConsent": [
@@ -7806,9 +7912,13 @@
     "started_at",
     "metadata"
   ],
+  "RecognizeAmortizationLineParams": [
+    "reference",
+    "metadata"
+  ],
   "RecognizeDeferredRevenueParams": [
-    "move_id",
-    "move_line_id"
+    "reference",
+    "metadata"
   ],
   "ReconcileAccountBankStatementLineParams": [
     "move_ids",
@@ -8052,6 +8162,26 @@
     "is_active",
     "created_at",
     "updated_at",
+    "metadata"
+  ],
+  "RunFxRevaluationBatchParams": [
+    "currency_code",
+    "as_of_date",
+    "journal_id",
+    "gain_account_id",
+    "loss_account_id",
+    "rate",
+    "reference",
+    "metadata"
+  ],
+  "RunFxRevaluationParams": [
+    "currency_code",
+    "as_of_date",
+    "journal_id",
+    "gain_account_id",
+    "loss_account_id",
+    "lines",
+    "reference",
     "metadata"
   ],
   "SaleOrder": [
@@ -10265,6 +10395,13 @@
     "is_active",
     "metadata"
   ],
+  "UpdateSodConflictRuleParams": [
+    "permission_a",
+    "permission_b",
+    "description",
+    "is_active",
+    "metadata"
+  ],
   "UpdateStockLocationParams": [
     "name",
     "usage",
@@ -10570,6 +10707,13 @@
     "module_config",
     "feature_flags",
     "integration_keys",
+    "metadata"
+  ],
+  "UpsertPartnerCreditControlParams": [
+    "partner_id",
+    "credit_limit",
+    "payment_hold",
+    "notes",
     "metadata"
   ],
   "UpsertSearchEmbeddingParams": [

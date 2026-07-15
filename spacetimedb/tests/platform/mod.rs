@@ -1,5 +1,7 @@
 //! Platform module smoke tests — helpdesk, HR, manufacturing, documents, workflow, subscriptions.
+mod country_pack_test;
 mod platform_smoke;
+mod tenant_isolation_test;
 
 use spacetimedb::ReducerContext;
 
@@ -11,6 +13,8 @@ pub fn run_all_platform_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_documents_folder_test(ctx)?;
     run_workflow_definition_test(ctx)?;
     run_subscription_plan_test(ctx)?;
+    run_tenant_isolation_tests(ctx)?;
+    run_country_pack_test(ctx)?;
     log::info!("✅ run_all_platform_tests complete");
     Ok(())
 }
@@ -44,4 +48,17 @@ pub fn run_workflow_definition_test(ctx: &ReducerContext) -> Result<(), String> 
 #[spacetimedb::reducer]
 pub fn run_subscription_plan_test(ctx: &ReducerContext) -> Result<(), String> {
     platform_smoke::test_subscription_plan_create(ctx).map_err(|e| format!("subscriptions: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_tenant_isolation_tests(ctx: &ReducerContext) -> Result<(), String> {
+    tenant_isolation_test::test_cross_tenant_company_scope_blocked(ctx)
+        .map_err(|e| format!("cross_tenant_scope: {e}"))?;
+    tenant_isolation_test::test_audit_log_append_only(ctx)
+        .map_err(|e| format!("audit_append_only: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_country_pack_test(ctx: &ReducerContext) -> Result<(), String> {
+    country_pack_test::test_country_pack_activation(ctx).map_err(|e| format!("country_pack: {e}"))
 }

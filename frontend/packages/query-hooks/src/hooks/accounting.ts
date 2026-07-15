@@ -2420,6 +2420,152 @@ export function useRunFxRevaluation(organizationId: number, companyId: bigint) {
   })
 }
 
+export function useRunFxRevaluationBatch(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const { urlPath, init } = accountingBffPost("run_fx_revaluation_batch", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params, "RunFxRevaluationBatchParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["stdb", "fx-revaluation-runs", k] })
+      invalidateMoveQueries(qc, organizationId)
+    },
+  })
+}
+
+export function usePostRealizedFxGainLoss(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const { urlPath, init } = accountingBffPost("post_realized_fx_gain_loss", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params, "PostRealizedFxParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["stdb", "fx-revaluation-runs", k] })
+      invalidateMoveQueries(qc, organizationId)
+    },
+  })
+}
+
+export function usePartnerCreditControls(
+  organizationId: bigint,
+  options?: { staleTime?: number; enabled?: boolean },
+) {
+  return useStdbQuery("partner-credit-controls", organizationId, options)
+}
+
+export function useUpsertPartnerCreditControl(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const { urlPath, init } = accountingBffPost("upsert_partner_credit_control", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params, "UpsertPartnerCreditControlParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["stdb", "partner-credit-controls", k] })
+    },
+  })
+}
+
+export function useCreateBadDebtWriteOff(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const { urlPath, init } = accountingBffPost("create_bad_debt_write_off", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params, "CreateBadDebtWriteOffParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      invalidateMoveQueries(qc, organizationId)
+    },
+  })
+}
+
+export function useAmortizationSchedules(
+  organizationId: bigint,
+  options?: { staleTime?: number; enabled?: boolean },
+) {
+  return useStdbQuery("amortization-schedules", organizationId, options)
+}
+
+export function useAmortizationLines(
+  organizationId: bigint,
+  options?: { staleTime?: number; enabled?: boolean },
+) {
+  return useStdbQuery("amortization-lines", organizationId, options)
+}
+
+export function useCreateAmortizationSchedule(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const { urlPath, init } = accountingBffPost("create_amortization_schedule", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params, "CreateAmortizationScheduleParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["stdb", "amortization-schedules", k] })
+      void qc.invalidateQueries({ queryKey: ["stdb", "amortization-lines", k] })
+    },
+  })
+}
+
+export function useRecognizeAmortizationLine(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  const k = String(organizationId)
+  return useMutation({
+    mutationFn: async ({
+      lineId,
+      params,
+    }: {
+      lineId: bigint
+      params: Record<string, unknown>
+    }) => {
+      const { urlPath, init } = accountingBffPost("recognize_amortization_line", [
+        organizationId,
+        companyId,
+        lineId,
+        stdbParamsToJson(params, "RecognizeAmortizationLineParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["stdb", "amortization-schedules", k] })
+      void qc.invalidateQueries({ queryKey: ["stdb", "amortization-lines", k] })
+      invalidateMoveQueries(qc, organizationId)
+    },
+  })
+}
+
 /** Chart / journal / tax / budget / analytic CSV imports for accounting UI toolbars. */
 export function useAccountingCsvImportMutations(organizationId: number, companyId: bigint) {
   return {

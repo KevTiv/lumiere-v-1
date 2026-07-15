@@ -37,9 +37,11 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "create_account_reconciliation_widget",
   "create_account_tax",
   "create_account_tax_group",
+  "create_amortization_schedule",
   "create_analytic_account",
   "create_analytic_distribution_model",
   "create_analytic_line",
+  "create_bad_debt_write_off",
   "create_budget_line",
   "create_budget_post",
   "create_consolidation_account",
@@ -94,8 +96,10 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "post_invoice",
   "post_payment",
   "post_payment_transaction",
+  "post_realized_fx_gain_loss",
   "process_consolidation",
   "process_intercompany_transaction",
+  "recognize_amortization_line",
   "reconcile_account_bank_statement_line",
   "reconcile_payment_with_invoice",
   "allocate_payment_transaction",
@@ -104,6 +108,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "refresh_tax_deadline_statuses",
   "register_payment_on_invoice",
   "run_fx_revaluation",
+  "run_fx_revaluation_batch",
   "retry_intercompany_transaction",
   "schedule_tax_deadline_updates",
   "setup_fiscal_calendar",
@@ -144,6 +149,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "update_tax_deadline",
   "update_tax_jurisdiction",
   "update_tax_schedule",
+  "upsert_partner_credit_control",
   "validate_budget",
   "validate_consolidation",
   "void_payment_transaction",
@@ -185,148 +191,108 @@ export function accountingBffPost(
   };
 }
 
+const ACCOUNTING_HINT_OVERRIDES: Partial<
+  Record<AccountingBffReducerKey, readonly string[]>
+> = {
+  add_account_move_line: ["account-moves", "account-move-lines"],
+  approve_bank_statement_import: [
+    "bank-statements",
+    "bank-statement-lines",
+    "bank-match-candidates",
+    "account-reconciliation-widgets",
+  ],
+  cancel_account_move: ["account-moves", "account-move-lines"],
+  create_account_account: ["account-accounts"],
+  create_account_asset: ["fixed-assets", "depreciation-lines"],
+  create_account_bank_statement: [
+    "bank-statements",
+    "bank-statement-lines",
+    "bank-match-candidates",
+    "account-reconciliation-widgets",
+  ],
+  create_account_journal: ["account-journals"],
+  create_account_move: ["account-moves", "account-move-lines"],
+  create_account_tax: [
+    "account-taxes",
+    "tax-groups",
+    "tax-jurisdictions",
+    "tax-schedules",
+    "tax-deadlines",
+  ],
+  create_amortization_schedule: ["amortization-schedules", "amortization-lines"],
+  create_bad_debt_write_off: ["account-moves", "account-move-lines"],
+  create_budget_line: ["budgets", "budget-lines", "budget-posts"],
+  create_credit_note_from_invoice: ["account-moves", "account-move-lines"],
+  create_payment_account: ["payment-accounts"],
+  create_payment_fee: ["payment-fees", "payment-transactions"],
+  create_payment_transaction: ["payment-transactions"],
+  delete_account_move_line: ["account-moves", "account-move-lines"],
+  deprecate_account_account: ["account-accounts"],
+  dispose_account_asset: ["fixed-assets", "depreciation-lines"],
+  post_account_move: ["account-moves", "account-move-lines"],
+  post_invoice: ["account-moves", "account-move-lines"],
+  post_payment_transaction: [
+    "payment-transactions",
+    "account-payments",
+    "account-moves",
+  ],
+  post_realized_fx_gain_loss: ["account-moves", "account-move-lines", "fx-revaluation-runs"],
+  recognize_amortization_line: [
+    "amortization-lines",
+    "amortization-schedules",
+    "account-moves",
+    "account-move-lines",
+  ],
+  allocate_payment_transaction: [
+    "payment-reconciliations",
+    "payment-transactions",
+    "account-move-lines",
+  ],
+  archive_payment_account: ["payment-accounts"],
+  reverse_payment_transaction: [
+    "payment-reversals",
+    "payment-reconciliations",
+    "payment-transactions",
+    "account-payments",
+  ],
+  run_fx_revaluation: ["fx-revaluation-runs", "account-moves", "account-move-lines"],
+  run_fx_revaluation_batch: ["fx-revaluation-runs", "account-moves", "account-move-lines"],
+  unreconcile_account_bank_statement_line: [
+    "bank-statements",
+    "bank-statement-lines",
+    "bank-match-candidates",
+    "account-reconciliation-widgets",
+  ],
+  update_account_account: ["account-accounts"],
+  update_account_asset: ["fixed-assets", "depreciation-lines"],
+  update_account_bank_statement: [
+    "bank-statements",
+    "bank-statement-lines",
+    "bank-match-candidates",
+    "account-reconciliation-widgets",
+  ],
+  update_account_journal: ["account-journals"],
+  update_account_tax: [
+    "account-taxes",
+    "tax-groups",
+    "tax-jurisdictions",
+    "tax-schedules",
+    "tax-deadlines",
+  ],
+  update_budget_line: ["budgets", "budget-lines", "budget-posts"],
+  update_crossovered_budget: ["budgets", "budget-lines", "budget-posts"],
+  update_payment_account: ["payment-accounts"],
+  update_payment_transaction: ["payment-transactions"],
+  upsert_partner_credit_control: ["partner-credit-controls"],
+  void_payment_transaction: ["payment-transactions"],
+};
+
 function accountingReducerHints(): Record<AccountingBffReducerKey, readonly string[]> {
-  const o = {} as Record<AccountingBffReducerKey, readonly string[]>
-  o["add_account_move_line"] = ["account-moves","account-move-lines"] as const
-  o["apply_reconciliation_rules"] = []
-  o["approve_intercompany_transaction"] = []
-  o["approve_bank_statement_import"] = ["bank-statements","bank-statement-lines","bank-match-candidates","account-reconciliation-widgets"] as const
-  o["cancel_account_move"] = ["account-moves","account-move-lines"] as const
-  o["cancel_budget"] = []
-  o["cancel_consolidation"] = []
-  o["cancel_intercompany_transaction"] = []
-  o["cancel_payment"] = []
-  o["close_account_asset"] = []
-  o["close_account_period"] = []
-  o["close_fiscal_year"] = []
-  o["complete_intercompany_transaction"] = []
-  o["complete_tax_deadline"] = []
-  o["compute_depreciation_board"] = []
-  o["compute_invoice_totals"] = []
-  o["confirm_account_asset"] = []
-  o["confirm_budget"] = []
-  o["create_account_account"] = ["account-accounts"] as const
-  o["create_account_account_type"] = []
-  o["create_account_asset"] = ["fixed-assets","depreciation-lines"] as const
-  o["create_account_bank_statement"] = ["bank-statements","bank-statement-lines","bank-match-candidates","account-reconciliation-widgets"] as const
-  o["create_account_bank_statement_line"] = []
-  o["create_account_group"] = []
-  o["create_account_journal"] = ["account-journals"] as const
-  o["create_account_move"] = ["account-moves","account-move-lines"] as const
-  o["create_account_period"] = []
-  o["create_account_reconciliation_widget"] = []
-  o["create_account_tax"] = ["account-taxes","tax-groups","tax-jurisdictions","tax-schedules","tax-deadlines"] as const
-  o["create_account_tax_group"] = []
-  o["create_analytic_account"] = []
-  o["create_analytic_distribution_model"] = []
-  o["create_analytic_line"] = []
-  o["create_budget_line"] = ["budgets","budget-lines","budget-posts"] as const
-  o["create_budget_post"] = []
-  o["create_consolidation_account"] = []
-  o["create_consolidation_journal"] = []
-  o["create_credit_note_from_invoice"] = ["account-moves","account-move-lines"] as const
-  o["create_crossovered_budget"] = []
-  o["create_currency_rate"] = []
-  o["create_depreciation_line"] = []
-  o["create_elimination_entry"] = []
-  o["create_fiscal_year"] = []
-  o["create_intercompany_rule"] = []
-  o["create_intercompany_transaction"] = []
-  o["create_payment"] = []
-  o["create_payment_account"] = ["payment-accounts"] as const
-  o["create_payment_fee"] = ["payment-fees","payment-transactions"] as const
-  o["create_payment_transaction"] = ["payment-transactions"] as const
-  o["create_payment_term"] = []
-  o["create_payment_term_line"] = []
-  o["create_tax_deadline"] = []
-  o["create_tax_jurisdiction"] = []
-  o["create_tax_schedule"] = []
-  o["delete_account_asset"] = []
-  o["delete_account_bank_statement"] = []
-  o["delete_account_bank_statement_line"] = []
-  o["delete_account_move_line"] = ["account-moves","account-move-lines"] as const
-  o["delete_account_period"] = []
-  o["delete_account_reconciliation_widget"] = []
-  o["delete_analytic_line"] = []
-  o["delete_budget_line"] = []
-  o["delete_fiscal_year"] = []
-  o["delete_intercompany_rule"] = []
-  o["delete_payment_term"] = []
-  o["delete_payment_term_line"] = []
-  o["delete_tax_deadline"] = []
-  o["deprecate_account_account"] = ["account-accounts"] as const
-  o["dispose_account_asset"] = ["fixed-assets","depreciation-lines"] as const
-  o["done_budget"] = []
-  o["error_intercompany_transaction"] = []
-  o["import_account_csv"] = []
-  o["import_account_move_csv"] = []
-  o["import_account_move_line_csv"] = []
-  o["import_analytic_account_csv"] = []
-  o["import_budget_csv"] = []
-  o["import_budget_line_csv"] = []
-  o["import_tax_rate_csv"] = []
-  o["match_bank_line"] = []
-  o["match_elimination_entries"] = []
-  o["open_account_period"] = []
-  o["open_fiscal_year"] = []
-  o["post_account_bank_statement"] = []
-  o["post_account_move"] = ["account-moves","account-move-lines"] as const
-  o["post_invoice"] = ["account-moves","account-move-lines"] as const
-  o["post_payment"] = []
-  o["post_payment_transaction"] = ["payment-transactions","account-payments","account-moves"] as const
-  o["process_consolidation"] = []
-  o["process_intercompany_transaction"] = []
-  o["reconcile_account_bank_statement_line"] = []
-  o["reconcile_payment_with_invoice"] = []
-  o["allocate_payment_transaction"] = ["payment-reconciliations","payment-transactions","account-move-lines"] as const
-  o["archive_payment_account"] = ["payment-accounts"] as const
-  o["reverse_payment_transaction"] = ["payment-reversals","payment-reconciliations","payment-transactions","account-payments"] as const
-  o["refresh_tax_deadline_statuses"] = []
-  o["register_payment_on_invoice"] = []
-  o["retry_intercompany_transaction"] = []
-  o["schedule_tax_deadline_updates"] = []
-  o["set_analytic_account_active"] = []
-  o["set_asset_active"] = []
-  o["set_consolidation_company_rate"] = []
-  o["stage_bank_statement_import"] = []
-  o["set_intercompany_rule_active"] = []
-  o["unmatch_elimination_entry"] = []
-  o["unreconcile_account_bank_statement_line"] = ["bank-statements","bank-statement-lines","bank-match-candidates","account-reconciliation-widgets"] as const
-  o["unreconciled_account_bank_statement_line"] = []
-  o["update_account_account"] = ["account-accounts"] as const
-  o["update_account_account_type"] = []
-  o["update_account_asset"] = ["fixed-assets","depreciation-lines"] as const
-  o["update_account_bank_statement"] = ["bank-statements","bank-statement-lines","bank-match-candidates","account-reconciliation-widgets"] as const
-  o["update_account_bank_statement_line"] = []
-  o["update_account_group"] = []
-  o["update_account_journal"] = ["account-journals"] as const
-  o["update_account_move_line"] = []
-  o["update_account_period"] = []
-  o["update_account_reconciliation_widget"] = []
-  o["update_account_tax"] = ["account-taxes","tax-groups","tax-jurisdictions","tax-schedules","tax-deadlines"] as const
-  o["update_account_tax_group"] = []
-  o["update_analytic_account"] = []
-  o["update_analytic_distribution_model"] = []
-  o["update_analytic_line"] = []
-  o["update_budget_line"] = ["budgets","budget-lines","budget-posts"] as const
-  o["update_budget_line_actuals"] = []
-  o["update_budget_post"] = []
-  o["update_consolidation_account"] = []
-  o["update_crossovered_budget"] = ["budgets","budget-lines","budget-posts"] as const
-  o["update_fiscal_year"] = []
-  o["update_intercompany_rule"] = []
-  o["update_payment_term"] = []
-  o["update_payment_account"] = ["payment-accounts"] as const
-  o["update_payment_transaction"] = ["payment-transactions"] as const
-  o["update_payment_term_line"] = []
-  o["update_tax_deadline"] = []
-  o["update_tax_jurisdiction"] = []
-  o["update_tax_schedule"] = []
-  o["validate_budget"] = []
-  o["validate_consolidation"] = []
-  o["void_payment_transaction"] = ["payment-transactions"] as const
-  o["waive_tax_deadline"] = []
-  return o
+  const o = {} as Record<AccountingBffReducerKey, readonly string[]>;
+  for (const k of ACCOUNTING_BFF_REDUCERS) {
+    o[k] = ACCOUNTING_HINT_OVERRIDES[k] ?? [];
+  }
+  return o;
 }
 
 export const ACCOUNTING_COMMAND_SUBSCRIPTION_HINTS: Record<

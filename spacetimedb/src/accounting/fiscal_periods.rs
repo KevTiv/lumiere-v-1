@@ -5,6 +5,7 @@
 /// Tables for managing fiscal years and accounting periods.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{FiscalYearState, PeriodState};
 
@@ -132,6 +133,7 @@ pub fn create_fiscal_year(
     params: CreateFiscalYearParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_fiscal_year", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     if params.date_from >= params.date_to {
         return Err("Fiscal year start date must be before end date".to_string());
@@ -836,18 +838,38 @@ pub fn ensure_accounting_period_open_for_date(
     company_id: u64,
     move_date: Timestamp,
 ) -> Result<(), String> {
-    for period in ctx.db.account_period().period_by_company().filter(&company_id) {
-        if move_date >= period.date_from
-            && move_date <= period.date_to
-            && period.state == PeriodState::Closed
-        {
-            return Err(format!(
-                "Accounting period {} is closed; cannot post moves dated in this period",
-                period.name
-            ));
-        }
+    let covering: Vec<_> = ctx
+        .db
+        .account_period()
+        .period_by_company()
+        .filter(&company_id)
+        .filter(|period| move_date >= period.date_from && move_date <= period.date_to)
+        .collect();
+
+    if covering.is_empty() {
+        return Err(
+            "No open accounting period covers this date; cannot post".to_string(),
+        );
     }
-    Ok(())
+
+    if let Some(closed) = covering
+        .iter()
+        .find(|period| period.state == PeriodState::Closed)
+    {
+        return Err(format!(
+            "Accounting period {} is closed; cannot post moves dated in this period",
+            closed.name
+        ));
+    }
+
+    if covering
+        .iter()
+        .any(|period| period.state == PeriodState::Open)
+    {
+        return Ok(());
+    }
+
+    Err("No open accounting period covers this date; cannot post".to_string())
 }
 
 #[derive(SpacetimeType, Clone, Debug)]

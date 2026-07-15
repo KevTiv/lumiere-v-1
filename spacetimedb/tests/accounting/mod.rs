@@ -1,5 +1,7 @@
 //! Accounting domain test suite — invoke via `run_all_accounting_tests` reducer.
 mod helpers;
+pub mod fx_revaluation_test;
+pub mod ic_consolidation_test;
 pub mod journal_entries_test;
 pub mod payment_management_test;
 pub mod payment_terms_test;
@@ -22,6 +24,8 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_accounting_posted_immutability_test(ctx)?;
     run_accounting_trial_balance_test(ctx)?;
     run_accounting_payment_management_test(ctx)?;
+    run_accounting_ic_consolidation_test(ctx)?;
+    run_accounting_fx_revaluation_test(ctx)?;
     log::info!("✅ run_all_accounting_tests complete");
     Ok(())
 }
@@ -82,4 +86,18 @@ pub fn run_accounting_payment_management_test(ctx: &ReducerContext) -> Result<()
         .map_err(|e| format!("payment_transaction_fee_and_void: {e}"))?;
     log::info!("✅ run_accounting_payment_management_test complete");
     Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_ic_consolidation_test(ctx: &ReducerContext) -> Result<(), String> {
+    ic_consolidation_test::test_intercompany_rule_requires_same_org(ctx)
+        .map_err(|e| format!("ic_cross_org: {e}"))?;
+    ic_consolidation_test::test_intercompany_elimination_nets_to_zero(ctx)
+        .map_err(|e| format!("ic_elimination: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_fx_revaluation_test(ctx: &ReducerContext) -> Result<(), String> {
+    fx_revaluation_test::test_fx_revaluation_posts_balanced_move(ctx)
+        .map_err(|e| format!("fx_revaluation: {e}"))
 }

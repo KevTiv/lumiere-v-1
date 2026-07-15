@@ -898,6 +898,16 @@ pub fn post_invoice(
         validate_in_invoice_three_way_match(ctx, &move_record, move_id)?;
     }
 
+    ensure_accounting_period_open_for_date(ctx, move_record.company_id, move_record.date)?;
+
+    crate::accounting::credit_control::ensure_partner_credit_allows_invoice(
+        ctx,
+        organization_id,
+        move_record.company_id,
+        move_record.partner_id,
+        move_record.amount_total,
+    )?;
+
     compute_invoice_totals_internal(ctx, move_id)?;
     post_cogs_entries(
         ctx,

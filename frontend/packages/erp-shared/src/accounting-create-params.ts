@@ -2020,3 +2020,160 @@ export function toRunFxRevaluationParamsFromForm(
 export function runFxRevaluationParamsToJson(params: Record<string, unknown>): Record<string, unknown> {
   return stdbParamsToJson(params, 'RunFxRevaluationParams')
 }
+
+export function toRunFxRevaluationBatchParamsFromForm(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const currencyCode = optionalTrimmedString(formData.currencyCode)?.toUpperCase()
+  const journalId = requiredBigIntU64(formData.journalId)
+  const gainAccountId = requiredBigIntU64(formData.gainAccountId)
+  const lossAccountId = requiredBigIntU64(formData.lossAccountId)
+  const rate = Number(formData.rate)
+  if (
+    !currencyCode ||
+    journalId == null ||
+    gainAccountId == null ||
+    lossAccountId == null ||
+    !Number.isFinite(rate) ||
+    rate <= 0
+  ) {
+    return null
+  }
+  return {
+    currencyCode,
+    asOfDate: timestampFromFormDate(formData.asOfDate),
+    journalId,
+    gainAccountId,
+    lossAccountId,
+    rate,
+    reference: optionalTrimmedString(formData.reference),
+    metadata: undefined,
+  }
+}
+
+export function toPostRealizedFxParamsFromForm(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const paymentId = requiredBigIntU64(formData.paymentId)
+  const invoiceMoveId = requiredBigIntU64(formData.invoiceMoveId)
+  const journalId = requiredBigIntU64(formData.journalId)
+  const gainAccountId = requiredBigIntU64(formData.gainAccountId)
+  const lossAccountId = requiredBigIntU64(formData.lossAccountId)
+  const clearingAccountId = requiredBigIntU64(formData.clearingAccountId)
+  const paymentAmountFunctional = Number(formData.paymentAmountFunctional)
+  const invoiceResidualFunctional = Number(formData.invoiceResidualFunctional)
+  if (
+    paymentId == null ||
+    invoiceMoveId == null ||
+    journalId == null ||
+    gainAccountId == null ||
+    lossAccountId == null ||
+    clearingAccountId == null ||
+    !Number.isFinite(paymentAmountFunctional) ||
+    !Number.isFinite(invoiceResidualFunctional)
+  ) {
+    return null
+  }
+  return {
+    paymentId,
+    invoiceMoveId,
+    paymentAmountFunctional,
+    invoiceResidualFunctional,
+    journalId,
+    gainAccountId,
+    lossAccountId,
+    clearingAccountId,
+    date: timestampFromFormDate(formData.date),
+    reference: optionalTrimmedString(formData.reference),
+    metadata: undefined,
+  }
+}
+
+export function toUpsertPartnerCreditControlParamsFromForm(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const partnerId = requiredBigIntU64(formData.partnerId)
+  const creditLimit = Number(formData.creditLimit)
+  if (partnerId == null || !Number.isFinite(creditLimit) || creditLimit < 0) {
+    return null
+  }
+  return {
+    partnerId,
+    creditLimit,
+    paymentHold: Boolean(formData.paymentHold),
+    notes: optionalTrimmedString(formData.notes),
+    metadata: undefined,
+  }
+}
+
+export function toCreateBadDebtWriteOffParamsFromForm(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const partnerId = requiredBigIntU64(formData.partnerId)
+  const moveId = requiredBigIntU64(formData.moveId)
+  const journalId = requiredBigIntU64(formData.journalId)
+  const receivableAccountId = requiredBigIntU64(formData.receivableAccountId)
+  const writeOffAccountId = requiredBigIntU64(formData.writeOffAccountId)
+  const amount = Number(formData.amount)
+  if (
+    partnerId == null ||
+    moveId == null ||
+    journalId == null ||
+    receivableAccountId == null ||
+    writeOffAccountId == null ||
+    !Number.isFinite(amount) ||
+    amount <= 0
+  ) {
+    return null
+  }
+  return {
+    partnerId,
+    moveId,
+    amount,
+    journalId,
+    receivableAccountId,
+    writeOffAccountId,
+    date: timestampFromFormDate(formData.date),
+    reference: optionalTrimmedString(formData.reference),
+    metadata: undefined,
+  }
+}
+
+export function toCreateAmortizationScheduleParamsFromForm(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const scheduleKind = optionalTrimmedString(formData.scheduleKind)
+  const description = optionalTrimmedString(formData.description)
+  const journalId = requiredBigIntU64(formData.journalId)
+  const balanceSheetAccountId = requiredBigIntU64(formData.balanceSheetAccountId)
+  const plAccountId = requiredBigIntU64(formData.plAccountId)
+  const currencyId = requiredBigIntU64(formData.currencyId)
+  const recognitionPeriod = optionalTrimmedString(formData.recognitionPeriod)
+  const totalAmount = Number(formData.totalAmount)
+  if (
+    !scheduleKind ||
+    !description ||
+    journalId == null ||
+    balanceSheetAccountId == null ||
+    plAccountId == null ||
+    currencyId == null ||
+    !recognitionPeriod ||
+    !Number.isFinite(totalAmount) ||
+    totalAmount <= 0
+  ) {
+    return null
+  }
+  return {
+    scheduleKind,
+    description,
+    journalId,
+    balanceSheetAccountId,
+    plAccountId,
+    currencyId,
+    totalAmount,
+    startDate: timestampFromFormDate(formData.startDate),
+    endDate: timestampFromFormDate(formData.endDate),
+    recognitionPeriod,
+    metadata: undefined,
+  }
+}

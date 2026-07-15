@@ -19,3 +19,6 @@ dist
 */**/dist
 *.tsbuildinfo
 frontend/web/reports/
+*/**/.pnpm-store
+*/**/**/.turbo
+*/**/.turbo

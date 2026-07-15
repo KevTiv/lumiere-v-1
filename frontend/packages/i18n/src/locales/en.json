@@ -1021,16 +1021,23 @@
       "panelTitle": "Foreign exchange revaluation",
       "panelDescription": "Post unrealized currency adjustments and review prior runs for this company.",
       "runAction": "Run revaluation",
+      "batchAction": "Run AR/AP batch",
+      "realizedAction": "Post realized FX",
       "importRateHint": "Add exchange rate",
       "runsTitle": "Recent runs",
       "runsEmpty": "No FX revaluation runs recorded yet.",
+      "searchRuns": "Search FX runs…",
       "colCurrency": "Currency",
       "colNet": "Net adjustment",
       "colMove": "Journal entry",
       "colReference": "Reference",
       "rateModalDescription": "Record a spot rate before running revaluation for that currency pair.",
       "invalidForm": "Fill currency, journal, accounts, and a non-zero adjustment.",
+      "invalidBatchForm": "Fill currency, rate, journal, and gain/loss accounts.",
+      "invalidRealizedForm": "Fill payment, invoice, amounts, journal, and accounts.",
       "runSuccess": "FX revaluation posted",
+      "batchSuccess": "FX revaluation batch posted",
+      "realizedSuccess": "Realized FX gain/loss posted",
       "rateSuccess": "Currency rate saved",
       "form": {
         "title": "Run FX revaluation",
@@ -1048,6 +1055,134 @@
           "gainAccountId": "Unrealized gain account",
           "lossAccountId": "Unrealized loss account",
           "reference": "Reference (optional)"
+        }
+      },
+      "batchForm": {
+        "title": "Run FX revaluation batch",
+        "description": "Revalue all open foreign-currency AR/AP residuals at the given rate.",
+        "submitLabel": "Run batch",
+        "sections": {
+          "main": "Parameters"
+        },
+        "fields": {
+          "rate": "Spot rate"
+        }
+      },
+      "realizedForm": {
+        "title": "Post realized FX",
+        "description": "Post gain or loss when a foreign invoice is settled at a different rate.",
+        "submitLabel": "Post realized FX",
+        "sections": {
+          "main": "Settlement"
+        },
+        "fields": {
+          "paymentId": "Payment",
+          "invoiceMoveId": "Invoice",
+          "paymentAmountFunctional": "Payment amount (functional)",
+          "invoiceResidualFunctional": "Invoice residual (functional)",
+          "clearingAccountId": "Clearing account",
+          "date": "Date"
+        }
+      }
+    },
+    "creditControl": {
+      "tabLabel": "Credit control",
+      "panelTitle": "Partner credit control",
+      "panelDescription": "Set credit limits and payment holds, or write off uncollectible receivables.",
+      "upsertAction": "Set credit limit",
+      "writeOffAction": "Bad debt write-off",
+      "listTitle": "Credit limits",
+      "listEmpty": "No partner credit controls configured yet.",
+      "searchPlaceholder": "Search credit controls…",
+      "colPartner": "Partner",
+      "colLimit": "Credit limit",
+      "colHold": "Payment hold",
+      "colNotes": "Notes",
+      "invalidForm": "Choose a partner and enter a non-negative credit limit.",
+      "invalidWriteOffForm": "Fill partner, invoice, amount, journal, and accounts.",
+      "upsertSuccess": "Partner credit control saved",
+      "writeOffSuccess": "Bad debt write-off posted",
+      "form": {
+        "title": "Set partner credit control",
+        "description": "Update the credit limit and optional payment hold for a partner.",
+        "submitLabel": "Save",
+        "sections": {
+          "main": "Credit"
+        },
+        "fields": {
+          "partnerId": "Partner",
+          "creditLimit": "Credit limit",
+          "paymentHold": "Hold payments",
+          "notes": "Notes"
+        }
+      },
+      "writeOffForm": {
+        "title": "Bad debt write-off",
+        "description": "Write off an uncollectible receivable to expense.",
+        "submitLabel": "Post write-off",
+        "sections": {
+          "main": "Write-off"
+        },
+        "fields": {
+          "moveId": "Invoice / move",
+          "amount": "Amount",
+          "receivableAccountId": "Receivable account",
+          "writeOffAccountId": "Write-off expense account",
+          "date": "Date"
+        }
+      }
+    },
+    "amortization": {
+      "tabLabel": "Amortization",
+      "panelTitle": "Accrual & prepaid amortization",
+      "panelDescription": "Create recognition schedules and post open amortization lines to the GL.",
+      "createAction": "New schedule",
+      "recognizeAction": "Recognize",
+      "schedulesTitle": "Schedules",
+      "schedulesEmpty": "No amortization schedules yet.",
+      "searchSchedules": "Search schedules…",
+      "linesTitle": "Open lines",
+      "linesDescription": "Unrecognized lines ready to post.",
+      "linesEmpty": "No open amortization lines.",
+      "searchLines": "Search lines…",
+      "colKind": "Kind",
+      "colDescription": "Description",
+      "colTotal": "Total",
+      "colRemaining": "Remaining",
+      "colState": "State",
+      "colSchedule": "Schedule",
+      "colSequence": "Seq",
+      "colAmount": "Amount",
+      "colRecognize": "Action",
+      "invalidForm": "Fill kind, amounts, dates, journal, and accounts.",
+      "createSuccess": "Amortization schedule created",
+      "recognizeSuccess": "Amortization line recognized",
+      "kind": {
+        "accrual": "Accrual",
+        "prepaid": "Prepaid"
+      },
+      "period": {
+        "month": "Monthly",
+        "quarter": "Quarterly",
+        "year": "Yearly"
+      },
+      "form": {
+        "title": "Create amortization schedule",
+        "description": "Generate recognition lines for an accrual or prepaid amount.",
+        "submitLabel": "Create schedule",
+        "sections": {
+          "main": "Schedule"
+        },
+        "fields": {
+          "scheduleKind": "Kind",
+          "recognitionPeriod": "Recognition period",
+          "description": "Description",
+          "totalAmount": "Total amount",
+          "currencyId": "Currency",
+          "balanceSheetAccountId": "Balance sheet account",
+          "plAccountId": "P&L account",
+          "startDate": "Start",
+          "endDate": "End"
         }
       }
     },

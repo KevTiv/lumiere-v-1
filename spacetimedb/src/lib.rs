@@ -111,6 +111,7 @@ pub mod platform_tests;
 #[path = "../tests/core/tests/mod.rs"]
 pub mod core_tests;
 
+use crate::core::migrations::apply_pending_global_migrations;
 use crate::core::reference::currency;
 use crate::core::reference::Currency;
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
@@ -152,6 +153,9 @@ pub fn init(ctx: &ReducerContext) {
             created_at: ctx.timestamp,
             metadata: Some(r#"{"seed":"init"}"#.to_string()),
         });
+    }
+    if let Err(error) = apply_pending_global_migrations(ctx) {
+        log::warn!("Global migrations skipped during init: {error}");
     }
     log::info!("Lumiere ERP module initialised");
 }

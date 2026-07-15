@@ -879,6 +879,138 @@ export const accountingEntityConfigs = (t: TFunction): Record<string, EntityView
   "reconciliation-widgets-table": reconciliationWidgetsTableConfig(t),
   "intercompany-rules-table": intercompanyRulesTableConfig(t),
   "intercompany-transactions-table": intercompanyTransactionsTableConfig(t),
+  "fx-revaluation-runs-table": fxRevaluationRunsTableConfig(t),
+  "partner-credit-controls-table": partnerCreditControlsTableConfig(t),
+  "amortization-schedules-table": amortizationSchedulesTableConfig(t),
+  "amortization-lines-table": amortizationLinesTableConfig(t),
+})
+
+export const fxRevaluationRunsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "fx-revaluation-runs-table",
+  title: t("accounting.fxRevaluation.runsTitle"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("accounting.fxRevaluation.searchRuns"),
+    searchKeys: ["currencyCode", "reference", "moveId"],
+    columns: [
+      { key: "currencyCode", label: t("accounting.fxRevaluation.colCurrency"), width: "min-w-24" },
+      {
+        key: "netAdjustment",
+        label: t("accounting.fxRevaluation.colNet"),
+        type: "number",
+        align: "right",
+        width: "min-w-28",
+      },
+      { key: "moveId", label: t("accounting.fxRevaluation.colMove"), width: "min-w-28" },
+      { key: "reference", label: t("accounting.fxRevaluation.colReference"), width: "min-w-40" },
+    ],
+    emptyMessage: t("accounting.fxRevaluation.runsEmpty"),
+  },
+})
+
+export const partnerCreditControlsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "partner-credit-controls-table",
+  title: t("accounting.creditControl.listTitle"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("accounting.creditControl.searchPlaceholder"),
+    searchKeys: ["partnerId", "notes"],
+    columns: [
+      { key: "partnerId", label: t("accounting.creditControl.colPartner"), width: "min-w-28" },
+      {
+        key: "creditLimit",
+        label: t("accounting.creditControl.colLimit"),
+        type: "number",
+        align: "right",
+        width: "min-w-28",
+      },
+      {
+        key: "paymentHold",
+        label: t("accounting.creditControl.colHold"),
+        type: "boolean",
+        align: "center",
+        width: "min-w-24",
+      },
+      { key: "notes", label: t("accounting.creditControl.colNotes"), width: "min-w-40" },
+    ],
+    emptyMessage: t("accounting.creditControl.listEmpty"),
+  },
+})
+
+export const amortizationSchedulesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "amortization-schedules-table",
+  title: t("accounting.amortization.schedulesTitle"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("accounting.amortization.searchSchedules"),
+    searchKeys: ["description", "scheduleKind", "state"],
+    columns: [
+      {
+        key: "scheduleKind",
+        label: t("accounting.amortization.colKind"),
+        type: "badge",
+        width: "min-w-24",
+        badgeLabels: {
+          accrual: t("accounting.amortization.kind.accrual"),
+          prepaid: t("accounting.amortization.kind.prepaid"),
+        },
+      },
+      { key: "description", label: t("accounting.amortization.colDescription"), width: "min-w-48" },
+      {
+        key: "totalAmount",
+        label: t("accounting.amortization.colTotal"),
+        type: "number",
+        align: "right",
+        width: "min-w-28",
+      },
+      {
+        key: "remainingAmount",
+        label: t("accounting.amortization.colRemaining"),
+        type: "number",
+        align: "right",
+        width: "min-w-28",
+      },
+      { key: "state", label: t("accounting.amortization.colState"), type: "badge", width: "min-w-24" },
+    ],
+    emptyMessage: t("accounting.amortization.schedulesEmpty"),
+  },
+})
+
+export const amortizationLinesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "amortization-lines-table",
+  title: t("accounting.amortization.linesTitle"),
+  description: t("accounting.amortization.linesDescription"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("accounting.amortization.searchLines"),
+    searchKeys: ["scheduleId", "sequence"],
+    columns: [
+      { key: "scheduleId", label: t("accounting.amortization.colSchedule"), width: "min-w-28" },
+      {
+        key: "sequence",
+        label: t("accounting.amortization.colSequence"),
+        type: "number",
+        align: "right",
+        width: "min-w-20",
+      },
+      {
+        key: "amount",
+        label: t("accounting.amortization.colAmount"),
+        type: "number",
+        align: "right",
+        width: "min-w-28",
+      },
+    ],
+    emptyMessage: t("accounting.amortization.linesEmpty"),
+  },
 })
 
 // ── Intercompany Rules ───────────────────────────────────────────────────────

@@ -60,6 +60,11 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_crm_contact_identity_test \
 	run_accounting_payment_management_test \
 	run_core_operational_messaging_test \
+	run_core_sod_test \
+	run_tenant_isolation_tests \
+	run_country_pack_test \
+	run_accounting_ic_consolidation_test \
+	run_accounting_fx_revaluation_test \
 	run_purchasing_bill_balanced_test \
 	run_helpdesk_ticket_test \
 	run_hr_leave_type_test \
@@ -70,7 +75,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 
 .PHONY: \
 	help help-e2e \
-	setup check check-env check-env-prod build \
+	setup check check-env check-env-prod build validate-subscriptions \
 	start stop publish publish-clear test call-tests logs seed-test-user \
 	generate-stdb-ts-sdk generate-stdb-rust-sdk \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
@@ -197,6 +202,9 @@ check-env-prod:
 
 check:
 	cd $(MODULE) && cargo check --tests
+
+validate-subscriptions:
+	node scripts/validate-subscription-org-filters.mjs
 
 build:
 	cd $(MODULE) && cargo build --target wasm32-unknown-unknown --release

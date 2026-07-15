@@ -33,13 +33,16 @@
 /// └── financial_statements.rs← 8.6 Financial Statements
 /// ```
 pub mod analytic_accounting;
+pub mod amortization;
 pub mod bank_reconciliation;
 pub mod budgeting;
 pub mod chart_of_accounts;
 pub mod consolidation;
+pub mod credit_control;
 pub mod financial_statements;
 pub mod fiscal_periods;
 pub mod fixed_assets;
+pub mod fx_revaluation;
 pub mod intercompany;
 pub mod journal_entries;
 pub mod payment_management;

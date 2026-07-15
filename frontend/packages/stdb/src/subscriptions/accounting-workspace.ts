@@ -50,6 +50,9 @@ export const ACCOUNTING_WORKSPACE_RESOURCE_KEYS = [
   "fx-revaluation-runs",
   "deferred-revenue-schedules",
   "deferred-revenue-lines",
+  "amortization-schedules",
+  "amortization-lines",
+  "partner-credit-controls",
 ] as const;
 
 export type AccountingWorkspaceResourceKey =

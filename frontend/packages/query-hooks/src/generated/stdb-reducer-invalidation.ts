@@ -12,6 +12,8 @@ export const STDB_REDUCER_INVALIDATION: Record<string, readonly string[]> = {
   "create_account_move": ["account-moves", "account-move-lines"] as const,
   "create_account_tax": ["account-taxes", "tax-groups", "tax-jurisdictions", "tax-schedules", "tax-deadlines"] as const,
   "create_ai_reducer_allowlist": ["ai-reducer-allowlist"] as const,
+  "create_amortization_schedule": ["amortization-schedules", "amortization-lines"] as const,
+  "create_bad_debt_write_off": ["account-moves", "account-move-lines"] as const,
   "create_budget_line": ["budgets", "budget-lines", "budget-posts"] as const,
   "delete_account_move_line": ["account-moves", "account-move-lines"] as const,
   "delete_ai_reducer_allowlist": ["ai-reducer-allowlist"] as const,
@@ -19,6 +21,11 @@ export const STDB_REDUCER_INVALIDATION: Record<string, readonly string[]> = {
   "dispose_account_asset": ["fixed-assets", "depreciation-lines"] as const,
   "post_account_move": ["account-moves", "account-move-lines"] as const,
   "post_invoice": ["account-moves", "account-move-lines"] as const,
+  "post_realized_fx_gain_loss": ["account-moves", "account-move-lines", "fx-revaluation-runs"] as const,
+  "recognize_amortization_line": ["amortization-lines", "amortization-schedules", "account-moves", "account-move-lines"] as const,
+  "recognize_deferred_revenue": ["deferred-revenue-lines", "deferred-revenue-schedules", "account-moves", "account-move-lines"] as const,
+  "run_fx_revaluation": ["fx-revaluation-runs", "account-moves", "account-move-lines"] as const,
+  "run_fx_revaluation_batch": ["fx-revaluation-runs", "account-moves", "account-move-lines"] as const,
   "set_ai_reducer_allowlist_enabled": ["ai-reducer-allowlist"] as const,
   "unreconcile_account_bank_statement_line": ["bank-statements", "bank-statement-lines", "bank-match-candidates", "account-reconciliation-widgets"] as const,
   "update_account_account": ["account-accounts"] as const,
@@ -28,7 +35,8 @@ export const STDB_REDUCER_INVALIDATION: Record<string, readonly string[]> = {
   "update_account_tax": ["account-taxes", "tax-groups", "tax-jurisdictions", "tax-schedules", "tax-deadlines"] as const,
   "update_ai_reducer_allowlist": ["ai-reducer-allowlist"] as const,
   "update_budget_line": ["budgets", "budget-lines", "budget-posts"] as const,
-  "update_crossovered_budget": ["budgets", "budget-lines", "budget-posts"] as const
+  "update_crossovered_budget": ["budgets", "budget-lines", "budget-posts"] as const,
+  "upsert_partner_credit_control": ["partner-credit-controls"] as const
 }
 
 export function stdbInvalidationFor(reducer: string): readonly string[] {

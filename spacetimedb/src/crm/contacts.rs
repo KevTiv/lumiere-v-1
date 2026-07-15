@@ -10,6 +10,8 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
+use crate::core::permissions::role;
+use crate::core::users::{user_organization, user_profile};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -550,6 +552,36 @@ pub fn update_contact(
     if params.is_partner.is_some() {
         changed_fields.push("is_partner".to_string());
     }
+
+    let user = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(ctx.sender())
+        .ok_or("User not found")?;
+    let user_org = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|uo| uo.organization_id == organization_id && uo.is_active)
+        .ok_or("User is not a member of this organization")?;
+    let role = ctx
+        .db
+        .role()
+        .id()
+        .find(user_org.role_id)
+        .ok_or("Role not found")?;
+    crate::core::permissions::ensure_resource_fields_writable(
+        ctx,
+        organization_id,
+        ctx.sender(),
+        role.id,
+        &role.name,
+        user.is_superuser,
+        "contact",
+        &changed_fields,
+    )?;
 
     ctx.db.contact().id().update(Contact {
         name: new_name.clone(),

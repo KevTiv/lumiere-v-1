@@ -19,6 +19,11 @@ fn domain_test_reducers_are_wasm_linked() {
     let _ = stringify!(run_accounting_payment_term_update_test);
     let _ = stringify!(run_accounting_payment_management_test);
     let _ = stringify!(run_core_operational_messaging_test);
+    let _ = stringify!(run_core_sod_test);
+    let _ = stringify!(run_tenant_isolation_tests);
+    let _ = stringify!(run_country_pack_test);
+    let _ = stringify!(run_accounting_ic_consolidation_test);
+    let _ = stringify!(run_accounting_fx_revaluation_test);
     let _ = stringify!(run_crm_contact_identity_test);
 }
 
@@ -34,4 +39,9 @@ fn run_sales_order_update_test() {}
 fn run_accounting_payment_term_update_test() {}
 fn run_accounting_payment_management_test() {}
 fn run_core_operational_messaging_test() {}
+fn run_core_sod_test() {}
+fn run_tenant_isolation_tests() {}
+fn run_country_pack_test() {}
+fn run_accounting_ic_consolidation_test() {}
+fn run_accounting_fx_revaluation_test() {}
 fn run_crm_contact_identity_test() {}

@@ -485,6 +485,21 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       createAction: "createAccountPeriod",
     },
     {
+      id: "fx-revaluation",
+      label: t("accounting.fxRevaluation.tabLabel"),
+      type: "custom" as const,
+    },
+    {
+      id: "credit-control",
+      label: t("accounting.creditControl.tabLabel"),
+      type: "custom" as const,
+    },
+    {
+      id: "amortization",
+      label: t("accounting.amortization.tabLabel"),
+      type: "custom" as const,
+    },
+    {
       id: "consolidation",
       label: t("accounting.consolidation.tabLabel"),
       type: "custom" as const,

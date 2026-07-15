@@ -219,7 +219,7 @@ export function useRecognizeDeferredRevenue(organizationId: bigint, companyId?: 
         organizationId,
         companyId ?? organizationId,
         lineId,
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(params as object, "RecognizeDeferredRevenueParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to recognize deferred revenue')
@@ -228,6 +228,8 @@ export function useRecognizeDeferredRevenue(organizationId: bigint, companyId?: 
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['deferred-revenue-lines', rqBigIntKey(organizationId)] }),
         qc.invalidateQueries({ queryKey: ['deferred-revenue-schedules', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['stdb', 'account-moves', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['stdb', 'account-move-lines', rqBigIntKey(organizationId)] }),
       ])
     },
   })

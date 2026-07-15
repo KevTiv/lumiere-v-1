@@ -179,12 +179,14 @@ import CreateAiSkillReducer from "./create_ai_skill_reducer";
 import CreateAiSkillFixtureReducer from "./create_ai_skill_fixture_reducer";
 import CreateAiSkillVersionReducer from "./create_ai_skill_version_reducer";
 import CreateAiTeamMemberReducer from "./create_ai_team_member_reducer";
+import CreateAmortizationScheduleReducer from "./create_amortization_schedule_reducer";
 import CreateAnalyticAccountReducer from "./create_analytic_account_reducer";
 import CreateAnalyticDistributionModelReducer from "./create_analytic_distribution_model_reducer";
 import CreateAnalyticLineReducer from "./create_analytic_line_reducer";
 import CreateAnalyticsMetricReducer from "./create_analytics_metric_reducer";
 import CreateApprovalRuleReducer from "./create_approval_rule_reducer";
 import CreateAuditRuleReducer from "./create_audit_rule_reducer";
+import CreateBadDebtWriteOffReducer from "./create_bad_debt_write_off_reducer";
 import CreateBarcodeNomenclatureReducer from "./create_barcode_nomenclature_reducer";
 import CreateBarcodeRuleReducer from "./create_barcode_rule_reducer";
 import CreateBillFromPurchaseOrderReducer from "./create_bill_from_purchase_order_reducer";
@@ -528,6 +530,7 @@ import PostLandedCostsReducer from "./post_landed_costs_reducer";
 import PostMessageReducer from "./post_message_reducer";
 import PostPaymentReducer from "./post_payment_reducer";
 import PostPaymentTransactionReducer from "./post_payment_transaction_reducer";
+import PostRealizedFxGainLossReducer from "./post_realized_fx_gain_loss_reducer";
 import ProcessConsolidationReducer from "./process_consolidation_reducer";
 import ProcessIntercompanyTransactionReducer from "./process_intercompany_transaction_reducer";
 import ProcessInventoryAdjustmentReducer from "./process_inventory_adjustment_reducer";
@@ -536,6 +539,7 @@ import ProduceManufacturingOrderReducer from "./produce_manufacturing_order_redu
 import PromoteAiSkillVersionReducer from "./promote_ai_skill_version_reducer";
 import QueueMailFromTemplateReducer from "./queue_mail_from_template_reducer";
 import ReceivePoLineReducer from "./receive_po_line_reducer";
+import RecognizeAmortizationLineReducer from "./recognize_amortization_line_reducer";
 import RecognizeDeferredRevenueReducer from "./recognize_deferred_revenue_reducer";
 import ReconcileAccountBankStatementLineReducer from "./reconcile_account_bank_statement_line_reducer";
 import ReconcilePaymentWithInvoiceReducer from "./reconcile_payment_with_invoice_reducer";
@@ -587,10 +591,12 @@ import RetryIotActionReducer from "./retry_iot_action_reducer";
 import ReversePaymentTransactionReducer from "./reverse_payment_transaction_reducer";
 import ReviewMessageBatchReducer from "./review_message_batch_reducer";
 import ReviewSupplierIntakeReducer from "./review_supplier_intake_reducer";
+import RevokeDelegatedAdminScopeReducer from "./revoke_delegated_admin_scope_reducer";
 import RevokePermissionReducer from "./revoke_permission_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
 import RollbackAiSkillReleaseReducer from "./rollback_ai_skill_release_reducer";
 import RollbackImportJobReducer from "./rollback_import_job_reducer";
+import RunAccountingFxRevaluationTestReducer from "./run_accounting_fx_revaluation_test_reducer";
 import RunAccountingIcConsolidationTestReducer from "./run_accounting_ic_consolidation_test_reducer";
 import RunAccountingPaymentCancelTestReducer from "./run_accounting_payment_cancel_test_reducer";
 import RunAccountingPaymentManagementTestReducer from "./run_accounting_payment_management_test_reducer";
@@ -614,6 +620,8 @@ import RunCrmContactIdentityTestReducer from "./run_crm_contact_identity_test_re
 import RunCrmContactUpdateDeleteTestReducer from "./run_crm_contact_update_delete_test_reducer";
 import RunCrmOpportunityConvertTestReducer from "./run_crm_opportunity_convert_test_reducer";
 import RunDocumentsFolderTestReducer from "./run_documents_folder_test_reducer";
+import RunFxRevaluationReducer from "./run_fx_revaluation_reducer";
+import RunFxRevaluationBatchReducer from "./run_fx_revaluation_batch_reducer";
 import RunHelpdeskTicketTestReducer from "./run_helpdesk_ticket_test_reducer";
 import RunHrLeaveTypeTestReducer from "./run_hr_leave_type_test_reducer";
 import RunInventoryAdjustmentTestReducer from "./run_inventory_adjustment_test_reducer";
@@ -795,6 +803,7 @@ import UpdateReportTemplateReducer from "./update_report_template_reducer";
 import UpdateRoleReducer from "./update_role_reducer";
 import UpdateSaleOrderReducer from "./update_sale_order_reducer";
 import UpdateSavedReportReducer from "./update_saved_report_reducer";
+import UpdateSodConflictRuleReducer from "./update_sod_conflict_rule_reducer";
 import UpdateStockInventoryStateReducer from "./update_stock_inventory_state_reducer";
 import UpdateStockLocationReducer from "./update_stock_location_reducer";
 import UpdateStockProductionLotReducer from "./update_stock_production_lot_reducer";
@@ -829,6 +838,7 @@ import UpdateWorkcenterReducer from "./update_workcenter_reducer";
 import UpsertAiSkillReducer from "./upsert_ai_skill_reducer";
 import UpsertAiSkillConfigReducer from "./upsert_ai_skill_config_reducer";
 import UpsertOrganizationSettingsReducer from "./upsert_organization_settings_reducer";
+import UpsertPartnerCreditControlReducer from "./upsert_partner_credit_control_reducer";
 import UpsertProposalSectionReducer from "./upsert_proposal_section_reducer";
 import UpsertSearchEmbeddingReducer from "./upsert_search_embedding_reducer";
 import UpsertWarehouseGeoReducer from "./upsert_warehouse_geo_reducer";
@@ -888,6 +898,8 @@ import AiSkillTestRunRow from "./ai_skill_test_run_table";
 import AiSkillVersionRow from "./ai_skill_version_table";
 import AiTeamMemberRow from "./ai_team_member_table";
 import AiTeamMemberSkillRow from "./ai_team_member_skill_table";
+import AmortizationLineRow from "./amortization_line_table";
+import AmortizationScheduleRow from "./amortization_schedule_table";
 import AnalyticsMetricRow from "./analytics_metric_table";
 import ApprovalRequestRow from "./approval_request_table";
 import ApprovalRuleRow from "./approval_rule_table";
@@ -953,6 +965,7 @@ import FleetVehicleRow from "./fleet_vehicle_table";
 import FormConfigRow from "./form_config_table";
 import FormConfigFieldRow from "./form_config_field_table";
 import FormRoleConfigRow from "./form_role_config_table";
+import FxRevaluationRunRow from "./fx_revaluation_run_table";
 import GeneratedOwnerReportRow from "./generated_owner_report_table";
 import GoogleDriveConnectionRow from "./google_drive_connection_table";
 import HelpdeskSlaRow from "./helpdesk_sla_table";
@@ -1011,6 +1024,7 @@ import OrgSchemaMigrationRow from "./org_schema_migration_table";
 import OrganizationRow from "./organization_table";
 import OrganizationSettingsRow from "./organization_settings_table";
 import PackagingMaterialRow from "./packaging_material_table";
+import PartnerCreditControlRow from "./partner_credit_control_table";
 import PaymentAccountRow from "./payment_account_table";
 import PaymentFeeRow from "./payment_fee_table";
 import PaymentReconciliationRow from "./payment_reconciliation_table";
@@ -1995,6 +2009,40 @@ const tablesSchema = __schema({
       { name: 'ai_team_member_skill_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AiTeamMemberSkillRow),
+  amortization_line: __table({
+    name: 'amortization_line',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'amort_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'amort_line_by_schedule', algorithm: 'btree', columns: [
+        'scheduleId',
+      ] },
+    ],
+    constraints: [
+      { name: 'amortization_line_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AmortizationLineRow),
+  amortization_schedule: __table({
+    name: 'amortization_schedule',
+    indexes: [
+      { name: 'amort_schedule_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'amort_schedule_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'amortization_schedule_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AmortizationScheduleRow),
   analytics_metric: __table({
     name: 'analytics_metric',
     indexes: [
@@ -3072,6 +3120,23 @@ const tablesSchema = __schema({
       { name: 'form_role_config_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, FormRoleConfigRow),
+  fx_revaluation_run: __table({
+    name: 'fx_revaluation_run',
+    indexes: [
+      { name: 'fx_reval_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'fx_reval_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'fx_revaluation_run_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FxRevaluationRunRow),
   generated_owner_report: __table({
     name: 'generated_owner_report',
     indexes: [
@@ -4072,6 +4137,26 @@ const tablesSchema = __schema({
       { name: 'packaging_material_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PackagingMaterialRow),
+  partner_credit_control: __table({
+    name: 'partner_credit_control',
+    indexes: [
+      { name: 'partner_credit_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'partner_credit_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'partner_credit_by_partner', algorithm: 'btree', columns: [
+        'partnerId',
+      ] },
+    ],
+    constraints: [
+      { name: 'partner_credit_control_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PartnerCreditControlRow),
   payment_account: __table({
     name: 'payment_account',
     indexes: [
@@ -6281,12 +6366,14 @@ const reducersSchema = __reducers(
   __reducerSchema("create_ai_skill_fixture", CreateAiSkillFixtureReducer),
   __reducerSchema("create_ai_skill_version", CreateAiSkillVersionReducer),
   __reducerSchema("create_ai_team_member", CreateAiTeamMemberReducer),
+  __reducerSchema("create_amortization_schedule", CreateAmortizationScheduleReducer),
   __reducerSchema("create_analytic_account", CreateAnalyticAccountReducer),
   __reducerSchema("create_analytic_distribution_model", CreateAnalyticDistributionModelReducer),
   __reducerSchema("create_analytic_line", CreateAnalyticLineReducer),
   __reducerSchema("create_analytics_metric", CreateAnalyticsMetricReducer),
   __reducerSchema("create_approval_rule", CreateApprovalRuleReducer),
   __reducerSchema("create_audit_rule", CreateAuditRuleReducer),
+  __reducerSchema("create_bad_debt_write_off", CreateBadDebtWriteOffReducer),
   __reducerSchema("create_barcode_nomenclature", CreateBarcodeNomenclatureReducer),
   __reducerSchema("create_barcode_rule", CreateBarcodeRuleReducer),
   __reducerSchema("create_bill_from_purchase_order", CreateBillFromPurchaseOrderReducer),
@@ -6630,6 +6717,7 @@ const reducersSchema = __reducers(
   __reducerSchema("post_message", PostMessageReducer),
   __reducerSchema("post_payment", PostPaymentReducer),
   __reducerSchema("post_payment_transaction", PostPaymentTransactionReducer),
+  __reducerSchema("post_realized_fx_gain_loss", PostRealizedFxGainLossReducer),
   __reducerSchema("process_consolidation", ProcessConsolidationReducer),
   __reducerSchema("process_intercompany_transaction", ProcessIntercompanyTransactionReducer),
   __reducerSchema("process_inventory_adjustment", ProcessInventoryAdjustmentReducer),
@@ -6638,6 +6726,7 @@ const reducersSchema = __reducers(
   __reducerSchema("promote_ai_skill_version", PromoteAiSkillVersionReducer),
   __reducerSchema("queue_mail_from_template", QueueMailFromTemplateReducer),
   __reducerSchema("receive_po_line", ReceivePoLineReducer),
+  __reducerSchema("recognize_amortization_line", RecognizeAmortizationLineReducer),
   __reducerSchema("recognize_deferred_revenue", RecognizeDeferredRevenueReducer),
   __reducerSchema("reconcile_account_bank_statement_line", ReconcileAccountBankStatementLineReducer),
   __reducerSchema("reconcile_payment_with_invoice", ReconcilePaymentWithInvoiceReducer),
@@ -6689,10 +6778,12 @@ const reducersSchema = __reducers(
   __reducerSchema("reverse_payment_transaction", ReversePaymentTransactionReducer),
   __reducerSchema("review_message_batch", ReviewMessageBatchReducer),
   __reducerSchema("review_supplier_intake", ReviewSupplierIntakeReducer),
+  __reducerSchema("revoke_delegated_admin_scope", RevokeDelegatedAdminScopeReducer),
   __reducerSchema("revoke_permission", RevokePermissionReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
   __reducerSchema("rollback_ai_skill_release", RollbackAiSkillReleaseReducer),
   __reducerSchema("rollback_import_job", RollbackImportJobReducer),
+  __reducerSchema("run_accounting_fx_revaluation_test", RunAccountingFxRevaluationTestReducer),
   __reducerSchema("run_accounting_ic_consolidation_test", RunAccountingIcConsolidationTestReducer),
   __reducerSchema("run_accounting_payment_cancel_test", RunAccountingPaymentCancelTestReducer),
   __reducerSchema("run_accounting_payment_management_test", RunAccountingPaymentManagementTestReducer),
@@ -6716,6 +6807,8 @@ const reducersSchema = __reducers(
   __reducerSchema("run_crm_contact_update_delete_test", RunCrmContactUpdateDeleteTestReducer),
   __reducerSchema("run_crm_opportunity_convert_test", RunCrmOpportunityConvertTestReducer),
   __reducerSchema("run_documents_folder_test", RunDocumentsFolderTestReducer),
+  __reducerSchema("run_fx_revaluation", RunFxRevaluationReducer),
+  __reducerSchema("run_fx_revaluation_batch", RunFxRevaluationBatchReducer),
   __reducerSchema("run_helpdesk_ticket_test", RunHelpdeskTicketTestReducer),
   __reducerSchema("run_hr_leave_type_test", RunHrLeaveTypeTestReducer),
   __reducerSchema("run_inventory_adjustment_test", RunInventoryAdjustmentTestReducer),
@@ -6897,6 +6990,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_role", UpdateRoleReducer),
   __reducerSchema("update_sale_order", UpdateSaleOrderReducer),
   __reducerSchema("update_saved_report", UpdateSavedReportReducer),
+  __reducerSchema("update_sod_conflict_rule", UpdateSodConflictRuleReducer),
   __reducerSchema("update_stock_inventory_state", UpdateStockInventoryStateReducer),
   __reducerSchema("update_stock_location", UpdateStockLocationReducer),
   __reducerSchema("update_stock_production_lot", UpdateStockProductionLotReducer),
@@ -6931,6 +7025,7 @@ const reducersSchema = __reducers(
   __reducerSchema("upsert_ai_skill", UpsertAiSkillReducer),
   __reducerSchema("upsert_ai_skill_config", UpsertAiSkillConfigReducer),
   __reducerSchema("upsert_organization_settings", UpsertOrganizationSettingsReducer),
+  __reducerSchema("upsert_partner_credit_control", UpsertPartnerCreditControlReducer),
   __reducerSchema("upsert_proposal_section", UpsertProposalSectionReducer),
   __reducerSchema("upsert_search_embedding", UpsertSearchEmbeddingReducer),
   __reducerSchema("upsert_warehouse_geo", UpsertWarehouseGeoReducer),

@@ -106,6 +106,97 @@
   },
   {
     "extra_where": "",
+    "mapKey": "bank-statements",
+    "order_by": "",
+    "resource_key": "bank-statements",
+    "table": "account_bank_statement"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "bank-statement-lines",
+    "order_by": " ORDER BY id ASC",
+    "resource_key": "bank-statement-lines",
+    "table": "account_bank_statement_line"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "bank-match-candidates",
+    "order_by": "",
+    "resource_key": "bank-match-candidates",
+    "table": "bank_match_candidate"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "account-reconciliation-widgets",
+    "order_by": "",
+    "resource_key": "account-reconciliation-widgets",
+    "table": "account_reconciliation_widget"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "account-payments",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "account-payments",
+    "table": "account_payment"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "account-payment-terms",
+    "order_by": "",
+    "resource_key": "account-payment-terms",
+    "table": "account_payment_term"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "payment-accounts",
+    "order_by": "",
+    "resource_key": "payment-accounts",
+    "table": "payment_account"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "payment-transactions",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "payment-transactions",
+    "table": "payment_transaction"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "payment-fees",
+    "order_by": "",
+    "resource_key": "payment-fees",
+    "table": "payment_fee"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "payment-reconciliations",
+    "order_by": "",
+    "resource_key": "payment-reconciliations",
+    "table": "payment_reconciliation"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "payment-reversals",
+    "order_by": "",
+    "resource_key": "payment-reversals",
+    "table": "payment_reversal"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "analytic-lines",
+    "order_by": "",
+    "resource_key": "analytic-lines",
+    "table": "account_analytic_line"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "analytic-distribution-models",
+    "order_by": "",
+    "resource_key": "analytic-distribution-models",
+    "table": "account_analytic_distribution_model"
+  },
+  {
+    "extra_where": "",
     "mapKey": "sale-orders",
     "order_by": "",
     "resource_key": "sale-orders",
@@ -474,6 +565,48 @@
     "order_by": "",
     "resource_key": "subscriptions",
     "table": "subscription"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "sod-conflict-rules",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "sod-conflict-rules",
+    "table": "sod_conflict_rule"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "fx-revaluation-runs",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "fx-revaluation-runs",
+    "table": "fx_revaluation_run"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "amortization-schedules",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "amortization-schedules",
+    "table": "amortization_schedule"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "amortization-lines",
+    "order_by": " ORDER BY schedule_id ASC, sequence ASC",
+    "resource_key": "amortization-lines",
+    "table": "amortization_line"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "partner-credit-controls",
+    "order_by": "",
+    "resource_key": "partner-credit-controls",
+    "table": "partner_credit_control"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "delegated-admin-scopes",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "delegated-admin-scopes",
+    "table": "delegated_admin_scope"
   },
   {
     "extra_where": "",

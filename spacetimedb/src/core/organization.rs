@@ -553,7 +553,11 @@ pub fn create_company(
         return Err("Company name cannot be empty".to_string());
     }
 
-    ctx.db.company().insert(Company {
+    if let Some(parent_id) = params.parent_id {
+        require_company_in_organization(ctx, organization_id, parent_id)?;
+    }
+
+    let company = ctx.db.company().insert(Company {
         id: 0,
         external_id: new_external_id(ctx),
         organization_id,
@@ -576,6 +580,28 @@ pub fn create_company(
         deleted_at: None,
         metadata: params.metadata,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company.id),
+            table_name: "company",
+            record_id: company.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": company.name,
+                    "code": company.code,
+                    "parent_id": company.parent_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "code".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

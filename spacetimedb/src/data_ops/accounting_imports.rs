@@ -129,6 +129,7 @@ pub fn import_tax_rate_csv(
 
         let type_tax_use = match col(&headers, row, "type_tax_use") {
             "purchase" => TaxTypeUse::Purchase,
+            "withholding" | "wht" => TaxTypeUse::Withholding,
             "none" => TaxTypeUse::None,
             _ => TaxTypeUse::Sale,
         };

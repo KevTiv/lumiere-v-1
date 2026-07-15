@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::fiscal_periods::{
@@ -19,7 +21,7 @@ fn seed_closed_period(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(), 
             name: "Closed test period".to_string(),
             code: "CL01".to_string(),
             date_from: ctx.timestamp,
-            date_to: ctx.timestamp,
+            date_to: ctx.timestamp + Duration::from_secs(86_400),
             fiscal_year_id: fixture.fiscal_year_id,
             state: PeriodState::Open,
             is_adjustment: false,

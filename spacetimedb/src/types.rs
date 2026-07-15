@@ -574,6 +574,8 @@ pub enum PaymentState {
 pub enum TaxTypeUse {
     Sale,
     Purchase,
+    /// Withholding / retention tax (Oceania PAYG, ZA, BR IRRF, SEA WHT).
+    Withholding,
     None,
 }
 

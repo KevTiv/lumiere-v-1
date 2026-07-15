@@ -18,6 +18,8 @@ mod session;
 mod settings;
 mod statement_imports;
 mod stdb;
+mod country_packs;
+mod statutory_adapters;
 mod vertical_packs;
 
 use std::sync::Arc;
@@ -46,5 +48,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(admin::router())
         .merge(proposals::router())
         .merge(reports::router())
+        .merge(country_packs::router())
+        .merge(statutory_adapters::router())
         .merge(vertical_packs::router())
 }

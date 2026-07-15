@@ -19,7 +19,9 @@
 pub mod billing;
 pub mod audit;
 pub mod auth;
+pub mod country_pack;
 pub mod messaging;
+pub mod migrations;
 pub mod operational_messaging;
 pub mod organization;
 pub mod permissions;

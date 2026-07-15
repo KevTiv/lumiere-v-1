@@ -35,7 +35,8 @@ use crate::accounting::chart_of_accounts::{
     CreateAccountAccountParams, CreateAccountAccountTypeParams,
 };
 use crate::accounting::fiscal_periods::{
-    account_fiscal_year, create_fiscal_year, CreateFiscalYearParams,
+    account_fiscal_year, create_account_period, create_fiscal_year, CreateAccountPeriodParams,
+    CreateFiscalYearParams,
 };
 use crate::core::organization::{
     company, create_company, insert_organization_with_owner, organization, CreateCompanyParams,
@@ -51,7 +52,7 @@ use crate::inventory::product_category::{
     create_product_category, product_category, CreateProductCategoryParams,
 };
 use crate::inventory::warehouse::{warehouse, Warehouse};
-use crate::types::{AccountInternalGroup, AccountTypeInternal, FiscalYearState};
+use crate::types::{AccountInternalGroup, AccountTypeInternal, FiscalYearState, PeriodState};
 
 /// Alias for mission docs — domain tests receive a live `ReducerContext` from SpacetimeDB.
 pub type TestContext = ReducerContext;
@@ -166,6 +167,23 @@ impl OrgFixture {
             .find(|fy| fy.name.contains(&suffix.to_string()))
             .map(|fy| fy.id)
             .ok_or("Harness: fiscal year not found after create")?;
+
+        create_account_period(
+            ctx,
+            organization_id,
+            company_id,
+            CreateAccountPeriodParams {
+                name: format!("Open-{suffix}"),
+                code: format!("OP{suffix}"),
+                date_from: year_start,
+                date_to: year_end,
+                fiscal_year_id,
+                state: PeriodState::Open,
+                is_adjustment: false,
+                notes: None,
+                metadata: None,
+            },
+        )?;
 
         let at_receivable = seed_account_type(
             ctx,

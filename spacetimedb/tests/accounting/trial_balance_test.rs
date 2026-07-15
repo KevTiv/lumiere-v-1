@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::financial_statements::{
@@ -22,7 +24,7 @@ pub fn test_trial_balance_summary_balances(ctx: &ReducerContext) -> Result<(), S
             name: "Harness trial balance".to_string(),
             report_type: ReportType::TrialBalance,
             date_from: ctx.timestamp,
-            date_to: ctx.timestamp,
+            date_to: ctx.timestamp + Duration::from_secs(86_400),
             currency_id: 1,
             target_move: "posted".to_string(),
             comparison_mode: "none".to_string(),

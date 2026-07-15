@@ -35,6 +35,9 @@ const ACCOUNTING_TAB_IDS = [
   "fixed-assets",
   "fiscal-years",
   "account-periods",
+  "fx-revaluation",
+  "credit-control",
+  "amortization",
   "consolidation",
   "intercompany-rules",
   "intercompany-transactions",
@@ -100,6 +103,15 @@ async function assertAccountingTabRenders(page: Page, tabId: string) {
       break
     case "consolidation":
       await expect(page.getByText("Consolidation Accounts")).toBeVisible()
+      break
+    case "fx-revaluation":
+      await expect(page.getByText("Foreign exchange revaluation")).toBeVisible()
+      break
+    case "credit-control":
+      await expect(page.getByText("Partner credit control")).toBeVisible()
+      break
+    case "amortization":
+      await expect(page.getByText("Accrual & prepaid amortization")).toBeVisible()
       break
     case "intercompany-rules":
     case "intercompany-transactions":

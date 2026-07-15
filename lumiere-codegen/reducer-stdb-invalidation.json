@@ -22,12 +22,41 @@
     "tax-schedules",
     "tax-deadlines"
   ],
+  "create_amortization_schedule": ["amortization-schedules", "amortization-lines"],
+  "create_bad_debt_write_off": ["account-moves", "account-move-lines"],
   "create_budget_line": ["budgets", "budget-lines", "budget-posts"],
   "delete_account_move_line": ["account-moves", "account-move-lines"],
   "deprecate_account_account": ["account-accounts"],
   "dispose_account_asset": ["fixed-assets", "depreciation-lines"],
   "post_account_move": ["account-moves", "account-move-lines"],
   "post_invoice": ["account-moves", "account-move-lines"],
+  "post_realized_fx_gain_loss": [
+    "account-moves",
+    "account-move-lines",
+    "fx-revaluation-runs"
+  ],
+  "recognize_amortization_line": [
+    "amortization-lines",
+    "amortization-schedules",
+    "account-moves",
+    "account-move-lines"
+  ],
+  "recognize_deferred_revenue": [
+    "deferred-revenue-lines",
+    "deferred-revenue-schedules",
+    "account-moves",
+    "account-move-lines"
+  ],
+  "run_fx_revaluation": [
+    "fx-revaluation-runs",
+    "account-moves",
+    "account-move-lines"
+  ],
+  "run_fx_revaluation_batch": [
+    "fx-revaluation-runs",
+    "account-moves",
+    "account-move-lines"
+  ],
   "unreconcile_account_bank_statement_line": [
     "bank-statements",
     "bank-statement-lines",
@@ -51,5 +80,6 @@
     "tax-deadlines"
   ],
   "update_budget_line": ["budgets", "budget-lines", "budget-posts"],
-  "update_crossovered_budget": ["budgets", "budget-lines", "budget-posts"]
+  "update_crossovered_budget": ["budgets", "budget-lines", "budget-posts"],
+  "upsert_partner_credit_control": ["partner-credit-controls"]
 }

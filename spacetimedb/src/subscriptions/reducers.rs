@@ -11,10 +11,13 @@
 
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
 use crate::core::organization::company_id_from_scope;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::sales::sales_core::sale_order;
 use crate::subscriptions::tables::*;
+use crate::types::{AccountMoveState, PaymentState};
 
 // ============================================================================
 // INPUT PARAMS
@@ -140,10 +143,11 @@ pub struct CreateDeferredRevenueScheduleParams {
 
 /// Params for recognizing deferred revenue.
 /// Scope: `company_id` and `line_id` are flat reducer params.
+/// The reducer posts a balanced GL move (Dr deferred liability / Cr income).
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct RecognizeDeferredRevenueParams {
-    pub move_id: u64,
-    pub move_line_id: u64,
+    pub reference: Option<String>,
+    pub metadata: Option<String>,
 }
 
 /// Params for creating revenue recognition rule.
@@ -904,6 +908,7 @@ pub fn recognize_deferred_revenue(
     params: RecognizeDeferredRevenueParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "deferred_revenue_line", "write")?;
+    check_permission(ctx, organization_id, "account_move", "create")?;
 
     let line = ctx
         .db
@@ -922,29 +927,181 @@ pub fn recognize_deferred_revenue(
     if schedule.organization_id != organization_id {
         return Err("Revenue line does not belong to this organization".to_string());
     }
+    if line.company_id != company_id || schedule.company_id != company_id {
+        return Err("Revenue line does not belong to this company".to_string());
+    }
 
     if line.recognized {
         return Err("Revenue already recognized for this line".to_string());
     }
+    if line.amount <= 0.0 {
+        return Err("Recognition amount must be positive".to_string());
+    }
+
+    ensure_accounting_period_open_for_date(ctx, company_id, line.recognition_date)?;
+
+    // account_id = deferred liability (BS); deferred_account_id = income when recognized
+    let liability_account_id = line.account_id;
+    let income_account_id = line.deferred_account_id;
+    let amount = line.amount;
+    let name = next_doc_number(ctx, "REVREC");
+    let currency_id = line.currency_id;
+
+    let move_record = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        organization_id,
+        name: name.clone(),
+        ref_: params.reference.clone(),
+        move_type: crate::types::MoveType::Entry,
+        auto_post: false,
+        state: AccountMoveState::Posted,
+        date: line.recognition_date,
+        invoice_date: None,
+        invoice_date_due: None,
+        invoice_payment_term_id: None,
+        invoice_origin: None,
+        invoice_partner_display_name: None,
+        invoice_cash_rounding_id: None,
+        payment_reference: params.reference.clone(),
+        partner_shipping_id: None,
+        sale_order_id: None,
+        partner_id: None,
+        commercial_partner_id: None,
+        partner_bank_id: None,
+        fiscal_position_id: None,
+        invoice_user_id: None,
+        invoice_incoterm_id: None,
+        incoterm_location: None,
+        campaign_id: None,
+        source_id: None,
+        medium_id: None,
+        company_id,
+        journal_id: line.journal_id,
+        currency_id,
+        company_currency_id: currency_id,
+        amount_untaxed: amount,
+        amount_tax: 0.0,
+        amount_total: amount,
+        amount_residual: 0.0,
+        amount_untaxed_signed: amount,
+        amount_tax_signed: 0.0,
+        amount_total_signed: amount,
+        amount_total_in_currency_signed: amount,
+        amount_residual_signed: 0.0,
+        to_check: false,
+        posted_before: true,
+        is_storno: false,
+        is_move_sent: false,
+        secure_sequence_number: None,
+        invoice_has_outstanding: false,
+        payment_state: PaymentState::NotPaid,
+        restrict_mode_hash_table: false,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: params.metadata.clone(),
+    });
+
+    let insert_line = |account_id: u64, line_name: &str, debit: f64, credit: f64, sequence: u32| {
+        ctx.db.account_move_line().insert(AccountMoveLine {
+            id: 0,
+            organization_id,
+            move_id: move_record.id,
+            move_name: Some(name.clone()),
+            date: line.recognition_date,
+            ref_: params.reference.clone(),
+            parent_state: AccountMoveState::Posted,
+            journal_id: line.journal_id,
+            company_id,
+            company_currency_id: currency_id,
+            sequence,
+            name: line_name.to_string(),
+            quantity: 0.0,
+            price_unit: 0.0,
+            price: 0.0,
+            price_subtotal: 0.0,
+            price_total: 0.0,
+            discount: 0.0,
+            balance: debit - credit,
+            currency_id,
+            amount_currency: 0.0,
+            amount_residual: 0.0,
+            amount_residual_currency: 0.0,
+            debit,
+            credit,
+            debit_currency: 0.0,
+            credit_currency: 0.0,
+            tax_base_amount: 0.0,
+            account_id,
+            account_internal_type: None,
+            account_internal_group: None,
+            account_root_id: None,
+            group_tax_id: None,
+            tax_line_id: None,
+            tax_group_id: None,
+            tax_ids: vec![],
+            tax_repartition_line_id: None,
+            tax_audit: None,
+            partner_id: None,
+            commercial_partner_id: None,
+            reconcile_model_id: None,
+            payment_id: None,
+            statement_line_id: None,
+            currency_id_field: None,
+            blocked: false,
+            matching_number: None,
+            matching_label: None,
+            is_matching: false,
+            expected_pay_date: None,
+            expected_pay_date_currency_id: None,
+            expected_pay_date_amount: 0.0,
+            expected_pay_date_residual: 0.0,
+            display_type: None,
+            is_downpayment: false,
+            exclude_from_invoice_tab: false,
+            analytic_account_id: None,
+            analytic_tag_ids: vec![],
+            product_id: None,
+            product_uom_id: None,
+            product_category_id: None,
+            cogs_amount: 0.0,
+            create_uid: Some(ctx.sender()),
+            create_date: Some(ctx.timestamp),
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            metadata: params.metadata.clone(),
+        })
+    };
+
+    let liability_line = insert_line(
+        liability_account_id,
+        "Deferred revenue recognition",
+        amount,
+        0.0,
+        1,
+    );
+    insert_line(income_account_id, "Recognized revenue", 0.0, amount, 2);
 
     ctx.db
         .deferred_revenue_line()
         .id()
         .update(DeferredRevenueLine {
             recognized: true,
-            move_id: Some(params.move_id),
-            move_line_id: Some(params.move_line_id),
+            move_id: Some(move_record.id),
+            move_line_id: Some(liability_line.id),
             ..line.clone()
         });
 
-    // Update schedule totals
-    let new_recognized = schedule.recognized_amount + line.amount;
-    let new_deferred = schedule.deferred_amount - line.amount;
+    let new_recognized = schedule.recognized_amount + amount;
+    let new_deferred = schedule.deferred_amount - amount;
     let new_state = if new_deferred <= 0.0 {
         "finished".to_string()
     } else {
         schedule.state.clone()
     };
+    let mut journal_entry_ids = schedule.journal_entry_ids.clone();
+    journal_entry_ids.push(move_record.id);
 
     ctx.db
         .deferred_revenue_schedule()
@@ -953,6 +1110,7 @@ pub fn recognize_deferred_revenue(
             recognized_amount: new_recognized,
             deferred_amount: new_deferred,
             state: new_state,
+            journal_entry_ids,
             ..schedule
         });
 
@@ -965,20 +1123,28 @@ pub fn recognize_deferred_revenue(
             record_id: line_id,
             action: "UPDATE",
             old_values: Some(serde_json::json!({ "recognized": false }).to_string()),
-            new_values: Some(serde_json::json!({ "recognized": true }).to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "recognized": true,
+                    "move_id": move_record.id,
+                    "amount": amount,
+                })
+                .to_string(),
+            ),
             changed_fields: vec![
                 "recognized".to_string(),
                 "move_id".to_string(),
                 "move_line_id".to_string(),
             ],
-            metadata: Some(serde_json::json!({ "amount": line.amount }).to_string()),
+            metadata: params.metadata.clone(),
         },
     );
 
     log::info!(
-        "Recognized deferred revenue line {} for amount {}",
+        "Recognized deferred revenue line {} for amount {} via move {}",
         line_id,
-        line.amount
+        amount,
+        move_record.id
     );
     Ok(())
 }

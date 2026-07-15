@@ -236,6 +236,8 @@ export type { AccountAccount, AccountMove } from "./lib/accounting-types";
 export * from "./accounting-components/budgets-workspace";
 export * from "./accounting-components/consolidation-workspace";
 export * from "./accounting-components/fx-revaluation-panel";
+export * from "./accounting-components/partner-credit-control-panel";
+export * from "./accounting-components/amortization-panel";
 
 // Calendar components
 export * from "./calendar-components/calendar-view";

@@ -1314,6 +1314,45 @@ export const AllocatePaymentParams = __t.object("AllocatePaymentParams", {
 });
 export type AllocatePaymentParams = __Infer<typeof AllocatePaymentParams>;
 
+export const AmortizationLine = __t.object("AmortizationLine", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  scheduleId: __t.u64(),
+  sequence: __t.u32(),
+  recognitionDate: __t.timestamp(),
+  amount: __t.f64(),
+  recognized: __t.bool(),
+  moveId: __t.option(__t.u64()),
+  createUid: __t.option(__t.identity()),
+  createDate: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type AmortizationLine = __Infer<typeof AmortizationLine>;
+
+export const AmortizationSchedule = __t.object("AmortizationSchedule", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  scheduleKind: __t.string(),
+  description: __t.string(),
+  journalId: __t.u64(),
+  balanceSheetAccountId: __t.u64(),
+  plAccountId: __t.u64(),
+  currencyId: __t.u64(),
+  totalAmount: __t.f64(),
+  recognizedAmount: __t.f64(),
+  remainingAmount: __t.f64(),
+  startDate: __t.timestamp(),
+  endDate: __t.timestamp(),
+  recognitionPeriod: __t.string(),
+  state: __t.string(),
+  createUid: __t.option(__t.identity()),
+  createDate: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type AmortizationSchedule = __Infer<typeof AmortizationSchedule>;
+
 export const AnalyticsMetric = __t.object("AnalyticsMetric", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -2794,6 +2833,21 @@ export const CreateAiTeamMemberParams = __t.object("CreateAiTeamMemberParams", {
 });
 export type CreateAiTeamMemberParams = __Infer<typeof CreateAiTeamMemberParams>;
 
+export const CreateAmortizationScheduleParams = __t.object("CreateAmortizationScheduleParams", {
+  scheduleKind: __t.string(),
+  description: __t.string(),
+  journalId: __t.u64(),
+  balanceSheetAccountId: __t.u64(),
+  plAccountId: __t.u64(),
+  currencyId: __t.u64(),
+  totalAmount: __t.f64(),
+  startDate: __t.timestamp(),
+  endDate: __t.timestamp(),
+  recognitionPeriod: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateAmortizationScheduleParams = __Infer<typeof CreateAmortizationScheduleParams>;
+
 export const CreateAnalyticAccountParams = __t.object("CreateAnalyticAccountParams", {
   companyId: __t.option(__t.u64()),
   name: __t.string(),
@@ -2903,6 +2957,19 @@ export const CreateAuditRuleParams = __t.object("CreateAuditRuleParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateAuditRuleParams = __Infer<typeof CreateAuditRuleParams>;
+
+export const CreateBadDebtWriteOffParams = __t.object("CreateBadDebtWriteOffParams", {
+  partnerId: __t.u64(),
+  moveId: __t.u64(),
+  amount: __t.f64(),
+  journalId: __t.u64(),
+  receivableAccountId: __t.u64(),
+  writeOffAccountId: __t.u64(),
+  date: __t.timestamp(),
+  reference: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateBadDebtWriteOffParams = __Infer<typeof CreateBadDebtWriteOffParams>;
 
 export const CreateBarcodeNomenclatureParams = __t.object("CreateBarcodeNomenclatureParams", {
   name: __t.string(),
@@ -6299,6 +6366,30 @@ export const FormRoleConfig = __t.object("FormRoleConfig", {
 });
 export type FormRoleConfig = __Infer<typeof FormRoleConfig>;
 
+export const FxRevaluationLineParams = __t.object("FxRevaluationLineParams", {
+  accountId: __t.u64(),
+  adjustment: __t.f64(),
+});
+export type FxRevaluationLineParams = __Infer<typeof FxRevaluationLineParams>;
+
+export const FxRevaluationRun = __t.object("FxRevaluationRun", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  currencyCode: __t.string(),
+  asOfDate: __t.timestamp(),
+  moveId: __t.u64(),
+  journalId: __t.u64(),
+  totalGain: __t.f64(),
+  totalLoss: __t.f64(),
+  netAdjustment: __t.f64(),
+  reference: __t.option(__t.string()),
+  createUid: __t.option(__t.identity()),
+  createDate: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type FxRevaluationRun = __Infer<typeof FxRevaluationRun>;
+
 export const GenerateEuVatReportParams = __t.object("GenerateEuVatReportParams", {
   name: __t.string(),
   dateFrom: __t.timestamp(),
@@ -7927,6 +8018,22 @@ export const PackagingMaterial = __t.object("PackagingMaterial", {
 });
 export type PackagingMaterial = __Infer<typeof PackagingMaterial>;
 
+export const PartnerCreditControl = __t.object("PartnerCreditControl", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  partnerId: __t.u64(),
+  creditLimit: __t.f64(),
+  paymentHold: __t.bool(),
+  notes: __t.option(__t.string()),
+  createUid: __t.option(__t.identity()),
+  createDate: __t.option(__t.timestamp()),
+  writeUid: __t.option(__t.identity()),
+  writeDate: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type PartnerCreditControl = __Infer<typeof PartnerCreditControl>;
+
 // The tagged union or sum type for the algebraic type `PartnerType`.
 export const PartnerType = __t.enum("PartnerType", {
   Customer: __t.unit(),
@@ -8609,6 +8716,21 @@ export const PosTerminal = __t.object("PosTerminal", {
   metadata: __t.option(__t.string()),
 });
 export type PosTerminal = __Infer<typeof PosTerminal>;
+
+export const PostRealizedFxParams = __t.object("PostRealizedFxParams", {
+  paymentId: __t.u64(),
+  invoiceMoveId: __t.u64(),
+  paymentAmountFunctional: __t.f64(),
+  invoiceResidualFunctional: __t.f64(),
+  journalId: __t.u64(),
+  gainAccountId: __t.u64(),
+  lossAccountId: __t.u64(),
+  clearingAccountId: __t.u64(),
+  date: __t.timestamp(),
+  reference: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type PostRealizedFxParams = __Infer<typeof PostRealizedFxParams>;
 
 // The tagged union or sum type for the algebraic type `PricelistAppliedOn`.
 export const PricelistAppliedOn = __t.enum("PricelistAppliedOn", {
@@ -9504,9 +9626,15 @@ export const QueueWorker = __t.object("QueueWorker", {
 });
 export type QueueWorker = __Infer<typeof QueueWorker>;
 
+export const RecognizeAmortizationLineParams = __t.object("RecognizeAmortizationLineParams", {
+  reference: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type RecognizeAmortizationLineParams = __Infer<typeof RecognizeAmortizationLineParams>;
+
 export const RecognizeDeferredRevenueParams = __t.object("RecognizeDeferredRevenueParams", {
-  moveId: __t.u64(),
-  moveLineId: __t.u64(),
+  reference: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
 });
 export type RecognizeDeferredRevenueParams = __Infer<typeof RecognizeDeferredRevenueParams>;
 
@@ -9842,6 +9970,32 @@ export const RuleType = __t.enum("RuleType", {
   Transfer: __t.unit(),
 });
 export type RuleType = __Infer<typeof RuleType>;
+
+export const RunFxRevaluationBatchParams = __t.object("RunFxRevaluationBatchParams", {
+  currencyCode: __t.string(),
+  asOfDate: __t.timestamp(),
+  journalId: __t.u64(),
+  gainAccountId: __t.u64(),
+  lossAccountId: __t.u64(),
+  rate: __t.f64(),
+  reference: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type RunFxRevaluationBatchParams = __Infer<typeof RunFxRevaluationBatchParams>;
+
+export const RunFxRevaluationParams = __t.object("RunFxRevaluationParams", {
+  currencyCode: __t.string(),
+  asOfDate: __t.timestamp(),
+  journalId: __t.u64(),
+  gainAccountId: __t.u64(),
+  lossAccountId: __t.u64(),
+  get lines() {
+    return __t.array(FxRevaluationLineParams);
+  },
+  reference: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type RunFxRevaluationParams = __Infer<typeof RunFxRevaluationParams>;
 
 export const SaleOrder = __t.object("SaleOrder", {
   id: __t.u64(),
@@ -11339,6 +11493,7 @@ export type TaxSchedule = __Infer<typeof TaxSchedule>;
 export const TaxTypeUse = __t.enum("TaxTypeUse", {
   Sale: __t.unit(),
   Purchase: __t.unit(),
+  Withholding: __t.unit(),
   None: __t.unit(),
 });
 export type TaxTypeUse = __Infer<typeof TaxTypeUse>;
@@ -12493,6 +12648,15 @@ export const UpdateSavedReportParams = __t.object("UpdateSavedReportParams", {
 });
 export type UpdateSavedReportParams = __Infer<typeof UpdateSavedReportParams>;
 
+export const UpdateSodConflictRuleParams = __t.object("UpdateSodConflictRuleParams", {
+  permissionA: __t.option(__t.string()),
+  permissionB: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+  isActive: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateSodConflictRuleParams = __Infer<typeof UpdateSodConflictRuleParams>;
+
 export const UpdateStockLocationParams = __t.object("UpdateStockLocationParams", {
   name: __t.option(__t.string()),
   usage: __t.option(__t.string()),
@@ -12861,6 +13025,15 @@ export const UpsertOrganizationSettingsParams = __t.object("UpsertOrganizationSe
   metadata: __t.option(__t.string()),
 });
 export type UpsertOrganizationSettingsParams = __Infer<typeof UpsertOrganizationSettingsParams>;
+
+export const UpsertPartnerCreditControlParams = __t.object("UpsertPartnerCreditControlParams", {
+  partnerId: __t.u64(),
+  creditLimit: __t.f64(),
+  paymentHold: __t.bool(),
+  notes: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type UpsertPartnerCreditControlParams = __Infer<typeof UpsertPartnerCreditControlParams>;
 
 export const UpsertSearchEmbeddingParams = __t.object("UpsertSearchEmbeddingParams", {
   contentType: __t.string(),

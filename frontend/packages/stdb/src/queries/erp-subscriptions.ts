@@ -143,6 +143,9 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "iot-pairing-tokens",
   "sod-conflict-rules",
   "fx-revaluation-runs",
+  "amortization-schedules",
+  "amortization-lines",
+  "partner-credit-controls",
   "delegated-admin-scopes",
   "roles",
   "user-roles",
@@ -463,6 +466,32 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       fa,
       "",
       " ORDER BY id DESC",
+    ),
+  "amortization-schedules": (id, fa) =>
+    selectOrgScopedSql(
+      "amortization-schedules",
+      "amortization_schedule",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "amortization-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "amortization-lines",
+      "amortization_line",
+      id,
+      fa,
+      "",
+      " ORDER BY schedule_id ASC, sequence ASC",
+    ),
+  "partner-credit-controls": (id, fa) =>
+    selectOrgScopedSql(
+      "partner-credit-controls",
+      "partner_credit_control",
+      id,
+      fa,
+      "",
     ),
   "delegated-admin-scopes": (id, fa) =>
     selectOrgScopedSql(

@@ -14,6 +14,8 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::ConsolidationState;
 
+use crate::core::organization::require_company_in_organization;
+
 // ── Tables ───────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(
@@ -434,6 +436,10 @@ pub fn create_consolidation_journal(
 
     if params.exchange_rate <= 0.0 {
         return Err("Exchange rate must be positive".to_string());
+    }
+
+    for company_id in &params.company_ids {
+        require_company_in_organization(ctx, organization_id, *company_id)?;
     }
 
     let journal = ctx.db.consolidation_journal().insert(ConsolidationJournal {

@@ -59,6 +59,30 @@ pub struct AssignRoleParams {
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateSodConflictRuleParams {
+    pub permission_a: String,
+    pub permission_b: String,
+    pub description: Option<String>,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateSodConflictRuleParams {
+    pub permission_a: Option<String>,
+    pub permission_b: Option<String>,
+    pub description: Option<String>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct GrantDelegatedAdminScopeParams {
+    pub user_identity: Identity,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
 pub enum PermissionSubject {
     Role(u64),
     User(Identity),
@@ -171,6 +195,45 @@ pub struct UserRoleAssignment {
     pub assigned_by: Identity,
     pub assigned_at: Timestamp,
     pub expires_at: Option<Timestamp>,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+/// Segregation-of-duties conflict: a user must not hold both permissions concurrently.
+#[spacetimedb::table(
+    accessor = sod_conflict_rule,
+    public,
+    index(accessor = sod_by_org, btree(columns = [organization_id]))
+)]
+pub struct SodConflictRule {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub permission_a: String,
+    pub permission_b: String,
+    pub description: Option<String>,
+    pub is_active: bool,
+    pub created_at: Timestamp,
+    pub metadata: Option<String>,
+}
+
+/// Company-scoped delegated administrator — may manage users/roles for one company only.
+#[spacetimedb::table(
+    accessor = delegated_admin_scope,
+    public,
+    index(accessor = delegated_admin_by_org, btree(columns = [organization_id])),
+    index(accessor = delegated_admin_by_user, btree(columns = [user_identity]))
+)]
+pub struct DelegatedAdminScope {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub user_identity: spacetimedb::Identity,
+    pub granted_by: spacetimedb::Identity,
+    pub granted_at: Timestamp,
     pub is_active: bool,
     pub metadata: Option<String>,
 }
@@ -421,6 +484,186 @@ pub(crate) fn upsert_policy_snapshot(
         let row = ctx.db.policy_snapshot().insert(snapshot);
         Ok(row.id)
     }
+}
+
+fn permission_strings_for_user(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    user_identity: Identity,
+    extra_role_id: Option<u64>,
+) -> Result<Vec<String>, String> {
+    let mut perms: Vec<String> = Vec::new();
+
+    for assignment in ctx
+        .db
+        .user_role_assignment()
+        .role_assign_by_user()
+        .filter(&user_identity)
+        .filter(|a| a.organization_id == organization_id && a.is_active)
+    {
+        if let Some(role) = ctx.db.role().id().find(&assignment.role_id) {
+            perms.extend(role.permissions.clone());
+        }
+    }
+
+    if let Some(role_id) = extra_role_id {
+        if let Some(role) = ctx.db.role().id().find(&role_id) {
+            if role.organization_id == organization_id {
+                perms.extend(role.permissions.clone());
+            }
+        }
+    }
+
+    perms.sort();
+    perms.dedup();
+    Ok(perms)
+}
+
+fn permission_set_has(permissions: &[String], needle: &str) -> bool {
+    if permissions.iter().any(|p| p == "*:*") {
+        return true;
+    }
+    if let Some((resource, _action)) = needle.split_once(':') {
+        let wildcard = format!("{resource}:*");
+        return permissions.iter().any(|p| p == needle || p == &wildcard);
+    }
+    false
+}
+
+pub(crate) fn validate_sod_for_permissions(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    permissions: &[String],
+) -> Result<(), String> {
+    if permission_set_has(permissions, "*:*") {
+        return Ok(());
+    }
+
+    for rule in ctx
+        .db
+        .sod_conflict_rule()
+        .sod_by_org()
+        .filter(&organization_id)
+        .filter(|r| r.is_active)
+    {
+        if permission_set_has(permissions, &rule.permission_a)
+            && permission_set_has(permissions, &rule.permission_b)
+        {
+            return Err(format!(
+                "segregation of duties conflict: {} and {} cannot be held together",
+                rule.permission_a, rule.permission_b
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn caller_delegated_company_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Option<u64> {
+    ctx.db
+        .delegated_admin_scope()
+        .delegated_admin_by_user()
+        .filter(&ctx.sender())
+        .find(|s| s.organization_id == organization_id && s.is_active)
+        .map(|s| s.company_id)
+}
+
+pub(crate) fn ensure_delegated_admin_may_assign_role(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    role: &Role,
+) -> Result<(), String> {
+    let Some(scope_company_id) = caller_delegated_company_scope(ctx, organization_id) else {
+        return Ok(());
+    };
+
+    if role.permissions.iter().any(|p| p == "*:*") {
+        return Err(
+            "delegated administrators cannot assign organization owner roles".to_string(),
+        );
+    }
+
+    if role.name == "owner" || role.is_system {
+        return Err("delegated administrators cannot assign system or owner roles".to_string());
+    }
+
+    let _ = scope_company_id;
+    Ok(())
+}
+
+pub(crate) fn ensure_delegated_admin_may_grant_permission(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    if caller_delegated_company_scope(ctx, organization_id).is_some() {
+        return Err("delegated administrators cannot grant org permissions".to_string());
+    }
+    Ok(())
+}
+
+/// When Casbin `write` field rules exist for the caller, changed fields must stay in the allow-list.
+pub(crate) fn ensure_resource_fields_writable(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    user_identity: Identity,
+    role_id: u64,
+    role_name: &str,
+    is_superuser: bool,
+    resource: &str,
+    changed_fields: &[String],
+) -> Result<(), String> {
+    if is_superuser || changed_fields.is_empty() {
+        return Ok(());
+    }
+
+    let role_str = role_id.to_string();
+    let org_str = organization_id.to_string();
+    let identity_hex = user_identity.to_hex().to_string();
+
+    let mut allowed: Option<Vec<String>> = None;
+    for rule in ctx
+        .db
+        .casbin_rule()
+        .casbin_by_ptype()
+        .filter(&"p".to_string())
+    {
+        if rule.v1.as_deref() != Some(org_str.as_str()) {
+            continue;
+        }
+        if rule.v3.as_deref() != Some("write") {
+            continue;
+        }
+        let resource_ok = rule.v2.as_deref() == Some(resource)
+            || rule.v2.as_deref() == Some(&resource.replace('_', "-"));
+        if !resource_ok {
+            continue;
+        }
+        let subject_ok = rule.v0.as_deref() == Some(role_str.as_str())
+            || rule.v0.as_deref() == Some(role_name)
+            || rule.v0.as_deref() == Some(identity_hex.as_str());
+        if !subject_ok {
+            continue;
+        }
+        if let Some(fields) = parse_casbin_field_list(&rule.metadata) {
+            allowed = Some(fields);
+            break;
+        }
+    }
+
+    let Some(allowed_fields) = allowed else {
+        return Ok(());
+    };
+
+    for field in changed_fields {
+        if !allowed_fields.iter().any(|f| f == field) {
+            return Err(format!(
+                "field '{field}' is not writable under column-level write policy"
+            ));
+        }
+    }
+    Ok(())
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -698,6 +941,7 @@ pub fn grant_permission(
     params: GrantOrgPermissionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "org_permission", "create")?;
+    ensure_delegated_admin_may_grant_permission(ctx, organization_id)?;
 
     if params.resource.is_empty() {
         return Err("resource cannot be empty".to_string());
@@ -796,6 +1040,290 @@ pub fn revoke_permission(
 }
 
 #[spacetimedb::reducer]
+pub fn create_sod_conflict_rule(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateSodConflictRuleParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "role", "create")?;
+
+    if params.permission_a.is_empty() || params.permission_b.is_empty() {
+        return Err("Both permission_a and permission_b are required".to_string());
+    }
+    if params.permission_a == params.permission_b {
+        return Err("SoD rule permissions must differ".to_string());
+    }
+
+    let row = ctx.db.sod_conflict_rule().insert(SodConflictRule {
+        id: 0,
+        organization_id,
+        permission_a: params.permission_a.clone(),
+        permission_b: params.permission_b.clone(),
+        description: params.description.clone(),
+        is_active: params.is_active,
+        created_at: ctx.timestamp,
+        metadata: params.metadata.clone(),
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "sod_conflict_rule",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "permission_a": params.permission_a,
+                    "permission_b": params.permission_b,
+                    "is_active": params.is_active,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "permission_a".to_string(),
+                "permission_b".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_sod_conflict_rule(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    rule_id: u64,
+    params: UpdateSodConflictRuleParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "role", "update")?;
+
+    let rule = ctx
+        .db
+        .sod_conflict_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("SoD conflict rule not found")?;
+
+    if rule.organization_id != organization_id {
+        return Err("SoD conflict rule does not belong to this organization".to_string());
+    }
+
+    let permission_a = params
+        .permission_a
+        .as_ref()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(rule.permission_a.clone());
+    let permission_b = params
+        .permission_b
+        .as_ref()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(rule.permission_b.clone());
+
+    if permission_a == permission_b {
+        return Err("SoD rule permissions must differ".to_string());
+    }
+
+    let old_values = serde_json::json!({
+        "permission_a": rule.permission_a,
+        "permission_b": rule.permission_b,
+        "is_active": rule.is_active,
+    })
+    .to_string();
+
+    let mut changed_fields = Vec::new();
+    if params.permission_a.is_some() {
+        changed_fields.push("permission_a".to_string());
+    }
+    if params.permission_b.is_some() {
+        changed_fields.push("permission_b".to_string());
+    }
+    if params.description.is_some() {
+        changed_fields.push("description".to_string());
+    }
+    if params.is_active.is_some() {
+        changed_fields.push("is_active".to_string());
+    }
+    if params.metadata.is_some() {
+        changed_fields.push("metadata".to_string());
+    }
+
+    ctx.db.sod_conflict_rule().id().update(SodConflictRule {
+        permission_a: permission_a.clone(),
+        permission_b: permission_b.clone(),
+        description: params.description.or(rule.description),
+        is_active: params.is_active.unwrap_or(rule.is_active),
+        metadata: params.metadata.or(rule.metadata),
+        ..rule
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "sod_conflict_rule",
+            record_id: rule_id,
+            action: if params.is_active == Some(false) {
+                "SET_ACTIVE"
+            } else {
+                "UPDATE"
+            },
+            old_values: Some(old_values),
+            new_values: Some(
+                serde_json::json!({
+                    "permission_a": permission_a,
+                    "permission_b": permission_b,
+                    "is_active": params.is_active.unwrap_or(rule.is_active),
+                })
+                .to_string(),
+            ),
+            changed_fields,
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn grant_delegated_admin_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: GrantDelegatedAdminScopeParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "user_role_assignment", "create")?;
+    crate::core::organization::require_company_in_organization(
+        ctx,
+        organization_id,
+        company_id,
+    )?;
+
+    if caller_delegated_company_scope(ctx, organization_id).is_some() {
+        return Err("delegated administrators cannot grant delegated admin scope".to_string());
+    }
+
+    let existing = ctx
+        .db
+        .delegated_admin_scope()
+        .delegated_admin_by_user()
+        .filter(&params.user_identity)
+        .find(|s| {
+            s.organization_id == organization_id
+                && s.company_id == company_id
+                && s.is_active
+        });
+
+    if existing.is_some() {
+        return Err("User already has delegated admin scope for this company".to_string());
+    }
+
+    let row = ctx.db.delegated_admin_scope().insert(DelegatedAdminScope {
+        id: 0,
+        organization_id,
+        company_id,
+        user_identity: params.user_identity,
+        granted_by: ctx.sender(),
+        granted_at: ctx.timestamp,
+        is_active: true,
+        metadata: params.metadata.clone(),
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "delegated_admin_scope",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "user_identity": params.user_identity.to_hex().to_string(),
+                    "company_id": company_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["user_identity".to_string(), "company_id".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn revoke_delegated_admin_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    scope_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "user_role_assignment", "delete")?;
+
+    let scope = ctx
+        .db
+        .delegated_admin_scope()
+        .id()
+        .find(&scope_id)
+        .ok_or("Delegated admin scope not found")?;
+
+    if scope.organization_id != organization_id {
+        return Err("Delegated admin scope does not belong to this organization".to_string());
+    }
+
+    if !scope.is_active {
+        return Err("Delegated admin scope is already inactive".to_string());
+    }
+
+    let old_values = serde_json::json!({
+        "user_identity": scope.user_identity.to_hex().to_string(),
+        "company_id": scope.company_id,
+        "is_active": scope.is_active,
+    })
+    .to_string();
+
+    ctx.db
+        .delegated_admin_scope()
+        .id()
+        .update(DelegatedAdminScope {
+            is_active: false,
+            ..scope
+        });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(scope.company_id),
+            table_name: "delegated_admin_scope",
+            record_id: scope_id,
+            action: "UPDATE",
+            old_values: Some(old_values),
+            new_values: Some(
+                serde_json::json!({
+                    "user_identity": scope.user_identity.to_hex().to_string(),
+                    "company_id": scope.company_id,
+                    "is_active": false,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["is_active".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn assign_role(
     ctx: &ReducerContext,
     user_identity: Identity,
@@ -810,6 +1338,12 @@ pub fn assign_role(
     if role.organization_id != organization_id {
         return Err("Role does not belong to this organization".to_string());
     }
+
+    ensure_delegated_admin_may_assign_role(ctx, organization_id, &role)?;
+
+    let effective_permissions =
+        permission_strings_for_user(ctx, organization_id, user_identity, Some(role_id))?;
+    validate_sod_for_permissions(ctx, organization_id, &effective_permissions)?;
 
     let already_assigned = ctx.db.user_role_assignment().iter().any(|a| {
         a.user_identity == user_identity

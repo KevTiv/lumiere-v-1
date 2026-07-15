@@ -285,3 +285,83 @@ pub fn record_privacy_consent(
 
     Ok(())
 }
+
+/// Purge rows past their classification retention window (operational messages only in v1).
+#[spacetimedb::reducer]
+pub fn execute_retention_purge(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    use crate::core::operational_messaging::operational_message;
+
+    check_permission(ctx, organization_id, "data_classification", "write")?;
+
+    let mut purged_count = 0u32;
+
+    for classification in ctx
+        .db
+        .data_classification()
+        .data_class_by_org()
+        .filter(&organization_id)
+    {
+        let Some(retention_days) = classification.retention_days else {
+            continue;
+        };
+        if retention_days == 0 {
+            continue;
+        }
+
+        let cutoff_micros = ctx
+            .timestamp
+            .to_duration_since_unix_epoch()
+            .unwrap_or_default()
+            .as_micros()
+            .saturating_sub(u128::from(retention_days) * 86_400_000_000);
+
+        let cutoff = Timestamp::from_micros_since_unix_epoch(cutoff_micros as i64);
+
+        for rule in ctx
+            .db
+            .data_classification_rule()
+            .class_rule_by_org()
+            .filter(&organization_id)
+            .filter(|r| r.classification_id == classification.id)
+        {
+            if rule.table_name != "operational_message" {
+                continue;
+            }
+
+            let stale_ids: Vec<u64> = ctx
+                .db
+                .operational_message()
+                .iter()
+                .filter(|m| m.organization_id == organization_id && m.created_at < cutoff)
+                .map(|m| m.id)
+                .collect();
+
+            for id in stale_ids {
+                ctx.db.operational_message().id().delete(&id);
+                purged_count += 1;
+            }
+        }
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "data_classification",
+            record_id: 0,
+            action: "RETENTION_PURGE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "purged_count": purged_count }).to_string(),
+            ),
+            changed_fields: vec!["purged_count".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}

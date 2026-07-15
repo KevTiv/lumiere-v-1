@@ -14,6 +14,8 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{IntercompanyState, RuleType};
 
+use crate::core::organization::require_company_in_organization;
+
 // ── Tables ───────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(
@@ -159,6 +161,9 @@ pub fn create_intercompany_rule(
     params: CreateIntercompanyRuleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_rule", "create")?;
+
+    require_company_in_organization(ctx, organization_id, source_company_id)?;
+    require_company_in_organization(ctx, organization_id, destination_company_id)?;
 
     if params.name.is_empty() {
         return Err("Rule name is required".to_string());
@@ -403,6 +408,9 @@ pub fn create_intercompany_transaction(
     params: CreateIntercompanyTransactionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "create")?;
+
+    require_company_in_organization(ctx, organization_id, origin_company_id)?;
+    require_company_in_organization(ctx, organization_id, params.destination_company_id)?;
 
     if origin_company_id == params.destination_company_id {
         return Err("Origin and destination companies must be different".to_string());

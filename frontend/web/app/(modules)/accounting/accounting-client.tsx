@@ -132,7 +132,12 @@ import {
   toCreatePaymentTermParamsFromForm,
   toCreatePaymentTermLineParamsFromForm,
   toCreateCurrencyRateParamsFromForm,
-  createCurrencyRateParamsToJson,
+  toRunFxRevaluationParamsFromForm,
+  toRunFxRevaluationBatchParamsFromForm,
+  toPostRealizedFxParamsFromForm,
+  toUpsertPartnerCreditControlParamsFromForm,
+  toCreateBadDebtWriteOffParamsFromForm,
+  toCreateAmortizationScheduleParamsFromForm,
 } from "@/lib/accounting-create-params"
 import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
@@ -276,6 +281,17 @@ import {
   useDeletePaymentTermLine,
   useCreateCurrencyRate,
   useSetAccountAssetActive,
+  useFxRevaluationRuns,
+  useRunFxRevaluation,
+  useRunFxRevaluationBatch,
+  usePostRealizedFxGainLoss,
+  usePartnerCreditControls,
+  useUpsertPartnerCreditControl,
+  useCreateBadDebtWriteOff,
+  useAmortizationSchedules,
+  useAmortizationLines,
+  useCreateAmortizationSchedule,
+  useRecognizeAmortizationLine,
 } from "@lumiere/query-hooks/hooks/accounting"
 import { useFinancialReports } from "@lumiere/query-hooks/hooks/reports"
 import {
@@ -301,6 +317,9 @@ import {
   PeriodCloseChecklist,
   BudgetsWorkspace,
   ConsolidationWorkspace,
+  FxRevaluationPanel,
+  PartnerCreditControlPanel,
+  AmortizationPanel,
   type AccountAccount,
 } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -685,6 +704,18 @@ function AccountingClientLoaded({
   const { data: eliminationEntries = [] } = useConsolidationEliminationEntries(orgId, {
     enabled: organizationId > 0,
   })
+  const { data: fxRevaluationRuns = [] } = useFxRevaluationRuns(orgId, {
+    enabled: organizationId > 0,
+  })
+  const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId, {
+    enabled: organizationId > 0,
+  })
+  const { data: amortizationSchedules = [] } = useAmortizationSchedules(orgId, {
+    enabled: organizationId > 0,
+  })
+  const { data: amortizationLines = [] } = useAmortizationLines(orgId, {
+    enabled: organizationId > 0,
+  })
   const { data: fiscalYearsRaw = [] } = useAccountFiscalYears(orgId, {
     enabled: organizationId > 0,
     initialData: initialFiscalYears,
@@ -854,6 +885,28 @@ function AccountingClientLoaded({
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noPartners"), disabled: true }]
   }, [contacts, t])
+
+  const invoiceMoveSelectOptions = useMemo(() => {
+    const invoiceMoves = (allMoves as Record<string, unknown>[]).filter((row) =>
+      isInvoiceLikeMoveType(enumTag(row.moveType ?? row.move_type)),
+    )
+    const opts = accountMoveRowsToSelectOptions(invoiceMoves)
+    return opts.length > 0 ? opts : [{ value: "", label: "—", disabled: true }]
+  }, [allMoves])
+
+  const paymentSelectOptions = useMemo(() => {
+    const rows = accountPayments as Record<string, unknown>[]
+    if (rows.length === 0) return [{ value: "", label: "—", disabled: true }]
+    return rows.map((row) => {
+      const id = String(row.id ?? "")
+      const ref = String(row.ref ?? row.name ?? "").trim()
+      const amount = row.amount != null ? String(row.amount) : ""
+      const label = ref
+        ? `${ref}${amount ? ` (${amount})` : ""}`
+        : `Payment #${id}${amount ? ` (${amount})` : ""}`
+      return { value: id, label }
+    })
+  }, [accountPayments])
 
   const accountPaymentFormConfig = useMemo(() => {
     const merged = mergeSelectOptionsForFields(newAccountPaymentForm(t), {
@@ -1483,6 +1536,13 @@ function AccountingClientLoaded({
   const updatePaymentTermLine = useUpdatePaymentTermLine(organizationId)
   const deletePaymentTermLine = useDeletePaymentTermLine(organizationId)
   const createCurrencyRate = useCreateCurrencyRate(organizationId, operatingCompanyId)
+  const runFxRevaluation = useRunFxRevaluation(organizationId, operatingCompanyId)
+  const runFxRevaluationBatch = useRunFxRevaluationBatch(organizationId, operatingCompanyId)
+  const postRealizedFxGainLoss = usePostRealizedFxGainLoss(organizationId, operatingCompanyId)
+  const upsertPartnerCreditControl = useUpsertPartnerCreditControl(organizationId, operatingCompanyId)
+  const createBadDebtWriteOff = useCreateBadDebtWriteOff(organizationId, operatingCompanyId)
+  const createAmortizationSchedule = useCreateAmortizationSchedule(organizationId, operatingCompanyId)
+  const recognizeAmortizationLine = useRecognizeAmortizationLine(organizationId, operatingCompanyId)
   const setAccountAssetActive = useSetAccountAssetActive(organizationId, operatingCompanyId)
 
   const analyticAccountEditFormConfig = useMemo(() => {
@@ -3236,6 +3296,104 @@ function AccountingClientLoaded({
                 createForm: reconciliationWidgetCreateFormConfig,
               }
             }
+            if (tab.id === "fx-revaluation") {
+              return {
+                ...tab,
+                type: "custom" as const,
+                customContent: (
+                  <FxRevaluationPanel
+                    runs={fxRevaluationRuns as unknown as Record<string, unknown>[]}
+                    journalSelectOptions={journalFieldOptionsForModularForm}
+                    accountSelectOptions={glAccountFieldOptions}
+                    paymentSelectOptions={paymentSelectOptions}
+                    moveSelectOptions={invoiceMoveSelectOptions}
+                    runPending={runFxRevaluation.isPending}
+                    batchPending={runFxRevaluationBatch.isPending}
+                    realizedPending={postRealizedFxGainLoss.isPending}
+                    onRunFxRevaluation={async (formData) => {
+                      const params = toRunFxRevaluationParamsFromForm(formData)
+                      if (!params) throw new Error(t("accounting.fxRevaluation.invalidForm"))
+                      await runFxRevaluation.mutateAsync(params)
+                      toast({ title: t("accounting.fxRevaluation.runSuccess") })
+                    }}
+                    onRunFxRevaluationBatch={async (formData) => {
+                      const params = toRunFxRevaluationBatchParamsFromForm(formData)
+                      if (!params) throw new Error(t("accounting.fxRevaluation.invalidBatchForm"))
+                      await runFxRevaluationBatch.mutateAsync(params)
+                      toast({ title: t("accounting.fxRevaluation.batchSuccess") })
+                    }}
+                    onPostRealizedFx={async (formData) => {
+                      const params = toPostRealizedFxParamsFromForm(formData)
+                      if (!params) throw new Error(t("accounting.fxRevaluation.invalidRealizedForm"))
+                      await postRealizedFxGainLoss.mutateAsync(params)
+                      toast({ title: t("accounting.fxRevaluation.realizedSuccess") })
+                    }}
+                    onCreateCurrencyRate={async (formData) => {
+                      const params = toCreateCurrencyRateParamsFromForm(formData)
+                      if (!params) throw new Error(t("accounting.fxRevaluation.invalidForm"))
+                      await createCurrencyRate.mutateAsync(params as unknown as Record<string, unknown>)
+                      toast({ title: t("accounting.fxRevaluation.rateSuccess") })
+                    }}
+                  />
+                ),
+              }
+            }
+            if (tab.id === "credit-control") {
+              return {
+                ...tab,
+                type: "custom" as const,
+                customContent: (
+                  <PartnerCreditControlPanel
+                    controls={partnerCreditControls as unknown as Record<string, unknown>[]}
+                    partnerSelectOptions={partnerSelectOptions}
+                    journalSelectOptions={journalFieldOptionsForModularForm}
+                    accountSelectOptions={glAccountFieldOptions}
+                    moveSelectOptions={invoiceMoveSelectOptions}
+                    upsertPending={upsertPartnerCreditControl.isPending}
+                    writeOffPending={createBadDebtWriteOff.isPending}
+                    onUpsertCreditControl={async (formData) => {
+                      const params = toUpsertPartnerCreditControlParamsFromForm(formData)
+                      if (!params) throw new Error(t("accounting.creditControl.invalidForm"))
+                      await upsertPartnerCreditControl.mutateAsync(params)
+                      toast({ title: t("accounting.creditControl.upsertSuccess") })
+                    }}
+                    onCreateBadDebtWriteOff={async (formData) => {
+                      const params = toCreateBadDebtWriteOffParamsFromForm(formData)
+                      if (!params) throw new Error(t("accounting.creditControl.invalidWriteOffForm"))
+                      await createBadDebtWriteOff.mutateAsync(params)
+                      toast({ title: t("accounting.creditControl.writeOffSuccess") })
+                    }}
+                  />
+                ),
+              }
+            }
+            if (tab.id === "amortization") {
+              return {
+                ...tab,
+                type: "custom" as const,
+                customContent: (
+                  <AmortizationPanel
+                    schedules={amortizationSchedules as unknown as Record<string, unknown>[]}
+                    lines={amortizationLines as unknown as Record<string, unknown>[]}
+                    journalSelectOptions={journalFieldOptionsForModularForm}
+                    accountSelectOptions={glAccountFieldOptions}
+                    currencySelectOptions={currencySelectOptions}
+                    createPending={createAmortizationSchedule.isPending}
+                    recognizePending={recognizeAmortizationLine.isPending}
+                    onCreateSchedule={async (formData) => {
+                      const params = toCreateAmortizationScheduleParamsFromForm(formData)
+                      if (!params) throw new Error(t("accounting.amortization.invalidForm"))
+                      await createAmortizationSchedule.mutateAsync(params)
+                      toast({ title: t("accounting.amortization.createSuccess") })
+                    }}
+                    onRecognizeLine={async ({ lineId, params }) => {
+                      await recognizeAmortizationLine.mutateAsync({ lineId, params })
+                      toast({ title: t("accounting.amortization.recognizeSuccess") })
+                    }}
+                  />
+                ),
+              }
+            }
             if (tab.id === "consolidation") {
               return {
                 ...tab,
@@ -3424,6 +3582,32 @@ function AccountingClientLoaded({
       accountPeriodsRaw,
       bankStatementLines,
       financialReportsRaw,
+      fxRevaluationRuns,
+      partnerCreditControls,
+      amortizationSchedules,
+      amortizationLines,
+      runFxRevaluation.isPending,
+      runFxRevaluation.mutateAsync,
+      runFxRevaluationBatch.isPending,
+      runFxRevaluationBatch.mutateAsync,
+      postRealizedFxGainLoss.isPending,
+      postRealizedFxGainLoss.mutateAsync,
+      upsertPartnerCreditControl.isPending,
+      upsertPartnerCreditControl.mutateAsync,
+      createBadDebtWriteOff.isPending,
+      createBadDebtWriteOff.mutateAsync,
+      createAmortizationSchedule.isPending,
+      createAmortizationSchedule.mutateAsync,
+      recognizeAmortizationLine.isPending,
+      recognizeAmortizationLine.mutateAsync,
+      createCurrencyRate.mutateAsync,
+      journalFieldOptionsForModularForm,
+      glAccountFieldOptions,
+      partnerSelectOptions,
+      invoiceMoveSelectOptions,
+      paymentSelectOptions,
+      currencySelectOptions,
+      toast,
     ],
   )
 

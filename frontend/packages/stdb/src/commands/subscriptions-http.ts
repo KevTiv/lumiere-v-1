@@ -69,6 +69,8 @@ const SUBSCRIPTIONS_HINT_OVERRIDES: Partial<
   recognize_deferred_revenue: [
     "deferred-revenue-lines",
     "deferred-revenue-schedules",
+    "account-moves",
+    "account-move-lines",
   ],
 };
 
