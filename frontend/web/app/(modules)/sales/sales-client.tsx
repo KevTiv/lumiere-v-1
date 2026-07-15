@@ -142,6 +142,7 @@ import {
   useAccountAccounts,
   useAccountPaymentTerms,
   useComputeInvoiceTotals,
+  usePartnerCreditControls,
   type AccountMove,
 } from '@lumiere/query-hooks/hooks/accounting';
 import {
@@ -399,6 +400,7 @@ function SalesClientLoaded({
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
+  const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId);
   const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
   const { data: stockMoves = [] } = useStockMoves(orgId);
   const { data: returnOrders = [] } = useReturnOrders(orgId, initialReturnOrders);
@@ -475,6 +477,13 @@ function SalesClientLoaded({
   const navigateToOrdersByState = useCallback(
     (state: string) => {
       router.push(buildModuleTabHref('sales', 'orders', { state }));
+    },
+    [router],
+  );
+
+  const navigateToSalesTab = useCallback(
+    (tab: string, filters?: Record<string, string>) => {
+      router.push(buildModuleTabHref('sales', tab, filters));
     },
     [router],
   );
@@ -1384,6 +1393,87 @@ function SalesClientLoaded({
       ...section,
       widgets: section.widgets.map((w) => {
         if (w.type === 'stat-cards') {
+          if (w.id === 'sales-exception-queue-cards') {
+            const awaitingApproval = orders.filter(
+              (o) => saleOrderState(o as Record<string, unknown>) === 'ToApprove',
+            ).length;
+            const sentQuotes = orders.filter(
+              (o) => saleOrderState(o as Record<string, unknown>) === 'Sent',
+            ).length;
+            const creditHolds = partnerCreditControls.filter((c) =>
+              Boolean(
+                (c as Record<string, unknown>).paymentHold ??
+                  (c as Record<string, unknown>).payment_hold,
+              ),
+            ).length;
+            const returnsToReceive = returnOrders.filter((r) => {
+              const st = String(
+                (r as Record<string, unknown>).state ?? '',
+              ).toLowerCase();
+              return st === 'confirmed' || st === 'draft';
+            }).length;
+            const openDeliveries = stockPickings.filter((p) => {
+              const row = p as Record<string, unknown>;
+              if (Boolean(row.isReturn ?? row.is_return)) return false;
+              const st = String(row.state ?? '').toLowerCase();
+              return st !== 'done' && st !== 'cancel' && st !== 'cancelled';
+            }).length;
+            return {
+              ...w,
+              title: t('sales.dashboard.exceptionQueues', {
+                defaultValue: 'Exception queues',
+              }),
+              data: {
+                stats: [
+                  {
+                    label: t('sales.dashboard.queues.awaitingApproval', {
+                      defaultValue: 'Awaiting approval',
+                    }),
+                    value: String(awaitingApproval),
+                    icon: 'FileText',
+                    testId: 'sales-queue-to-approve',
+                    onClick: () => navigateToOrdersByState('ToApprove'),
+                  },
+                  {
+                    label: t('sales.dashboard.queues.sentQuotations', {
+                      defaultValue: 'Sent quotations',
+                    }),
+                    value: String(sentQuotes),
+                    icon: 'CheckCircle',
+                    testId: 'sales-queue-sent',
+                    onClick: () => navigateToOrdersByState('Sent'),
+                  },
+                  {
+                    label: t('sales.dashboard.queues.creditHolds', {
+                      defaultValue: 'Credit holds',
+                    }),
+                    value: String(creditHolds),
+                    icon: 'AlertCircle',
+                    testId: 'sales-queue-credit',
+                    onClick: () => navigateToSalesTab('orders'),
+                  },
+                  {
+                    label: t('sales.dashboard.queues.returnsToReceive', {
+                      defaultValue: 'Returns to receive',
+                    }),
+                    value: String(returnsToReceive),
+                    icon: 'package',
+                    testId: 'sales-queue-returns',
+                    onClick: () => navigateToSalesTab('returns'),
+                  },
+                  {
+                    label: t('sales.dashboard.queues.openDeliveries', {
+                      defaultValue: 'Open deliveries',
+                    }),
+                    value: String(openDeliveries),
+                    icon: 'cart',
+                    testId: 'sales-queue-pickings',
+                    onClick: () => navigateToSalesTab('fulfillment'),
+                  },
+                ],
+              },
+            };
+          }
           return {
             ...w,
             data: {
@@ -1545,6 +1635,10 @@ function SalesClientLoaded({
     router,
     salesRepLabelByIdentity,
     navigateToOrdersByState,
+    navigateToSalesTab,
+    partnerCreditControls,
+    returnOrders,
+    stockPickings,
     dashboardTimeRange,
   ]);
 

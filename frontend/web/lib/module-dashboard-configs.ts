@@ -566,6 +566,27 @@ export const salesDashboard: DashboardConfig = {
       ],
     },
     {
+      id: "sales-exception-queues",
+      title: "Exception queues",
+      widgets: [
+        {
+          id: "sales-exception-queue-cards",
+          type: "stat-cards",
+          title: "Live exceptions",
+          width: "full",
+          data: {
+            stats: [
+              { label: "Awaiting approval", value: "—", icon: "FileText", testId: "sales-queue-to-approve" },
+              { label: "Sent quotations", value: "—", icon: "CheckCircle", testId: "sales-queue-sent" },
+              { label: "Credit holds", value: "—", icon: "AlertCircle", testId: "sales-queue-credit" },
+              { label: "Returns to receive", value: "—", icon: "package", testId: "sales-queue-returns" },
+              { label: "Open deliveries", value: "—", icon: "cart", testId: "sales-queue-pickings" },
+            ],
+          },
+        },
+      ],
+    },
+    {
       id: "sales-charts",
       title: "Trends",
       widgets: [

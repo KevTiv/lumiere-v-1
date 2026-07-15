@@ -13,6 +13,10 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
+use crate::core::organization::company;
+use crate::core::reference::{
+    currency_rate, legacy_currency_code_for_id,
+};
 use crate::crm::contacts::contact;
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
@@ -331,6 +335,96 @@ fn validate_order_org_scope(order: &SaleOrder, organization_id: u64) -> Result<(
         return Err("Sale order does not belong to this organization".to_string());
     }
     Ok(())
+}
+
+/// Snapshots order→company FX at confirm time into `metadata` (fail closed if rate missing).
+fn confirm_exchange_rate_snapshot(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order: &SaleOrder,
+) -> Result<(f64, String, String), String> {
+    let company_row = ctx
+        .db
+        .company()
+        .id()
+        .find(&order.company_id)
+        .ok_or("Company not found for sale order")?;
+    let from = legacy_currency_code_for_id(order.currency_id).to_string();
+    let to = legacy_currency_code_for_id(company_row.currency_id).to_string();
+    if from.eq_ignore_ascii_case(&to) {
+        return Ok((1.0, from, to));
+    }
+
+    let mut best_rate: Option<(Timestamp, f64)> = None;
+    for rate in ctx
+        .db
+        .currency_rate()
+        .rate_by_org()
+        .filter(&organization_id)
+    {
+        if !rate.from_currency.eq_ignore_ascii_case(&from)
+            || !rate.to_currency.eq_ignore_ascii_case(&to)
+        {
+            continue;
+        }
+        if let Some(cid) = rate.company_id {
+            if cid != order.company_id {
+                continue;
+            }
+        }
+        match best_rate {
+            Some((prev_date, _)) if rate.date <= prev_date => {}
+            _ => best_rate = Some((rate.date, rate.rate)),
+        }
+    }
+
+    let rate = best_rate
+        .map(|(_, r)| r)
+        .ok_or_else(|| {
+            format!(
+                "No exchange rate for {} → {} (company {}); seed currency_rate before confirming multi-currency orders",
+                from, to, order.company_id
+            )
+        })?;
+    if rate <= 0.0 {
+        return Err("Exchange rate must be positive".to_string());
+    }
+    Ok((rate, from, to))
+}
+
+fn merge_exchange_rate_metadata(
+    existing: &Option<String>,
+    rate: f64,
+    from: &str,
+    to: &str,
+    at: Timestamp,
+) -> Option<String> {
+    let mut metadata = existing
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|parsed| parsed.as_object().cloned())
+        .unwrap_or_default();
+    metadata.insert(
+        "exchange_rate".to_string(),
+        serde_json::json!(rate),
+    );
+    metadata.insert(
+        "exchange_rate_from".to_string(),
+        serde_json::Value::String(from.to_string()),
+    );
+    metadata.insert(
+        "exchange_rate_to".to_string(),
+        serde_json::Value::String(to.to_string()),
+    );
+    let at_micros = at
+        .to_duration_since_unix_epoch()
+        .unwrap_or_default()
+        .as_micros() as u64;
+    metadata.insert(
+        "exchange_rate_at_micros".to_string(),
+        serde_json::json!(at_micros),
+    );
+    Some(serde_json::Value::Object(metadata).to_string())
 }
 
 fn merge_metadata(existing: &Option<String>, key: &str, value: &Option<String>) -> Option<String> {
@@ -942,6 +1036,14 @@ pub fn send_sale_order_quotation(
 
     if let Some(validity) = order.validity_date {
         if ctx.timestamp > validity {
+            if !order.is_expired {
+                ctx.db.sale_order().id().update(SaleOrder {
+                    is_expired: true,
+                    write_uid: ctx.sender(),
+                    write_date: ctx.timestamp,
+                    ..order
+                });
+            }
             return Err("Quotation has expired".to_string());
         }
     }
@@ -997,6 +1099,14 @@ pub fn confirm_sales_order_impl(
 
     if let Some(validity) = order.validity_date {
         if ctx.timestamp > validity {
+            if !order.is_expired {
+                ctx.db.sale_order().id().update(SaleOrder {
+                    is_expired: true,
+                    write_uid: ctx.sender(),
+                    write_date: ctx.timestamp,
+                    ..order
+                });
+            }
             return Err("Order has expired".to_string());
         }
     }
@@ -1064,6 +1174,16 @@ pub fn confirm_sales_order_impl(
         }
     }
 
+    let (exchange_rate, fx_from, fx_to) =
+        confirm_exchange_rate_snapshot(ctx, organization_id, &order)?;
+    let fx_metadata = merge_exchange_rate_metadata(
+        &order.metadata,
+        exchange_rate,
+        &fx_from,
+        &fx_to,
+        ctx.timestamp,
+    );
+
     let partner_id = order.partner_id;
     let company_id = order.company_id;
 
@@ -1071,6 +1191,7 @@ pub fn confirm_sales_order_impl(
         state: SaleState::Sale,
         confirmation_date: Some(ctx.timestamp),
         invoice_status: InvoiceStatus::ToInvoice,
+        metadata: fx_metadata.or(order.metadata.clone()),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..order

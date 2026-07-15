@@ -5774,6 +5774,14 @@
   "sales": {
     "dashboard": {
       "ordersByState": "Orders by State",
+      "exceptionQueues": "Exception queues",
+      "queues": {
+        "awaitingApproval": "Awaiting approval",
+        "sentQuotations": "Sent quotations",
+        "creditHolds": "Credit holds",
+        "returnsToReceive": "Returns to receive",
+        "openDeliveries": "Open deliveries"
+      },
       "widgets": {
         "revenue": "Revenue"
       }

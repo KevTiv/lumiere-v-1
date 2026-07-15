@@ -8,6 +8,7 @@ export const SALES_WORKSPACE_RESOURCE_KEYS = [
   "account-payment-terms",
   "delivery-carriers",
   "delivery-price-rules",
+  "partner-credit-controls",
   "picking-batches",
   "pos-loyalty-cards",
   "pos-loyalty-programs",
@@ -19,6 +20,7 @@ export const SALES_WORKSPACE_RESOURCE_KEYS = [
   "return-orders",
   "return-order-lines",
   "shipping-methods",
+  "stock-pickings",
 ] as const;
 
 export type SalesWorkspaceResourceKey =

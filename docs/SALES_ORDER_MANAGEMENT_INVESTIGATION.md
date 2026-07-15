@@ -255,9 +255,10 @@ Country packs today are **tax-seed + company-ID metadata**. Sales needs commerci
 - ~~Backorder creation on partial validate~~ **Done** (`validate_stock_picking_backorder`; UI create-backorder enabled)
 - ~~SO-level credit check on confirm~~ **Done** (`ensure_partner_credit_allows_invoice` before confirm)
 - Tax fiscal-position remapping; Incoterm id parity with PO/invoice
-- Exception queues via subscriptions (ToApprove, credit hold, late pickings, open RMAs)
-- Multi-currency rate snapshot on confirm/invoice
+- ~~Exception queues via subscriptions~~ **Done** (dashboard live queue strip; sales workspace subscribes `partner-credit-controls` + `stock-pickings`)
+- ~~Multi-currency rate snapshot on confirm~~ **Done** (rate written into SO `metadata` at confirm; fail closed when currencies differ and no `currency_rate`)
 - ~~Domain tests for cancel, ATP fail, credit hold, pricelist apply, send quote, backorder~~ **Done** (`run_all_sales_tests`)
+- Quote expiry: `is_expired` set when send/confirm hits past `validity_date`
 
 ### Differentiating
 

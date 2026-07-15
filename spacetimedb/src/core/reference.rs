@@ -447,6 +447,22 @@ pub(crate) fn legacy_currency_id_for_code(code: &str) -> u64 {
     }
 }
 
+/// Maps legacy numeric `currency_id` back to ISO 4217 (inverse of [`legacy_currency_id_for_code`]).
+pub(crate) fn legacy_currency_code_for_id(id: u64) -> &'static str {
+    match id {
+        1 => "USD",
+        2 => "EUR",
+        3 => "GBP",
+        4 => "CAD",
+        5 => "AUD",
+        6 => "JPY",
+        7 => "CHF",
+        8 => "CNY",
+        9 => "INR",
+        _ => "USD",
+    }
+}
+
 /// Resolves a global `Currency` row by ISO 4217 code (case-insensitive).
 pub(crate) fn require_currency_row(ctx: &ReducerContext, code: &str) -> Result<Currency, String> {
     let normalized = code.trim().to_uppercase();

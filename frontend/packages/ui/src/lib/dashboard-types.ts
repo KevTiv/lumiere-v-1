@@ -128,6 +128,7 @@ export interface StatCardsWidget extends BaseWidget {
       change?: number
       icon?: string
       testId?: string
+      onClick?: () => void
     }>
   }
 }

@@ -14,9 +14,12 @@ import {
   Calendar,
   LayoutTemplate,
   Activity,
+  AlertCircle,
+  TrendingUp,
 } from "lucide-react"
 import { TrendBadge } from "../../components/trend-badge"
 import type { StatCardsWidget as StatCardsWidgetType } from "../../lib/dashboard-types"
+import { cn } from "../../lib/utils"
 
 const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   dollar: DollarSign,
@@ -31,6 +34,10 @@ const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   Calendar,
   template: LayoutTemplate,
   gauge: Activity,
+  AlertCircle,
+  TrendingUp,
+  ShoppingCart,
+  DollarSign,
 }
 
 export function StatCardsWidget({ data }: { data: StatCardsWidgetType["data"] }) {
@@ -39,12 +46,29 @@ export function StatCardsWidget({ data }: { data: StatCardsWidgetType["data"] })
       {data.stats.map((stat, index) => {
         const Icon = stat.icon ? iconMap[stat.icon] : null
         const statTestId = stat.testId ?? `stat-${index}`
+        const clickable = typeof stat.onClick === "function"
 
         return (
           <div
             key={index}
             data-testid={statTestId}
-            className="p-4 rounded-xl bg-secondary/50 border border-border/50"
+            role={clickable ? "button" : undefined}
+            tabIndex={clickable ? 0 : undefined}
+            onClick={clickable ? stat.onClick : undefined}
+            onKeyDown={
+              clickable
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      stat.onClick?.()
+                    }
+                  }
+                : undefined
+            }
+            className={cn(
+              "p-4 rounded-xl bg-secondary/50 border border-border/50",
+              clickable && "cursor-pointer transition-colors hover:bg-secondary/80",
+            )}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-muted-foreground">{stat.label}</span>
