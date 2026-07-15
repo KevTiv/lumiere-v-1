@@ -9,6 +9,8 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::{company_id_from_scope, CompanyScopeParams};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::product::product;
+use crate::inventory::warehouse::warehouse;
 use crate::sales::return_orders::return_order;
 use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::types::{InvoiceStatus, LineInvoiceStatus, ProcureMethod};
@@ -494,6 +496,271 @@ pub struct DoneStockMoveParams {
 pub struct AssignUserToPickingParams {
     pub company_id: Option<u64>,
     pub user_id: Option<Identity>,
+}
+
+// ── Internal helpers (sales / picking integrity) ─────────────────────────────
+
+/// On-hand location for a warehouse (`lot_stock_id` when set; else warehouse id).
+pub(crate) fn resolve_warehouse_stock_location(
+    ctx: &ReducerContext,
+    warehouse_id: u64,
+) -> u64 {
+    if let Some(wh) = ctx.db.warehouse().id().find(&warehouse_id) {
+        if wh.lot_stock_id > 0 {
+            return wh.lot_stock_id;
+        }
+    }
+    warehouse_id
+}
+
+/// Storable / consumable products need ATP; services do not.
+pub(crate) fn product_requires_stock(ctx: &ReducerContext, product_id: u64) -> bool {
+    ctx.db
+        .product()
+        .id()
+        .find(&product_id)
+        .map(|p| p.type_ != "service")
+        .unwrap_or(true)
+}
+
+fn find_quant_at_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    location_id: u64,
+) -> Option<StockQuant> {
+    ctx.db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&product_id)
+        .find(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.location_id == location_id
+        })
+}
+
+/// Reserve qty at a location; fails closed when ATP is short.
+pub(crate) fn reserve_quantity_at_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    location_id: u64,
+    qty: f64,
+) -> Result<(), String> {
+    if qty <= 0.0 {
+        return Ok(());
+    }
+    let quant = find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
+        .ok_or_else(|| {
+            format!(
+                "No stock quant for product {} at location {} — cannot reserve",
+                product_id, location_id
+            )
+        })?;
+
+    let new_reserved = quant.reserved_quantity + qty;
+    if new_reserved > quant.quantity + 1e-9 {
+        return Err(format!(
+            "Insufficient available quantity for product {} (need {}, available {})",
+            product_id,
+            qty,
+            (quant.quantity - quant.reserved_quantity).max(0.0)
+        ));
+    }
+
+    let available_quantity = quant.quantity - new_reserved;
+    ctx.db.stock_quant().id().update(StockQuant {
+        reserved_quantity: new_reserved,
+        available_quantity,
+        ..quant
+    });
+    Ok(())
+}
+
+/// Release a prior reservation without moving on-hand qty.
+pub(crate) fn unreserve_quantity_at_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    location_id: u64,
+    qty: f64,
+) -> Result<(), String> {
+    if qty <= 0.0 {
+        return Ok(());
+    }
+    let Some(quant) =
+        find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
+    else {
+        return Ok(());
+    };
+
+    let new_reserved = (quant.reserved_quantity - qty).max(0.0);
+    let available_quantity = quant.quantity - new_reserved;
+    ctx.db.stock_quant().id().update(StockQuant {
+        reserved_quantity: new_reserved,
+        available_quantity,
+        ..quant
+    });
+    Ok(())
+}
+
+fn increase_quant_at_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    location_id: u64,
+    qty: f64,
+    cost: f64,
+) -> Result<(), String> {
+    if qty <= 0.0 {
+        return Ok(());
+    }
+    if let Some(quant) =
+        find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
+    {
+        let new_qty = quant.quantity + qty;
+        let available_quantity = new_qty - quant.reserved_quantity;
+        ctx.db.stock_quant().id().update(StockQuant {
+            quantity: new_qty,
+            available_quantity,
+            value: new_qty * quant.cost,
+            ..quant
+        });
+    } else {
+        ctx.db.stock_quant().insert(StockQuant {
+            id: 0,
+            organization_id,
+            product_id,
+            product_variant_id: None,
+            location_id,
+            lot_id: None,
+            package_id: None,
+            owner_id: None,
+            company_id,
+            quantity: qty,
+            reserved_quantity: 0.0,
+            available_quantity: qty,
+            in_date: Some(ctx.timestamp),
+            inventory_quantity: qty,
+            inventory_diff_quantity: 0.0,
+            inventory_quantity_set: true,
+            is_outdated: false,
+            user_id: Some(ctx.sender()),
+            inventory_date: Some(ctx.timestamp),
+            cost,
+            value: qty * cost,
+            cost_method: Some("standard".to_string()),
+            accounting_date: None,
+            currency_id: None,
+            accounting_entry_ids: vec![],
+            metadata: None,
+        });
+    }
+    Ok(())
+}
+
+/// Apply inventory consequences for a validated stock move (outbound consume or inbound receive).
+pub(crate) fn apply_validated_move_to_quants(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    location_id: u64,
+    location_dest_id: u64,
+    qty: f64,
+    is_return: bool,
+) -> Result<(), String> {
+    if qty <= 0.0 || !product_requires_stock(ctx, product_id) {
+        return Ok(());
+    }
+
+    if is_return {
+        // Customer → warehouse: receive into destination stock location.
+        let cost = find_quant_at_location(ctx, organization_id, company_id, product_id, location_dest_id)
+            .map(|q| q.cost)
+            .or_else(|| {
+                find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
+                    .map(|q| q.cost)
+            })
+            .unwrap_or(0.0);
+        if let Some(src) =
+            find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
+        {
+            let take = qty.min(src.quantity);
+            if take > 0.0 {
+                let new_qty = src.quantity - take;
+                let new_reserved = src.reserved_quantity.min(new_qty);
+                ctx.db.stock_quant().id().update(StockQuant {
+                    quantity: new_qty,
+                    reserved_quantity: new_reserved,
+                    available_quantity: new_qty - new_reserved,
+                    value: new_qty * src.cost,
+                    ..src
+                });
+            }
+        }
+        return increase_quant_at_location(
+            ctx,
+            organization_id,
+            company_id,
+            product_id,
+            location_dest_id,
+            qty,
+            cost,
+        );
+    }
+
+    // Outbound: consume reserved qty at source and transfer to dest.
+    let quant = find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
+        .ok_or_else(|| {
+            format!(
+                "No stock quant for product {} at location {} on validate",
+                product_id, location_id
+            )
+        })?;
+
+    if quant.quantity + 1e-9 < qty {
+        return Err(format!(
+            "Cannot deliver more than on-hand for product {} (have {}, need {})",
+            product_id, quant.quantity, qty
+        ));
+    }
+
+    let release_reserve = qty.min(quant.reserved_quantity);
+    let new_qty = quant.quantity - qty;
+    let new_reserved = (quant.reserved_quantity - release_reserve).max(0.0);
+    let available_quantity = new_qty - new_reserved;
+    let cost = quant.cost;
+
+    if new_qty <= 1e-9 {
+        ctx.db.stock_quant().id().delete(&quant.id);
+    } else {
+        ctx.db.stock_quant().id().update(StockQuant {
+            quantity: new_qty,
+            reserved_quantity: new_reserved,
+            available_quantity,
+            value: new_qty * cost,
+            ..quant
+        });
+    }
+
+    if location_dest_id != location_id {
+        increase_quant_at_location(
+            ctx,
+            organization_id,
+            company_id,
+            product_id,
+            location_dest_id,
+            qty,
+            cost,
+        )?;
+    }
+    Ok(())
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -1525,6 +1792,8 @@ pub fn validate_stock_picking(
         return Err("Picking must be assigned before validation".to_string());
     }
 
+    let mut validated_moves: Vec<(u64, u64, u64, f64)> = Vec::new();
+
     ctx.db.stock_picking().id().update(StockPicking {
         state: "done".to_string(),
         date_done: Some(ctx.timestamp),
@@ -1543,12 +1812,36 @@ pub fn validate_stock_picking(
             continue;
         }
         if move_record.state == "assigned" {
+            let qty_done = if move_record.quantity_done > 0.0 {
+                move_record.quantity_done
+            } else {
+                move_record.product_uom_qty
+            };
+            validated_moves.push((
+                move_record.product_id,
+                move_record.location_id,
+                move_record.location_dest_id,
+                qty_done,
+            ));
             move_record.state = "done".to_string();
             move_record.is_done = true;
             move_record.date = Some(ctx.timestamp);
-            move_record.quantity_done = move_record.product_uom_qty;
+            move_record.quantity_done = qty_done;
             ctx.db.stock_move().id().update(move_record);
         }
+    }
+
+    for (product_id, location_id, location_dest_id, qty_done) in &validated_moves {
+        apply_validated_move_to_quants(
+            ctx,
+            organization_id,
+            company_id,
+            *product_id,
+            *location_id,
+            *location_dest_id,
+            *qty_done,
+            picking.is_return,
+        )?;
     }
 
     // Propagate delivered quantities back to SaleOrderLine

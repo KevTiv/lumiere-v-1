@@ -183,8 +183,9 @@ fn create_return_picking_for_order(
             .id
     };
 
-    let customer_location = warehouse_id.saturating_add(1);
-    let stock_location = warehouse_id;
+    let stock_location =
+        crate::inventory::stock::resolve_warehouse_stock_location(ctx, warehouse_id);
+    let customer_location = stock_location.saturating_add(1);
     let order_label = return_order.name.clone();
 
     create_stock_picking(

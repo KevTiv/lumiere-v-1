@@ -51,7 +51,8 @@ use crate::inventory::product::{create_product, product, CreateProductParams};
 use crate::inventory::product_category::{
     create_product_category, product_category, CreateProductCategoryParams,
 };
-use crate::inventory::warehouse::{warehouse, Warehouse};
+use crate::inventory::stock::{stock_quant, StockQuant};
+use crate::inventory::warehouse::{stock_location, warehouse, StockLocation, Warehouse};
 use crate::types::{AccountInternalGroup, AccountTypeInternal, FiscalYearState, PeriodState};
 
 /// Alias for mission docs — domain tests receive a live `ReducerContext` from SpacetimeDB.
@@ -522,6 +523,72 @@ impl OrgFixture {
             is_active: true,
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
+            metadata: Some(r#"{"harness":"minimal"}"#.to_string()),
+        });
+
+        let loc_stock = ctx.db.stock_location().insert(StockLocation {
+            id: 0,
+            organization_id,
+            name: format!("Harness Stock {suffix}"),
+            complete_name: Some(format!("WH{suffix}/Stock")),
+            location_id: None,
+            parent_path: "".to_string(),
+            child_ids: vec![],
+            child_left: 0,
+            child_right: 0,
+            usage: "internal".to_string(),
+            company_id: Some(company_id),
+            scrap_location: false,
+            return_location: false,
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            active: true,
+            comment: None,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            barcode: None,
+            cyclic_inventory_frequency: 0,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            location_category: "internal".to_string(),
+            is_active: true,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            metadata: None,
+        });
+
+        ctx.db.warehouse().id().update(Warehouse {
+            lot_stock_id: loc_stock.id,
+            ..wh
+        });
+
+        ctx.db.stock_quant().insert(StockQuant {
+            id: 0,
+            organization_id,
+            product_id,
+            product_variant_id: None,
+            location_id: loc_stock.id,
+            lot_id: None,
+            package_id: None,
+            owner_id: None,
+            company_id,
+            quantity: 100.0,
+            reserved_quantity: 0.0,
+            available_quantity: 100.0,
+            in_date: Some(ctx.timestamp),
+            inventory_quantity: 100.0,
+            inventory_diff_quantity: 0.0,
+            inventory_quantity_set: true,
+            is_outdated: false,
+            user_id: Some(ctx.sender()),
+            inventory_date: Some(ctx.timestamp),
+            cost: 10.0,
+            value: 1_000.0,
+            cost_method: Some("standard".to_string()),
+            accounting_date: None,
+            currency_id: None,
+            accounting_entry_ids: vec![],
             metadata: Some(r#"{"harness":"minimal"}"#.to_string()),
         });
 

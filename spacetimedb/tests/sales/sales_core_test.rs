@@ -9,12 +9,13 @@ use crate::accounting::journal_entries::{
 use crate::core::organization::CompanyScopeParams;
 use crate::inventory::product::product;
 use crate::inventory::stock::{
-    assign_stock_picking, confirm_stock_picking, stock_picking, validate_stock_picking,
+    assign_stock_picking, confirm_stock_picking, stock_picking, stock_quant,
+    validate_stock_picking,
 };
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{
-    confirm_sales_order, create_sale_order, sale_order, sale_order_line, CreateSaleOrderLineParams,
-    CreateSaleOrderParams,
+    cancel_sale_order, confirm_sales_order, create_sale_order, sale_order, sale_order_line,
+    CreateSaleOrderLineParams, CreateSaleOrderParams,
 };
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{DiscountPolicy, InvoiceStatus, JournalType, LineInvoiceStatus, MoveType, SaleState};
@@ -499,6 +500,30 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
         ));
     }
 
+    // Soft ATP reservation must be held after confirm.
+    let reserved_qty: f64 = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&fixture.product_id)
+        .filter(|q| q.organization_id == org_id && q.company_id == company_id)
+        .map(|q| q.reserved_quantity)
+        .sum();
+    if (reserved_qty - 2.0).abs() > 1e-6 {
+        return Err(format!(
+            "Expected reserved_quantity 2.0 after confirm, got {reserved_qty}"
+        ));
+    }
+
+    let on_hand_before: f64 = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&fixture.product_id)
+        .filter(|q| q.organization_id == org_id && q.company_id == company_id)
+        .map(|q| q.quantity)
+        .sum();
+
     let order_line = ctx
         .db
         .sale_order_line()
@@ -536,6 +561,41 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
         ));
     }
 
+    let on_hand_after: f64 = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&fixture.product_id)
+        .filter(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.location_id == picking.location_id
+        })
+        .map(|q| q.quantity)
+        .sum();
+    if (on_hand_after - (on_hand_before - 2.0)).abs() > 1e-6 {
+        return Err(format!(
+            "Expected source on-hand {} after validate, got {} (before {})",
+            on_hand_before - 2.0,
+            on_hand_after,
+            on_hand_before
+        ));
+    }
+
+    let reserved_after: f64 = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&fixture.product_id)
+        .filter(|q| q.organization_id == org_id && q.company_id == company_id)
+        .map(|q| q.reserved_quantity)
+        .sum();
+    if reserved_after > 1e-6 {
+        return Err(format!(
+            "Expected reserved_quantity 0 after validate, got {reserved_after}"
+        ));
+    }
+
     let delivered_line = ctx
         .db
         .sale_order_line()
@@ -562,6 +622,162 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
         return Err(format!(
             "Expected qty_to_invoice > 0 after delivery, got {}",
             delivered_line.qty_to_invoice
+        ));
+    }
+
+    Ok(())
+}
+
+/// Confirm then cancel: open picking cancelled and reservation released.
+pub fn test_order_confirm_cancel_releases_reservation(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found")?;
+
+    create_pricelist(
+        ctx,
+        org_id,
+        CreatePricelistParams {
+            name: "Harness Cancel Pricelist".to_string(),
+            currency_id: 1,
+            discount_policy: DiscountPolicy::WithDiscount,
+        },
+    )?;
+
+    let pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "Harness Cancel Pricelist")
+        .map(|p| p.id)
+        .ok_or("Pricelist not found after create")?;
+
+    create_sale_order(
+        ctx,
+        org_id,
+        CreateSaleOrderParams {
+            company_id: Some(company_id),
+            partner_id: fixture.partner_id,
+            partner_invoice_id: fixture.partner_id,
+            partner_shipping_id: fixture.partner_id,
+            pricelist_id,
+            currency_id: 1,
+            warehouse_id: fixture.warehouse_id,
+            order_lines: vec![CreateSaleOrderLineParams {
+                product_id: fixture.product_id,
+                quantity: 3.0,
+                uom_id: product.uom_id,
+                price_unit: Some(product.list_price),
+                discount: 0.0,
+                tax_ids: vec![],
+                name: None,
+                sequence: 1,
+                is_downpayment: false,
+                display_type: None,
+                product_variant_id: None,
+                packaging_id: None,
+                route_id: None,
+                analytic_tag_ids: vec![],
+                customer_lead: None,
+                metadata: None,
+            }],
+            origin: Some("Harness cancel SO".to_string()),
+            client_order_ref: Some("HARNESS-SO-CANCEL".to_string()),
+            payment_term_id: None,
+            fiscal_position_id: None,
+            team_id: None,
+            opportunity_id: None,
+            note: None,
+            terms_and_conditions: None,
+            validity_days: None,
+            shipping_policy: None,
+            picking_policy: None,
+            campaign_id: None,
+            medium_id: None,
+            source_id: None,
+            commitment_date: None,
+            expected_date: None,
+            incoterm: None,
+            incoterm_location: None,
+            carrier_id: None,
+            customer_lead: None,
+            analytic_account_id: None,
+            user_id: None,
+            is_printed: None,
+            is_locked: None,
+            is_dropship: None,
+            message_follower_ids: None,
+            message_partner_ids: None,
+            message_channel_ids: None,
+            activity_ids: None,
+            metadata: Some(r#"{"test":"order_confirm_cancel"}"#.to_string()),
+        },
+    )?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|o| {
+            o.organization_id == org_id
+                && o.client_order_ref == Some("HARNESS-SO-CANCEL".to_string())
+        })
+        .ok_or("Sale order not found after create")?;
+
+    confirm_sales_order(ctx, org_id, order.id)?;
+
+    cancel_sale_order(
+        ctx,
+        org_id,
+        order.id,
+        Some("test cancel with reservation release".to_string()),
+    )?;
+
+    let cancelled = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order.id)
+        .ok_or("Sale order not found after cancel")?;
+    if cancelled.state != SaleState::Cancelled {
+        return Err(format!(
+            "Expected Cancelled state, got {:?}",
+            cancelled.state
+        ));
+    }
+
+    let picking = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.sale_id == Some(order.id) && !p.is_return)
+        .ok_or("Picking not found after cancel")?;
+    if picking.state != "cancel" {
+        return Err(format!(
+            "Expected picking cancel state, got {}",
+            picking.state
+        ));
+    }
+
+    let reserved_after: f64 = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&fixture.product_id)
+        .filter(|q| q.organization_id == org_id && q.company_id == company_id)
+        .map(|q| q.reserved_quantity)
+        .sum();
+    if reserved_after > 1e-6 {
+        return Err(format!(
+            "Expected reserved_quantity 0 after cancel, got {reserved_after}"
         ));
     }
 

@@ -654,14 +654,16 @@ pub fn create_sale_order(
 }
 
 /// Create draft outgoing pickings and stock moves for deliverable SO lines (MVP fulfillment path).
+/// Reserves on-hand quantity atomically for make-to-stock, non-dropship, storable lines.
 fn create_outgoing_pickings_for_confirmed_order(
     ctx: &ReducerContext,
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
     use crate::inventory::stock::{
-        create_stock_move, create_stock_picking, stock_picking, CreateStockMoveParams,
-        CreateStockPickingParams,
+        create_stock_move, create_stock_picking, product_requires_stock,
+        reserve_quantity_at_location, resolve_warehouse_stock_location, stock_picking,
+        CreateStockMoveParams, CreateStockPickingParams,
     };
 
     let order = ctx
@@ -693,8 +695,9 @@ fn create_outgoing_pickings_for_confirmed_order(
 
     let company_id = order.company_id;
     let warehouse_id = order.warehouse_id;
-    let src_location = warehouse_id;
-    let dest_location = warehouse_id.saturating_add(1);
+    let src_location = resolve_warehouse_stock_location(ctx, warehouse_id);
+    let dest_location = src_location.saturating_add(1);
+    let skip_stock = order.is_dropship;
     let order_label = order
         .reference
         .as_deref()
@@ -704,6 +707,23 @@ fn create_outgoing_pickings_for_confirmed_order(
         .filter(|s| !s.is_empty())
         .map(str::to_string)
         .unwrap_or_else(|| order_id.to_string());
+
+    // ATP gate before creating logistics rows — fail closed on shortfall.
+    if !skip_stock {
+        for line in &order_lines {
+            if !product_requires_stock(ctx, line.product_id) {
+                continue;
+            }
+            reserve_quantity_at_location(
+                ctx,
+                organization_id,
+                company_id,
+                line.product_id,
+                src_location,
+                line.product_uom_qty,
+            )?;
+        }
+    }
 
     create_stock_picking(
         ctx,
@@ -737,7 +757,7 @@ fn create_outgoing_pickings_for_confirmed_order(
             backorder_ids: vec![],
             show_operations: false,
             show_lots_text: false,
-            show_reserved: false,
+            show_reserved: !skip_stock,
             show_check_availability: true,
             show_validate: false,
             show_mark_as_todo: true,
@@ -813,7 +833,11 @@ fn create_outgoing_pickings_for_confirmed_order(
                 product_variant_id: None,
                 group_id: None,
                 rule_id: None,
-                procure_method: "make_to_stock".to_string(),
+                procure_method: if skip_stock {
+                    "make_to_order".to_string()
+                } else {
+                    "make_to_stock".to_string()
+                },
                 price_unit: line.price_unit,
                 scrapped: false,
                 to_refund: false,
@@ -840,7 +864,7 @@ fn create_outgoing_pickings_for_confirmed_order(
                 result_package_id: None,
                 owner_id: None,
                 package_level_id: None,
-                product_type: Some("product".to_string()),
+                product_type: Some(product.type_.clone()),
                 metadata: None,
             },
         )?;
@@ -1025,6 +1049,11 @@ pub fn cancel_sale_order(
     order_id: u64,
     reason: Option<String>,
 ) -> Result<(), String> {
+    use crate::inventory::stock::{
+        product_requires_stock, stock_move, stock_picking, unreserve_quantity_at_location,
+        StockMove, StockPicking,
+    };
+
     let order = ctx
         .db
         .sale_order()
@@ -1039,7 +1068,68 @@ pub fn cancel_sale_order(
         return Err("Cannot cancel a done order".to_string());
     }
 
+    if order.invoice_status == InvoiceStatus::Invoiced {
+        return Err(
+            "Cannot cancel an invoiced sale order — create a credit note / return instead"
+                .to_string(),
+        );
+    }
+
     let company_id = order.company_id;
+
+    // Cancel open outbound pickings and release reservations for this SO.
+    let open_pickings: Vec<_> = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .filter(|p| {
+            p.organization_id == organization_id
+                && p.company_id == company_id
+                && p.sale_id == Some(order_id)
+                && !p.is_return
+                && p.state != "done"
+                && p.state != "cancel"
+                && p.state != "cancelled"
+        })
+        .collect();
+
+    for picking in &open_pickings {
+        for move_record in ctx
+            .db
+            .stock_move()
+            .move_by_org()
+            .filter(&organization_id)
+            .filter(|m| m.picking_id == Some(picking.id) && m.state != "done" && m.state != "cancel")
+        {
+            if !order.is_dropship
+                && product_requires_stock(ctx, move_record.product_id)
+                && move_record.product_uom_qty > 0.0
+            {
+                unreserve_quantity_at_location(
+                    ctx,
+                    organization_id,
+                    company_id,
+                    move_record.product_id,
+                    move_record.location_id,
+                    move_record.product_uom_qty,
+                )?;
+            }
+            ctx.db.stock_move().id().update(StockMove {
+                state: "cancel".to_string(),
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..move_record
+            });
+        }
+
+        ctx.db.stock_picking().id().update(StockPicking {
+            state: "cancel".to_string(),
+            show_validate: false,
+            updated_at: ctx.timestamp,
+            ..picking.clone()
+        });
+    }
+
     ctx.db.sale_order().id().update(SaleOrder {
         state: SaleState::Cancelled,
         write_uid: ctx.sender(),
