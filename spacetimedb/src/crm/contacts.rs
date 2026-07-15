@@ -9,6 +9,7 @@
 ///   - ContactTagAssignment
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::country_pack::{validate_address_for_packs, validate_company_identifier_for_packs};
 use crate::core::organization::company_id_from_scope;
 use crate::core::permissions::role;
 use crate::core::users::{user_organization, user_profile};
@@ -255,6 +256,17 @@ pub struct CreateContactTagParams {
     pub metadata: Option<String>,
 }
 
+/// `end_date`/`is_active` are system-managed (set by `end_contact_relationship`).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateContactRelationshipParams {
+    pub left_contact_id: u64,
+    pub right_contact_id: u64,
+    pub relationship_type: String,
+    pub start_date: Option<Timestamp>,
+    pub notes: Option<String>,
+    pub metadata: Option<String>,
+}
+
 // ── Reducers ──────────────────────────────────────────────────────────────────
 
 #[spacetimedb::reducer]
@@ -276,6 +288,22 @@ pub fn create_contact(
         .unwrap_or_else(|| params.name.clone());
 
     let operating_company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
+    validate_company_identifier_for_packs(
+        ctx,
+        organization_id,
+        operating_company_id,
+        &params.tax_id,
+    )?;
+    validate_address_for_packs(
+        ctx,
+        organization_id,
+        operating_company_id,
+        &params.country_code,
+        &params.city,
+        &params.zip,
+        &params.state_code,
+    )?;
 
     let contact = ctx.db.contact().insert(Contact {
         id: 0,
@@ -366,6 +394,18 @@ pub fn update_contact_address(
         return Err("Contact does not belong to this organization".to_string());
     }
 
+    if let Some(company_id) = contact.company_id {
+        validate_address_for_packs(
+            ctx,
+            organization_id,
+            company_id,
+            &params.country_code,
+            &params.city,
+            &params.zip,
+            &params.state_code,
+        )?;
+    }
+
     ctx.db.contact().id().update(Contact {
         street: params.street,
         street2: params.street2,
@@ -413,6 +453,10 @@ pub fn update_contact_business(
 
     if contact.organization_id != organization_id {
         return Err("Contact does not belong to this organization".to_string());
+    }
+
+    if let Some(company_id) = contact.company_id {
+        validate_company_identifier_for_packs(ctx, organization_id, company_id, &params.tax_id)?;
     }
 
     ctx.db.contact().id().update(Contact {
@@ -745,6 +789,201 @@ pub fn assign_tag_to_contact(
             assigned_at: ctx.timestamp,
             metadata,
         });
+
+    Ok(())
+}
+
+fn require_org_contact(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    contact_id: u64,
+) -> Result<Contact, String> {
+    let contact = ctx
+        .db
+        .contact()
+        .id()
+        .find(&contact_id)
+        .ok_or("Contact not found")?;
+
+    if contact.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
+
+    Ok(contact)
+}
+
+#[spacetimedb::reducer]
+pub fn create_contact_relationship(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateContactRelationshipParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact_relationship", "create")?;
+
+    if params.left_contact_id == params.right_contact_id {
+        return Err("A contact cannot have a relationship with itself".to_string());
+    }
+
+    require_org_contact(ctx, organization_id, params.left_contact_id)?;
+    require_org_contact(ctx, organization_id, params.right_contact_id)?;
+
+    let relationship = ctx
+        .db
+        .contact_relationship()
+        .insert(ContactRelationship {
+            id: 0,
+            organization_id,
+            left_contact_id: params.left_contact_id,
+            right_contact_id: params.right_contact_id,
+            relationship_type: params.relationship_type.clone(),
+            start_date: params.start_date,
+            end_date: None,
+            is_active: true,
+            notes: params.notes,
+            created_by: ctx.sender(),
+            created_at: ctx.timestamp,
+            metadata: params.metadata,
+        });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact_relationship",
+            record_id: relationship.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "left_contact_id": params.left_contact_id,
+                    "right_contact_id": params.right_contact_id,
+                    "relationship_type": params.relationship_type,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "left_contact_id".to_string(),
+                "right_contact_id".to_string(),
+                "relationship_type".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn end_contact_relationship(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    relationship_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact_relationship", "write")?;
+
+    let relationship = ctx
+        .db
+        .contact_relationship()
+        .id()
+        .find(&relationship_id)
+        .ok_or("Contact relationship not found")?;
+
+    if relationship.organization_id != organization_id {
+        return Err("Relationship does not belong to this organization".to_string());
+    }
+
+    if !relationship.is_active {
+        return Err("Relationship is already ended".to_string());
+    }
+
+    ctx.db
+        .contact_relationship()
+        .id()
+        .update(ContactRelationship {
+            is_active: false,
+            end_date: Some(ctx.timestamp),
+            ..relationship
+        });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact_relationship",
+            record_id: relationship_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "is_active": true }).to_string()),
+            new_values: Some(serde_json::json!({ "is_active": false }).to_string()),
+            changed_fields: vec!["is_active".to_string(), "end_date".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Sets or clears `contact_id`'s parent. Rejects self-parenting and any cycle
+/// that would result from walking `parent_id` up from the candidate parent.
+#[spacetimedb::reducer]
+pub fn update_contact_parent(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    contact_id: u64,
+    parent_id: Option<u64>,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact", "write")?;
+
+    let target = require_org_contact(ctx, organization_id, contact_id)?;
+
+    if let Some(target_company_id) = target.company_id {
+        if target_company_id != company_id {
+            return Err("Contact does not belong to this company".to_string());
+        }
+    }
+
+    if let Some(pid) = parent_id {
+        require_org_contact(ctx, organization_id, pid)?;
+
+        // Walk the ancestor chain from the candidate parent; if `contact_id`
+        // appears in it, setting this parent would create a cycle.
+        let mut current = Some(pid);
+        let mut visited = std::collections::HashSet::new();
+        while let Some(cid) = current {
+            if cid == contact_id {
+                return Err("Setting this parent would create a cycle".to_string());
+            }
+            if !visited.insert(cid) {
+                break; // pre-existing cycle elsewhere in the data — stop walking
+            }
+            current = ctx.db.contact().id().find(&cid).and_then(|c| c.parent_id);
+        }
+    }
+
+    let old_parent_id = target.parent_id;
+
+    ctx.db.contact().id().update(Contact {
+        parent_id,
+        updated_at: ctx.timestamp,
+        ..target
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "contact",
+            record_id: contact_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "parent_id": old_parent_id }).to_string()),
+            new_values: Some(serde_json::json!({ "parent_id": parent_id }).to_string()),
+            changed_fields: vec!["parent_id".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

@@ -103,6 +103,44 @@ pub struct ConvertLeadParams {
     pub metadata: Option<String>,
 }
 
+/// Params for creating a lead source.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateLeadSourceParams {
+    pub name: String,
+    pub description: Option<String>,
+    pub sequence: i32,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating a lead source. `None` = keep existing value.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateLeadSourceParams {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub sequence: Option<i32>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<String>,
+}
+
+/// Params for creating a lead lost reason.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateLeadLostReasonParams {
+    pub name: String,
+    pub description: Option<String>,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating a lead lost reason. `None` = keep existing value.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateLeadLostReasonParams {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<String>,
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TABLES: LEADS
 // ══════════════════════════════════════════════════════════════════════════════
@@ -549,6 +587,240 @@ pub fn convert_lead_to_customer(
             old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
             new_values: Some(r#"{"state":"converted"}"#.to_string()),
             changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REDUCERS: LEAD SOURCE ADMIN
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[spacetimedb::reducer]
+pub fn create_lead_source(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateLeadSourceParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "lead_source", "create")?;
+
+    if params.name.is_empty() {
+        return Err("Source name cannot be empty".to_string());
+    }
+
+    let source = ctx.db.lead_source().insert(LeadSource {
+        id: 0,
+        organization_id,
+        name: params.name.clone(),
+        description: params.description,
+        sequence: params.sequence,
+        is_active: params.is_active,
+        metadata: params.metadata,
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "lead_source",
+            record_id: source.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "name": params.name }).to_string()),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_lead_source(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    source_id: u64,
+    params: UpdateLeadSourceParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "lead_source", "write")?;
+
+    let source = ctx
+        .db
+        .lead_source()
+        .id()
+        .find(&source_id)
+        .ok_or("Lead source not found")?;
+
+    if source.organization_id != organization_id {
+        return Err("Lead source does not belong to this organization".to_string());
+    }
+
+    let mut changed_fields = Vec::new();
+
+    let name = match params.name {
+        Some(v) => {
+            if v.is_empty() {
+                return Err("Source name cannot be empty".to_string());
+            }
+            changed_fields.push("name".to_string());
+            v
+        }
+        None => source.name.clone(),
+    };
+    if params.description.is_some() {
+        changed_fields.push("description".to_string());
+    }
+    let description = params.description.or_else(|| source.description.clone());
+    let sequence = params.sequence.unwrap_or(source.sequence);
+    if params.sequence.is_some() {
+        changed_fields.push("sequence".to_string());
+    }
+    let is_active = params.is_active.unwrap_or(source.is_active);
+    if params.is_active.is_some() {
+        changed_fields.push("is_active".to_string());
+    }
+    if params.metadata.is_some() {
+        changed_fields.push("metadata".to_string());
+    }
+    let metadata = params.metadata.or_else(|| source.metadata.clone());
+
+    ctx.db.lead_source().id().update(LeadSource {
+        name,
+        description,
+        sequence,
+        is_active,
+        metadata,
+        ..source
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "lead_source",
+            record_id: source_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields,
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REDUCERS: LEAD LOST REASON ADMIN
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[spacetimedb::reducer]
+pub fn create_lead_lost_reason(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateLeadLostReasonParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "lead_lost_reason", "create")?;
+
+    if params.name.is_empty() {
+        return Err("Lost reason name cannot be empty".to_string());
+    }
+
+    let reason = ctx.db.lead_lost_reason().insert(LeadLostReason {
+        id: 0,
+        organization_id,
+        name: params.name.clone(),
+        description: params.description,
+        is_active: params.is_active,
+        metadata: params.metadata,
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "lead_lost_reason",
+            record_id: reason.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "name": params.name }).to_string()),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_lead_lost_reason(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    lost_reason_id: u64,
+    params: UpdateLeadLostReasonParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "lead_lost_reason", "write")?;
+
+    let reason = ctx
+        .db
+        .lead_lost_reason()
+        .id()
+        .find(&lost_reason_id)
+        .ok_or("Lost reason not found")?;
+
+    if reason.organization_id != organization_id {
+        return Err("Lost reason does not belong to this organization".to_string());
+    }
+
+    let mut changed_fields = Vec::new();
+
+    let name = match params.name {
+        Some(v) => {
+            if v.is_empty() {
+                return Err("Lost reason name cannot be empty".to_string());
+            }
+            changed_fields.push("name".to_string());
+            v
+        }
+        None => reason.name.clone(),
+    };
+    if params.description.is_some() {
+        changed_fields.push("description".to_string());
+    }
+    let description = params.description.or_else(|| reason.description.clone());
+    let is_active = params.is_active.unwrap_or(reason.is_active);
+    if params.is_active.is_some() {
+        changed_fields.push("is_active".to_string());
+    }
+    if params.metadata.is_some() {
+        changed_fields.push("metadata".to_string());
+    }
+    let metadata = params.metadata.or_else(|| reason.metadata.clone());
+
+    ctx.db.lead_lost_reason().id().update(LeadLostReason {
+        name,
+        description,
+        is_active,
+        metadata,
+        ..reason
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "lead_lost_reason",
+            record_id: lost_reason_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields,
             metadata: None,
         },
     );

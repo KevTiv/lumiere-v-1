@@ -68,7 +68,25 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "leads",
   "opportunities",
   "opportunity-stages",
+  "opportunity-lines",
+  "opportunity-presence",
   "contacts",
+  "contact-phone-identities",
+  "contact-role-assignments",
+  "contact-tags",
+  "contact-tag-assignments",
+  "contact-segments",
+  "segment-members",
+  "contact-relationships",
+  "contact-duplicate-candidates",
+  "assignment-rules",
+  "activities",
+  "utm-campaigns",
+  "utm-media",
+  "utm-sources",
+  "privacy-consent",
+  "contact-communication-preferences",
+  "crm-forecast-snapshots",
   "projects",
   "tasks",
   "timesheets",
@@ -335,7 +353,84 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "",
       " ORDER BY sequence ASC",
     ),
+  "opportunity-lines": (id, fa) =>
+    selectOrgScopedSql("opportunity-lines", "opportunity_line", id, fa, ""),
+  "opportunity-presence": (id, fa) =>
+    selectOrgScopedSql("opportunity-presence", "opportunity_presence", id, fa, ""),
   contacts: (id, fa) => selectOrgScopedSql("contacts", "contact", id, fa, ""),
+  "contact-phone-identities": (id, fa) =>
+    selectOrgScopedSql(
+      "contact-phone-identities",
+      "contact_phone_identity",
+      id,
+      fa,
+      "",
+    ),
+  "contact-role-assignments": (id, fa) =>
+    selectOrgScopedSql(
+      "contact-role-assignments",
+      "contact_role_assignment",
+      id,
+      fa,
+      "",
+    ),
+  "contact-tags": (id, fa) =>
+    selectOrgScopedSql("contact-tags", "contact_tag", id, fa, ""),
+  "contact-tag-assignments": (id, fa) =>
+    selectOrgScopedSql(
+      "contact-tag-assignments",
+      "contact_tag_assignment",
+      id,
+      fa,
+      "",
+    ),
+  "contact-segments": (id, fa) =>
+    selectOrgScopedSql("contact-segments", "contact_segment", id, fa, ""),
+  "segment-members": (id, fa) =>
+    selectOrgScopedSql("segment-members", "segment_member", id, fa, ""),
+  "contact-relationships": (id, fa) =>
+    selectOrgScopedSql(
+      "contact-relationships",
+      "contact_relationship",
+      id,
+      fa,
+      "",
+    ),
+  "contact-duplicate-candidates": (id, fa) =>
+    selectOrgScopedSql(
+      "contact-duplicate-candidates",
+      "contact_duplicate_candidate",
+      id,
+      fa,
+      "",
+    ),
+  "assignment-rules": (id, fa) =>
+    selectOrgScopedSql("assignment-rules", "assignment_rule", id, fa, ""),
+  activities: (id, fa) => selectOrgScopedSql("activities", "activity", id, fa, ""),
+  "utm-campaigns": (id, fa) =>
+    selectOrgScopedSql("utm-campaigns", "utm_campaign", id, fa, ""),
+  "utm-media": (id, fa) => selectOrgScopedSql("utm-media", "utm_medium", id, fa, ""),
+  "utm-sources": (id, fa) =>
+    selectOrgScopedSql("utm-sources", "utm_source", id, fa, ""),
+  "privacy-consent": (id, fa) =>
+    selectOrgScopedSql("privacy-consent", "privacy_consent", id, fa, ""),
+  "contact-communication-preferences": (id, fa) =>
+    selectOrgScopedSql(
+      "contact-communication-preferences",
+      "contact_communication_preference",
+      id,
+      fa,
+      "",
+    ),
+  "crm-forecast-snapshots": (id, fa) =>
+    selectOrgScopedSql(
+      "crm-forecast-snapshots",
+      "crm_forecast_snapshot",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
   projects: (id, fa) =>
     selectOrgScopedSql("projects", "project_project", id, fa, ""),
   tasks: (id, fa) => selectOrgScopedSql("tasks", "project_task", id, fa, ""),
@@ -676,6 +771,30 @@ function subscriptionSqlForCompanyScopedResource(
     const filter = companyIdsEqualityOr("company_id", ids)
     return [`SELECT ${c} FROM stock_picking_batch WHERE ${filter}`]
   }
+  if (resource === "delivery-carriers") {
+    if (!ids?.length) return null
+    const c = resolveHttpSqlColumns("delivery-carriers", fa).join(", ")
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM delivery_carrier WHERE ${filter} ORDER BY sequence ASC`]
+  }
+  if (resource === "delivery-price-rules") {
+    if (!ids?.length) return null
+    const c = resolveHttpSqlColumns("delivery-price-rules", fa).join(", ")
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM delivery_price_rule WHERE ${filter}`]
+  }
+  if (resource === "shipping-methods") {
+    if (!ids?.length) return null
+    const c = resolveHttpSqlColumns("shipping-methods", fa).join(", ")
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM shipping_method WHERE ${filter} ORDER BY name ASC`]
+  }
+  if (resource === "pos-payment-methods") {
+    if (!ids?.length) return null
+    const c = resolveHttpSqlColumns("pos-payment-methods", fa).join(", ")
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM pos_payment_method WHERE ${filter} ORDER BY sequence ASC`]
+  }
   if (resource === "pos-sessions") {
     // Child of pos_config — no SQL subqueries; load pos-sessions via api-server query instead.
     return null
@@ -807,7 +926,11 @@ const EXTRA_COMPANY_SCOPED_ERP_KEYS = [
   "consolidation-accounts",
   "pos-configs",
   "pos-sessions",
+  "pos-payment-methods",
   "picking-batches",
+  "delivery-carriers",
+  "delivery-price-rules",
+  "shipping-methods",
 ] as const
 
 /** Keys for org-scoped ERP tables ({@link ERP_ORG_SQL} plus company-scoped resources). */

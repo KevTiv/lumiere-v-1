@@ -98,6 +98,35 @@ pub struct UpdateOpportunityParams {
     pub tag_ids: Option<Vec<u64>>,
 }
 
+/// Params for creating an opportunity pipeline stage.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateOpportunityStageParams {
+    pub name: String,
+    pub sequence: i32,
+    pub probability: f64,
+    pub requirements: Option<String>,
+    pub fold: bool,
+    pub is_won: bool,
+    pub team_id: Option<u64>,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating an opportunity pipeline stage.
+/// `None` = keep existing value for every field.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateOpportunityStageParams {
+    pub name: Option<String>,
+    pub sequence: Option<i32>,
+    pub probability: Option<f64>,
+    pub requirements: Option<String>,
+    pub fold: Option<bool>,
+    pub is_won: Option<bool>,
+    pub team_id: Option<u64>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<String>,
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TABLES: OPPORTUNITIES
 // ══════════════════════════════════════════════════════════════════════════════
@@ -279,6 +308,153 @@ pub fn create_opportunity(
                     .to_string(),
             ),
             changed_fields: vec!["name".to_string(), "expected_revenue".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REDUCERS: OPPORTUNITY STAGE ADMIN
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[spacetimedb::reducer]
+pub fn create_opportunity_stage(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateOpportunityStageParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "opportunity_stage", "create")?;
+
+    if params.name.is_empty() {
+        return Err("Stage name cannot be empty".to_string());
+    }
+
+    let stage = ctx.db.opp_stage().insert(OpportunityStage {
+        id: 0,
+        organization_id,
+        name: params.name.clone(),
+        sequence: params.sequence,
+        probability: params.probability,
+        requirements: params.requirements,
+        fold: params.fold,
+        is_won: params.is_won,
+        team_id: params.team_id,
+        is_active: params.is_active,
+        metadata: params.metadata,
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "opp_stage",
+            record_id: stage.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": params.name, "sequence": params.sequence })
+                    .to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "sequence".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_opportunity_stage(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    stage_id: u64,
+    params: UpdateOpportunityStageParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "opportunity_stage", "write")?;
+
+    let stage = ctx
+        .db
+        .opp_stage()
+        .id()
+        .find(&stage_id)
+        .ok_or("Stage not found")?;
+
+    if stage.organization_id != organization_id {
+        return Err("Stage does not belong to this organization".to_string());
+    }
+
+    let mut changed_fields = Vec::new();
+
+    let name = match params.name {
+        Some(v) => {
+            if v.is_empty() {
+                return Err("Stage name cannot be empty".to_string());
+            }
+            changed_fields.push("name".to_string());
+            v
+        }
+        None => stage.name.clone(),
+    };
+    let sequence = params.sequence.unwrap_or(stage.sequence);
+    if params.sequence.is_some() {
+        changed_fields.push("sequence".to_string());
+    }
+    let probability = params.probability.unwrap_or(stage.probability);
+    if params.probability.is_some() {
+        changed_fields.push("probability".to_string());
+    }
+    if params.requirements.is_some() {
+        changed_fields.push("requirements".to_string());
+    }
+    let requirements = params.requirements.or_else(|| stage.requirements.clone());
+    let fold = params.fold.unwrap_or(stage.fold);
+    if params.fold.is_some() {
+        changed_fields.push("fold".to_string());
+    }
+    let is_won = params.is_won.unwrap_or(stage.is_won);
+    if params.is_won.is_some() {
+        changed_fields.push("is_won".to_string());
+    }
+    let team_id = params.team_id.or(stage.team_id);
+    if params.team_id.is_some() {
+        changed_fields.push("team_id".to_string());
+    }
+    let is_active = params.is_active.unwrap_or(stage.is_active);
+    if params.is_active.is_some() {
+        changed_fields.push("is_active".to_string());
+    }
+    if params.metadata.is_some() {
+        changed_fields.push("metadata".to_string());
+    }
+    let metadata = params.metadata.or_else(|| stage.metadata.clone());
+
+    ctx.db.opp_stage().id().update(OpportunityStage {
+        name,
+        sequence,
+        probability,
+        requirements,
+        fold,
+        is_won,
+        team_id,
+        is_active,
+        metadata,
+        ..stage
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "opp_stage",
+            record_id: stage_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields,
             metadata: None,
         },
     );

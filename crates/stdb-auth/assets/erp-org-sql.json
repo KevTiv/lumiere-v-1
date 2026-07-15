@@ -274,10 +274,136 @@
   },
   {
     "extra_where": "",
+    "mapKey": "opportunity-lines",
+    "order_by": "",
+    "resource_key": "opportunity-lines",
+    "table": "opportunity_line"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "opportunity-presence",
+    "order_by": "",
+    "resource_key": "opportunity-presence",
+    "table": "opportunity_presence"
+  },
+  {
+    "extra_where": "",
     "mapKey": "contacts",
     "order_by": "",
     "resource_key": "contacts",
     "table": "contact"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "contact-phone-identities",
+    "order_by": "",
+    "resource_key": "contact-phone-identities",
+    "table": "contact_phone_identity"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "contact-role-assignments",
+    "order_by": "",
+    "resource_key": "contact-role-assignments",
+    "table": "contact_role_assignment"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "contact-tags",
+    "order_by": "",
+    "resource_key": "contact-tags",
+    "table": "contact_tag"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "contact-tag-assignments",
+    "order_by": "",
+    "resource_key": "contact-tag-assignments",
+    "table": "contact_tag_assignment"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "contact-segments",
+    "order_by": "",
+    "resource_key": "contact-segments",
+    "table": "contact_segment"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "segment-members",
+    "order_by": "",
+    "resource_key": "segment-members",
+    "table": "segment_member"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "contact-relationships",
+    "order_by": "",
+    "resource_key": "contact-relationships",
+    "table": "contact_relationship"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "contact-duplicate-candidates",
+    "order_by": "",
+    "resource_key": "contact-duplicate-candidates",
+    "table": "contact_duplicate_candidate"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "assignment-rules",
+    "order_by": "",
+    "resource_key": "assignment-rules",
+    "table": "assignment_rule"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "activities",
+    "order_by": "",
+    "resource_key": "activities",
+    "table": "activity"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "utm-campaigns",
+    "order_by": "",
+    "resource_key": "utm-campaigns",
+    "table": "utm_campaign"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "utm-media",
+    "order_by": "",
+    "resource_key": "utm-media",
+    "table": "utm_medium"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "utm-sources",
+    "order_by": "",
+    "resource_key": "utm-sources",
+    "table": "utm_source"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "privacy-consent",
+    "order_by": "",
+    "resource_key": "privacy-consent",
+    "table": "privacy_consent"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "contact-communication-preferences",
+    "order_by": "",
+    "resource_key": "contact-communication-preferences",
+    "table": "contact_communication_preference"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "crm-forecast-snapshots",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "crm-forecast-snapshots",
+    "table": "crm_forecast_snapshot"
   },
   {
     "extra_where": "",

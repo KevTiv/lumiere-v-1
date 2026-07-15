@@ -2654,7 +2654,10 @@
       "pipelineValue": "Pipeline Value",
       "openOpportunities": "Open Opportunities",
       "totalContacts": "Total Contacts",
-      "opportunityFunnel": "Opportunity Funnel"
+      "opportunityFunnel": "Opportunity Funnel",
+      "weightedPipeline": "Weighted pipeline",
+      "forecastSnapshot": "Last forecast",
+      "pipelineHealthAttribution": "Pipeline & attribution"
     },
     "leads": {
       "title": "Leads",
@@ -3272,6 +3275,62 @@
           "noChanges": "Update at least one field before saving."
         }
       }
+    },
+    "consent": {
+      "tabLabel": "Consent",
+      "title": "Consent history",
+      "description": "Grant and revocation decisions for this contact.",
+      "record": "Record consent",
+      "type": "Consent type",
+      "decision": "Decision",
+      "granted": "Granted",
+      "revoked": "Revoked",
+      "save": "Save",
+      "loading": "Loading…",
+      "emptyTitle": "No consent recorded",
+      "emptyDescription": "Record a grant or revocation before outbound messaging."
+    },
+    "relationships": {
+      "tabLabel": "Relationships",
+      "title": "Relationships",
+      "description": "Explicit links between contacts (partner, subsidiary, spouse, …).",
+      "hierarchyTitle": "Account hierarchy",
+      "hierarchyDescription": "Optional parent contact for multi-entity accounts.",
+      "currentParent": "Current parent",
+      "parent": "Parent contact",
+      "noParent": "None",
+      "saveParent": "Save parent",
+      "needCompany": "Company scope required to set parent",
+      "add": "Add",
+      "otherContact": "Other contact",
+      "pickContact": "Pick another contact",
+      "type": "Type",
+      "save": "Save",
+      "loading": "Loading…",
+      "emptyTitle": "No relationships",
+      "emptyDescription": "Link related contacts for hierarchy and partner channels.",
+      "active": "Active",
+      "end": "End"
+    },
+    "presence": {
+      "viewing": "Also viewing",
+      "you": "You"
+    },
+    "admin": {
+      "tabLabel": "Pipeline admin",
+      "stagesTitle": "Opportunity stages",
+      "stagesDescription": "Add pipeline stages instead of seed-only configuration.",
+      "stageName": "Name",
+      "stageProbability": "Probability %",
+      "createStage": "Create stage",
+      "sourcesTitle": "Lead sources",
+      "sourcesDescription": "Named sources for inbound qualification tracking.",
+      "sourceName": "Name",
+      "createSource": "Create source",
+      "rulesTitle": "Assignment rules",
+      "rulesDescription": "Route leads and opportunities (territories foundation).",
+      "ruleName": "Name",
+      "createRule": "Create rule"
     }
   },
   "iot": {

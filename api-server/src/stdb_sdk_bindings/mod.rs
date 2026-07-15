@@ -68,6 +68,8 @@ pub mod ai_skill_version_type;
 pub mod ai_team_member_type;
 pub mod ai_team_member_skill_type;
 pub mod allocate_payment_params_type;
+pub mod amortization_line_type;
+pub mod amortization_schedule_type;
 pub mod analytics_metric_type;
 pub mod append_ai_agent_run_step_params_type;
 pub mod append_ai_chat_message_params_type;
@@ -163,12 +165,15 @@ pub mod create_ai_skill_fixture_params_type;
 pub mod create_ai_skill_params_type;
 pub mod create_ai_skill_version_params_type;
 pub mod create_ai_team_member_params_type;
+pub mod create_amortization_schedule_params_type;
 pub mod create_analytic_account_params_type;
 pub mod create_analytic_distribution_model_params_type;
 pub mod create_analytic_line_params_type;
 pub mod create_analytics_metric_params_type;
 pub mod create_approval_rule_params_type;
+pub mod create_assignment_rule_params_type;
 pub mod create_audit_rule_params_type;
+pub mod create_bad_debt_write_off_params_type;
 pub mod create_barcode_nomenclature_params_type;
 pub mod create_barcode_rule_params_type;
 pub mod create_bill_from_purchase_order_params_type;
@@ -181,12 +186,14 @@ pub mod create_consolidation_account_params_type;
 pub mod create_consolidation_journal_params_type;
 pub mod create_contact_identity_params_type;
 pub mod create_contact_params_type;
+pub mod create_contact_relationship_params_type;
 pub mod create_contact_segment_params_type;
 pub mod create_contact_tag_params_type;
 pub mod create_contract_params_type;
 pub mod create_country_params_type;
 pub mod create_credit_note_from_return_order_params_type;
 pub mod create_credit_note_params_type;
+pub mod create_crm_forecast_snapshot_params_type;
 pub mod create_crossovered_budget_line_params_type;
 pub mod create_crossovered_budget_params_type;
 pub mod create_currency_params_type;
@@ -225,7 +232,9 @@ pub mod create_job_position_params_type;
 pub mod create_knowledge_article_params_type;
 pub mod create_knowledge_category_params_type;
 pub mod create_landed_cost_params_type;
+pub mod create_lead_lost_reason_params_type;
 pub mod create_lead_params_type;
+pub mod create_lead_source_params_type;
 pub mod create_leave_request_params_type;
 pub mod create_leave_type_params_type;
 pub mod create_loyalty_program_params_type;
@@ -236,6 +245,7 @@ pub mod create_mrp_production_params_type;
 pub mod create_operational_message_params_type;
 pub mod create_opportunity_line_params_type;
 pub mod create_opportunity_params_type;
+pub mod create_opportunity_stage_params_type;
 pub mod create_organization_params_type;
 pub mod create_partner_bank_params_type;
 pub mod create_payment_account_params_type;
@@ -319,6 +329,7 @@ pub mod create_workcenter_params_type;
 pub mod create_workcenter_productivity_params_type;
 pub mod create_workflow_params_type;
 pub mod create_workorder_params_type;
+pub mod crm_forecast_snapshot_type;
 pub mod crossovered_budget_type;
 pub mod crossovered_budget_lines_type;
 pub mod currency_type;
@@ -362,6 +373,8 @@ pub mod fleet_vehicle_type;
 pub mod form_config_type;
 pub mod form_config_field_type;
 pub mod form_role_config_type;
+pub mod fx_revaluation_line_params_type;
+pub mod fx_revaluation_run_type;
 pub mod generate_eu_vat_report_params_type;
 pub mod generate_subscription_invoice_params_type;
 pub mod generated_owner_report_type;
@@ -445,12 +458,14 @@ pub mod operational_message_type;
 pub mod operational_message_status_type;
 pub mod opportunity_type;
 pub mod opportunity_line_type;
+pub mod opportunity_presence_type;
 pub mod opportunity_stage_type;
 pub mod org_permission_type;
 pub mod org_schema_migration_type;
 pub mod organization_type;
 pub mod organization_settings_type;
 pub mod packaging_material_type;
+pub mod partner_credit_control_type;
 pub mod partner_type_type;
 pub mod password_reset_token_type;
 pub mod payment_account_type;
@@ -489,6 +504,7 @@ pub mod pos_payment_method_type;
 pub mod pos_session_type;
 pub mod pos_status_type;
 pub mod pos_terminal_type;
+pub mod post_realized_fx_params_type;
 pub mod pricelist_applied_on_type;
 pub mod privacy_consent_type;
 pub mod process_intercompany_transaction_params_type;
@@ -525,6 +541,7 @@ pub mod quality_team_type;
 pub mod queue_job_type;
 pub mod queue_mail_from_template_params_type;
 pub mod queue_worker_type;
+pub mod recognize_amortization_line_params_type;
 pub mod recognize_deferred_revenue_params_type;
 pub mod reconcile_account_bank_statement_line_params_type;
 pub mod record_ai_skill_test_run_params_type;
@@ -553,6 +570,8 @@ pub mod reverse_payment_transaction_params_type;
 pub mod review_message_batch_params_type;
 pub mod role_type;
 pub mod rule_type_type;
+pub mod run_fx_revaluation_batch_params_type;
+pub mod run_fx_revaluation_params_type;
 pub mod sale_order_type;
 pub mod sale_order_line_type;
 pub mod sale_order_option_type;
@@ -643,6 +662,7 @@ pub mod update_analytic_account_params_type;
 pub mod update_analytic_distribution_model_params_type;
 pub mod update_analytic_line_params_type;
 pub mod update_approval_rule_params_type;
+pub mod update_assignment_rule_params_type;
 pub mod update_audit_rule_params_type;
 pub mod update_barcode_nomenclature_params_type;
 pub mod update_barcode_rule_params_type;
@@ -680,12 +700,15 @@ pub mod update_knowledge_category_params_type;
 pub mod update_landed_cost_params_type;
 pub mod update_lead_address_params_type;
 pub mod update_lead_details_params_type;
+pub mod update_lead_lost_reason_params_type;
 pub mod update_lead_revenue_params_type;
+pub mod update_lead_source_params_type;
 pub mod update_leave_type_params_type;
 pub mod update_mail_template_params_type;
 pub mod update_message_template_params_type;
 pub mod update_metric_values_params_type;
 pub mod update_opportunity_params_type;
+pub mod update_opportunity_stage_params_type;
 pub mod update_org_member_details_params_type;
 pub mod update_organization_params_type;
 pub mod update_owner_report_schedule_params_type;
@@ -710,6 +733,7 @@ pub mod update_report_template_params_type;
 pub mod update_role_params_type;
 pub mod update_sale_order_params_type;
 pub mod update_saved_report_params_type;
+pub mod update_sod_conflict_rule_params_type;
 pub mod update_stock_location_params_type;
 pub mod update_stock_production_lot_params_type;
 pub mod update_stock_production_serial_params_type;
@@ -736,6 +760,7 @@ pub mod update_workcenter_params_type;
 pub mod upsert_ai_skill_config_params_type;
 pub mod upsert_ai_skill_params_type;
 pub mod upsert_organization_settings_params_type;
+pub mod upsert_partner_credit_control_params_type;
 pub mod upsert_search_embedding_params_type;
 pub mod user_credential_type;
 pub mod user_custom_field_type;
@@ -848,6 +873,7 @@ pub mod cancel_workflow_instance_reducer;
 pub mod check_mo_availability_reducer;
 pub mod claim_hub_with_token_reducer;
 pub mod claim_queue_job_reducer;
+pub mod clear_opportunity_presence_reducer;
 pub mod clear_proposal_presence_reducer;
 pub mod close_account_asset_reducer;
 pub mod close_account_period_reducer;
@@ -910,12 +936,15 @@ pub mod create_ai_skill_reducer;
 pub mod create_ai_skill_fixture_reducer;
 pub mod create_ai_skill_version_reducer;
 pub mod create_ai_team_member_reducer;
+pub mod create_amortization_schedule_reducer;
 pub mod create_analytic_account_reducer;
 pub mod create_analytic_distribution_model_reducer;
 pub mod create_analytic_line_reducer;
 pub mod create_analytics_metric_reducer;
 pub mod create_approval_rule_reducer;
+pub mod create_assignment_rule_reducer;
 pub mod create_audit_rule_reducer;
+pub mod create_bad_debt_write_off_reducer;
 pub mod create_barcode_nomenclature_reducer;
 pub mod create_barcode_rule_reducer;
 pub mod create_bill_from_purchase_order_reducer;
@@ -929,6 +958,7 @@ pub mod create_consolidation_account_reducer;
 pub mod create_consolidation_journal_reducer;
 pub mod create_contact_reducer;
 pub mod create_contact_identity_reducer;
+pub mod create_contact_relationship_reducer;
 pub mod create_contact_segment_reducer;
 pub mod create_contact_tag_reducer;
 pub mod create_contract_reducer;
@@ -959,6 +989,7 @@ pub mod create_expense_sheet_reducer;
 pub mod create_financial_report_reducer;
 pub mod create_fiscal_year_reducer;
 pub mod create_fleet_vehicle_reducer;
+pub mod create_forecast_snapshot_reducer;
 pub mod create_form_configuration_reducer;
 pub mod create_google_drive_connection_reducer;
 pub mod create_helpdesk_sla_reducer;
@@ -976,6 +1007,8 @@ pub mod create_knowledge_article_reducer;
 pub mod create_knowledge_category_reducer;
 pub mod create_landed_cost_reducer;
 pub mod create_lead_reducer;
+pub mod create_lead_lost_reason_reducer;
+pub mod create_lead_source_reducer;
 pub mod create_leave_request_reducer;
 pub mod create_leave_type_reducer;
 pub mod create_loyalty_card_reducer;
@@ -987,6 +1020,7 @@ pub mod create_message_template_reducer;
 pub mod create_operational_message_reducer;
 pub mod create_opportunity_reducer;
 pub mod create_opportunity_line_reducer;
+pub mod create_opportunity_stage_reducer;
 pub mod create_organization_reducer;
 pub mod create_partner_bank_reducer;
 pub mod create_password_reset_token_reducer;
@@ -1133,6 +1167,7 @@ pub mod dispatch_due_owner_reports_reducer;
 pub mod dispose_account_asset_reducer;
 pub mod done_budget_reducer;
 pub mod done_stock_move_reducer;
+pub mod end_contact_relationship_reducer;
 pub mod end_contact_role_reducer;
 pub mod end_user_session_reducer;
 pub mod enqueue_job_reducer;
@@ -1259,6 +1294,7 @@ pub mod post_landed_costs_reducer;
 pub mod post_message_reducer;
 pub mod post_payment_reducer;
 pub mod post_payment_transaction_reducer;
+pub mod post_realized_fx_gain_loss_reducer;
 pub mod process_consolidation_reducer;
 pub mod process_intercompany_transaction_reducer;
 pub mod process_inventory_adjustment_reducer;
@@ -1267,6 +1303,7 @@ pub mod produce_manufacturing_order_reducer;
 pub mod promote_ai_skill_version_reducer;
 pub mod queue_mail_from_template_reducer;
 pub mod receive_po_line_reducer;
+pub mod recognize_amortization_line_reducer;
 pub mod recognize_deferred_revenue_reducer;
 pub mod reconcile_account_bank_statement_line_reducer;
 pub mod reconcile_payment_with_invoice_reducer;
@@ -1318,10 +1355,12 @@ pub mod retry_iot_action_reducer;
 pub mod reverse_payment_transaction_reducer;
 pub mod review_message_batch_reducer;
 pub mod review_supplier_intake_reducer;
+pub mod revoke_delegated_admin_scope_reducer;
 pub mod revoke_permission_reducer;
 pub mod revoke_role_reducer;
 pub mod rollback_ai_skill_release_reducer;
 pub mod rollback_import_job_reducer;
+pub mod run_accounting_fx_revaluation_test_reducer;
 pub mod run_accounting_ic_consolidation_test_reducer;
 pub mod run_accounting_payment_cancel_test_reducer;
 pub mod run_accounting_payment_management_test_reducer;
@@ -1344,7 +1383,11 @@ pub mod run_country_pack_test_reducer;
 pub mod run_crm_contact_identity_test_reducer;
 pub mod run_crm_contact_update_delete_test_reducer;
 pub mod run_crm_opportunity_convert_test_reducer;
+pub mod run_crm_relationship_admin_test_reducer;
+pub mod run_crm_wave_2_test_reducer;
 pub mod run_documents_folder_test_reducer;
+pub mod run_fx_revaluation_reducer;
+pub mod run_fx_revaluation_batch_reducer;
 pub mod run_helpdesk_ticket_test_reducer;
 pub mod run_hr_leave_type_test_reducer;
 pub mod run_inventory_adjustment_test_reducer;
@@ -1444,6 +1487,7 @@ pub mod update_analytic_account_reducer;
 pub mod update_analytic_distribution_model_reducer;
 pub mod update_analytic_line_reducer;
 pub mod update_approval_rule_reducer;
+pub mod update_assignment_rule_reducer;
 pub mod update_audit_rule_reducer;
 pub mod update_barcode_nomenclature_reducer;
 pub mod update_barcode_rule_reducer;
@@ -1463,6 +1507,7 @@ pub mod update_contact_address_reducer;
 pub mod update_contact_business_reducer;
 pub mod update_contact_details_reducer;
 pub mod update_contact_identity_reducer;
+pub mod update_contact_parent_reducer;
 pub mod update_contract_reducer;
 pub mod update_crossovered_budget_reducer;
 pub mod update_department_reducer;
@@ -1485,12 +1530,16 @@ pub mod update_knowledge_category_reducer;
 pub mod update_landed_cost_reducer;
 pub mod update_lead_address_reducer;
 pub mod update_lead_details_reducer;
+pub mod update_lead_lost_reason_reducer;
 pub mod update_lead_revenue_reducer;
+pub mod update_lead_source_reducer;
 pub mod update_leave_type_reducer;
 pub mod update_mail_template_reducer;
 pub mod update_message_template_reducer;
 pub mod update_metric_values_reducer;
 pub mod update_opportunity_reducer;
+pub mod update_opportunity_presence_reducer;
+pub mod update_opportunity_stage_reducer;
 pub mod update_org_member_details_reducer;
 pub mod update_org_member_role_reducer;
 pub mod update_organization_reducer;
@@ -1526,6 +1575,7 @@ pub mod update_report_template_reducer;
 pub mod update_role_reducer;
 pub mod update_sale_order_reducer;
 pub mod update_saved_report_reducer;
+pub mod update_sod_conflict_rule_reducer;
 pub mod update_stock_inventory_state_reducer;
 pub mod update_stock_location_reducer;
 pub mod update_stock_production_lot_reducer;
@@ -1560,6 +1610,7 @@ pub mod update_workcenter_reducer;
 pub mod upsert_ai_skill_reducer;
 pub mod upsert_ai_skill_config_reducer;
 pub mod upsert_organization_settings_reducer;
+pub mod upsert_partner_credit_control_reducer;
 pub mod upsert_proposal_section_reducer;
 pub mod upsert_search_embedding_reducer;
 pub mod upsert_warehouse_geo_reducer;
@@ -1615,6 +1666,8 @@ pub mod ai_skill_test_run_table;
 pub mod ai_skill_version_table;
 pub mod ai_team_member_table;
 pub mod ai_team_member_skill_table;
+pub mod amortization_line_table;
+pub mod amortization_schedule_table;
 pub mod analytics_metric_table;
 pub mod approval_request_table;
 pub mod approval_rule_table;
@@ -1656,6 +1709,7 @@ pub mod contact_tag_assignment_table;
 pub mod country_table;
 pub mod country_pack_definition_table;
 pub mod country_pack_tax_rule_table;
+pub mod crm_forecast_snapshot_table;
 pub mod crossovered_budget_table;
 pub mod crossovered_budget_lines_table;
 pub mod currency_table;
@@ -1680,6 +1734,7 @@ pub mod fleet_vehicle_table;
 pub mod form_config_table;
 pub mod form_config_field_table;
 pub mod form_role_config_table;
+pub mod fx_revaluation_run_table;
 pub mod generated_owner_report_table;
 pub mod google_drive_connection_table;
 pub mod helpdesk_sla_table;
@@ -1733,11 +1788,13 @@ pub mod operational_message_table;
 pub mod opp_stage_table;
 pub mod opportunity_table;
 pub mod opportunity_line_table;
+pub mod opportunity_presence_table;
 pub mod org_permission_table;
 pub mod org_schema_migration_table;
 pub mod organization_table;
 pub mod organization_settings_table;
 pub mod packaging_material_table;
+pub mod partner_credit_control_table;
 pub mod payment_account_table;
 pub mod payment_fee_table;
 pub mod payment_reconciliation_table;
@@ -1912,6 +1969,8 @@ pub use ai_skill_version_type::AiSkillVersion;
 pub use ai_team_member_type::AiTeamMember;
 pub use ai_team_member_skill_type::AiTeamMemberSkill;
 pub use allocate_payment_params_type::AllocatePaymentParams;
+pub use amortization_line_type::AmortizationLine;
+pub use amortization_schedule_type::AmortizationSchedule;
 pub use analytics_metric_type::AnalyticsMetric;
 pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
 pub use append_ai_chat_message_params_type::AppendAiChatMessageParams;
@@ -2007,12 +2066,15 @@ pub use create_ai_skill_fixture_params_type::CreateAiSkillFixtureParams;
 pub use create_ai_skill_params_type::CreateAiSkillParams;
 pub use create_ai_skill_version_params_type::CreateAiSkillVersionParams;
 pub use create_ai_team_member_params_type::CreateAiTeamMemberParams;
+pub use create_amortization_schedule_params_type::CreateAmortizationScheduleParams;
 pub use create_analytic_account_params_type::CreateAnalyticAccountParams;
 pub use create_analytic_distribution_model_params_type::CreateAnalyticDistributionModelParams;
 pub use create_analytic_line_params_type::CreateAnalyticLineParams;
 pub use create_analytics_metric_params_type::CreateAnalyticsMetricParams;
 pub use create_approval_rule_params_type::CreateApprovalRuleParams;
+pub use create_assignment_rule_params_type::CreateAssignmentRuleParams;
 pub use create_audit_rule_params_type::CreateAuditRuleParams;
+pub use create_bad_debt_write_off_params_type::CreateBadDebtWriteOffParams;
 pub use create_barcode_nomenclature_params_type::CreateBarcodeNomenclatureParams;
 pub use create_barcode_rule_params_type::CreateBarcodeRuleParams;
 pub use create_bill_from_purchase_order_params_type::CreateBillFromPurchaseOrderParams;
@@ -2025,12 +2087,14 @@ pub use create_consolidation_account_params_type::CreateConsolidationAccountPara
 pub use create_consolidation_journal_params_type::CreateConsolidationJournalParams;
 pub use create_contact_identity_params_type::CreateContactIdentityParams;
 pub use create_contact_params_type::CreateContactParams;
+pub use create_contact_relationship_params_type::CreateContactRelationshipParams;
 pub use create_contact_segment_params_type::CreateContactSegmentParams;
 pub use create_contact_tag_params_type::CreateContactTagParams;
 pub use create_contract_params_type::CreateContractParams;
 pub use create_country_params_type::CreateCountryParams;
 pub use create_credit_note_from_return_order_params_type::CreateCreditNoteFromReturnOrderParams;
 pub use create_credit_note_params_type::CreateCreditNoteParams;
+pub use create_crm_forecast_snapshot_params_type::CreateCrmForecastSnapshotParams;
 pub use create_crossovered_budget_line_params_type::CreateCrossoveredBudgetLineParams;
 pub use create_crossovered_budget_params_type::CreateCrossoveredBudgetParams;
 pub use create_currency_params_type::CreateCurrencyParams;
@@ -2069,7 +2133,9 @@ pub use create_job_position_params_type::CreateJobPositionParams;
 pub use create_knowledge_article_params_type::CreateKnowledgeArticleParams;
 pub use create_knowledge_category_params_type::CreateKnowledgeCategoryParams;
 pub use create_landed_cost_params_type::CreateLandedCostParams;
+pub use create_lead_lost_reason_params_type::CreateLeadLostReasonParams;
 pub use create_lead_params_type::CreateLeadParams;
+pub use create_lead_source_params_type::CreateLeadSourceParams;
 pub use create_leave_request_params_type::CreateLeaveRequestParams;
 pub use create_leave_type_params_type::CreateLeaveTypeParams;
 pub use create_loyalty_program_params_type::CreateLoyaltyProgramParams;
@@ -2080,6 +2146,7 @@ pub use create_mrp_production_params_type::CreateMrpProductionParams;
 pub use create_operational_message_params_type::CreateOperationalMessageParams;
 pub use create_opportunity_line_params_type::CreateOpportunityLineParams;
 pub use create_opportunity_params_type::CreateOpportunityParams;
+pub use create_opportunity_stage_params_type::CreateOpportunityStageParams;
 pub use create_organization_params_type::CreateOrganizationParams;
 pub use create_partner_bank_params_type::CreatePartnerBankParams;
 pub use create_payment_account_params_type::CreatePaymentAccountParams;
@@ -2163,6 +2230,7 @@ pub use create_workcenter_params_type::CreateWorkcenterParams;
 pub use create_workcenter_productivity_params_type::CreateWorkcenterProductivityParams;
 pub use create_workflow_params_type::CreateWorkflowParams;
 pub use create_workorder_params_type::CreateWorkorderParams;
+pub use crm_forecast_snapshot_type::CrmForecastSnapshot;
 pub use crossovered_budget_type::CrossoveredBudget;
 pub use crossovered_budget_lines_type::CrossoveredBudgetLines;
 pub use currency_type::Currency;
@@ -2206,6 +2274,8 @@ pub use fleet_vehicle_type::FleetVehicle;
 pub use form_config_type::FormConfig;
 pub use form_config_field_type::FormConfigField;
 pub use form_role_config_type::FormRoleConfig;
+pub use fx_revaluation_line_params_type::FxRevaluationLineParams;
+pub use fx_revaluation_run_type::FxRevaluationRun;
 pub use generate_eu_vat_report_params_type::GenerateEuVatReportParams;
 pub use generate_subscription_invoice_params_type::GenerateSubscriptionInvoiceParams;
 pub use generated_owner_report_type::GeneratedOwnerReport;
@@ -2289,12 +2359,14 @@ pub use operational_message_type::OperationalMessage;
 pub use operational_message_status_type::OperationalMessageStatus;
 pub use opportunity_type::Opportunity;
 pub use opportunity_line_type::OpportunityLine;
+pub use opportunity_presence_type::OpportunityPresence;
 pub use opportunity_stage_type::OpportunityStage;
 pub use org_permission_type::OrgPermission;
 pub use org_schema_migration_type::OrgSchemaMigration;
 pub use organization_type::Organization;
 pub use organization_settings_type::OrganizationSettings;
 pub use packaging_material_type::PackagingMaterial;
+pub use partner_credit_control_type::PartnerCreditControl;
 pub use partner_type_type::PartnerType;
 pub use password_reset_token_type::PasswordResetToken;
 pub use payment_account_type::PaymentAccount;
@@ -2333,6 +2405,7 @@ pub use pos_payment_method_type::PosPaymentMethod;
 pub use pos_session_type::PosSession;
 pub use pos_status_type::PosStatus;
 pub use pos_terminal_type::PosTerminal;
+pub use post_realized_fx_params_type::PostRealizedFxParams;
 pub use pricelist_applied_on_type::PricelistAppliedOn;
 pub use privacy_consent_type::PrivacyConsent;
 pub use process_intercompany_transaction_params_type::ProcessIntercompanyTransactionParams;
@@ -2369,6 +2442,7 @@ pub use quality_team_type::QualityTeam;
 pub use queue_job_type::QueueJob;
 pub use queue_mail_from_template_params_type::QueueMailFromTemplateParams;
 pub use queue_worker_type::QueueWorker;
+pub use recognize_amortization_line_params_type::RecognizeAmortizationLineParams;
 pub use recognize_deferred_revenue_params_type::RecognizeDeferredRevenueParams;
 pub use reconcile_account_bank_statement_line_params_type::ReconcileAccountBankStatementLineParams;
 pub use record_ai_skill_test_run_params_type::RecordAiSkillTestRunParams;
@@ -2397,6 +2471,8 @@ pub use reverse_payment_transaction_params_type::ReversePaymentTransactionParams
 pub use review_message_batch_params_type::ReviewMessageBatchParams;
 pub use role_type::Role;
 pub use rule_type_type::RuleType;
+pub use run_fx_revaluation_batch_params_type::RunFxRevaluationBatchParams;
+pub use run_fx_revaluation_params_type::RunFxRevaluationParams;
 pub use sale_order_type::SaleOrder;
 pub use sale_order_line_type::SaleOrderLine;
 pub use sale_order_option_type::SaleOrderOption;
@@ -2487,6 +2563,7 @@ pub use update_analytic_account_params_type::UpdateAnalyticAccountParams;
 pub use update_analytic_distribution_model_params_type::UpdateAnalyticDistributionModelParams;
 pub use update_analytic_line_params_type::UpdateAnalyticLineParams;
 pub use update_approval_rule_params_type::UpdateApprovalRuleParams;
+pub use update_assignment_rule_params_type::UpdateAssignmentRuleParams;
 pub use update_audit_rule_params_type::UpdateAuditRuleParams;
 pub use update_barcode_nomenclature_params_type::UpdateBarcodeNomenclatureParams;
 pub use update_barcode_rule_params_type::UpdateBarcodeRuleParams;
@@ -2524,12 +2601,15 @@ pub use update_knowledge_category_params_type::UpdateKnowledgeCategoryParams;
 pub use update_landed_cost_params_type::UpdateLandedCostParams;
 pub use update_lead_address_params_type::UpdateLeadAddressParams;
 pub use update_lead_details_params_type::UpdateLeadDetailsParams;
+pub use update_lead_lost_reason_params_type::UpdateLeadLostReasonParams;
 pub use update_lead_revenue_params_type::UpdateLeadRevenueParams;
+pub use update_lead_source_params_type::UpdateLeadSourceParams;
 pub use update_leave_type_params_type::UpdateLeaveTypeParams;
 pub use update_mail_template_params_type::UpdateMailTemplateParams;
 pub use update_message_template_params_type::UpdateMessageTemplateParams;
 pub use update_metric_values_params_type::UpdateMetricValuesParams;
 pub use update_opportunity_params_type::UpdateOpportunityParams;
+pub use update_opportunity_stage_params_type::UpdateOpportunityStageParams;
 pub use update_org_member_details_params_type::UpdateOrgMemberDetailsParams;
 pub use update_organization_params_type::UpdateOrganizationParams;
 pub use update_owner_report_schedule_params_type::UpdateOwnerReportScheduleParams;
@@ -2554,6 +2634,7 @@ pub use update_report_template_params_type::UpdateReportTemplateParams;
 pub use update_role_params_type::UpdateRoleParams;
 pub use update_sale_order_params_type::UpdateSaleOrderParams;
 pub use update_saved_report_params_type::UpdateSavedReportParams;
+pub use update_sod_conflict_rule_params_type::UpdateSodConflictRuleParams;
 pub use update_stock_location_params_type::UpdateStockLocationParams;
 pub use update_stock_production_lot_params_type::UpdateStockProductionLotParams;
 pub use update_stock_production_serial_params_type::UpdateStockProductionSerialParams;
@@ -2580,6 +2661,7 @@ pub use update_workcenter_params_type::UpdateWorkcenterParams;
 pub use upsert_ai_skill_config_params_type::UpsertAiSkillConfigParams;
 pub use upsert_ai_skill_params_type::UpsertAiSkillParams;
 pub use upsert_organization_settings_params_type::UpsertOrganizationSettingsParams;
+pub use upsert_partner_credit_control_params_type::UpsertPartnerCreditControlParams;
 pub use upsert_search_embedding_params_type::UpsertSearchEmbeddingParams;
 pub use user_credential_type::UserCredential;
 pub use user_custom_field_type::UserCustomField;
@@ -2651,6 +2733,8 @@ pub use ai_skill_test_run_table::*;
 pub use ai_skill_version_table::*;
 pub use ai_team_member_table::*;
 pub use ai_team_member_skill_table::*;
+pub use amortization_line_table::*;
+pub use amortization_schedule_table::*;
 pub use analytics_metric_table::*;
 pub use approval_request_table::*;
 pub use approval_rule_table::*;
@@ -2692,6 +2776,7 @@ pub use contact_tag_assignment_table::*;
 pub use country_table::*;
 pub use country_pack_definition_table::*;
 pub use country_pack_tax_rule_table::*;
+pub use crm_forecast_snapshot_table::*;
 pub use crossovered_budget_table::*;
 pub use crossovered_budget_lines_table::*;
 pub use currency_table::*;
@@ -2716,6 +2801,7 @@ pub use fleet_vehicle_table::*;
 pub use form_config_table::*;
 pub use form_config_field_table::*;
 pub use form_role_config_table::*;
+pub use fx_revaluation_run_table::*;
 pub use generated_owner_report_table::*;
 pub use google_drive_connection_table::*;
 pub use helpdesk_sla_table::*;
@@ -2769,11 +2855,13 @@ pub use operational_message_table::*;
 pub use opp_stage_table::*;
 pub use opportunity_table::*;
 pub use opportunity_line_table::*;
+pub use opportunity_presence_table::*;
 pub use org_permission_table::*;
 pub use org_schema_migration_table::*;
 pub use organization_table::*;
 pub use organization_settings_table::*;
 pub use packaging_material_table::*;
+pub use partner_credit_control_table::*;
 pub use payment_account_table::*;
 pub use payment_fee_table::*;
 pub use payment_reconciliation_table::*;
@@ -2973,6 +3061,7 @@ pub use cancel_workflow_instance_reducer::cancel_workflow_instance;
 pub use check_mo_availability_reducer::check_mo_availability;
 pub use claim_hub_with_token_reducer::claim_hub_with_token;
 pub use claim_queue_job_reducer::claim_queue_job;
+pub use clear_opportunity_presence_reducer::clear_opportunity_presence;
 pub use clear_proposal_presence_reducer::clear_proposal_presence;
 pub use close_account_asset_reducer::close_account_asset;
 pub use close_account_period_reducer::close_account_period;
@@ -3035,12 +3124,15 @@ pub use create_ai_skill_reducer::create_ai_skill;
 pub use create_ai_skill_fixture_reducer::create_ai_skill_fixture;
 pub use create_ai_skill_version_reducer::create_ai_skill_version;
 pub use create_ai_team_member_reducer::create_ai_team_member;
+pub use create_amortization_schedule_reducer::create_amortization_schedule;
 pub use create_analytic_account_reducer::create_analytic_account;
 pub use create_analytic_distribution_model_reducer::create_analytic_distribution_model;
 pub use create_analytic_line_reducer::create_analytic_line;
 pub use create_analytics_metric_reducer::create_analytics_metric;
 pub use create_approval_rule_reducer::create_approval_rule;
+pub use create_assignment_rule_reducer::create_assignment_rule;
 pub use create_audit_rule_reducer::create_audit_rule;
+pub use create_bad_debt_write_off_reducer::create_bad_debt_write_off;
 pub use create_barcode_nomenclature_reducer::create_barcode_nomenclature;
 pub use create_barcode_rule_reducer::create_barcode_rule;
 pub use create_bill_from_purchase_order_reducer::create_bill_from_purchase_order;
@@ -3054,6 +3146,7 @@ pub use create_consolidation_account_reducer::create_consolidation_account;
 pub use create_consolidation_journal_reducer::create_consolidation_journal;
 pub use create_contact_reducer::create_contact;
 pub use create_contact_identity_reducer::create_contact_identity;
+pub use create_contact_relationship_reducer::create_contact_relationship;
 pub use create_contact_segment_reducer::create_contact_segment;
 pub use create_contact_tag_reducer::create_contact_tag;
 pub use create_contract_reducer::create_contract;
@@ -3084,6 +3177,7 @@ pub use create_expense_sheet_reducer::create_expense_sheet;
 pub use create_financial_report_reducer::create_financial_report;
 pub use create_fiscal_year_reducer::create_fiscal_year;
 pub use create_fleet_vehicle_reducer::create_fleet_vehicle;
+pub use create_forecast_snapshot_reducer::create_forecast_snapshot;
 pub use create_form_configuration_reducer::create_form_configuration;
 pub use create_google_drive_connection_reducer::create_google_drive_connection;
 pub use create_helpdesk_sla_reducer::create_helpdesk_sla;
@@ -3101,6 +3195,8 @@ pub use create_knowledge_article_reducer::create_knowledge_article;
 pub use create_knowledge_category_reducer::create_knowledge_category;
 pub use create_landed_cost_reducer::create_landed_cost;
 pub use create_lead_reducer::create_lead;
+pub use create_lead_lost_reason_reducer::create_lead_lost_reason;
+pub use create_lead_source_reducer::create_lead_source;
 pub use create_leave_request_reducer::create_leave_request;
 pub use create_leave_type_reducer::create_leave_type;
 pub use create_loyalty_card_reducer::create_loyalty_card;
@@ -3112,6 +3208,7 @@ pub use create_message_template_reducer::create_message_template;
 pub use create_operational_message_reducer::create_operational_message;
 pub use create_opportunity_reducer::create_opportunity;
 pub use create_opportunity_line_reducer::create_opportunity_line;
+pub use create_opportunity_stage_reducer::create_opportunity_stage;
 pub use create_organization_reducer::create_organization;
 pub use create_partner_bank_reducer::create_partner_bank;
 pub use create_password_reset_token_reducer::create_password_reset_token;
@@ -3258,6 +3355,7 @@ pub use dispatch_due_owner_reports_reducer::dispatch_due_owner_reports;
 pub use dispose_account_asset_reducer::dispose_account_asset;
 pub use done_budget_reducer::done_budget;
 pub use done_stock_move_reducer::done_stock_move;
+pub use end_contact_relationship_reducer::end_contact_relationship;
 pub use end_contact_role_reducer::end_contact_role;
 pub use end_user_session_reducer::end_user_session;
 pub use enqueue_job_reducer::enqueue_job;
@@ -3384,6 +3482,7 @@ pub use post_landed_costs_reducer::post_landed_costs;
 pub use post_message_reducer::post_message;
 pub use post_payment_reducer::post_payment;
 pub use post_payment_transaction_reducer::post_payment_transaction;
+pub use post_realized_fx_gain_loss_reducer::post_realized_fx_gain_loss;
 pub use process_consolidation_reducer::process_consolidation;
 pub use process_intercompany_transaction_reducer::process_intercompany_transaction;
 pub use process_inventory_adjustment_reducer::process_inventory_adjustment;
@@ -3392,6 +3491,7 @@ pub use produce_manufacturing_order_reducer::produce_manufacturing_order;
 pub use promote_ai_skill_version_reducer::promote_ai_skill_version;
 pub use queue_mail_from_template_reducer::queue_mail_from_template;
 pub use receive_po_line_reducer::receive_po_line;
+pub use recognize_amortization_line_reducer::recognize_amortization_line;
 pub use recognize_deferred_revenue_reducer::recognize_deferred_revenue;
 pub use reconcile_account_bank_statement_line_reducer::reconcile_account_bank_statement_line;
 pub use reconcile_payment_with_invoice_reducer::reconcile_payment_with_invoice;
@@ -3443,10 +3543,12 @@ pub use retry_iot_action_reducer::retry_iot_action;
 pub use reverse_payment_transaction_reducer::reverse_payment_transaction;
 pub use review_message_batch_reducer::review_message_batch;
 pub use review_supplier_intake_reducer::review_supplier_intake;
+pub use revoke_delegated_admin_scope_reducer::revoke_delegated_admin_scope;
 pub use revoke_permission_reducer::revoke_permission;
 pub use revoke_role_reducer::revoke_role;
 pub use rollback_ai_skill_release_reducer::rollback_ai_skill_release;
 pub use rollback_import_job_reducer::rollback_import_job;
+pub use run_accounting_fx_revaluation_test_reducer::run_accounting_fx_revaluation_test;
 pub use run_accounting_ic_consolidation_test_reducer::run_accounting_ic_consolidation_test;
 pub use run_accounting_payment_cancel_test_reducer::run_accounting_payment_cancel_test;
 pub use run_accounting_payment_management_test_reducer::run_accounting_payment_management_test;
@@ -3469,7 +3571,11 @@ pub use run_country_pack_test_reducer::run_country_pack_test;
 pub use run_crm_contact_identity_test_reducer::run_crm_contact_identity_test;
 pub use run_crm_contact_update_delete_test_reducer::run_crm_contact_update_delete_test;
 pub use run_crm_opportunity_convert_test_reducer::run_crm_opportunity_convert_test;
+pub use run_crm_relationship_admin_test_reducer::run_crm_relationship_admin_test;
+pub use run_crm_wave_2_test_reducer::run_crm_wave_2_test;
 pub use run_documents_folder_test_reducer::run_documents_folder_test;
+pub use run_fx_revaluation_reducer::run_fx_revaluation;
+pub use run_fx_revaluation_batch_reducer::run_fx_revaluation_batch;
 pub use run_helpdesk_ticket_test_reducer::run_helpdesk_ticket_test;
 pub use run_hr_leave_type_test_reducer::run_hr_leave_type_test;
 pub use run_inventory_adjustment_test_reducer::run_inventory_adjustment_test;
@@ -3569,6 +3675,7 @@ pub use update_analytic_account_reducer::update_analytic_account;
 pub use update_analytic_distribution_model_reducer::update_analytic_distribution_model;
 pub use update_analytic_line_reducer::update_analytic_line;
 pub use update_approval_rule_reducer::update_approval_rule;
+pub use update_assignment_rule_reducer::update_assignment_rule;
 pub use update_audit_rule_reducer::update_audit_rule;
 pub use update_barcode_nomenclature_reducer::update_barcode_nomenclature;
 pub use update_barcode_rule_reducer::update_barcode_rule;
@@ -3588,6 +3695,7 @@ pub use update_contact_address_reducer::update_contact_address;
 pub use update_contact_business_reducer::update_contact_business;
 pub use update_contact_details_reducer::update_contact_details;
 pub use update_contact_identity_reducer::update_contact_identity;
+pub use update_contact_parent_reducer::update_contact_parent;
 pub use update_contract_reducer::update_contract;
 pub use update_crossovered_budget_reducer::update_crossovered_budget;
 pub use update_department_reducer::update_department;
@@ -3610,12 +3718,16 @@ pub use update_knowledge_category_reducer::update_knowledge_category;
 pub use update_landed_cost_reducer::update_landed_cost;
 pub use update_lead_address_reducer::update_lead_address;
 pub use update_lead_details_reducer::update_lead_details;
+pub use update_lead_lost_reason_reducer::update_lead_lost_reason;
 pub use update_lead_revenue_reducer::update_lead_revenue;
+pub use update_lead_source_reducer::update_lead_source;
 pub use update_leave_type_reducer::update_leave_type;
 pub use update_mail_template_reducer::update_mail_template;
 pub use update_message_template_reducer::update_message_template;
 pub use update_metric_values_reducer::update_metric_values;
 pub use update_opportunity_reducer::update_opportunity;
+pub use update_opportunity_presence_reducer::update_opportunity_presence;
+pub use update_opportunity_stage_reducer::update_opportunity_stage;
 pub use update_org_member_details_reducer::update_org_member_details;
 pub use update_org_member_role_reducer::update_org_member_role;
 pub use update_organization_reducer::update_organization;
@@ -3651,6 +3763,7 @@ pub use update_report_template_reducer::update_report_template;
 pub use update_role_reducer::update_role;
 pub use update_sale_order_reducer::update_sale_order;
 pub use update_saved_report_reducer::update_saved_report;
+pub use update_sod_conflict_rule_reducer::update_sod_conflict_rule;
 pub use update_stock_inventory_state_reducer::update_stock_inventory_state;
 pub use update_stock_location_reducer::update_stock_location;
 pub use update_stock_production_lot_reducer::update_stock_production_lot;
@@ -3685,6 +3798,7 @@ pub use update_workcenter_reducer::update_workcenter;
 pub use upsert_ai_skill_reducer::upsert_ai_skill;
 pub use upsert_ai_skill_config_reducer::upsert_ai_skill_config;
 pub use upsert_organization_settings_reducer::upsert_organization_settings;
+pub use upsert_partner_credit_control_reducer::upsert_partner_credit_control;
 pub use upsert_proposal_section_reducer::upsert_proposal_section;
 pub use upsert_search_embedding_reducer::upsert_search_embedding;
 pub use upsert_warehouse_geo_reducer::upsert_warehouse_geo;
@@ -4107,6 +4221,9 @@ pub enum Reducer {
         organization_id: u64,
         job_id: u64,
 }    ,
+    ClearOpportunityPresence {
+        opportunity_id: u64,
+}    ,
     ClearProposalPresence {
         proposal_id: u64,
 }    ,
@@ -4394,6 +4511,11 @@ pub enum Reducer {
         company_id: Option::<u64>,
         params: CreateAiTeamMemberParams,
 }    ,
+    CreateAmortizationSchedule {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateAmortizationScheduleParams,
+}    ,
     CreateAnalyticAccount {
         organization_id: u64,
         params: CreateAnalyticAccountParams,
@@ -4416,9 +4538,18 @@ pub enum Reducer {
         company_id: Option::<u64>,
         params: CreateApprovalRuleParams,
 }    ,
+    CreateAssignmentRule {
+        organization_id: u64,
+        params: CreateAssignmentRuleParams,
+}    ,
     CreateAuditRule {
         organization_id: u64,
         params: CreateAuditRuleParams,
+}    ,
+    CreateBadDebtWriteOff {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateBadDebtWriteOffParams,
 }    ,
     CreateBarcodeNomenclature {
         organization_id: u64,
@@ -4473,6 +4604,10 @@ pub enum Reducer {
     CreateContactIdentity {
         organization_id: u64,
         params: CreateContactIdentityParams,
+}    ,
+    CreateContactRelationship {
+        organization_id: u64,
+        params: CreateContactRelationshipParams,
 }    ,
     CreateContactSegment {
         organization_id: u64,
@@ -4616,6 +4751,11 @@ pub enum Reducer {
         license_plate: Option::<String>,
         driver_name: Option::<String>,
 }    ,
+    CreateForecastSnapshot {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateCrmForecastSnapshotParams,
+}    ,
     CreateFormConfiguration {
         organization_id: u64,
         params: CreateFormConfigParams,
@@ -4706,6 +4846,14 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateLeadParams,
 }    ,
+    CreateLeadLostReason {
+        organization_id: u64,
+        params: CreateLeadLostReasonParams,
+}    ,
+    CreateLeadSource {
+        organization_id: u64,
+        params: CreateLeadSourceParams,
+}    ,
     CreateLeaveRequest {
         organization_id: u64,
         company_id: u64,
@@ -4757,6 +4905,10 @@ pub enum Reducer {
         company_id: u64,
         opportunity_id: u64,
         params: CreateOpportunityLineParams,
+}    ,
+    CreateOpportunityStage {
+        organization_id: u64,
+        params: CreateOpportunityStageParams,
 }    ,
     CreateOrganization {
         params: CreateOrganizationParams,
@@ -5399,6 +5551,10 @@ pub enum Reducer {
         move_id: u64,
         params: DoneStockMoveParams,
 }    ,
+    EndContactRelationship {
+        organization_id: u64,
+        relationship_id: u64,
+}    ,
     EndContactRole {
         organization_id: u64,
         assignment_id: u64,
@@ -5973,6 +6129,11 @@ pub enum Reducer {
         organization_id: u64,
         transaction_id: u64,
 }    ,
+    PostRealizedFxGainLoss {
+        organization_id: u64,
+        company_id: u64,
+        params: PostRealizedFxParams,
+}    ,
     ProcessConsolidation {
         organization_id: u64,
         journal_id: u64,
@@ -6009,6 +6170,12 @@ pub enum Reducer {
         organization_id: u64,
         line_id: u64,
         qty: f64,
+}    ,
+    RecognizeAmortizationLine {
+        organization_id: u64,
+        company_id: u64,
+        line_id: u64,
+        params: RecognizeAmortizationLineParams,
 }    ,
     RecognizeDeferredRevenue {
         organization_id: u64,
@@ -6249,6 +6416,10 @@ pub enum Reducer {
         intake_id: u64,
         notes: Option::<String>,
 }    ,
+    RevokeDelegatedAdminScope {
+        organization_id: u64,
+        scope_id: u64,
+}    ,
     RevokePermission {
         organization_id: u64,
         permission_id: u64,
@@ -6267,6 +6438,7 @@ pub enum Reducer {
         organization_id: u64,
         job_id: u64,
 }    ,
+    RunAccountingFxRevaluationTest ,
     RunAccountingIcConsolidationTest ,
     RunAccountingPaymentCancelTest ,
     RunAccountingPaymentManagementTest ,
@@ -6289,7 +6461,19 @@ pub enum Reducer {
     RunCrmContactIdentityTest ,
     RunCrmContactUpdateDeleteTest ,
     RunCrmOpportunityConvertTest ,
+    RunCrmRelationshipAdminTest ,
+    RunCrmWave2Test ,
     RunDocumentsFolderTest ,
+    RunFxRevaluation {
+        organization_id: u64,
+        company_id: u64,
+        params: RunFxRevaluationParams,
+}    ,
+    RunFxRevaluationBatch {
+        organization_id: u64,
+        company_id: u64,
+        params: RunFxRevaluationBatchParams,
+}    ,
     RunHelpdeskTicketTest ,
     RunHrLeaveTypeTest ,
     RunInventoryAdjustmentTest ,
@@ -6713,6 +6897,11 @@ pub enum Reducer {
         rule_id: u64,
         params: UpdateApprovalRuleParams,
 }    ,
+    UpdateAssignmentRule {
+        organization_id: u64,
+        rule_id: u64,
+        params: UpdateAssignmentRuleParams,
+}    ,
     UpdateAuditRule {
         rule_id: u64,
         params: UpdateAuditRuleParams,
@@ -6803,6 +6992,12 @@ pub enum Reducer {
         organization_id: u64,
         identity_id: u64,
         params: UpdateContactIdentityParams,
+}    ,
+    UpdateContactParent {
+        organization_id: u64,
+        company_id: u64,
+        contact_id: u64,
+        parent_id: Option::<u64>,
 }    ,
     UpdateContract {
         organization_id: u64,
@@ -6935,10 +7130,20 @@ pub enum Reducer {
         lead_id: u64,
         params: UpdateLeadDetailsParams,
 }    ,
+    UpdateLeadLostReason {
+        organization_id: u64,
+        lost_reason_id: u64,
+        params: UpdateLeadLostReasonParams,
+}    ,
     UpdateLeadRevenue {
         organization_id: u64,
         lead_id: u64,
         params: UpdateLeadRevenueParams,
+}    ,
+    UpdateLeadSource {
+        organization_id: u64,
+        source_id: u64,
+        params: UpdateLeadSourceParams,
 }    ,
     UpdateLeaveType {
         organization_id: u64,
@@ -6967,6 +7172,16 @@ pub enum Reducer {
         company_id: u64,
         opportunity_id: u64,
         params: UpdateOpportunityParams,
+}    ,
+    UpdateOpportunityPresence {
+        organization_id: u64,
+        opportunity_id: u64,
+        user_name: String,
+}    ,
+    UpdateOpportunityStage {
+        organization_id: u64,
+        stage_id: u64,
+        params: UpdateOpportunityStageParams,
 }    ,
     UpdateOrgMemberDetails {
         user_org_id: u64,
@@ -7155,6 +7370,11 @@ pub enum Reducer {
         saved_report_id: u64,
         params: UpdateSavedReportParams,
 }    ,
+    UpdateSodConflictRule {
+        organization_id: u64,
+        rule_id: u64,
+        params: UpdateSodConflictRuleParams,
+}    ,
     UpdateStockInventoryState {
         organization_id: u64,
         inventory_id: u64,
@@ -7324,6 +7544,11 @@ pub enum Reducer {
         organization_id: u64,
         params: UpsertOrganizationSettingsParams,
 }    ,
+    UpsertPartnerCreditControl {
+        organization_id: u64,
+        company_id: u64,
+        params: UpsertPartnerCreditControlParams,
+}    ,
     UpsertProposalSection {
         proposal_id: u64,
         section_id: u64,
@@ -7484,6 +7709,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CheckMoAvailability { .. } => "check_mo_availability",
             Reducer::ClaimHubWithToken { .. } => "claim_hub_with_token",
             Reducer::ClaimQueueJob { .. } => "claim_queue_job",
+            Reducer::ClearOpportunityPresence { .. } => "clear_opportunity_presence",
             Reducer::ClearProposalPresence { .. } => "clear_proposal_presence",
             Reducer::CloseAccountAsset { .. } => "close_account_asset",
             Reducer::CloseAccountPeriod { .. } => "close_account_period",
@@ -7546,12 +7772,15 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateAiSkillFixture { .. } => "create_ai_skill_fixture",
             Reducer::CreateAiSkillVersion { .. } => "create_ai_skill_version",
             Reducer::CreateAiTeamMember { .. } => "create_ai_team_member",
+            Reducer::CreateAmortizationSchedule { .. } => "create_amortization_schedule",
             Reducer::CreateAnalyticAccount { .. } => "create_analytic_account",
             Reducer::CreateAnalyticDistributionModel { .. } => "create_analytic_distribution_model",
             Reducer::CreateAnalyticLine { .. } => "create_analytic_line",
             Reducer::CreateAnalyticsMetric { .. } => "create_analytics_metric",
             Reducer::CreateApprovalRule { .. } => "create_approval_rule",
+            Reducer::CreateAssignmentRule { .. } => "create_assignment_rule",
             Reducer::CreateAuditRule { .. } => "create_audit_rule",
+            Reducer::CreateBadDebtWriteOff { .. } => "create_bad_debt_write_off",
             Reducer::CreateBarcodeNomenclature { .. } => "create_barcode_nomenclature",
             Reducer::CreateBarcodeRule { .. } => "create_barcode_rule",
             Reducer::CreateBillFromPurchaseOrder { .. } => "create_bill_from_purchase_order",
@@ -7565,6 +7794,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateConsolidationJournal { .. } => "create_consolidation_journal",
             Reducer::CreateContact { .. } => "create_contact",
             Reducer::CreateContactIdentity { .. } => "create_contact_identity",
+            Reducer::CreateContactRelationship { .. } => "create_contact_relationship",
             Reducer::CreateContactSegment { .. } => "create_contact_segment",
             Reducer::CreateContactTag { .. } => "create_contact_tag",
             Reducer::CreateContract { .. } => "create_contract",
@@ -7595,6 +7825,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateFinancialReport { .. } => "create_financial_report",
             Reducer::CreateFiscalYear { .. } => "create_fiscal_year",
             Reducer::CreateFleetVehicle { .. } => "create_fleet_vehicle",
+            Reducer::CreateForecastSnapshot { .. } => "create_forecast_snapshot",
             Reducer::CreateFormConfiguration { .. } => "create_form_configuration",
             Reducer::CreateGoogleDriveConnection { .. } => "create_google_drive_connection",
             Reducer::CreateHelpdeskSla { .. } => "create_helpdesk_sla",
@@ -7612,6 +7843,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateKnowledgeCategory { .. } => "create_knowledge_category",
             Reducer::CreateLandedCost { .. } => "create_landed_cost",
             Reducer::CreateLead { .. } => "create_lead",
+            Reducer::CreateLeadLostReason { .. } => "create_lead_lost_reason",
+            Reducer::CreateLeadSource { .. } => "create_lead_source",
             Reducer::CreateLeaveRequest { .. } => "create_leave_request",
             Reducer::CreateLeaveType { .. } => "create_leave_type",
             Reducer::CreateLoyaltyCard { .. } => "create_loyalty_card",
@@ -7623,6 +7856,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateOperationalMessage { .. } => "create_operational_message",
             Reducer::CreateOpportunity { .. } => "create_opportunity",
             Reducer::CreateOpportunityLine { .. } => "create_opportunity_line",
+            Reducer::CreateOpportunityStage { .. } => "create_opportunity_stage",
             Reducer::CreateOrganization { .. } => "create_organization",
             Reducer::CreatePartnerBank { .. } => "create_partner_bank",
             Reducer::CreatePasswordResetToken { .. } => "create_password_reset_token",
@@ -7769,6 +8003,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DisposeAccountAsset { .. } => "dispose_account_asset",
             Reducer::DoneBudget { .. } => "done_budget",
             Reducer::DoneStockMove { .. } => "done_stock_move",
+            Reducer::EndContactRelationship { .. } => "end_contact_relationship",
             Reducer::EndContactRole { .. } => "end_contact_role",
             Reducer::EndUserSession { .. } => "end_user_session",
             Reducer::EnqueueJob { .. } => "enqueue_job",
@@ -7895,6 +8130,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::PostMessage { .. } => "post_message",
             Reducer::PostPayment { .. } => "post_payment",
             Reducer::PostPaymentTransaction { .. } => "post_payment_transaction",
+            Reducer::PostRealizedFxGainLoss { .. } => "post_realized_fx_gain_loss",
             Reducer::ProcessConsolidation { .. } => "process_consolidation",
             Reducer::ProcessIntercompanyTransaction { .. } => "process_intercompany_transaction",
             Reducer::ProcessInventoryAdjustment { .. } => "process_inventory_adjustment",
@@ -7903,6 +8139,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::PromoteAiSkillVersion { .. } => "promote_ai_skill_version",
             Reducer::QueueMailFromTemplate { .. } => "queue_mail_from_template",
             Reducer::ReceivePoLine { .. } => "receive_po_line",
+            Reducer::RecognizeAmortizationLine { .. } => "recognize_amortization_line",
             Reducer::RecognizeDeferredRevenue { .. } => "recognize_deferred_revenue",
             Reducer::ReconcileAccountBankStatementLine { .. } => "reconcile_account_bank_statement_line",
             Reducer::ReconcilePaymentWithInvoice { .. } => "reconcile_payment_with_invoice",
@@ -7954,10 +8191,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReversePaymentTransaction { .. } => "reverse_payment_transaction",
             Reducer::ReviewMessageBatch { .. } => "review_message_batch",
             Reducer::ReviewSupplierIntake { .. } => "review_supplier_intake",
+            Reducer::RevokeDelegatedAdminScope { .. } => "revoke_delegated_admin_scope",
             Reducer::RevokePermission { .. } => "revoke_permission",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::RollbackAiSkillRelease { .. } => "rollback_ai_skill_release",
             Reducer::RollbackImportJob { .. } => "rollback_import_job",
+            Reducer::RunAccountingFxRevaluationTest => "run_accounting_fx_revaluation_test",
             Reducer::RunAccountingIcConsolidationTest => "run_accounting_ic_consolidation_test",
             Reducer::RunAccountingPaymentCancelTest => "run_accounting_payment_cancel_test",
             Reducer::RunAccountingPaymentManagementTest => "run_accounting_payment_management_test",
@@ -7980,7 +8219,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunCrmContactIdentityTest => "run_crm_contact_identity_test",
             Reducer::RunCrmContactUpdateDeleteTest => "run_crm_contact_update_delete_test",
             Reducer::RunCrmOpportunityConvertTest => "run_crm_opportunity_convert_test",
+            Reducer::RunCrmRelationshipAdminTest => "run_crm_relationship_admin_test",
+            Reducer::RunCrmWave2Test => "run_crm_wave_2_test",
             Reducer::RunDocumentsFolderTest => "run_documents_folder_test",
+            Reducer::RunFxRevaluation { .. } => "run_fx_revaluation",
+            Reducer::RunFxRevaluationBatch { .. } => "run_fx_revaluation_batch",
             Reducer::RunHelpdeskTicketTest => "run_helpdesk_ticket_test",
             Reducer::RunHrLeaveTypeTest => "run_hr_leave_type_test",
             Reducer::RunInventoryAdjustmentTest => "run_inventory_adjustment_test",
@@ -8080,6 +8323,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateAnalyticDistributionModel { .. } => "update_analytic_distribution_model",
             Reducer::UpdateAnalyticLine { .. } => "update_analytic_line",
             Reducer::UpdateApprovalRule { .. } => "update_approval_rule",
+            Reducer::UpdateAssignmentRule { .. } => "update_assignment_rule",
             Reducer::UpdateAuditRule { .. } => "update_audit_rule",
             Reducer::UpdateBarcodeNomenclature { .. } => "update_barcode_nomenclature",
             Reducer::UpdateBarcodeRule { .. } => "update_barcode_rule",
@@ -8099,6 +8343,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateContactBusiness { .. } => "update_contact_business",
             Reducer::UpdateContactDetails { .. } => "update_contact_details",
             Reducer::UpdateContactIdentity { .. } => "update_contact_identity",
+            Reducer::UpdateContactParent { .. } => "update_contact_parent",
             Reducer::UpdateContract { .. } => "update_contract",
             Reducer::UpdateCrossoveredBudget { .. } => "update_crossovered_budget",
             Reducer::UpdateDepartment { .. } => "update_department",
@@ -8121,12 +8366,16 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateLandedCost { .. } => "update_landed_cost",
             Reducer::UpdateLeadAddress { .. } => "update_lead_address",
             Reducer::UpdateLeadDetails { .. } => "update_lead_details",
+            Reducer::UpdateLeadLostReason { .. } => "update_lead_lost_reason",
             Reducer::UpdateLeadRevenue { .. } => "update_lead_revenue",
+            Reducer::UpdateLeadSource { .. } => "update_lead_source",
             Reducer::UpdateLeaveType { .. } => "update_leave_type",
             Reducer::UpdateMailTemplate { .. } => "update_mail_template",
             Reducer::UpdateMessageTemplate { .. } => "update_message_template",
             Reducer::UpdateMetricValues { .. } => "update_metric_values",
             Reducer::UpdateOpportunity { .. } => "update_opportunity",
+            Reducer::UpdateOpportunityPresence { .. } => "update_opportunity_presence",
+            Reducer::UpdateOpportunityStage { .. } => "update_opportunity_stage",
             Reducer::UpdateOrgMemberDetails { .. } => "update_org_member_details",
             Reducer::UpdateOrgMemberRole { .. } => "update_org_member_role",
             Reducer::UpdateOrganization { .. } => "update_organization",
@@ -8162,6 +8411,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateRole { .. } => "update_role",
             Reducer::UpdateSaleOrder { .. } => "update_sale_order",
             Reducer::UpdateSavedReport { .. } => "update_saved_report",
+            Reducer::UpdateSodConflictRule { .. } => "update_sod_conflict_rule",
             Reducer::UpdateStockInventoryState { .. } => "update_stock_inventory_state",
             Reducer::UpdateStockLocation { .. } => "update_stock_location",
             Reducer::UpdateStockProductionLot { .. } => "update_stock_production_lot",
@@ -8196,6 +8446,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpsertAiSkill { .. } => "upsert_ai_skill",
             Reducer::UpsertAiSkillConfig { .. } => "upsert_ai_skill_config",
             Reducer::UpsertOrganizationSettings { .. } => "upsert_organization_settings",
+            Reducer::UpsertPartnerCreditControl { .. } => "upsert_partner_credit_control",
             Reducer::UpsertProposalSection { .. } => "upsert_proposal_section",
             Reducer::UpsertSearchEmbedding { .. } => "upsert_search_embedding",
             Reducer::UpsertWarehouseGeo { .. } => "upsert_warehouse_geo",
@@ -8934,6 +9185,11 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 job_id: job_id.clone(),
 }),
+            Reducer::ClearOpportunityPresence{
+                opportunity_id,
+}             => __sats::bsatn::to_vec(&clear_opportunity_presence_reducer::ClearOpportunityPresenceArgs {
+                opportunity_id: opportunity_id.clone(),
+}),
             Reducer::ClearProposalPresence{
                 proposal_id,
 }             => __sats::bsatn::to_vec(&clear_proposal_presence_reducer::ClearProposalPresenceArgs {
@@ -9446,6 +9702,15 @@ Reducer::BillTimesheets{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateAmortizationSchedule{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_amortization_schedule_reducer::CreateAmortizationScheduleArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateAnalyticAccount{
                 organization_id,
                 params,
@@ -9485,11 +9750,27 @@ Reducer::BillTimesheets{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateAssignmentRule{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_assignment_rule_reducer::CreateAssignmentRuleArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateAuditRule{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_audit_rule_reducer::CreateAuditRuleArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateBadDebtWriteOff{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_bad_debt_write_off_reducer::CreateBadDebtWriteOffArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateBarcodeNomenclature{
@@ -9584,6 +9865,13 @@ Reducer::BillTimesheets{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_contact_identity_reducer::CreateContactIdentityArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateContactRelationship{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_contact_relationship_reducer::CreateContactRelationshipArgs {
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
@@ -9841,6 +10129,15 @@ Reducer::BillTimesheets{
                 license_plate: license_plate.clone(),
                 driver_name: driver_name.clone(),
 }),
+            Reducer::CreateForecastSnapshot{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_forecast_snapshot_reducer::CreateForecastSnapshotArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateFormConfiguration{
                 organization_id,
                 params,
@@ -10004,6 +10301,20 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateLeadLostReason{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_lead_lost_reason_reducer::CreateLeadLostReasonArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateLeadSource{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_lead_source_reducer::CreateLeadSourceArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateLeaveRequest{
                 organization_id,
                 company_id,
@@ -10095,6 +10406,13 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 opportunity_id: opportunity_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateOpportunityStage{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_opportunity_stage_reducer::CreateOpportunityStageArgs {
+                organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateOrganization{
@@ -11234,6 +11552,13 @@ Reducer::DismissInsight{
                 move_id: move_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::EndContactRelationship{
+                organization_id,
+                relationship_id,
+}             => __sats::bsatn::to_vec(&end_contact_relationship_reducer::EndContactRelationshipArgs {
+                organization_id: organization_id.clone(),
+                relationship_id: relationship_id.clone(),
+}),
             Reducer::EndContactRole{
                 organization_id,
                 assignment_id,
@@ -12258,6 +12583,15 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 transaction_id: transaction_id.clone(),
 }),
+            Reducer::PostRealizedFxGainLoss{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&post_realized_fx_gain_loss_reducer::PostRealizedFxGainLossArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ProcessConsolidation{
                 organization_id,
                 journal_id,
@@ -12323,6 +12657,17 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 line_id: line_id.clone(),
                 qty: qty.clone(),
+}),
+            Reducer::RecognizeAmortizationLine{
+                organization_id,
+                company_id,
+                line_id,
+                params,
+}             => __sats::bsatn::to_vec(&recognize_amortization_line_reducer::RecognizeAmortizationLineArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                line_id: line_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RecognizeDeferredRevenue{
                 organization_id,
@@ -12751,6 +13096,13 @@ Reducer::MoveStockQuant{
                 intake_id: intake_id.clone(),
                 notes: notes.clone(),
 }),
+            Reducer::RevokeDelegatedAdminScope{
+                organization_id,
+                scope_id,
+}             => __sats::bsatn::to_vec(&revoke_delegated_admin_scope_reducer::RevokeDelegatedAdminScopeArgs {
+                organization_id: organization_id.clone(),
+                scope_id: scope_id.clone(),
+}),
             Reducer::RevokePermission{
                 organization_id,
                 permission_id,
@@ -12783,7 +13135,9 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 job_id: job_id.clone(),
 }),
-            Reducer::RunAccountingIcConsolidationTest => __sats::bsatn::to_vec(&run_accounting_ic_consolidation_test_reducer::RunAccountingIcConsolidationTestArgs {
+            Reducer::RunAccountingFxRevaluationTest => __sats::bsatn::to_vec(&run_accounting_fx_revaluation_test_reducer::RunAccountingFxRevaluationTestArgs {
+                }),
+Reducer::RunAccountingIcConsolidationTest => __sats::bsatn::to_vec(&run_accounting_ic_consolidation_test_reducer::RunAccountingIcConsolidationTestArgs {
                 }),
 Reducer::RunAccountingPaymentCancelTest => __sats::bsatn::to_vec(&run_accounting_payment_cancel_test_reducer::RunAccountingPaymentCancelTestArgs {
                 }),
@@ -12827,9 +13181,31 @@ Reducer::RunCrmContactUpdateDeleteTest => __sats::bsatn::to_vec(&run_crm_contact
                 }),
 Reducer::RunCrmOpportunityConvertTest => __sats::bsatn::to_vec(&run_crm_opportunity_convert_test_reducer::RunCrmOpportunityConvertTestArgs {
                 }),
+Reducer::RunCrmRelationshipAdminTest => __sats::bsatn::to_vec(&run_crm_relationship_admin_test_reducer::RunCrmRelationshipAdminTestArgs {
+                }),
+Reducer::RunCrmWave2Test => __sats::bsatn::to_vec(&run_crm_wave_2_test_reducer::RunCrmWave2TestArgs {
+                }),
 Reducer::RunDocumentsFolderTest => __sats::bsatn::to_vec(&run_documents_folder_test_reducer::RunDocumentsFolderTestArgs {
                 }),
-Reducer::RunHelpdeskTicketTest => __sats::bsatn::to_vec(&run_helpdesk_ticket_test_reducer::RunHelpdeskTicketTestArgs {
+Reducer::RunFxRevaluation{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&run_fx_revaluation_reducer::RunFxRevaluationArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RunFxRevaluationBatch{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&run_fx_revaluation_batch_reducer::RunFxRevaluationBatchArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RunHelpdeskTicketTest => __sats::bsatn::to_vec(&run_helpdesk_ticket_test_reducer::RunHelpdeskTicketTestArgs {
                 }),
 Reducer::RunHrLeaveTypeTest => __sats::bsatn::to_vec(&run_hr_leave_type_test_reducer::RunHrLeaveTypeTestArgs {
                 }),
@@ -13594,6 +13970,15 @@ Reducer::SeedOrganizationFormConfigs{
                 rule_id: rule_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateAssignmentRule{
+                organization_id,
+                rule_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_assignment_rule_reducer::UpdateAssignmentRuleArgs {
+                organization_id: organization_id.clone(),
+                rule_id: rule_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdateAuditRule{
                 rule_id,
                 params,
@@ -13756,6 +14141,17 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 identity_id: identity_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::UpdateContactParent{
+                organization_id,
+                company_id,
+                contact_id,
+                parent_id,
+}             => __sats::bsatn::to_vec(&update_contact_parent_reducer::UpdateContactParentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                contact_id: contact_id.clone(),
+                parent_id: parent_id.clone(),
 }),
             Reducer::UpdateContract{
                 organization_id,
@@ -13997,6 +14393,15 @@ Reducer::SeedOrganizationFormConfigs{
                 lead_id: lead_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateLeadLostReason{
+                organization_id,
+                lost_reason_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_lead_lost_reason_reducer::UpdateLeadLostReasonArgs {
+                organization_id: organization_id.clone(),
+                lost_reason_id: lost_reason_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdateLeadRevenue{
                 organization_id,
                 lead_id,
@@ -14004,6 +14409,15 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&update_lead_revenue_reducer::UpdateLeadRevenueArgs {
                 organization_id: organization_id.clone(),
                 lead_id: lead_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateLeadSource{
+                organization_id,
+                source_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_lead_source_reducer::UpdateLeadSourceArgs {
+                organization_id: organization_id.clone(),
+                source_id: source_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateLeaveType{
@@ -14055,6 +14469,24 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 opportunity_id: opportunity_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateOpportunityPresence{
+                organization_id,
+                opportunity_id,
+                user_name,
+}             => __sats::bsatn::to_vec(&update_opportunity_presence_reducer::UpdateOpportunityPresenceArgs {
+                organization_id: organization_id.clone(),
+                opportunity_id: opportunity_id.clone(),
+                user_name: user_name.clone(),
+}),
+            Reducer::UpdateOpportunityStage{
+                organization_id,
+                stage_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_opportunity_stage_reducer::UpdateOpportunityStageArgs {
+                organization_id: organization_id.clone(),
+                stage_id: stage_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateOrgMemberDetails{
@@ -14396,6 +14828,15 @@ Reducer::SeedOrganizationFormConfigs{
                 saved_report_id: saved_report_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateSodConflictRule{
+                organization_id,
+                rule_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_sod_conflict_rule_reducer::UpdateSodConflictRuleArgs {
+                organization_id: organization_id.clone(),
+                rule_id: rule_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdateStockInventoryState{
                 organization_id,
                 inventory_id,
@@ -14700,6 +15141,15 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpsertPartnerCreditControl{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&upsert_partner_credit_control_reducer::UpsertPartnerCreditControlArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpsertProposalSection{
                 proposal_id,
                 section_id,
@@ -14872,6 +15322,8 @@ pub struct DbUpdate {
     ai_skill_version: __sdk::TableUpdate<AiSkillVersion>,
     ai_team_member: __sdk::TableUpdate<AiTeamMember>,
     ai_team_member_skill: __sdk::TableUpdate<AiTeamMemberSkill>,
+    amortization_line: __sdk::TableUpdate<AmortizationLine>,
+    amortization_schedule: __sdk::TableUpdate<AmortizationSchedule>,
     analytics_metric: __sdk::TableUpdate<AnalyticsMetric>,
     approval_request: __sdk::TableUpdate<ApprovalRequest>,
     approval_rule: __sdk::TableUpdate<ApprovalRule>,
@@ -14913,6 +15365,7 @@ pub struct DbUpdate {
     country: __sdk::TableUpdate<Country>,
     country_pack_definition: __sdk::TableUpdate<CountryPackDefinition>,
     country_pack_tax_rule: __sdk::TableUpdate<CountryPackTaxRule>,
+    crm_forecast_snapshot: __sdk::TableUpdate<CrmForecastSnapshot>,
     crossovered_budget: __sdk::TableUpdate<CrossoveredBudget>,
     crossovered_budget_lines: __sdk::TableUpdate<CrossoveredBudgetLines>,
     currency: __sdk::TableUpdate<Currency>,
@@ -14937,6 +15390,7 @@ pub struct DbUpdate {
     form_config: __sdk::TableUpdate<FormConfig>,
     form_config_field: __sdk::TableUpdate<FormConfigField>,
     form_role_config: __sdk::TableUpdate<FormRoleConfig>,
+    fx_revaluation_run: __sdk::TableUpdate<FxRevaluationRun>,
     generated_owner_report: __sdk::TableUpdate<GeneratedOwnerReport>,
     google_drive_connection: __sdk::TableUpdate<GoogleDriveConnection>,
     helpdesk_sla: __sdk::TableUpdate<HelpdeskSla>,
@@ -14990,11 +15444,13 @@ pub struct DbUpdate {
     opp_stage: __sdk::TableUpdate<OpportunityStage>,
     opportunity: __sdk::TableUpdate<Opportunity>,
     opportunity_line: __sdk::TableUpdate<OpportunityLine>,
+    opportunity_presence: __sdk::TableUpdate<OpportunityPresence>,
     org_permission: __sdk::TableUpdate<OrgPermission>,
     org_schema_migration: __sdk::TableUpdate<OrgSchemaMigration>,
     organization: __sdk::TableUpdate<Organization>,
     organization_settings: __sdk::TableUpdate<OrganizationSettings>,
     packaging_material: __sdk::TableUpdate<PackagingMaterial>,
+    partner_credit_control: __sdk::TableUpdate<PartnerCreditControl>,
     payment_account: __sdk::TableUpdate<PaymentAccount>,
     payment_fee: __sdk::TableUpdate<PaymentFee>,
     payment_reconciliation: __sdk::TableUpdate<PaymentReconciliation>,
@@ -15163,6 +15619,8 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "ai_skill_version" => db_update.ai_skill_version.append(ai_skill_version_table::parse_table_update(table_update)?),
     "ai_team_member" => db_update.ai_team_member.append(ai_team_member_table::parse_table_update(table_update)?),
     "ai_team_member_skill" => db_update.ai_team_member_skill.append(ai_team_member_skill_table::parse_table_update(table_update)?),
+    "amortization_line" => db_update.amortization_line.append(amortization_line_table::parse_table_update(table_update)?),
+    "amortization_schedule" => db_update.amortization_schedule.append(amortization_schedule_table::parse_table_update(table_update)?),
     "analytics_metric" => db_update.analytics_metric.append(analytics_metric_table::parse_table_update(table_update)?),
     "approval_request" => db_update.approval_request.append(approval_request_table::parse_table_update(table_update)?),
     "approval_rule" => db_update.approval_rule.append(approval_rule_table::parse_table_update(table_update)?),
@@ -15204,6 +15662,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "country" => db_update.country.append(country_table::parse_table_update(table_update)?),
     "country_pack_definition" => db_update.country_pack_definition.append(country_pack_definition_table::parse_table_update(table_update)?),
     "country_pack_tax_rule" => db_update.country_pack_tax_rule.append(country_pack_tax_rule_table::parse_table_update(table_update)?),
+    "crm_forecast_snapshot" => db_update.crm_forecast_snapshot.append(crm_forecast_snapshot_table::parse_table_update(table_update)?),
     "crossovered_budget" => db_update.crossovered_budget.append(crossovered_budget_table::parse_table_update(table_update)?),
     "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(crossovered_budget_lines_table::parse_table_update(table_update)?),
     "currency" => db_update.currency.append(currency_table::parse_table_update(table_update)?),
@@ -15228,6 +15687,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "form_config" => db_update.form_config.append(form_config_table::parse_table_update(table_update)?),
     "form_config_field" => db_update.form_config_field.append(form_config_field_table::parse_table_update(table_update)?),
     "form_role_config" => db_update.form_role_config.append(form_role_config_table::parse_table_update(table_update)?),
+    "fx_revaluation_run" => db_update.fx_revaluation_run.append(fx_revaluation_run_table::parse_table_update(table_update)?),
     "generated_owner_report" => db_update.generated_owner_report.append(generated_owner_report_table::parse_table_update(table_update)?),
     "google_drive_connection" => db_update.google_drive_connection.append(google_drive_connection_table::parse_table_update(table_update)?),
     "helpdesk_sla" => db_update.helpdesk_sla.append(helpdesk_sla_table::parse_table_update(table_update)?),
@@ -15281,11 +15741,13 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "opp_stage" => db_update.opp_stage.append(opp_stage_table::parse_table_update(table_update)?),
     "opportunity" => db_update.opportunity.append(opportunity_table::parse_table_update(table_update)?),
     "opportunity_line" => db_update.opportunity_line.append(opportunity_line_table::parse_table_update(table_update)?),
+    "opportunity_presence" => db_update.opportunity_presence.append(opportunity_presence_table::parse_table_update(table_update)?),
     "org_permission" => db_update.org_permission.append(org_permission_table::parse_table_update(table_update)?),
     "org_schema_migration" => db_update.org_schema_migration.append(org_schema_migration_table::parse_table_update(table_update)?),
     "organization" => db_update.organization.append(organization_table::parse_table_update(table_update)?),
     "organization_settings" => db_update.organization_settings.append(organization_settings_table::parse_table_update(table_update)?),
     "packaging_material" => db_update.packaging_material.append(packaging_material_table::parse_table_update(table_update)?),
+    "partner_credit_control" => db_update.partner_credit_control.append(partner_credit_control_table::parse_table_update(table_update)?),
     "payment_account" => db_update.payment_account.append(payment_account_table::parse_table_update(table_update)?),
     "payment_fee" => db_update.payment_fee.append(payment_fee_table::parse_table_update(table_update)?),
     "payment_reconciliation" => db_update.payment_reconciliation.append(payment_reconciliation_table::parse_table_update(table_update)?),
@@ -15466,6 +15928,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.ai_skill_version = cache.apply_diff_to_table::<AiSkillVersion>("ai_skill_version", &self.ai_skill_version).with_updates_by_pk(|row| &row.id);
         diff.ai_team_member = cache.apply_diff_to_table::<AiTeamMember>("ai_team_member", &self.ai_team_member).with_updates_by_pk(|row| &row.id);
         diff.ai_team_member_skill = cache.apply_diff_to_table::<AiTeamMemberSkill>("ai_team_member_skill", &self.ai_team_member_skill).with_updates_by_pk(|row| &row.id);
+        diff.amortization_line = cache.apply_diff_to_table::<AmortizationLine>("amortization_line", &self.amortization_line).with_updates_by_pk(|row| &row.id);
+        diff.amortization_schedule = cache.apply_diff_to_table::<AmortizationSchedule>("amortization_schedule", &self.amortization_schedule).with_updates_by_pk(|row| &row.id);
         diff.analytics_metric = cache.apply_diff_to_table::<AnalyticsMetric>("analytics_metric", &self.analytics_metric).with_updates_by_pk(|row| &row.id);
         diff.approval_request = cache.apply_diff_to_table::<ApprovalRequest>("approval_request", &self.approval_request).with_updates_by_pk(|row| &row.id);
         diff.approval_rule = cache.apply_diff_to_table::<ApprovalRule>("approval_rule", &self.approval_rule).with_updates_by_pk(|row| &row.id);
@@ -15507,6 +15971,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.country = cache.apply_diff_to_table::<Country>("country", &self.country).with_updates_by_pk(|row| &row.code);
         diff.country_pack_definition = cache.apply_diff_to_table::<CountryPackDefinition>("country_pack_definition", &self.country_pack_definition).with_updates_by_pk(|row| &row.pack_key);
         diff.country_pack_tax_rule = cache.apply_diff_to_table::<CountryPackTaxRule>("country_pack_tax_rule", &self.country_pack_tax_rule).with_updates_by_pk(|row| &row.id);
+        diff.crm_forecast_snapshot = cache.apply_diff_to_table::<CrmForecastSnapshot>("crm_forecast_snapshot", &self.crm_forecast_snapshot).with_updates_by_pk(|row| &row.id);
         diff.crossovered_budget = cache.apply_diff_to_table::<CrossoveredBudget>("crossovered_budget", &self.crossovered_budget).with_updates_by_pk(|row| &row.id);
         diff.crossovered_budget_lines = cache.apply_diff_to_table::<CrossoveredBudgetLines>("crossovered_budget_lines", &self.crossovered_budget_lines).with_updates_by_pk(|row| &row.id);
         diff.currency = cache.apply_diff_to_table::<Currency>("currency", &self.currency).with_updates_by_pk(|row| &row.code);
@@ -15531,6 +15996,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.form_config = cache.apply_diff_to_table::<FormConfig>("form_config", &self.form_config).with_updates_by_pk(|row| &row.id);
         diff.form_config_field = cache.apply_diff_to_table::<FormConfigField>("form_config_field", &self.form_config_field).with_updates_by_pk(|row| &row.id);
         diff.form_role_config = cache.apply_diff_to_table::<FormRoleConfig>("form_role_config", &self.form_role_config).with_updates_by_pk(|row| &row.id);
+        diff.fx_revaluation_run = cache.apply_diff_to_table::<FxRevaluationRun>("fx_revaluation_run", &self.fx_revaluation_run).with_updates_by_pk(|row| &row.id);
         diff.generated_owner_report = cache.apply_diff_to_table::<GeneratedOwnerReport>("generated_owner_report", &self.generated_owner_report).with_updates_by_pk(|row| &row.id);
         diff.google_drive_connection = cache.apply_diff_to_table::<GoogleDriveConnection>("google_drive_connection", &self.google_drive_connection).with_updates_by_pk(|row| &row.id);
         diff.helpdesk_sla = cache.apply_diff_to_table::<HelpdeskSla>("helpdesk_sla", &self.helpdesk_sla).with_updates_by_pk(|row| &row.id);
@@ -15584,11 +16050,13 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.opp_stage = cache.apply_diff_to_table::<OpportunityStage>("opp_stage", &self.opp_stage).with_updates_by_pk(|row| &row.id);
         diff.opportunity = cache.apply_diff_to_table::<Opportunity>("opportunity", &self.opportunity).with_updates_by_pk(|row| &row.id);
         diff.opportunity_line = cache.apply_diff_to_table::<OpportunityLine>("opportunity_line", &self.opportunity_line).with_updates_by_pk(|row| &row.id);
+        diff.opportunity_presence = cache.apply_diff_to_table::<OpportunityPresence>("opportunity_presence", &self.opportunity_presence).with_updates_by_pk(|row| &row.id);
         diff.org_permission = cache.apply_diff_to_table::<OrgPermission>("org_permission", &self.org_permission).with_updates_by_pk(|row| &row.id);
         diff.org_schema_migration = cache.apply_diff_to_table::<OrgSchemaMigration>("org_schema_migration", &self.org_schema_migration).with_updates_by_pk(|row| &row.id);
         diff.organization = cache.apply_diff_to_table::<Organization>("organization", &self.organization).with_updates_by_pk(|row| &row.id);
         diff.organization_settings = cache.apply_diff_to_table::<OrganizationSettings>("organization_settings", &self.organization_settings).with_updates_by_pk(|row| &row.organization_id);
         diff.packaging_material = cache.apply_diff_to_table::<PackagingMaterial>("packaging_material", &self.packaging_material).with_updates_by_pk(|row| &row.id);
+        diff.partner_credit_control = cache.apply_diff_to_table::<PartnerCreditControl>("partner_credit_control", &self.partner_credit_control).with_updates_by_pk(|row| &row.id);
         diff.payment_account = cache.apply_diff_to_table::<PaymentAccount>("payment_account", &self.payment_account).with_updates_by_pk(|row| &row.id);
         diff.payment_fee = cache.apply_diff_to_table::<PaymentFee>("payment_fee", &self.payment_fee).with_updates_by_pk(|row| &row.id);
         diff.payment_reconciliation = cache.apply_diff_to_table::<PaymentReconciliation>("payment_reconciliation", &self.payment_reconciliation).with_updates_by_pk(|row| &row.id);
@@ -15754,6 +16222,8 @@ for table_rows in raw.tables {
                 "ai_skill_version" => db_update.ai_skill_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_team_member" => db_update.ai_team_member.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_team_member_skill" => db_update.ai_team_member_skill.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "amortization_line" => db_update.amortization_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "amortization_schedule" => db_update.amortization_schedule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "analytics_metric" => db_update.analytics_metric.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "approval_request" => db_update.approval_request.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "approval_rule" => db_update.approval_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -15795,6 +16265,7 @@ for table_rows in raw.tables {
                 "country" => db_update.country.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "country_pack_definition" => db_update.country_pack_definition.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "country_pack_tax_rule" => db_update.country_pack_tax_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crm_forecast_snapshot" => db_update.crm_forecast_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "crossovered_budget" => db_update.crossovered_budget.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "currency" => db_update.currency.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -15819,6 +16290,7 @@ for table_rows in raw.tables {
                 "form_config" => db_update.form_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "form_config_field" => db_update.form_config_field.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "form_role_config" => db_update.form_role_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "fx_revaluation_run" => db_update.fx_revaluation_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "generated_owner_report" => db_update.generated_owner_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "google_drive_connection" => db_update.google_drive_connection.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "helpdesk_sla" => db_update.helpdesk_sla.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -15872,11 +16344,13 @@ for table_rows in raw.tables {
                 "opp_stage" => db_update.opp_stage.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "opportunity" => db_update.opportunity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "opportunity_line" => db_update.opportunity_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "opportunity_presence" => db_update.opportunity_presence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "org_permission" => db_update.org_permission.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "org_schema_migration" => db_update.org_schema_migration.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "organization" => db_update.organization.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "organization_settings" => db_update.organization_settings.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "packaging_material" => db_update.packaging_material.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "partner_credit_control" => db_update.partner_credit_control.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "payment_account" => db_update.payment_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "payment_fee" => db_update.payment_fee.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "payment_reconciliation" => db_update.payment_reconciliation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -16042,6 +16516,8 @@ for table_rows in raw.tables {
                 "ai_skill_version" => db_update.ai_skill_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_team_member" => db_update.ai_team_member.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_team_member_skill" => db_update.ai_team_member_skill.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "amortization_line" => db_update.amortization_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "amortization_schedule" => db_update.amortization_schedule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "analytics_metric" => db_update.analytics_metric.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "approval_request" => db_update.approval_request.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "approval_rule" => db_update.approval_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -16083,6 +16559,7 @@ for table_rows in raw.tables {
                 "country" => db_update.country.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "country_pack_definition" => db_update.country_pack_definition.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "country_pack_tax_rule" => db_update.country_pack_tax_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crm_forecast_snapshot" => db_update.crm_forecast_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "crossovered_budget" => db_update.crossovered_budget.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "currency" => db_update.currency.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -16107,6 +16584,7 @@ for table_rows in raw.tables {
                 "form_config" => db_update.form_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "form_config_field" => db_update.form_config_field.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "form_role_config" => db_update.form_role_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "fx_revaluation_run" => db_update.fx_revaluation_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "generated_owner_report" => db_update.generated_owner_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "google_drive_connection" => db_update.google_drive_connection.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "helpdesk_sla" => db_update.helpdesk_sla.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -16160,11 +16638,13 @@ for table_rows in raw.tables {
                 "opp_stage" => db_update.opp_stage.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "opportunity" => db_update.opportunity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "opportunity_line" => db_update.opportunity_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "opportunity_presence" => db_update.opportunity_presence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "org_permission" => db_update.org_permission.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "org_schema_migration" => db_update.org_schema_migration.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "organization" => db_update.organization.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "organization_settings" => db_update.organization_settings.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "packaging_material" => db_update.packaging_material.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "partner_credit_control" => db_update.partner_credit_control.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "payment_account" => db_update.payment_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "payment_fee" => db_update.payment_fee.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "payment_reconciliation" => db_update.payment_reconciliation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -16332,6 +16812,8 @@ pub struct AppliedDiff<'r> {
     ai_skill_version: __sdk::TableAppliedDiff<'r, AiSkillVersion>,
     ai_team_member: __sdk::TableAppliedDiff<'r, AiTeamMember>,
     ai_team_member_skill: __sdk::TableAppliedDiff<'r, AiTeamMemberSkill>,
+    amortization_line: __sdk::TableAppliedDiff<'r, AmortizationLine>,
+    amortization_schedule: __sdk::TableAppliedDiff<'r, AmortizationSchedule>,
     analytics_metric: __sdk::TableAppliedDiff<'r, AnalyticsMetric>,
     approval_request: __sdk::TableAppliedDiff<'r, ApprovalRequest>,
     approval_rule: __sdk::TableAppliedDiff<'r, ApprovalRule>,
@@ -16373,6 +16855,7 @@ pub struct AppliedDiff<'r> {
     country: __sdk::TableAppliedDiff<'r, Country>,
     country_pack_definition: __sdk::TableAppliedDiff<'r, CountryPackDefinition>,
     country_pack_tax_rule: __sdk::TableAppliedDiff<'r, CountryPackTaxRule>,
+    crm_forecast_snapshot: __sdk::TableAppliedDiff<'r, CrmForecastSnapshot>,
     crossovered_budget: __sdk::TableAppliedDiff<'r, CrossoveredBudget>,
     crossovered_budget_lines: __sdk::TableAppliedDiff<'r, CrossoveredBudgetLines>,
     currency: __sdk::TableAppliedDiff<'r, Currency>,
@@ -16397,6 +16880,7 @@ pub struct AppliedDiff<'r> {
     form_config: __sdk::TableAppliedDiff<'r, FormConfig>,
     form_config_field: __sdk::TableAppliedDiff<'r, FormConfigField>,
     form_role_config: __sdk::TableAppliedDiff<'r, FormRoleConfig>,
+    fx_revaluation_run: __sdk::TableAppliedDiff<'r, FxRevaluationRun>,
     generated_owner_report: __sdk::TableAppliedDiff<'r, GeneratedOwnerReport>,
     google_drive_connection: __sdk::TableAppliedDiff<'r, GoogleDriveConnection>,
     helpdesk_sla: __sdk::TableAppliedDiff<'r, HelpdeskSla>,
@@ -16450,11 +16934,13 @@ pub struct AppliedDiff<'r> {
     opp_stage: __sdk::TableAppliedDiff<'r, OpportunityStage>,
     opportunity: __sdk::TableAppliedDiff<'r, Opportunity>,
     opportunity_line: __sdk::TableAppliedDiff<'r, OpportunityLine>,
+    opportunity_presence: __sdk::TableAppliedDiff<'r, OpportunityPresence>,
     org_permission: __sdk::TableAppliedDiff<'r, OrgPermission>,
     org_schema_migration: __sdk::TableAppliedDiff<'r, OrgSchemaMigration>,
     organization: __sdk::TableAppliedDiff<'r, Organization>,
     organization_settings: __sdk::TableAppliedDiff<'r, OrganizationSettings>,
     packaging_material: __sdk::TableAppliedDiff<'r, PackagingMaterial>,
+    partner_credit_control: __sdk::TableAppliedDiff<'r, PartnerCreditControl>,
     payment_account: __sdk::TableAppliedDiff<'r, PaymentAccount>,
     payment_fee: __sdk::TableAppliedDiff<'r, PaymentFee>,
     payment_reconciliation: __sdk::TableAppliedDiff<'r, PaymentReconciliation>,
@@ -16623,6 +17109,8 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<AiSkillVersion>("ai_skill_version", &self.ai_skill_version, event);
         callbacks.invoke_table_row_callbacks::<AiTeamMember>("ai_team_member", &self.ai_team_member, event);
         callbacks.invoke_table_row_callbacks::<AiTeamMemberSkill>("ai_team_member_skill", &self.ai_team_member_skill, event);
+        callbacks.invoke_table_row_callbacks::<AmortizationLine>("amortization_line", &self.amortization_line, event);
+        callbacks.invoke_table_row_callbacks::<AmortizationSchedule>("amortization_schedule", &self.amortization_schedule, event);
         callbacks.invoke_table_row_callbacks::<AnalyticsMetric>("analytics_metric", &self.analytics_metric, event);
         callbacks.invoke_table_row_callbacks::<ApprovalRequest>("approval_request", &self.approval_request, event);
         callbacks.invoke_table_row_callbacks::<ApprovalRule>("approval_rule", &self.approval_rule, event);
@@ -16664,6 +17152,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Country>("country", &self.country, event);
         callbacks.invoke_table_row_callbacks::<CountryPackDefinition>("country_pack_definition", &self.country_pack_definition, event);
         callbacks.invoke_table_row_callbacks::<CountryPackTaxRule>("country_pack_tax_rule", &self.country_pack_tax_rule, event);
+        callbacks.invoke_table_row_callbacks::<CrmForecastSnapshot>("crm_forecast_snapshot", &self.crm_forecast_snapshot, event);
         callbacks.invoke_table_row_callbacks::<CrossoveredBudget>("crossovered_budget", &self.crossovered_budget, event);
         callbacks.invoke_table_row_callbacks::<CrossoveredBudgetLines>("crossovered_budget_lines", &self.crossovered_budget_lines, event);
         callbacks.invoke_table_row_callbacks::<Currency>("currency", &self.currency, event);
@@ -16688,6 +17177,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<FormConfig>("form_config", &self.form_config, event);
         callbacks.invoke_table_row_callbacks::<FormConfigField>("form_config_field", &self.form_config_field, event);
         callbacks.invoke_table_row_callbacks::<FormRoleConfig>("form_role_config", &self.form_role_config, event);
+        callbacks.invoke_table_row_callbacks::<FxRevaluationRun>("fx_revaluation_run", &self.fx_revaluation_run, event);
         callbacks.invoke_table_row_callbacks::<GeneratedOwnerReport>("generated_owner_report", &self.generated_owner_report, event);
         callbacks.invoke_table_row_callbacks::<GoogleDriveConnection>("google_drive_connection", &self.google_drive_connection, event);
         callbacks.invoke_table_row_callbacks::<HelpdeskSla>("helpdesk_sla", &self.helpdesk_sla, event);
@@ -16741,11 +17231,13 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<OpportunityStage>("opp_stage", &self.opp_stage, event);
         callbacks.invoke_table_row_callbacks::<Opportunity>("opportunity", &self.opportunity, event);
         callbacks.invoke_table_row_callbacks::<OpportunityLine>("opportunity_line", &self.opportunity_line, event);
+        callbacks.invoke_table_row_callbacks::<OpportunityPresence>("opportunity_presence", &self.opportunity_presence, event);
         callbacks.invoke_table_row_callbacks::<OrgPermission>("org_permission", &self.org_permission, event);
         callbacks.invoke_table_row_callbacks::<OrgSchemaMigration>("org_schema_migration", &self.org_schema_migration, event);
         callbacks.invoke_table_row_callbacks::<Organization>("organization", &self.organization, event);
         callbacks.invoke_table_row_callbacks::<OrganizationSettings>("organization_settings", &self.organization_settings, event);
         callbacks.invoke_table_row_callbacks::<PackagingMaterial>("packaging_material", &self.packaging_material, event);
+        callbacks.invoke_table_row_callbacks::<PartnerCreditControl>("partner_credit_control", &self.partner_credit_control, event);
         callbacks.invoke_table_row_callbacks::<PaymentAccount>("payment_account", &self.payment_account, event);
         callbacks.invoke_table_row_callbacks::<PaymentFee>("payment_fee", &self.payment_fee, event);
         callbacks.invoke_table_row_callbacks::<PaymentReconciliation>("payment_reconciliation", &self.payment_reconciliation, event);
@@ -17545,6 +18037,8 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         ai_skill_version_table::register_table(client_cache);
         ai_team_member_table::register_table(client_cache);
         ai_team_member_skill_table::register_table(client_cache);
+        amortization_line_table::register_table(client_cache);
+        amortization_schedule_table::register_table(client_cache);
         analytics_metric_table::register_table(client_cache);
         approval_request_table::register_table(client_cache);
         approval_rule_table::register_table(client_cache);
@@ -17586,6 +18080,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         country_table::register_table(client_cache);
         country_pack_definition_table::register_table(client_cache);
         country_pack_tax_rule_table::register_table(client_cache);
+        crm_forecast_snapshot_table::register_table(client_cache);
         crossovered_budget_table::register_table(client_cache);
         crossovered_budget_lines_table::register_table(client_cache);
         currency_table::register_table(client_cache);
@@ -17610,6 +18105,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         form_config_table::register_table(client_cache);
         form_config_field_table::register_table(client_cache);
         form_role_config_table::register_table(client_cache);
+        fx_revaluation_run_table::register_table(client_cache);
         generated_owner_report_table::register_table(client_cache);
         google_drive_connection_table::register_table(client_cache);
         helpdesk_sla_table::register_table(client_cache);
@@ -17663,11 +18159,13 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         opp_stage_table::register_table(client_cache);
         opportunity_table::register_table(client_cache);
         opportunity_line_table::register_table(client_cache);
+        opportunity_presence_table::register_table(client_cache);
         org_permission_table::register_table(client_cache);
         org_schema_migration_table::register_table(client_cache);
         organization_table::register_table(client_cache);
         organization_settings_table::register_table(client_cache);
         packaging_material_table::register_table(client_cache);
+        partner_credit_control_table::register_table(client_cache);
         payment_account_table::register_table(client_cache);
         payment_fee_table::register_table(client_cache);
         payment_reconciliation_table::register_table(client_cache);
@@ -17828,6 +18326,8 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "ai_skill_version",
         "ai_team_member",
         "ai_team_member_skill",
+        "amortization_line",
+        "amortization_schedule",
         "analytics_metric",
         "approval_request",
         "approval_rule",
@@ -17869,6 +18369,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "country",
         "country_pack_definition",
         "country_pack_tax_rule",
+        "crm_forecast_snapshot",
         "crossovered_budget",
         "crossovered_budget_lines",
         "currency",
@@ -17893,6 +18394,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "form_config",
         "form_config_field",
         "form_role_config",
+        "fx_revaluation_run",
         "generated_owner_report",
         "google_drive_connection",
         "helpdesk_sla",
@@ -17946,11 +18448,13 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "opp_stage",
         "opportunity",
         "opportunity_line",
+        "opportunity_presence",
         "org_permission",
         "org_schema_migration",
         "organization",
         "organization_settings",
         "packaging_material",
+        "partner_credit_control",
         "payment_account",
         "payment_fee",
         "payment_reconciliation",

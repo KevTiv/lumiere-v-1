@@ -12,6 +12,8 @@ pub enum TaxTypeUse {
 
     Purchase,
 
+    Withholding,
+
     None,
 }
 

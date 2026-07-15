@@ -1575,6 +1575,12 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: None,
     });
 
+    // Wire warehouse stock location so SO confirm reserves against real quants.
+    ctx.db.warehouse().id().update(Warehouse {
+        lot_stock_id: loc_stock.id,
+        ..wh
+    });
+
     // ── 3.5 Stock Quants (on-hand) ────────────────────────────────────────────
     ctx.db.stock_quant().insert(StockQuant {
         id: 0,

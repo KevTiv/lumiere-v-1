@@ -2409,6 +2409,17 @@
     "is_active",
     "metadata"
   ],
+  "CreateAssignmentRuleParams": [
+    "name",
+    "model",
+    "domain",
+    "assign_type",
+    "user_ids",
+    "team_id",
+    "priority",
+    "is_active",
+    "metadata"
+  ],
   "CreateAuditRuleParams": [
     "table_name",
     "log_reads",
@@ -2605,6 +2616,14 @@
     "color",
     "metadata"
   ],
+  "CreateContactRelationshipParams": [
+    "left_contact_id",
+    "right_contact_id",
+    "relationship_type",
+    "start_date",
+    "notes",
+    "metadata"
+  ],
   "CreateContactSegmentParams": [
     "name",
     "is_dynamic",
@@ -2654,6 +2673,12 @@
   "CreateCreditNoteParams": [
     "line_ids",
     "reason"
+  ],
+  "CreateCrmForecastSnapshotParams": [
+    "period_start",
+    "period_end",
+    "owner_id",
+    "metadata"
   ],
   "CreateCrossoveredBudgetLineParams": [
     "analytic_account_id",
@@ -3138,6 +3163,12 @@
     "message_ids",
     "metadata"
   ],
+  "CreateLeadLostReasonParams": [
+    "name",
+    "description",
+    "is_active",
+    "metadata"
+  ],
   "CreateLeadParams": [
     "name",
     "priority",
@@ -3166,6 +3197,13 @@
     "team_id",
     "partner_id",
     "date_deadline",
+    "metadata"
+  ],
+  "CreateLeadSourceParams": [
+    "name",
+    "description",
+    "sequence",
+    "is_active",
     "metadata"
   ],
   "CreateLeaveRequestParams": [
@@ -3318,6 +3356,17 @@
     "day_close",
     "color",
     "description",
+    "metadata"
+  ],
+  "CreateOpportunityStageParams": [
+    "name",
+    "sequence",
+    "probability",
+    "requirements",
+    "fold",
+    "is_won",
+    "team_id",
+    "is_active",
     "metadata"
   ],
   "CreateOrganizationParams": [
@@ -4728,6 +4777,19 @@
     "operation_id",
     "blocked_by_workorder_id",
     "quality_state",
+    "metadata"
+  ],
+  "CrmForecastSnapshot": [
+    "id",
+    "organization_id",
+    "company_id",
+    "period_start",
+    "period_end",
+    "owner_id",
+    "weighted_pipeline",
+    "open_count",
+    "created_by",
+    "created_at",
     "metadata"
   ],
   "CrossoveredBudget": [
@@ -6571,6 +6633,14 @@
     "sequence",
     "created_at",
     "metadata"
+  ],
+  "OpportunityPresence": [
+    "id",
+    "organization_id",
+    "opportunity_id",
+    "user_id",
+    "user_name",
+    "last_seen"
   ],
   "OpportunityStage": [
     "id",
@@ -9750,6 +9820,17 @@
     "is_active",
     "metadata"
   ],
+  "UpdateAssignmentRuleParams": [
+    "name",
+    "model",
+    "domain",
+    "assign_type",
+    "user_ids",
+    "team_id",
+    "priority",
+    "is_active",
+    "metadata"
+  ],
   "UpdateAuditRuleParams": [
     "log_reads",
     "log_writes",
@@ -10096,9 +10177,22 @@
     "referred_by",
     "description"
   ],
+  "UpdateLeadLostReasonParams": [
+    "name",
+    "description",
+    "is_active",
+    "metadata"
+  ],
   "UpdateLeadRevenueParams": [
     "expected_revenue",
     "probability"
+  ],
+  "UpdateLeadSourceParams": [
+    "name",
+    "description",
+    "sequence",
+    "is_active",
+    "metadata"
   ],
   "UpdateLeaveTypeParams": [
     "name",
@@ -10144,6 +10238,17 @@
     "lost_reason_id",
     "description",
     "tag_ids"
+  ],
+  "UpdateOpportunityStageParams": [
+    "name",
+    "sequence",
+    "probability",
+    "requirements",
+    "fold",
+    "is_won",
+    "team_id",
+    "is_active",
+    "metadata"
   ],
   "UpdateOrgMemberDetailsParams": [
     "department_id",

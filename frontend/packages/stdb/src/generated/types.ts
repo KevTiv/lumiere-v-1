@@ -2947,6 +2947,19 @@ export const CreateApprovalRuleParams = __t.object("CreateApprovalRuleParams", {
 });
 export type CreateApprovalRuleParams = __Infer<typeof CreateApprovalRuleParams>;
 
+export const CreateAssignmentRuleParams = __t.object("CreateAssignmentRuleParams", {
+  name: __t.string(),
+  model: __t.string(),
+  domain: __t.option(__t.string()),
+  assignType: __t.string(),
+  userIds: __t.array(__t.identity()),
+  teamId: __t.option(__t.u64()),
+  priority: __t.i32(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateAssignmentRuleParams = __Infer<typeof CreateAssignmentRuleParams>;
+
 export const CreateAuditRuleParams = __t.object("CreateAuditRuleParams", {
   tableName: __t.string(),
   logReads: __t.bool(),
@@ -3183,6 +3196,16 @@ export const CreateContactParams = __t.object("CreateContactParams", {
 });
 export type CreateContactParams = __Infer<typeof CreateContactParams>;
 
+export const CreateContactRelationshipParams = __t.object("CreateContactRelationshipParams", {
+  leftContactId: __t.u64(),
+  rightContactId: __t.u64(),
+  relationshipType: __t.string(),
+  startDate: __t.option(__t.timestamp()),
+  notes: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateContactRelationshipParams = __Infer<typeof CreateContactRelationshipParams>;
+
 export const CreateContactSegmentParams = __t.object("CreateContactSegmentParams", {
   name: __t.string(),
   isDynamic: __t.bool(),
@@ -3248,6 +3271,14 @@ export const CreateCreditNoteParams = __t.object("CreateCreditNoteParams", {
   reason: __t.option(__t.string()),
 });
 export type CreateCreditNoteParams = __Infer<typeof CreateCreditNoteParams>;
+
+export const CreateCrmForecastSnapshotParams = __t.object("CreateCrmForecastSnapshotParams", {
+  periodStart: __t.timestamp(),
+  periodEnd: __t.timestamp(),
+  ownerId: __t.option(__t.identity()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateCrmForecastSnapshotParams = __Infer<typeof CreateCrmForecastSnapshotParams>;
 
 export const CreateCrossoveredBudgetLineParams = __t.object("CreateCrossoveredBudgetLineParams", {
   analyticAccountId: __t.option(__t.u64()),
@@ -3838,6 +3869,14 @@ export const CreateLandedCostParams = __t.object("CreateLandedCostParams", {
 });
 export type CreateLandedCostParams = __Infer<typeof CreateLandedCostParams>;
 
+export const CreateLeadLostReasonParams = __t.object("CreateLeadLostReasonParams", {
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateLeadLostReasonParams = __Infer<typeof CreateLeadLostReasonParams>;
+
 export const CreateLeadParams = __t.object("CreateLeadParams", {
   name: __t.string(),
   priority: __t.string(),
@@ -3869,6 +3908,15 @@ export const CreateLeadParams = __t.object("CreateLeadParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateLeadParams = __Infer<typeof CreateLeadParams>;
+
+export const CreateLeadSourceParams = __t.object("CreateLeadSourceParams", {
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  sequence: __t.i32(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateLeadSourceParams = __Infer<typeof CreateLeadSourceParams>;
 
 export const CreateLeaveRequestParams = __t.object("CreateLeaveRequestParams", {
   employeeId: __t.u64(),
@@ -4053,6 +4101,19 @@ export const CreateOpportunityParams = __t.object("CreateOpportunityParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateOpportunityParams = __Infer<typeof CreateOpportunityParams>;
+
+export const CreateOpportunityStageParams = __t.object("CreateOpportunityStageParams", {
+  name: __t.string(),
+  sequence: __t.i32(),
+  probability: __t.f64(),
+  requirements: __t.option(__t.string()),
+  fold: __t.bool(),
+  isWon: __t.bool(),
+  teamId: __t.option(__t.u64()),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateOpportunityStageParams = __Infer<typeof CreateOpportunityStageParams>;
 
 export const CreateOrganizationParams = __t.object("CreateOrganizationParams", {
   name: __t.string(),
@@ -5679,6 +5740,21 @@ export const CreateWorkorderParams = __t.object("CreateWorkorderParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateWorkorderParams = __Infer<typeof CreateWorkorderParams>;
+
+export const CrmForecastSnapshot = __t.object("CrmForecastSnapshot", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  periodStart: __t.timestamp(),
+  periodEnd: __t.timestamp(),
+  ownerId: __t.option(__t.identity()),
+  weightedPipeline: __t.f64(),
+  openCount: __t.i32(),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type CrmForecastSnapshot = __Infer<typeof CrmForecastSnapshot>;
 
 export const CrossoveredBudget = __t.object("CrossoveredBudget", {
   id: __t.u64(),
@@ -7922,6 +7998,16 @@ export const OpportunityLine = __t.object("OpportunityLine", {
   metadata: __t.option(__t.string()),
 });
 export type OpportunityLine = __Infer<typeof OpportunityLine>;
+
+export const OpportunityPresence = __t.object("OpportunityPresence", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  opportunityId: __t.u64(),
+  userId: __t.identity(),
+  userName: __t.string(),
+  lastSeen: __t.timestamp(),
+});
+export type OpportunityPresence = __Infer<typeof OpportunityPresence>;
 
 export const OpportunityStage = __t.object("OpportunityStage", {
   id: __t.u64(),
@@ -11861,6 +11947,19 @@ export const UpdateApprovalRuleParams = __t.object("UpdateApprovalRuleParams", {
 });
 export type UpdateApprovalRuleParams = __Infer<typeof UpdateApprovalRuleParams>;
 
+export const UpdateAssignmentRuleParams = __t.object("UpdateAssignmentRuleParams", {
+  name: __t.option(__t.string()),
+  model: __t.option(__t.string()),
+  domain: __t.option(__t.string()),
+  assignType: __t.option(__t.string()),
+  userIds: __t.option(__t.array(__t.identity())),
+  teamId: __t.option(__t.u64()),
+  priority: __t.option(__t.i32()),
+  isActive: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateAssignmentRuleParams = __Infer<typeof UpdateAssignmentRuleParams>;
+
 export const UpdateAuditRuleParams = __t.object("UpdateAuditRuleParams", {
   logReads: __t.option(__t.bool()),
   logWrites: __t.option(__t.bool()),
@@ -12289,11 +12388,28 @@ export const UpdateLeadDetailsParams = __t.object("UpdateLeadDetailsParams", {
 });
 export type UpdateLeadDetailsParams = __Infer<typeof UpdateLeadDetailsParams>;
 
+export const UpdateLeadLostReasonParams = __t.object("UpdateLeadLostReasonParams", {
+  name: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+  isActive: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateLeadLostReasonParams = __Infer<typeof UpdateLeadLostReasonParams>;
+
 export const UpdateLeadRevenueParams = __t.object("UpdateLeadRevenueParams", {
   expectedRevenue: __t.f64(),
   probability: __t.f64(),
 });
 export type UpdateLeadRevenueParams = __Infer<typeof UpdateLeadRevenueParams>;
+
+export const UpdateLeadSourceParams = __t.object("UpdateLeadSourceParams", {
+  name: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+  sequence: __t.option(__t.i32()),
+  isActive: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateLeadSourceParams = __Infer<typeof UpdateLeadSourceParams>;
 
 export const UpdateLeaveTypeParams = __t.object("UpdateLeaveTypeParams", {
   name: __t.option(__t.string()),
@@ -12349,6 +12465,19 @@ export const UpdateOpportunityParams = __t.object("UpdateOpportunityParams", {
   tagIds: __t.option(__t.array(__t.u64())),
 });
 export type UpdateOpportunityParams = __Infer<typeof UpdateOpportunityParams>;
+
+export const UpdateOpportunityStageParams = __t.object("UpdateOpportunityStageParams", {
+  name: __t.option(__t.string()),
+  sequence: __t.option(__t.i32()),
+  probability: __t.option(__t.f64()),
+  requirements: __t.option(__t.string()),
+  fold: __t.option(__t.bool()),
+  isWon: __t.option(__t.bool()),
+  teamId: __t.option(__t.u64()),
+  isActive: __t.option(__t.bool()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateOpportunityStageParams = __Infer<typeof UpdateOpportunityStageParams>;
 
 export const UpdateOrgMemberDetailsParams = __t.object("UpdateOrgMemberDetailsParams", {
   departmentId: __t.option(__t.u64()),

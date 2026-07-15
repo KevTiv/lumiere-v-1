@@ -27,6 +27,34 @@ pub struct CreateContactSegmentParams {
     pub metadata: Option<String>,
 }
 
+/// Params for creating an assignment rule.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateAssignmentRuleParams {
+    pub name: String,
+    pub model: String,
+    pub domain: Option<String>,
+    pub assign_type: String,
+    pub user_ids: Vec<Identity>,
+    pub team_id: Option<u64>,
+    pub priority: i32,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+/// Params for updating an assignment rule. `None` = keep existing value.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateAssignmentRuleParams {
+    pub name: Option<String>,
+    pub model: Option<String>,
+    pub domain: Option<String>,
+    pub assign_type: Option<String>,
+    pub user_ids: Option<Vec<Identity>>,
+    pub team_id: Option<u64>,
+    pub priority: Option<i32>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<String>,
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TABLES: SEGMENTS
 // ══════════════════════════════════════════════════════════════════════════════
@@ -227,6 +255,158 @@ pub fn add_contact_to_segment(
                 })
                 .to_string(),
             ),
+        },
+    );
+
+    Ok(())
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REDUCERS: ASSIGNMENT RULE ADMIN
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[spacetimedb::reducer]
+pub fn create_assignment_rule(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateAssignmentRuleParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "assignment_rule", "create")?;
+
+    if params.name.is_empty() {
+        return Err("Rule name cannot be empty".to_string());
+    }
+
+    let rule = ctx.db.assignment_rule().insert(AssignmentRule {
+        id: 0,
+        organization_id,
+        name: params.name.clone(),
+        model: params.model,
+        domain: params.domain,
+        assign_type: params.assign_type,
+        user_ids: params.user_ids,
+        team_id: params.team_id,
+        priority: params.priority,
+        is_active: params.is_active,
+        created_at: ctx.timestamp,
+        metadata: params.metadata,
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "assignment_rule",
+            record_id: rule.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "name": params.name }).to_string()),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_assignment_rule(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    rule_id: u64,
+    params: UpdateAssignmentRuleParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "assignment_rule", "write")?;
+
+    let rule = ctx
+        .db
+        .assignment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("Assignment rule not found")?;
+
+    if rule.organization_id != organization_id {
+        return Err("Assignment rule does not belong to this organization".to_string());
+    }
+
+    let mut changed_fields = Vec::new();
+
+    let name = match params.name {
+        Some(v) => {
+            if v.is_empty() {
+                return Err("Rule name cannot be empty".to_string());
+            }
+            changed_fields.push("name".to_string());
+            v
+        }
+        None => rule.name.clone(),
+    };
+    let model = match params.model {
+        Some(v) => {
+            changed_fields.push("model".to_string());
+            v
+        }
+        None => rule.model.clone(),
+    };
+    if params.domain.is_some() {
+        changed_fields.push("domain".to_string());
+    }
+    let domain = params.domain.or_else(|| rule.domain.clone());
+    let assign_type = match params.assign_type {
+        Some(v) => {
+            changed_fields.push("assign_type".to_string());
+            v
+        }
+        None => rule.assign_type.clone(),
+    };
+    let user_ids_changed = params.user_ids.is_some();
+    let user_ids = params.user_ids.unwrap_or_else(|| rule.user_ids.clone());
+    if user_ids_changed {
+        changed_fields.push("user_ids".to_string());
+    }
+    let team_id = params.team_id.or(rule.team_id);
+    if params.team_id.is_some() {
+        changed_fields.push("team_id".to_string());
+    }
+    let priority = params.priority.unwrap_or(rule.priority);
+    if params.priority.is_some() {
+        changed_fields.push("priority".to_string());
+    }
+    let is_active = params.is_active.unwrap_or(rule.is_active);
+    if params.is_active.is_some() {
+        changed_fields.push("is_active".to_string());
+    }
+    if params.metadata.is_some() {
+        changed_fields.push("metadata".to_string());
+    }
+    let metadata = params.metadata.or_else(|| rule.metadata.clone());
+
+    ctx.db.assignment_rule().id().update(AssignmentRule {
+        name,
+        model,
+        domain,
+        assign_type,
+        user_ids,
+        team_id,
+        priority,
+        is_active,
+        metadata,
+        ..rule
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "assignment_rule",
+            record_id: rule_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields,
+            metadata: None,
         },
     );
 

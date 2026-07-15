@@ -115,6 +115,7 @@ use crate::core::migrations::apply_pending_global_migrations;
 use crate::core::reference::currency;
 use crate::core::reference::Currency;
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
+use crate::crm::presence::opportunity_presence;
 use crate::proposals::proposals::proposal_presence;
 
 /// Run accounting, inventory, sales, and CRM domain test suites in one call.
@@ -226,5 +227,18 @@ pub fn identity_disconnected(ctx: &ReducerContext) {
 
     for id in presence_ids {
         ctx.db.proposal_presence().id().delete(&id);
+    }
+
+    // Clean up opportunity presence rows for this user
+    let opp_presence_ids: Vec<u64> = ctx
+        .db
+        .opportunity_presence()
+        .opp_presence_by_user()
+        .filter(&ctx.sender())
+        .map(|p| p.id)
+        .collect();
+
+    for id in opp_presence_ids {
+        ctx.db.opportunity_presence().id().delete(&id);
     }
 }

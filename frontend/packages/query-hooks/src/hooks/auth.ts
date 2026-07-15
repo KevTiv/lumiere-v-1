@@ -13,6 +13,7 @@ import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { invalidateResourceQueries } from "../subscription-query"
 import { toCreateAuditRuleParams } from "@lumiere/erp-shared/settings-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
@@ -895,6 +896,7 @@ export function useRecordPrivacyConsent(organizationId: bigint) {
     },
     onSuccess: async () => {
       await invalidateAuthModule(qc, organizationId)
+      await invalidateResourceQueries(qc, organizationId, ["privacy-consent"])
     },
   })
 }

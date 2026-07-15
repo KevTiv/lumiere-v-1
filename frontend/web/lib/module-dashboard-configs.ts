@@ -768,6 +768,7 @@ export const crmDashboard: DashboardConfig = {
               { id: "create_opportunity", label: "Add Opportunity", icon: "trending", color: "green" },
               { id: "create_contact", label: "Add Contact", icon: "users", color: "teal" },
               { id: "log_activity", label: "Log Activity", icon: "bell", color: "orange" },
+              { id: "create_forecast_snapshot", label: "Snapshot forecast", icon: "trending", color: "purple" },
             ],
           },
         },

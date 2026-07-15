@@ -3,6 +3,10 @@
 import { CrmDuplicateContacts } from "@/lib/crm-duplicate-contacts-panel"
 import { ContactIdentitiesPanel } from "./contact-identities-panel"
 import { ContactPaymentsAndMessagesPanel } from "./contact-payments-and-messages-panel"
+import { ContactConsentPanel } from "./contact-consent-panel"
+import { ContactRelationshipsPanel } from "./contact-relationships-panel"
+import { OpportunityPresenceBanner } from "./opportunity-presence-banner"
+import { CrmPipelineAdminPanel } from "./crm-pipeline-admin-panel"
 import { useCrmModuleSubscription } from "@/lib/module-subscription-hooks"
 import { phCapture } from "@/lib/posthog-browser"
 import {
@@ -44,6 +48,8 @@ import {
 } from "@/lib/crm-update-params"
 import { groupBy } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
+import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import type { CreateCrmForecastSnapshotParams } from "@lumiere/stdb/types"
 import { useRuntimeListConfig } from "@lumiere/ui/forms"
 import { contactPrimaryLabel } from "@lumiere/stdb/read-models"
 import {
@@ -78,6 +84,15 @@ import {
   useUpdateLeadRevenue,
   useUpdateOpportunity,
   useCrmCsvImportMutations,
+  useCreateForecastSnapshot,
+  useCrmForecastSnapshots,
+  useClearOpportunityPresence,
+  useOpportunityPresence,
+  useUpdateOpportunityPresence,
+  useCreateOpportunityStage,
+  useCreateLeadSource,
+  useCreateAssignmentRule,
+  useAssignmentRules,
 } from "@lumiere/query-hooks/hooks/crm"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
@@ -563,6 +578,8 @@ function CrmClientLoaded({
   const updateLeadAddress = useUpdateLeadAddress(orgId)
   const updateLeadRevenue = useUpdateLeadRevenue(orgId)
   const csvImports = useCrmCsvImportMutations(orgId)
+  const { data: forecastSnapshots = [] } = useCrmForecastSnapshots(orgId)
+  const createForecastSnapshot = useCreateForecastSnapshot(orgId)
 
   const csvImportTitle = useMemo(() => {
     if (!csvKind) return ""
@@ -996,12 +1013,19 @@ function CrmClientLoaded({
           id: "activity",
           label: t("crm.chatter.timeline"),
           content: (record) => (
-            <CrmRecordChatter
-              organizationId={organizationId}
-              resModel="opportunity"
-              resId={rowIdBigInt(record)}
-              recordTitle={crmRowChatterLabel("opportunities", record)}
-            />
+            <div className="space-y-3">
+              <OpportunityPresenceBanner
+                organizationId={organizationId}
+                opportunityId={rowIdBigInt(record)}
+                userName={t("crm.presence.you", "You")}
+              />
+              <CrmRecordChatter
+                organizationId={organizationId}
+                resModel="opportunity"
+                resId={rowIdBigInt(record)}
+                recordTitle={crmRowChatterLabel("opportunities", record)}
+              />
+            </div>
           ),
         },
       ],
@@ -1023,6 +1047,27 @@ function CrmClientLoaded({
               organizationId={organizationId}
               contactId={rowIdBigInt(record)}
               companyId={rowCompanyId(record, operatingCompanyId)}
+            />
+          ),
+        },
+        {
+          id: "relationships",
+          label: t("crm.relationships.tabLabel", "Relationships"),
+          content: (record) => (
+            <ContactRelationshipsPanel
+              organizationId={organizationId}
+              contactId={rowIdBigInt(record)}
+              companyId={rowCompanyId(record, operatingCompanyId)}
+            />
+          ),
+        },
+        {
+          id: "consent",
+          label: t("crm.consent.tabLabel", "Consent"),
+          content: (record) => (
+            <ContactConsentPanel
+              organizationId={organizationId}
+              contactId={rowIdBigInt(record)}
             />
           ),
         },
@@ -1329,6 +1374,12 @@ function CrmClientLoaded({
           customContent: <CrmUtmSettings organizationId={organizationId} />,
         },
         {
+          id: "pipeline-admin",
+          label: t("crm.admin.tabLabel", "Pipeline admin"),
+          type: "custom" as const,
+          customContent: <CrmPipelineAdminPanel organizationId={organizationId} />,
+        },
+        {
           id: "duplicates",
           label: t("crm.duplicates.tabLabel"),
           type: "custom" as const,
@@ -1425,9 +1476,39 @@ function CrmClientLoaded({
       (s, o) => s + Number(o.expectedRevenue ?? 0),
       0,
     )
+    const currentWeightedPipeline = currentOpenOpportunities.reduce((s, o) => {
+      const revenue = Number(o.expectedRevenue ?? o.expected_revenue ?? 0)
+      const probability = Number(o.probability ?? 0)
+      return s + revenue * (probability / 100)
+    }, 0)
+    const latestSnapshot = (forecastSnapshots as Record<string, unknown>[])[0]
+    const latestSnapshotWeighted = latestSnapshot
+      ? Number(latestSnapshot.weightedPipeline ?? latestSnapshot.weighted_pipeline ?? 0)
+      : null
 
-    const currentContacts = contacts.filter((c) => inCurrentRange(c as Record<string, unknown>)).length
-    const previousContacts = contacts.filter((c) => inPreviousRange(c as Record<string, unknown>)).length
+    const wonWithCampaign = opportunities.filter((o) => {
+      const row = o as Record<string, unknown>
+      return (
+        (row.isWon === true || row.is_won === true) &&
+        inCurrentRange(row) &&
+        (row.campaignId ?? row.campaign_id) != null
+      )
+    })
+    const attributionByCampaign = Object.entries(
+      groupBy(wonWithCampaign, (o) =>
+        String((o as Record<string, unknown>).campaignId ?? (o as Record<string, unknown>).campaign_id ?? "—"),
+      ),
+    )
+      .map(([campaignId, items]) => ({
+        label: `Campaign ${campaignId}`,
+        value: items.reduce(
+          (sum, item) =>
+            sum + Number((item as Record<string, unknown>).expectedRevenue ?? (item as Record<string, unknown>).expected_revenue ?? 0),
+          0,
+        ),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 4)
 
     const openOpportunities = currentOpenOpportunities
     const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
@@ -1454,16 +1535,23 @@ function CrmClientLoaded({
                   icon: "TrendingUp",
                 },
                 {
-                  label: t("crm.dashboard.openOpportunities"),
-                  value: String(openOpportunities.length),
-                  change: percentChange(currentOpenOpportunities.length, previousOpenOpportunities.length),
+                  label: t("crm.dashboard.weightedPipeline", "Weighted pipeline"),
+                  value: `$${Math.round(currentWeightedPipeline).toLocaleString()}`,
                   icon: "Target",
                 },
                 {
-                  label: t("crm.dashboard.totalContacts"),
-                  value: String(currentContacts),
-                  change: percentChange(currentContacts, previousContacts),
+                  label: t("crm.dashboard.forecastSnapshot", "Last forecast"),
+                  value:
+                    latestSnapshotWeighted == null
+                      ? "—"
+                      : `$${Math.round(latestSnapshotWeighted).toLocaleString()}`,
                   icon: "BookUser",
+                },
+                {
+                  label: t("crm.dashboard.openOpportunities"),
+                  value: String(openOpportunities.length),
+                  change: percentChange(currentOpenOpportunities.length, previousOpenOpportunities.length),
+                  icon: "Users",
                 },
               ],
             },
@@ -1479,6 +1567,20 @@ function CrmClientLoaded({
               }),
             create_contact: () => setQuickActionForm({ form: newContactForm(t), action: "createContact" }),
             log_activity: () => setQuickActionForm({ form: newActivityForm(t), action: "createActivity" }),
+            create_forecast_snapshot: () => {
+              if (!operatingCompanyId || operatingCompanyId === 0n) return
+              const now = Date.now()
+              const endMsSafe = endMs > startMs ? endMs : now
+              void createForecastSnapshot.mutateAsync({
+                companyId: operatingCompanyId,
+                params: {
+                  periodStart: stbTimestampFromDate(new Date(startMs)),
+                  periodEnd: stbTimestampFromDate(new Date(endMsSafe)),
+                  ownerId: undefined,
+                  metadata: undefined,
+                } satisfies CreateCrmForecastSnapshotParams,
+              })
+            },
           }
           return {
             ...w,
@@ -1543,15 +1645,28 @@ function CrmClientLoaded({
             }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 4)
+          const attributionMetrics = attributionByCampaign.map((row, i) => ({
+            label: row.label,
+            value: Math.round(row.value),
+            max: Math.max(attributionByCampaign[0]?.value ?? 1, 1),
+            color: ["#0ea5e9", "#0284c7", "#0369a1", "#075985"][i] ?? "#0ea5e9",
+          }))
           const colors = ["#6366f1", "#8b5cf6", "#a78bfa", "#22c55e"]
           const maxCount = stages[0]?.count ?? 1
-          const metrics = stages.map((s, i) => ({
-            label: s.label,
-            value: s.count,
-            max: maxCount,
-            color: colors[i] ?? "#6366f1",
-          }))
-          return { ...w, data: { metrics } }
+          const metrics = [
+            ...stages.map((s, i) => ({
+              label: s.label,
+              value: s.count,
+              max: maxCount,
+              color: colors[i] ?? "#6366f1",
+            })),
+            ...attributionMetrics,
+          ]
+          return {
+            ...w,
+            title: t("crm.dashboard.pipelineHealthAttribution", "Pipeline & attribution"),
+            data: { metrics },
+          }
         }
         if (w.id === "crm-recent-contacts") {
           const recentRows = contacts.slice(0, 4).map((c) => {
@@ -1576,7 +1691,7 @@ function CrmClientLoaded({
         return w
       }),
     }))
-  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, dashboardTimeRange, t, navigateToLeadsByState, opportunityStages])
+  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, dashboardTimeRange, t, navigateToLeadsByState, opportunityStages, forecastSnapshots, createForecastSnapshot, operatingCompanyId])
 
   const config = useMemo(
     () =>

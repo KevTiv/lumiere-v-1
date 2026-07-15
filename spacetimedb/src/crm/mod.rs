@@ -22,8 +22,10 @@ pub mod contact_identities;
 pub mod contact_roles;
 pub mod contacts;
 pub mod duplicate;
+pub mod forecast;
 pub mod leads;
 pub mod opportunities;
+pub mod presence;
 pub mod segments;
 
 // Re-export key types for convenience
@@ -41,22 +43,32 @@ pub use contact_roles::{
     AssignContactRoleParams, EndContactRoleParams,
 };
 pub use contacts::{
-    assign_tag_to_contact, create_contact, create_contact_tag, delete_contact, update_contact,
-    update_contact_address, update_contact_business, update_contact_details, Contact,
-    ContactCategory, ContactCategoryAssignment, ContactRelationship, ContactTag,
-    ContactTagAssignment,
+    assign_tag_to_contact, create_contact, create_contact_relationship, create_contact_tag,
+    delete_contact, end_contact_relationship, update_contact, update_contact_address,
+    update_contact_business, update_contact_details, update_contact_parent, Contact,
+    ContactCategory, ContactCategoryAssignment, ContactRelationship,
+    CreateContactRelationshipParams, ContactTag, ContactTagAssignment,
 };
 pub use duplicate::{
     find_duplicate_contacts, merge_contacts, ContactDuplicateCandidate, MergeContactsParams,
 };
+pub use forecast::{create_forecast_snapshot, CreateCrmForecastSnapshotParams, CrmForecastSnapshot};
 pub use leads::{
-    convert_lead_to_customer, create_lead, update_lead_address, update_lead_details,
-    update_lead_revenue, Lead, LeadLostReason, LeadSource,
+    convert_lead_to_customer, create_lead, create_lead_lost_reason, create_lead_source,
+    update_lead_address, update_lead_details, update_lead_lost_reason, update_lead_revenue,
+    update_lead_source, CreateLeadLostReasonParams, CreateLeadSourceParams, Lead, LeadLostReason,
+    LeadSource, UpdateLeadLostReasonParams, UpdateLeadSourceParams,
 };
 pub use opportunities::{
-    convert_opportunity_to_sale_order, create_opportunity, update_opportunity, Opportunity,
-    OpportunityLine, OpportunityStage, UpdateOpportunityParams,
+    convert_opportunity_to_sale_order, create_opportunity, create_opportunity_stage,
+    update_opportunity, update_opportunity_stage, CreateOpportunityStageParams, Opportunity,
+    OpportunityLine, OpportunityStage, UpdateOpportunityParams, UpdateOpportunityStageParams,
+};
+pub use presence::{
+    clear_opportunity_presence, update_opportunity_presence, OpportunityPresence,
 };
 pub use segments::{
-    add_contact_to_segment, create_contact_segment, AssignmentRule, ContactSegment, SegmentMember,
+    add_contact_to_segment, create_assignment_rule, create_contact_segment,
+    update_assignment_rule, AssignmentRule, ContactSegment, CreateAssignmentRuleParams,
+    SegmentMember, UpdateAssignmentRuleParams,
 };

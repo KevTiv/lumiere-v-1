@@ -117,6 +117,7 @@ import CancelWorkflowInstanceReducer from "./cancel_workflow_instance_reducer";
 import CheckMoAvailabilityReducer from "./check_mo_availability_reducer";
 import ClaimHubWithTokenReducer from "./claim_hub_with_token_reducer";
 import ClaimQueueJobReducer from "./claim_queue_job_reducer";
+import ClearOpportunityPresenceReducer from "./clear_opportunity_presence_reducer";
 import ClearProposalPresenceReducer from "./clear_proposal_presence_reducer";
 import CloseAccountAssetReducer from "./close_account_asset_reducer";
 import CloseAccountPeriodReducer from "./close_account_period_reducer";
@@ -185,6 +186,7 @@ import CreateAnalyticDistributionModelReducer from "./create_analytic_distributi
 import CreateAnalyticLineReducer from "./create_analytic_line_reducer";
 import CreateAnalyticsMetricReducer from "./create_analytics_metric_reducer";
 import CreateApprovalRuleReducer from "./create_approval_rule_reducer";
+import CreateAssignmentRuleReducer from "./create_assignment_rule_reducer";
 import CreateAuditRuleReducer from "./create_audit_rule_reducer";
 import CreateBadDebtWriteOffReducer from "./create_bad_debt_write_off_reducer";
 import CreateBarcodeNomenclatureReducer from "./create_barcode_nomenclature_reducer";
@@ -200,6 +202,7 @@ import CreateConsolidationAccountReducer from "./create_consolidation_account_re
 import CreateConsolidationJournalReducer from "./create_consolidation_journal_reducer";
 import CreateContactReducer from "./create_contact_reducer";
 import CreateContactIdentityReducer from "./create_contact_identity_reducer";
+import CreateContactRelationshipReducer from "./create_contact_relationship_reducer";
 import CreateContactSegmentReducer from "./create_contact_segment_reducer";
 import CreateContactTagReducer from "./create_contact_tag_reducer";
 import CreateContractReducer from "./create_contract_reducer";
@@ -230,6 +233,7 @@ import CreateExpenseSheetReducer from "./create_expense_sheet_reducer";
 import CreateFinancialReportReducer from "./create_financial_report_reducer";
 import CreateFiscalYearReducer from "./create_fiscal_year_reducer";
 import CreateFleetVehicleReducer from "./create_fleet_vehicle_reducer";
+import CreateForecastSnapshotReducer from "./create_forecast_snapshot_reducer";
 import CreateFormConfigurationReducer from "./create_form_configuration_reducer";
 import CreateGoogleDriveConnectionReducer from "./create_google_drive_connection_reducer";
 import CreateHelpdeskSlaReducer from "./create_helpdesk_sla_reducer";
@@ -247,6 +251,8 @@ import CreateKnowledgeArticleReducer from "./create_knowledge_article_reducer";
 import CreateKnowledgeCategoryReducer from "./create_knowledge_category_reducer";
 import CreateLandedCostReducer from "./create_landed_cost_reducer";
 import CreateLeadReducer from "./create_lead_reducer";
+import CreateLeadLostReasonReducer from "./create_lead_lost_reason_reducer";
+import CreateLeadSourceReducer from "./create_lead_source_reducer";
 import CreateLeaveRequestReducer from "./create_leave_request_reducer";
 import CreateLeaveTypeReducer from "./create_leave_type_reducer";
 import CreateLoyaltyCardReducer from "./create_loyalty_card_reducer";
@@ -258,6 +264,7 @@ import CreateMessageTemplateReducer from "./create_message_template_reducer";
 import CreateOperationalMessageReducer from "./create_operational_message_reducer";
 import CreateOpportunityReducer from "./create_opportunity_reducer";
 import CreateOpportunityLineReducer from "./create_opportunity_line_reducer";
+import CreateOpportunityStageReducer from "./create_opportunity_stage_reducer";
 import CreateOrganizationReducer from "./create_organization_reducer";
 import CreatePartnerBankReducer from "./create_partner_bank_reducer";
 import CreatePasswordResetTokenReducer from "./create_password_reset_token_reducer";
@@ -404,6 +411,7 @@ import DispatchDueOwnerReportsReducer from "./dispatch_due_owner_reports_reducer
 import DisposeAccountAssetReducer from "./dispose_account_asset_reducer";
 import DoneBudgetReducer from "./done_budget_reducer";
 import DoneStockMoveReducer from "./done_stock_move_reducer";
+import EndContactRelationshipReducer from "./end_contact_relationship_reducer";
 import EndContactRoleReducer from "./end_contact_role_reducer";
 import EndUserSessionReducer from "./end_user_session_reducer";
 import EnqueueJobReducer from "./enqueue_job_reducer";
@@ -619,6 +627,8 @@ import RunCountryPackTestReducer from "./run_country_pack_test_reducer";
 import RunCrmContactIdentityTestReducer from "./run_crm_contact_identity_test_reducer";
 import RunCrmContactUpdateDeleteTestReducer from "./run_crm_contact_update_delete_test_reducer";
 import RunCrmOpportunityConvertTestReducer from "./run_crm_opportunity_convert_test_reducer";
+import RunCrmRelationshipAdminTestReducer from "./run_crm_relationship_admin_test_reducer";
+import RunCrmWave2TestReducer from "./run_crm_wave_2_test_reducer";
 import RunDocumentsFolderTestReducer from "./run_documents_folder_test_reducer";
 import RunFxRevaluationReducer from "./run_fx_revaluation_reducer";
 import RunFxRevaluationBatchReducer from "./run_fx_revaluation_batch_reducer";
@@ -721,6 +731,7 @@ import UpdateAnalyticAccountReducer from "./update_analytic_account_reducer";
 import UpdateAnalyticDistributionModelReducer from "./update_analytic_distribution_model_reducer";
 import UpdateAnalyticLineReducer from "./update_analytic_line_reducer";
 import UpdateApprovalRuleReducer from "./update_approval_rule_reducer";
+import UpdateAssignmentRuleReducer from "./update_assignment_rule_reducer";
 import UpdateAuditRuleReducer from "./update_audit_rule_reducer";
 import UpdateBarcodeNomenclatureReducer from "./update_barcode_nomenclature_reducer";
 import UpdateBarcodeRuleReducer from "./update_barcode_rule_reducer";
@@ -740,6 +751,7 @@ import UpdateContactAddressReducer from "./update_contact_address_reducer";
 import UpdateContactBusinessReducer from "./update_contact_business_reducer";
 import UpdateContactDetailsReducer from "./update_contact_details_reducer";
 import UpdateContactIdentityReducer from "./update_contact_identity_reducer";
+import UpdateContactParentReducer from "./update_contact_parent_reducer";
 import UpdateContractReducer from "./update_contract_reducer";
 import UpdateCrossoveredBudgetReducer from "./update_crossovered_budget_reducer";
 import UpdateDepartmentReducer from "./update_department_reducer";
@@ -762,12 +774,16 @@ import UpdateKnowledgeCategoryReducer from "./update_knowledge_category_reducer"
 import UpdateLandedCostReducer from "./update_landed_cost_reducer";
 import UpdateLeadAddressReducer from "./update_lead_address_reducer";
 import UpdateLeadDetailsReducer from "./update_lead_details_reducer";
+import UpdateLeadLostReasonReducer from "./update_lead_lost_reason_reducer";
 import UpdateLeadRevenueReducer from "./update_lead_revenue_reducer";
+import UpdateLeadSourceReducer from "./update_lead_source_reducer";
 import UpdateLeaveTypeReducer from "./update_leave_type_reducer";
 import UpdateMailTemplateReducer from "./update_mail_template_reducer";
 import UpdateMessageTemplateReducer from "./update_message_template_reducer";
 import UpdateMetricValuesReducer from "./update_metric_values_reducer";
 import UpdateOpportunityReducer from "./update_opportunity_reducer";
+import UpdateOpportunityPresenceReducer from "./update_opportunity_presence_reducer";
+import UpdateOpportunityStageReducer from "./update_opportunity_stage_reducer";
 import UpdateOrgMemberDetailsReducer from "./update_org_member_details_reducer";
 import UpdateOrgMemberRoleReducer from "./update_org_member_role_reducer";
 import UpdateOrganizationReducer from "./update_organization_reducer";
@@ -941,6 +957,7 @@ import ContactTagAssignmentRow from "./contact_tag_assignment_table";
 import CountryRow from "./country_table";
 import CountryPackDefinitionRow from "./country_pack_definition_table";
 import CountryPackTaxRuleRow from "./country_pack_tax_rule_table";
+import CrmForecastSnapshotRow from "./crm_forecast_snapshot_table";
 import CrossoveredBudgetRow from "./crossovered_budget_table";
 import CrossoveredBudgetLinesRow from "./crossovered_budget_lines_table";
 import CurrencyRow from "./currency_table";
@@ -1019,6 +1036,7 @@ import OperationalMessageRow from "./operational_message_table";
 import OppStageRow from "./opp_stage_table";
 import OpportunityRow from "./opportunity_table";
 import OpportunityLineRow from "./opportunity_line_table";
+import OpportunityPresenceRow from "./opportunity_presence_table";
 import OrgPermissionRow from "./org_permission_table";
 import OrgSchemaMigrationRow from "./org_schema_migration_table";
 import OrganizationRow from "./organization_table";
@@ -2724,6 +2742,23 @@ const tablesSchema = __schema({
       { name: 'country_pack_tax_rule_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CountryPackTaxRuleRow),
+  crm_forecast_snapshot: __table({
+    name: 'crm_forecast_snapshot',
+    indexes: [
+      { name: 'forecast_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'forecast_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'crm_forecast_snapshot_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CrmForecastSnapshotRow),
   crossovered_budget: __table({
     name: 'crossovered_budget',
     indexes: [
@@ -4067,6 +4102,23 @@ const tablesSchema = __schema({
       { name: 'opportunity_line_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, OpportunityLineRow),
+  opportunity_presence: __table({
+    name: 'opportunity_presence',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'opp_presence_by_opportunity', algorithm: 'btree', columns: [
+        'opportunityId',
+      ] },
+      { name: 'opp_presence_by_user', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+    ],
+    constraints: [
+      { name: 'opportunity_presence_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, OpportunityPresenceRow),
   org_permission: __table({
     name: 'org_permission',
     indexes: [
@@ -6304,6 +6356,7 @@ const reducersSchema = __reducers(
   __reducerSchema("check_mo_availability", CheckMoAvailabilityReducer),
   __reducerSchema("claim_hub_with_token", ClaimHubWithTokenReducer),
   __reducerSchema("claim_queue_job", ClaimQueueJobReducer),
+  __reducerSchema("clear_opportunity_presence", ClearOpportunityPresenceReducer),
   __reducerSchema("clear_proposal_presence", ClearProposalPresenceReducer),
   __reducerSchema("close_account_asset", CloseAccountAssetReducer),
   __reducerSchema("close_account_period", CloseAccountPeriodReducer),
@@ -6372,6 +6425,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_analytic_line", CreateAnalyticLineReducer),
   __reducerSchema("create_analytics_metric", CreateAnalyticsMetricReducer),
   __reducerSchema("create_approval_rule", CreateApprovalRuleReducer),
+  __reducerSchema("create_assignment_rule", CreateAssignmentRuleReducer),
   __reducerSchema("create_audit_rule", CreateAuditRuleReducer),
   __reducerSchema("create_bad_debt_write_off", CreateBadDebtWriteOffReducer),
   __reducerSchema("create_barcode_nomenclature", CreateBarcodeNomenclatureReducer),
@@ -6387,6 +6441,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_consolidation_journal", CreateConsolidationJournalReducer),
   __reducerSchema("create_contact", CreateContactReducer),
   __reducerSchema("create_contact_identity", CreateContactIdentityReducer),
+  __reducerSchema("create_contact_relationship", CreateContactRelationshipReducer),
   __reducerSchema("create_contact_segment", CreateContactSegmentReducer),
   __reducerSchema("create_contact_tag", CreateContactTagReducer),
   __reducerSchema("create_contract", CreateContractReducer),
@@ -6417,6 +6472,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_financial_report", CreateFinancialReportReducer),
   __reducerSchema("create_fiscal_year", CreateFiscalYearReducer),
   __reducerSchema("create_fleet_vehicle", CreateFleetVehicleReducer),
+  __reducerSchema("create_forecast_snapshot", CreateForecastSnapshotReducer),
   __reducerSchema("create_form_configuration", CreateFormConfigurationReducer),
   __reducerSchema("create_google_drive_connection", CreateGoogleDriveConnectionReducer),
   __reducerSchema("create_helpdesk_sla", CreateHelpdeskSlaReducer),
@@ -6434,6 +6490,8 @@ const reducersSchema = __reducers(
   __reducerSchema("create_knowledge_category", CreateKnowledgeCategoryReducer),
   __reducerSchema("create_landed_cost", CreateLandedCostReducer),
   __reducerSchema("create_lead", CreateLeadReducer),
+  __reducerSchema("create_lead_lost_reason", CreateLeadLostReasonReducer),
+  __reducerSchema("create_lead_source", CreateLeadSourceReducer),
   __reducerSchema("create_leave_request", CreateLeaveRequestReducer),
   __reducerSchema("create_leave_type", CreateLeaveTypeReducer),
   __reducerSchema("create_loyalty_card", CreateLoyaltyCardReducer),
@@ -6445,6 +6503,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_operational_message", CreateOperationalMessageReducer),
   __reducerSchema("create_opportunity", CreateOpportunityReducer),
   __reducerSchema("create_opportunity_line", CreateOpportunityLineReducer),
+  __reducerSchema("create_opportunity_stage", CreateOpportunityStageReducer),
   __reducerSchema("create_organization", CreateOrganizationReducer),
   __reducerSchema("create_partner_bank", CreatePartnerBankReducer),
   __reducerSchema("create_password_reset_token", CreatePasswordResetTokenReducer),
@@ -6591,6 +6650,7 @@ const reducersSchema = __reducers(
   __reducerSchema("dispose_account_asset", DisposeAccountAssetReducer),
   __reducerSchema("done_budget", DoneBudgetReducer),
   __reducerSchema("done_stock_move", DoneStockMoveReducer),
+  __reducerSchema("end_contact_relationship", EndContactRelationshipReducer),
   __reducerSchema("end_contact_role", EndContactRoleReducer),
   __reducerSchema("end_user_session", EndUserSessionReducer),
   __reducerSchema("enqueue_job", EnqueueJobReducer),
@@ -6806,6 +6866,8 @@ const reducersSchema = __reducers(
   __reducerSchema("run_crm_contact_identity_test", RunCrmContactIdentityTestReducer),
   __reducerSchema("run_crm_contact_update_delete_test", RunCrmContactUpdateDeleteTestReducer),
   __reducerSchema("run_crm_opportunity_convert_test", RunCrmOpportunityConvertTestReducer),
+  __reducerSchema("run_crm_relationship_admin_test", RunCrmRelationshipAdminTestReducer),
+  __reducerSchema("run_crm_wave_2_test", RunCrmWave2TestReducer),
   __reducerSchema("run_documents_folder_test", RunDocumentsFolderTestReducer),
   __reducerSchema("run_fx_revaluation", RunFxRevaluationReducer),
   __reducerSchema("run_fx_revaluation_batch", RunFxRevaluationBatchReducer),
@@ -6908,6 +6970,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_analytic_distribution_model", UpdateAnalyticDistributionModelReducer),
   __reducerSchema("update_analytic_line", UpdateAnalyticLineReducer),
   __reducerSchema("update_approval_rule", UpdateApprovalRuleReducer),
+  __reducerSchema("update_assignment_rule", UpdateAssignmentRuleReducer),
   __reducerSchema("update_audit_rule", UpdateAuditRuleReducer),
   __reducerSchema("update_barcode_nomenclature", UpdateBarcodeNomenclatureReducer),
   __reducerSchema("update_barcode_rule", UpdateBarcodeRuleReducer),
@@ -6927,6 +6990,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_contact_business", UpdateContactBusinessReducer),
   __reducerSchema("update_contact_details", UpdateContactDetailsReducer),
   __reducerSchema("update_contact_identity", UpdateContactIdentityReducer),
+  __reducerSchema("update_contact_parent", UpdateContactParentReducer),
   __reducerSchema("update_contract", UpdateContractReducer),
   __reducerSchema("update_crossovered_budget", UpdateCrossoveredBudgetReducer),
   __reducerSchema("update_department", UpdateDepartmentReducer),
@@ -6949,12 +7013,16 @@ const reducersSchema = __reducers(
   __reducerSchema("update_landed_cost", UpdateLandedCostReducer),
   __reducerSchema("update_lead_address", UpdateLeadAddressReducer),
   __reducerSchema("update_lead_details", UpdateLeadDetailsReducer),
+  __reducerSchema("update_lead_lost_reason", UpdateLeadLostReasonReducer),
   __reducerSchema("update_lead_revenue", UpdateLeadRevenueReducer),
+  __reducerSchema("update_lead_source", UpdateLeadSourceReducer),
   __reducerSchema("update_leave_type", UpdateLeaveTypeReducer),
   __reducerSchema("update_mail_template", UpdateMailTemplateReducer),
   __reducerSchema("update_message_template", UpdateMessageTemplateReducer),
   __reducerSchema("update_metric_values", UpdateMetricValuesReducer),
   __reducerSchema("update_opportunity", UpdateOpportunityReducer),
+  __reducerSchema("update_opportunity_presence", UpdateOpportunityPresenceReducer),
+  __reducerSchema("update_opportunity_stage", UpdateOpportunityStageReducer),
   __reducerSchema("update_org_member_details", UpdateOrgMemberDetailsReducer),
   __reducerSchema("update_org_member_role", UpdateOrgMemberRoleReducer),
   __reducerSchema("update_organization", UpdateOrganizationReducer),

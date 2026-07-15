@@ -40,6 +40,20 @@ export const CRM_BFF_REDUCERS = [
   "archive_contact_identity",
   "assign_contact_role",
   "end_contact_role",
+  "create_contact_relationship",
+  "end_contact_relationship",
+  "update_contact_parent",
+  "create_opportunity_stage",
+  "update_opportunity_stage",
+  "create_lead_source",
+  "update_lead_source",
+  "create_lead_lost_reason",
+  "update_lead_lost_reason",
+  "create_assignment_rule",
+  "update_assignment_rule",
+  "update_opportunity_presence",
+  "clear_opportunity_presence",
+  "create_forecast_snapshot",
 ] as const;
 
 export type CrmBffReducerKey = (typeof CRM_BFF_REDUCERS)[number];
@@ -47,6 +61,8 @@ export type CrmBffReducerKey = (typeof CRM_BFF_REDUCERS)[number];
 const WITH_COMPANY_QUERY = new Set<CrmBffReducerKey>([
   "convert_opportunity_to_sale_order",
   "create_opportunity_line",
+  "update_contact_parent",
+  "create_forecast_snapshot",
 ]);
 
 /** Same-origin path used by `apiFetch` in the web app. */
@@ -107,6 +123,20 @@ export const CRM_COMMAND_SUBSCRIPTION_HINTS: Record<
   archive_contact_identity: ["contact-phone-identities"],
   assign_contact_role: ["contact-role-assignments"],
   end_contact_role: ["contact-role-assignments"],
+  create_contact_relationship: ["contact-relationships"],
+  end_contact_relationship: ["contact-relationships"],
+  update_contact_parent: ["contacts"],
+  create_opportunity_stage: ["opportunity-stages"],
+  update_opportunity_stage: ["opportunity-stages"],
+  create_lead_source: ["leads"],
+  update_lead_source: ["leads"],
+  create_lead_lost_reason: ["leads"],
+  update_lead_lost_reason: ["leads"],
+  create_assignment_rule: ["assignment-rules"],
+  update_assignment_rule: ["assignment-rules"],
+  update_opportunity_presence: ["opportunity-presence"],
+  clear_opportunity_presence: ["opportunity-presence"],
+  create_forecast_snapshot: ["crm-forecast-snapshots"],
 };
 
 export function crmCommandContract(

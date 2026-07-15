@@ -17,12 +17,17 @@ import type {
   ConvertLeadParams,
   ConvertOpportunityParams,
   CreateActivityParams,
+  CreateAssignmentRuleParams,
   CreateContactSegmentParams,
   CreateContactTagParams,
   CreateContactParams,
+  CreateContactRelationshipParams,
+  CreateCrmForecastSnapshotParams,
   CreateLeadParams,
+  CreateLeadSourceParams,
   CreateOpportunityLineParams,
   CreateOpportunityParams,
+  CreateOpportunityStageParams,
   UpdateContactAddressParams,
   UpdateContactBusinessParams,
   UpdateContactDetailsParams,
@@ -808,18 +813,196 @@ export function useCrmCsvImportMutations(organizationId: bigint) {
   }
 }
 
+// ── Wave 1–2 CRM extensions ───────────────────────────────────────────────────
+
+export function usePrivacyConsents(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("privacy-consent", organizationId, { initialData })
+}
+
+export function useContactRelationships(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("contact-relationships", organizationId, { initialData })
+}
+
+export function useOpportunityPresence(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("opportunity-presence", organizationId, { initialData })
+}
+
+export function useCrmForecastSnapshots(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("crm-forecast-snapshots", organizationId, { initialData })
+}
+
+export function useAssignmentRules(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("assignment-rules", organizationId, { initialData })
+}
+
+export function useCreateContactRelationship(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreateContactRelationshipParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = crmBffPost("create_contact_relationship", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateContactRelationshipParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create contact relationship")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["contact-relationships"]),
+  })
+}
+
+export function useEndContactRelationship(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (relationshipId) => {
+      const { urlPath, init } = crmBffPost("end_contact_relationship", [
+        organizationId,
+        toScalarU64(relationshipId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to end contact relationship")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["contact-relationships"]),
+  })
+}
+
+export function useUpdateContactParent(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { companyId: ScalarId; contactId: ScalarId; parentId: ScalarId | null }
+  >({
+    mutationFn: async ({ companyId, contactId, parentId }) => {
+      const { urlPath, init } = crmBffPost("update_contact_parent", [
+        organizationId,
+        toScalarU64(companyId),
+        toScalarU64(contactId),
+        parentId == null ? null : toScalarU64(parentId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update contact parent")
+    },
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ["contacts"]),
+  })
+}
+
+export function useCreateOpportunityStage(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreateOpportunityStageParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = crmBffPost("create_opportunity_stage", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateOpportunityStageParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create opportunity stage")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["opportunity-stages"]),
+  })
+}
+
+export function useCreateLeadSource(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreateLeadSourceParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = crmBffPost("create_lead_source", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateLeadSourceParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create lead source")
+    },
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ["leads"]),
+  })
+}
+
+export function useCreateAssignmentRule(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreateAssignmentRuleParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = crmBffPost("create_assignment_rule", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateAssignmentRuleParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create assignment rule")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["assignment-rules"]),
+  })
+}
+
+export function useUpdateOpportunityPresence(organizationId: bigint) {
+  return useMutation<
+    void,
+    Error,
+    { opportunityId: ScalarId; userName: string }
+  >({
+    mutationFn: async ({ opportunityId, userName }) => {
+      const { urlPath, init } = crmBffPost("update_opportunity_presence", [
+        organizationId,
+        toScalarU64(opportunityId),
+        userName,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update opportunity presence")
+    },
+  })
+}
+
+export function useClearOpportunityPresence(organizationId: bigint) {
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (opportunityId) => {
+      const { urlPath, init } = crmBffPost("clear_opportunity_presence", [
+        toScalarU64(opportunityId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to clear opportunity presence")
+    },
+  })
+}
+
+export function useCreateForecastSnapshot(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { companyId: ScalarId; params: CreateCrmForecastSnapshotParams }
+  >({
+    mutationFn: async ({ companyId, params }) => {
+      const { urlPath, init } = crmBffPost("create_forecast_snapshot", [
+        organizationId,
+        toScalarU64(companyId),
+        stdbParamsToJson(params as object, "CreateCrmForecastSnapshotParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create forecast snapshot")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["crm-forecast-snapshots"]),
+  })
+}
+
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
   ConvertLeadParams,
   ConvertOpportunityParams,
   CreateActivityParams,
+  CreateAssignmentRuleParams,
   CreateContactParams,
   CreateContactIdentityParams,
+  CreateContactRelationshipParams,
   CreateContactSegmentParams,
   CreateContactTagParams,
+  CreateCrmForecastSnapshotParams,
   CreateLeadParams,
+  CreateLeadSourceParams,
   CreateOpportunityLineParams,
   CreateOpportunityParams,
+  CreateOpportunityStageParams,
   UpdateContactAddressParams,
   UpdateContactBusinessParams,
   UpdateContactDetailsParams,

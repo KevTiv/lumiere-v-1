@@ -2,6 +2,8 @@
 pub mod contact_identity_test;
 pub mod contact_lifecycle_test;
 pub mod opportunity_lifecycle_test;
+pub mod relationship_and_admin_test;
+pub mod wave2_test;
 
 use spacetimedb::ReducerContext;
 
@@ -12,8 +14,32 @@ pub fn run_all_crm_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_crm_opportunity_convert_test(ctx)?;
     run_crm_contact_update_delete_test(ctx)?;
     run_crm_contact_identity_test(ctx)?;
+    run_crm_wave2_test(ctx)?;
+    run_crm_relationship_admin_test(ctx)?;
     log::info!("✅ run_all_crm_tests complete");
     Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_crm_relationship_admin_test(ctx: &ReducerContext) -> Result<(), String> {
+    relationship_and_admin_test::test_contact_relationship_lifecycle(ctx)
+        .map_err(|e| format!("contact_relationship_lifecycle: {e}"))?;
+    relationship_and_admin_test::test_contact_parent_hierarchy_cycle_rejected(ctx)
+        .map_err(|e| format!("contact_parent_hierarchy_cycle_rejected: {e}"))?;
+    relationship_and_admin_test::test_opportunity_stage_and_lead_admin(ctx)
+        .map_err(|e| format!("opportunity_stage_and_lead_admin: {e}"))?;
+    relationship_and_admin_test::test_assignment_rule_admin(ctx)
+        .map_err(|e| format!("assignment_rule_admin: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_crm_wave2_test(ctx: &ReducerContext) -> Result<(), String> {
+    wave2_test::test_opportunity_presence_upsert_and_clear(ctx)
+        .map_err(|e| format!("opportunity_presence_upsert_and_clear: {e}"))?;
+    wave2_test::test_forecast_snapshot_weighted_sum(ctx)
+        .map_err(|e| format!("forecast_snapshot_weighted_sum: {e}"))?;
+    wave2_test::test_country_pack_rejects_invalid_abn(ctx)
+        .map_err(|e| format!("country_pack_rejects_invalid_abn: {e}"))
 }
 
 #[spacetimedb::reducer]

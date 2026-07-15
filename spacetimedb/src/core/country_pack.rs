@@ -76,6 +76,205 @@ pub struct SetCompanyCountryPackParams {
     pub configuration: Option<String>,
 }
 
+// ── Party validators ─────────────────────────────────────────────────────────
+//
+// Country packs may declare `company_id_kind` / `company_id_kinds` and
+// `address_required` keys in their `metadata` JSON. These validators are
+// intentionally permissive: a pack with no such keys configured (or no pack
+// enabled at all) never blocks a write — existing tenants keep working.
+
+/// Enabled pack keys for a company, scoped to the organization.
+pub(crate) fn company_enabled_pack_keys(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+) -> Vec<String> {
+    ctx.db
+        .company_country_pack()
+        .company_country_pack_by_company()
+        .filter(&company_id)
+        .filter(|p| p.organization_id == organization_id && p.enabled)
+        .map(|p| p.pack_key.clone())
+        .collect()
+}
+
+fn enabled_pack_definitions(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+) -> Vec<CountryPackDefinition> {
+    company_enabled_pack_keys(ctx, organization_id, company_id)
+        .into_iter()
+        .filter_map(|key| ctx.db.country_pack_definition().pack_key().find(&key))
+        .collect()
+}
+
+fn pack_metadata_json(definition: &CountryPackDefinition) -> Option<serde_json::Value> {
+    let meta = definition.metadata.as_ref()?;
+    serde_json::from_str(meta).ok()
+}
+
+/// Reads `company_id_kind` (single string) or `company_id_kinds` (array) from pack metadata.
+fn pack_company_id_kinds(definition: &CountryPackDefinition) -> Vec<String> {
+    let Some(value) = pack_metadata_json(definition) else {
+        return Vec::new();
+    };
+    if let Some(kind) = value.get("company_id_kind").and_then(|v| v.as_str()) {
+        return vec![kind.to_string()];
+    }
+    value
+        .get("company_id_kinds")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Reads `address_required` (array of field names) from pack metadata.
+fn pack_address_required_fields(definition: &CountryPackDefinition) -> Vec<String> {
+    let Some(value) = pack_metadata_json(definition) else {
+        return Vec::new();
+    };
+    value
+        .get("address_required")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Validate a stripped identifier against a known jurisdiction "kind". Unknown kinds
+/// are skipped (no strict validation) so unrecognized pack configuration never blocks writes.
+fn validate_identifier_kind(kind: &str, raw: &str) -> Result<(), String> {
+    let digits: String = raw.chars().filter(|c| c.is_ascii_digit()).collect();
+    let alnum: String = raw.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+
+    match kind.trim().to_uppercase().as_str() {
+        "ABN" | "AU" => {
+            if digits.len() != 11 {
+                return Err(format!(
+                    "Invalid ABN: expected 11 digits, got {}",
+                    digits.len()
+                ));
+            }
+        }
+        "NZBN" => {
+            if digits.len() != 13 {
+                return Err(format!(
+                    "Invalid NZBN: expected 13 digits, got {}",
+                    digits.len()
+                ));
+            }
+        }
+        "CNPJ" => {
+            if digits.len() != 14 {
+                return Err(format!(
+                    "Invalid CNPJ: expected 14 digits, got {}",
+                    digits.len()
+                ));
+            }
+        }
+        "CPF" => {
+            if digits.len() != 11 {
+                return Err(format!(
+                    "Invalid CPF: expected 11 digits, got {}",
+                    digits.len()
+                ));
+            }
+        }
+        "UEN" => {
+            if alnum.len() < 9 || alnum.len() > 10 {
+                return Err(format!(
+                    "Invalid UEN: expected 9-10 alphanumeric characters, got {}",
+                    alnum.len()
+                ));
+            }
+        }
+        "NPWP" => {
+            if digits.len() < 15 {
+                return Err(format!(
+                    "Invalid NPWP: expected at least 15 digits, got {}",
+                    digits.len()
+                ));
+            }
+        }
+        _ => {
+            // Unknown kind — don't break tenants on unrecognized pack configuration.
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate a company/contact tax identifier against every jurisdiction "kind" declared by
+/// packs enabled on `company_id`. `None`/empty `tax_id` always passes (nothing to validate).
+pub(crate) fn validate_company_identifier_for_packs(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    tax_id: &Option<String>,
+) -> Result<(), String> {
+    let Some(raw) = tax_id else {
+        return Ok(());
+    };
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok(());
+    }
+
+    for definition in enabled_pack_definitions(ctx, organization_id, company_id) {
+        for kind in pack_company_id_kinds(&definition) {
+            validate_identifier_kind(&kind, trimmed)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate address completeness against `address_required` fields declared by packs
+/// enabled on `company_id`. Packs without an `address_required` key never block writes.
+pub(crate) fn validate_address_for_packs(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    country_code: &Option<String>,
+    city: &Option<String>,
+    zip: &Option<String>,
+    state_code: &Option<String>,
+) -> Result<(), String> {
+    let is_present = |field: &Option<String>| {
+        field
+            .as_ref()
+            .is_some_and(|v| !v.trim().is_empty())
+    };
+
+    for definition in enabled_pack_definitions(ctx, organization_id, company_id) {
+        for field in pack_address_required_fields(&definition) {
+            let present = match field.as_str() {
+                "city" => is_present(city),
+                "zip" | "postal_code" => is_present(zip),
+                "state_code" | "state" => is_present(state_code),
+                "country_code" | "country" => is_present(country_code),
+                _ => true,
+            };
+            if !present {
+                return Err(format!(
+                    "Country pack '{}' requires address field '{}'",
+                    definition.pack_key, field
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 // ── Seed helpers ─────────────────────────────────────────────────────────────
 
 pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
@@ -86,7 +285,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Australia GST",
             "oceania",
             "1.0.0",
-            r#"{"fiscal_year_start_month":7,"bas_reporting":true}"#,
+            r#"{"fiscal_year_start_month":7,"bas_reporting":true,"company_id_kind":"ABN"}"#,
         ),
         (
             "nz",
@@ -94,7 +293,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "New Zealand GST",
             "oceania",
             "1.0.0",
-            r#"{"fiscal_year_start_month":4,"gst_rate":0.15}"#,
+            r#"{"fiscal_year_start_month":4,"gst_rate":0.15,"company_id_kind":"NZBN"}"#,
         ),
         (
             "za",
@@ -110,7 +309,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Singapore GST",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"gst_rate":0.09,"iras":true}"#,
+            r#"{"gst_rate":0.09,"iras":true,"company_id_kind":"UEN"}"#,
         ),
     ];
 
@@ -159,7 +358,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Brazil taxes",
             "southern_cone",
             "1.0.0",
-            r#"{"nfe_adapter":true,"currency":"BRL","inflation_mode":"optional"}"#,
+            r#"{"nfe_adapter":true,"currency":"BRL","inflation_mode":"optional","company_id_kind":"CNPJ"}"#,
         ),
         (
             "ar",
