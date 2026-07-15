@@ -5,6 +5,7 @@
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::product::product;
 use crate::types::{ComputePrice, DiscountPolicy, PricelistAppliedOn};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -86,6 +87,78 @@ pub struct CreatePricelistItemParams {
     pub price_min_margin: f64,
     pub price_max_margin: f64,
     pub sequence: u32,
+}
+
+/// Resolve unit price from pricelist rules. Falls back to `base_price` when no rule matches.
+pub(crate) fn resolve_unit_price(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    pricelist_id: u64,
+    product_id: u64,
+    quantity: f64,
+    base_price: f64,
+) -> Result<f64, String> {
+    let pl = ctx
+        .db
+        .product_pricelist()
+        .id()
+        .find(&pricelist_id)
+        .ok_or("Pricelist not found")?;
+    if pl.organization_id != organization_id {
+        return Err("Pricelist belongs to a different organization".to_string());
+    }
+    if !pl.is_active {
+        return Ok(base_price);
+    }
+
+    let product_row = ctx.db.product().id().find(&product_id);
+    let categ_id = product_row.as_ref().map(|p| p.categ_id);
+
+    let now = ctx.timestamp;
+    let mut candidates: Vec<ProductPricelistItem> = ctx
+        .db
+        .product_pricelist_item()
+        .pricelist_item_by_pricelist()
+        .filter(&pricelist_id)
+        .filter(|item| {
+            if quantity + 1e-9 < item.min_quantity {
+                return false;
+            }
+            if let Some(start) = item.date_start {
+                if now < start {
+                    return false;
+                }
+            }
+            if let Some(end) = item.date_end {
+                if now > end {
+                    return false;
+                }
+            }
+            match item.applied_on {
+                PricelistAppliedOn::AllProducts => true,
+                PricelistAppliedOn::Product => {
+                    item.product_id == Some(product_id)
+                        || item.product_tmpl_id == Some(product_id)
+                }
+                PricelistAppliedOn::Category => categ_id.is_some() && item.categ_id == categ_id,
+            }
+        })
+        .collect();
+
+    candidates.sort_by_key(|i| i.sequence);
+    let Some(rule) = candidates.into_iter().next() else {
+        return Ok(base_price);
+    };
+
+    let price = match rule.compute_price {
+        ComputePrice::Fixed => rule.fixed_price,
+        ComputePrice::Percentage => base_price * (rule.percent_price / 100.0),
+        ComputePrice::Formula => {
+            let discounted = base_price * (1.0 - rule.price_discount / 100.0);
+            discounted + rule.price_surcharge
+        }
+    };
+    Ok(price.max(0.0))
 }
 
 // ── Reducers: Pricelist ───────────────────────────────────────────────────────

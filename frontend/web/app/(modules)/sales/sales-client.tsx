@@ -23,6 +23,7 @@ import {
   createInvoiceFromSaleOrderForm,
   buildPartialDeliveryForm,
   cancelPickingConfirmForm,
+  editSaleOrderForm,
   InvoiceListView,
   MissingOrganization,
   mergeSelectOptionsForFields,
@@ -96,6 +97,7 @@ import {
   useCreatePricelistItem,
   useCreatePickingBatch,
   useConfirmSaleOrder,
+  useSendSaleOrderQuotation,
   useCancelSaleOrder,
   useComputeSoTotals,
   useUpdatePricelist,
@@ -343,6 +345,9 @@ function SalesClientLoaded({
   const [cancelPickingTarget, setCancelPickingTarget] =
     useState<Record<string, unknown> | null>(null);
   const [cancelPickingError, setCancelPickingError] = useState<string | null>(null);
+  const [editSaleOrderTarget, setEditSaleOrderTarget] =
+    useState<Record<string, unknown> | null>(null);
+  const [editSaleOrderError, setEditSaleOrderError] = useState<string | null>(null);
   const [selectedReturnOrderId, setSelectedReturnOrderId] = useState<string | null>(null);
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>('30d');
   const [creditReturnOrderId, setCreditReturnOrderId] = useState<bigint | null>(null);
@@ -404,6 +409,7 @@ function SalesClientLoaded({
   const createPricelistItem = useCreatePricelistItem(orgId);
   const createPickingBatch = useCreatePickingBatch(orgId, operatingCompanyId);
   const confirmSaleOrder = useConfirmSaleOrder(orgId);
+  const sendSaleOrderQuotation = useSendSaleOrderQuotation(orgId);
   const cancelSaleOrder = useCancelSaleOrder(orgId);
   const computeSoTotals = useComputeSoTotals(orgId);
   const updatePricelist = useUpdatePricelist(orgId);
@@ -1077,6 +1083,31 @@ function SalesClientLoaded({
             },
           },
           {
+            id: 'send-quotation',
+            label: t('sales.actions.sendQuotation'),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                if (saleOrderState(r) === 'Draft') {
+                  void sendSaleOrderQuotation.mutateAsync(r.id as string | number | bigint);
+                }
+              }
+            },
+          },
+          {
+            id: 'edit-order',
+            label: t('sales.actions.editOrder'),
+            requiresSelection: true,
+            onClick: (rows) => {
+              if (rows.length !== 1) return;
+              const r = rows[0] as Record<string, unknown>;
+              const st = saleOrderState(r);
+              if (st !== 'Draft' && st !== 'Sent') return;
+              setEditSaleOrderError(null);
+              setEditSaleOrderTarget(r);
+            },
+          },
+          {
             id: 'cancel-orders',
             label: t('sales.actions.cancelOrders'),
             requiresSelection: true,
@@ -1161,11 +1192,13 @@ function SalesClientLoaded({
     saleOrdersTableRuntime,
     openCreateSaleOrder,
     confirmSaleOrder,
+    sendSaleOrderQuotation,
     cancelSaleOrder,
     computeSoTotals,
     lockSaleOrder,
     unlockSaleOrder,
     setCsvKind,
+    organizationId,
   ]);
 
   const pricelistsEntityConfig = useMemo((): EntityViewConfig => {
@@ -2029,7 +2062,10 @@ function SalesClientLoaded({
                   await doneStockMove.mutateAsync({ moveId, quantityDone: qty });
                 }
               }
-              await validatePicking.mutateAsync(pickingId);
+              await validatePicking.mutateAsync({
+                pickingId,
+                createBackorder: formData.createBackorder === true,
+              });
               setPartialDeliveryPicking(null);
             } catch (e) {
               setPartialDeliveryError(e instanceof Error ? e.message : String(e));
@@ -2064,6 +2100,61 @@ function SalesClientLoaded({
               setCancelPickingTarget(null);
             } catch (e) {
               setCancelPickingError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      ) : null}
+      {editSaleOrderTarget != null ? (
+        <FormModal
+          key={`edit-sale-order-${String(editSaleOrderTarget.id)}`}
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setEditSaleOrderTarget(null);
+              setEditSaleOrderError(null);
+            }
+          }}
+          config={mergeFieldDefaultValues(editSaleOrderForm(t), {
+            clientOrderRef: String(
+              editSaleOrderTarget.clientOrderRef ??
+                editSaleOrderTarget.client_order_ref ??
+                '',
+            ),
+            note: String(editSaleOrderTarget.note ?? ''),
+            incoterm: String(editSaleOrderTarget.incoterm ?? ''),
+            incotermLocation: String(
+              editSaleOrderTarget.incotermLocation ??
+                editSaleOrderTarget.incoterm_location ??
+                '',
+            ),
+          })}
+          closeOnSubmit={false}
+          submitError={editSaleOrderError}
+          isPending={updateSaleOrder.isPending}
+          onSubmit={async (formData) => {
+            setEditSaleOrderError(null);
+            const id = editSaleOrderTarget.id;
+            if (id == null) return;
+            try {
+              await updateSaleOrder.mutateAsync({
+                orderId: id as string | number | bigint,
+                params: {
+                  clientOrderRef:
+                    typeof formData.clientOrderRef === 'string'
+                      ? formData.clientOrderRef
+                      : undefined,
+                  note: typeof formData.note === 'string' ? formData.note : undefined,
+                  incoterm:
+                    typeof formData.incoterm === 'string' ? formData.incoterm : undefined,
+                  incotermLocation:
+                    typeof formData.incotermLocation === 'string'
+                      ? formData.incotermLocation
+                      : undefined,
+                },
+              });
+              setEditSaleOrderTarget(null);
+            } catch (e) {
+              setEditSaleOrderError(e instanceof Error ? e.message : String(e));
             }
           }}
         />

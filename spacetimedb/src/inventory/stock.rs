@@ -1444,13 +1444,17 @@ pub fn done_stock_move(
     }
 
     let quantity_done = params.quantity_done;
+    if quantity_done < 0.0 {
+        return Err("quantity_done cannot be negative".to_string());
+    }
+    if quantity_done > move_record.product_uom_qty + 1e-9 {
+        return Err("quantity_done cannot exceed ordered quantity".to_string());
+    }
 
+    // Record demand for validate; keep assigned so validate applies inventory once.
     ctx.db.stock_move().id().update(StockMove {
-        state: "done".to_string(),
-        is_done: true,
         quantity_done,
         product_uom_qty_done: quantity_done,
-        date: Some(ctx.timestamp),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..move_record.clone()
@@ -1464,11 +1468,13 @@ pub fn done_stock_move(
             table_name: "stock_move",
             record_id: move_id,
             action: "UPDATE",
-            old_values: Some(serde_json::json!({ "state": move_record.state }).to_string()),
-            new_values: Some(
-                serde_json::json!({ "state": "done", "quantity_done": quantity_done }).to_string(),
+            old_values: Some(
+                serde_json::json!({ "quantity_done": move_record.quantity_done }).to_string(),
             ),
-            changed_fields: vec!["state".to_string(), "quantity_done".to_string()],
+            new_values: Some(
+                serde_json::json!({ "quantity_done": quantity_done }).to_string(),
+            ),
+            changed_fields: vec!["quantity_done".to_string()],
             metadata: None,
         },
     );
@@ -1773,6 +1779,27 @@ pub fn validate_stock_picking(
     picking_id: u64,
     params: CompanyScopeParams,
 ) -> Result<(), String> {
+    validate_stock_picking_impl(ctx, organization_id, picking_id, params, false)
+}
+
+/// Validate an assigned picking and create a backorder for undelivered residual quantities.
+#[reducer]
+pub fn validate_stock_picking_backorder(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    picking_id: u64,
+    params: CompanyScopeParams,
+) -> Result<(), String> {
+    validate_stock_picking_impl(ctx, organization_id, picking_id, params, true)
+}
+
+fn validate_stock_picking_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    picking_id: u64,
+    params: CompanyScopeParams,
+    create_backorder: bool,
+) -> Result<(), String> {
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let picking = ctx
@@ -1792,17 +1819,24 @@ pub fn validate_stock_picking(
         return Err("Picking must be assigned before validation".to_string());
     }
 
-    let mut validated_moves: Vec<(u64, u64, u64, f64)> = Vec::new();
+    struct ValidatedMove {
+        move_id: u64,
+        product_id: u64,
+        location_id: u64,
+        location_dest_id: u64,
+        qty_done: f64,
+        residual: f64,
+        product_uom: u64,
+        sale_line_id: Option<u64>,
+        warehouse_id: Option<u64>,
+        partner_id: Option<u64>,
+        name: Option<String>,
+        price_unit: f64,
+    }
 
-    ctx.db.stock_picking().id().update(StockPicking {
-        state: "done".to_string(),
-        date_done: Some(ctx.timestamp),
-        show_validate: false,
-        updated_at: ctx.timestamp,
-        ..picking.clone()
-    });
+    let mut validated_moves: Vec<ValidatedMove> = Vec::new();
 
-    for mut move_record in ctx
+    for move_record in ctx
         .db
         .stock_move()
         .move_by_org()
@@ -1811,38 +1845,241 @@ pub fn validate_stock_picking(
         if move_record.picking_id != Some(picking_id) {
             continue;
         }
-        if move_record.state == "assigned" {
-            let qty_done = if move_record.quantity_done > 0.0 {
-                move_record.quantity_done
-            } else {
-                move_record.product_uom_qty
-            };
-            validated_moves.push((
-                move_record.product_id,
-                move_record.location_id,
-                move_record.location_dest_id,
-                qty_done,
-            ));
-            move_record.state = "done".to_string();
-            move_record.is_done = true;
-            move_record.date = Some(ctx.timestamp);
-            move_record.quantity_done = qty_done;
-            ctx.db.stock_move().id().update(move_record);
+        if move_record.state != "assigned" {
+            continue;
+        }
+        let qty_done = if move_record.quantity_done > 0.0 {
+            move_record.quantity_done.min(move_record.product_uom_qty)
+        } else {
+            move_record.product_uom_qty
+        };
+        let residual = (move_record.product_uom_qty - qty_done).max(0.0);
+        validated_moves.push(ValidatedMove {
+            move_id: move_record.id,
+            product_id: move_record.product_id,
+            location_id: move_record.location_id,
+            location_dest_id: move_record.location_dest_id,
+            qty_done,
+            residual,
+            product_uom: move_record.product_uom,
+            sale_line_id: move_record.sale_line_id,
+            warehouse_id: move_record.warehouse_id,
+            partner_id: move_record.partner_id,
+            name: move_record.name.clone(),
+            price_unit: move_record.price_unit,
+        });
+    }
+
+    for vm in &validated_moves {
+        if let Some(mv) = ctx.db.stock_move().id().find(&vm.move_id) {
+            ctx.db.stock_move().id().update(StockMove {
+                state: "done".to_string(),
+                is_done: true,
+                date: Some(ctx.timestamp),
+                quantity_done: vm.qty_done,
+                product_uom_qty_done: vm.qty_done,
+                product_uom_qty: if create_backorder && vm.residual > 1e-9 {
+                    vm.qty_done
+                } else {
+                    mv.product_uom_qty
+                },
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..mv
+            });
+        }
+        if vm.qty_done > 0.0 {
+            apply_validated_move_to_quants(
+                ctx,
+                organization_id,
+                company_id,
+                vm.product_id,
+                vm.location_id,
+                vm.location_dest_id,
+                vm.qty_done,
+                picking.is_return,
+            )?;
+        }
+        if vm.residual > 1e-9 && !create_backorder && !picking.is_return {
+            if product_requires_stock(ctx, vm.product_id) {
+                unreserve_quantity_at_location(
+                    ctx,
+                    organization_id,
+                    company_id,
+                    vm.product_id,
+                    vm.location_id,
+                    vm.residual,
+                )?;
+            }
         }
     }
 
-    for (product_id, location_id, location_dest_id, qty_done) in &validated_moves {
-        apply_validated_move_to_quants(
-            ctx,
-            organization_id,
-            company_id,
-            *product_id,
-            *location_id,
-            *location_dest_id,
-            *qty_done,
-            picking.is_return,
-        )?;
+    let mut backorder_picking_id: Option<u64> = None;
+    if create_backorder && !picking.is_return {
+        let residual_moves: Vec<&ValidatedMove> = validated_moves
+            .iter()
+            .filter(|vm| vm.residual > 1e-9)
+            .collect();
+        if !residual_moves.is_empty() {
+            let bo_name = format!("{}-BO", picking.name);
+            create_stock_picking(
+                ctx,
+                organization_id,
+                CreateStockPickingParams {
+                    company_id: Some(company_id),
+                    name: bo_name.clone(),
+                    picking_type_id: picking.picking_type_id,
+                    location_id: picking.location_id,
+                    location_dest_id: picking.location_dest_id,
+                    move_type: picking.move_type.clone(),
+                    priority: picking.priority.clone(),
+                    partner_id: picking.partner_id,
+                    contact_id: picking.contact_id,
+                    scheduled_date: Some(ctx.timestamp),
+                    origin: picking.origin.clone(),
+                    note: picking.note.clone(),
+                    user_id: picking.user_id,
+                    sale_id: picking.sale_id,
+                    purchase_id: picking.purchase_id,
+                    group_id: picking.group_id,
+                    is_locked: false,
+                    immediate_transfer: false,
+                    is_printed: false,
+                    is_return: false,
+                    has_scrap_move: false,
+                    has_tracking: picking.has_tracking,
+                    date: None,
+                    date_done: None,
+                    backorder_id: Some(picking_id),
+                    backorder_ids: vec![],
+                    show_operations: false,
+                    show_lots_text: false,
+                    show_reserved: true,
+                    show_check_availability: true,
+                    show_validate: false,
+                    show_mark_as_todo: true,
+                    show_set_qty_button: false,
+                    show_clear_qty_button: false,
+                    show_lots_m2o: false,
+                    product_id: residual_moves.first().map(|m| m.product_id),
+                    lot_id: None,
+                    package_id: None,
+                    result_package_id: None,
+                    owner_id: None,
+                    display_lot_id: None,
+                    location_id_name: None,
+                    location_dest_id_name: None,
+                    picking_code: picking.picking_code.clone(),
+                    product_tracking: None,
+                    product_barcode: None,
+                    move_line_exist: false,
+                    has_packages: false,
+                    has_move_lines: true,
+                    has_package: false,
+                    has_lot: false,
+                    has_owner: false,
+                    has_entire_package_src: false,
+                    has_entire_package_dest: false,
+                    package_level_ids: vec![],
+                    batch_id: None,
+                    metadata: Some(format!(r#"{{"backorder_of":{picking_id}}}"#)),
+                },
+            )?;
+
+            let bo_picking = ctx
+                .db
+                .stock_picking()
+                .iter()
+                .find(|p| {
+                    p.organization_id == organization_id
+                        && p.backorder_id == Some(picking_id)
+                        && p.name == bo_name
+                })
+                .ok_or("Backorder picking not found after create")?;
+            backorder_picking_id = Some(bo_picking.id);
+
+            for (idx, vm) in residual_moves.iter().enumerate() {
+                create_stock_move(
+                    ctx,
+                    organization_id,
+                    CreateStockMoveParams {
+                        company_id: Some(company_id),
+                        name: vm
+                            .name
+                            .clone()
+                            .unwrap_or_else(|| format!("Backorder {}", vm.product_id)),
+                        product_id: vm.product_id,
+                        product_tmpl_id: vm.product_id,
+                        product_uom: vm.product_uom,
+                        product_uom_qty: vm.residual,
+                        location_id: vm.location_id,
+                        location_dest_id: vm.location_dest_id,
+                        date_expected: ctx.timestamp,
+                        move_type: "outgoing".to_string(),
+                        priority: "1".to_string(),
+                        reference: picking.origin.clone(),
+                        sequence: ((idx + 1) as i32) * 10,
+                        origin: picking.origin.clone(),
+                        note: None,
+                        date: None,
+                        date_deadline: None,
+                        picking_id: Some(bo_picking.id),
+                        picking_type_id: Some(picking.picking_type_id),
+                        partner_id: vm.partner_id,
+                        product_variant_id: None,
+                        group_id: None,
+                        rule_id: None,
+                        procure_method: "make_to_stock".to_string(),
+                        price_unit: vm.price_unit,
+                        scrapped: false,
+                        to_refund: false,
+                        propagate_cancel: true,
+                        delay_alert: false,
+                        product_packaging_id: None,
+                        product_packaging_qty: 0.0,
+                        warehouse_id: vm.warehouse_id,
+                        production_id: None,
+                        raw_material_production_id: None,
+                        unbuild_id: None,
+                        consume_unbuild_id: None,
+                        cost_share: 0.0,
+                        is_subcontract: false,
+                        purchase_line_id: None,
+                        need_release: false,
+                        release_ready: false,
+                        propagation_cancel: true,
+                        has_tracking: false,
+                        inventory_id: None,
+                        sale_line_id: vm.sale_line_id,
+                        lot_id: None,
+                        package_id: None,
+                        result_package_id: None,
+                        owner_id: None,
+                        package_level_id: None,
+                        product_type: None,
+                        metadata: None,
+                    },
+                )?;
+            }
+            // Residual stays reserved from original confirm.
+        }
     }
+
+    let mut backorder_ids = picking.backorder_ids.clone();
+    if let Some(bo_id) = backorder_picking_id {
+        if !backorder_ids.contains(&bo_id) {
+            backorder_ids.push(bo_id);
+        }
+    }
+
+    ctx.db.stock_picking().id().update(StockPicking {
+        state: "done".to_string(),
+        date_done: Some(ctx.timestamp),
+        show_validate: false,
+        backorder_ids,
+        updated_at: ctx.timestamp,
+        ..picking.clone()
+    });
 
     // Propagate delivered quantities back to SaleOrderLine
     if picking.is_return {

@@ -210,6 +210,26 @@ export function useConfirmSaleOrder(organizationId: bigint) {
   })
 }
 
+export function useSendSaleOrderQuotation(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (orderId: bigint | number | string) => {
+      const { urlPath, init } = salesBffPost("send_sale_order_quotation", [
+        organizationId,
+        orderId,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) {
+        const body = await r.text().catch(() => "")
+        throw new Error(body || "Failed to send quotation")
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sale-orders", rqBigIntKey(organizationId)] })
+    },
+  })
+}
+
 export function useCancelSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({

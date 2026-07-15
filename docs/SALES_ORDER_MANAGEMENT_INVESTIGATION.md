@@ -249,15 +249,15 @@ Country packs today are **tax-seed + company-ID metadata**. Sales needs commerci
 
 ### Competitive
 
-- Apply pricelist items on line create/update
-- SO edit UI + line update/delete
-- Quote send (`Sent`) + expiry UX
-- Backorder creation on partial validate
-- SO-level credit check option on confirm
+- ~~Apply pricelist items on line create~~ **Done** (`resolve_unit_price` when `price_unit` is None)
+- ~~SO edit UI~~ **Done** (header fields: client ref / note / Incoterms); line update/delete hooks already existed
+- ~~Quote send (`Sent`)~~ **Done** (`send_sale_order_quotation` + UI); expiry UX still thin
+- ~~Backorder creation on partial validate~~ **Done** (`validate_stock_picking_backorder`; UI create-backorder enabled)
+- ~~SO-level credit check on confirm~~ **Done** (`ensure_partner_credit_allows_invoice` before confirm)
 - Tax fiscal-position remapping; Incoterm id parity with PO/invoice
 - Exception queues via subscriptions (ToApprove, credit hold, late pickings, open RMAs)
 - Multi-currency rate snapshot on confirm/invoice
-- Domain tests for cancel, RMA, approval, ATP fail
+- ~~Domain tests for cancel, ATP fail, credit hold, pricelist apply, send quote, backorder~~ **Done** (`run_all_sales_tests`)
 
 ### Differentiating
 

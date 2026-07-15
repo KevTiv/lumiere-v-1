@@ -694,9 +694,20 @@ export function useProcessInventoryAdjustment(organizationId: bigint) {
 
 export function useValidateStockPicking(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (pickingId) => {
-      const { urlPath, init } = inventoryBffPost("validate_stock_picking", [
+  return useMutation<void, Error, { pickingId: ScalarId; createBackorder?: boolean } | ScalarId>({
+    mutationFn: async (arg) => {
+      const pickingId =
+        typeof arg === "object" && arg !== null && "pickingId" in arg
+          ? arg.pickingId
+          : arg
+      const createBackorder =
+        typeof arg === "object" && arg !== null && "pickingId" in arg
+          ? Boolean(arg.createBackorder)
+          : false
+      const reducer = createBackorder
+        ? "validate_stock_picking_backorder"
+        : "validate_stock_picking"
+      const { urlPath, init } = inventoryBffPost(reducer, [
         organizationId,
         toScalarU64(pickingId),
         companyScopeParams(companyId),

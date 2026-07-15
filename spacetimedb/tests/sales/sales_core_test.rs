@@ -8,17 +8,26 @@ use crate::accounting::journal_entries::{
 };
 use crate::core::organization::CompanyScopeParams;
 use crate::inventory::product::product;
-use crate::inventory::stock::{
-    assign_stock_picking, confirm_stock_picking, stock_picking, stock_quant,
-    validate_stock_picking,
+use crate::accounting::credit_control::{
+    upsert_partner_credit_control, UpsertPartnerCreditControlParams,
 };
-use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
+use crate::inventory::stock::{
+    assign_stock_picking, confirm_stock_picking, done_stock_move, stock_move, stock_picking,
+    stock_quant, validate_stock_picking, validate_stock_picking_backorder, DoneStockMoveParams,
+};
+use crate::sales::pricelists::{
+    create_pricelist, create_pricelist_item, product_pricelist, CreatePricelistItemParams,
+    CreatePricelistParams,
+};
 use crate::sales::sales_core::{
     cancel_sale_order, confirm_sales_order, create_sale_order, sale_order, sale_order_line,
-    CreateSaleOrderLineParams, CreateSaleOrderParams,
+    send_sale_order_quotation, CreateSaleOrderLineParams, CreateSaleOrderParams,
 };
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
-use crate::types::{DiscountPolicy, InvoiceStatus, JournalType, LineInvoiceStatus, MoveType, SaleState};
+use crate::types::{
+    ComputePrice, DiscountPolicy, InvoiceStatus, JournalType, LineInvoiceStatus, MoveType,
+    PricelistAppliedOn, SaleState,
+};
 
 pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -778,6 +787,511 @@ pub fn test_order_confirm_cancel_releases_reservation(ctx: &ReducerContext) -> R
     if reserved_after > 1e-6 {
         return Err(format!(
             "Expected reserved_quantity 0 after cancel, got {reserved_after}"
+        ));
+    }
+
+    Ok(())
+}
+
+fn minimal_so_params(
+    fixture: &OrgFixture,
+    product_uom_id: u64,
+    qty: f64,
+    price_unit: Option<f64>,
+    pricelist_id: u64,
+    client_order_ref: &str,
+    metadata: &str,
+) -> CreateSaleOrderParams {
+    CreateSaleOrderParams {
+        company_id: Some(fixture.company_id),
+        partner_id: fixture.partner_id,
+        partner_invoice_id: fixture.partner_id,
+        partner_shipping_id: fixture.partner_id,
+        pricelist_id,
+        currency_id: 1,
+        warehouse_id: fixture.warehouse_id,
+        order_lines: vec![CreateSaleOrderLineParams {
+            product_id: fixture.product_id,
+            quantity: qty,
+            uom_id: product_uom_id,
+            price_unit,
+            discount: 0.0,
+            tax_ids: vec![],
+            name: None,
+            sequence: 1,
+            is_downpayment: false,
+            display_type: None,
+            product_variant_id: None,
+            packaging_id: None,
+            route_id: None,
+            analytic_tag_ids: vec![],
+            customer_lead: None,
+            metadata: None,
+        }],
+        origin: Some(metadata.to_string()),
+        client_order_ref: Some(client_order_ref.to_string()),
+        payment_term_id: None,
+        fiscal_position_id: None,
+        team_id: None,
+        opportunity_id: None,
+        note: None,
+        terms_and_conditions: None,
+        validity_days: None,
+        shipping_policy: None,
+        picking_policy: None,
+        campaign_id: None,
+        medium_id: None,
+        source_id: None,
+        commitment_date: None,
+        expected_date: None,
+        incoterm: None,
+        incoterm_location: None,
+        carrier_id: None,
+        customer_lead: None,
+        analytic_account_id: None,
+        user_id: None,
+        is_printed: None,
+        is_locked: None,
+        is_dropship: None,
+        message_follower_ids: None,
+        message_partner_ids: None,
+        message_channel_ids: None,
+        activity_ids: None,
+        metadata: Some(format!(r#"{{"test":"{metadata}"}}"#)),
+    }
+}
+
+/// Confirm fails closed when order qty exceeds on-hand ATP.
+pub fn test_confirm_fails_on_atp_shortfall(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found")?;
+
+    create_pricelist(
+        ctx,
+        org_id,
+        CreatePricelistParams {
+            name: "ATP Fail Pricelist".to_string(),
+            currency_id: 1,
+            discount_policy: DiscountPolicy::WithDiscount,
+        },
+    )?;
+    let pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "ATP Fail Pricelist")
+        .map(|p| p.id)
+        .ok_or("Pricelist not found")?;
+
+    create_sale_order(
+        ctx,
+        org_id,
+        minimal_so_params(
+            &fixture,
+            product.uom_id,
+            101.0,
+            Some(product.list_price),
+            pricelist_id,
+            "HARNESS-SO-ATP",
+            "atp_shortfall",
+        ),
+    )?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|o| {
+            o.organization_id == org_id && o.client_order_ref == Some("HARNESS-SO-ATP".to_string())
+        })
+        .ok_or("Sale order not found")?;
+
+    match confirm_sales_order(ctx, org_id, order.id) {
+        Ok(()) => Err("Expected confirm to fail on ATP shortfall".to_string()),
+        Err(e) if e.contains("Insufficient available quantity") => Ok(()),
+        Err(e) => Err(format!("Unexpected confirm error: {e}")),
+    }
+}
+
+/// Partner payment hold blocks SO confirm.
+pub fn test_confirm_blocked_by_partner_credit_hold(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found")?;
+
+    upsert_partner_credit_control(
+        ctx,
+        org_id,
+        company_id,
+        UpsertPartnerCreditControlParams {
+            partner_id: fixture.partner_id,
+            credit_limit: 0.0,
+            payment_hold: true,
+            notes: Some("harness hold".to_string()),
+            metadata: None,
+        },
+    )?;
+
+    create_pricelist(
+        ctx,
+        org_id,
+        CreatePricelistParams {
+            name: "Credit Hold Pricelist".to_string(),
+            currency_id: 1,
+            discount_policy: DiscountPolicy::WithDiscount,
+        },
+    )?;
+    let pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "Credit Hold Pricelist")
+        .map(|p| p.id)
+        .ok_or("Pricelist not found")?;
+
+    create_sale_order(
+        ctx,
+        org_id,
+        minimal_so_params(
+            &fixture,
+            product.uom_id,
+            1.0,
+            Some(product.list_price),
+            pricelist_id,
+            "HARNESS-SO-CREDIT",
+            "credit_hold",
+        ),
+    )?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|o| {
+            o.organization_id == org_id
+                && o.client_order_ref == Some("HARNESS-SO-CREDIT".to_string())
+        })
+        .ok_or("Sale order not found")?;
+
+    match confirm_sales_order(ctx, org_id, order.id) {
+        Ok(()) => Err("Expected confirm to fail on payment hold".to_string()),
+        Err(e) if e.contains("payment hold") => Ok(()),
+        Err(e) => Err(format!("Unexpected confirm error: {e}")),
+    }
+}
+
+/// Line create with `price_unit: None` applies fixed pricelist item.
+pub fn test_pricelist_applied_on_line_create(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found")?;
+
+    create_pricelist(
+        ctx,
+        org_id,
+        CreatePricelistParams {
+            name: "Fixed Price Pricelist".to_string(),
+            currency_id: 1,
+            discount_policy: DiscountPolicy::WithDiscount,
+        },
+    )?;
+    let pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "Fixed Price Pricelist")
+        .map(|p| p.id)
+        .ok_or("Pricelist not found")?;
+
+    create_pricelist_item(
+        ctx,
+        org_id,
+        CreatePricelistItemParams {
+            pricelist_id,
+            applied_on: PricelistAppliedOn::Product,
+            compute_price: ComputePrice::Fixed,
+            product_tmpl_id: None,
+            product_id: Some(fixture.product_id),
+            categ_id: None,
+            min_quantity: 1.0,
+            date_start: None,
+            date_end: None,
+            fixed_price: 42.5,
+            percent_price: 0.0,
+            price_discount: 0.0,
+            price_surcharge: 0.0,
+            price_min_margin: 0.0,
+            price_max_margin: 0.0,
+            sequence: 10,
+        },
+    )?;
+
+    create_sale_order(
+        ctx,
+        org_id,
+        minimal_so_params(
+            &fixture,
+            product.uom_id,
+            2.0,
+            None,
+            pricelist_id,
+            "HARNESS-SO-PL",
+            "pricelist_apply",
+        ),
+    )?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|o| {
+            o.organization_id == org_id && o.client_order_ref == Some("HARNESS-SO-PL".to_string())
+        })
+        .ok_or("Sale order not found")?;
+    let line = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&order.id)
+        .next()
+        .ok_or("Sale order line not found")?;
+
+    if (line.price_unit - 42.5).abs() > 1e-6 {
+        return Err(format!(
+            "Expected pricelist fixed price 42.5, got {}",
+            line.price_unit
+        ));
+    }
+    Ok(())
+}
+
+/// Draft → Sent via send quotation; confirm from Sent succeeds.
+pub fn test_send_quotation_then_confirm(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found")?;
+
+    create_pricelist(
+        ctx,
+        org_id,
+        CreatePricelistParams {
+            name: "Send Quote Pricelist".to_string(),
+            currency_id: 1,
+            discount_policy: DiscountPolicy::WithDiscount,
+        },
+    )?;
+    let pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "Send Quote Pricelist")
+        .map(|p| p.id)
+        .ok_or("Pricelist not found")?;
+
+    create_sale_order(
+        ctx,
+        org_id,
+        minimal_so_params(
+            &fixture,
+            product.uom_id,
+            1.0,
+            Some(product.list_price),
+            pricelist_id,
+            "HARNESS-SO-SENT",
+            "send_quote",
+        ),
+    )?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|o| {
+            o.organization_id == org_id && o.client_order_ref == Some("HARNESS-SO-SENT".to_string())
+        })
+        .ok_or("Sale order not found")?;
+
+    send_sale_order_quotation(ctx, org_id, order.id)?;
+    let sent = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order.id)
+        .ok_or("Sale order not found after send")?;
+    if sent.state != SaleState::Sent {
+        return Err(format!("Expected Sent after send quotation, got {:?}", sent.state));
+    }
+
+    confirm_sales_order(ctx, org_id, order.id)?;
+    let confirmed = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order.id)
+        .ok_or("Sale order not found after confirm")?;
+    if confirmed.state != SaleState::Sale {
+        return Err(format!("Expected Sale after confirm, got {:?}", confirmed.state));
+    }
+    Ok(())
+}
+
+/// Partial validate with backorder creates residual picking and keeps reservation.
+pub fn test_partial_validate_creates_backorder(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found")?;
+
+    create_pricelist(
+        ctx,
+        org_id,
+        CreatePricelistParams {
+            name: "Backorder Pricelist".to_string(),
+            currency_id: 1,
+            discount_policy: DiscountPolicy::WithDiscount,
+        },
+    )?;
+    let pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "Backorder Pricelist")
+        .map(|p| p.id)
+        .ok_or("Pricelist not found")?;
+
+    create_sale_order(
+        ctx,
+        org_id,
+        minimal_so_params(
+            &fixture,
+            product.uom_id,
+            10.0,
+            Some(product.list_price),
+            pricelist_id,
+            "HARNESS-SO-BO",
+            "backorder",
+        ),
+    )?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|o| {
+            o.organization_id == org_id && o.client_order_ref == Some("HARNESS-SO-BO".to_string())
+        })
+        .ok_or("Sale order not found")?;
+
+    confirm_sales_order(ctx, org_id, order.id)?;
+
+    let scope = CompanyScopeParams {
+        company_id: Some(company_id),
+    };
+    let picking = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.sale_id == Some(order.id) && !p.is_return)
+        .ok_or("Delivery picking not found")?;
+
+    confirm_stock_picking(ctx, org_id, picking.id, scope.clone())?;
+    assign_stock_picking(ctx, org_id, picking.id, scope.clone())?;
+
+    let mv = ctx
+        .db
+        .stock_move()
+        .move_by_org()
+        .filter(&org_id)
+        .find(|m| m.picking_id == Some(picking.id))
+        .ok_or("Stock move not found on picking")?;
+
+    done_stock_move(
+        ctx,
+        org_id,
+        mv.id,
+        DoneStockMoveParams {
+            company_id: Some(company_id),
+            quantity_done: 4.0,
+        },
+    )?;
+
+    validate_stock_picking_backorder(ctx, org_id, picking.id, scope)?;
+
+    let done_picking = ctx
+        .db
+        .stock_picking()
+        .id()
+        .find(&picking.id)
+        .ok_or("Picking not found after validate")?;
+    if done_picking.state != "done" {
+        return Err(format!(
+            "Expected original picking done, got {}",
+            done_picking.state
+        ));
+    }
+
+    let backorder = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.backorder_id == Some(picking.id))
+        .ok_or("Backorder picking not created")?;
+
+    let bo_qty: f64 = ctx
+        .db
+        .stock_move()
+        .move_by_org()
+        .filter(&org_id)
+        .filter(|m| m.picking_id == Some(backorder.id))
+        .map(|m| m.product_uom_qty)
+        .sum();
+    if (bo_qty - 6.0).abs() > 1e-6 {
+        return Err(format!("Expected backorder qty 6.0, got {bo_qty}"));
+    }
+
+    let reserved: f64 = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&fixture.product_id)
+        .filter(|q| q.organization_id == org_id && q.company_id == company_id)
+        .map(|q| q.reserved_quantity)
+        .sum();
+    if (reserved - 6.0).abs() > 1e-6 {
+        return Err(format!(
+            "Expected residual reserved_quantity 6.0 after partial ship, got {reserved}"
         ));
     }
 

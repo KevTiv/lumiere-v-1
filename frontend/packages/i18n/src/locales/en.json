@@ -6360,7 +6360,7 @@
         "fields": {
           "orderedQty": "Ordered: {{qty}}",
           "createBackorder": "Create backorder for short quantities",
-          "createBackorderHint": "Automatic backorder creation is not wired yet. Short quantities are recorded on validate; link backorders manually if needed."
+          "createBackorderHint": "When short quantities are validated, create a new picking for the remainder (keeps reservation)."
         },
         "errors": {
           "noAssignedMoves": "No assigned move lines on this picking.",
@@ -6376,10 +6376,25 @@
           "pickingReference": "Picking",
           "confirmCancel": "I understand this picking will be cancelled"
         }
+      },
+      "editSaleOrder": {
+        "title": "Edit sale order",
+        "description": "Update draft or sent quotation header fields.",
+        "submitLabel": "Save",
+        "sections": {
+          "header": "Header"
+        },
+        "fields": {
+          "note": "Internal note",
+          "incoterm": "Incoterm",
+          "incotermLocation": "Incoterm location"
+        }
       }
     },
     "actions": {
       "confirmSelected": "Confirm",
+      "sendQuotation": "Send quotation",
+      "editOrder": "Edit order",
       "cancelOrders": "Cancel orders",
       "recalculateTotals": "Recalculate totals",
       "createInvoice": "Create invoice…",

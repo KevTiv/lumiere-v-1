@@ -146,6 +146,7 @@ export const INVENTORY_BFF_REDUCERS = [
   "validate_cycle_count",
   "validate_stock_inventory",
   "validate_stock_picking",
+  "validate_stock_picking_backorder",
 ] as const;
 
 export type InventoryBffReducerKey = (typeof INVENTORY_BFF_REDUCERS)[number];
@@ -327,6 +328,7 @@ function inventoryReducerHints(): Record<InventoryBffReducerKey, readonly string
   o["validate_cycle_count"] = []
   o["validate_stock_inventory"] = []
   o["validate_stock_picking"] = []
+  o["validate_stock_picking_backorder"] = []
   return o
 }
 

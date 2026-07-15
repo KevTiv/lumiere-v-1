@@ -1206,8 +1206,7 @@ export function buildPartialDeliveryForm(
             type: "checkbox",
             label: t("sales.forms.partialDelivery.fields.createBackorder"),
             description: t("sales.forms.partialDelivery.fields.createBackorderHint"),
-            defaultValue: false,
-            disabled: true,
+            defaultValue: true,
             width: "full",
           },
         ],
@@ -1247,6 +1246,50 @@ export const cancelPickingConfirmForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const editSaleOrderForm = (t: TFunction): FormConfig => ({
+  id: "edit-sale-order",
+  title: t("sales.forms.editSaleOrder.title"),
+  description: t("sales.forms.editSaleOrder.description"),
+  submitLabel: t("sales.forms.editSaleOrder.submitLabel"),
+  cancelLabel: t("common.cancel"),
+  sections: [
+    {
+      id: "header",
+      title: t("sales.forms.editSaleOrder.sections.header"),
+      fields: [
+        {
+          id: "clientOrderRef",
+          name: "clientOrderRef",
+          type: "text",
+          label: t("sales.forms.newSaleOrder.fields.clientOrderRef"),
+          width: "1/2",
+        },
+        {
+          id: "note",
+          name: "note",
+          type: "textarea",
+          label: t("sales.forms.editSaleOrder.fields.note"),
+          width: "full",
+        },
+        {
+          id: "incoterm",
+          name: "incoterm",
+          type: "text",
+          label: t("sales.forms.editSaleOrder.fields.incoterm"),
+          width: "1/2",
+        },
+        {
+          id: "incotermLocation",
+          name: "incotermLocation",
+          type: "text",
+          label: t("sales.forms.editSaleOrder.fields.incotermLocation"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
 export const salesFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-sale-order": newSaleOrderForm(t),
   "new-pricelist": newPricelistForm(t),
@@ -1257,6 +1300,7 @@ export const salesFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-return-order": newReturnOrderForm(t),
   "add-return-order-line": addReturnOrderLineForm(t),
   "cancel-picking-confirm": cancelPickingConfirmForm(t),
+  "edit-sale-order": editSaleOrderForm(t),
   "new-delivery-price-rule": newDeliveryPriceRuleForm(t),
   "new-delivery-carrier": newDeliveryCarrierForm(t),
   "new-shipping-method": newShippingMethodForm(t),

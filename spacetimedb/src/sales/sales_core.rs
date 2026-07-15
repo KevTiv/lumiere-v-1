@@ -353,23 +353,38 @@ fn create_sale_order_line_internal(
     organization_id: u64,
     company_id: u64,
     partner_id: u64,
+    pricelist_id: u64,
 ) -> Result<SaleOrderLine, String> {
+    use crate::sales::pricelists::resolve_unit_price;
+
     let product_result = ctx.db.product().id().find(&params.product_id);
-    let (product_name, product_type, product_cost): (Option<String>, String, f64) =
+    let (product_name, product_type, product_cost, list_price): (Option<String>, String, f64, f64) =
         match product_result {
             Some(product) => (
                 product.display_name.clone(),
                 product.type_.clone(),
                 product.standard_price,
+                product.list_price,
             ),
             None => (
                 Some(format!("Product {}", params.product_id)),
                 "product".to_string(),
                 0.0,
+                0.0,
             ),
         };
 
-    let price_unit = params.price_unit.unwrap_or(0.0);
+    let price_unit = match params.price_unit {
+        Some(p) => p,
+        None => resolve_unit_price(
+            ctx,
+            organization_id,
+            pricelist_id,
+            params.product_id,
+            params.quantity,
+            list_price,
+        )?,
+    };
     let discount_amount = price_unit * params.quantity * (params.discount / 100.0);
     let price_subtotal = price_unit * params.quantity - discount_amount;
 
@@ -612,6 +627,7 @@ pub fn create_sale_order(
             organization_id,
             company_id,
             params.partner_id,
+            params.pricelist_id,
         )?;
         line_ids.push(line.id);
         amount_untaxed += line.price_subtotal;
@@ -893,6 +909,69 @@ pub fn confirm_sales_order(
     confirm_sales_order_impl(ctx, organization_id, order_id, false)
 }
 
+/// Draft quotation → Sent (awaiting customer acceptance / confirm).
+#[reducer]
+pub fn send_sale_order_quotation(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .ok_or("Sale order not found")?;
+
+    validate_order_org_scope(&order, organization_id)?;
+    check_permission(ctx, organization_id, "sale_order", "write")?;
+
+    if order.state != SaleState::Draft {
+        return Err("Only draft quotations can be sent".to_string());
+    }
+
+    let has_lines = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&order_id)
+        .any(|l| l.display_type.is_none() && l.product_uom_qty > 0.0);
+    if !has_lines {
+        return Err("Cannot send a quotation without lines".to_string());
+    }
+
+    if let Some(validity) = order.validity_date {
+        if ctx.timestamp > validity {
+            return Err("Quotation has expired".to_string());
+        }
+    }
+
+    let company_id = order.company_id;
+    ctx.db.sale_order().id().update(SaleOrder {
+        state: SaleState::Sent,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "sale_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": "Draft" }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Sent" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
 pub fn confirm_sales_order_impl(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -921,6 +1000,14 @@ pub fn confirm_sales_order_impl(
             return Err("Order has expired".to_string());
         }
     }
+
+    crate::accounting::credit_control::ensure_partner_credit_allows_invoice(
+        ctx,
+        organization_id,
+        order.company_id,
+        Some(order.partner_id),
+        order.amount_total,
+    )?;
 
     if !skip_approval_check {
         let max_discount = ctx
@@ -1492,6 +1579,7 @@ pub fn create_sale_order_line(
         organization_id,
         order.company_id,
         order.partner_id,
+        order.pricelist_id,
     )?;
 
     let mut order_line = order.order_line.clone();
