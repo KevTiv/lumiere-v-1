@@ -28,6 +28,12 @@ export const CRM_WORKSPACE_RESOURCE_KEYS = [
   "privacy-consent",
   "contact-communication-preferences",
   "crm-forecast-snapshots",
+  "lead-scores",
+  "lead-score-factors",
+  "contact-segment-rules",
+  "contact-relationship-insights",
+  "crm-conversations",
+  "crm-conversation-messages",
   "users",
 ] as const;
 

@@ -1184,6 +1184,14 @@
     "status",
     "metadata"
   ],
+  "AppendCrmConversationMessageParams": [
+    "direction",
+    "body",
+    "status",
+    "provider_message_id",
+    "operational_message_id",
+    "metadata"
+  ],
   "ApprovalRequest": [
     "id",
     "organization_id",
@@ -1833,6 +1841,19 @@
     "created_at",
     "metadata"
   ],
+  "ContactRelationshipInsight": [
+    "id",
+    "organization_id",
+    "contact_id",
+    "strength_score",
+    "active_relationship_count",
+    "hierarchy_depth",
+    "related_contact_ids",
+    "summary",
+    "computed_at",
+    "computed_by",
+    "metadata"
+  ],
   "ContactRoleAssignment": [
     "id",
     "organization_id",
@@ -1860,6 +1881,18 @@
     "parent_id",
     "is_active",
     "created_by",
+    "created_at",
+    "metadata"
+  ],
+  "ContactSegmentRule": [
+    "id",
+    "organization_id",
+    "segment_id",
+    "sequence",
+    "field",
+    "op",
+    "value_text",
+    "value_id",
     "created_at",
     "metadata"
   ],
@@ -4779,6 +4812,35 @@
     "quality_state",
     "metadata"
   ],
+  "CrmConversation": [
+    "id",
+    "organization_id",
+    "contact_id",
+    "channel",
+    "phone_identity_id",
+    "status",
+    "assigned_user_id",
+    "last_message_at",
+    "last_preview",
+    "external_thread_id",
+    "created_at",
+    "created_by",
+    "updated_at",
+    "metadata"
+  ],
+  "CrmConversationMessage": [
+    "id",
+    "organization_id",
+    "conversation_id",
+    "direction",
+    "body",
+    "status",
+    "provider_message_id",
+    "operational_message_id",
+    "created_at",
+    "created_by",
+    "metadata"
+  ],
   "CrmForecastSnapshot": [
     "id",
     "organization_id",
@@ -6143,6 +6205,26 @@
     "is_active",
     "metadata"
   ],
+  "LeadScore": [
+    "id",
+    "organization_id",
+    "lead_id",
+    "total_score",
+    "formula_version",
+    "scored_at",
+    "scored_by",
+    "metadata"
+  ],
+  "LeadScoreFactor": [
+    "id",
+    "organization_id",
+    "lead_id",
+    "score_id",
+    "factor_key",
+    "label",
+    "points",
+    "evidence"
+  ],
   "LeadSource": [
     "id",
     "organization_id",
@@ -6543,6 +6625,14 @@
     "create_date",
     "write_uid",
     "write_date",
+    "metadata"
+  ],
+  "OpenCrmConversationParams": [
+    "contact_id",
+    "channel",
+    "phone_identity_id",
+    "external_thread_id",
+    "assigned_user_id",
     "metadata"
   ],
   "OperationalMessage": [
@@ -8545,6 +8635,12 @@
     "is_active",
     "metadata"
   ],
+  "SegmentRuleClause": [
+    "field",
+    "op",
+    "value_text",
+    "value_id"
+  ],
   "SerialLotTraceability": [
     "id",
     "organization_id",
@@ -8586,6 +8682,11 @@
     "exchange_rate",
     "rate_type",
     "effective_date",
+    "metadata"
+  ],
+  "SetContactSegmentRulesParams": [
+    "replace_all",
+    "rules",
     "metadata"
   ],
   "SetRecordCustomFieldValuesParams": [
@@ -9997,6 +10098,12 @@
     "job_id",
     "department_id",
     "notes"
+  ],
+  "UpdateCrmConversationParams": [
+    "status",
+    "assigned_user_id",
+    "external_thread_id",
+    "metadata"
   ],
   "UpdateCrossoveredBudgetLineParams": [
     "planned_amount",

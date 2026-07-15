@@ -23,9 +23,12 @@ pub mod contact_roles;
 pub mod contacts;
 pub mod duplicate;
 pub mod forecast;
+pub mod inbox;
+pub mod lead_scoring;
 pub mod leads;
 pub mod opportunities;
 pub mod presence;
+pub mod relationship_intel;
 pub mod segments;
 
 // Re-export key types for convenience
@@ -53,6 +56,14 @@ pub use duplicate::{
     find_duplicate_contacts, merge_contacts, ContactDuplicateCandidate, MergeContactsParams,
 };
 pub use forecast::{create_forecast_snapshot, CreateCrmForecastSnapshotParams, CrmForecastSnapshot};
+pub use inbox::{
+    append_crm_conversation_message, open_crm_conversation, update_crm_conversation,
+    AppendCrmConversationMessageParams, CrmConversation, CrmConversationMessage,
+    OpenCrmConversationParams, UpdateCrmConversationParams,
+};
+pub use lead_scoring::{
+    recompute_lead_score, LeadScore, LeadScoreFactor, LEAD_SCORE_FORMULA_VERSION,
+};
 pub use leads::{
     convert_lead_to_customer, create_lead, create_lead_lost_reason, create_lead_source,
     update_lead_address, update_lead_details, update_lead_lost_reason, update_lead_revenue,
@@ -67,8 +78,13 @@ pub use opportunities::{
 pub use presence::{
     clear_opportunity_presence, update_opportunity_presence, OpportunityPresence,
 };
+pub use relationship_intel::{
+    recompute_relationship_insights, ContactRelationshipInsight,
+};
 pub use segments::{
     add_contact_to_segment, create_assignment_rule, create_contact_segment,
-    update_assignment_rule, AssignmentRule, ContactSegment, CreateAssignmentRuleParams,
-    SegmentMember, UpdateAssignmentRuleParams,
+    evaluate_dynamic_segment, set_contact_segment_rules, update_assignment_rule, AssignmentRule,
+    ContactSegment, ContactSegmentRule, CreateAssignmentRuleParams, SegmentMember,
+    SegmentRuleClause, SegmentRuleField, SegmentRuleOp, SetContactSegmentRulesParams,
+    UpdateAssignmentRuleParams,
 };

@@ -1,6 +1,7 @@
 //! CRM domain test suite — invoke via `run_all_crm_tests` reducer.
 pub mod contact_identity_test;
 pub mod contact_lifecycle_test;
+pub mod deferred_test;
 pub mod opportunity_lifecycle_test;
 pub mod relationship_and_admin_test;
 pub mod wave2_test;
@@ -16,8 +17,21 @@ pub fn run_all_crm_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_crm_contact_identity_test(ctx)?;
     run_crm_wave2_test(ctx)?;
     run_crm_relationship_admin_test(ctx)?;
+    run_crm_deferred_test(ctx)?;
     log::info!("✅ run_all_crm_tests complete");
     Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_crm_deferred_test(ctx: &ReducerContext) -> Result<(), String> {
+    deferred_test::test_lead_score_explainable_factors(ctx)
+        .map_err(|e| format!("lead_score_explainable_factors: {e}"))?;
+    deferred_test::test_dynamic_segment_rule_ast(ctx)
+        .map_err(|e| format!("dynamic_segment_rule_ast: {e}"))?;
+    deferred_test::test_relationship_insights(ctx)
+        .map_err(|e| format!("relationship_insights: {e}"))?;
+    deferred_test::test_crm_whatsapp_inbox(ctx)
+        .map_err(|e| format!("crm_whatsapp_inbox: {e}"))
 }
 
 #[spacetimedb::reducer]

@@ -407,6 +407,48 @@
   },
   {
     "extra_where": "",
+    "mapKey": "lead-scores",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "lead-scores",
+    "table": "lead_score"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "lead-score-factors",
+    "order_by": "",
+    "resource_key": "lead-score-factors",
+    "table": "lead_score_factor"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "contact-segment-rules",
+    "order_by": " ORDER BY sequence ASC",
+    "resource_key": "contact-segment-rules",
+    "table": "contact_segment_rule"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "contact-relationship-insights",
+    "order_by": "",
+    "resource_key": "contact-relationship-insights",
+    "table": "contact_relationship_insight"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "crm-conversations",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "crm-conversations",
+    "table": "crm_conversation"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "crm-conversation-messages",
+    "order_by": " ORDER BY id ASC",
+    "resource_key": "crm-conversation-messages",
+    "table": "crm_conversation_message"
+  },
+  {
+    "extra_where": "",
     "mapKey": "projects",
     "order_by": "",
     "resource_key": "projects",

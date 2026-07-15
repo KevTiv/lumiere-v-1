@@ -47,4 +47,11 @@ export const CRM_UI_REDUCERS = [
   "update_opportunity_presence",
   "clear_opportunity_presence",
   "create_forecast_snapshot",
+  "recompute_lead_score",
+  "set_contact_segment_rules",
+  "evaluate_dynamic_segment",
+  "recompute_relationship_insights",
+  "open_crm_conversation",
+  "append_crm_conversation_message",
+  "update_crm_conversation",
 ] as const

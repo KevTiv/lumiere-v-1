@@ -87,6 +87,12 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "privacy-consent",
   "contact-communication-preferences",
   "crm-forecast-snapshots",
+  "lead-scores",
+  "lead-score-factors",
+  "contact-segment-rules",
+  "contact-relationship-insights",
+  "crm-conversations",
+  "crm-conversation-messages",
   "projects",
   "tasks",
   "timesheets",
@@ -430,6 +436,45 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       fa,
       "",
       " ORDER BY id DESC",
+    ),
+  "lead-scores": (id, fa) =>
+    selectOrgScopedSql("lead-scores", "lead_score", id, fa, "", " ORDER BY id DESC"),
+  "lead-score-factors": (id, fa) =>
+    selectOrgScopedSql("lead-score-factors", "lead_score_factor", id, fa, ""),
+  "contact-segment-rules": (id, fa) =>
+    selectOrgScopedSql(
+      "contact-segment-rules",
+      "contact_segment_rule",
+      id,
+      fa,
+      "",
+      " ORDER BY sequence ASC",
+    ),
+  "contact-relationship-insights": (id, fa) =>
+    selectOrgScopedSql(
+      "contact-relationship-insights",
+      "contact_relationship_insight",
+      id,
+      fa,
+      "",
+    ),
+  "crm-conversations": (id, fa) =>
+    selectOrgScopedSql(
+      "crm-conversations",
+      "crm_conversation",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "crm-conversation-messages": (id, fa) =>
+    selectOrgScopedSql(
+      "crm-conversation-messages",
+      "crm_conversation_message",
+      id,
+      fa,
+      "",
+      " ORDER BY id ASC",
     ),
   projects: (id, fa) =>
     selectOrgScopedSql("projects", "project_project", id, fa, ""),

@@ -2,7 +2,7 @@
 
 Status snapshot of Lumiere CRM against a NetSuite/Attio *quality* bar (integrated ops/finance, multi-entity, drill-down, workflow controls, i18n, extensibility, lifecycle, integrations) — not a feature-copy checklist.
 
-**Implementation status (2026-07-15):** Waves 1–2 from this doc are implemented in-tree (subscriptions expanded, consent/relationship/admin/presence/forecast/pack validators). Differentiating items remain deferred.
+**Implementation status (2026-07-15):** Waves 1–2 from this doc are implemented in-tree (subscriptions expanded, consent/relationship/admin/presence/forecast/pack validators). Differentiating foundations are also in-tree: lead scoring (explainable factors), dynamic segment rule AST + evaluate, relationship intelligence snapshots, and WhatsApp CRM conversation inbox (intent rows; delivery remains worker-side).
 
 **Verdict:** Lumiere has a solid **lead → opportunity → sale order** spine with phone-first identities, duplicate merge, UTM dimensions, consent tables, and subscription-backed lists. Against that bar it is strong on transactionality and tenant safety, **partial** on pipeline UX / attribution / customer-360, and **absent** on territories, scoring, quotas, forecasting, campaign engines, and collaborative presence.
 
@@ -18,7 +18,7 @@ Status snapshot of Lumiere CRM against a NetSuite/Attio *quality* bar (integrate
 | 2 | Opportunity presence + disconnect cleanup | Done |
 | 2 | Country-pack ABN/CNPJ/UEN (+ address_required) validators on contact writes | Done |
 | 2 | Forecast snapshot + weighted pipeline / UTM attribution dashboard | Done |
-| — | WhatsApp CRM inbox, lead scoring, relationship intelligence | Deferred |
+| — | WhatsApp CRM inbox, lead scoring, relationship intelligence, dynamic segment AST | Foundations shipped (see deferred modules) |
 
 ---
 

@@ -61,6 +61,7 @@ import AddWorkflowTransitionReducer from "./add_workflow_transition_reducer";
 import AllocatePaymentTransactionReducer from "./allocate_payment_transaction_reducer";
 import AppendAiAgentRunStepReducer from "./append_ai_agent_run_step_reducer";
 import AppendAiChatMessageReducer from "./append_ai_chat_message_reducer";
+import AppendCrmConversationMessageReducer from "./append_crm_conversation_message_reducer";
 import ApplyGlobalMigrationsReducer from "./apply_global_migrations_reducer";
 import ApplyLandedCostsReducer from "./apply_landed_costs_reducer";
 import ApplyOrgMigrationsReducer from "./apply_org_migrations_reducer";
@@ -417,6 +418,7 @@ import EndUserSessionReducer from "./end_user_session_reducer";
 import EnqueueJobReducer from "./enqueue_job_reducer";
 import EnsureDevAdminReducer from "./ensure_dev_admin_reducer";
 import ErrorIntercompanyTransactionReducer from "./error_intercompany_transaction_reducer";
+import EvaluateDynamicSegmentReducer from "./evaluate_dynamic_segment_reducer";
 import ExecuteReplenishmentRuleReducer from "./execute_replenishment_rule_reducer";
 import ExecuteRetentionPurgeReducer from "./execute_retention_purge_reducer";
 import ExpireAiActionDraftsReducer from "./expire_ai_action_drafts_reducer";
@@ -524,6 +526,7 @@ import MigrateAllOrganizationsReducer from "./migrate_all_organizations_reducer"
 import MoveStockQuantReducer from "./move_stock_quant_reducer";
 import OpenAccountPeriodReducer from "./open_account_period_reducer";
 import OpenContractReducer from "./open_contract_reducer";
+import OpenCrmConversationReducer from "./open_crm_conversation_reducer";
 import OpenFiscalYearReducer from "./open_fiscal_year_reducer";
 import OpenPosSessionReducer from "./open_pos_session_reducer";
 import OpenQualityAlertReducer from "./open_quality_alert_reducer";
@@ -549,6 +552,8 @@ import QueueMailFromTemplateReducer from "./queue_mail_from_template_reducer";
 import ReceivePoLineReducer from "./receive_po_line_reducer";
 import RecognizeAmortizationLineReducer from "./recognize_amortization_line_reducer";
 import RecognizeDeferredRevenueReducer from "./recognize_deferred_revenue_reducer";
+import RecomputeLeadScoreReducer from "./recompute_lead_score_reducer";
+import RecomputeRelationshipInsightsReducer from "./recompute_relationship_insights_reducer";
 import ReconcileAccountBankStatementLineReducer from "./reconcile_account_bank_statement_line_reducer";
 import ReconcilePaymentWithInvoiceReducer from "./reconcile_payment_with_invoice_reducer";
 import RecordAiAgentRunPolicySnapshotReducer from "./record_ai_agent_run_policy_snapshot_reducer";
@@ -626,6 +631,7 @@ import RunCoreSodTestReducer from "./run_core_sod_test_reducer";
 import RunCountryPackTestReducer from "./run_country_pack_test_reducer";
 import RunCrmContactIdentityTestReducer from "./run_crm_contact_identity_test_reducer";
 import RunCrmContactUpdateDeleteTestReducer from "./run_crm_contact_update_delete_test_reducer";
+import RunCrmDeferredTestReducer from "./run_crm_deferred_test_reducer";
 import RunCrmOpportunityConvertTestReducer from "./run_crm_opportunity_convert_test_reducer";
 import RunCrmRelationshipAdminTestReducer from "./run_crm_relationship_admin_test_reducer";
 import RunCrmWave2TestReducer from "./run_crm_wave_2_test_reducer";
@@ -644,6 +650,7 @@ import RunInventoryStockQuantTestReducer from "./run_inventory_stock_quant_test_
 import RunManufacturingWorkcenterTestReducer from "./run_manufacturing_workcenter_test_reducer";
 import RunOwnerReportScheduleReducer from "./run_owner_report_schedule_reducer";
 import RunPurchasingBillBalancedTestReducer from "./run_purchasing_bill_balanced_test_reducer";
+import RunSalesOrderCancelTestReducer from "./run_sales_order_cancel_test_reducer";
 import RunSalesOrderDeliveryTestReducer from "./run_sales_order_delivery_test_reducer";
 import RunSalesOrderInvoiceTestReducer from "./run_sales_order_invoice_test_reducer";
 import RunSalesOrderUpdateTestReducer from "./run_sales_order_update_test_reducer";
@@ -669,6 +676,7 @@ import SetCompanyCountryPackReducer from "./set_company_country_pack_reducer";
 import SetCompanyVerticalPackReducer from "./set_company_vertical_pack_reducer";
 import SetConsolidationCompanyRateReducer from "./set_consolidation_company_rate_reducer";
 import SetContactCommunicationPreferenceReducer from "./set_contact_communication_preference_reducer";
+import SetContactSegmentRulesReducer from "./set_contact_segment_rules_reducer";
 import SetFormRoleConfigReducer from "./set_form_role_config_reducer";
 import SetIntercompanyRuleActiveReducer from "./set_intercompany_rule_active_reducer";
 import SetIotThresholdReducer from "./set_iot_threshold_reducer";
@@ -753,6 +761,7 @@ import UpdateContactDetailsReducer from "./update_contact_details_reducer";
 import UpdateContactIdentityReducer from "./update_contact_identity_reducer";
 import UpdateContactParentReducer from "./update_contact_parent_reducer";
 import UpdateContractReducer from "./update_contract_reducer";
+import UpdateCrmConversationReducer from "./update_crm_conversation_reducer";
 import UpdateCrossoveredBudgetReducer from "./update_crossovered_budget_reducer";
 import UpdateDepartmentReducer from "./update_department_reducer";
 import UpdateDeviceStatusReducer from "./update_device_status_reducer";
@@ -950,13 +959,17 @@ import ContactCommunicationPreferenceRow from "./contact_communication_preferenc
 import ContactDuplicateCandidateRow from "./contact_duplicate_candidate_table";
 import ContactPhoneIdentityRow from "./contact_phone_identity_table";
 import ContactRelationshipRow from "./contact_relationship_table";
+import ContactRelationshipInsightRow from "./contact_relationship_insight_table";
 import ContactRoleAssignmentRow from "./contact_role_assignment_table";
 import ContactSegmentRow from "./contact_segment_table";
+import ContactSegmentRuleRow from "./contact_segment_rule_table";
 import ContactTagRow from "./contact_tag_table";
 import ContactTagAssignmentRow from "./contact_tag_assignment_table";
 import CountryRow from "./country_table";
 import CountryPackDefinitionRow from "./country_pack_definition_table";
 import CountryPackTaxRuleRow from "./country_pack_tax_rule_table";
+import CrmConversationRow from "./crm_conversation_table";
+import CrmConversationMessageRow from "./crm_conversation_message_table";
 import CrmForecastSnapshotRow from "./crm_forecast_snapshot_table";
 import CrossoveredBudgetRow from "./crossovered_budget_table";
 import CrossoveredBudgetLinesRow from "./crossovered_budget_lines_table";
@@ -1019,6 +1032,8 @@ import KbCategoryRow from "./kb_category_table";
 import KnowledgeArticleRow from "./knowledge_article_table";
 import LeadRow from "./lead_table";
 import LeadLostReasonRow from "./lead_lost_reason_table";
+import LeadScoreRow from "./lead_score_table";
+import LeadScoreFactorRow from "./lead_score_factor_table";
 import LeadSourceRow from "./lead_source_table";
 import MailFollowerRow from "./mail_follower_table";
 import MailMessageRow from "./mail_message_table";
@@ -2646,6 +2661,23 @@ const tablesSchema = __schema({
       { name: 'contact_relationship_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ContactRelationshipRow),
+  contact_relationship_insight: __table({
+    name: 'contact_relationship_insight',
+    indexes: [
+      { name: 'rel_insight_by_contact', algorithm: 'btree', columns: [
+        'contactId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'rel_insight_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'contact_relationship_insight_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ContactRelationshipInsightRow),
   contact_role_assignment: __table({
     name: 'contact_role_assignment',
     indexes: [
@@ -2681,6 +2713,23 @@ const tablesSchema = __schema({
       { name: 'contact_segment_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ContactSegmentRow),
+  contact_segment_rule: __table({
+    name: 'contact_segment_rule',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'segment_rule_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'segment_rule_by_segment', algorithm: 'btree', columns: [
+        'segmentId',
+      ] },
+    ],
+    constraints: [
+      { name: 'contact_segment_rule_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ContactSegmentRuleRow),
   contact_tag: __table({
     name: 'contact_tag',
     indexes: [
@@ -2742,6 +2791,40 @@ const tablesSchema = __schema({
       { name: 'country_pack_tax_rule_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CountryPackTaxRuleRow),
+  crm_conversation: __table({
+    name: 'crm_conversation',
+    indexes: [
+      { name: 'crm_conversation_by_contact', algorithm: 'btree', columns: [
+        'contactId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'crm_conversation_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'crm_conversation_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CrmConversationRow),
+  crm_conversation_message: __table({
+    name: 'crm_conversation_message',
+    indexes: [
+      { name: 'crm_conversation_message_by_conversation', algorithm: 'btree', columns: [
+        'conversationId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'crm_conversation_message_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'crm_conversation_message_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CrmConversationMessageRow),
   crm_forecast_snapshot: __table({
     name: 'crm_forecast_snapshot',
     indexes: [
@@ -3798,6 +3881,40 @@ const tablesSchema = __schema({
       { name: 'lead_lost_reason_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, LeadLostReasonRow),
+  lead_score: __table({
+    name: 'lead_score',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'lead_score_by_lead', algorithm: 'btree', columns: [
+        'leadId',
+      ] },
+      { name: 'lead_score_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'lead_score_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, LeadScoreRow),
+  lead_score_factor: __table({
+    name: 'lead_score_factor',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'lead_score_factor_by_lead', algorithm: 'btree', columns: [
+        'leadId',
+      ] },
+      { name: 'lead_score_factor_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'lead_score_factor_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, LeadScoreFactorRow),
   lead_source: __table({
     name: 'lead_source',
     indexes: [
@@ -6300,6 +6417,7 @@ const reducersSchema = __reducers(
   __reducerSchema("allocate_payment_transaction", AllocatePaymentTransactionReducer),
   __reducerSchema("append_ai_agent_run_step", AppendAiAgentRunStepReducer),
   __reducerSchema("append_ai_chat_message", AppendAiChatMessageReducer),
+  __reducerSchema("append_crm_conversation_message", AppendCrmConversationMessageReducer),
   __reducerSchema("apply_global_migrations", ApplyGlobalMigrationsReducer),
   __reducerSchema("apply_landed_costs", ApplyLandedCostsReducer),
   __reducerSchema("apply_org_migrations", ApplyOrgMigrationsReducer),
@@ -6656,6 +6774,7 @@ const reducersSchema = __reducers(
   __reducerSchema("enqueue_job", EnqueueJobReducer),
   __reducerSchema("ensure_dev_admin", EnsureDevAdminReducer),
   __reducerSchema("error_intercompany_transaction", ErrorIntercompanyTransactionReducer),
+  __reducerSchema("evaluate_dynamic_segment", EvaluateDynamicSegmentReducer),
   __reducerSchema("execute_replenishment_rule", ExecuteReplenishmentRuleReducer),
   __reducerSchema("execute_retention_purge", ExecuteRetentionPurgeReducer),
   __reducerSchema("expire_ai_action_drafts", ExpireAiActionDraftsReducer),
@@ -6763,6 +6882,7 @@ const reducersSchema = __reducers(
   __reducerSchema("move_stock_quant", MoveStockQuantReducer),
   __reducerSchema("open_account_period", OpenAccountPeriodReducer),
   __reducerSchema("open_contract", OpenContractReducer),
+  __reducerSchema("open_crm_conversation", OpenCrmConversationReducer),
   __reducerSchema("open_fiscal_year", OpenFiscalYearReducer),
   __reducerSchema("open_pos_session", OpenPosSessionReducer),
   __reducerSchema("open_quality_alert", OpenQualityAlertReducer),
@@ -6788,6 +6908,8 @@ const reducersSchema = __reducers(
   __reducerSchema("receive_po_line", ReceivePoLineReducer),
   __reducerSchema("recognize_amortization_line", RecognizeAmortizationLineReducer),
   __reducerSchema("recognize_deferred_revenue", RecognizeDeferredRevenueReducer),
+  __reducerSchema("recompute_lead_score", RecomputeLeadScoreReducer),
+  __reducerSchema("recompute_relationship_insights", RecomputeRelationshipInsightsReducer),
   __reducerSchema("reconcile_account_bank_statement_line", ReconcileAccountBankStatementLineReducer),
   __reducerSchema("reconcile_payment_with_invoice", ReconcilePaymentWithInvoiceReducer),
   __reducerSchema("record_ai_agent_run_policy_snapshot", RecordAiAgentRunPolicySnapshotReducer),
@@ -6865,6 +6987,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_country_pack_test", RunCountryPackTestReducer),
   __reducerSchema("run_crm_contact_identity_test", RunCrmContactIdentityTestReducer),
   __reducerSchema("run_crm_contact_update_delete_test", RunCrmContactUpdateDeleteTestReducer),
+  __reducerSchema("run_crm_deferred_test", RunCrmDeferredTestReducer),
   __reducerSchema("run_crm_opportunity_convert_test", RunCrmOpportunityConvertTestReducer),
   __reducerSchema("run_crm_relationship_admin_test", RunCrmRelationshipAdminTestReducer),
   __reducerSchema("run_crm_wave_2_test", RunCrmWave2TestReducer),
@@ -6883,6 +7006,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_manufacturing_workcenter_test", RunManufacturingWorkcenterTestReducer),
   __reducerSchema("run_owner_report_schedule", RunOwnerReportScheduleReducer),
   __reducerSchema("run_purchasing_bill_balanced_test", RunPurchasingBillBalancedTestReducer),
+  __reducerSchema("run_sales_order_cancel_test", RunSalesOrderCancelTestReducer),
   __reducerSchema("run_sales_order_delivery_test", RunSalesOrderDeliveryTestReducer),
   __reducerSchema("run_sales_order_invoice_test", RunSalesOrderInvoiceTestReducer),
   __reducerSchema("run_sales_order_update_test", RunSalesOrderUpdateTestReducer),
@@ -6908,6 +7032,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_company_vertical_pack", SetCompanyVerticalPackReducer),
   __reducerSchema("set_consolidation_company_rate", SetConsolidationCompanyRateReducer),
   __reducerSchema("set_contact_communication_preference", SetContactCommunicationPreferenceReducer),
+  __reducerSchema("set_contact_segment_rules", SetContactSegmentRulesReducer),
   __reducerSchema("set_form_role_config", SetFormRoleConfigReducer),
   __reducerSchema("set_intercompany_rule_active", SetIntercompanyRuleActiveReducer),
   __reducerSchema("set_iot_threshold", SetIotThresholdReducer),
@@ -6992,6 +7117,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_contact_identity", UpdateContactIdentityReducer),
   __reducerSchema("update_contact_parent", UpdateContactParentReducer),
   __reducerSchema("update_contract", UpdateContractReducer),
+  __reducerSchema("update_crm_conversation", UpdateCrmConversationReducer),
   __reducerSchema("update_crossovered_budget", UpdateCrossoveredBudgetReducer),
   __reducerSchema("update_department", UpdateDepartmentReducer),
   __reducerSchema("update_device_status", UpdateDeviceStatusReducer),

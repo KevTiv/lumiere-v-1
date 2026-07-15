@@ -7,6 +7,10 @@ import { ContactConsentPanel } from "./contact-consent-panel"
 import { ContactRelationshipsPanel } from "./contact-relationships-panel"
 import { OpportunityPresenceBanner } from "./opportunity-presence-banner"
 import { CrmPipelineAdminPanel } from "./crm-pipeline-admin-panel"
+import { LeadScorePanel } from "./lead-score-panel"
+import { CrmInboxPanel } from "./crm-inbox-panel"
+import { RelationshipInsightPanel } from "./relationship-insight-panel"
+import { SegmentRulesPanel } from "./segment-rules-panel"
 import { useCrmModuleSubscription } from "@/lib/module-subscription-hooks"
 import { phCapture } from "@/lib/posthog-browser"
 import {
@@ -980,6 +984,16 @@ function CrmClientLoaded({
       auditTableName: "lead",
       customTabs: [
         {
+          id: "score",
+          label: t("crm.scoring.tabLabel", "Score"),
+          content: (record) => (
+            <LeadScorePanel
+              organizationId={organizationId}
+              leadId={rowIdBigInt(record)}
+            />
+          ),
+        },
+        {
           id: "activity",
           label: t("crm.chatter.timeline"),
           content: (record) => (
@@ -1054,11 +1068,17 @@ function CrmClientLoaded({
           id: "relationships",
           label: t("crm.relationships.tabLabel", "Relationships"),
           content: (record) => (
-            <ContactRelationshipsPanel
-              organizationId={organizationId}
-              contactId={rowIdBigInt(record)}
-              companyId={rowCompanyId(record, operatingCompanyId)}
-            />
+            <div className="space-y-4">
+              <RelationshipInsightPanel
+                organizationId={organizationId}
+                contactId={rowIdBigInt(record)}
+              />
+              <ContactRelationshipsPanel
+                organizationId={organizationId}
+                contactId={rowIdBigInt(record)}
+                companyId={rowCompanyId(record, operatingCompanyId)}
+              />
+            </div>
           ),
         },
         {
@@ -1066,6 +1086,16 @@ function CrmClientLoaded({
           label: t("crm.consent.tabLabel", "Consent"),
           content: (record) => (
             <ContactConsentPanel
+              organizationId={organizationId}
+              contactId={rowIdBigInt(record)}
+            />
+          ),
+        },
+        {
+          id: "inbox",
+          label: t("crm.inbox.tabLabel", "Inbox"),
+          content: (record) => (
+            <CrmInboxPanel
               organizationId={organizationId}
               contactId={rowIdBigInt(record)}
             />
@@ -1377,7 +1407,12 @@ function CrmClientLoaded({
           id: "pipeline-admin",
           label: t("crm.admin.tabLabel", "Pipeline admin"),
           type: "custom" as const,
-          customContent: <CrmPipelineAdminPanel organizationId={organizationId} />,
+          customContent: (
+            <div className="space-y-6">
+              <CrmPipelineAdminPanel organizationId={organizationId} />
+              <SegmentRulesPanel organizationId={organizationId} />
+            </div>
+          ),
         },
         {
           id: "duplicates",

@@ -1409,6 +1409,16 @@ export const AppendAiChatMessageParams = __t.object("AppendAiChatMessageParams",
 });
 export type AppendAiChatMessageParams = __Infer<typeof AppendAiChatMessageParams>;
 
+export const AppendCrmConversationMessageParams = __t.object("AppendCrmConversationMessageParams", {
+  direction: __t.string(),
+  body: __t.string(),
+  status: __t.string(),
+  providerMessageId: __t.option(__t.string()),
+  operationalMessageId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type AppendCrmConversationMessageParams = __Infer<typeof AppendCrmConversationMessageParams>;
+
 export const ApprovalRequest = __t.object("ApprovalRequest", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -2248,6 +2258,21 @@ export const ContactRelationship = __t.object("ContactRelationship", {
 });
 export type ContactRelationship = __Infer<typeof ContactRelationship>;
 
+export const ContactRelationshipInsight = __t.object("ContactRelationshipInsight", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  contactId: __t.u64(),
+  strengthScore: __t.i32(),
+  activeRelationshipCount: __t.i32(),
+  hierarchyDepth: __t.i32(),
+  relatedContactIds: __t.array(__t.u64()),
+  summary: __t.string(),
+  computedAt: __t.timestamp(),
+  computedBy: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type ContactRelationshipInsight = __Infer<typeof ContactRelationshipInsight>;
+
 export const ContactRoleAssignment = __t.object("ContactRoleAssignment", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -2281,6 +2306,24 @@ export const ContactSegment = __t.object("ContactSegment", {
   metadata: __t.option(__t.string()),
 });
 export type ContactSegment = __Infer<typeof ContactSegment>;
+
+export const ContactSegmentRule = __t.object("ContactSegmentRule", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  segmentId: __t.u64(),
+  sequence: __t.i32(),
+  get field() {
+    return SegmentRuleField;
+  },
+  get op() {
+    return SegmentRuleOp;
+  },
+  valueText: __t.option(__t.string()),
+  valueId: __t.option(__t.u64()),
+  createdAt: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ContactSegmentRule = __Infer<typeof ContactSegmentRule>;
 
 export const ContactTag = __t.object("ContactTag", {
   id: __t.u64(),
@@ -5741,6 +5784,41 @@ export const CreateWorkorderParams = __t.object("CreateWorkorderParams", {
 });
 export type CreateWorkorderParams = __Infer<typeof CreateWorkorderParams>;
 
+export const CrmConversation = __t.object("CrmConversation", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  contactId: __t.u64(),
+  get channel() {
+    return MessageChannel;
+  },
+  phoneIdentityId: __t.option(__t.u64()),
+  status: __t.string(),
+  assignedUserId: __t.option(__t.identity()),
+  lastMessageAt: __t.option(__t.timestamp()),
+  lastPreview: __t.option(__t.string()),
+  externalThreadId: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  updatedAt: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type CrmConversation = __Infer<typeof CrmConversation>;
+
+export const CrmConversationMessage = __t.object("CrmConversationMessage", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  conversationId: __t.u64(),
+  direction: __t.string(),
+  body: __t.string(),
+  status: __t.string(),
+  providerMessageId: __t.option(__t.string()),
+  operationalMessageId: __t.option(__t.u64()),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type CrmConversationMessage = __Infer<typeof CrmConversationMessage>;
+
 export const CrmForecastSnapshot = __t.object("CrmForecastSnapshot", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -7377,6 +7455,30 @@ export const LeadLostReason = __t.object("LeadLostReason", {
 });
 export type LeadLostReason = __Infer<typeof LeadLostReason>;
 
+export const LeadScore = __t.object("LeadScore", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  leadId: __t.u64(),
+  totalScore: __t.i32(),
+  formulaVersion: __t.string(),
+  scoredAt: __t.timestamp(),
+  scoredBy: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type LeadScore = __Infer<typeof LeadScore>;
+
+export const LeadScoreFactor = __t.object("LeadScoreFactor", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  leadId: __t.u64(),
+  scoreId: __t.u64(),
+  factorKey: __t.string(),
+  label: __t.string(),
+  points: __t.i32(),
+  evidence: __t.option(__t.string()),
+});
+export type LeadScoreFactor = __Infer<typeof LeadScoreFactor>;
+
 export const LeadSource = __t.object("LeadSource", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -7900,6 +8002,18 @@ export const MrpWorkorder = __t.object("MrpWorkorder", {
   metadata: __t.option(__t.string()),
 });
 export type MrpWorkorder = __Infer<typeof MrpWorkorder>;
+
+export const OpenCrmConversationParams = __t.object("OpenCrmConversationParams", {
+  contactId: __t.u64(),
+  get channel() {
+    return MessageChannel;
+  },
+  phoneIdentityId: __t.option(__t.u64()),
+  externalThreadId: __t.option(__t.string()),
+  assignedUserId: __t.option(__t.identity()),
+  metadata: __t.option(__t.string()),
+});
+export type OpenCrmConversationParams = __Infer<typeof OpenCrmConversationParams>;
 
 export const OperationalMessage = __t.object("OperationalMessage", {
   id: __t.u64(),
@@ -10422,6 +10536,40 @@ export const SegmentMember = __t.object("SegmentMember", {
 });
 export type SegmentMember = __Infer<typeof SegmentMember>;
 
+export const SegmentRuleClause = __t.object("SegmentRuleClause", {
+  get field() {
+    return SegmentRuleField;
+  },
+  get op() {
+    return SegmentRuleOp;
+  },
+  valueText: __t.option(__t.string()),
+  valueId: __t.option(__t.u64()),
+});
+export type SegmentRuleClause = __Infer<typeof SegmentRuleClause>;
+
+// The tagged union or sum type for the algebraic type `SegmentRuleField`.
+export const SegmentRuleField = __t.enum("SegmentRuleField", {
+  CountryCode: __t.unit(),
+  City: __t.unit(),
+  Industry: __t.unit(),
+  IsCustomer: __t.unit(),
+  IsProspect: __t.unit(),
+  IsVendor: __t.unit(),
+  TagId: __t.unit(),
+});
+export type SegmentRuleField = __Infer<typeof SegmentRuleField>;
+
+// The tagged union or sum type for the algebraic type `SegmentRuleOp`.
+export const SegmentRuleOp = __t.enum("SegmentRuleOp", {
+  Eq: __t.unit(),
+  Neq: __t.unit(),
+  Contains: __t.unit(),
+  IsTrue: __t.unit(),
+  IsFalse: __t.unit(),
+});
+export type SegmentRuleOp = __Infer<typeof SegmentRuleOp>;
+
 export const SerialLotTraceability = __t.object("SerialLotTraceability", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -10484,6 +10632,15 @@ export const SetConsolidationCompanyRateParams = __t.object("SetConsolidationCom
   metadata: __t.option(__t.string()),
 });
 export type SetConsolidationCompanyRateParams = __Infer<typeof SetConsolidationCompanyRateParams>;
+
+export const SetContactSegmentRulesParams = __t.object("SetContactSegmentRulesParams", {
+  replaceAll: __t.bool(),
+  get rules() {
+    return __t.array(SegmentRuleClause);
+  },
+  metadata: __t.option(__t.string()),
+});
+export type SetContactSegmentRulesParams = __Infer<typeof SetContactSegmentRulesParams>;
 
 export const SetRecordCustomFieldValuesParams = __t.object("SetRecordCustomFieldValuesParams", {
   model: __t.string(),
@@ -12166,6 +12323,14 @@ export const UpdateContractParams = __t.object("UpdateContractParams", {
   notes: __t.option(__t.string()),
 });
 export type UpdateContractParams = __Infer<typeof UpdateContractParams>;
+
+export const UpdateCrmConversationParams = __t.object("UpdateCrmConversationParams", {
+  status: __t.option(__t.string()),
+  assignedUserId: __t.option(__t.identity()),
+  externalThreadId: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateCrmConversationParams = __Infer<typeof UpdateCrmConversationParams>;
 
 export const UpdateCrossoveredBudgetLineParams = __t.object("UpdateCrossoveredBudgetLineParams", {
   plannedAmount: __t.option(__t.f64()),

@@ -54,6 +54,13 @@ export const CRM_BFF_REDUCERS = [
   "update_opportunity_presence",
   "clear_opportunity_presence",
   "create_forecast_snapshot",
+  "recompute_lead_score",
+  "set_contact_segment_rules",
+  "evaluate_dynamic_segment",
+  "recompute_relationship_insights",
+  "open_crm_conversation",
+  "append_crm_conversation_message",
+  "update_crm_conversation",
 ] as const;
 
 export type CrmBffReducerKey = (typeof CRM_BFF_REDUCERS)[number];
@@ -137,6 +144,16 @@ export const CRM_COMMAND_SUBSCRIPTION_HINTS: Record<
   update_opportunity_presence: ["opportunity-presence"],
   clear_opportunity_presence: ["opportunity-presence"],
   create_forecast_snapshot: ["crm-forecast-snapshots"],
+  recompute_lead_score: ["lead-scores", "lead-score-factors"],
+  set_contact_segment_rules: ["contact-segment-rules"],
+  evaluate_dynamic_segment: ["contact-segments", "segment-members"],
+  recompute_relationship_insights: ["contact-relationship-insights"],
+  open_crm_conversation: ["crm-conversations"],
+  append_crm_conversation_message: [
+    "crm-conversation-messages",
+    "crm-conversations",
+  ],
+  update_crm_conversation: ["crm-conversations"],
 };
 
 export function crmCommandContract(

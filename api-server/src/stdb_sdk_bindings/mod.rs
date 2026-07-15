@@ -73,6 +73,7 @@ pub mod amortization_schedule_type;
 pub mod analytics_metric_type;
 pub mod append_ai_agent_run_step_params_type;
 pub mod append_ai_chat_message_params_type;
+pub mod append_crm_conversation_message_params_type;
 pub mod approval_request_type;
 pub mod approval_rule_type;
 pub mod asset_state_type;
@@ -129,8 +130,10 @@ pub mod contact_duplicate_candidate_type;
 pub mod contact_identity_kind_type;
 pub mod contact_phone_identity_type;
 pub mod contact_relationship_type;
+pub mod contact_relationship_insight_type;
 pub mod contact_role_assignment_type;
 pub mod contact_segment_type;
+pub mod contact_segment_rule_type;
 pub mod contact_tag_type;
 pub mod contact_tag_assignment_type;
 pub mod contact_verification_state_type;
@@ -329,6 +332,8 @@ pub mod create_workcenter_params_type;
 pub mod create_workcenter_productivity_params_type;
 pub mod create_workflow_params_type;
 pub mod create_workorder_params_type;
+pub mod crm_conversation_type;
+pub mod crm_conversation_message_type;
 pub mod crm_forecast_snapshot_type;
 pub mod crossovered_budget_type;
 pub mod crossovered_budget_lines_type;
@@ -428,6 +433,8 @@ pub mod knowledge_article_category_type;
 pub mod landed_cost_state_type;
 pub mod lead_type;
 pub mod lead_lost_reason_type;
+pub mod lead_score_type;
+pub mod lead_score_factor_type;
 pub mod lead_source_type;
 pub mod line_invoice_status_type;
 pub mod line_state_type;
@@ -454,6 +461,7 @@ pub mod mrp_routing_workcenter_type;
 pub mod mrp_workcenter_type;
 pub mod mrp_workcenter_productivity_type;
 pub mod mrp_workorder_type;
+pub mod open_crm_conversation_params_type;
 pub mod operational_message_type;
 pub mod operational_message_status_type;
 pub mod opportunity_type;
@@ -584,12 +592,16 @@ pub mod schema_migration_type;
 pub mod search_embedding_type;
 pub mod section_status_type;
 pub mod segment_member_type;
+pub mod segment_rule_clause_type;
+pub mod segment_rule_field_type;
+pub mod segment_rule_op_type;
 pub mod serial_lot_traceability_type;
 pub mod session_state_type;
 pub mod set_article_published_params_type;
 pub mod set_company_country_pack_params_type;
 pub mod set_company_vertical_pack_params_type;
 pub mod set_consolidation_company_rate_params_type;
+pub mod set_contact_segment_rules_params_type;
 pub mod set_record_custom_field_values_params_type;
 pub mod setup_fiscal_calendar_params_type;
 pub mod shipping_method_type;
@@ -682,6 +694,7 @@ pub mod update_contact_core_params_type;
 pub mod update_contact_details_params_type;
 pub mod update_contact_identity_params_type;
 pub mod update_contract_params_type;
+pub mod update_crm_conversation_params_type;
 pub mod update_crossovered_budget_line_params_type;
 pub mod update_crossovered_budget_params_type;
 pub mod update_dashboard_share_params_type;
@@ -817,6 +830,7 @@ pub mod add_workflow_transition_reducer;
 pub mod allocate_payment_transaction_reducer;
 pub mod append_ai_agent_run_step_reducer;
 pub mod append_ai_chat_message_reducer;
+pub mod append_crm_conversation_message_reducer;
 pub mod apply_global_migrations_reducer;
 pub mod apply_landed_costs_reducer;
 pub mod apply_org_migrations_reducer;
@@ -1173,6 +1187,7 @@ pub mod end_user_session_reducer;
 pub mod enqueue_job_reducer;
 pub mod ensure_dev_admin_reducer;
 pub mod error_intercompany_transaction_reducer;
+pub mod evaluate_dynamic_segment_reducer;
 pub mod execute_replenishment_rule_reducer;
 pub mod execute_retention_purge_reducer;
 pub mod expire_ai_action_drafts_reducer;
@@ -1280,6 +1295,7 @@ pub mod migrate_all_organizations_reducer;
 pub mod move_stock_quant_reducer;
 pub mod open_account_period_reducer;
 pub mod open_contract_reducer;
+pub mod open_crm_conversation_reducer;
 pub mod open_fiscal_year_reducer;
 pub mod open_pos_session_reducer;
 pub mod open_quality_alert_reducer;
@@ -1305,6 +1321,8 @@ pub mod queue_mail_from_template_reducer;
 pub mod receive_po_line_reducer;
 pub mod recognize_amortization_line_reducer;
 pub mod recognize_deferred_revenue_reducer;
+pub mod recompute_lead_score_reducer;
+pub mod recompute_relationship_insights_reducer;
 pub mod reconcile_account_bank_statement_line_reducer;
 pub mod reconcile_payment_with_invoice_reducer;
 pub mod record_ai_agent_run_policy_snapshot_reducer;
@@ -1382,6 +1400,7 @@ pub mod run_core_sod_test_reducer;
 pub mod run_country_pack_test_reducer;
 pub mod run_crm_contact_identity_test_reducer;
 pub mod run_crm_contact_update_delete_test_reducer;
+pub mod run_crm_deferred_test_reducer;
 pub mod run_crm_opportunity_convert_test_reducer;
 pub mod run_crm_relationship_admin_test_reducer;
 pub mod run_crm_wave_2_test_reducer;
@@ -1400,6 +1419,7 @@ pub mod run_inventory_stock_quant_test_reducer;
 pub mod run_manufacturing_workcenter_test_reducer;
 pub mod run_owner_report_schedule_reducer;
 pub mod run_purchasing_bill_balanced_test_reducer;
+pub mod run_sales_order_cancel_test_reducer;
 pub mod run_sales_order_delivery_test_reducer;
 pub mod run_sales_order_invoice_test_reducer;
 pub mod run_sales_order_update_test_reducer;
@@ -1425,6 +1445,7 @@ pub mod set_company_country_pack_reducer;
 pub mod set_company_vertical_pack_reducer;
 pub mod set_consolidation_company_rate_reducer;
 pub mod set_contact_communication_preference_reducer;
+pub mod set_contact_segment_rules_reducer;
 pub mod set_form_role_config_reducer;
 pub mod set_intercompany_rule_active_reducer;
 pub mod set_iot_threshold_reducer;
@@ -1509,6 +1530,7 @@ pub mod update_contact_details_reducer;
 pub mod update_contact_identity_reducer;
 pub mod update_contact_parent_reducer;
 pub mod update_contract_reducer;
+pub mod update_crm_conversation_reducer;
 pub mod update_crossovered_budget_reducer;
 pub mod update_department_reducer;
 pub mod update_device_status_reducer;
@@ -1702,13 +1724,17 @@ pub mod contact_communication_preference_table;
 pub mod contact_duplicate_candidate_table;
 pub mod contact_phone_identity_table;
 pub mod contact_relationship_table;
+pub mod contact_relationship_insight_table;
 pub mod contact_role_assignment_table;
 pub mod contact_segment_table;
+pub mod contact_segment_rule_table;
 pub mod contact_tag_table;
 pub mod contact_tag_assignment_table;
 pub mod country_table;
 pub mod country_pack_definition_table;
 pub mod country_pack_tax_rule_table;
+pub mod crm_conversation_table;
+pub mod crm_conversation_message_table;
 pub mod crm_forecast_snapshot_table;
 pub mod crossovered_budget_table;
 pub mod crossovered_budget_lines_table;
@@ -1771,6 +1797,8 @@ pub mod kb_category_table;
 pub mod knowledge_article_table;
 pub mod lead_table;
 pub mod lead_lost_reason_table;
+pub mod lead_score_table;
+pub mod lead_score_factor_table;
 pub mod lead_source_table;
 pub mod mail_follower_table;
 pub mod mail_message_table;
@@ -1974,6 +2002,7 @@ pub use amortization_schedule_type::AmortizationSchedule;
 pub use analytics_metric_type::AnalyticsMetric;
 pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
 pub use append_ai_chat_message_params_type::AppendAiChatMessageParams;
+pub use append_crm_conversation_message_params_type::AppendCrmConversationMessageParams;
 pub use approval_request_type::ApprovalRequest;
 pub use approval_rule_type::ApprovalRule;
 pub use asset_state_type::AssetState;
@@ -2030,8 +2059,10 @@ pub use contact_duplicate_candidate_type::ContactDuplicateCandidate;
 pub use contact_identity_kind_type::ContactIdentityKind;
 pub use contact_phone_identity_type::ContactPhoneIdentity;
 pub use contact_relationship_type::ContactRelationship;
+pub use contact_relationship_insight_type::ContactRelationshipInsight;
 pub use contact_role_assignment_type::ContactRoleAssignment;
 pub use contact_segment_type::ContactSegment;
+pub use contact_segment_rule_type::ContactSegmentRule;
 pub use contact_tag_type::ContactTag;
 pub use contact_tag_assignment_type::ContactTagAssignment;
 pub use contact_verification_state_type::ContactVerificationState;
@@ -2230,6 +2261,8 @@ pub use create_workcenter_params_type::CreateWorkcenterParams;
 pub use create_workcenter_productivity_params_type::CreateWorkcenterProductivityParams;
 pub use create_workflow_params_type::CreateWorkflowParams;
 pub use create_workorder_params_type::CreateWorkorderParams;
+pub use crm_conversation_type::CrmConversation;
+pub use crm_conversation_message_type::CrmConversationMessage;
 pub use crm_forecast_snapshot_type::CrmForecastSnapshot;
 pub use crossovered_budget_type::CrossoveredBudget;
 pub use crossovered_budget_lines_type::CrossoveredBudgetLines;
@@ -2329,6 +2362,8 @@ pub use knowledge_article_category_type::KnowledgeArticleCategory;
 pub use landed_cost_state_type::LandedCostState;
 pub use lead_type::Lead;
 pub use lead_lost_reason_type::LeadLostReason;
+pub use lead_score_type::LeadScore;
+pub use lead_score_factor_type::LeadScoreFactor;
 pub use lead_source_type::LeadSource;
 pub use line_invoice_status_type::LineInvoiceStatus;
 pub use line_state_type::LineState;
@@ -2355,6 +2390,7 @@ pub use mrp_routing_workcenter_type::MrpRoutingWorkcenter;
 pub use mrp_workcenter_type::MrpWorkcenter;
 pub use mrp_workcenter_productivity_type::MrpWorkcenterProductivity;
 pub use mrp_workorder_type::MrpWorkorder;
+pub use open_crm_conversation_params_type::OpenCrmConversationParams;
 pub use operational_message_type::OperationalMessage;
 pub use operational_message_status_type::OperationalMessageStatus;
 pub use opportunity_type::Opportunity;
@@ -2485,12 +2521,16 @@ pub use schema_migration_type::SchemaMigration;
 pub use search_embedding_type::SearchEmbedding;
 pub use section_status_type::SectionStatus;
 pub use segment_member_type::SegmentMember;
+pub use segment_rule_clause_type::SegmentRuleClause;
+pub use segment_rule_field_type::SegmentRuleField;
+pub use segment_rule_op_type::SegmentRuleOp;
 pub use serial_lot_traceability_type::SerialLotTraceability;
 pub use session_state_type::SessionState;
 pub use set_article_published_params_type::SetArticlePublishedParams;
 pub use set_company_country_pack_params_type::SetCompanyCountryPackParams;
 pub use set_company_vertical_pack_params_type::SetCompanyVerticalPackParams;
 pub use set_consolidation_company_rate_params_type::SetConsolidationCompanyRateParams;
+pub use set_contact_segment_rules_params_type::SetContactSegmentRulesParams;
 pub use set_record_custom_field_values_params_type::SetRecordCustomFieldValuesParams;
 pub use setup_fiscal_calendar_params_type::SetupFiscalCalendarParams;
 pub use shipping_method_type::ShippingMethod;
@@ -2583,6 +2623,7 @@ pub use update_contact_core_params_type::UpdateContactCoreParams;
 pub use update_contact_details_params_type::UpdateContactDetailsParams;
 pub use update_contact_identity_params_type::UpdateContactIdentityParams;
 pub use update_contract_params_type::UpdateContractParams;
+pub use update_crm_conversation_params_type::UpdateCrmConversationParams;
 pub use update_crossovered_budget_line_params_type::UpdateCrossoveredBudgetLineParams;
 pub use update_crossovered_budget_params_type::UpdateCrossoveredBudgetParams;
 pub use update_dashboard_share_params_type::UpdateDashboardShareParams;
@@ -2769,13 +2810,17 @@ pub use contact_communication_preference_table::*;
 pub use contact_duplicate_candidate_table::*;
 pub use contact_phone_identity_table::*;
 pub use contact_relationship_table::*;
+pub use contact_relationship_insight_table::*;
 pub use contact_role_assignment_table::*;
 pub use contact_segment_table::*;
+pub use contact_segment_rule_table::*;
 pub use contact_tag_table::*;
 pub use contact_tag_assignment_table::*;
 pub use country_table::*;
 pub use country_pack_definition_table::*;
 pub use country_pack_tax_rule_table::*;
+pub use crm_conversation_table::*;
+pub use crm_conversation_message_table::*;
 pub use crm_forecast_snapshot_table::*;
 pub use crossovered_budget_table::*;
 pub use crossovered_budget_lines_table::*;
@@ -2838,6 +2883,8 @@ pub use kb_category_table::*;
 pub use knowledge_article_table::*;
 pub use lead_table::*;
 pub use lead_lost_reason_table::*;
+pub use lead_score_table::*;
+pub use lead_score_factor_table::*;
 pub use lead_source_table::*;
 pub use mail_follower_table::*;
 pub use mail_message_table::*;
@@ -3005,6 +3052,7 @@ pub use add_workflow_transition_reducer::add_workflow_transition;
 pub use allocate_payment_transaction_reducer::allocate_payment_transaction;
 pub use append_ai_agent_run_step_reducer::append_ai_agent_run_step;
 pub use append_ai_chat_message_reducer::append_ai_chat_message;
+pub use append_crm_conversation_message_reducer::append_crm_conversation_message;
 pub use apply_global_migrations_reducer::apply_global_migrations;
 pub use apply_landed_costs_reducer::apply_landed_costs;
 pub use apply_org_migrations_reducer::apply_org_migrations;
@@ -3361,6 +3409,7 @@ pub use end_user_session_reducer::end_user_session;
 pub use enqueue_job_reducer::enqueue_job;
 pub use ensure_dev_admin_reducer::ensure_dev_admin;
 pub use error_intercompany_transaction_reducer::error_intercompany_transaction;
+pub use evaluate_dynamic_segment_reducer::evaluate_dynamic_segment;
 pub use execute_replenishment_rule_reducer::execute_replenishment_rule;
 pub use execute_retention_purge_reducer::execute_retention_purge;
 pub use expire_ai_action_drafts_reducer::expire_ai_action_drafts;
@@ -3468,6 +3517,7 @@ pub use migrate_all_organizations_reducer::migrate_all_organizations;
 pub use move_stock_quant_reducer::move_stock_quant;
 pub use open_account_period_reducer::open_account_period;
 pub use open_contract_reducer::open_contract;
+pub use open_crm_conversation_reducer::open_crm_conversation;
 pub use open_fiscal_year_reducer::open_fiscal_year;
 pub use open_pos_session_reducer::open_pos_session;
 pub use open_quality_alert_reducer::open_quality_alert;
@@ -3493,6 +3543,8 @@ pub use queue_mail_from_template_reducer::queue_mail_from_template;
 pub use receive_po_line_reducer::receive_po_line;
 pub use recognize_amortization_line_reducer::recognize_amortization_line;
 pub use recognize_deferred_revenue_reducer::recognize_deferred_revenue;
+pub use recompute_lead_score_reducer::recompute_lead_score;
+pub use recompute_relationship_insights_reducer::recompute_relationship_insights;
 pub use reconcile_account_bank_statement_line_reducer::reconcile_account_bank_statement_line;
 pub use reconcile_payment_with_invoice_reducer::reconcile_payment_with_invoice;
 pub use record_ai_agent_run_policy_snapshot_reducer::record_ai_agent_run_policy_snapshot;
@@ -3570,6 +3622,7 @@ pub use run_core_sod_test_reducer::run_core_sod_test;
 pub use run_country_pack_test_reducer::run_country_pack_test;
 pub use run_crm_contact_identity_test_reducer::run_crm_contact_identity_test;
 pub use run_crm_contact_update_delete_test_reducer::run_crm_contact_update_delete_test;
+pub use run_crm_deferred_test_reducer::run_crm_deferred_test;
 pub use run_crm_opportunity_convert_test_reducer::run_crm_opportunity_convert_test;
 pub use run_crm_relationship_admin_test_reducer::run_crm_relationship_admin_test;
 pub use run_crm_wave_2_test_reducer::run_crm_wave_2_test;
@@ -3588,6 +3641,7 @@ pub use run_inventory_stock_quant_test_reducer::run_inventory_stock_quant_test;
 pub use run_manufacturing_workcenter_test_reducer::run_manufacturing_workcenter_test;
 pub use run_owner_report_schedule_reducer::run_owner_report_schedule;
 pub use run_purchasing_bill_balanced_test_reducer::run_purchasing_bill_balanced_test;
+pub use run_sales_order_cancel_test_reducer::run_sales_order_cancel_test;
 pub use run_sales_order_delivery_test_reducer::run_sales_order_delivery_test;
 pub use run_sales_order_invoice_test_reducer::run_sales_order_invoice_test;
 pub use run_sales_order_update_test_reducer::run_sales_order_update_test;
@@ -3613,6 +3667,7 @@ pub use set_company_country_pack_reducer::set_company_country_pack;
 pub use set_company_vertical_pack_reducer::set_company_vertical_pack;
 pub use set_consolidation_company_rate_reducer::set_consolidation_company_rate;
 pub use set_contact_communication_preference_reducer::set_contact_communication_preference;
+pub use set_contact_segment_rules_reducer::set_contact_segment_rules;
 pub use set_form_role_config_reducer::set_form_role_config;
 pub use set_intercompany_rule_active_reducer::set_intercompany_rule_active;
 pub use set_iot_threshold_reducer::set_iot_threshold;
@@ -3697,6 +3752,7 @@ pub use update_contact_details_reducer::update_contact_details;
 pub use update_contact_identity_reducer::update_contact_identity;
 pub use update_contact_parent_reducer::update_contact_parent;
 pub use update_contract_reducer::update_contract;
+pub use update_crm_conversation_reducer::update_crm_conversation;
 pub use update_crossovered_budget_reducer::update_crossovered_budget;
 pub use update_department_reducer::update_department;
 pub use update_device_status_reducer::update_device_status;
@@ -3964,6 +4020,11 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         params: AppendAiChatMessageParams,
+}    ,
+    AppendCrmConversationMessage {
+        organization_id: u64,
+        conversation_id: u64,
+        params: AppendCrmConversationMessageParams,
 }    ,
     ApplyGlobalMigrations ,
     ApplyLandedCosts {
@@ -5574,6 +5635,10 @@ pub enum Reducer {
         transaction_id: u64,
         params: ErrorIntercompanyTransactionParams,
 }    ,
+    EvaluateDynamicSegment {
+        organization_id: u64,
+        segment_id: u64,
+}    ,
     ExecuteReplenishmentRule {
         organization_id: u64,
         company_id: u64,
@@ -6055,6 +6120,10 @@ pub enum Reducer {
         organization_id: u64,
         contract_id: u64,
 }    ,
+    OpenCrmConversation {
+        organization_id: u64,
+        params: OpenCrmConversationParams,
+}    ,
     OpenFiscalYear {
         organization_id: u64,
         company_id: u64,
@@ -6182,6 +6251,14 @@ pub enum Reducer {
         company_id: u64,
         line_id: u64,
         params: RecognizeDeferredRevenueParams,
+}    ,
+    RecomputeLeadScore {
+        organization_id: u64,
+        lead_id: u64,
+}    ,
+    RecomputeRelationshipInsights {
+        organization_id: u64,
+        contact_id: u64,
 }    ,
     ReconcileAccountBankStatementLine {
         organization_id: u64,
@@ -6460,6 +6537,7 @@ pub enum Reducer {
     RunCountryPackTest ,
     RunCrmContactIdentityTest ,
     RunCrmContactUpdateDeleteTest ,
+    RunCrmDeferredTest ,
     RunCrmOpportunityConvertTest ,
     RunCrmRelationshipAdminTest ,
     RunCrmWave2Test ,
@@ -6489,6 +6567,7 @@ pub enum Reducer {
         report_id: u64,
 }    ,
     RunPurchasingBillBalancedTest ,
+    RunSalesOrderCancelTest ,
     RunSalesOrderDeliveryTest ,
     RunSalesOrderInvoiceTest ,
     RunSalesOrderUpdateTest ,
@@ -6581,6 +6660,11 @@ pub enum Reducer {
         contact_id: u64,
         channel: MessageChannel,
         opted_in: bool,
+}    ,
+    SetContactSegmentRules {
+        organization_id: u64,
+        segment_id: u64,
+        params: SetContactSegmentRulesParams,
 }    ,
     SetFormRoleConfig {
         organization_id: u64,
@@ -7003,6 +7087,11 @@ pub enum Reducer {
         organization_id: u64,
         contract_id: u64,
         params: UpdateContractParams,
+}    ,
+    UpdateCrmConversation {
+        organization_id: u64,
+        conversation_id: u64,
+        params: UpdateCrmConversationParams,
 }    ,
     UpdateCrossoveredBudget {
         organization_id: u64,
@@ -7653,6 +7742,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AllocatePaymentTransaction { .. } => "allocate_payment_transaction",
             Reducer::AppendAiAgentRunStep { .. } => "append_ai_agent_run_step",
             Reducer::AppendAiChatMessage { .. } => "append_ai_chat_message",
+            Reducer::AppendCrmConversationMessage { .. } => "append_crm_conversation_message",
             Reducer::ApplyGlobalMigrations => "apply_global_migrations",
             Reducer::ApplyLandedCosts { .. } => "apply_landed_costs",
             Reducer::ApplyOrgMigrations { .. } => "apply_org_migrations",
@@ -8009,6 +8099,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::EnqueueJob { .. } => "enqueue_job",
             Reducer::EnsureDevAdmin => "ensure_dev_admin",
             Reducer::ErrorIntercompanyTransaction { .. } => "error_intercompany_transaction",
+            Reducer::EvaluateDynamicSegment { .. } => "evaluate_dynamic_segment",
             Reducer::ExecuteReplenishmentRule { .. } => "execute_replenishment_rule",
             Reducer::ExecuteRetentionPurge { .. } => "execute_retention_purge",
             Reducer::ExpireAiActionDrafts { .. } => "expire_ai_action_drafts",
@@ -8116,6 +8207,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::MoveStockQuant { .. } => "move_stock_quant",
             Reducer::OpenAccountPeriod { .. } => "open_account_period",
             Reducer::OpenContract { .. } => "open_contract",
+            Reducer::OpenCrmConversation { .. } => "open_crm_conversation",
             Reducer::OpenFiscalYear { .. } => "open_fiscal_year",
             Reducer::OpenPosSession { .. } => "open_pos_session",
             Reducer::OpenQualityAlert { .. } => "open_quality_alert",
@@ -8141,6 +8233,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReceivePoLine { .. } => "receive_po_line",
             Reducer::RecognizeAmortizationLine { .. } => "recognize_amortization_line",
             Reducer::RecognizeDeferredRevenue { .. } => "recognize_deferred_revenue",
+            Reducer::RecomputeLeadScore { .. } => "recompute_lead_score",
+            Reducer::RecomputeRelationshipInsights { .. } => "recompute_relationship_insights",
             Reducer::ReconcileAccountBankStatementLine { .. } => "reconcile_account_bank_statement_line",
             Reducer::ReconcilePaymentWithInvoice { .. } => "reconcile_payment_with_invoice",
             Reducer::RecordAiAgentRunPolicySnapshot { .. } => "record_ai_agent_run_policy_snapshot",
@@ -8218,6 +8312,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunCountryPackTest => "run_country_pack_test",
             Reducer::RunCrmContactIdentityTest => "run_crm_contact_identity_test",
             Reducer::RunCrmContactUpdateDeleteTest => "run_crm_contact_update_delete_test",
+            Reducer::RunCrmDeferredTest => "run_crm_deferred_test",
             Reducer::RunCrmOpportunityConvertTest => "run_crm_opportunity_convert_test",
             Reducer::RunCrmRelationshipAdminTest => "run_crm_relationship_admin_test",
             Reducer::RunCrmWave2Test => "run_crm_wave_2_test",
@@ -8236,6 +8331,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunManufacturingWorkcenterTest => "run_manufacturing_workcenter_test",
             Reducer::RunOwnerReportSchedule { .. } => "run_owner_report_schedule",
             Reducer::RunPurchasingBillBalancedTest => "run_purchasing_bill_balanced_test",
+            Reducer::RunSalesOrderCancelTest => "run_sales_order_cancel_test",
             Reducer::RunSalesOrderDeliveryTest => "run_sales_order_delivery_test",
             Reducer::RunSalesOrderInvoiceTest => "run_sales_order_invoice_test",
             Reducer::RunSalesOrderUpdateTest => "run_sales_order_update_test",
@@ -8261,6 +8357,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetCompanyVerticalPack { .. } => "set_company_vertical_pack",
             Reducer::SetConsolidationCompanyRate { .. } => "set_consolidation_company_rate",
             Reducer::SetContactCommunicationPreference { .. } => "set_contact_communication_preference",
+            Reducer::SetContactSegmentRules { .. } => "set_contact_segment_rules",
             Reducer::SetFormRoleConfig { .. } => "set_form_role_config",
             Reducer::SetIntercompanyRuleActive { .. } => "set_intercompany_rule_active",
             Reducer::SetIotThreshold { .. } => "set_iot_threshold",
@@ -8345,6 +8442,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateContactIdentity { .. } => "update_contact_identity",
             Reducer::UpdateContactParent { .. } => "update_contact_parent",
             Reducer::UpdateContract { .. } => "update_contract",
+            Reducer::UpdateCrmConversation { .. } => "update_crm_conversation",
             Reducer::UpdateCrossoveredBudget { .. } => "update_crossovered_budget",
             Reducer::UpdateDepartment { .. } => "update_department",
             Reducer::UpdateDeviceStatus { .. } => "update_device_status",
@@ -8725,6 +8823,15 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
 }             => __sats::bsatn::to_vec(&append_ai_chat_message_reducer::AppendAiChatMessageArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::AppendCrmConversationMessage{
+                organization_id,
+                conversation_id,
+                params,
+}             => __sats::bsatn::to_vec(&append_crm_conversation_message_reducer::AppendCrmConversationMessageArgs {
+                organization_id: organization_id.clone(),
+                conversation_id: conversation_id.clone(),
                 params: params.clone(),
 }),
             Reducer::ApplyGlobalMigrations => __sats::bsatn::to_vec(&apply_global_migrations_reducer::ApplyGlobalMigrationsArgs {
@@ -11593,6 +11700,13 @@ Reducer::ErrorIntercompanyTransaction{
                 transaction_id: transaction_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::EvaluateDynamicSegment{
+                organization_id,
+                segment_id,
+}             => __sats::bsatn::to_vec(&evaluate_dynamic_segment_reducer::EvaluateDynamicSegmentArgs {
+                organization_id: organization_id.clone(),
+                segment_id: segment_id.clone(),
+}),
             Reducer::ExecuteReplenishmentRule{
                 organization_id,
                 company_id,
@@ -12449,6 +12563,13 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 contract_id: contract_id.clone(),
 }),
+            Reducer::OpenCrmConversation{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&open_crm_conversation_reducer::OpenCrmConversationArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::OpenFiscalYear{
                 organization_id,
                 company_id,
@@ -12679,6 +12800,20 @@ Reducer::MoveStockQuant{
                 company_id: company_id.clone(),
                 line_id: line_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::RecomputeLeadScore{
+                organization_id,
+                lead_id,
+}             => __sats::bsatn::to_vec(&recompute_lead_score_reducer::RecomputeLeadScoreArgs {
+                organization_id: organization_id.clone(),
+                lead_id: lead_id.clone(),
+}),
+            Reducer::RecomputeRelationshipInsights{
+                organization_id,
+                contact_id,
+}             => __sats::bsatn::to_vec(&recompute_relationship_insights_reducer::RecomputeRelationshipInsightsArgs {
+                organization_id: organization_id.clone(),
+                contact_id: contact_id.clone(),
 }),
             Reducer::ReconcileAccountBankStatementLine{
                 organization_id,
@@ -13179,6 +13314,8 @@ Reducer::RunCrmContactIdentityTest => __sats::bsatn::to_vec(&run_crm_contact_ide
                 }),
 Reducer::RunCrmContactUpdateDeleteTest => __sats::bsatn::to_vec(&run_crm_contact_update_delete_test_reducer::RunCrmContactUpdateDeleteTestArgs {
                 }),
+Reducer::RunCrmDeferredTest => __sats::bsatn::to_vec(&run_crm_deferred_test_reducer::RunCrmDeferredTestArgs {
+                }),
 Reducer::RunCrmOpportunityConvertTest => __sats::bsatn::to_vec(&run_crm_opportunity_convert_test_reducer::RunCrmOpportunityConvertTestArgs {
                 }),
 Reducer::RunCrmRelationshipAdminTest => __sats::bsatn::to_vec(&run_crm_relationship_admin_test_reducer::RunCrmRelationshipAdminTestArgs {
@@ -13233,6 +13370,8 @@ Reducer::RunOwnerReportSchedule{
                 report_id: report_id.clone(),
 }),
             Reducer::RunPurchasingBillBalancedTest => __sats::bsatn::to_vec(&run_purchasing_bill_balanced_test_reducer::RunPurchasingBillBalancedTestArgs {
+                }),
+Reducer::RunSalesOrderCancelTest => __sats::bsatn::to_vec(&run_sales_order_cancel_test_reducer::RunSalesOrderCancelTestArgs {
                 }),
 Reducer::RunSalesOrderDeliveryTest => __sats::bsatn::to_vec(&run_sales_order_delivery_test_reducer::RunSalesOrderDeliveryTestArgs {
                 }),
@@ -13401,6 +13540,15 @@ Reducer::SeedOrganizationFormConfigs{
                 contact_id: contact_id.clone(),
                 channel: channel.clone(),
                 opted_in: opted_in.clone(),
+}),
+            Reducer::SetContactSegmentRules{
+                organization_id,
+                segment_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_contact_segment_rules_reducer::SetContactSegmentRulesArgs {
+                organization_id: organization_id.clone(),
+                segment_id: segment_id.clone(),
+                params: params.clone(),
 }),
             Reducer::SetFormRoleConfig{
                 organization_id,
@@ -14160,6 +14308,15 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&update_contract_reducer::UpdateContractArgs {
                 organization_id: organization_id.clone(),
                 contract_id: contract_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateCrmConversation{
+                organization_id,
+                conversation_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_crm_conversation_reducer::UpdateCrmConversationArgs {
+                organization_id: organization_id.clone(),
+                conversation_id: conversation_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateCrossoveredBudget{
@@ -15358,13 +15515,17 @@ pub struct DbUpdate {
     contact_duplicate_candidate: __sdk::TableUpdate<ContactDuplicateCandidate>,
     contact_phone_identity: __sdk::TableUpdate<ContactPhoneIdentity>,
     contact_relationship: __sdk::TableUpdate<ContactRelationship>,
+    contact_relationship_insight: __sdk::TableUpdate<ContactRelationshipInsight>,
     contact_role_assignment: __sdk::TableUpdate<ContactRoleAssignment>,
     contact_segment: __sdk::TableUpdate<ContactSegment>,
+    contact_segment_rule: __sdk::TableUpdate<ContactSegmentRule>,
     contact_tag: __sdk::TableUpdate<ContactTag>,
     contact_tag_assignment: __sdk::TableUpdate<ContactTagAssignment>,
     country: __sdk::TableUpdate<Country>,
     country_pack_definition: __sdk::TableUpdate<CountryPackDefinition>,
     country_pack_tax_rule: __sdk::TableUpdate<CountryPackTaxRule>,
+    crm_conversation: __sdk::TableUpdate<CrmConversation>,
+    crm_conversation_message: __sdk::TableUpdate<CrmConversationMessage>,
     crm_forecast_snapshot: __sdk::TableUpdate<CrmForecastSnapshot>,
     crossovered_budget: __sdk::TableUpdate<CrossoveredBudget>,
     crossovered_budget_lines: __sdk::TableUpdate<CrossoveredBudgetLines>,
@@ -15427,6 +15588,8 @@ pub struct DbUpdate {
     knowledge_article: __sdk::TableUpdate<KnowledgeArticle>,
     lead: __sdk::TableUpdate<Lead>,
     lead_lost_reason: __sdk::TableUpdate<LeadLostReason>,
+    lead_score: __sdk::TableUpdate<LeadScore>,
+    lead_score_factor: __sdk::TableUpdate<LeadScoreFactor>,
     lead_source: __sdk::TableUpdate<LeadSource>,
     mail_follower: __sdk::TableUpdate<MailFollower>,
     mail_message: __sdk::TableUpdate<MailMessage>,
@@ -15655,13 +15818,17 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(contact_duplicate_candidate_table::parse_table_update(table_update)?),
     "contact_phone_identity" => db_update.contact_phone_identity.append(contact_phone_identity_table::parse_table_update(table_update)?),
     "contact_relationship" => db_update.contact_relationship.append(contact_relationship_table::parse_table_update(table_update)?),
+    "contact_relationship_insight" => db_update.contact_relationship_insight.append(contact_relationship_insight_table::parse_table_update(table_update)?),
     "contact_role_assignment" => db_update.contact_role_assignment.append(contact_role_assignment_table::parse_table_update(table_update)?),
     "contact_segment" => db_update.contact_segment.append(contact_segment_table::parse_table_update(table_update)?),
+    "contact_segment_rule" => db_update.contact_segment_rule.append(contact_segment_rule_table::parse_table_update(table_update)?),
     "contact_tag" => db_update.contact_tag.append(contact_tag_table::parse_table_update(table_update)?),
     "contact_tag_assignment" => db_update.contact_tag_assignment.append(contact_tag_assignment_table::parse_table_update(table_update)?),
     "country" => db_update.country.append(country_table::parse_table_update(table_update)?),
     "country_pack_definition" => db_update.country_pack_definition.append(country_pack_definition_table::parse_table_update(table_update)?),
     "country_pack_tax_rule" => db_update.country_pack_tax_rule.append(country_pack_tax_rule_table::parse_table_update(table_update)?),
+    "crm_conversation" => db_update.crm_conversation.append(crm_conversation_table::parse_table_update(table_update)?),
+    "crm_conversation_message" => db_update.crm_conversation_message.append(crm_conversation_message_table::parse_table_update(table_update)?),
     "crm_forecast_snapshot" => db_update.crm_forecast_snapshot.append(crm_forecast_snapshot_table::parse_table_update(table_update)?),
     "crossovered_budget" => db_update.crossovered_budget.append(crossovered_budget_table::parse_table_update(table_update)?),
     "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(crossovered_budget_lines_table::parse_table_update(table_update)?),
@@ -15724,6 +15891,8 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "knowledge_article" => db_update.knowledge_article.append(knowledge_article_table::parse_table_update(table_update)?),
     "lead" => db_update.lead.append(lead_table::parse_table_update(table_update)?),
     "lead_lost_reason" => db_update.lead_lost_reason.append(lead_lost_reason_table::parse_table_update(table_update)?),
+    "lead_score" => db_update.lead_score.append(lead_score_table::parse_table_update(table_update)?),
+    "lead_score_factor" => db_update.lead_score_factor.append(lead_score_factor_table::parse_table_update(table_update)?),
     "lead_source" => db_update.lead_source.append(lead_source_table::parse_table_update(table_update)?),
     "mail_follower" => db_update.mail_follower.append(mail_follower_table::parse_table_update(table_update)?),
     "mail_message" => db_update.mail_message.append(mail_message_table::parse_table_update(table_update)?),
@@ -15964,13 +16133,17 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.contact_duplicate_candidate = cache.apply_diff_to_table::<ContactDuplicateCandidate>("contact_duplicate_candidate", &self.contact_duplicate_candidate).with_updates_by_pk(|row| &row.id);
         diff.contact_phone_identity = cache.apply_diff_to_table::<ContactPhoneIdentity>("contact_phone_identity", &self.contact_phone_identity).with_updates_by_pk(|row| &row.id);
         diff.contact_relationship = cache.apply_diff_to_table::<ContactRelationship>("contact_relationship", &self.contact_relationship).with_updates_by_pk(|row| &row.id);
+        diff.contact_relationship_insight = cache.apply_diff_to_table::<ContactRelationshipInsight>("contact_relationship_insight", &self.contact_relationship_insight).with_updates_by_pk(|row| &row.id);
         diff.contact_role_assignment = cache.apply_diff_to_table::<ContactRoleAssignment>("contact_role_assignment", &self.contact_role_assignment).with_updates_by_pk(|row| &row.id);
         diff.contact_segment = cache.apply_diff_to_table::<ContactSegment>("contact_segment", &self.contact_segment).with_updates_by_pk(|row| &row.id);
+        diff.contact_segment_rule = cache.apply_diff_to_table::<ContactSegmentRule>("contact_segment_rule", &self.contact_segment_rule).with_updates_by_pk(|row| &row.id);
         diff.contact_tag = cache.apply_diff_to_table::<ContactTag>("contact_tag", &self.contact_tag).with_updates_by_pk(|row| &row.id);
         diff.contact_tag_assignment = cache.apply_diff_to_table::<ContactTagAssignment>("contact_tag_assignment", &self.contact_tag_assignment).with_updates_by_pk(|row| &row.id);
         diff.country = cache.apply_diff_to_table::<Country>("country", &self.country).with_updates_by_pk(|row| &row.code);
         diff.country_pack_definition = cache.apply_diff_to_table::<CountryPackDefinition>("country_pack_definition", &self.country_pack_definition).with_updates_by_pk(|row| &row.pack_key);
         diff.country_pack_tax_rule = cache.apply_diff_to_table::<CountryPackTaxRule>("country_pack_tax_rule", &self.country_pack_tax_rule).with_updates_by_pk(|row| &row.id);
+        diff.crm_conversation = cache.apply_diff_to_table::<CrmConversation>("crm_conversation", &self.crm_conversation).with_updates_by_pk(|row| &row.id);
+        diff.crm_conversation_message = cache.apply_diff_to_table::<CrmConversationMessage>("crm_conversation_message", &self.crm_conversation_message).with_updates_by_pk(|row| &row.id);
         diff.crm_forecast_snapshot = cache.apply_diff_to_table::<CrmForecastSnapshot>("crm_forecast_snapshot", &self.crm_forecast_snapshot).with_updates_by_pk(|row| &row.id);
         diff.crossovered_budget = cache.apply_diff_to_table::<CrossoveredBudget>("crossovered_budget", &self.crossovered_budget).with_updates_by_pk(|row| &row.id);
         diff.crossovered_budget_lines = cache.apply_diff_to_table::<CrossoveredBudgetLines>("crossovered_budget_lines", &self.crossovered_budget_lines).with_updates_by_pk(|row| &row.id);
@@ -16033,6 +16206,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.knowledge_article = cache.apply_diff_to_table::<KnowledgeArticle>("knowledge_article", &self.knowledge_article).with_updates_by_pk(|row| &row.id);
         diff.lead = cache.apply_diff_to_table::<Lead>("lead", &self.lead).with_updates_by_pk(|row| &row.id);
         diff.lead_lost_reason = cache.apply_diff_to_table::<LeadLostReason>("lead_lost_reason", &self.lead_lost_reason).with_updates_by_pk(|row| &row.id);
+        diff.lead_score = cache.apply_diff_to_table::<LeadScore>("lead_score", &self.lead_score).with_updates_by_pk(|row| &row.id);
+        diff.lead_score_factor = cache.apply_diff_to_table::<LeadScoreFactor>("lead_score_factor", &self.lead_score_factor).with_updates_by_pk(|row| &row.id);
         diff.lead_source = cache.apply_diff_to_table::<LeadSource>("lead_source", &self.lead_source).with_updates_by_pk(|row| &row.id);
         diff.mail_follower = cache.apply_diff_to_table::<MailFollower>("mail_follower", &self.mail_follower).with_updates_by_pk(|row| &row.id);
         diff.mail_message = cache.apply_diff_to_table::<MailMessage>("mail_message", &self.mail_message).with_updates_by_pk(|row| &row.id);
@@ -16258,13 +16433,17 @@ for table_rows in raw.tables {
                 "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_phone_identity" => db_update.contact_phone_identity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_relationship" => db_update.contact_relationship.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_relationship_insight" => db_update.contact_relationship_insight.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_role_assignment" => db_update.contact_role_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_segment" => db_update.contact_segment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_segment_rule" => db_update.contact_segment_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_tag" => db_update.contact_tag.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_tag_assignment" => db_update.contact_tag_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "country" => db_update.country.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "country_pack_definition" => db_update.country_pack_definition.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "country_pack_tax_rule" => db_update.country_pack_tax_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crm_conversation" => db_update.crm_conversation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crm_conversation_message" => db_update.crm_conversation_message.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "crm_forecast_snapshot" => db_update.crm_forecast_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "crossovered_budget" => db_update.crossovered_budget.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -16327,6 +16506,8 @@ for table_rows in raw.tables {
                 "knowledge_article" => db_update.knowledge_article.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "lead" => db_update.lead.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "lead_lost_reason" => db_update.lead_lost_reason.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "lead_score" => db_update.lead_score.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "lead_score_factor" => db_update.lead_score_factor.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "lead_source" => db_update.lead_source.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mail_follower" => db_update.mail_follower.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mail_message" => db_update.mail_message.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -16552,13 +16733,17 @@ for table_rows in raw.tables {
                 "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_phone_identity" => db_update.contact_phone_identity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_relationship" => db_update.contact_relationship.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_relationship_insight" => db_update.contact_relationship_insight.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_role_assignment" => db_update.contact_role_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_segment" => db_update.contact_segment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_segment_rule" => db_update.contact_segment_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_tag" => db_update.contact_tag.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_tag_assignment" => db_update.contact_tag_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "country" => db_update.country.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "country_pack_definition" => db_update.country_pack_definition.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "country_pack_tax_rule" => db_update.country_pack_tax_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crm_conversation" => db_update.crm_conversation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crm_conversation_message" => db_update.crm_conversation_message.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "crm_forecast_snapshot" => db_update.crm_forecast_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "crossovered_budget" => db_update.crossovered_budget.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -16621,6 +16806,8 @@ for table_rows in raw.tables {
                 "knowledge_article" => db_update.knowledge_article.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "lead" => db_update.lead.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "lead_lost_reason" => db_update.lead_lost_reason.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "lead_score" => db_update.lead_score.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "lead_score_factor" => db_update.lead_score_factor.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "lead_source" => db_update.lead_source.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mail_follower" => db_update.mail_follower.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mail_message" => db_update.mail_message.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -16848,13 +17035,17 @@ pub struct AppliedDiff<'r> {
     contact_duplicate_candidate: __sdk::TableAppliedDiff<'r, ContactDuplicateCandidate>,
     contact_phone_identity: __sdk::TableAppliedDiff<'r, ContactPhoneIdentity>,
     contact_relationship: __sdk::TableAppliedDiff<'r, ContactRelationship>,
+    contact_relationship_insight: __sdk::TableAppliedDiff<'r, ContactRelationshipInsight>,
     contact_role_assignment: __sdk::TableAppliedDiff<'r, ContactRoleAssignment>,
     contact_segment: __sdk::TableAppliedDiff<'r, ContactSegment>,
+    contact_segment_rule: __sdk::TableAppliedDiff<'r, ContactSegmentRule>,
     contact_tag: __sdk::TableAppliedDiff<'r, ContactTag>,
     contact_tag_assignment: __sdk::TableAppliedDiff<'r, ContactTagAssignment>,
     country: __sdk::TableAppliedDiff<'r, Country>,
     country_pack_definition: __sdk::TableAppliedDiff<'r, CountryPackDefinition>,
     country_pack_tax_rule: __sdk::TableAppliedDiff<'r, CountryPackTaxRule>,
+    crm_conversation: __sdk::TableAppliedDiff<'r, CrmConversation>,
+    crm_conversation_message: __sdk::TableAppliedDiff<'r, CrmConversationMessage>,
     crm_forecast_snapshot: __sdk::TableAppliedDiff<'r, CrmForecastSnapshot>,
     crossovered_budget: __sdk::TableAppliedDiff<'r, CrossoveredBudget>,
     crossovered_budget_lines: __sdk::TableAppliedDiff<'r, CrossoveredBudgetLines>,
@@ -16917,6 +17108,8 @@ pub struct AppliedDiff<'r> {
     knowledge_article: __sdk::TableAppliedDiff<'r, KnowledgeArticle>,
     lead: __sdk::TableAppliedDiff<'r, Lead>,
     lead_lost_reason: __sdk::TableAppliedDiff<'r, LeadLostReason>,
+    lead_score: __sdk::TableAppliedDiff<'r, LeadScore>,
+    lead_score_factor: __sdk::TableAppliedDiff<'r, LeadScoreFactor>,
     lead_source: __sdk::TableAppliedDiff<'r, LeadSource>,
     mail_follower: __sdk::TableAppliedDiff<'r, MailFollower>,
     mail_message: __sdk::TableAppliedDiff<'r, MailMessage>,
@@ -17145,13 +17338,17 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<ContactDuplicateCandidate>("contact_duplicate_candidate", &self.contact_duplicate_candidate, event);
         callbacks.invoke_table_row_callbacks::<ContactPhoneIdentity>("contact_phone_identity", &self.contact_phone_identity, event);
         callbacks.invoke_table_row_callbacks::<ContactRelationship>("contact_relationship", &self.contact_relationship, event);
+        callbacks.invoke_table_row_callbacks::<ContactRelationshipInsight>("contact_relationship_insight", &self.contact_relationship_insight, event);
         callbacks.invoke_table_row_callbacks::<ContactRoleAssignment>("contact_role_assignment", &self.contact_role_assignment, event);
         callbacks.invoke_table_row_callbacks::<ContactSegment>("contact_segment", &self.contact_segment, event);
+        callbacks.invoke_table_row_callbacks::<ContactSegmentRule>("contact_segment_rule", &self.contact_segment_rule, event);
         callbacks.invoke_table_row_callbacks::<ContactTag>("contact_tag", &self.contact_tag, event);
         callbacks.invoke_table_row_callbacks::<ContactTagAssignment>("contact_tag_assignment", &self.contact_tag_assignment, event);
         callbacks.invoke_table_row_callbacks::<Country>("country", &self.country, event);
         callbacks.invoke_table_row_callbacks::<CountryPackDefinition>("country_pack_definition", &self.country_pack_definition, event);
         callbacks.invoke_table_row_callbacks::<CountryPackTaxRule>("country_pack_tax_rule", &self.country_pack_tax_rule, event);
+        callbacks.invoke_table_row_callbacks::<CrmConversation>("crm_conversation", &self.crm_conversation, event);
+        callbacks.invoke_table_row_callbacks::<CrmConversationMessage>("crm_conversation_message", &self.crm_conversation_message, event);
         callbacks.invoke_table_row_callbacks::<CrmForecastSnapshot>("crm_forecast_snapshot", &self.crm_forecast_snapshot, event);
         callbacks.invoke_table_row_callbacks::<CrossoveredBudget>("crossovered_budget", &self.crossovered_budget, event);
         callbacks.invoke_table_row_callbacks::<CrossoveredBudgetLines>("crossovered_budget_lines", &self.crossovered_budget_lines, event);
@@ -17214,6 +17411,8 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<KnowledgeArticle>("knowledge_article", &self.knowledge_article, event);
         callbacks.invoke_table_row_callbacks::<Lead>("lead", &self.lead, event);
         callbacks.invoke_table_row_callbacks::<LeadLostReason>("lead_lost_reason", &self.lead_lost_reason, event);
+        callbacks.invoke_table_row_callbacks::<LeadScore>("lead_score", &self.lead_score, event);
+        callbacks.invoke_table_row_callbacks::<LeadScoreFactor>("lead_score_factor", &self.lead_score_factor, event);
         callbacks.invoke_table_row_callbacks::<LeadSource>("lead_source", &self.lead_source, event);
         callbacks.invoke_table_row_callbacks::<MailFollower>("mail_follower", &self.mail_follower, event);
         callbacks.invoke_table_row_callbacks::<MailMessage>("mail_message", &self.mail_message, event);
@@ -18073,13 +18272,17 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         contact_duplicate_candidate_table::register_table(client_cache);
         contact_phone_identity_table::register_table(client_cache);
         contact_relationship_table::register_table(client_cache);
+        contact_relationship_insight_table::register_table(client_cache);
         contact_role_assignment_table::register_table(client_cache);
         contact_segment_table::register_table(client_cache);
+        contact_segment_rule_table::register_table(client_cache);
         contact_tag_table::register_table(client_cache);
         contact_tag_assignment_table::register_table(client_cache);
         country_table::register_table(client_cache);
         country_pack_definition_table::register_table(client_cache);
         country_pack_tax_rule_table::register_table(client_cache);
+        crm_conversation_table::register_table(client_cache);
+        crm_conversation_message_table::register_table(client_cache);
         crm_forecast_snapshot_table::register_table(client_cache);
         crossovered_budget_table::register_table(client_cache);
         crossovered_budget_lines_table::register_table(client_cache);
@@ -18142,6 +18345,8 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         knowledge_article_table::register_table(client_cache);
         lead_table::register_table(client_cache);
         lead_lost_reason_table::register_table(client_cache);
+        lead_score_table::register_table(client_cache);
+        lead_score_factor_table::register_table(client_cache);
         lead_source_table::register_table(client_cache);
         mail_follower_table::register_table(client_cache);
         mail_message_table::register_table(client_cache);
@@ -18362,13 +18567,17 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "contact_duplicate_candidate",
         "contact_phone_identity",
         "contact_relationship",
+        "contact_relationship_insight",
         "contact_role_assignment",
         "contact_segment",
+        "contact_segment_rule",
         "contact_tag",
         "contact_tag_assignment",
         "country",
         "country_pack_definition",
         "country_pack_tax_rule",
+        "crm_conversation",
+        "crm_conversation_message",
         "crm_forecast_snapshot",
         "crossovered_budget",
         "crossovered_budget_lines",
@@ -18431,6 +18640,8 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "knowledge_article",
         "lead",
         "lead_lost_reason",
+        "lead_score",
+        "lead_score_factor",
         "lead_source",
         "mail_follower",
         "mail_message",

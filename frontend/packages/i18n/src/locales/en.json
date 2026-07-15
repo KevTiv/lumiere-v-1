@@ -3331,6 +3331,42 @@
       "rulesDescription": "Route leads and opportunities (territories foundation).",
       "ruleName": "Name",
       "createRule": "Create rule"
+    },
+    "scoring": {
+      "tabLabel": "Score",
+      "title": "Lead score",
+      "description": "Explainable fit factors (deterministic baseline).",
+      "recompute": "Recompute",
+      "emptyTitle": "No score yet",
+      "emptyDescription": "Recompute to generate explainable factors."
+    },
+    "inbox": {
+      "tabLabel": "Inbox",
+      "title": "WhatsApp inbox",
+      "description": "CRM conversation thread for WhatsApp intents (delivery via workers).",
+      "open": "Open thread",
+      "close": "Close",
+      "emptyTitle": "No open conversation",
+      "emptyDescription": "Open a WhatsApp thread for this contact.",
+      "compose": "Outbound message",
+      "placeholder": "Type a message…"
+    },
+    "relIntel": {
+      "title": "Relationship intelligence",
+      "description": "Strength from active relationships and hierarchy depth.",
+      "recompute": "Recompute",
+      "empty": "No insight yet — recompute to generate.",
+      "relationships": "Relationships",
+      "depth": "Depth"
+    },
+    "segments": {
+      "rulesTitle": "Dynamic segment rules",
+      "rulesDescription": "Bounded AST (country / flags). Evaluate to refresh membership.",
+      "select": "Dynamic segment",
+      "selectPlaceholder": "Choose segment",
+      "noRules": "No rules yet.",
+      "applySample": "Apply AU customer rules",
+      "evaluate": "Evaluate"
     }
   },
   "iot": {

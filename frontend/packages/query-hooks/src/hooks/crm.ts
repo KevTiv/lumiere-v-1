@@ -23,6 +23,10 @@ import type {
   CreateContactParams,
   CreateContactRelationshipParams,
   CreateCrmForecastSnapshotParams,
+  AppendCrmConversationMessageParams,
+  OpenCrmConversationParams,
+  SetContactSegmentRulesParams,
+  UpdateCrmConversationParams,
   CreateLeadParams,
   CreateLeadSourceParams,
   CreateOpportunityLineParams,
@@ -986,6 +990,169 @@ export function useCreateForecastSnapshot(organizationId: bigint) {
   })
 }
 
+// ── Deferred CRM foundations ──────────────────────────────────────────────────
+
+export function useLeadScores(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("lead-scores", organizationId, { initialData })
+}
+
+export function useLeadScoreFactors(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("lead-score-factors", organizationId, { initialData })
+}
+
+export function useContactSegmentRules(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("contact-segment-rules", organizationId, { initialData })
+}
+
+export function useContactRelationshipInsights(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("contact-relationship-insights", organizationId, {
+    initialData,
+  })
+}
+
+export function useCrmConversations(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("crm-conversations", organizationId, { initialData })
+}
+
+export function useCrmConversationMessages(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("crm-conversation-messages", organizationId, {
+    initialData,
+  })
+}
+
+export function useRecomputeLeadScore(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (leadId) => {
+      const { urlPath, init } = crmBffPost("recompute_lead_score", [
+        organizationId,
+        toScalarU64(leadId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to recompute lead score")
+    },
+    onSuccess: () => {
+      void invalidateResourceQueries(qc, organizationId, ["lead-scores"])
+      void invalidateResourceQueries(qc, organizationId, ["lead-score-factors"])
+    },
+  })
+}
+
+export function useSetContactSegmentRules(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { segmentId: ScalarId; params: SetContactSegmentRulesParams }
+  >({
+    mutationFn: async ({ segmentId, params }) => {
+      const { urlPath, init } = crmBffPost("set_contact_segment_rules", [
+        organizationId,
+        toScalarU64(segmentId),
+        stdbParamsToJson(params as object, "SetContactSegmentRulesParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to set segment rules")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["contact-segment-rules"]),
+  })
+}
+
+export function useEvaluateDynamicSegment(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (segmentId) => {
+      const { urlPath, init } = crmBffPost("evaluate_dynamic_segment", [
+        organizationId,
+        toScalarU64(segmentId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to evaluate dynamic segment")
+    },
+    onSuccess: () => {
+      void invalidateResourceQueries(qc, organizationId, ["contact-segments"])
+      void invalidateResourceQueries(qc, organizationId, ["segment-members"])
+    },
+  })
+}
+
+export function useRecomputeRelationshipInsights(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (contactId) => {
+      const { urlPath, init } = crmBffPost("recompute_relationship_insights", [
+        organizationId,
+        toScalarU64(contactId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to recompute relationship insights")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["contact-relationship-insights"]),
+  })
+}
+
+export function useOpenCrmConversation(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, OpenCrmConversationParams>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = crmBffPost("open_crm_conversation", [
+        organizationId,
+        stdbParamsToJson(params as object, "OpenCrmConversationParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to open CRM conversation")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["crm-conversations"]),
+  })
+}
+
+export function useAppendCrmConversationMessage(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { conversationId: ScalarId; params: AppendCrmConversationMessageParams }
+  >({
+    mutationFn: async ({ conversationId, params }) => {
+      const { urlPath, init } = crmBffPost("append_crm_conversation_message", [
+        organizationId,
+        toScalarU64(conversationId),
+        stdbParamsToJson(params as object, "AppendCrmConversationMessageParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to append conversation message")
+    },
+    onSuccess: () => {
+      void invalidateResourceQueries(qc, organizationId, ["crm-conversation-messages"])
+      void invalidateResourceQueries(qc, organizationId, ["crm-conversations"])
+    },
+  })
+}
+
+export function useUpdateCrmConversation(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { conversationId: ScalarId; params: UpdateCrmConversationParams }
+  >({
+    mutationFn: async ({ conversationId, params }) => {
+      const { urlPath, init } = crmBffPost("update_crm_conversation", [
+        organizationId,
+        toScalarU64(conversationId),
+        stdbParamsToJson(params as object, "UpdateCrmConversationParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update CRM conversation")
+    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, ["crm-conversations"]),
+  })
+}
+
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
   ConvertLeadParams,
@@ -998,6 +1165,10 @@ export type {
   CreateContactSegmentParams,
   CreateContactTagParams,
   CreateCrmForecastSnapshotParams,
+  AppendCrmConversationMessageParams,
+  OpenCrmConversationParams,
+  SetContactSegmentRulesParams,
+  UpdateCrmConversationParams,
   CreateLeadParams,
   CreateLeadSourceParams,
   CreateOpportunityLineParams,
