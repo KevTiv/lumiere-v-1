@@ -831,7 +831,8 @@
         "recordPayment": "Record Payment",
         "postDraft": "Post",
         "recalculateTotals": "Recalculate totals",
-        "createCreditNote": "Create credit note"
+        "createCreditNote": "Create credit note",
+        "createExchange": "Create exchange order"
       },
       "recordSheet": {
         "actionsTab": "Actions",
@@ -5962,7 +5963,8 @@
         "confirm": "Confirm",
         "cancel": "Cancel",
         "receive": "Receive return",
-        "createCreditNote": "Create credit note"
+        "createCreditNote": "Create credit note",
+        "createExchange": "Create exchange order"
       }
     },
     "returnOrderLines": {

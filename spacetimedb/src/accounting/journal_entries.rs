@@ -1782,7 +1782,7 @@ pub fn create_invoice_from_sale_order(
         partner_bank_id: None,
         fiscal_position_id: order.fiscal_position_id,
         invoice_user_id: Some(ctx.sender()),
-        invoice_incoterm_id: None,
+        invoice_incoterm_id: order.incoterm_id,
         incoterm_location: order.incoterm_location.clone(),
         campaign_id: order.campaign_id,
         source_id: order.source_id,

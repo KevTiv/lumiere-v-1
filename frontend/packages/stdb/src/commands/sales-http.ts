@@ -7,6 +7,9 @@ import type { ReducerCommandContractMeta } from "./types";
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` sales hooks.
  */
 export const SALES_BFF_REDUCERS = [
+  "accrue_sale_commission",
+  "apply_sale_order_options",
+  "apply_sale_promotion_to_order",
   "cancel_picking_batch",
   "cancel_return_order",
   "cancel_sale_order",
@@ -14,10 +17,13 @@ export const SALES_BFF_REDUCERS = [
   "compute_so_totals",
   "confirm_return_order",
   "confirm_sales_order",
-  "send_sale_order_quotation",
   "create_credit_note_from_return_order",
   "create_delivery_carrier",
   "create_delivery_price_rule",
+  "create_exchange_order_from_return",
+  "create_fiscal_position",
+  "create_fiscal_position_tax",
+  "create_incoterm",
   "create_invoice_from_sale_order",
   "create_loyalty_card",
   "create_loyalty_program",
@@ -28,18 +34,23 @@ export const SALES_BFF_REDUCERS = [
   "create_return_order",
   "create_sale_order",
   "create_sale_order_line",
+  "create_sale_order_option",
+  "create_sale_promotion",
   "create_shipping_method",
   "delete_pricelist",
   "delete_pricelist_item",
   "delete_sale_order_line",
+  "delete_sale_order_option",
   "import_sale_order_csv",
   "import_sale_order_line_csv",
   "lock_sale_order",
+  "send_sale_order_quotation",
   "start_picking_batch",
   "unlock_sale_order",
   "update_pricelist",
   "update_sale_order",
   "update_sale_order_line",
+  "update_sale_order_option",
 ] as const;
 
 export type SalesBffReducerKey = (typeof SALES_BFF_REDUCERS)[number];

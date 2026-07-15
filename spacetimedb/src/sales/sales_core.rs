@@ -77,6 +77,7 @@ pub struct CreateSaleOrderParams {
     pub source_id: Option<u64>,
     pub commitment_date: Option<Timestamp>,
     pub expected_date: Option<Timestamp>,
+    pub incoterm_id: Option<u64>,
     pub incoterm: Option<String>,
     pub incoterm_location: Option<String>,
     pub carrier_id: Option<u64>,
@@ -108,6 +109,7 @@ pub struct UpdateSaleOrderParams {
     pub picking_policy: Option<String>,
     pub validity_date: Option<Timestamp>,
     pub carrier_id: Option<u64>,
+    pub incoterm_id: Option<u64>,
     pub incoterm: Option<String>,
     pub incoterm_location: Option<String>,
     pub customer_lead: Option<f64>,
@@ -188,6 +190,7 @@ pub struct SaleOrder {
     pub shipping_policy: String,
     pub picking_policy: String,
     pub warehouse_id: u64,
+    pub incoterm_id: Option<u64>,
     pub incoterm: Option<String>,
     pub incoterm_location: Option<String>,
     pub carrier_id: Option<u64>,
@@ -449,6 +452,7 @@ fn create_sale_order_line_internal(
     partner_id: u64,
     pricelist_id: u64,
 ) -> Result<SaleOrderLine, String> {
+    use crate::sales::oms_extensions::remap_taxes_for_fiscal_position;
     use crate::sales::pricelists::resolve_unit_price;
 
     let product_result = ctx.db.product().id().find(&params.product_id);
@@ -482,7 +486,20 @@ fn create_sale_order_line_internal(
     let discount_amount = price_unit * params.quantity * (params.discount / 100.0);
     let price_subtotal = price_unit * params.quantity - discount_amount;
 
-    let price_tax = calculate_tax(ctx, &params.tax_ids, price_subtotal);
+    let order_fiscal = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .map(|o| o.fiscal_position_id)
+        .unwrap_or(None);
+    let tax_ids = remap_taxes_for_fiscal_position(
+        ctx,
+        organization_id,
+        order_fiscal,
+        &params.tax_ids,
+    )?;
+    let price_tax = calculate_tax(ctx, &tax_ids, price_subtotal);
 
     let line = ctx.db.sale_order_line().insert(SaleOrderLine {
         id: 0,
@@ -527,7 +544,7 @@ fn create_sale_order_line_internal(
         company_id,
         order_partner_id: partner_id,
         salesman_id: ctx.sender(),
-        tax_id: params.tax_ids,
+        tax_id: tax_ids,
         analytic_tag_ids: params.analytic_tag_ids,
         analytic_line_ids: Vec::new(),
         is_service: product_type == "service",
@@ -663,7 +680,15 @@ pub fn create_sale_order(
         shipping_policy,
         picking_policy,
         warehouse_id: params.warehouse_id,
-        incoterm: params.incoterm,
+        incoterm_id: params.incoterm_id,
+        incoterm: {
+            let from_id = crate::sales::oms_extensions::resolve_incoterm_code(
+                ctx,
+                organization_id,
+                params.incoterm_id,
+            )?;
+            from_id.or(params.incoterm)
+        },
         incoterm_location: params.incoterm_location,
         carrier_id: params.carrier_id,
         weight: 0.0,
@@ -895,7 +920,15 @@ fn create_outgoing_pickings_for_confirmed_order(
             has_entire_package_dest: false,
             package_level_ids: vec![],
             batch_id: None,
-            metadata: Some(format!(r#"{{"sale_order_id":{order_id}}}"#)),
+            metadata: Some(format!(
+                r#"{{"sale_order_id":{order_id},"source_id":{},"medium_id":{},"route_ids":{:?}}}"#,
+                order.source_id.map(|v| v.to_string()).unwrap_or_else(|| "null".into()),
+                order.medium_id.map(|v| v.to_string()).unwrap_or_else(|| "null".into()),
+                order_lines
+                    .iter()
+                    .filter_map(|l| l.route_id)
+                    .collect::<Vec<_>>(),
+            )),
         },
     )?;
 
@@ -1186,6 +1219,16 @@ pub fn confirm_sales_order_impl(
 
     let partner_id = order.partner_id;
     let company_id = order.company_id;
+    let is_dropship = order.is_dropship;
+    let commission_rate = order
+        .metadata
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|v| {
+            v.get("commission_rate_percent")
+                .and_then(|x| x.as_f64())
+        })
+        .unwrap_or(0.0);
 
     ctx.db.sale_order().id().update(SaleOrder {
         state: SaleState::Sale,
@@ -1220,7 +1263,24 @@ pub fn confirm_sales_order_impl(
         });
     }
 
-    create_outgoing_pickings_for_confirmed_order(ctx, organization_id, order_id)?;
+    if is_dropship {
+        crate::sales::oms_extensions::create_dropship_purchase_orders_for_sale(
+            ctx,
+            organization_id,
+            order_id,
+        )?;
+    } else {
+        create_outgoing_pickings_for_confirmed_order(ctx, organization_id, order_id)?;
+    }
+
+    if commission_rate > 0.0 {
+        crate::sales::oms_extensions::accrue_sale_commission_for_order(
+            ctx,
+            organization_id,
+            order_id,
+            commission_rate,
+        )?;
+    }
 
     // Increment customer_rank on the partner contact
     if let Some(partner) = ctx.db.contact().id().find(&partner_id) {
@@ -1457,6 +1517,7 @@ pub fn update_sale_order(
     let mut picking_policy = order.picking_policy.clone();
     let mut validity_date = order.validity_date;
     let mut carrier_id = order.carrier_id;
+    let mut incoterm_id = order.incoterm_id;
     let mut incoterm = order.incoterm.clone();
     let mut incoterm_location = order.incoterm_location.clone();
     let mut customer_lead = order.customer_lead;
@@ -1522,6 +1583,14 @@ pub fn update_sale_order(
     if let Some(v) = params.carrier_id {
         carrier_id = Some(v);
     }
+    if let Some(v) = params.incoterm_id {
+        incoterm_id = Some(v);
+        if let Some(code) =
+            crate::sales::oms_extensions::resolve_incoterm_code(ctx, organization_id, Some(v))?
+        {
+            incoterm = Some(code);
+        }
+    }
     if let Some(ref v) = params.incoterm {
         incoterm = Some(v.clone());
     }
@@ -1582,6 +1651,9 @@ pub fn update_sale_order(
     if params.carrier_id.is_some() {
         changed_fields.push("carrier_id".into());
     }
+    if params.incoterm_id.is_some() {
+        changed_fields.push("incoterm_id".into());
+    }
     if params.incoterm.is_some() {
         changed_fields.push("incoterm".into());
     }
@@ -1627,6 +1699,7 @@ pub fn update_sale_order(
         picking_policy,
         validity_date,
         carrier_id,
+        incoterm_id,
         incoterm,
         incoterm_location,
         customer_lead,

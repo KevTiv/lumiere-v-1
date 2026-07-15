@@ -704,6 +704,7 @@ fn build_create_sale_order_params(
         source_id: obj.get("source_id").and_then(json_u64),
         commitment_date: None,
         expected_date: None,
+        incoterm_id: obj.get("incoterm_id").and_then(json_u64),
         incoterm: json_string(obj, "incoterm"),
         incoterm_location: json_string(obj, "incoterm_location"),
         carrier_id: obj.get("carrier_id").and_then(json_u64),

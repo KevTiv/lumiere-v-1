@@ -135,6 +135,7 @@ import {
   useConfirmReturnOrder,
   useCancelReturnOrder,
   useCreateCreditNoteFromReturnOrder,
+  useCreateExchangeOrderFromReturn,
 } from '@lumiere/query-hooks/hooks/sales';
 import {
   useAccountMoves,
@@ -442,6 +443,10 @@ function SalesClientLoaded({
   const confirmReturnOrder = useConfirmReturnOrder(orgId, operatingCompanyId);
   const cancelReturnOrder = useCancelReturnOrder(orgId, operatingCompanyId);
   const createCreditNoteFromReturnOrder = useCreateCreditNoteFromReturnOrder(
+    orgId,
+    operatingCompanyId,
+  );
+  const createExchangeOrderFromReturn = useCreateExchangeOrderFromReturn(
     orgId,
     operatingCompanyId,
   );
@@ -1039,6 +1044,21 @@ function SalesClientLoaded({
             },
           },
           {
+            id: 'create-exchange-order',
+            label: t('sales.returnOrders.actions.createExchange', {
+              defaultValue: 'Create exchange order',
+            }),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const row of rows) {
+                const st = returnOrderState(row);
+                if (st !== 'confirmed' && st !== 'received') continue;
+                const id = returnOrderRowId(row);
+                if (id != null) void createExchangeOrderFromReturn.mutateAsync(id);
+              }
+            },
+          },
+          {
             id: 'cancel-return',
             label: t('sales.returnOrders.actions.cancel'),
             requiresSelection: true,
@@ -1055,7 +1075,15 @@ function SalesClientLoaded({
         ],
       },
     };
-  }, [t, confirmReturnOrder, cancelReturnOrder, confirmPicking, assignPicking, validatePicking]);
+  }, [
+    t,
+    confirmReturnOrder,
+    cancelReturnOrder,
+    confirmPicking,
+    assignPicking,
+    validatePicking,
+    createExchangeOrderFromReturn,
+  ]);
 
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = saleOrdersTableConfig(t, {

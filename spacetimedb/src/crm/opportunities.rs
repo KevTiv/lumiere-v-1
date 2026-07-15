@@ -897,6 +897,7 @@ pub fn convert_opportunity_to_sale_order(
         source_id: opp.source_id,
         commitment_date: None,
         expected_date: opp.date_deadline,
+        incoterm_id: None,
         incoterm: None,
         incoterm_location: None,
         carrier_id: None,

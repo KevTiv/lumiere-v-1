@@ -254,27 +254,28 @@ Country packs today are **tax-seed + company-ID metadata**. Sales needs commerci
 - ~~Quote send (`Sent`)~~ **Done** (`send_sale_order_quotation` + UI); expiry UX still thin
 - ~~Backorder creation on partial validate~~ **Done** (`validate_stock_picking_backorder`; UI create-backorder enabled)
 - ~~SO-level credit check on confirm~~ **Done** (`ensure_partner_credit_allows_invoice` before confirm)
-- Tax fiscal-position remapping; Incoterm id parity with PO/invoice
+- ~~Tax fiscal-position remapping~~ **Done** (`AccountFiscalPosition` + tax maps remapping on SO line create)
+- ~~Incoterm id parity with PO/invoice~~ **Done** (`AccountIncoterm` + SO `incoterm_id`; invoice copies `invoice_incoterm_id`)
 - ~~Exception queues via subscriptions~~ **Done** (dashboard live queue strip; sales workspace subscribes `partner-credit-controls` + `stock-pickings`)
 - ~~Multi-currency rate snapshot on confirm~~ **Done** (rate written into SO `metadata` at confirm; fail closed when currencies differ and no `currency_rate`)
-- ~~Domain tests for cancel, ATP fail, credit hold, pricelist apply, send quote, backorder~~ **Done** (`run_all_sales_tests`)
+- ~~Domain tests for cancel, ATP fail, credit hold, pricelist apply, send quote, backorder, fiscal/promo/options~~ **Done** (`run_all_sales_tests`)
 - Quote expiry: `is_expired` set when send/confirm hits past `validity_date`
 
 ### Differentiating
 
-- True dropship orchestration (SO → PO → vendor ship → customer)
-- CPQ / configurable products (`SaleOrderOption` → real engine)
-- Promotions engine (not only POS coupons)
-- Exchange orders with linked RMA + replacement
-- Commission accrual + partner settlement
-- Multichannel fulfilment routing (POS / web / marketplace → allocation)
-- Live ops workbench (NetSuite-class exception cockpit) with drill-down SO → stock → GL
+- ~~True dropship orchestration (SO → PO → vendor ship → customer)~~ **Done** (confirm with `is_dropship` creates draft POs per supplier; warehouse OUT skipped)
+- ~~CPQ / configurable products (`SaleOrderOption` → real engine)~~ **Done** (CPQ-lite: option CRUD + `apply_sale_order_options` materialises selected options as lines)
+- ~~Promotions engine (not only POS coupons)~~ **Done** (`SalePromotion` + `apply_sale_promotion_to_order`)
+- ~~Exchange orders with linked RMA + replacement~~ **Done** (`create_exchange_order_from_return`)
+- ~~Commission accrual + partner settlement~~ **Done** (accrual on confirm via `commission_rate_percent` metadata + `accrue_sale_commission`; settlement deferred)
+- ~~Multichannel fulfilment routing (POS / web / marketplace → allocation)~~ **Done** (picking metadata stamps `source_id` / `medium_id` / `route_ids`; line `route_id` preserved)
+- ~~Live ops workbench~~ **Partial** (exception queue cards on sales dashboard; full NetSuite-class cockpit still richer)
 
 ---
 
 ## Bottom line
 
-Lumiere already supports an **operational quote-to-cash pilot** with returns and approval hooks that beat a spreadsheet OMS. The gap to the stated NetSuite **quality** bar is not “copy every module,” but enforcing that **every commercial exception has inventory and financial consequences inside SpacetimeDB transactions**, finishing **pricing/reservation/backorder/dropship** behind existing schema flags, and using **subscriptions as live exception queues** rather than KPI dashboards alone. CPQ, commissions, promotions, and exchange are differentiators — not pilot blockers — once commitment integrity is fixed.
+Lumiere’s OMS spine now enforces inventory and credit consequences, applies pricing/tax/FX rules inside transactions, and covers the prior competitive/differentiating checklist at MVP depth (dropship PO, CPQ-lite options, promotions, exchange, commission accrual). Remaining depth is settlement/ops polish — not missing commitment plumbing.
 
 ### Related docs
 

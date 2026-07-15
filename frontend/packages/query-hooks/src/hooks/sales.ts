@@ -230,6 +230,71 @@ export function useSendSaleOrderQuotation(organizationId: bigint) {
   })
 }
 
+export function useApplySalePromotion(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: { orderId: bigint | number | string; promotionCode: string }) => {
+      const { urlPath, init } = salesBffPost("apply_sale_promotion_to_order", [
+        organizationId,
+        toScalarU64(params.orderId),
+        stdbParamsToJson({ promotionCode: params.promotionCode }),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await r.text().catch(() => "Failed to apply promotion"))
+    },
+    onSuccess: async () => {
+      const orgKey = rqBigIntKey(organizationId)
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["sale-orders", orgKey] }),
+        qc.invalidateQueries({ queryKey: ["sale-order-lines", orgKey] }),
+      ])
+    },
+  })
+}
+
+export function useApplySaleOrderOptions(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (orderId: bigint | number | string) => {
+      const { urlPath, init } = salesBffPost("apply_sale_order_options", [
+        organizationId,
+        toScalarU64(orderId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await r.text().catch(() => "Failed to apply options"))
+    },
+    onSuccess: async () => {
+      const orgKey = rqBigIntKey(organizationId)
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["sale-orders", orgKey] }),
+        qc.invalidateQueries({ queryKey: ["sale-order-lines", orgKey] }),
+      ])
+    },
+  })
+}
+
+export function useCreateExchangeOrderFromReturn(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (returnOrderId: bigint | number | string) => {
+      const { urlPath, init } = salesBffPost("create_exchange_order_from_return", [
+        organizationId,
+        companyId,
+        toScalarU64(returnOrderId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await r.text().catch(() => "Failed to create exchange order"))
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sale-orders", rqBigIntKey(organizationId)] })
+      qc.invalidateQueries({ queryKey: ["return-orders", rqBigIntKey(organizationId)] })
+    },
+  })
+}
+
 export function useCancelSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
