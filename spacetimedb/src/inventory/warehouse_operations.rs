@@ -7,7 +7,11 @@
 ///   - CartonizationResult
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::CompanyScopeParams;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::stock::{
+    assign_stock_picking, confirm_stock_picking, stock_move, stock_picking,
+};
 use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -312,6 +316,168 @@ pub fn create_warehouse_task(
     Ok(())
 }
 
+/// Release a wave: confirm/assign linked pickings and create pick tasks per move.
+#[reducer]
+pub fn release_picking_wave(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    wave_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "picking_wave", "update")?;
+
+    let wave = ctx
+        .db
+        .picking_wave()
+        .id()
+        .find(&wave_id)
+        .ok_or("Wave not found")?;
+
+    if wave.organization_id != organization_id {
+        return Err("Wave does not belong to this organization".to_string());
+    }
+    if wave.company_id != company_id {
+        return Err("Wave does not belong to this company".to_string());
+    }
+    if wave.state == "done" || wave.state == "cancelled" {
+        return Err(format!("Cannot release wave in state {}", wave.state));
+    }
+    if wave.picking_ids.is_empty() {
+        return Err("Wave has no pickings to release".to_string());
+    }
+
+    let scope = CompanyScopeParams {
+        company_id: Some(company_id),
+    };
+    let mut tasks_created = 0u32;
+
+    for &picking_id in &wave.picking_ids {
+        let picking = ctx
+            .db
+            .stock_picking()
+            .id()
+            .find(&picking_id)
+            .ok_or_else(|| format!("Picking {} not found for wave", picking_id))?;
+        if picking.company_id != company_id {
+            return Err(format!(
+                "Picking {} does not belong to this company",
+                picking_id
+            ));
+        }
+
+        match picking.state.as_str() {
+            "draft" => {
+                confirm_stock_picking(ctx, organization_id, picking_id, scope.clone())?;
+                assign_stock_picking(ctx, organization_id, picking_id, scope.clone())?;
+            }
+            "confirmed" => {
+                assign_stock_picking(ctx, organization_id, picking_id, scope.clone())?;
+            }
+            "assigned" | "done" => {}
+            other => {
+                return Err(format!(
+                    "Picking {} in state {} cannot be released in a wave",
+                    picking_id, other
+                ));
+            }
+        }
+
+        for move_record in ctx
+            .db
+            .stock_move()
+            .move_by_picking()
+            .filter(&picking_id)
+        {
+            if move_record.state == "done" || move_record.state == "cancel" {
+                continue;
+            }
+            let already = ctx
+                .db
+                .warehouse_task()
+                .task_by_org()
+                .filter(&organization_id)
+                .any(|t| {
+                    t.company_id == company_id
+                        && t.picking_id == Some(picking_id)
+                        && t.move_id == Some(move_record.id)
+                        && t.state != "cancelled"
+                });
+            if already {
+                continue;
+            }
+
+            ctx.db.warehouse_task().insert(WarehouseTask {
+                id: 0,
+                organization_id,
+                name: format!(
+                    "Pick {} / move {}",
+                    picking.name,
+                    move_record
+                        .name
+                        .clone()
+                        .unwrap_or_else(|| move_record.id.to_string())
+                ),
+                task_type: "pick".to_string(),
+                state: "pending".to_string(),
+                priority: move_record.priority.clone(),
+                user_id: wave.user_id,
+                picking_id: Some(picking_id),
+                move_id: Some(move_record.id),
+                move_line_id: None,
+                location_id: Some(move_record.location_id),
+                location_dest_id: Some(move_record.location_dest_id),
+                product_id: Some(move_record.product_id),
+                lot_id: move_record.lot_id,
+                package_id: move_record.package_id,
+                quantity: move_record.product_uom_qty,
+                uom_id: Some(move_record.product_uom),
+                company_id,
+                date_scheduled: wave.date_start.or(Some(ctx.timestamp)),
+                date_started: None,
+                date_finished: None,
+                duration_expected: None,
+                duration_real: None,
+                notes: Some(format!("wave:{}", wave_id)),
+                created_at: ctx.timestamp,
+                metadata: Some(
+                    serde_json::json!({ "wave_id": wave_id, "picking_id": picking_id }).to_string(),
+                ),
+            });
+            tasks_created += 1;
+        }
+    }
+
+    let old_state = wave.state.clone();
+    ctx.db.picking_wave().id().update(PickingWave {
+        state: "in_progress".to_string(),
+        date_start: wave.date_start.or(Some(ctx.timestamp)),
+        ..wave
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "picking_wave",
+            record_id: wave_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "state": "in_progress",
+                    "tasks_created": tasks_created,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
 #[reducer]
 pub fn complete_picking_wave(
     ctx: &ReducerContext,
@@ -334,6 +500,40 @@ pub fn complete_picking_wave(
 
     if wave.state != "in_progress" {
         return Err("Only waves in progress can be completed".to_string());
+    }
+
+    // All wave pick tasks must be done/cancelled before wave completion.
+    let open_tasks = ctx
+        .db
+        .warehouse_task()
+        .task_by_org()
+        .filter(&organization_id)
+        .filter(|t| {
+            t.company_id == company_id
+                && t.state != "done"
+                && t.state != "cancelled"
+                && t.notes
+                    .as_deref()
+                    .map(|n| n.contains(&format!("wave:{wave_id}")))
+                    .unwrap_or(false)
+        })
+        .count();
+    if open_tasks > 0 {
+        return Err(format!(
+            "Wave {} still has {} open pick task(s)",
+            wave_id, open_tasks
+        ));
+    }
+
+    for &picking_id in &wave.picking_ids {
+        if let Some(picking) = ctx.db.stock_picking().id().find(&picking_id) {
+            if picking.state != "done" {
+                return Err(format!(
+                    "Picking {} must be validated (done) before completing wave (state: {})",
+                    picking_id, picking.state
+                ));
+            }
+        }
     }
 
     let old_state = wave.state.clone();
@@ -383,10 +583,30 @@ pub fn update_warehouse_task_status(
         return Err("Task does not belong to this company".to_string());
     }
 
+    let allowed = ["pending", "in_progress", "done", "cancelled"];
+    if !allowed.contains(&new_status.as_str()) {
+        return Err(format!(
+            "Invalid task status '{}'; expected one of {:?}",
+            new_status, allowed
+        ));
+    }
+
     let old_status = task.state.clone();
+    let date_started = if new_status == "in_progress" {
+        task.date_started.or(Some(ctx.timestamp))
+    } else {
+        task.date_started
+    };
+    let date_finished = if new_status == "done" || new_status == "cancelled" {
+        Some(ctx.timestamp)
+    } else {
+        task.date_finished
+    };
 
     ctx.db.warehouse_task().id().update(WarehouseTask {
         state: new_status.clone(),
+        date_started,
+        date_finished,
         ..task
     });
 

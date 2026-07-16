@@ -15,6 +15,8 @@ Checklist for tranche-1 fixes from [INVENTORY_WAREHOUSE_MANAGEMENT_INVESTIGATION
 - [x] FEFO + expiry block on lot/serial reserve/validate
 - [x] Move-level `StockMove.serial_id` (+ validate consume)
 - [x] `execute_replenishment_rule` creates draft PO or internal transfer demand
+- [x] Quality fail → quarantine location + remove from ATP (`fail_quality_check` / `quarantine_quantity`)
+- [x] Wave release orchestration: `release_picking_wave` → confirm/assign + pick tasks; validate blocked by open tasks; complete requires tasks + pickings done
 
 ## Verify after publish
 

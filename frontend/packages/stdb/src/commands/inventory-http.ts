@@ -92,6 +92,7 @@ export const INVENTORY_BFF_REDUCERS = [
   "record_cycle_count_line",
   "remove_member_from_quality_team",
   "remove_rule_from_nomenclature",
+  "release_picking_wave",
   "reserve_serial",
   "reserve_stock_quant",
   "restore_product_category",

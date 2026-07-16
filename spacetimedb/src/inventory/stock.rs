@@ -13,7 +13,8 @@ use crate::inventory::product::product;
 use crate::inventory::tracking::{
     stock_production_lot, stock_production_serial, StockProductionSerial,
 };
-use crate::inventory::warehouse::warehouse;
+use crate::inventory::warehouse::{stock_location, warehouse};
+use crate::inventory::warehouse_operations::warehouse_task;
 use crate::purchasing::purchase_orders::{purchase_order, purchase_order_line};
 use crate::sales::return_orders::return_order;
 use crate::sales::sales_core::{sale_order, sale_order_line};
@@ -1027,6 +1028,168 @@ fn enforce_tracking_on_move_validate(
     }
 }
 
+/// Locations that must not contribute to soft ATP (QC / quarantine / scrap).
+pub(crate) fn location_blocks_atp(ctx: &ReducerContext, location_id: u64) -> bool {
+    if let Some(loc) = ctx.db.stock_location().id().find(&location_id) {
+        if loc.scrap_location {
+            return true;
+        }
+        let usage = loc.usage.to_ascii_lowercase();
+        if usage.contains("qc") || usage.contains("quarantine") {
+            return true;
+        }
+    }
+    ctx.db
+        .warehouse()
+        .iter()
+        .any(|w| w.wh_qc_stock_loc_id == Some(location_id))
+}
+
+/// Move qty into a quarantine/QC location and release reservations (removes from ATP).
+pub(crate) fn quarantine_quantity(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    lot_id: Option<u64>,
+    source_location_id: u64,
+    quarantine_location_id: u64,
+    qty: f64,
+) -> Result<(), String> {
+    if qty <= 0.0 {
+        return Ok(());
+    }
+    if source_location_id == quarantine_location_id {
+        return Err("Quarantine location must differ from source location".to_string());
+    }
+
+    let src = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&product_id)
+        .find(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.location_id == source_location_id
+                && q.lot_id == lot_id
+        })
+        .ok_or_else(|| {
+            format!(
+                "No stock quant for product {} at location {} to quarantine",
+                product_id, source_location_id
+            )
+        })?;
+
+    if src.quantity + 1e-9 < qty {
+        return Err(format!(
+            "Cannot quarantine more than on-hand for product {} (have {}, need {})",
+            product_id, src.quantity, qty
+        ));
+    }
+
+    // Release reservation covering the quarantined qty so it leaves ATP.
+    let release = qty.min(src.reserved_quantity);
+    let new_reserved = (src.reserved_quantity - release).max(0.0);
+    let new_qty = src.quantity - qty;
+    let new_available = (new_qty - new_reserved).max(0.0);
+
+    if new_qty <= 1e-9 {
+        ctx.db.stock_quant().id().delete(&src.id);
+    } else {
+        ctx.db.stock_quant().id().update(StockQuant {
+            quantity: new_qty,
+            reserved_quantity: new_reserved,
+            available_quantity: new_available,
+            value: new_qty * src.cost,
+            ..src.clone()
+        });
+    }
+
+    if let Some(dest) = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&product_id)
+        .find(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.location_id == quarantine_location_id
+                && q.lot_id == lot_id
+        })
+    {
+        let dq = dest.quantity + qty;
+        // Quarantined stock is never ATP-available even if co-located.
+        ctx.db.stock_quant().id().update(StockQuant {
+            quantity: dq,
+            available_quantity: 0.0,
+            reserved_quantity: 0.0,
+            value: dq * dest.cost,
+            ..dest
+        });
+    } else {
+        ctx.db.stock_quant().insert(StockQuant {
+            id: 0,
+            organization_id,
+            product_id,
+            product_variant_id: src.product_variant_id,
+            location_id: quarantine_location_id,
+            lot_id,
+            package_id: src.package_id,
+            owner_id: src.owner_id,
+            company_id,
+            quantity: qty,
+            reserved_quantity: 0.0,
+            available_quantity: 0.0,
+            in_date: Some(ctx.timestamp),
+            inventory_quantity: qty,
+            inventory_diff_quantity: 0.0,
+            inventory_quantity_set: true,
+            is_outdated: false,
+            user_id: Some(ctx.sender()),
+            inventory_date: Some(ctx.timestamp),
+            cost: src.cost,
+            value: qty * src.cost,
+            cost_method: src.cost_method.clone(),
+            accounting_date: None,
+            currency_id: src.currency_id,
+            accounting_entry_ids: vec![],
+            metadata: Some(r#"{"quarantine":true}"#.to_string()),
+        });
+    }
+
+    Ok(())
+}
+
+fn ensure_picking_tasks_allow_validate(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    picking_id: u64,
+) -> Result<(), String> {
+    // Option columns are not FilterableValue in STDB 2.0.1 — scan org index.
+    let open_count = ctx
+        .db
+        .warehouse_task()
+        .task_by_org()
+        .filter(&organization_id)
+        .filter(|t| {
+            t.company_id == company_id
+                && t.picking_id == Some(picking_id)
+                && t.state != "done"
+                && t.state != "cancelled"
+        })
+        .count();
+
+    if open_count > 0 {
+        return Err(format!(
+            "Picking {} has {} open warehouse task(s) — complete or cancel them before validate",
+            picking_id, open_count
+        ));
+    }
+    Ok(())
+}
+
 /// Reserve qty at a location; fails closed when ATP is short.
 pub(crate) fn reserve_quantity_at_location(
     ctx: &ReducerContext,
@@ -1038,6 +1201,12 @@ pub(crate) fn reserve_quantity_at_location(
 ) -> Result<(), String> {
     if qty <= 0.0 {
         return Ok(());
+    }
+    if location_blocks_atp(ctx, location_id) {
+        return Err(format!(
+            "Cannot reserve ATP from quarantine/QC location {}",
+            location_id
+        ));
     }
     let tracking = product_tracking_mode(ctx, product_id)?;
     let quant = if tracking == "lot" {
@@ -2348,6 +2517,8 @@ fn validate_stock_picking_impl(
     if picking.state != "assigned" {
         return Err("Picking must be assigned before validation".to_string());
     }
+
+    ensure_picking_tasks_allow_validate(ctx, organization_id, company_id, picking_id)?;
 
     let is_inbound = picking.is_return
         || picking.picking_code.as_deref() == Some("incoming");

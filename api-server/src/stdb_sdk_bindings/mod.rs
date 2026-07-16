@@ -1446,6 +1446,7 @@ pub mod reject_ai_action_draft_reducer;
 pub mod reject_approval_request_reducer;
 pub mod reject_supplier_intake_reducer;
 pub mod release_blanket_to_po_reducer;
+pub mod release_picking_wave_reducer;
 pub mod remove_article_member_reducer;
 pub mod remove_casbin_rule_reducer;
 pub mod remove_landed_cost_line_reducer;
@@ -1515,12 +1516,14 @@ pub mod run_inventory_lot_reserve_test_reducer;
 pub mod run_inventory_lot_validate_test_reducer;
 pub mod run_inventory_product_category_test_reducer;
 pub mod run_inventory_product_update_test_reducer;
+pub mod run_inventory_qc_quarantine_test_reducer;
 pub mod run_inventory_receipt_quant_test_reducer;
 pub mod run_inventory_replenishment_demand_test_reducer;
 pub mod run_inventory_serial_id_validate_test_reducer;
 pub mod run_inventory_serial_reserve_test_reducer;
 pub mod run_inventory_stock_inventory_test_reducer;
 pub mod run_inventory_stock_quant_test_reducer;
+pub mod run_inventory_wave_release_test_reducer;
 pub mod run_manufacturing_workcenter_test_reducer;
 pub mod run_owner_report_schedule_reducer;
 pub mod run_purchasing_bill_balanced_test_reducer;
@@ -3849,6 +3852,7 @@ pub use reject_ai_action_draft_reducer::reject_ai_action_draft;
 pub use reject_approval_request_reducer::reject_approval_request;
 pub use reject_supplier_intake_reducer::reject_supplier_intake;
 pub use release_blanket_to_po_reducer::release_blanket_to_po;
+pub use release_picking_wave_reducer::release_picking_wave;
 pub use remove_article_member_reducer::remove_article_member;
 pub use remove_casbin_rule_reducer::remove_casbin_rule;
 pub use remove_landed_cost_line_reducer::remove_landed_cost_line;
@@ -3918,12 +3922,14 @@ pub use run_inventory_lot_reserve_test_reducer::run_inventory_lot_reserve_test;
 pub use run_inventory_lot_validate_test_reducer::run_inventory_lot_validate_test;
 pub use run_inventory_product_category_test_reducer::run_inventory_product_category_test;
 pub use run_inventory_product_update_test_reducer::run_inventory_product_update_test;
+pub use run_inventory_qc_quarantine_test_reducer::run_inventory_qc_quarantine_test;
 pub use run_inventory_receipt_quant_test_reducer::run_inventory_receipt_quant_test;
 pub use run_inventory_replenishment_demand_test_reducer::run_inventory_replenishment_demand_test;
 pub use run_inventory_serial_id_validate_test_reducer::run_inventory_serial_id_validate_test;
 pub use run_inventory_serial_reserve_test_reducer::run_inventory_serial_reserve_test;
 pub use run_inventory_stock_inventory_test_reducer::run_inventory_stock_inventory_test;
 pub use run_inventory_stock_quant_test_reducer::run_inventory_stock_quant_test;
+pub use run_inventory_wave_release_test_reducer::run_inventory_wave_release_test;
 pub use run_manufacturing_workcenter_test_reducer::run_manufacturing_workcenter_test;
 pub use run_owner_report_schedule_reducer::run_owner_report_schedule;
 pub use run_purchasing_bill_balanced_test_reducer::run_purchasing_bill_balanced_test;
@@ -6890,6 +6896,11 @@ pub enum Reducer {
         blanket_order_id: u64,
         params: ReleaseBlanketToPoParams,
 }    ,
+    ReleasePickingWave {
+        organization_id: u64,
+        company_id: u64,
+        wave_id: u64,
+}    ,
     RemoveArticleMember {
         organization_id: u64,
         article_id: u64,
@@ -7061,12 +7072,14 @@ pub enum Reducer {
     RunInventoryLotValidateTest ,
     RunInventoryProductCategoryTest ,
     RunInventoryProductUpdateTest ,
+    RunInventoryQcQuarantineTest ,
     RunInventoryReceiptQuantTest ,
     RunInventoryReplenishmentDemandTest ,
     RunInventorySerialIdValidateTest ,
     RunInventorySerialReserveTest ,
     RunInventoryStockInventoryTest ,
     RunInventoryStockQuantTest ,
+    RunInventoryWaveReleaseTest ,
     RunManufacturingWorkcenterTest ,
     RunOwnerReportSchedule {
         organization_id: u64,
@@ -8877,6 +8890,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RejectApprovalRequest { .. } => "reject_approval_request",
             Reducer::RejectSupplierIntake { .. } => "reject_supplier_intake",
             Reducer::ReleaseBlanketToPo { .. } => "release_blanket_to_po",
+            Reducer::ReleasePickingWave { .. } => "release_picking_wave",
             Reducer::RemoveArticleMember { .. } => "remove_article_member",
             Reducer::RemoveCasbinRule { .. } => "remove_casbin_rule",
             Reducer::RemoveLandedCostLine { .. } => "remove_landed_cost_line",
@@ -8946,12 +8960,14 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventoryLotValidateTest => "run_inventory_lot_validate_test",
             Reducer::RunInventoryProductCategoryTest => "run_inventory_product_category_test",
             Reducer::RunInventoryProductUpdateTest => "run_inventory_product_update_test",
+            Reducer::RunInventoryQcQuarantineTest => "run_inventory_qc_quarantine_test",
             Reducer::RunInventoryReceiptQuantTest => "run_inventory_receipt_quant_test",
             Reducer::RunInventoryReplenishmentDemandTest => "run_inventory_replenishment_demand_test",
             Reducer::RunInventorySerialIdValidateTest => "run_inventory_serial_id_validate_test",
             Reducer::RunInventorySerialReserveTest => "run_inventory_serial_reserve_test",
             Reducer::RunInventoryStockInventoryTest => "run_inventory_stock_inventory_test",
             Reducer::RunInventoryStockQuantTest => "run_inventory_stock_quant_test",
+            Reducer::RunInventoryWaveReleaseTest => "run_inventory_wave_release_test",
             Reducer::RunManufacturingWorkcenterTest => "run_manufacturing_workcenter_test",
             Reducer::RunOwnerReportSchedule { .. } => "run_owner_report_schedule",
             Reducer::RunPurchasingBillBalancedTest => "run_purchasing_bill_balanced_test",
@@ -14033,6 +14049,15 @@ Reducer::MoveStockQuant{
                 blanket_order_id: blanket_order_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::ReleasePickingWave{
+                organization_id,
+                company_id,
+                wave_id,
+}             => __sats::bsatn::to_vec(&release_picking_wave_reducer::ReleasePickingWaveArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                wave_id: wave_id.clone(),
+}),
             Reducer::RemoveArticleMember{
                 organization_id,
                 article_id,
@@ -14346,6 +14371,8 @@ Reducer::RunInventoryProductCategoryTest => __sats::bsatn::to_vec(&run_inventory
                 }),
 Reducer::RunInventoryProductUpdateTest => __sats::bsatn::to_vec(&run_inventory_product_update_test_reducer::RunInventoryProductUpdateTestArgs {
                 }),
+Reducer::RunInventoryQcQuarantineTest => __sats::bsatn::to_vec(&run_inventory_qc_quarantine_test_reducer::RunInventoryQcQuarantineTestArgs {
+                }),
 Reducer::RunInventoryReceiptQuantTest => __sats::bsatn::to_vec(&run_inventory_receipt_quant_test_reducer::RunInventoryReceiptQuantTestArgs {
                 }),
 Reducer::RunInventoryReplenishmentDemandTest => __sats::bsatn::to_vec(&run_inventory_replenishment_demand_test_reducer::RunInventoryReplenishmentDemandTestArgs {
@@ -14357,6 +14384,8 @@ Reducer::RunInventorySerialReserveTest => __sats::bsatn::to_vec(&run_inventory_s
 Reducer::RunInventoryStockInventoryTest => __sats::bsatn::to_vec(&run_inventory_stock_inventory_test_reducer::RunInventoryStockInventoryTestArgs {
                 }),
 Reducer::RunInventoryStockQuantTest => __sats::bsatn::to_vec(&run_inventory_stock_quant_test_reducer::RunInventoryStockQuantTestArgs {
+                }),
+Reducer::RunInventoryWaveReleaseTest => __sats::bsatn::to_vec(&run_inventory_wave_release_test_reducer::RunInventoryWaveReleaseTestArgs {
                 }),
 Reducer::RunManufacturingWorkcenterTest => __sats::bsatn::to_vec(&run_manufacturing_workcenter_test_reducer::RunManufacturingWorkcenterTestArgs {
                 }),

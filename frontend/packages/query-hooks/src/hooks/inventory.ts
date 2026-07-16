@@ -1553,9 +1553,26 @@ export function useCreatePickingWave(organizationId: bigint, companyId: bigint) 
   })
 }
 
-/** Completes an in-progress wave (maps to `complete_picking_wave`). */
+/** Releases a draft wave: confirm/assign pickings and create pick tasks. */
+export function useReleasePickingWave(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (waveId) => {
+      const { urlPath, init } = inventoryBffPost("release_picking_wave", [
+        organizationId,
+        companyId,
+        toScalarU64(waveId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to release picking wave')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+/** UI "confirm wave" → `release_picking_wave` (orchestrate pickings + tasks). */
 export function useConfirmPickingWave(organizationId: bigint, companyId: bigint) {
-  return useCompletePickingWave(organizationId, companyId)
+  return useReleasePickingWave(organizationId, companyId)
 }
 
 export function useCompletePickingWave(organizationId: bigint, companyId: bigint) {

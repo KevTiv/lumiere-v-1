@@ -618,6 +618,7 @@ import RejectAiActionDraftReducer from "./reject_ai_action_draft_reducer";
 import RejectApprovalRequestReducer from "./reject_approval_request_reducer";
 import RejectSupplierIntakeReducer from "./reject_supplier_intake_reducer";
 import ReleaseBlanketToPoReducer from "./release_blanket_to_po_reducer";
+import ReleasePickingWaveReducer from "./release_picking_wave_reducer";
 import RemoveArticleMemberReducer from "./remove_article_member_reducer";
 import RemoveCasbinRuleReducer from "./remove_casbin_rule_reducer";
 import RemoveLandedCostLineReducer from "./remove_landed_cost_line_reducer";
@@ -687,12 +688,14 @@ import RunInventoryLotReserveTestReducer from "./run_inventory_lot_reserve_test_
 import RunInventoryLotValidateTestReducer from "./run_inventory_lot_validate_test_reducer";
 import RunInventoryProductCategoryTestReducer from "./run_inventory_product_category_test_reducer";
 import RunInventoryProductUpdateTestReducer from "./run_inventory_product_update_test_reducer";
+import RunInventoryQcQuarantineTestReducer from "./run_inventory_qc_quarantine_test_reducer";
 import RunInventoryReceiptQuantTestReducer from "./run_inventory_receipt_quant_test_reducer";
 import RunInventoryReplenishmentDemandTestReducer from "./run_inventory_replenishment_demand_test_reducer";
 import RunInventorySerialIdValidateTestReducer from "./run_inventory_serial_id_validate_test_reducer";
 import RunInventorySerialReserveTestReducer from "./run_inventory_serial_reserve_test_reducer";
 import RunInventoryStockInventoryTestReducer from "./run_inventory_stock_inventory_test_reducer";
 import RunInventoryStockQuantTestReducer from "./run_inventory_stock_quant_test_reducer";
+import RunInventoryWaveReleaseTestReducer from "./run_inventory_wave_release_test_reducer";
 import RunManufacturingWorkcenterTestReducer from "./run_manufacturing_workcenter_test_reducer";
 import RunOwnerReportScheduleReducer from "./run_owner_report_schedule_reducer";
 import RunPurchasingBillBalancedTestReducer from "./run_purchasing_bill_balanced_test_reducer";
@@ -7434,6 +7437,7 @@ const reducersSchema = __reducers(
   __reducerSchema("reject_approval_request", RejectApprovalRequestReducer),
   __reducerSchema("reject_supplier_intake", RejectSupplierIntakeReducer),
   __reducerSchema("release_blanket_to_po", ReleaseBlanketToPoReducer),
+  __reducerSchema("release_picking_wave", ReleasePickingWaveReducer),
   __reducerSchema("remove_article_member", RemoveArticleMemberReducer),
   __reducerSchema("remove_casbin_rule", RemoveCasbinRuleReducer),
   __reducerSchema("remove_landed_cost_line", RemoveLandedCostLineReducer),
@@ -7503,12 +7507,14 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_lot_validate_test", RunInventoryLotValidateTestReducer),
   __reducerSchema("run_inventory_product_category_test", RunInventoryProductCategoryTestReducer),
   __reducerSchema("run_inventory_product_update_test", RunInventoryProductUpdateTestReducer),
+  __reducerSchema("run_inventory_qc_quarantine_test", RunInventoryQcQuarantineTestReducer),
   __reducerSchema("run_inventory_receipt_quant_test", RunInventoryReceiptQuantTestReducer),
   __reducerSchema("run_inventory_replenishment_demand_test", RunInventoryReplenishmentDemandTestReducer),
   __reducerSchema("run_inventory_serial_id_validate_test", RunInventorySerialIdValidateTestReducer),
   __reducerSchema("run_inventory_serial_reserve_test", RunInventorySerialReserveTestReducer),
   __reducerSchema("run_inventory_stock_inventory_test", RunInventoryStockInventoryTestReducer),
   __reducerSchema("run_inventory_stock_quant_test", RunInventoryStockQuantTestReducer),
+  __reducerSchema("run_inventory_wave_release_test", RunInventoryWaveReleaseTestReducer),
   __reducerSchema("run_manufacturing_workcenter_test", RunManufacturingWorkcenterTestReducer),
   __reducerSchema("run_owner_report_schedule", RunOwnerReportScheduleReducer),
   __reducerSchema("run_purchasing_bill_balanced_test", RunPurchasingBillBalancedTestReducer),

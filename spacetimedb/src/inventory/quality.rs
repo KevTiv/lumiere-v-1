@@ -9,6 +9,8 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::stock::{quarantine_quantity, stock_picking, stock_quant};
+use crate::inventory::warehouse::warehouse;
 use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -549,6 +551,42 @@ pub fn fail_quality_check(
         return Err("Check is already completed".to_string());
     }
 
+    if qty_failed <= 0.0 {
+        return Err("qty_failed must be positive to quarantine stock".to_string());
+    }
+
+    let product_id = record
+        .product_id
+        .ok_or("Quality check must reference a product to quarantine stock")?;
+
+    let resolved_qc_location = resolve_quarantine_location(
+        ctx,
+        organization_id,
+        company_id,
+        failure_location_id.or(record.failure_location_id),
+        record.picking_id,
+    )?;
+
+    let source_location_id = resolve_quality_source_location(
+        ctx,
+        organization_id,
+        company_id,
+        product_id,
+        record.lot_id,
+        record.picking_id,
+    )?;
+
+    quarantine_quantity(
+        ctx,
+        organization_id,
+        company_id,
+        product_id,
+        record.lot_id,
+        source_location_id,
+        resolved_qc_location,
+        qty_failed,
+    )?;
+
     ctx.db.quality_check().id().update(QualityCheck {
         quality_state: "fail".to_string(),
         status: "completed".to_string(),
@@ -556,7 +594,7 @@ pub fn fail_quality_check(
         qty_failed,
         note: note.or(record.note.clone()),
         picture_fail: picture_fail.or(record.picture_fail.clone()),
-        failure_location_id: failure_location_id.or(record.failure_location_id),
+        failure_location_id: Some(resolved_qc_location),
         check_date: Some(ctx.timestamp),
         write_date: ctx.timestamp,
         ..record
@@ -576,6 +614,8 @@ pub fn fail_quality_check(
                     "quality_state": "fail",
                     "status": "completed",
                     "qty_failed": qty_failed,
+                    "failure_location_id": resolved_qc_location,
+                    "source_location_id": source_location_id,
                 })
                 .to_string(),
             ),
@@ -583,12 +623,107 @@ pub fn fail_quality_check(
                 "quality_state".to_string(),
                 "status".to_string(),
                 "qty_failed".to_string(),
+                "failure_location_id".to_string(),
             ],
             metadata: None,
         },
     );
 
     Ok(())
+}
+
+fn resolve_quarantine_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    explicit: Option<u64>,
+    picking_id: Option<u64>,
+) -> Result<u64, String> {
+    if let Some(loc) = explicit {
+        return Ok(loc);
+    }
+
+    if let Some(pid) = picking_id {
+        if let Some(picking) = ctx.db.stock_picking().id().find(&pid) {
+            // Prefer warehouse QC loc tied to the picking's stock locations.
+            if let Some(wh) = ctx.db.warehouse().iter().find(|w| {
+                w.organization_id == organization_id
+                    && w.company_id == company_id
+                    && w.wh_qc_stock_loc_id.is_some()
+                    && (picking.location_dest_id == w.lot_stock_id
+                        || picking.location_id == w.lot_stock_id
+                        || picking.location_dest_id == w.id
+                        || picking.location_id == w.id)
+            }) {
+                if let Some(qc) = wh.wh_qc_stock_loc_id {
+                    return Ok(qc);
+                }
+            }
+        }
+    }
+
+    if let Some(wh) = ctx.db.warehouse().iter().find(|w| {
+        w.organization_id == organization_id
+            && w.company_id == company_id
+            && w.wh_qc_stock_loc_id.is_some()
+    }) {
+        if let Some(qc) = wh.wh_qc_stock_loc_id {
+            return Ok(qc);
+        }
+    }
+
+    Err(
+        "No quarantine/QC location: pass failure_location_id or configure warehouse.wh_qc_stock_loc_id"
+            .to_string(),
+    )
+}
+
+fn resolve_quality_source_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    lot_id: Option<u64>,
+    picking_id: Option<u64>,
+) -> Result<u64, String> {
+    if let Some(pid) = picking_id {
+        if let Some(picking) = ctx.db.stock_picking().id().find(&pid) {
+            // Inbound receipts hold stock at dest; outbound at source.
+            let candidate = if picking.picking_code.as_deref() == Some("incoming") || picking.is_return
+            {
+                picking.location_dest_id
+            } else {
+                picking.location_id
+            };
+            if ctx.db.stock_quant().quant_by_product().filter(&product_id).any(|q| {
+                q.organization_id == organization_id
+                    && q.company_id == company_id
+                    && q.location_id == candidate
+                    && q.lot_id == lot_id
+                    && q.quantity > 0.0
+            }) {
+                return Ok(candidate);
+            }
+        }
+    }
+
+    ctx.db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&product_id)
+        .find(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.lot_id == lot_id
+                && q.quantity > 0.0
+        })
+        .map(|q| q.location_id)
+        .ok_or_else(|| {
+            format!(
+                "No on-hand quant for product {} to quarantine",
+                product_id
+            )
+        })
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

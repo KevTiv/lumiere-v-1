@@ -907,6 +907,8 @@ function categorizeByModule(reducerName: string): string {
     cancel_stock_cycle_count: 'inventory',
     create_picking_wave: 'inventory',
     confirm_picking_wave: 'inventory',
+    release_picking_wave: 'inventory',
+    complete_picking_wave: 'inventory',
     create_barcode_rule: 'inventory',
     update_barcode_rule: 'inventory',
     delete_barcode_rule: 'inventory',

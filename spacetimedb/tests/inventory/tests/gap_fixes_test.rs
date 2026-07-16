@@ -1,4 +1,4 @@
-//! Inventory gap fixes — isolation, ATP, lot/serial, FEFO/expiry, replenishment demand.
+//! Inventory gap fixes — isolation, ATP, lot/serial, FEFO/expiry, replenishment, QC, waves.
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::core::organization::{company, create_company, CompanyScopeParams, CreateCompanyParams};
@@ -6,6 +6,9 @@ use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::{
     create_product, create_product_supplier_info, product, CreateProductParams,
     CreateProductSupplierInfoParams,
+};
+use crate::inventory::quality::{
+    create_quality_check, fail_quality_check, quality_check, CreateQualityCheckParams,
 };
 use crate::inventory::replenishment::{
     create_replenishment_rule, execute_replenishment_rule, replenishment_rule,
@@ -20,6 +23,11 @@ use crate::inventory::stock::{
 use crate::inventory::tracking::{
     create_stock_production_lot, create_stock_production_serial, stock_production_lot,
     stock_production_serial, CreateStockProductionLotParams, CreateStockProductionSerialParams,
+};
+use crate::inventory::warehouse::{create_stock_location, stock_location, CreateStockLocationParams};
+use crate::inventory::warehouse_operations::{
+    complete_picking_wave, create_picking_wave, picking_wave, release_picking_wave,
+    update_warehouse_task_status, warehouse_task, CreatePickingWaveParams,
 };
 use crate::purchasing::purchase_orders::purchase_order;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
@@ -1247,6 +1255,390 @@ pub fn test_replenishment_creates_draft_po(ctx: &ReducerContext) -> Result<(), S
     let meta = rule.metadata.unwrap_or_default();
     if !meta.contains("buy") {
         return Err(format!("expected demand_type buy in metadata, got {meta}"));
+    }
+    Ok(())
+}
+
+/// fail_quality_check moves qty to QC location and removes it from ATP.
+pub fn test_quality_fail_quarantines_from_atp(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = fixture.product_id;
+
+    create_quant_for_fixture(ctx, &fixture, 10.0)?;
+
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "QC Quarantine".to_string(),
+            usage: "internal_qc".to_string(),
+            location_category: "qc".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: None,
+            complete_name: Some("QC Quarantine".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: Some(r#"{"test":"qc"}"#.to_string()),
+        },
+    )?;
+    let qc_loc = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "QC Quarantine")
+        .map(|l| l.id)
+        .ok_or("qc location missing")?;
+
+    create_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        CreateQualityCheckParams {
+            name: "QC-FAIL-1".to_string(),
+            test_type: "passfail".to_string(),
+            product_id: Some(product_id),
+            product_variant_id: None,
+            picking_id: None,
+            move_line_id: None,
+            lot_id: None,
+            team_id: None,
+            user_id: None,
+            control_point_id: None,
+            qty_tested: 10.0,
+            tolerance_min: None,
+            tolerance_max: None,
+            norm_unit: None,
+            metadata: None,
+        },
+    )?;
+    let check_id = ctx
+        .db
+        .quality_check()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.name == "QC-FAIL-1")
+        .map(|c| c.id)
+        .ok_or("quality check missing")?;
+
+    fail_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        check_id,
+        4.0,
+        Some("failed sample".to_string()),
+        None,
+        Some(qc_loc),
+    )?;
+
+    let src = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .find(|q| {
+            q.organization_id == org_id
+                && q.product_id == product_id
+                && q.location_id == fixture.warehouse_id
+        })
+        .ok_or("source quant after quarantine")?;
+    if (src.quantity - 6.0).abs() > 0.001 {
+        return Err(format!(
+            "expected source qty 6 after quarantine, got {}",
+            src.quantity
+        ));
+    }
+
+    let qc_quant = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .find(|q| {
+            q.organization_id == org_id && q.product_id == product_id && q.location_id == qc_loc
+        })
+        .ok_or("quarantine quant missing")?;
+    if (qc_quant.quantity - 4.0).abs() > 0.001 {
+        return Err(format!(
+            "expected quarantine qty 4, got {}",
+            qc_quant.quantity
+        ));
+    }
+    if qc_quant.available_quantity > 0.001 {
+        return Err(format!(
+            "quarantine stock must have available_quantity 0, got {}",
+            qc_quant.available_quantity
+        ));
+    }
+
+    match reserve_quantity_at_location(ctx, org_id, company_id, product_id, qc_loc, 1.0) {
+        Err(msg)
+            if msg.to_lowercase().contains("quarantine")
+                || msg.to_lowercase().contains("qc") =>
+        {
+            Ok(())
+        }
+        Err(msg) => Err(format!("Expected QC/ATP block, got: {msg}")),
+        Ok(()) => Err("quarantine ATP block failed: reserved from QC location".into()),
+    }
+}
+
+/// Wave release creates pick tasks; validate blocked until tasks done; complete needs done pickings.
+pub fn test_wave_release_orchestrates_tasks(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = fixture.product_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or("product")?;
+
+    create_quant_for_fixture(ctx, &fixture, 5.0)?;
+
+    create_stock_picking(
+        ctx,
+        org_id,
+        CreateStockPickingParams {
+            company_id: Some(company_id),
+            name: "OUT-WAVE-1".to_string(),
+            picking_type_id: 0,
+            location_id: fixture.warehouse_id,
+            location_dest_id: fixture.partner_id,
+            move_type: "direct".to_string(),
+            priority: "1".to_string(),
+            partner_id: Some(fixture.partner_id),
+            contact_id: None,
+            scheduled_date: Some(ctx.timestamp),
+            origin: Some("wave-test".to_string()),
+            note: None,
+            user_id: None,
+            sale_id: None,
+            purchase_id: None,
+            group_id: None,
+            is_locked: false,
+            immediate_transfer: false,
+            is_printed: false,
+            is_return: false,
+            has_scrap_move: false,
+            has_tracking: false,
+            date: None,
+            date_done: None,
+            backorder_id: None,
+            backorder_ids: vec![],
+            show_operations: false,
+            show_lots_text: false,
+            show_reserved: true,
+            show_check_availability: true,
+            show_validate: true,
+            show_mark_as_todo: true,
+            show_set_qty_button: false,
+            show_clear_qty_button: false,
+            show_lots_m2o: false,
+            product_id: Some(product_id),
+            lot_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            display_lot_id: None,
+            location_id_name: None,
+            location_dest_id_name: None,
+            picking_code: Some("outgoing".to_string()),
+            product_tracking: None,
+            product_barcode: None,
+            move_line_exist: false,
+            has_packages: false,
+            has_move_lines: true,
+            has_package: false,
+            has_lot: false,
+            has_owner: false,
+            has_entire_package_src: false,
+            has_entire_package_dest: false,
+            package_level_ids: vec![],
+            batch_id: None,
+            metadata: Some(r#"{"test":"wave"}"#.to_string()),
+        },
+    )?;
+    let picking_id = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "OUT-WAVE-1")
+        .map(|p| p.id)
+        .ok_or("picking missing")?;
+
+    create_stock_move(
+        ctx,
+        org_id,
+        CreateStockMoveParams {
+            company_id: Some(company_id),
+            name: "Wave pick move".to_string(),
+            product_id,
+            product_tmpl_id: product_id,
+            product_uom: product.uom_id,
+            product_uom_qty: 2.0,
+            location_id: fixture.warehouse_id,
+            location_dest_id: fixture.partner_id,
+            date_expected: ctx.timestamp,
+            move_type: "outgoing".to_string(),
+            priority: "1".to_string(),
+            reference: None,
+            sequence: 10,
+            origin: Some("wave-test".to_string()),
+            note: None,
+            date: None,
+            date_deadline: None,
+            picking_id: Some(picking_id),
+            picking_type_id: None,
+            partner_id: Some(fixture.partner_id),
+            product_variant_id: None,
+            group_id: None,
+            rule_id: None,
+            procure_method: "make_to_stock".to_string(),
+            price_unit: 20.0,
+            scrapped: false,
+            to_refund: false,
+            propagate_cancel: true,
+            delay_alert: false,
+            product_packaging_id: None,
+            product_packaging_qty: 0.0,
+            warehouse_id: Some(fixture.warehouse_id),
+            production_id: None,
+            raw_material_production_id: None,
+            unbuild_id: None,
+            consume_unbuild_id: None,
+            cost_share: 0.0,
+            is_subcontract: false,
+            purchase_line_id: None,
+            need_release: false,
+            release_ready: false,
+            propagation_cancel: true,
+            has_tracking: false,
+            inventory_id: None,
+            sale_line_id: None,
+            lot_id: None,
+            serial_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            package_level_id: None,
+            product_type: Some("product".to_string()),
+            metadata: None,
+        },
+    )?;
+
+    create_picking_wave(
+        ctx,
+        org_id,
+        company_id,
+        CreatePickingWaveParams {
+            name: "WAVE-1".to_string(),
+            picking_type_id: 0,
+            state: "draft".to_string(),
+            is_wave: true,
+            picking_ids: vec![picking_id],
+            move_line_ids: vec![],
+            user_id: None,
+            team_id: None,
+            date_start: None,
+            date_done: None,
+            metadata: None,
+        },
+    )?;
+    let wave_id = ctx
+        .db
+        .picking_wave()
+        .iter()
+        .find(|w| w.organization_id == org_id && w.name == "WAVE-1")
+        .map(|w| w.id)
+        .ok_or("wave missing")?;
+
+    release_picking_wave(ctx, org_id, company_id, wave_id)?;
+
+    let picking = ctx
+        .db
+        .stock_picking()
+        .id()
+        .find(&picking_id)
+        .ok_or("picking after release")?;
+    if picking.state != "assigned" {
+        return Err(format!(
+            "expected picking assigned after wave release, got {}",
+            picking.state
+        ));
+    }
+
+    let task_id = ctx
+        .db
+        .warehouse_task()
+        .iter()
+        .find(|t| {
+            t.organization_id == org_id
+                && t.picking_id == Some(picking_id)
+                && t.notes
+                    .as_deref()
+                    .map(|n| n.contains(&format!("wave:{wave_id}")))
+                    .unwrap_or(false)
+        })
+        .map(|t| t.id)
+        .ok_or("pick task missing after wave release")?;
+
+    let scope = CompanyScopeParams {
+        company_id: Some(company_id),
+    };
+
+    match validate_stock_picking(ctx, org_id, picking_id, scope.clone()) {
+        Err(msg) if msg.to_lowercase().contains("warehouse task") => {}
+        Err(msg) => return Err(format!("Expected open-task block on validate, got: {msg}")),
+        Ok(()) => return Err("validate should block while wave tasks are open".into()),
+    }
+
+    match complete_picking_wave(ctx, org_id, company_id, wave_id) {
+        Err(msg) if msg.to_lowercase().contains("open pick task") => {}
+        Err(msg) => return Err(format!("Expected open-task block on complete, got: {msg}")),
+        Ok(()) => return Err("complete should block while pick tasks are open".into()),
+    }
+
+    update_warehouse_task_status(ctx, org_id, company_id, task_id, "done".to_string())?;
+
+    match complete_picking_wave(ctx, org_id, company_id, wave_id) {
+        Err(msg) if msg.to_lowercase().contains("validated") || msg.contains("done") => {}
+        Err(msg) => {
+            return Err(format!(
+                "Expected picking-not-done block on complete, got: {msg}"
+            ))
+        }
+        Ok(()) => return Err("complete should block until picking is validated".into()),
+    }
+
+    reserve_quantity_at_location(ctx, org_id, company_id, product_id, fixture.warehouse_id, 2.0)?;
+    validate_stock_picking(ctx, org_id, picking_id, scope)?;
+    complete_picking_wave(ctx, org_id, company_id, wave_id)?;
+
+    let wave = ctx
+        .db
+        .picking_wave()
+        .id()
+        .find(&wave_id)
+        .ok_or("wave after complete")?;
+    if wave.state != "done" {
+        return Err(format!("expected wave done, got {}", wave.state));
     }
     Ok(())
 }

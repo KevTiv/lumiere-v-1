@@ -28,6 +28,8 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_fefo_test(ctx)?;
     run_inventory_serial_id_validate_test(ctx)?;
     run_inventory_replenishment_demand_test(ctx)?;
+    run_inventory_qc_quarantine_test(ctx)?;
+    run_inventory_wave_release_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -121,4 +123,16 @@ pub fn run_inventory_serial_id_validate_test(ctx: &ReducerContext) -> Result<(),
 pub fn run_inventory_replenishment_demand_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_replenishment_creates_draft_po(ctx)
         .map_err(|e| format!("replenishment_demand: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_qc_quarantine_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_quality_fail_quarantines_from_atp(ctx)
+        .map_err(|e| format!("qc_quarantine: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_wave_release_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_wave_release_orchestrates_tasks(ctx)
+        .map_err(|e| format!("wave_release: {e}"))
 }
