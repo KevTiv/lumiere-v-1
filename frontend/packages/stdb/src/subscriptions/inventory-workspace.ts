@@ -3,16 +3,20 @@ import type { SubscriptionQueryContext } from "../queries/erp-subscriptions";
 /**
  * Inventory list/query resources aligned with `GET /api/query/:resource` and WebSocket mirrors.
  * Compose with session workspace keys (`auth` bundle via `SESSION_WORKSPACE_RESOURCE_KEYS`).
+ *
+ * Intentionally excludes:
+ * - `warehouse-3d` (orphan key; no registry/table)
+ * - `inventory-valuations` (unused/mis-shaped table; avoid live fan-out)
  */
 export const INVENTORY_WORKSPACE_RESOURCE_KEYS = [
   "adjustment-reasons",
   "barcode-nomenclatures",
   "barcode-rules",
   "inventory-adjustments",
-  "inventory-valuations",
   "picking-waves",
   "product-categories",
   "products",
+  "quality-alerts",
   "quality-checks",
   "replenishment-rules",
   "serial-lot-traceability",
@@ -28,7 +32,6 @@ export const INVENTORY_WORKSPACE_RESOURCE_KEYS = [
   "stock-rules",
   "stock-traceability-reports",
   "uoms",
-  "warehouse-3d",
   "warehouse-3d-zones",
   "warehouse-tasks",
   "warehouses",

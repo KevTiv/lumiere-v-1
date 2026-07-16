@@ -88,7 +88,7 @@ Tabs from `purchasingModuleConfig` + client-injected tabs ([`purchasing-client.t
 | Layer | What exists | Not covered |
 |-------|-------------|-------------|
 | Domain | `run_purchasing_bill_balanced_test` / `test_po_confirm_to_balanced_bill` (confirm → receive → bill) | Match reject, lock, requisition, intake, landed, company isolation, stock receipt |
-| Inventory note | `stock_picking_quant_test.rs` documents `receive_po_line` does **not** post quants | Atomic receipt |
+| Inventory note | `stock_picking_quant_test.rs` / `test_receipt_increases_quant` — `receive_po_line` validates inbound picking and posts quants | See [inventory investigation](./INVENTORY_WAREHOUSE_MANAGEMENT_INVESTIGATION.md) |
 | Sales | Dropship PO create in `gap_fixes_test.rs` | Purchasing-side dropship UX |
 | Playwright | `mvp-procure-to-pay` (@p0): happy path, partial receive matched, over-bill post rejected; `purchasing-module` shell/tabs/modals; approvals parity blocks PO confirm | Requisition→PO, returns, RFQ, budgets |
 | Contract | `purchasing.contract.ts` enumerates BFF keys | Does not prove inventory atomicity |
@@ -113,8 +113,8 @@ Definitions:
 | PO draft / send / confirm / cancel | **Present** | Reducers + UI + approval gate on send/confirm; e2e confirm |
 | PO line CRUD | **Present** | Add/update/remove + UI |
 | PO lock / unlock | **Present** | Reducers + BFF + UI (audit missing — see invariants) |
-| Inventory receipt on confirm | **Absent** | `confirm_purchase_order_impl` sets state only; no IN picking create |
-| Qty receipt on PO | **Partial** | `receive_po_line` updates `qty_received` + receipt_status; **no quant/move** |
+| Inventory receipt on confirm | **Present** | Confirm creates draft IN picking + moves (stocked products) |
+| Qty + stock receipt on PO | **Present** | `receive_po_line` → `validate_stock_picking_backorder` posts quants and updates `qty_received` |
 | Atomic receipt + commitment | **Unsuitable** (for stock) | Qty and stock can diverge; seed pickings are fixture-only |
 | Bill from PO | **Present** | `create_bill_from_purchase_order` bills `qty_received - qty_invoiced` |
 | Three-way match (qty) | **Present** | Post `InInvoice` with `PO{id}` origin blocked when billed > received/ordered + tol (`0.001`) |
@@ -152,7 +152,7 @@ Definitions:
 | Invariant | Currently enforced | Evidence | Remaining requirement |
 |-----------|-------------------|----------|------------------------|
 | Bill qty ≤ received / ordered | Yes (post) | `validate_in_invoice_three_way_match` + `validate_three_way_match_po_lines` | Price tolerances; configurable tolerance per company |
-| Receive before bill (happy path) | Partial | Bill create uses `qty_received > qty_invoiced` | Prevent silent qty-only receive without stock when inventory policy requires it |
+| Receive before bill (happy path) | Yes | Bill create uses `qty_received > qty_invoiced`; stocked receive posts quants in-txn | Service/non-stocked PO policy remains explicit if needed |
 | Immutable FX snapshot | No (PO) | No `currency_rate` on PO | Snapshot at confirm/bill; consume on post |
 | Landed cost valuation | Partial | `apply_landed_costs` adjusts quant value | Link to bill/duty lines; period lock |
 | Budget / commitment | No | Budgets actualize on journal, not PO confirm | Encumbrance at confirm; release on cancel/bill |
@@ -182,7 +182,7 @@ Definitions:
 | Invariant | Currently enforced | Evidence | Remaining requirement |
 |-----------|-------------------|----------|------------------------|
 | Atomic PO confirm | Yes (state) | Single reducer; approval gate | Optionally create IN picking in same txn |
-| Atomic stock receipt | **No** | `receive_po_line` qty-only | Single reducer: qty + picking validate / quant receive |
+| Atomic stock receipt | **Yes** | `receive_po_line` validates inbound picking and updates qty in one reducer txn | Keep path covered by domain + e2e tests after publish |
 | Stale-state rejection | Partial | State preconditions on confirm/cancel/send | Idempotency for bill create/post retries |
 | Three-way fail closed | Yes | Post rejects over-bill | Domain test + e2e (e2e exists) |
 | No client multi-step commit | Intent | Approval resume server-side | Never orchestrate receive+bill+post across optimistic client steps without server guards |
@@ -219,7 +219,7 @@ SpacetimeDB atomicity model: each reducer runs in one transaction that commits o
 2. Send PO → `Sent` or `ToApprove` per approval rule; second confirm without approval fails; approver resume → `Purchase` (SoD).
 3. Confirm PO → state `Purchase`, `date_approve` set, `supplier_rank` bumped; **and** (target) draft IN picking + moves linked by PO line — **stock half fails today**.
 4. Lock PO blocks unsafe update/confirm/line edits; unlock restores; audit SET_ACTIVE/UPDATE (target: audit today missing on lock).
-5. `receive_po_line` for partial qty updates `qty_received` and `receipt_status`; stock quants increase **or** explicit policy that inventory uses picking validate only (must be one documented path).
+5. `receive_po_line` for partial qty updates `qty_received` and posts stock via inbound picking validate (stocked products); service/non-stocked policy remains explicit if needed.
 6. `create_bill_from_purchase_order` creates `InInvoice` for unbilled received qty with `invoice_origin = PO{id}`; line `qty_invoiced` increases.
 7. Post bill when billed ≤ received + tol succeeds and balances; GL lines correct.
 8. Force over-bill (`invoice_po_line` / manual) → line match `over_billed` → `post_invoice` fails closed with three-way error.
@@ -282,7 +282,7 @@ Quality benchmark for integrated procure-to-pay controls: Oracle NetSuite purcha
 | Topic | Decision |
 |-------|----------|
 | **Atomic mutations** | Keep PO confirm, receipt commitment, stock receive (when required), bill create qty bump, and three-way match rejection in **single reducers** (or one internal `*_impl`) wherever atomicity is required. Prefer `receive_po_line` (or a successor) to update PO qty **and** inventoriable stock in one transaction — do not leave stock sync to a client second step. |
-| **Confirm vs receive** | Either (a) confirm creates draft IN picking and validate/receive moves quants while updating `qty_received`, or (b) document qty-only receive as non-inventory service PO policy. Dual paths must be explicit; today’s silent split is Unsuitable for stocked products. |
+| **Confirm vs receive** | Confirm creates draft IN picking for stocked products; `receive_po_line` validates and posts quants atomically with `qty_received`. Document any intentional qty-only path for non-stocked / service POs separately. |
 | **Preconditions / idempotency** | Enforce state preconditions on send/confirm/cancel/receive/bill. Add idempotency keys for repeated bill create/post and external customs/payment callbacks. |
 | **Subscriptions** | Prefer company-filtered and **bounded exception** subscriptions (`state = ToApprove`, partial receipt, over-billed lines, open spend commitments). Wire `landed-costs` / `supplier-intakes` into `ERP_ORG_SQL`. Avoid deriving all queues solely from full-table client filters. |
 | **Indexes** | Index tenant, company, state, partner, order, picking, and invoice-origin lookup paths. Index names must remain unique module-wide. |

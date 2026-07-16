@@ -515,31 +515,11 @@ function extractRustFunctionBodyByName(src: string, fnName: string): string | nu
 
 /** Reducers invoked from query-hooks whose SpacetimeDB module has no generated *_reducer.ts yet. */
 const REDUCER_HOOKS_WITHOUT_STDB_BINDINGS = new Set([
-  'cancel_stock_inventory',
-  'cancel_warehouse_task',
-  'complete_warehouse_task',
-  'confirm_stock_inventory',
   'create_sale_order_line',
-  'delete_picking_wave',
-  'delete_quality_alert',
-  'delete_quality_check',
-  'delete_replenishment_rule',
   'delete_sale_order_line',
-  'delete_uom',
-  'delete_warehouse_task',
   'lock_sale_order',
-  'process_picking_wave',
-  'start_stock_inventory',
-  'start_warehouse_task',
-  'trigger_replenishment',
   'unlock_sale_order',
-  'update_picking_wave',
-  'update_quality_alert',
-  'update_quality_check',
-  'update_replenishment_rule',
   'update_sale_order_line',
-  'update_uom',
-  'validate_stock_inventory',
 ])
 
 // ── Pass 4: Scan api-server route handlers ────────────────────────────────────

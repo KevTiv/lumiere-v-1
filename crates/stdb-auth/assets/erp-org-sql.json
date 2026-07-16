@@ -554,6 +554,139 @@
   },
   {
     "extra_where": "",
+    "mapKey": "stock-locations",
+    "order_by": "",
+    "resource_key": "stock-locations",
+    "table": "stock_location"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "stock-moves",
+    "order_by": "",
+    "resource_key": "stock-moves",
+    "table": "stock_move"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "stock-production-lots",
+    "order_by": "",
+    "resource_key": "stock-production-lots",
+    "table": "stock_production_lot"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "stock-production-serials",
+    "order_by": "",
+    "resource_key": "stock-production-serials",
+    "table": "stock_production_serial"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "stock-cycle-counts",
+    "order_by": "",
+    "resource_key": "stock-cycle-counts",
+    "table": "stock_cycle_count"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "stock-inventories",
+    "order_by": "",
+    "resource_key": "stock-inventories",
+    "table": "stock_inventory"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "stock-routes",
+    "order_by": "",
+    "resource_key": "stock-routes",
+    "table": "stock_route"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "stock-rules",
+    "order_by": "",
+    "resource_key": "stock-rules",
+    "table": "stock_rule"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "picking-waves",
+    "order_by": "",
+    "resource_key": "picking-waves",
+    "table": "picking_wave"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "warehouse-tasks",
+    "order_by": "",
+    "resource_key": "warehouse-tasks",
+    "table": "warehouse_task"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "warehouse-3d-zones",
+    "order_by": "",
+    "resource_key": "warehouse-3d-zones",
+    "table": "warehouse_3d_zone"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "quality-checks",
+    "order_by": "",
+    "resource_key": "quality-checks",
+    "table": "quality_check"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "quality-alerts",
+    "order_by": "",
+    "resource_key": "quality-alerts",
+    "table": "quality_alert"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "replenishment-rules",
+    "order_by": "",
+    "resource_key": "replenishment-rules",
+    "table": "replenishment_rule"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "barcode-rules",
+    "order_by": "",
+    "resource_key": "barcode-rules",
+    "table": "barcode_rule"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "barcode-nomenclatures",
+    "order_by": "",
+    "resource_key": "barcode-nomenclatures",
+    "table": "barcode_nomenclature"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "adjustment-reasons",
+    "order_by": "",
+    "resource_key": "adjustment-reasons",
+    "table": "adjustment_reason"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "serial-lot-traceability",
+    "order_by": "",
+    "resource_key": "serial-lot-traceability",
+    "table": "serial_lot_traceability"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "stock-traceability-reports",
+    "order_by": "",
+    "resource_key": "stock-traceability-reports",
+    "table": "stock_traceability_report"
+  },
+  {
+    "extra_where": "",
     "mapKey": "purchase-orders",
     "order_by": "",
     "resource_key": "purchase-orders",
@@ -607,6 +740,41 @@
     "order_by": "",
     "resource_key": "purchase-requisitions",
     "table": "purchase_requisition"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "purchase-rfqs",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "purchase-rfqs",
+    "table": "purchase_rfq"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "purchase-rfq-lines",
+    "order_by": "",
+    "resource_key": "purchase-rfq-lines",
+    "table": "purchase_rfq_line"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "purchase-rfq-bids",
+    "order_by": "",
+    "resource_key": "purchase-rfq-bids",
+    "table": "purchase_rfq_bid"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "purchase-returns",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "purchase-returns",
+    "table": "purchase_return"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "purchase-return-lines",
+    "order_by": "",
+    "resource_key": "purchase-return-lines",
+    "table": "purchase_return_line"
   },
   {
     "extra_where": "",

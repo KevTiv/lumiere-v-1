@@ -108,6 +108,25 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "stock-pickings",
   "warehouses",
   "inventory-adjustments",
+  "stock-locations",
+  "stock-moves",
+  "stock-production-lots",
+  "stock-production-serials",
+  "stock-cycle-counts",
+  "stock-inventories",
+  "stock-routes",
+  "stock-rules",
+  "picking-waves",
+  "warehouse-tasks",
+  "warehouse-3d-zones",
+  "quality-checks",
+  "quality-alerts",
+  "replenishment-rules",
+  "barcode-rules",
+  "barcode-nomenclatures",
+  "adjustment-reasons",
+  "serial-lot-traceability",
+  "stock-traceability-reports",
   "purchase-orders",
   "purchase-orders-to-approve",
   "purchase-orders-partial-receipt",
@@ -553,6 +572,74 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql(
       "inventory-adjustments",
       "inventory_adjustment",
+      id,
+      fa,
+      "",
+    ),
+  "stock-locations": (id, fa) =>
+    selectOrgScopedSql("stock-locations", "stock_location", id, fa, ""),
+  "stock-moves": (id, fa) =>
+    selectOrgScopedSql("stock-moves", "stock_move", id, fa, ""),
+  "stock-production-lots": (id, fa) =>
+    selectOrgScopedSql(
+      "stock-production-lots",
+      "stock_production_lot",
+      id,
+      fa,
+      "",
+    ),
+  "stock-production-serials": (id, fa) =>
+    selectOrgScopedSql(
+      "stock-production-serials",
+      "stock_production_serial",
+      id,
+      fa,
+      "",
+    ),
+  "stock-cycle-counts": (id, fa) =>
+    selectOrgScopedSql("stock-cycle-counts", "stock_cycle_count", id, fa, ""),
+  "stock-inventories": (id, fa) =>
+    selectOrgScopedSql("stock-inventories", "stock_inventory", id, fa, ""),
+  "stock-routes": (id, fa) =>
+    selectOrgScopedSql("stock-routes", "stock_route", id, fa, ""),
+  "stock-rules": (id, fa) =>
+    selectOrgScopedSql("stock-rules", "stock_rule", id, fa, ""),
+  "picking-waves": (id, fa) =>
+    selectOrgScopedSql("picking-waves", "picking_wave", id, fa, ""),
+  "warehouse-tasks": (id, fa) =>
+    selectOrgScopedSql("warehouse-tasks", "warehouse_task", id, fa, ""),
+  "warehouse-3d-zones": (id, fa) =>
+    selectOrgScopedSql("warehouse-3d-zones", "warehouse_3d_zone", id, fa, ""),
+  "quality-checks": (id, fa) =>
+    selectOrgScopedSql("quality-checks", "quality_check", id, fa, ""),
+  "quality-alerts": (id, fa) =>
+    selectOrgScopedSql("quality-alerts", "quality_alert", id, fa, ""),
+  "replenishment-rules": (id, fa) =>
+    selectOrgScopedSql("replenishment-rules", "replenishment_rule", id, fa, ""),
+  "barcode-rules": (id, fa) =>
+    selectOrgScopedSql("barcode-rules", "barcode_rule", id, fa, ""),
+  "barcode-nomenclatures": (id, fa) =>
+    selectOrgScopedSql(
+      "barcode-nomenclatures",
+      "barcode_nomenclature",
+      id,
+      fa,
+      "",
+    ),
+  "adjustment-reasons": (id, fa) =>
+    selectOrgScopedSql("adjustment-reasons", "adjustment_reason", id, fa, ""),
+  "serial-lot-traceability": (id, fa) =>
+    selectOrgScopedSql(
+      "serial-lot-traceability",
+      "serial_lot_traceability",
+      id,
+      fa,
+      "",
+    ),
+  "stock-traceability-reports": (id, fa) =>
+    selectOrgScopedSql(
+      "stock-traceability-reports",
+      "stock_traceability_report",
       id,
       fa,
       "",

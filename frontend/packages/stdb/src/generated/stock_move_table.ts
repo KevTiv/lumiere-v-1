@@ -35,6 +35,7 @@ export default __t.row({
   partnerId: __t.option(__t.u64()).name("partner_id"),
   companyId: __t.u64().name("company_id"),
   pickingId: __t.option(__t.u64()).name("picking_id"),
+  pickingKey: __t.u64().name("picking_key"),
   pickingTypeId: __t.option(__t.u64()).name("picking_type_id"),
   originReturnedMoveId: __t.option(__t.u64()).name("origin_returned_move_id"),
   procureMethod: __t.string().name("procure_method"),

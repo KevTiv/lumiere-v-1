@@ -1,4 +1,5 @@
 //! Inventory domain test suite — invoke via `run_all_inventory_tests` reducer.
+pub mod gap_fixes_test;
 pub mod inventory_adjustments_tests;
 pub mod product_category_tests;
 pub mod product_update_test;
@@ -18,6 +19,8 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_stock_quant_test(ctx)?;
     run_inventory_receipt_quant_test(ctx)?;
     run_inventory_delivery_quant_test(ctx)?;
+    run_inventory_company_isolation_test(ctx)?;
+    run_inventory_atp_fail_closed_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -61,4 +64,16 @@ pub fn run_inventory_receipt_quant_test(ctx: &ReducerContext) -> Result<(), Stri
 pub fn run_inventory_delivery_quant_test(ctx: &ReducerContext) -> Result<(), String> {
     stock_picking_quant_test::test_delivery_decreases_reserved_or_moves_quant(ctx)
         .map_err(|e| format!("delivery_quant: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_company_isolation_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_company_isolation_on_reserve(ctx)
+        .map_err(|e| format!("company_isolation: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_atp_fail_closed_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_atp_fail_closed_on_over_reserve(ctx)
+        .map_err(|e| format!("atp_fail_closed: {e}"))
 }

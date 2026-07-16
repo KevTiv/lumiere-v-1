@@ -124,11 +124,9 @@ import {
   useCreateQualityCheck,
   usePassQualityCheck,
   useFailQualityCheck,
-  useDeleteQualityCheck,
   useCreateQualityAlert,
   useAssignQualityAlert,
   useCancelQualityAlert,
-  useDeleteQualityAlert,
   useCreateQualityPoint,
   useUpdateQualityPoint,
   useDeleteQualityPoint,
@@ -155,15 +153,9 @@ import {
   useRunTraceabilityReport,
   // Replenishment
   useCreateReplenishmentRule,
-  useUpdateReplenishmentRule,
-  useDeleteReplenishmentRule,
-  useTriggerReplenishment,
   // Picking waves
   useCreatePickingWave,
-  useUpdatePickingWave,
-  useDeletePickingWave,
   useConfirmPickingWave,
-  useProcessPickingWave,
   useCompletePickingWave,
   // Product category
   useCreateProductCategory,
@@ -178,7 +170,6 @@ import {
   useDeleteStockRule,
   // Warehouse tasks
   useCreateWarehouseTask,
-  useDeleteWarehouseTask,
   useStartWarehouseTask,
   useCompleteWarehouseTask,
   useCancelWarehouseTask,
@@ -816,11 +807,9 @@ function InventoryClientLoaded({
   const createQualityCheck = useCreateQualityCheck(orgId, operatingCompanyId)
   const passQualityCheck = usePassQualityCheck(orgId, operatingCompanyId)
   const failQualityCheck = useFailQualityCheck(orgId, operatingCompanyId)
-  const deleteQualityCheck = useDeleteQualityCheck(orgId, operatingCompanyId)
   const createQualityAlert = useCreateQualityAlert(orgId, operatingCompanyId)
   const assignQualityAlert = useAssignQualityAlert(orgId, operatingCompanyId)
   const cancelQualityAlert = useCancelQualityAlert(orgId, operatingCompanyId)
-  const deleteQualityAlert = useDeleteQualityAlert(orgId, operatingCompanyId)
   const createQualityPoint = useCreateQualityPoint(orgId, operatingCompanyId)
   const updateQualityPoint = useUpdateQualityPoint(orgId, operatingCompanyId)
   const deleteQualityPoint = useDeleteQualityPoint(orgId, operatingCompanyId)
@@ -849,16 +838,10 @@ function InventoryClientLoaded({
 
   // Replenishment hooks
   const createReplenishmentRule = useCreateReplenishmentRule(orgId, operatingCompanyId)
-  const updateReplenishmentRule = useUpdateReplenishmentRule(orgId, operatingCompanyId)
-  const deleteReplenishmentRule = useDeleteReplenishmentRule(orgId, operatingCompanyId)
-  const triggerReplenishment = useTriggerReplenishment(orgId, operatingCompanyId)
 
   // Picking wave hooks
   const createPickingWave = useCreatePickingWave(orgId, operatingCompanyId)
-  const updatePickingWave = useUpdatePickingWave(orgId, operatingCompanyId)
-  const deletePickingWave = useDeletePickingWave(orgId, operatingCompanyId)
   const confirmPickingWave = useConfirmPickingWave(orgId, operatingCompanyId)
-  const processPickingWave = useProcessPickingWave(orgId, operatingCompanyId)
   const completePickingWave = useCompletePickingWave(orgId, operatingCompanyId)
 
   // Product category hooks
@@ -876,7 +859,6 @@ function InventoryClientLoaded({
 
   // Warehouse task hooks
   const createWarehouseTask = useCreateWarehouseTask(orgId, operatingCompanyId)
-  const deleteWarehouseTask = useDeleteWarehouseTask(orgId, operatingCompanyId)
   const startWarehouseTask = useStartWarehouseTask(orgId, operatingCompanyId)
   const completeWarehouseTask = useCompleteWarehouseTask(orgId, operatingCompanyId)
   const cancelWarehouseTask = useCancelWarehouseTask(orgId, operatingCompanyId)
@@ -2651,19 +2633,6 @@ function InventoryClientLoaded({
                     void removeMemberFromQualityTeam.mutateAsync({ teamId, memberIdentityHex: hex.trim() })
                   },
                 },
-                {
-                  id: "delete-check",
-                  label: t("common.delete"),
-                  icon: Trash2,
-                  variant: "destructive",
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined
-                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.qualityActions.confirmDeleteCheck"))) {
-                      void deleteQualityCheck.mutateAsync(id)
-                    }
-                  },
-                },
               ],
             },
           },
@@ -2689,18 +2658,6 @@ function InventoryClientLoaded({
               ...v,
               actions: [
                 {
-                  id: "trigger-replenishment",
-                  label: t("inventory.replenishmentActions.trigger"),
-                  icon: RefreshCw,
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    const row = rows[0] as Record<string, unknown> | undefined
-                    const productId = row?.productId as ScalarId | undefined
-                    const locationId = row?.locationId as ScalarId | undefined
-                    void triggerReplenishment.mutateAsync({ productId, locationId })
-                  },
-                },
-                {
                   id: "execute-replenishment-rule",
                   label: t("inventory.replenishmentActions.executeRule"),
                   icon: ListChecks,
@@ -2714,19 +2671,6 @@ function InventoryClientLoaded({
                       )
                     ) {
                       void executeReplenishmentRule.mutateAsync(id)
-                    }
-                  },
-                },
-                {
-                  id: "delete-rule",
-                  label: t("common.delete"),
-                  icon: Trash2,
-                  variant: "destructive",
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined
-                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.replenishmentActions.confirmDelete"))) {
-                      void deleteReplenishmentRule.mutateAsync(id)
                     }
                   },
                 },
@@ -2759,16 +2703,6 @@ function InventoryClientLoaded({
                   },
                 },
                 {
-                  id: "process-wave",
-                  label: t("inventory.pickingWaveActions.process"),
-                  icon: PackageOpen,
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined
-                    if (id != null) void processPickingWave.mutateAsync(id)
-                  },
-                },
-                {
                   id: "complete-wave",
                   label: t("inventory.pickingWaveActions.complete"),
                   icon: ListChecks,
@@ -2776,19 +2710,6 @@ function InventoryClientLoaded({
                   onClick: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined
                     if (id != null) void completePickingWave.mutateAsync(id)
-                  },
-                },
-                {
-                  id: "delete-wave",
-                  label: t("common.delete"),
-                  icon: Trash2,
-                  variant: "destructive",
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined
-                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.pickingWaveActions.confirmDelete"))) {
-                      void deletePickingWave.mutateAsync(id)
-                    }
                   },
                 },
               ],
@@ -3098,19 +3019,6 @@ function InventoryClientLoaded({
                   },
                 },
                 {
-                  id: "delete-task",
-                  label: t("common.delete"),
-                  icon: Trash2,
-                  variant: "destructive",
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined
-                    if (id != null && typeof window !== "undefined" && window.confirm(t("inventory.taskActions.confirmDelete"))) {
-                      void deleteWarehouseTask.mutateAsync(id)
-                    }
-                  },
-                },
-                {
                   id: "set-task-status",
                   label: t("inventory.taskActions.setStatus"),
                   icon: Pencil,
@@ -3231,20 +3139,13 @@ function InventoryClientLoaded({
     // Quality management
     passQualityCheck,
     failQualityCheck,
-    deleteQualityCheck,
-    deleteQualityAlert,
     updateQualityPoint,
     deleteQualityPoint,
     updateQualityTeam,
     deleteQualityTeam,
-    // Replenishment
-    triggerReplenishment,
-    deleteReplenishmentRule,
     // Picking waves
     confirmPickingWave,
-    processPickingWave,
     completePickingWave,
-    deletePickingWave,
     // Product categories
     deleteProductCategory,
     // Stock routes and rules
@@ -3261,7 +3162,6 @@ function InventoryClientLoaded({
     startWarehouseTask,
     completeWarehouseTask,
     cancelWarehouseTask,
-    deleteWarehouseTask,
     updateWarehouseTaskStatus,
     executeReplenishmentRule,
     startQualityCheck,
@@ -3582,11 +3482,9 @@ function InventoryClientLoaded({
       createQualityCheck,
       passQualityCheck,
       failQualityCheck,
-      deleteQualityCheck,
       createQualityAlert,
       assignQualityAlert,
       cancelQualityAlert,
-      deleteQualityAlert,
       createQualityPoint,
       updateQualityPoint,
       deleteQualityPoint,
@@ -3611,14 +3509,8 @@ function InventoryClientLoaded({
       createTraceabilityReport,
       runTraceabilityReport,
       createReplenishmentRule,
-      updateReplenishmentRule,
-      deleteReplenishmentRule,
-      triggerReplenishment,
       createPickingWave,
-      updatePickingWave,
-      deletePickingWave,
       confirmPickingWave,
-      processPickingWave,
       completePickingWave,
       createProductCategory,
       updateProductCategory,
@@ -3630,7 +3522,6 @@ function InventoryClientLoaded({
       updateStockRule,
       deleteStockRule,
       createWarehouseTask,
-      deleteWarehouseTask,
       startWarehouseTask,
       completeWarehouseTask,
       cancelWarehouseTask,

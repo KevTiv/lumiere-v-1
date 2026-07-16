@@ -71,7 +71,8 @@ pub struct StockQuant {
     public,
     index(accessor = move_by_org, btree(columns = [organization_id])),
     index(accessor = move_by_product, btree(columns = [product_id])),
-    index(accessor = move_by_picking, btree(columns = [picking_id])),
+    // picking_key = picking_id.unwrap_or(0); Option columns are not FilterableValue in STDB 2.0.1.
+    index(accessor = move_by_picking, btree(columns = [picking_key])),
     index(accessor = move_by_state, btree(columns = [state])),
     index(accessor = move_by_date, btree(columns = [date_expected]))
 )]
@@ -102,6 +103,8 @@ pub struct StockMove {
     pub partner_id: Option<u64>,
     pub company_id: u64,
     pub picking_id: Option<u64>,
+    // Denormalized picking_id.unwrap_or(0) for indexed lookups.
+    pub picking_key: u64,
     pub picking_type_id: Option<u64>,
     pub origin_returned_move_id: Option<u64>,
     pub procure_method: String,
@@ -1224,6 +1227,7 @@ pub fn create_stock_move(
         partner_id: params.partner_id,
         company_id,
         picking_id: params.picking_id,
+        picking_key: params.picking_id.unwrap_or(0),
         picking_type_id: params.picking_type_id,
         origin_returned_move_id: None,
         procure_method: params.procure_method,
@@ -1673,12 +1677,9 @@ pub fn confirm_stock_picking(
     for mut move_record in ctx
         .db
         .stock_move()
-        .move_by_org()
-        .filter(&picking.organization_id)
+        .move_by_picking()
+        .filter(&picking_id)
     {
-        if move_record.picking_id != Some(picking_id) {
-            continue;
-        }
         if move_record.state == "draft" {
             move_record.state = "confirmed".to_string();
             move_record.is_initial_demand_editable = false;
@@ -1742,12 +1743,9 @@ pub fn assign_stock_picking(
     for mut move_record in ctx
         .db
         .stock_move()
-        .move_by_org()
-        .filter(&picking.organization_id)
+        .move_by_picking()
+        .filter(&picking_id)
     {
-        if move_record.picking_id != Some(picking_id) {
-            continue;
-        }
         if move_record.state == "confirmed" {
             move_record.state = "assigned".to_string();
             move_record.is_assigned = true;
@@ -1848,12 +1846,9 @@ fn validate_stock_picking_impl(
     for move_record in ctx
         .db
         .stock_move()
-        .move_by_org()
-        .filter(&picking.organization_id)
+        .move_by_picking()
+        .filter(&picking_id)
     {
-        if move_record.picking_id != Some(picking_id) {
-            continue;
-        }
         if move_record.state != "assigned" {
             continue;
         }
@@ -2104,10 +2099,10 @@ fn validate_stock_picking_impl(
         for move_record in ctx
             .db
             .stock_move()
-            .move_by_org()
-            .filter(&picking.organization_id)
+            .move_by_picking()
+            .filter(&picking_id)
         {
-            if move_record.picking_id != Some(picking_id) || !move_record.is_done {
+            if !move_record.is_done {
                 continue;
             }
             if let Some(sl_id) = move_record.sale_line_id {
@@ -2179,10 +2174,10 @@ fn validate_stock_picking_impl(
         for move_record in ctx
             .db
             .stock_move()
-            .move_by_org()
-            .filter(&picking.organization_id)
+            .move_by_picking()
+            .filter(&picking_id)
         {
-            if move_record.picking_id != Some(picking_id) || !move_record.is_done {
+            if !move_record.is_done {
                 continue;
             }
             if let Some(sl_id) = move_record.sale_line_id {
@@ -2245,10 +2240,10 @@ fn validate_stock_picking_impl(
         for move_record in ctx
             .db
             .stock_move()
-            .move_by_org()
-            .filter(&picking.organization_id)
+            .move_by_picking()
+            .filter(&picking_id)
         {
-            if move_record.picking_id != Some(picking_id) || !move_record.is_done {
+            if !move_record.is_done {
                 continue;
             }
             if let Some(pl_id) = move_record.purchase_line_id {
@@ -2362,12 +2357,9 @@ pub fn cancel_stock_picking(
     for mut move_record in ctx
         .db
         .stock_move()
-        .move_by_org()
-        .filter(&picking.organization_id)
+        .move_by_picking()
+        .filter(&picking_id)
     {
-        if move_record.picking_id != Some(picking_id) {
-            continue;
-        }
         if move_record.state != "done" {
             move_record.state = "cancel".to_string();
             ctx.db.stock_move().id().update(move_record);

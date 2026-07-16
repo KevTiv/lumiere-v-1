@@ -31,6 +31,7 @@ pub struct StockMove {
     pub partner_id: Option<u64>,
     pub company_id: u64,
     pub picking_id: Option<u64>,
+    pub picking_key: u64,
     pub picking_type_id: Option<u64>,
     pub origin_returned_move_id: Option<u64>,
     pub procure_method: String,
@@ -128,6 +129,7 @@ pub struct StockMoveCols {
     pub partner_id: __sdk::__query_builder::Col<StockMove, Option<u64>>,
     pub company_id: __sdk::__query_builder::Col<StockMove, u64>,
     pub picking_id: __sdk::__query_builder::Col<StockMove, Option<u64>>,
+    pub picking_key: __sdk::__query_builder::Col<StockMove, u64>,
     pub picking_type_id: __sdk::__query_builder::Col<StockMove, Option<u64>>,
     pub origin_returned_move_id: __sdk::__query_builder::Col<StockMove, Option<u64>>,
     pub procure_method: __sdk::__query_builder::Col<StockMove, String>,
@@ -221,6 +223,7 @@ impl __sdk::__query_builder::HasCols for StockMove {
             partner_id: __sdk::__query_builder::Col::new(table_name, "partner_id"),
             company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             picking_id: __sdk::__query_builder::Col::new(table_name, "picking_id"),
+            picking_key: __sdk::__query_builder::Col::new(table_name, "picking_key"),
             picking_type_id: __sdk::__query_builder::Col::new(table_name, "picking_type_id"),
             origin_returned_move_id: __sdk::__query_builder::Col::new(
                 table_name,
@@ -322,7 +325,7 @@ pub struct StockMoveIxCols {
     pub date_expected: __sdk::__query_builder::IxCol<StockMove, __sdk::Timestamp>,
     pub id: __sdk::__query_builder::IxCol<StockMove, u64>,
     pub organization_id: __sdk::__query_builder::IxCol<StockMove, u64>,
-    pub picking_id: __sdk::__query_builder::IxCol<StockMove, Option<u64>>,
+    pub picking_key: __sdk::__query_builder::IxCol<StockMove, u64>,
     pub product_id: __sdk::__query_builder::IxCol<StockMove, u64>,
     pub state: __sdk::__query_builder::IxCol<StockMove, String>,
 }
@@ -334,7 +337,7 @@ impl __sdk::__query_builder::HasIxCols for StockMove {
             date_expected: __sdk::__query_builder::IxCol::new(table_name, "date_expected"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
-            picking_id: __sdk::__query_builder::IxCol::new(table_name, "picking_id"),
+            picking_key: __sdk::__query_builder::IxCol::new(table_name, "picking_key"),
             product_id: __sdk::__query_builder::IxCol::new(table_name, "product_id"),
             state: __sdk::__query_builder::IxCol::new(table_name, "state"),
         }

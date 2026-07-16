@@ -1097,30 +1097,6 @@ export function useCreateQualityCheck(organizationId: bigint, companyId: bigint)
   })
 }
 
-export function useUpdateQualityCheck(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, { checkId: ScalarId; params: Record<string, unknown> }>({
-    mutationFn: async ({ checkId, params }) => {
-      const { urlPath, init } = inventoryBffPost("update_quality_check", [organizationId, toScalarU64(checkId), stdbParamsToJson(params as object)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update quality check')
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  })
-}
-
-export function useDeleteQualityCheck(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (checkId) => {
-      const { urlPath, init } = inventoryBffPost("delete_quality_check", [organizationId, toScalarU64(checkId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to delete quality check')
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  })
-}
-
 export function usePassQualityCheck(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<
@@ -1191,30 +1167,6 @@ export function useCreateQualityAlert(organizationId: bigint, companyId: bigint)
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create quality alert')
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  })
-}
-
-export function useUpdateQualityAlert(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, { alertId: ScalarId; params: Record<string, unknown> }>({
-    mutationFn: async ({ alertId, params }) => {
-      const { urlPath, init } = inventoryBffPost("update_quality_alert", [organizationId, toScalarU64(alertId), stdbParamsToJson(params as object)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update quality alert')
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  })
-}
-
-export function useDeleteQualityAlert(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (alertId) => {
-      const { urlPath, init } = inventoryBffPost("delete_quality_alert", [organizationId, toScalarU64(alertId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to delete quality alert')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
   })
@@ -1545,30 +1497,6 @@ export function useCreateUom(organizationId: bigint, _companyId?: bigint) {
   })
 }
 
-export function useUpdateUom(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, { uomId: ScalarId; params: Record<string, unknown> }>({
-    mutationFn: async ({ uomId, params }) => {
-      const { urlPath, init } = inventoryBffPost("update_uom", [organizationId, toScalarU64(uomId), stdbParamsToJson(params as object)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update UOM')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
-  })
-}
-
-export function useDeleteUom(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (uomId) => {
-      const { urlPath, init } = inventoryBffPost("delete_uom", [organizationId, toScalarU64(uomId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to delete UOM')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['uoms', rqBigIntKey(organizationId)] }),
-  })
-}
-
 export function useCreateUomConversion(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { categoryId: ScalarId; params: Record<string, unknown> }>({
@@ -1607,45 +1535,6 @@ export function useCreateReplenishmentRule(organizationId: bigint, companyId: bi
   })
 }
 
-export function useUpdateReplenishmentRule(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, { ruleId: ScalarId; params: Record<string, unknown> }>({
-    mutationFn: async ({ ruleId, params }) => {
-      const { urlPath, init } = inventoryBffPost("update_replenishment_rule", [organizationId, toScalarU64(ruleId), stdbParamsToJson(params as object)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update replenishment rule')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] }),
-  })
-}
-
-export function useDeleteReplenishmentRule(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (ruleId) => {
-      const { urlPath, init } = inventoryBffPost("delete_replenishment_rule", [organizationId, toScalarU64(ruleId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to delete replenishment rule')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] }),
-  })
-}
-
-export function useTriggerReplenishment(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, { productId?: ScalarId; locationId?: ScalarId; warehouseId?: ScalarId }>({
-    mutationFn: async ({ productId, locationId, warehouseId }) => {
-      const { urlPath, init } = inventoryBffPost("trigger_replenishment", [organizationId, productId ? toScalarU64(productId) : null, locationId ? toScalarU64(locationId) : null, warehouseId ? toScalarU64(warehouseId) : null])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to trigger replenishment')
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] })
-      qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
-    },
-  })
-}
-
 // ── Picking Wave ─────────────────────────────────────────────────────────────
 
 export function useCreatePickingWave(organizationId: bigint, companyId: bigint) {
@@ -1664,56 +1553,9 @@ export function useCreatePickingWave(organizationId: bigint, companyId: bigint) 
   })
 }
 
-/** @remarks No `update_picking_wave` reducer in the module yet; kept for forward compatibility. */
-export function useUpdatePickingWave(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, { waveId: ScalarId; params: Record<string, unknown> }>({
-    mutationFn: async ({ waveId, params }) => {
-      const { urlPath, init } = inventoryBffPost("update_picking_wave", [organizationId, toScalarU64(waveId), stdbParamsToJson(params as object)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update picking wave')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
-  })
-}
-
-/** @remarks No `delete_picking_wave` reducer in the module yet. */
-export function useDeletePickingWave(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (waveId) => {
-      const { urlPath, init } = inventoryBffPost("delete_picking_wave", [organizationId, toScalarU64(waveId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to delete picking wave')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
-  })
-}
-
 /** Completes an in-progress wave (maps to `complete_picking_wave`). */
 export function useConfirmPickingWave(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (waveId) => {
-      const { urlPath, init } = inventoryBffPost("complete_picking_wave", [organizationId, companyId, toScalarU64(waveId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to confirm picking wave')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
-  })
-}
-
-/** @remarks No `process_picking_wave` reducer in the module yet. */
-export function useProcessPickingWave(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (waveId) => {
-      const { urlPath, init } = inventoryBffPost("process_picking_wave", [organizationId, toScalarU64(waveId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to process picking wave')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['picking-waves', rqBigIntKey(organizationId)] }),
-  })
+  return useCompletePickingWave(organizationId, companyId)
 }
 
 export function useCompletePickingWave(organizationId: bigint, companyId: bigint) {
@@ -1723,56 +1565,6 @@ export function useCompletePickingWave(organizationId: bigint, companyId: bigint
       const { urlPath, init } = inventoryBffPost("complete_picking_wave", [organizationId, companyId, toScalarU64(waveId)])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to complete picking wave')
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  })
-}
-
-// ── Stock Inventory Operations ─────────────────────────────────────────────────
-
-export function useConfirmStockInventory(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (inventoryId) => {
-      const { urlPath, init } = inventoryBffPost("confirm_stock_inventory", [organizationId, toScalarU64(inventoryId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to confirm stock inventory')
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  })
-}
-
-export function useStartStockInventory(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (inventoryId) => {
-      const { urlPath, init } = inventoryBffPost("start_stock_inventory", [organizationId, toScalarU64(inventoryId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to start stock inventory')
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  })
-}
-
-export function useValidateStockInventory(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (inventoryId) => {
-      const { urlPath, init } = inventoryBffPost("validate_stock_inventory", [organizationId, toScalarU64(inventoryId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to validate stock inventory')
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  })
-}
-
-export function useCancelStockInventory(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (inventoryId) => {
-      const { urlPath, init } = inventoryBffPost("cancel_stock_inventory", [organizationId, toScalarU64(inventoryId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to cancel stock inventory')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
   })
@@ -1910,51 +1702,51 @@ export function useCreateWarehouseTask(organizationId: bigint, companyId: bigint
   })
 }
 
-export function useDeleteWarehouseTask(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (taskId) => {
-      const { urlPath, init } = inventoryBffPost("delete_warehouse_task", [organizationId, toScalarU64(taskId)])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to delete warehouse task')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
-  })
-}
-
+/** Start task via `update_warehouse_task_status` → `in_progress`. */
 export function useStartWarehouseTask(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (taskId) => {
-      const { urlPath, init } = inventoryBffPost("start_warehouse_task", [organizationId, toScalarU64(taskId)])
+      const { urlPath, init } = inventoryBffPost("update_warehouse_task_status", [
+        toScalarU64(taskId),
+        "in_progress",
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to start warehouse task')
+      if (!r.ok) throw new Error("Failed to start warehouse task")
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["warehouse-tasks", rqBigIntKey(organizationId)] }),
   })
 }
 
+/** Complete task via `update_warehouse_task_status` → `done`. */
 export function useCompleteWarehouseTask(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { taskId: ScalarId; result?: Record<string, unknown> }>({
-    mutationFn: async ({ taskId, result }) => {
-      const { urlPath, init } = inventoryBffPost("complete_warehouse_task", [organizationId, toScalarU64(taskId), result ?? {}])
+    mutationFn: async ({ taskId }) => {
+      const { urlPath, init } = inventoryBffPost("update_warehouse_task_status", [
+        toScalarU64(taskId),
+        "done",
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to complete warehouse task')
+      if (!r.ok) throw new Error("Failed to complete warehouse task")
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
   })
 }
 
+/** Cancel task via `update_warehouse_task_status` → `cancelled`. */
 export function useCancelWarehouseTask(organizationId: bigint, _companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (taskId) => {
-      const { urlPath, init } = inventoryBffPost("cancel_warehouse_task", [organizationId, toScalarU64(taskId)])
+      const { urlPath, init } = inventoryBffPost("update_warehouse_task_status", [
+        toScalarU64(taskId),
+        "cancelled",
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to cancel warehouse task')
+      if (!r.ok) throw new Error("Failed to cancel warehouse task")
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["warehouse-tasks", rqBigIntKey(organizationId)] }),
   })
 }
 

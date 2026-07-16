@@ -650,6 +650,8 @@ import RunFxRevaluationBatchReducer from "../run_fx_revaluation_batch_reducer";
 import RunHelpdeskTicketTestReducer from "../run_helpdesk_ticket_test_reducer";
 import RunHrLeaveTypeTestReducer from "../run_hr_leave_type_test_reducer";
 import RunInventoryAdjustmentTestReducer from "../run_inventory_adjustment_test_reducer";
+import RunInventoryAtpFailClosedTestReducer from "../run_inventory_atp_fail_closed_test_reducer";
+import RunInventoryCompanyIsolationTestReducer from "../run_inventory_company_isolation_test_reducer";
 import RunInventoryDeliveryQuantTestReducer from "../run_inventory_delivery_quant_test_reducer";
 import RunInventoryProductCategoryTestReducer from "../run_inventory_product_category_test_reducer";
 import RunInventoryProductUpdateTestReducer from "../run_inventory_product_update_test_reducer";
@@ -1561,6 +1563,8 @@ export type RunFxRevaluationBatchParams = __Infer<typeof RunFxRevaluationBatchRe
 export type RunHelpdeskTicketTestParams = __Infer<typeof RunHelpdeskTicketTestReducer>;
 export type RunHrLeaveTypeTestParams = __Infer<typeof RunHrLeaveTypeTestReducer>;
 export type RunInventoryAdjustmentTestParams = __Infer<typeof RunInventoryAdjustmentTestReducer>;
+export type RunInventoryAtpFailClosedTestParams = __Infer<typeof RunInventoryAtpFailClosedTestReducer>;
+export type RunInventoryCompanyIsolationTestParams = __Infer<typeof RunInventoryCompanyIsolationTestReducer>;
 export type RunInventoryDeliveryQuantTestParams = __Infer<typeof RunInventoryDeliveryQuantTestReducer>;
 export type RunInventoryProductCategoryTestParams = __Infer<typeof RunInventoryProductCategoryTestReducer>;
 export type RunInventoryProductUpdateTestParams = __Infer<typeof RunInventoryProductUpdateTestReducer>;

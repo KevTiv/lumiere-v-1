@@ -678,6 +678,8 @@ import RunFxRevaluationBatchReducer from "./run_fx_revaluation_batch_reducer";
 import RunHelpdeskTicketTestReducer from "./run_helpdesk_ticket_test_reducer";
 import RunHrLeaveTypeTestReducer from "./run_hr_leave_type_test_reducer";
 import RunInventoryAdjustmentTestReducer from "./run_inventory_adjustment_test_reducer";
+import RunInventoryAtpFailClosedTestReducer from "./run_inventory_atp_fail_closed_test_reducer";
+import RunInventoryCompanyIsolationTestReducer from "./run_inventory_company_isolation_test_reducer";
 import RunInventoryDeliveryQuantTestReducer from "./run_inventory_delivery_quant_test_reducer";
 import RunInventoryProductCategoryTestReducer from "./run_inventory_product_category_test_reducer";
 import RunInventoryProductUpdateTestReducer from "./run_inventory_product_update_test_reducer";
@@ -6083,7 +6085,7 @@ const tablesSchema = __schema({
         'organizationId',
       ] },
       { name: 'move_by_picking', algorithm: 'btree', columns: [
-        'pickingId',
+        'pickingKey',
       ] },
       { name: 'move_by_product', algorithm: 'btree', columns: [
         'productId',
@@ -7485,6 +7487,8 @@ const reducersSchema = __reducers(
   __reducerSchema("run_helpdesk_ticket_test", RunHelpdeskTicketTestReducer),
   __reducerSchema("run_hr_leave_type_test", RunHrLeaveTypeTestReducer),
   __reducerSchema("run_inventory_adjustment_test", RunInventoryAdjustmentTestReducer),
+  __reducerSchema("run_inventory_atp_fail_closed_test", RunInventoryAtpFailClosedTestReducer),
+  __reducerSchema("run_inventory_company_isolation_test", RunInventoryCompanyIsolationTestReducer),
   __reducerSchema("run_inventory_delivery_quant_test", RunInventoryDeliveryQuantTestReducer),
   __reducerSchema("run_inventory_product_category_test", RunInventoryProductCategoryTestReducer),
   __reducerSchema("run_inventory_product_update_test", RunInventoryProductUpdateTestReducer),

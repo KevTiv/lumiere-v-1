@@ -1506,6 +1506,8 @@ pub mod run_fx_revaluation_batch_reducer;
 pub mod run_helpdesk_ticket_test_reducer;
 pub mod run_hr_leave_type_test_reducer;
 pub mod run_inventory_adjustment_test_reducer;
+pub mod run_inventory_atp_fail_closed_test_reducer;
+pub mod run_inventory_company_isolation_test_reducer;
 pub mod run_inventory_delivery_quant_test_reducer;
 pub mod run_inventory_product_category_test_reducer;
 pub mod run_inventory_product_update_test_reducer;
@@ -3900,6 +3902,8 @@ pub use run_fx_revaluation_batch_reducer::run_fx_revaluation_batch;
 pub use run_helpdesk_ticket_test_reducer::run_helpdesk_ticket_test;
 pub use run_hr_leave_type_test_reducer::run_hr_leave_type_test;
 pub use run_inventory_adjustment_test_reducer::run_inventory_adjustment_test;
+pub use run_inventory_atp_fail_closed_test_reducer::run_inventory_atp_fail_closed_test;
+pub use run_inventory_company_isolation_test_reducer::run_inventory_company_isolation_test;
 pub use run_inventory_delivery_quant_test_reducer::run_inventory_delivery_quant_test;
 pub use run_inventory_product_category_test_reducer::run_inventory_product_category_test;
 pub use run_inventory_product_update_test_reducer::run_inventory_product_update_test;
@@ -7034,6 +7038,8 @@ pub enum Reducer {
     RunHelpdeskTicketTest ,
     RunHrLeaveTypeTest ,
     RunInventoryAdjustmentTest ,
+    RunInventoryAtpFailClosedTest ,
+    RunInventoryCompanyIsolationTest ,
     RunInventoryDeliveryQuantTest ,
     RunInventoryProductCategoryTest ,
     RunInventoryProductUpdateTest ,
@@ -8910,6 +8916,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunHelpdeskTicketTest => "run_helpdesk_ticket_test",
             Reducer::RunHrLeaveTypeTest => "run_hr_leave_type_test",
             Reducer::RunInventoryAdjustmentTest => "run_inventory_adjustment_test",
+            Reducer::RunInventoryAtpFailClosedTest => "run_inventory_atp_fail_closed_test",
+            Reducer::RunInventoryCompanyIsolationTest => "run_inventory_company_isolation_test",
             Reducer::RunInventoryDeliveryQuantTest => "run_inventory_delivery_quant_test",
             Reducer::RunInventoryProductCategoryTest => "run_inventory_product_category_test",
             Reducer::RunInventoryProductUpdateTest => "run_inventory_product_update_test",
@@ -14291,6 +14299,10 @@ Reducer::RunFxRevaluation{
 Reducer::RunHrLeaveTypeTest => __sats::bsatn::to_vec(&run_hr_leave_type_test_reducer::RunHrLeaveTypeTestArgs {
                 }),
 Reducer::RunInventoryAdjustmentTest => __sats::bsatn::to_vec(&run_inventory_adjustment_test_reducer::RunInventoryAdjustmentTestArgs {
+                }),
+Reducer::RunInventoryAtpFailClosedTest => __sats::bsatn::to_vec(&run_inventory_atp_fail_closed_test_reducer::RunInventoryAtpFailClosedTestArgs {
+                }),
+Reducer::RunInventoryCompanyIsolationTest => __sats::bsatn::to_vec(&run_inventory_company_isolation_test_reducer::RunInventoryCompanyIsolationTestArgs {
                 }),
 Reducer::RunInventoryDeliveryQuantTest => __sats::bsatn::to_vec(&run_inventory_delivery_quant_test_reducer::RunInventoryDeliveryQuantTestArgs {
                 }),

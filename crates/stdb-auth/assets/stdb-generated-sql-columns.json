@@ -739,6 +739,13 @@
     "propagate_cancel",
     "metadata"
   ],
+  "AddPurchaseRfqLineParams": [
+    "product_id",
+    "product_uom",
+    "product_uom_qty",
+    "name",
+    "sequence"
+  ],
   "AddUserToOrganizationParams": [
     "role_id",
     "company_id",
@@ -1620,6 +1627,19 @@
     "close_reason_id",
     "notes"
   ],
+  "CommodityPriceIndex": [
+    "id",
+    "organization_id",
+    "company_id",
+    "code",
+    "rate",
+    "as_of",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
   "Company": [
     "id",
     "external_id",
@@ -1688,6 +1708,21 @@
     "company_id",
     "gross_wage",
     "net_wage"
+  ],
+  "ConsignmentAgreement": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "partner_id",
+    "product_id",
+    "warehouse_id",
+    "state",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
   ],
   "ConsolidationAccount": [
     "id",
@@ -2619,6 +2654,13 @@
     "address_city",
     "address_zip",
     "address_country_code",
+    "metadata"
+  ],
+  "CreateConsignmentAgreementParams": [
+    "name",
+    "partner_id",
+    "product_id",
+    "warehouse_id",
     "metadata"
   ],
   "CreateConsolidationAccountParams": [
@@ -3841,6 +3883,21 @@
     "message_ids",
     "metadata"
   ],
+  "CreatePurchaseBlanketOrderParams": [
+    "name",
+    "partner_id",
+    "currency_id",
+    "date_start",
+    "date_end",
+    "metadata"
+  ],
+  "CreatePurchaseContractParams": [
+    "name",
+    "partner_id",
+    "date_start",
+    "date_end",
+    "metadata"
+  ],
   "CreatePurchaseOrderParams": [
     "company_id",
     "partner_id",
@@ -3878,6 +3935,48 @@
     "activity_ids",
     "message_follower_ids",
     "message_ids",
+    "metadata"
+  ],
+  "CreatePurchaseReturnLineParams": [
+    "purchase_order_line_id",
+    "product_id",
+    "product_uom",
+    "product_uom_qty",
+    "price_unit",
+    "to_refund"
+  ],
+  "CreatePurchaseReturnParams": [
+    "purchase_order_id",
+    "partner_id",
+    "return_reason",
+    "lines"
+  ],
+  "CreatePurchaseRfqBidParams": [
+    "partner_id",
+    "currency_id",
+    "price_unit",
+    "notes"
+  ],
+  "CreatePurchaseRfqLineParams": [
+    "product_id",
+    "product_uom",
+    "product_uom_qty",
+    "name",
+    "sequence"
+  ],
+  "CreatePurchaseRfqParams": [
+    "requisition_id",
+    "currency_id",
+    "notes",
+    "lines",
+    "metadata"
+  ],
+  "CreatePurchasingIntegrationIntentParams": [
+    "provider",
+    "intent_type",
+    "purchase_order_id",
+    "idempotency_key",
+    "request_payload",
     "metadata"
   ],
   "CreateQualityAlertParams": [
@@ -4780,6 +4879,12 @@
   "CreateUtmSourceParams": [
     "name",
     "is_active"
+  ],
+  "CreateVendorCreditFromPurchaseReturnParams": [
+    "journal_id",
+    "expense_account_id",
+    "payable_account_id",
+    "metadata"
   ],
   "CreateWarehouse3DZoneParams": [
     "display_type",
@@ -7924,6 +8029,52 @@
     "author_id",
     "create_date"
   ],
+  "PurchaseApprovalDelegate": [
+    "id",
+    "organization_id",
+    "company_id",
+    "principal_identity",
+    "delegate_identity",
+    "is_active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "PurchaseBlanketOrder": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "partner_id",
+    "currency_id",
+    "state",
+    "date_start",
+    "date_end",
+    "release_count",
+    "last_release_po_id",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "PurchaseContract": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "partner_id",
+    "state",
+    "date_start",
+    "date_end",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
   "PurchaseOrder": [
     "id",
     "organization_id",
@@ -8047,6 +8198,100 @@
     "activity_ids",
     "message_follower_ids",
     "message_ids",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "PurchaseReturn": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "purchase_order_id",
+    "partner_id",
+    "state",
+    "return_reason",
+    "picking_id",
+    "credit_move_id",
+    "line_ids",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "PurchaseReturnLine": [
+    "id",
+    "organization_id",
+    "company_id",
+    "purchase_return_id",
+    "purchase_order_line_id",
+    "product_id",
+    "product_uom",
+    "product_uom_qty",
+    "price_unit",
+    "to_refund"
+  ],
+  "PurchaseRfq": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "requisition_id",
+    "state",
+    "currency_id",
+    "notes",
+    "awarded_bid_id",
+    "purchase_order_id",
+    "line_ids",
+    "bid_ids",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "PurchaseRfqBid": [
+    "id",
+    "organization_id",
+    "company_id",
+    "rfq_id",
+    "partner_id",
+    "currency_id",
+    "price_unit",
+    "amount_total",
+    "notes",
+    "state",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "PurchaseRfqLine": [
+    "id",
+    "organization_id",
+    "company_id",
+    "rfq_id",
+    "product_id",
+    "product_uom",
+    "product_uom_qty",
+    "name",
+    "sequence"
+  ],
+  "PurchasingIntegrationIntent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "provider",
+    "intent_type",
+    "purchase_order_id",
+    "status",
+    "idempotency_key",
+    "request_payload",
+    "last_error",
+    "external_reference",
+    "attempt_count",
     "create_uid",
     "create_date",
     "write_uid",
@@ -8279,6 +8524,12 @@
     "user_agent",
     "metadata"
   ],
+  "RecordPurchasingIntegrationResultParams": [
+    "status",
+    "external_reference",
+    "last_error",
+    "metadata"
+  ],
   "RecordSalesIntegrationResultParams": [
     "status",
     "external_reference",
@@ -8317,6 +8568,11 @@
   "RejectApprovalRequestParams": [
     "reason",
     "comment"
+  ],
+  "ReleaseBlanketToPoParams": [
+    "notes",
+    "date_planned",
+    "metadata"
   ],
   "ReplenishmentRule": [
     "id",
@@ -8921,6 +9177,12 @@
     "is_published",
     "website_url"
   ],
+  "SetCommodityPriceIndexParams": [
+    "code",
+    "rate",
+    "as_of",
+    "metadata"
+  ],
   "SetCompanyCountryPackParams": [
     "pack_key",
     "enabled",
@@ -8945,10 +9207,23 @@
     "rules",
     "metadata"
   ],
+  "SetPurchaseApprovalDelegateParams": [
+    "principal_identity",
+    "delegate_identity",
+    "is_active",
+    "metadata"
+  ],
   "SetRecordCustomFieldValuesParams": [
     "model",
     "record_id",
     "entries"
+  ],
+  "SetVendorRiskFlagParams": [
+    "partner_id",
+    "is_flagged",
+    "risk_level",
+    "reason",
+    "metadata"
   ],
   "SettleSaleCommissionsParams": [
     "commission_ids",
@@ -9234,6 +9509,7 @@
     "partner_id",
     "company_id",
     "picking_id",
+    "picking_key",
     "picking_type_id",
     "origin_returned_move_id",
     "procure_method",
@@ -11229,6 +11505,12 @@
     "embedding_hash",
     "metadata"
   ],
+  "UpsertVendorScorecardParams": [
+    "partner_id",
+    "otif_score",
+    "quality_score",
+    "metadata"
+  ],
   "UserCredential": [
     "id",
     "email",
@@ -11345,6 +11627,33 @@
   "ValidateTimesheetsParams": [
     "company_id",
     "timesheet_ids"
+  ],
+  "VendorRiskFlag": [
+    "id",
+    "organization_id",
+    "company_id",
+    "partner_id",
+    "is_flagged",
+    "risk_level",
+    "reason",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "VendorScorecard": [
+    "id",
+    "organization_id",
+    "company_id",
+    "partner_id",
+    "otif_score",
+    "quality_score",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
   ],
   "Warehouse": [
     "id",

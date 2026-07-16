@@ -5,13 +5,15 @@ Current-state assessment of Lumiere inventory / WMS against a NetSuite *quality*
 **Investigation date:** 2026-07-16  
 **Method:** Source-traced inventory. “Verified” means present in code. Domain/E2E test names are listed as *existence*; this document does not claim those suites were executed as part of this investigation unless noted under Validation.
 
-**Verdict:** Lumiere has a usable **MVP stock spine** — product/warehouse/location masters, quants with reserved/available, stock moves/pickings whose validate posts quants, SO confirm soft ATP reservation (fail-closed), PO confirm → IN picking + `receive_po_line` → validate/backorder (quant increase), cycle-count post-to-quant, and landed-cost apply to quant value. Against the quality bar it is **strong** on reservation + picking validate + lead-to-cash/P2P stock consequences, **partial** on lots/serials/expiry/quality/UoM/costing and live WS coverage (7/27 workspace keys in `ERP_ORG_SQL`), and **absent or schema-only / Unsuitable** for directed putaway, real wave planning, packing/cartonization, quarantine holds, cross-docking, 3PL, consignment ownership, safety-stock execution, replenishment that creates demand, and inventory-period close. Frontend contracts include **20 BFF keys with no SpacetimeDB reducer** (wave/task/replenishment/quality/UoM/stock-inventory aliases) — Unsuitable if operators click them.
+**Verdict:** Lumiere has a usable **MVP stock spine** — product/warehouse/location masters, quants with reserved/available, stock moves/pickings whose validate posts quants, SO confirm soft ATP reservation (fail-closed), PO confirm → IN picking + `receive_po_line` → validate/backorder (quant increase), cycle-count post-to-quant, and landed-cost apply to quant value. Against the quality bar it is **strong** on reservation + picking validate + lead-to-cash/P2P stock consequences and (after 2026-07-16 pilot fixes) clean BFF contracts + live inventory WS coverage, **partial** on lots/serials/expiry/quality/UoM/costing, and **absent or schema-only / Unsuitable** for directed putaway, real wave planning, packing/cartonization, quarantine holds, cross-docking, 3PL, consignment ownership, safety-stock execution, replenishment that creates demand, and inventory-period close.
+
+**Pilot-critical tranche (2026-07-16):** Phantom BFF keys removed; workspace keys wired into `ERP_ORG_SQL` (orphans `warehouse-3d` / `inventory-valuations` dropped); validate hot path uses `picking_key` + `move_by_picking`; company-isolation + ATP fail-closed domain tests added. See [`docs/plans/inventory-pilot-gap-fixes-plan.md`](./plans/inventory-pilot-gap-fixes-plan.md).
 
 **V1 roadmap reconciliation:** [`docs/V1_ROADMAP.md`](./V1_ROADMAP.md) lists warehouses/locations, lot/serial, cycle count, and replenishment as “Shipped — Verify/polish.” Source truth: **masters + cycle-count post Present**; **lot/serial schema Partial** (not enforced on reserve/validate/FEFO); **replenishment Unsuitable** (`execute_replenishment_rule` only stamps `last_run`/`next_run`). Classify overall WMS depth as **Partial** for V1 verify, not competitive warehouse ops.
 
-**Purchasing investigation reconciliation:** [`docs/PURCHASING_PROCUREMENT_INVESTIGATION.md`](./PURCHASING_PROCUREMENT_INVESTIGATION.md) claimed `receive_po_line` is qty-only without quant movement. **That claim is stale relative to current code:** `receive_po_line` confirms/assigns and calls `validate_stock_picking_backorder`, posting quants (`purchase_orders.rs` ~1768–1865; `test_receipt_increases_quant`). Treat inventory receipt on the PO receive path as **Present** for stocked products when a linked IN picking exists.
+**Purchasing investigation reconciliation:** PO receive→quant is **Present** for stocked products (`receive_po_line` → `validate_stock_picking_backorder`). Purchasing investigation matrix/narrative updated to match.
 
-**Compile check (this investigation):** `cargo check` in `spacetimedb/` — **passed** (2026-07-16).
+**Compile check:** `cargo check` in `spacetimedb/` — **passed** (2026-07-16, post pilot fixes).
 
 ---
 
@@ -81,17 +83,9 @@ UoM create trio (`core/reference.rs`); landed-cost lifecycle (`purchasing/landed
 
 ### 1.3 Frontend contracts (BFF / hooks)
 
-[`INVENTORY_BFF_REDUCERS`](../frontend/packages/stdb/src/commands/inventory-http.ts): **140** keys. Diff against SpacetimeDB reducers (2026-07-16): **120 match**, **20 missing**.
+[`INVENTORY_BFF_REDUCERS`](../frontend/packages/stdb/src/commands/inventory-http.ts): **120** keys. Diff against SpacetimeDB reducers (post pilot fixes): **120 match**, **0 missing**.
 
-| Phantom BFF key (no reducer) | Closest real surface |
-|------------------------------|----------------------|
-| `confirm_stock_inventory`, `start_stock_inventory`, `validate_stock_inventory`, `cancel_stock_inventory` | `update_stock_inventory_state` |
-| `update_picking_wave`, `delete_picking_wave`, `process_picking_wave` | `create_picking_wave`, `complete_picking_wave` |
-| `start_warehouse_task`, `complete_warehouse_task`, `cancel_warehouse_task`, `delete_warehouse_task` | `create_warehouse_task`, `update_warehouse_task_status` |
-| `trigger_replenishment`, `update_replenishment_rule`, `delete_replenishment_rule` | `create_replenishment_rule`, `execute_replenishment_rule` |
-| `update_quality_alert`, `delete_quality_alert` | create / assign / open / solve / cancel |
-| `update_quality_check`, `delete_quality_check` | create / start / pass / fail |
-| `update_uom`, `delete_uom` | `create_uom` only |
+Task start/complete/cancel map to `update_warehouse_task_status`; wave confirm/complete map to `complete_picking_wave`. Delete/update phantoms for waves, replenishment rules, quality check/alert, and UoM were removed from BFF and UI.
 
 **Backend without BFF:** `process_pending_scans`.
 
@@ -99,14 +93,13 @@ Contract: [`inventory.contract.ts`](../frontend/packages/stdb/src/contract-tests
 
 ### 1.4 Subscriptions & queries
 
-`INVENTORY_WORKSPACE_RESOURCE_KEYS` ([`inventory-workspace.ts`](../frontend/packages/stdb/src/subscriptions/inventory-workspace.ts)): **27** keys.
+`INVENTORY_WORKSPACE_RESOURCE_KEYS` ([`inventory-workspace.ts`](../frontend/packages/stdb/src/subscriptions/inventory-workspace.ts)): **26** keys (dropped `warehouse-3d`, `inventory-valuations`; added `quality-alerts`).
 
 | Key | In `ERP_ORG_SQL` | Notes |
 |-----|------------------|-------|
-| `products`, `product-categories`, `uoms`, `stock-quants`, `stock-pickings`, `warehouses`, `inventory-adjustments` | **Yes** | Live WS builders present |
-| Remaining 20 workspace keys (locations, moves, lots, serials, waves, tasks, cycle counts, quality-checks, replenishment, valuations, barcode, routes/rules, 3d zones, etc.) | **No** | Silent skip on WS; REST `/api/query` still used where registry exists |
-| `warehouse-3d` | No registry / row type | Orphan workspace key |
-| `quality-alerts` | Used by UI panels | Not in workspace keys; REST |
+| All current workspace keys | **Yes** | Live org-scoped WS builders present after pilot wire-up |
+| `inventory-valuations` | Intentionally out of workspace | Unused/mis-shaped table; REST prefetch may still exist |
+| `warehouse-3d` | Removed | Orphan key |
 
 **Exception / ops queues:** No inventory Ops panel. No server-bounded keys (e.g. short ATP, expired lots, open waves, failed quality holds). Dashboard KPIs are client-derived from subscribed/REST data.
 
@@ -117,21 +110,21 @@ Tabs from `inventoryModuleConfig` + injected tabs ([`inventory-client.tsx`](../f
 | Tab | End-to-end operations | Gaps |
 |-----|----------------------|------|
 | Dashboard | KPIs; quick actions → product/transfer/adjustment | Charts/placeholders; no exception queues |
-| Products | Create/update/delete; variant; pricing; inventory data; supplier/packaging; CSV; UOM create | UOM update/delete phantom |
+| Products | Create/update/delete; variant; pricing; inventory data; supplier/packaging; CSV; UOM create | No UOM update/delete reducers (UI no longer exposes) |
 | Stock on hand | Create quant; reserve/unreserve; set qty; CSV | |
 | Transfers | Create picking; confirm/assign/assign-user/validate/cancel | `validate_stock_picking_backorder` unused in UI |
 | Cycle counts + wizard | Plan → session → line → validate → post | Domain tests thin on post |
-| Waves / tasks | Create; complete wave; set task status | **process/delete wave, start/complete/cancel/delete task Unsuitable** |
-| Replenishment | Create; execute | **trigger/delete Unsuitable**; execute has no stock/PO side effect |
-| Quality | Check lifecycle; alert lifecycle (wizard) | update/delete check/alert phantoms |
-| Valuations | List | Read-only; table unused on backend |
+| Waves / tasks | Create; complete wave; start/complete/cancel task via status | No delete/update wave; wave still non-orchestrating |
+| Replenishment | Create; execute rule | Execute still timestamp-only (Unsuitable for ops demand) |
+| Quality | Check lifecycle; alert lifecycle (wizard) | No update/delete check/alert |
+| Valuations | List (REST) | Read-only; table unused on backend; not in live workspace |
 | Lots / serials | CRUD; use/block serial | `reserve_serial` no UI; no FEFO on pick |
 
 ### 1.6 Tests (existence only)
 
 | Layer | What exists | Not covered |
 |-------|-------------|-------------|
-| Domain | `run_all_inventory_tests`: category lifecycle, product update/delete, stock inventory create, adjustment create, quant create, **receipt→quant**, **delivery reserve/validate** | Cycle-count post, quality, lots/serials/expiry, waves/tasks, replenishment, barcode, routes, UoM conversion, costing, quarantine/cross-dock/3PL, close, company isolation |
+| Domain | `run_all_inventory_tests`: category lifecycle, product update/delete, stock inventory create, adjustment create, quant create, **receipt→quant**, **delivery reserve/validate**, **company isolation on reserve**, **ATP fail-closed** | Cycle-count post, quality, lots/serials/expiry, waves/tasks, replenishment, barcode, routes, UoM conversion, costing, quarantine/cross-dock/3PL, close |
 | Sales (adjacent) | ATP shortfall / reserve-after-confirm / unreserve paths in sales domain tests | Multi-warehouse promise calendar |
 | Playwright | `inventory-module.spec.ts` (@dev-fixture) shell/tabs; `inventory-mutations.spec.ts` (@p0) product update + category delete; lead-to-cash / returns paths exercise picking validate | Full transfer lifecycle, waves, cycle post, phantoms |
 | Contract | `inventory.contract.ts` | Backend presence of BFF keys |
@@ -151,7 +144,7 @@ Definitions:
 |------------|-------|----------|
 | Item masters | **Present** | Product CRUD + pricing/inventory data reducers + UI + CSV |
 | Variants | **Partial** | Variant create/update; attribute/value/line tables without reducers; no attribute-driven generation |
-| Units of measure | **Partial** | `uom` / conversion create; product `uom_id` / `uom_po_id`; **no** conversion on reserve/validate; update/delete UoM phantom |
+| Units of measure | **Partial** | `uom` / conversion create; product `uom_id` / `uom_po_id`; **no** conversion on reserve/validate; no update/delete UoM reducers |
 | Bins / locations | **Partial** | Hierarchical `stock_location` + warehouse FKs; `ZoneDisplayType::Bin` is 3D metadata, not directed bin putaway |
 | Lots | **Partial** | Lot CRUD + `lot_id` on quants/moves; validate does **not** require/enforce lot for tracked products |
 | Serials | **Partial** | Serial CRUD + reserve/use/block state machine; **not** wired into SO confirm / picking validate |
@@ -166,7 +159,7 @@ Definitions:
 | Landed cost | **Present** (adjacent) | Allocate / post / apply to done-move dest quant `value`/`cost` |
 | Costing methods | **Partial** | Product `cost_method` / `standard_price`; COGS helpers read quants (fifo/lifo/average/standard); stock ops default new quants to `"standard"` without layer maintenance |
 | Directed putaway / picking | **Absent** | No putaway strategy reducers; tasks are free-string CRUD |
-| Wave planning | **Unsuitable** | Wave stores `picking_ids`; create/complete flip state only; `process_picking_wave` / delete are BFF phantoms |
+| Wave planning | **Unsuitable** | Wave stores `picking_ids`; create/complete flip state only — no pick orchestration |
 | Packing | **Partial** | Pack location IDs on warehouse; product packaging CRUD; no pack-operation workflow |
 | Cartonization | **Absent** | `packaging_material` / `cartonization_result` tables only — zero reducers |
 | Consignment | **Absent** (inventory) | Purchasing agreement table; no vendor-owned quant rules |
@@ -175,8 +168,8 @@ Definitions:
 | 3PL interfaces | **Absent** | No 3PL tables, intents, or adapters in inventory |
 | Inventory-close reconciliation | **Absent** | No period-close reducer; `inventory_valuation` unused/mis-shaped; adjustment process does not post quants |
 | PO receipt → stock | **Present** | `receive_po_line` → `validate_stock_picking_backorder` + receipt domain test |
-| Live stock subscriptions | **Partial** | Core 7 keys in `ERP_ORG_SQL`; 20 workspace keys silent-skip; no bounded exception queues |
-| Phantom UI contracts | **Unsuitable** | 20 BFF keys without reducers (see §1.3) |
+| Live stock subscriptions | **Present** (org-scoped) | Workspace keys wired in `ERP_ORG_SQL`; no bounded exception queues yet |
+| Phantom UI contracts | **Present** (cleared) | BFF ⊆ reducers after pilot fixes |
 | Multi-entity / company isolation | **Partial** | Company fields + some guards; dedicated inventory isolation domain tests missing |
 | Drill-down reporting | **Partial** | Traceability reports + move/picking links; no competitive valuation/close drill-down |
 | Audit coverage | **Partial** | Many stock mutators use `write_audit_log_v2`; uneven across barcode/quality/wave paths |
@@ -217,11 +210,11 @@ Definitions:
 | Invariant | Currently enforced | Evidence | Remaining requirement |
 |-----------|-------------------|----------|------------------------|
 | Atomic reserve in one reducer txn | Yes | SpacetimeDB reducer atomicity + fail-closed ATP | Hot-item index (product+location+company); avoid full scans |
-| Atomic picking validate → quant | Yes | Single validate reducer applies moves | Use `move_by_picking` not org-wide filter |
+| Atomic picking validate → quant | Yes | Single validate reducer applies moves via `picking_key` / `move_by_picking` | Keep residual full-scan helpers (cycle/landed) off hot path |
 | Residual reservation on backorder | Yes | Backorder path keeps residual reserved | UI exposure of backorder validate |
 | Stale-state / double-validate | Partial | State preconditions on picking | Idempotent validate; explicit error on Done |
 | No client multi-step stock commit | Intent | SO confirm reserves server-side | Never orchestrate reserve+validate across optimistic client steps without server guards |
-| Hot-item contention proof | Partial | DB serializes reducers; no version field | Domain stress/isolation tests; measure validate latency |
+| Hot-item contention proof | Partial | DB serializes reducers; ATP + company isolation domain tests added | Broader concurrent stress / latency measurement still open |
 | Live exception queues | No | Client dashboard only | Bounded subscriptions: short ATP, expired lots, open QC fails |
 
 SpacetimeDB atomicity model: each reducer runs in one transaction that commits or rolls back as a unit ([Transactions and Atomicity](https://spacetimedb.com/docs/2.0.0-rc1/databases/transactions-atomicity); [Functions](https://spacetimedb.com/docs/functions/)). External HTTP belongs in procedures/workers, not reducers.
@@ -320,7 +313,7 @@ Quality benchmark for integrated inventory and warehouse operations: Oracle NetS
 |-------|----------|
 | **Atomic mutations** | Keep ATP reserve, picking validate (quant apply), PO receive→validate, and cycle-count post in **single reducers** (or one internal `*_impl`) wherever atomicity is required. Do not leave stock sync to a client second step. |
 | **Reservation correctness** | Soft reserve on `stock_quant` remains the pilot model: fail-closed when `reserved + qty > quantity`. Serial/lot reservation must join the same transaction as quant ATP before claiming tracked-product correctness. |
-| **Hot-item contention** | Prove under concurrent confirms: rely on SpacetimeDB txn serialization; add composite indexes (product + location + company); replace org-wide move scans with `move_by_picking`; avoid full-table `stock_quant().iter()` on hot paths (cycle/landed). Add domain contention tests. |
+| **Hot-item contention** | Rely on SpacetimeDB txn serialization; picking validate uses denormalized `picking_key` + `move_by_picking` (Option indexes are not FilterableValue in STDB 2.0.1). Prefer composite indexes (product + location + company); avoid full-table `stock_quant().iter()` on cycle/landed hot paths. Domain ATP + company isolation tests landed. |
 | **Subscriptions / scale** | Prefer **company-filtered** and **bounded exception** subscriptions (short ATP, expired lots, open QC fails, open waves). Wire remaining inventory workspace keys into `ERP_ORG_SQL` or drop them from the workspace list. Do not fan out unused valuation/wave tables to every client. |
 | **Indexes** | Keep/use `quant_by_product`, `quant_by_location`, `move_by_picking`, lot/serial indexes. Index names must remain unique module-wide. |
 | **External I/O** | 3PL ASN/WMS, customs, label printers, and commodity feeds go behind **API workers / procedures** with durable intents/results. Reducers must not block on HTTP. Offline scan queues reconcile via idempotent intent keys. |
@@ -356,12 +349,12 @@ flowchart LR
 
 | Gap | Priority status | Notes |
 |-----|-----------------|-------|
-| Remove/gate 20 phantom BFF keys | **Open** | Prevent operator false confidence on waves/tasks/replenishment |
-| Wire inventory workspace keys into `ERP_ORG_SQL` (or shrink workspace) | **Open** | 20/27 silent-skip today |
-| Hot-path validate/reserve scale (use `move_by_picking`; avoid full scans) | **Open** | Contends with real-time visibility claim |
-| Reservation contention + company isolation domain tests | **Open** | Prove fail-closed ATP under concurrency |
+| Remove/gate 20 phantom BFF keys | **Closed** | BFF 120/120; UI rewired/hidden |
+| Wire inventory workspace keys into `ERP_ORG_SQL` (or shrink workspace) | **Closed** | 26 workspace keys live; orphans dropped |
+| Hot-path validate/reserve scale (`picking_key` + `move_by_picking`) | **Closed in-tree** | Option index not filterable in STDB 2.0.1; denormalized `picking_key` |
+| Reservation contention + company isolation domain tests | **Closed in-tree** | `run_inventory_company_isolation_test` + `run_inventory_atp_fail_closed_test` |
 | Lot/serial enforcement policy for tracked products | **Open** | Schema without enforce is Partial for food/ag pilots |
-| Reconcile purchasing docs with receive→quant truth | **Open** | Avoid dual narratives in ops handoffs |
+| Reconcile purchasing docs with receive→quant truth | **Closed** | Purchasing investigation matrix updated |
 | Inventory e2e + `run_all_inventory_tests` green after publish | **Verify** | Expand beyond product shell mutations |
 
 ### Competitive
@@ -396,7 +389,7 @@ flowchart LR
 
 ## Bottom line
 
-Lumiere’s inventory spine is **reservation-and-validate strong, WMS-depth weak**: soft ATP and picking validate (including PO receive→quant) are real and partially tested, but lot/serial/expiry/quality do not constrain stock, replenishment and waves are operationally Unsuitable or phantom-wired, and inventory close / 3PL / cartonization / consignment / cross-dock remain Absent. Live subscriptions cover only seven core resources. Reconcile roadmap messaging: **masters + cycle-count + ATP/validate Present; competitive WMS and tracked-product enforcement still Open**.
+Lumiere’s inventory spine is **reservation-and-validate strong, WMS-depth weak**: soft ATP and picking validate (including PO receive→quant) are real and tested at domain depth; pilot fixes cleared phantom BFF contracts, wired live inventory subscriptions, and indexed picking validate via `picking_key`. Lot/serial/expiry/quality still do not constrain stock; replenishment execute remains timestamp-only; inventory close / 3PL / cartonization / consignment / cross-dock remain Absent. Reconcile roadmap messaging: **masters + cycle-count + ATP/validate Present; competitive WMS and tracked-product enforcement still Open**.
 
 ### Related docs
 
@@ -405,6 +398,7 @@ Lumiere’s inventory spine is **reservation-and-validate strong, WMS-depth weak
 - [Multi-entity platform inventory](./MULTI_ENTITY_PLATFORM_INVENTORY.md) — tenant, FX, country packs
 - [V1 roadmap](./V1_ROADMAP.md) — inventory “shipped” claims reconciled in Verdict
 - Investigation brief: [inventory-warehouse-investigation-plan.md](./plans/inventory-warehouse-investigation-plan.md)
+- Pilot fixes checklist: [inventory-pilot-gap-fixes-plan.md](./plans/inventory-pilot-gap-fixes-plan.md)
 - Inventory module: `spacetimedb/src/inventory/`
 - Inventory workspace: `frontend/packages/stdb/src/subscriptions/inventory-workspace.ts`
 - BFF: `frontend/packages/stdb/src/commands/inventory-http.ts`

@@ -11620,6 +11620,7 @@ export const StockMove = __t.object("StockMove", {
   partnerId: __t.option(__t.u64()),
   companyId: __t.u64(),
   pickingId: __t.option(__t.u64()),
+  pickingKey: __t.u64(),
   pickingTypeId: __t.option(__t.u64()),
   originReturnedMoveId: __t.option(__t.u64()),
   procureMethod: __t.string(),
