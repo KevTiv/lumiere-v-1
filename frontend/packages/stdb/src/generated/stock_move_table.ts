@@ -76,6 +76,7 @@ export default __t.row({
   inventoryId: __t.option(__t.u64()).name("inventory_id"),
   saleLineId: __t.option(__t.u64()).name("sale_line_id"),
   lotId: __t.option(__t.u64()).name("lot_id"),
+  serialId: __t.option(__t.u64()).name("serial_id"),
   packageId: __t.option(__t.u64()).name("package_id"),
   resultPackageId: __t.option(__t.u64()).name("result_package_id"),
   ownerId: __t.option(__t.u64()).name("owner_id"),

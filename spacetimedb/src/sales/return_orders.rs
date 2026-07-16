@@ -333,6 +333,7 @@ fn create_return_picking_for_order(
                 inventory_id: None,
                 sale_line_id: line.sale_order_line_id,
                 lot_id: None,
+                serial_id: None,
                 package_id: None,
                 result_package_id: None,
                 owner_id: None,

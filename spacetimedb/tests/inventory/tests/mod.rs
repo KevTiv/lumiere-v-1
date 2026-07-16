@@ -24,6 +24,10 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_lot_reserve_test(ctx)?;
     run_inventory_serial_reserve_test(ctx)?;
     run_inventory_lot_validate_test(ctx)?;
+    run_inventory_expired_lot_test(ctx)?;
+    run_inventory_fefo_test(ctx)?;
+    run_inventory_serial_id_validate_test(ctx)?;
+    run_inventory_replenishment_demand_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -95,4 +99,26 @@ pub fn run_inventory_serial_reserve_test(ctx: &ReducerContext) -> Result<(), Str
 #[spacetimedb::reducer]
 pub fn run_inventory_lot_validate_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_lot_required_on_validate(ctx).map_err(|e| format!("lot_validate: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_expired_lot_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_expired_lot_blocked_on_reserve(ctx)
+        .map_err(|e| format!("expired_lot: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_fefo_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_fefo_prefers_earlier_expiry(ctx).map_err(|e| format!("fefo: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_serial_id_validate_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_serial_id_on_validate(ctx).map_err(|e| format!("serial_id_validate: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_replenishment_demand_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_replenishment_creates_draft_po(ctx)
+        .map_err(|e| format!("replenishment_demand: {e}"))
 }

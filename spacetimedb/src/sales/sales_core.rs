@@ -1074,6 +1074,7 @@ fn create_outgoing_pickings_for_confirmed_order(
                     inventory_id: None,
                     sale_line_id: Some(line.id),
                     lot_id: None,
+                    serial_id: None,
                     package_id: None,
                     result_package_id: None,
                     owner_id: None,

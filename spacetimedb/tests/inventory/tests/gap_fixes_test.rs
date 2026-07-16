@@ -1,17 +1,27 @@
-//! Pilot-critical inventory gap fixes — company isolation, ATP, lot/serial enforcement.
-use spacetimedb::{ReducerContext, Table};
+//! Inventory gap fixes — isolation, ATP, lot/serial, FEFO/expiry, replenishment demand.
+use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::core::organization::{company, create_company, CompanyScopeParams, CreateCompanyParams};
-use crate::inventory::product::{create_product, product, CreateProductParams};
+use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::inventory::product::{
+    create_product, create_product_supplier_info, product, CreateProductParams,
+    CreateProductSupplierInfoParams,
+};
+use crate::inventory::replenishment::{
+    create_replenishment_rule, execute_replenishment_rule, replenishment_rule,
+    CreateReplenishmentRuleParams,
+};
 use crate::inventory::stock::{
     assign_stock_picking, confirm_stock_picking, create_stock_move, create_stock_picking,
-    create_stock_quant, reserve_stock_quant, stock_picking, stock_quant, validate_stock_picking,
-    CreateStockMoveParams, CreateStockPickingParams, CreateStockQuantParams, StockQuantReserveParams,
+    create_stock_quant, reserve_quantity_at_location, reserve_stock_quant, stock_picking,
+    stock_quant, validate_stock_picking, CreateStockMoveParams, CreateStockPickingParams,
+    CreateStockQuantParams, StockQuantReserveParams,
 };
 use crate::inventory::tracking::{
     create_stock_production_lot, create_stock_production_serial, stock_production_lot,
     stock_production_serial, CreateStockProductionLotParams, CreateStockProductionSerialParams,
 };
+use crate::purchasing::purchase_orders::purchase_order;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
 fn create_quant_for_fixture(
@@ -625,6 +635,7 @@ pub fn test_lot_required_on_validate(ctx: &ReducerContext) -> Result<(), String>
             inventory_id: None,
             sale_line_id: None,
             lot_id: None, // intentionally missing
+            serial_id: None,
             package_id: None,
             result_package_id: None,
             owner_id: None,
@@ -666,4 +677,576 @@ pub fn test_lot_required_on_validate(ctx: &ReducerContext) -> Result<(), String>
         Err(msg) => Err(format!("Expected lot-required on validate, got: {msg}")),
         Ok(()) => Err("lot validate enforcement failed: validated without lot_id".into()),
     }
+}
+
+fn past_timestamp(ctx: &ReducerContext) -> Timestamp {
+    Timestamp::from_micros_since_unix_epoch(
+        ctx.timestamp.to_micros_since_unix_epoch() - 86_400_000_000,
+    )
+}
+
+fn future_timestamp(ctx: &ReducerContext, days: i64) -> Timestamp {
+    Timestamp::from_micros_since_unix_epoch(
+        ctx.timestamp.to_micros_since_unix_epoch() + days * 86_400_000_000,
+    )
+}
+
+/// Expired lot cannot be reserved.
+pub fn test_expired_lot_blocked_on_reserve(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = create_tracked_product(ctx, &fixture, "lot", "LOT-EXP")?;
+
+    create_stock_production_lot(
+        ctx,
+        org_id,
+        CreateStockProductionLotParams {
+            company_id: Some(company_id),
+            name: "LOT-EXPIRED".to_string(),
+            product_id,
+            product_variant_id: None,
+            ref_: None,
+            note: None,
+            expiration_date: Some(past_timestamp(ctx)),
+            use_date: None,
+            removal_date: None,
+            alert_date: None,
+            product_qty: 2.0,
+            location_id: Some(fixture.warehouse_id),
+            package_id: None,
+            owner_id: None,
+            is_scrap: false,
+            is_locked: false,
+            metadata: None,
+        },
+    )?;
+    let lot_id = ctx
+        .db
+        .stock_production_lot()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "LOT-EXPIRED")
+        .map(|l| l.id)
+        .ok_or("expired lot missing")?;
+
+    let quant_id = create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.warehouse_id,
+        2.0,
+        Some(lot_id),
+    )?;
+
+    match reserve_stock_quant(
+        ctx,
+        org_id,
+        quant_id,
+        StockQuantReserveParams {
+            company_id: Some(company_id),
+            reserve_qty: 1.0,
+        },
+    ) {
+        Err(msg) if msg.to_lowercase().contains("expir") => Ok(()),
+        Err(msg) => Err(format!("Expected expired-lot error, got: {msg}")),
+        Ok(()) => Err("expiry block failed: reserved expired lot".into()),
+    }
+}
+
+/// FEFO: soft reserve prefers the lot that expires sooner.
+pub fn test_fefo_prefers_earlier_expiry(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = create_tracked_product(ctx, &fixture, "lot", "LOT-FEFO")?;
+
+    create_stock_production_lot(
+        ctx,
+        org_id,
+        CreateStockProductionLotParams {
+            company_id: Some(company_id),
+            name: "LOT-LATE".to_string(),
+            product_id,
+            product_variant_id: None,
+            ref_: None,
+            note: None,
+            expiration_date: Some(future_timestamp(ctx, 30)),
+            use_date: None,
+            removal_date: None,
+            alert_date: None,
+            product_qty: 5.0,
+            location_id: Some(fixture.warehouse_id),
+            package_id: None,
+            owner_id: None,
+            is_scrap: false,
+            is_locked: false,
+            metadata: None,
+        },
+    )?;
+    create_stock_production_lot(
+        ctx,
+        org_id,
+        CreateStockProductionLotParams {
+            company_id: Some(company_id),
+            name: "LOT-EARLY".to_string(),
+            product_id,
+            product_variant_id: None,
+            ref_: None,
+            note: None,
+            expiration_date: Some(future_timestamp(ctx, 5)),
+            use_date: None,
+            removal_date: None,
+            alert_date: None,
+            product_qty: 5.0,
+            location_id: Some(fixture.warehouse_id),
+            package_id: None,
+            owner_id: None,
+            is_scrap: false,
+            is_locked: false,
+            metadata: None,
+        },
+    )?;
+
+    let early_id = ctx
+        .db
+        .stock_production_lot()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "LOT-EARLY")
+        .map(|l| l.id)
+        .ok_or("early lot")?;
+    let late_id = ctx
+        .db
+        .stock_production_lot()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "LOT-LATE")
+        .map(|l| l.id)
+        .ok_or("late lot")?;
+
+    // Insert late lot first so FEFO must sort, not rely on insertion order.
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.warehouse_id,
+        5.0,
+        Some(late_id),
+    )?;
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.warehouse_id,
+        5.0,
+        Some(early_id),
+    )?;
+
+    reserve_quantity_at_location(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.warehouse_id,
+        1.0,
+    )?;
+
+    let early_q = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .find(|q| q.organization_id == org_id && q.lot_id == Some(early_id))
+        .ok_or("early quant")?;
+    let late_q = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .find(|q| q.organization_id == org_id && q.lot_id == Some(late_id))
+        .ok_or("late quant")?;
+
+    if early_q.reserved_quantity < 0.999 {
+        return Err(format!(
+            "FEFO failed: early lot reserved {}, late {}",
+            early_q.reserved_quantity, late_q.reserved_quantity
+        ));
+    }
+    if late_q.reserved_quantity > 0.001 {
+        return Err(format!(
+            "FEFO failed: late lot should be untouched, reserved {}",
+            late_q.reserved_quantity
+        ));
+    }
+    Ok(())
+}
+
+/// Move-level serial_id is consumed on validate (free → in_use).
+pub fn test_serial_id_on_validate(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = create_tracked_product(ctx, &fixture, "serial", "SER-MOVE")?;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or("serial product")?;
+
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.warehouse_id,
+        1.0,
+        None,
+    )?;
+
+    create_stock_production_serial(
+        ctx,
+        org_id,
+        CreateStockProductionSerialParams {
+            company_id: Some(company_id),
+            name: "SN-MOVE-1".to_string(),
+            product_id,
+            product_variant_id: None,
+            lot_id: None,
+            ref_: None,
+            note: None,
+            expiration_date: None,
+            use_date: None,
+            removal_date: None,
+            alert_date: None,
+            product_qty: 1.0,
+            location_id: Some(fixture.warehouse_id),
+            package_id: None,
+            owner_id: None,
+            state: "free".to_string(),
+            is_scrap: false,
+            is_locked: false,
+            warranty_expiration: None,
+            warranty_start: None,
+            last_maintenance: None,
+            next_maintenance: None,
+            maintenance_count: 0,
+            metadata: None,
+        },
+    )?;
+    let serial_id = ctx
+        .db
+        .stock_production_serial()
+        .iter()
+        .find(|s| s.organization_id == org_id && s.name == "SN-MOVE-1")
+        .map(|s| s.id)
+        .ok_or("serial missing")?;
+
+    create_stock_picking(
+        ctx,
+        org_id,
+        CreateStockPickingParams {
+            company_id: Some(company_id),
+            name: "OUT-SER-MOVE".to_string(),
+            picking_type_id: 0,
+            location_id: fixture.warehouse_id,
+            location_dest_id: fixture.partner_id,
+            move_type: "direct".to_string(),
+            priority: "1".to_string(),
+            partner_id: Some(fixture.partner_id),
+            contact_id: None,
+            scheduled_date: Some(ctx.timestamp),
+            origin: Some("serial-move".to_string()),
+            note: None,
+            user_id: None,
+            sale_id: None,
+            purchase_id: None,
+            group_id: None,
+            is_locked: false,
+            immediate_transfer: false,
+            is_printed: false,
+            is_return: false,
+            has_scrap_move: false,
+            has_tracking: true,
+            date: None,
+            date_done: None,
+            backorder_id: None,
+            backorder_ids: vec![],
+            show_operations: false,
+            show_lots_text: false,
+            show_reserved: true,
+            show_check_availability: true,
+            show_validate: true,
+            show_mark_as_todo: true,
+            show_set_qty_button: false,
+            show_clear_qty_button: false,
+            show_lots_m2o: false,
+            product_id: Some(product_id),
+            lot_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            display_lot_id: None,
+            location_id_name: None,
+            location_dest_id_name: None,
+            picking_code: Some("outgoing".to_string()),
+            product_tracking: Some("serial".to_string()),
+            product_barcode: None,
+            move_line_exist: false,
+            has_packages: false,
+            has_move_lines: true,
+            has_package: false,
+            has_lot: false,
+            has_owner: false,
+            has_entire_package_src: false,
+            has_entire_package_dest: false,
+            package_level_ids: vec![],
+            batch_id: None,
+            metadata: Some(r#"{"test":"serial_id"}"#.to_string()),
+        },
+    )?;
+    let picking_id = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "OUT-SER-MOVE")
+        .map(|p| p.id)
+        .ok_or("picking")?;
+
+    create_stock_move(
+        ctx,
+        org_id,
+        CreateStockMoveParams {
+            company_id: Some(company_id),
+            name: "Serial move".to_string(),
+            product_id,
+            product_tmpl_id: product_id,
+            product_uom: product.uom_id,
+            product_uom_qty: 1.0,
+            location_id: fixture.warehouse_id,
+            location_dest_id: fixture.partner_id,
+            date_expected: ctx.timestamp,
+            move_type: "outgoing".to_string(),
+            priority: "1".to_string(),
+            reference: None,
+            sequence: 10,
+            origin: Some("serial-move".to_string()),
+            note: None,
+            date: None,
+            date_deadline: None,
+            picking_id: Some(picking_id),
+            picking_type_id: None,
+            partner_id: Some(fixture.partner_id),
+            product_variant_id: None,
+            group_id: None,
+            rule_id: None,
+            procure_method: "make_to_stock".to_string(),
+            price_unit: 20.0,
+            scrapped: false,
+            to_refund: false,
+            propagate_cancel: true,
+            delay_alert: false,
+            product_packaging_id: None,
+            product_packaging_qty: 0.0,
+            warehouse_id: Some(fixture.warehouse_id),
+            production_id: None,
+            raw_material_production_id: None,
+            unbuild_id: None,
+            consume_unbuild_id: None,
+            cost_share: 0.0,
+            is_subcontract: false,
+            purchase_line_id: None,
+            need_release: false,
+            release_ready: false,
+            propagation_cancel: true,
+            has_tracking: true,
+            inventory_id: None,
+            sale_line_id: None,
+            lot_id: None,
+            serial_id: Some(serial_id),
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            package_level_id: None,
+            product_type: Some("product".to_string()),
+            metadata: None,
+        },
+    )?;
+
+    let scope = CompanyScopeParams {
+        company_id: Some(company_id),
+    };
+    confirm_stock_picking(ctx, org_id, picking_id, scope.clone())?;
+    reserve_quantity_at_location(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.warehouse_id,
+        1.0,
+    )?;
+    assign_stock_picking(ctx, org_id, picking_id, scope.clone())?;
+    validate_stock_picking(ctx, org_id, picking_id, scope)?;
+
+    let serial = ctx
+        .db
+        .stock_production_serial()
+        .id()
+        .find(&serial_id)
+        .ok_or("serial after validate")?;
+    if serial.state != "in_use" {
+        return Err(format!(
+            "expected serial in_use after validate with serial_id, got {}",
+            serial.state
+        ));
+    }
+    Ok(())
+}
+
+/// execute_replenishment_rule creates a draft PO when stock is below min and a vendor exists.
+pub fn test_replenishment_creates_draft_po(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("product")?;
+
+    create_contact(
+        ctx,
+        org_id,
+        CreateContactParams {
+            name: "Replen Vendor".to_string(),
+            type_: "contact".to_string(),
+            email: None,
+            phone: None,
+            mobile: None,
+            company_id: Some(company_id),
+            is_customer: false,
+            is_vendor: true,
+            is_employee: false,
+            is_prospect: false,
+            is_partner: false,
+            customer_rank: 0,
+            supplier_rank: 1,
+            display_name: Some("Replen Vendor".to_string()),
+            first_name: None,
+            last_name: None,
+            title: None,
+            email_secondary: None,
+            fax: None,
+            website: None,
+            street: None,
+            street2: None,
+            city: None,
+            state_code: None,
+            zip: None,
+            country_code: None,
+            tax_id: None,
+            company_registry: None,
+            industry: None,
+            employees_count: None,
+            annual_revenue: None,
+            description: None,
+            salesperson_id: None,
+            assigned_user_id: None,
+            parent_id: None,
+            user_id: None,
+            color: None,
+            metadata: Some(r#"{"test":"replen"}"#.to_string()),
+        },
+    )?;
+    let vendor_id = ctx
+        .db
+        .contact()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.display_name == "Replen Vendor")
+        .map(|c| c.id)
+        .ok_or("vendor")?;
+
+    create_product_supplier_info(
+        ctx,
+        org_id,
+        CreateProductSupplierInfoParams {
+            partner_id: vendor_id,
+            product_tmpl_id: Some(fixture.product_id),
+            product_id: Some(fixture.product_id),
+            min_qty: 1.0,
+            price: 12.0,
+            currency_id: 1,
+            delay: 3,
+            sequence: 1,
+            product_name: None,
+            product_code: None,
+            date_start: None,
+            date_end: None,
+        },
+    )?;
+
+    // Destination location has no stock → below min.
+    create_replenishment_rule(
+        ctx,
+        org_id,
+        company_id,
+        CreateReplenishmentRuleParams {
+            product_id: fixture.product_id,
+            location_id: fixture.warehouse_id,
+            warehouse_id: Some(fixture.warehouse_id),
+            uom_id: product.uom_id,
+            product_min_qty: 10.0,
+            product_max_qty: 20.0,
+            qty_multiple: 5.0,
+            lead_days: 2,
+            route_id: None,
+            trigger: "manual".to_string(),
+            group_id: None,
+            active: true,
+            last_run: None,
+            next_run: None,
+            metadata: None,
+        },
+    )?;
+    let rule_id = ctx
+        .db
+        .replenishment_rule()
+        .iter()
+        .find(|r| r.organization_id == org_id && r.product_id == fixture.product_id)
+        .map(|r| r.id)
+        .ok_or("rule missing")?;
+
+    execute_replenishment_rule(ctx, org_id, company_id, rule_id)?;
+
+    let po = ctx
+        .db
+        .purchase_order()
+        .iter()
+        .find(|o| {
+            o.organization_id == org_id && o.partner_ref == Some(format!("RPL-{rule_id}"))
+        })
+        .ok_or("expected draft PO from replenishment")?;
+    use crate::types::PoState;
+    if po.state != PoState::Draft {
+        return Err(format!("expected draft PO, got {:?}", po.state));
+    }
+
+    let rule = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("rule after execute")?;
+    if rule.last_run.is_none() {
+        return Err("expected last_run stamped".into());
+    }
+    let meta = rule.metadata.unwrap_or_default();
+    if !meta.contains("buy") {
+        return Err(format!("expected demand_type buy in metadata, got {meta}"));
+    }
+    Ok(())
 }

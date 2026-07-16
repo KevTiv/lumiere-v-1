@@ -12,6 +12,9 @@ Checklist for tranche-1 fixes from [INVENTORY_WAREHOUSE_MANAGEMENT_INVESTIGATION
 - [x] Reconcile purchasing investigation receipt narrative
 - [x] Update inventory investigation pilot-critical status
 - [x] Option 2: lot/serial enforcement on reserve/validate when `product.tracking` is lot/serial (+ domain tests)
+- [x] FEFO + expiry block on lot/serial reserve/validate
+- [x] Move-level `StockMove.serial_id` (+ validate consume)
+- [x] `execute_replenishment_rule` creates draft PO or internal transfer demand
 
 ## Verify after publish
 

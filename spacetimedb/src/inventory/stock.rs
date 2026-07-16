@@ -148,6 +148,7 @@ pub struct StockMove {
     pub inventory_id: Option<u64>,
     pub sale_line_id: Option<u64>,
     pub lot_id: Option<u64>,
+    pub serial_id: Option<u64>,
     pub package_id: Option<u64>,
     pub result_package_id: Option<u64>,
     pub owner_id: Option<u64>,
@@ -398,6 +399,7 @@ pub struct CreateStockMoveParams {
     pub inventory_id: Option<u64>,
     pub sale_line_id: Option<u64>,
     pub lot_id: Option<u64>,
+    pub serial_id: Option<u64>,
     pub package_id: Option<u64>,
     pub result_package_id: Option<u64>,
     pub owner_id: Option<u64>,
@@ -575,6 +577,31 @@ fn whole_unit_qty(qty: f64, product_id: u64) -> Result<usize, String> {
     Ok(qty.round() as usize)
 }
 
+fn timestamp_micros(ts: Timestamp) -> i64 {
+    ts.to_micros_since_unix_epoch()
+}
+
+fn is_timestamp_due(ts: Option<Timestamp>, now: Timestamp) -> bool {
+    ts.map(|t| timestamp_micros(t) <= timestamp_micros(now))
+        .unwrap_or(false)
+}
+
+fn lot_expiry_sort_key(ctx: &ReducerContext, lot_id: Option<u64>) -> i64 {
+    lot_id
+        .and_then(|id| ctx.db.stock_production_lot().id().find(&id))
+        .and_then(|lot| lot.expiration_date.or(lot.removal_date))
+        .map(timestamp_micros)
+        .unwrap_or(i64::MAX)
+}
+
+fn serial_expiry_sort_key(serial: &crate::inventory::tracking::StockProductionSerial) -> i64 {
+    serial
+        .expiration_date
+        .or(serial.removal_date)
+        .map(timestamp_micros)
+        .unwrap_or(i64::MAX)
+}
+
 fn find_lot_quant_at_location(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -583,23 +610,33 @@ fn find_lot_quant_at_location(
     location_id: u64,
     qty: f64,
 ) -> Result<StockQuant, String> {
-    ctx.db
+    let mut candidates: Vec<_> = ctx
+        .db
         .stock_quant()
         .quant_by_product()
         .filter(&product_id)
-        .find(|q| {
+        .filter(|q| {
             q.organization_id == organization_id
                 && q.company_id == company_id
                 && q.location_id == location_id
                 && q.lot_id.is_some()
                 && (q.quantity - q.reserved_quantity) + 1e-9 >= qty
         })
-        .ok_or_else(|| {
-            format!(
-                "No lot-tracked stock quant for product {} at location {} — lot required",
-                product_id, location_id
-            )
+        .filter(|q| {
+            q.lot_id
+                .map(|lid| ensure_lot_for_product(ctx, organization_id, company_id, product_id, lid).is_ok())
+                .unwrap_or(false)
         })
+        .collect();
+
+    candidates.sort_by_key(|q| lot_expiry_sort_key(ctx, q.lot_id));
+
+    candidates.into_iter().next().ok_or_else(|| {
+        format!(
+            "No non-expired lot-tracked stock quant for product {} at location {} — lot required",
+            product_id, location_id
+        )
+    })
 }
 
 fn ensure_lot_for_product(
@@ -630,6 +667,44 @@ fn ensure_lot_for_product(
     if lot.is_locked {
         return Err(format!("Lot {} is locked", lot_id));
     }
+    if is_timestamp_due(lot.expiration_date, ctx.timestamp)
+        || is_timestamp_due(lot.removal_date, ctx.timestamp)
+    {
+        return Err(format!("Lot {} is expired or past removal date", lot_id));
+    }
+    Ok(())
+}
+
+fn ensure_serial_usable(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    serial: &crate::inventory::tracking::StockProductionSerial,
+) -> Result<(), String> {
+    if serial.organization_id != organization_id {
+        return Err("Serial does not belong to this organization".to_string());
+    }
+    if serial.company_id != company_id {
+        return Err("Serial does not belong to this company".to_string());
+    }
+    if serial.product_id != product_id {
+        return Err(format!(
+            "Serial {} belongs to product {}, not {}",
+            serial.id, serial.product_id, product_id
+        ));
+    }
+    if serial.is_locked {
+        return Err(format!("Serial {} is locked", serial.id));
+    }
+    if is_timestamp_due(serial.expiration_date, ctx.timestamp)
+        || is_timestamp_due(serial.removal_date, ctx.timestamp)
+    {
+        return Err(format!(
+            "Serial {} is expired or past removal date",
+            serial.id
+        ));
+    }
     Ok(())
 }
 
@@ -644,25 +719,24 @@ fn reserve_free_serials(
     if qty == 0 {
         return Ok(());
     }
-    let free: Vec<_> = ctx
+    let mut free: Vec<_> = ctx
         .db
         .stock_production_serial()
         .serial_by_product()
         .filter(&product_id)
         .filter(|s| {
-            s.organization_id == organization_id
-                && s.company_id == company_id
-                && s.state == "free"
-                && !s.is_locked
+            s.state == "free"
                 && location_id
                     .map(|lid| s.location_id.is_none() || s.location_id == Some(lid))
                     .unwrap_or(true)
+                && ensure_serial_usable(ctx, organization_id, company_id, product_id, s).is_ok()
         })
-        .take(qty)
         .collect();
+    free.sort_by_key(serial_expiry_sort_key);
+    free.truncate(qty);
     if free.len() < qty {
         return Err(format!(
-            "Insufficient free serials for product {} (need {}, have {})",
+            "Insufficient free non-expired serials for product {} (need {}, have {})",
             product_id,
             qty,
             free.len()
@@ -678,6 +752,37 @@ fn reserve_free_serials(
                 ..serial
             });
     }
+    Ok(())
+}
+
+fn consume_serial_by_id(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    serial_id: u64,
+) -> Result<(), String> {
+    let serial = ctx
+        .db
+        .stock_production_serial()
+        .id()
+        .find(&serial_id)
+        .ok_or_else(|| format!("Serial {} not found", serial_id))?;
+    ensure_serial_usable(ctx, organization_id, company_id, product_id, &serial)?;
+    if serial.state != "reserved" && serial.state != "free" {
+        return Err(format!(
+            "Serial {} must be free or reserved before validate (current state: {})",
+            serial_id, serial.state
+        ));
+    }
+    ctx.db
+        .stock_production_serial()
+        .id()
+        .update(StockProductionSerial {
+            state: "in_use".to_string(),
+            write_date: ctx.timestamp,
+            ..serial
+        });
     Ok(())
 }
 
@@ -735,22 +840,21 @@ fn consume_reserved_serials(
     if qty == 0 {
         return Ok(());
     }
-    let reserved: Vec<_> = ctx
+    let mut reserved: Vec<_> = ctx
         .db
         .stock_production_serial()
         .serial_by_product()
         .filter(&product_id)
         .filter(|s| {
-            s.organization_id == organization_id
-                && s.company_id == company_id
-                && s.state == "reserved"
-                && !s.is_locked
+            s.state == "reserved"
+                && ensure_serial_usable(ctx, organization_id, company_id, product_id, s).is_ok()
         })
-        .take(qty)
         .collect();
+    reserved.sort_by_key(serial_expiry_sort_key);
+    reserved.truncate(qty);
     if reserved.len() < qty {
         return Err(format!(
-            "Insufficient reserved serials for product {} (need {}, have {})",
+            "Insufficient reserved non-expired serials for product {} (need {}, have {})",
             product_id,
             qty,
             reserved.len()
@@ -780,22 +884,21 @@ fn place_free_serials_at_location(
     if qty == 0 {
         return Ok(());
     }
-    let free: Vec<_> = ctx
+    let mut free: Vec<_> = ctx
         .db
         .stock_production_serial()
         .serial_by_product()
         .filter(&product_id)
         .filter(|s| {
-            s.organization_id == organization_id
-                && s.company_id == company_id
-                && s.state == "free"
-                && !s.is_locked
+            s.state == "free"
+                && ensure_serial_usable(ctx, organization_id, company_id, product_id, s).is_ok()
         })
-        .take(qty)
         .collect();
+    free.sort_by_key(serial_expiry_sort_key);
+    free.truncate(qty);
     if free.len() < qty {
         return Err(format!(
-            "Insufficient free serials for inbound product {} (need {}, have {})",
+            "Insufficient free non-expired serials for inbound product {} (need {}, have {})",
             product_id,
             qty,
             free.len()
@@ -854,6 +957,7 @@ fn enforce_tracking_on_move_validate(
     company_id: u64,
     product_id: u64,
     lot_id: Option<u64>,
+    serial_id: Option<u64>,
     location_dest_id: u64,
     qty_done: f64,
     is_inbound: bool,
@@ -873,7 +977,40 @@ fn enforce_tracking_on_move_validate(
         }
         "serial" => {
             let n = whole_unit_qty(qty_done, product_id)?;
-            if is_inbound {
+            if let Some(serial_id) = serial_id {
+                if n != 1 {
+                    return Err(format!(
+                        "Move serial_id requires quantity 1 for product {} (got {})",
+                        product_id, qty_done
+                    ));
+                }
+                if is_inbound {
+                    let serial = ctx
+                        .db
+                        .stock_production_serial()
+                        .id()
+                        .find(&serial_id)
+                        .ok_or_else(|| format!("Serial {} not found", serial_id))?;
+                    ensure_serial_usable(ctx, organization_id, company_id, product_id, &serial)?;
+                    if serial.state != "free" {
+                        return Err(format!(
+                            "Inbound serial {} must be free (current state: {})",
+                            serial_id, serial.state
+                        ));
+                    }
+                    ctx.db
+                        .stock_production_serial()
+                        .id()
+                        .update(StockProductionSerial {
+                            location_id: Some(location_dest_id),
+                            write_date: ctx.timestamp,
+                            ..serial
+                        });
+                    Ok(())
+                } else {
+                    consume_serial_by_id(ctx, organization_id, company_id, product_id, serial_id)
+                }
+            } else if is_inbound {
                 place_free_serials_at_location(
                     ctx,
                     organization_id,
@@ -1661,6 +1798,7 @@ pub fn create_stock_move(
         inventory_id: params.inventory_id,
         sale_line_id: params.sale_line_id,
         lot_id: params.lot_id,
+        serial_id: params.serial_id,
         package_id: params.package_id,
         result_package_id: params.result_package_id,
         owner_id: params.owner_id,
@@ -2224,6 +2362,7 @@ fn validate_stock_picking_impl(
         location_id: u64,
         location_dest_id: u64,
         lot_id: Option<u64>,
+        serial_id: Option<u64>,
         qty_done: f64,
         residual: f64,
         product_uom: u64,
@@ -2260,6 +2399,7 @@ fn validate_stock_picking_impl(
             location_id: move_record.location_id,
             location_dest_id: move_record.location_dest_id,
             lot_id: move_record.lot_id,
+            serial_id: move_record.serial_id,
             qty_done,
             residual,
             product_uom: move_record.product_uom,
@@ -2280,6 +2420,7 @@ fn validate_stock_picking_impl(
             company_id,
             vm.product_id,
             vm.lot_id,
+            vm.serial_id,
             vm.location_dest_id,
             vm.qty_done,
             is_inbound,
@@ -2473,6 +2614,7 @@ fn validate_stock_picking_impl(
                         inventory_id: None,
                         sale_line_id: vm.sale_line_id,
                         lot_id: vm.lot_id,
+                        serial_id: vm.serial_id,
                         package_id: None,
                         result_package_id: None,
                         owner_id: None,

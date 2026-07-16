@@ -53,6 +53,7 @@ pub struct CreateStockMoveParams {
     pub inventory_id: Option<u64>,
     pub sale_line_id: Option<u64>,
     pub lot_id: Option<u64>,
+    pub serial_id: Option<u64>,
     pub package_id: Option<u64>,
     pub result_package_id: Option<u64>,
     pub owner_id: Option<u64>,
