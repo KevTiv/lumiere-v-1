@@ -159,12 +159,12 @@ Definitions:
 | Landed cost | **Present** (adjacent) | Allocate / post / apply to done-move dest quant `value`/`cost` |
 | Costing methods | **Partial** | Product `cost_method` / `standard_price`; COGS helpers read quants (fifo/lifo/average/standard); stock ops default new quants to `"standard"` without layer maintenance |
 | Directed putaway / picking | **Absent** | No putaway strategy reducers; tasks are free-string CRUD |
-| Wave planning | **Unsuitable** | Wave stores `picking_ids`; create/complete flip state only — no pick orchestration |
+| Wave planning | **Partial** | `release_picking_wave` assign + pick tasks; validate gated on open tasks |
 | Packing | **Partial** | Pack location IDs on warehouse; product packaging CRUD; no pack-operation workflow |
 | Cartonization | **Partial** | `create_packaging_material` + `run_cartonization` (FFD); stamps move `result_package_id` |
-| Consignment | **Absent** (inventory) | Purchasing agreement table; no vendor-owned quant rules |
+| Consignment | **Partial** | Activate/receive with `owner_id`; excluded from company ATP |
 | Quarantine | **Partial** | `fail_quality_check` → `quarantine_quantity` (uses `failure_location_id` or `wh_qc_stock_loc_id`); available=0; reserve blocked |
-| Cross-docking | **Absent** | `warehouse.crossdock` stored; no flow |
+| Cross-docking | **Partial** | `execute_cross_dock` creates outbound from inbound dest when `crossdock` |
 | 3PL interfaces | **Partial** | `inventory_integration_intent` create/record; ASN inbound can post stock on success (worker HTTP outside reducers) |
 | Inventory-close reconciliation | **Absent** | No period-close reducer; `inventory_valuation` unused/mis-shaped; adjustment process does not post quants |
 | PO receipt → stock | **Present** | `receive_po_line` → `validate_stock_picking_backorder` + receipt domain test |
@@ -377,8 +377,8 @@ flowchart LR
 | Gap | Priority status | Notes |
 |-----|-----------------|-------|
 | Cartonization engine | **Open** | Tables exist; algorithms/procedures absent |
-| Consignment ownership on quants | **Open** | Vendor-owned vs company-owned |
-| Cross-dock flow | **Open** | Beyond warehouse flag |
+| Consignment ownership on quants | **Closed** (MVP) | Vendor `owner_id` excluded from company ATP |
+| Cross-dock flow | **Closed** (MVP) | Outbound from inbound dest when `warehouse.crossdock` |
 | 3PL ASN / outbound interfaces | **Closed** (MVP) | Durable intents + ASN stock post; workers remain external |
 | Offline / intermittent remote warehouse sync | **Open** | Oceania / island / mine sites |
 | Attribute-driven variant generation | **Open** | Competitive PIM depth |
