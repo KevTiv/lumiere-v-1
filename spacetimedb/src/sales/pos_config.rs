@@ -390,7 +390,7 @@ pub fn create_payment_method(
     let use_payment_terminal = params.use_payment_terminal.clone();
     let hide_use_payment_terminal = use_payment_terminal.is_none();
 
-    ctx.db.pos_payment_method().insert(PosPaymentMethod {
+    let method = ctx.db.pos_payment_method().insert(PosPaymentMethod {
         id: 0,
         name: params.name,
         outstanding_account_id: params.outstanding_account_id,
@@ -415,6 +415,23 @@ pub fn create_payment_method(
         write_date: ctx.timestamp,
         metadata: None,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "pos_payment_method",
+            record_id: method.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": method.name, "company_id": company_id }).to_string(),
+            ),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -442,7 +459,7 @@ pub fn create_loyalty_program(
         return Err("Loyalty program with this name already exists".to_string());
     }
 
-    ctx.db.pos_loyalty_program().insert(PosLoyaltyProgram {
+    let program = ctx.db.pos_loyalty_program().insert(PosLoyaltyProgram {
         id: 0,
         organization_id,
         name: params.name,
@@ -468,6 +485,24 @@ pub fn create_loyalty_program(
         metadata: None,
     });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "pos_loyalty_program",
+            record_id: program.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": program.name, "currency_id": program.currency_id })
+                    .to_string(),
+            ),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -486,12 +521,28 @@ pub fn activate_pos_config(
 
     check_permission(ctx, organization_id, "pos_config", "write")?;
 
+    let company_id = config.company_id;
     ctx.db.pos_config().id().update(PosConfig {
         is_active: true,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..config
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "pos_config",
+            record_id: config_id,
+            action: "SET_ACTIVE",
+            old_values: Some(serde_json::json!({ "is_active": false }).to_string()),
+            new_values: Some(serde_json::json!({ "is_active": true }).to_string()),
+            changed_fields: vec!["is_active".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -511,12 +562,28 @@ pub fn deactivate_pos_config(
 
     check_permission(ctx, organization_id, "pos_config", "write")?;
 
+    let company_id = config.company_id;
     ctx.db.pos_config().id().update(PosConfig {
         is_active: false,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..config
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "pos_config",
+            record_id: config_id,
+            action: "SET_ACTIVE",
+            old_values: Some(serde_json::json!({ "is_active": true }).to_string()),
+            new_values: Some(serde_json::json!({ "is_active": false }).to_string()),
+            changed_fields: vec!["is_active".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

@@ -113,6 +113,13 @@ export function toCreateSaleOrderParams(
   const metadata =
     Object.keys(metadataObj).length > 0 ? JSON.stringify(metadataObj) : undefined
 
+  const isDropship = checkboxFromForm(formData.isDropship, false)
+  const invoicePolicyRaw = optionalTrimmedString(formData.invoicePolicy)
+  const invoicePolicy =
+    invoicePolicyRaw === "delivery" || invoicePolicyRaw === "order"
+      ? invoicePolicyRaw
+      : undefined
+
   return {
     companyId,
     partnerId,
@@ -125,6 +132,8 @@ export function toCreateSaleOrderParams(
     paymentTermId,
     note,
     commitmentDate,
+    isDropship,
+    invoicePolicy,
     metadata,
     orderLines: [] as CreateSaleOrderParams['orderLines'],
   } as CreateSaleOrderParams

@@ -15,6 +15,7 @@ import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqB
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
+  ApplyOmnichannelAllocationParams,
   CreateDeliveryCarrierParams,
   CreateDeliveryPriceRuleParams,
   CreateLoyaltyProgramParams,
@@ -22,11 +23,17 @@ import type {
   CreatePickingBatchParams,
   CreatePricelistItemParams,
   CreatePricelistParams,
+  CreateSaleCommissionPlanParams,
+  CreateSaleCommissionPlanSplitParams,
+  CreateSaleContractParams,
+  CreateSaleCpqConstraintParams,
   CreateSaleOrderParams,
   CreateSaleOrderLineParams,
+  CreateSalesIntegrationIntentParams,
   CreateShippingMethodParams,
   CreateReturnOrderParams,
   CreateCreditNoteFromReturnOrderParams,
+  RecordSalesIntegrationResultParams,
   UpdateSaleOrderParams,
 } from "@lumiere/stdb/types"
 
@@ -184,6 +191,34 @@ export function useSaleCommissions(organizationId: bigint, initialData?: QueryRo
   })
 }
 
+/** Server-bounded: `sale_order.state = ToApprove`. */
+export function useSaleOrdersToApprove(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['sale-orders-to-approve', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/sale-orders-to-approve',
+        'Failed to fetch sale orders awaiting approval',
+      ),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+/** Server-bounded: `sale_commission.state = accrued` (awaiting settle). */
+export function useSaleCommissionsPending(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['sale-commissions-pending', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/sale-commissions-pending',
+        'Failed to fetch pending sale commissions',
+      ),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
@@ -202,20 +237,27 @@ export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
   })
 }
 
+async function salesReducerError(r: Response, fallback: string): Promise<Error> {
+  const body = await r.text().catch(() => "")
+  return new Error(body || fallback)
+}
+
 export function useConfirmSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: bigint | number | string) => {
       const { urlPath, init } = salesBffPost("confirm_sales_order", [organizationId, orderId])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to confirm sale order')
+      if (!r.ok) throw await salesReducerError(r, "Failed to confirm sale order")
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] })
-      qc.invalidateQueries({ queryKey: ['sale-order-lines', rqBigIntKey(organizationId)] })
-      qc.invalidateQueries({ queryKey: ['picking-batches', rqBigIntKey(organizationId)] })
-      qc.invalidateQueries({ queryKey: ['stock-pickings', rqBigIntKey(organizationId)] })
-      qc.invalidateQueries({ queryKey: ['stock-moves', rqBigIntKey(organizationId)] })
+      const k = rqBigIntKey(organizationId)
+      qc.invalidateQueries({ queryKey: ['sale-orders', k] })
+      qc.invalidateQueries({ queryKey: ['sale-orders-to-approve', k] })
+      qc.invalidateQueries({ queryKey: ['sale-order-lines', k] })
+      qc.invalidateQueries({ queryKey: ['picking-batches', k] })
+      qc.invalidateQueries({ queryKey: ['stock-pickings', k] })
+      qc.invalidateQueries({ queryKey: ['stock-moves', k] })
     },
   })
 }
@@ -229,10 +271,37 @@ export function useSendSaleOrderQuotation(organizationId: bigint) {
         orderId,
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) {
-        const body = await r.text().catch(() => "")
-        throw new Error(body || "Failed to send quotation")
-      }
+      if (!r.ok) throw await salesReducerError(r, "Failed to send quotation")
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      qc.invalidateQueries({ queryKey: ["sale-orders", k] })
+      qc.invalidateQueries({ queryKey: ["sale-orders-to-approve", k] })
+    },
+  })
+}
+
+export function useAcceptSaleOrderQuotation(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      orderId: bigint | number | string
+      signedBy: string
+      signature?: string | null
+    }) => {
+      const { urlPath, init } = salesBffPost("accept_sale_order_quotation", [
+        organizationId,
+        toScalarU64(params.orderId),
+        stdbParamsToJson(
+          {
+            signedBy: params.signedBy,
+            signature: params.signature ?? null,
+          },
+          "AcceptSaleOrderQuotationParams",
+        ),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw await salesReducerError(r, "Failed to accept quotation")
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sale-orders", rqBigIntKey(organizationId)] })
@@ -315,7 +384,16 @@ export function useCancelSaleOrder(organizationId: bigint) {
           params.reason ?? null,
         ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to cancel sale order')
+      if (!r.ok) {
+        const body = await r.text().catch(() => "")
+        const detail = body || "Failed to cancel sale order"
+        if (/invoic/i.test(detail)) {
+          throw new Error(
+            `${detail} — create an RMA and credit note instead of cancelling an invoiced order.`,
+          )
+        }
+        throw new Error(detail)
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] })
@@ -922,6 +1000,7 @@ export function useSettleSaleCommissions(organizationId: bigint, companyId: bigi
     onSuccess: () => {
       const k = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['sale-commissions', k] })
+      void qc.invalidateQueries({ queryKey: ['sale-commissions-pending', k] })
       void qc.invalidateQueries({ queryKey: ['account-moves', k] })
     },
   })
@@ -940,9 +1019,9 @@ export function useCancelSaleCommission(organizationId: bigint, companyId: bigin
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({
-        queryKey: ['sale-commissions', rqBigIntKey(organizationId)],
-      })
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['sale-commissions', k] })
+      void qc.invalidateQueries({ queryKey: ['sale-commissions-pending', k] })
     },
   })
 }
@@ -968,9 +1047,9 @@ export function useAccrueSaleCommission(organizationId: bigint) {
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
     onSuccess: () => {
-      void qc.invalidateQueries({
-        queryKey: ['sale-commissions', rqBigIntKey(organizationId)],
-      })
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['sale-commissions', k] })
+      void qc.invalidateQueries({ queryKey: ['sale-commissions-pending', k] })
     },
   })
 }
@@ -993,20 +1072,213 @@ export function useReverseSaleCommissionSettlement(
     onSuccess: () => {
       const k = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ['sale-commissions', k] })
+      void qc.invalidateQueries({ queryKey: ['sale-commissions-pending', k] })
       void qc.invalidateQueries({ queryKey: ['account-moves', k] })
+    },
+  })
+}
+
+// ── OMS advanced (Wave D) — creates via BFF; no QueryResourceKey list hooks yet ─
+
+export function useCreateSaleCommissionPlan(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, CreateSaleCommissionPlanParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson(
+        withCompanyScope(params as Record<string, unknown>, companyId),
+        "CreateSaleCommissionPlanParams",
+      )
+      const { urlPath, init } = salesBffPost("create_sale_commission_plan", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+  })
+}
+
+export function useCreateSaleCommissionPlanSplit(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, CreateSaleCommissionPlanSplitParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson(
+        params as object,
+        "CreateSaleCommissionPlanSplitParams",
+      )
+      const { urlPath, init } = salesBffPost("create_sale_commission_plan_split", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+  })
+}
+
+export function useCreateSaleContract(organizationId: bigint, companyId: bigint) {
+  return useMutation<void, Error, CreateSaleContractParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson(
+        withCompanyScope(params as Record<string, unknown>, companyId),
+        "CreateSaleContractParams",
+      )
+      const { urlPath, init } = salesBffPost("create_sale_contract", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+  })
+}
+
+export function useCreateSaleCpqConstraint(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, CreateSaleCpqConstraintParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson(
+        withCompanyScope(params as Record<string, unknown>, companyId),
+        "CreateSaleCpqConstraintParams",
+      )
+      const { urlPath, init } = salesBffPost("create_sale_cpq_constraint", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+  })
+}
+
+export function useCreateSalesIntegrationIntent(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, CreateSalesIntegrationIntentParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson(
+        withCompanyScope(params as Record<string, unknown>, companyId),
+        "CreateSalesIntegrationIntentParams",
+      )
+      const { urlPath, init } = salesBffPost("create_sales_integration_intent", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+  })
+}
+
+export function useRecordSalesIntegrationResult(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<
+    void,
+    Error,
+    {
+      intentId: bigint | number | string
+      params: RecordSalesIntegrationResultParams
+    }
+  >({
+    mutationFn: async ({ intentId, params }) => {
+      const encoded = stdbParamsToJson(
+        params as object,
+        "RecordSalesIntegrationResultParams",
+      )
+      const { urlPath, init } = salesBffPost("record_sales_integration_result", [
+        organizationId,
+        companyId,
+        toScalarU64(intentId),
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+  })
+}
+
+export function useApplyOmnichannelAllocation(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      orderId: bigint | number | string
+      params: ApplyOmnichannelAllocationParams
+    }
+  >({
+    mutationFn: async ({ orderId, params }) => {
+      const encoded = stdbParamsToJson(
+        params as object,
+        "ApplyOmnichannelAllocationParams",
+      )
+      const { urlPath, init } = salesBffPost("apply_omnichannel_allocation", [
+        organizationId,
+        companyId,
+        toScalarU64(orderId),
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ['sale-orders', rqBigIntKey(organizationId)],
+      })
+    },
+  })
+}
+
+export function useScheduleSalesSlaEscalation(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, { delaySecs: number }>({
+    mutationFn: async ({ delaySecs }) => {
+      const { urlPath, init } = salesBffPost("schedule_sales_sla_escalation", [
+        organizationId,
+        companyId,
+        delaySecs,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
   })
 }
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
+  ApplyOmnichannelAllocationParams,
   CreateDeliveryCarrierParams,
   CreateDeliveryPriceRuleParams,
   CreateLoyaltyProgramParams,
   CreatePaymentMethodParams,
   CreatePickingBatchParams,
   CreatePricelistParams,
+  CreateSaleCommissionPlanParams,
+  CreateSaleCommissionPlanSplitParams,
+  CreateSaleContractParams,
+  CreateSaleCpqConstraintParams,
   CreateSaleOrderParams,
+  CreateSalesIntegrationIntentParams,
   CreateShippingMethodParams,
+  RecordSalesIntegrationResultParams,
   UpdateSaleOrderParams,
 } from '@lumiere/stdb/types'

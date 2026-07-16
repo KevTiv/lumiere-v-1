@@ -2467,6 +2467,14 @@ export function usePartnerCreditControls(
   return useStdbQuery("partner-credit-controls", organizationId, options)
 }
 
+/** Server-bounded: `partner_credit_control.payment_hold = true`. */
+export function usePartnerCreditHolds(
+  organizationId: bigint,
+  options?: { staleTime?: number; enabled?: boolean },
+) {
+  return useStdbQuery("partner-credit-holds", organizationId, options)
+}
+
 export function useUpsertPartnerCreditControl(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   const k = String(organizationId)
@@ -2482,6 +2490,7 @@ export function useUpsertPartnerCreditControl(organizationId: number, companyId:
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["stdb", "partner-credit-controls", k] })
+      void qc.invalidateQueries({ queryKey: ["stdb", "partner-credit-holds", k] })
     },
   })
 }

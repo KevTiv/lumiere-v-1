@@ -96,6 +96,7 @@ pub fn test_draft_sale_order_update(ctx: &ReducerContext) -> Result<(), String> 
             is_printed: None,
             is_locked: None,
             is_dropship: None,
+            invoice_policy: None,
             message_follower_ids: None,
             message_partner_ids: None,
             message_channel_ids: None,
@@ -146,6 +147,7 @@ pub fn test_draft_sale_order_update(ctx: &ReducerContext) -> Result<(), String> 
             customer_lead: None,
             analytic_account_id: None,
             user_id: None,
+            is_dropship: None,
             metadata: None,
         },
     )?;

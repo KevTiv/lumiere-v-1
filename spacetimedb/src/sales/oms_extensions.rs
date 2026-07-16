@@ -1042,6 +1042,7 @@ pub fn apply_sale_order_options(
         .filter(|o| o.order_id == order_id && o.is_present && o.line_id.is_none())
         .collect();
 
+    let mut applied = 0u32;
     for opt in options {
         crate::sales::sales_core::create_sale_order_line(
             ctx,
@@ -1080,8 +1081,26 @@ pub fn apply_sale_order_options(
                 write_date: ctx.timestamp,
                 ..opt
             });
+            applied += 1;
         }
     }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(order.company_id),
+            table_name: "sale_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "options_applied": applied }).to_string(),
+            ),
+            changed_fields: vec!["order_line".to_string(), "sale_order_option".to_string()],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -1857,6 +1876,7 @@ pub fn create_exchange_order_from_return(
             is_printed: Some(false),
             is_locked: Some(false),
             is_dropship: Some(false),
+            invoice_policy: None,
             message_follower_ids: None,
             message_partner_ids: None,
             message_channel_ids: None,

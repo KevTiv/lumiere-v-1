@@ -113,6 +113,8 @@ pub fn import_sale_order_csv(
             customer_lead: 0.0,
             prepaid_amount: 0.0,
             credit_amount: 0.0,
+            currency_rate: 0.0,
+            invoice_policy: "order".to_string(),
             is_dropship: false,
             dropship_picking_count: 0,
             dropship_picking_ids: vec![],

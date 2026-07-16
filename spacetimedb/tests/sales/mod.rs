@@ -1,5 +1,6 @@
 //! Sales domain test suite — invoke via `run_all_sales_tests` reducer.
 pub mod commission_settle_test;
+pub mod gap_fixes_test;
 pub mod oms_extensions_test;
 pub mod sale_order_update_test;
 pub mod sales_core_test;
@@ -24,6 +25,12 @@ pub fn run_all_sales_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_sales_commission_accrue_test(ctx)?;
     run_sales_commission_settle_test(ctx)?;
     run_sales_commission_clawback_test(ctx)?;
+    run_sales_lock_blocks_update_test(ctx)?;
+    run_sales_line_update_delete_test(ctx)?;
+    run_sales_fx_fail_closed_test(ctx)?;
+    run_sales_dropship_confirm_test(ctx)?;
+    run_sales_company_isolation_test(ctx)?;
+    run_sales_exchange_from_return_test(ctx)?;
     log::info!("✅ run_all_sales_tests complete");
     Ok(())
 }
@@ -110,4 +117,38 @@ pub fn run_sales_commission_settle_test(ctx: &ReducerContext) -> Result<(), Stri
 pub fn run_sales_commission_clawback_test(ctx: &ReducerContext) -> Result<(), String> {
     commission_settle_test::test_commission_cancel_clawback(ctx)
         .map_err(|e| format!("commission_cancel_clawback: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_sales_lock_blocks_update_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_lock_blocks_update(ctx).map_err(|e| format!("lock_blocks_update: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_sales_line_update_delete_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_update_and_delete_sale_order_line(ctx)
+        .map_err(|e| format!("line_update_delete: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_sales_fx_fail_closed_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_fx_snapshot_fail_closed(ctx).map_err(|e| format!("fx_fail_closed: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_sales_dropship_confirm_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_dropship_confirm_creates_po(ctx)
+        .map_err(|e| format!("dropship_confirm: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_sales_company_isolation_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_company_isolation_on_confirm(ctx)
+        .map_err(|e| format!("company_isolation: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_sales_exchange_from_return_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_exchange_order_from_return(ctx)
+        .map_err(|e| format!("exchange_from_return: {e}"))
 }

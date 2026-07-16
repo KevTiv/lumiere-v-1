@@ -149,10 +149,18 @@ fn validate_return_lines_against_sale_order(
             if sol.order_id != sale_order_id {
                 return Err("Sale order line does not belong to the source sale order".to_string());
             }
-            if line.product_uom_qty > sol.qty_delivered {
+            let already_returned: f64 = ctx
+                .db
+                .return_order_line()
+                .iter()
+                .filter(|r| r.sale_order_line_id == Some(sol_id))
+                .map(|r| r.product_uom_qty)
+                .sum();
+            let residual = (sol.qty_delivered - already_returned).max(0.0);
+            if line.product_uom_qty > residual + f64::EPSILON {
                 return Err(format!(
-                    "Return quantity {} exceeds delivered quantity {} on sale order line {}",
-                    line.product_uom_qty, sol.qty_delivered, sol_id
+                    "Return quantity {} exceeds residual delivered quantity {} on sale order line {} (delivered {}, already returned {})",
+                    line.product_uom_qty, residual, sol_id, sol.qty_delivered, already_returned
                 ));
             }
         }
@@ -709,7 +717,7 @@ pub fn create_credit_note_from_return_order(
         let subtotal = qty * line.price_unit;
         let tax_ids = return_order
             .sale_order_id
-            .and_then(|so_id| line.sale_order_line_id)
+            .and_then(|_so_id| line.sale_order_line_id)
             .and_then(|sl_id| ctx.db.sale_order_line().id().find(&sl_id))
             .map(|sol| sol.tax_id.clone())
             .unwrap_or_default();

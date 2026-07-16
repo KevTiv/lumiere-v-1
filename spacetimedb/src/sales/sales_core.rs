@@ -87,6 +87,7 @@ pub struct CreateSaleOrderParams {
     pub is_printed: Option<bool>,
     pub is_locked: Option<bool>,
     pub is_dropship: Option<bool>,
+    pub invoice_policy: Option<String>,
     pub message_follower_ids: Option<Vec<u64>>,
     pub message_partner_ids: Option<Vec<u64>>,
     pub message_channel_ids: Option<Vec<u64>>,
@@ -115,7 +116,33 @@ pub struct UpdateSaleOrderParams {
     pub customer_lead: Option<f64>,
     pub analytic_account_id: Option<u64>,
     pub user_id: Option<Identity>,
+    pub is_dropship: Option<bool>,
     pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateSaleOrderLineParams {
+    pub product_id: Option<u64>,
+    pub quantity: Option<f64>,
+    pub uom_id: Option<u64>,
+    pub price_unit: Option<f64>,
+    pub discount: Option<f64>,
+    pub tax_ids: Option<Vec<u64>>,
+    pub name: Option<String>,
+    pub sequence: Option<u32>,
+    pub product_variant_id: Option<u64>,
+    pub packaging_id: Option<u64>,
+    pub route_id: Option<u64>,
+    pub analytic_tag_ids: Option<Vec<u64>>,
+    pub customer_lead: Option<f64>,
+    pub display_type: Option<String>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AcceptSaleOrderQuotationParams {
+    pub signed_by: String,
+    pub signature: Option<String>,
 }
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -201,6 +228,10 @@ pub struct SaleOrder {
     pub customer_lead: f64,
     pub prepaid_amount: f64,
     pub credit_amount: f64,
+    /// Snapshotted order→company FX at confirm (1.0 when same currency; 0.0 until confirmed).
+    pub currency_rate: f64,
+    /// `order` (invoice on confirm qty) or `delivery` (invoice on qty_delivered).
+    pub invoice_policy: String,
     pub is_dropship: bool,
     pub dropship_picking_count: u32,
     pub dropship_picking_ids: Vec<u64>,
@@ -619,6 +650,15 @@ pub fn create_sale_order(
     let is_printed = params.is_printed.unwrap_or(false);
     let is_locked = params.is_locked.unwrap_or(false);
     let is_dropship = params.is_dropship.unwrap_or(false);
+    let invoice_policy = match params.invoice_policy.as_deref() {
+        None | Some("") | Some("order") => "order".to_string(),
+        Some("delivery") => "delivery".to_string(),
+        Some(other) => {
+            return Err(format!(
+                "invoice_policy must be 'order' or 'delivery', got '{other}'"
+            ));
+        }
+    };
 
     let order = ctx.db.sale_order().insert(SaleOrder {
         id: 0,
@@ -698,6 +738,8 @@ pub fn create_sale_order(
         customer_lead,
         prepaid_amount: 0.0,
         credit_amount: 0.0,
+        currency_rate: 0.0,
+        invoice_policy,
         is_dropship,
         dropship_picking_count: 0,
         dropship_picking_ids: Vec::new(),
@@ -860,163 +902,193 @@ fn create_outgoing_pickings_for_confirmed_order(
         }
     }
 
-    create_stock_picking(
-        ctx,
-        organization_id,
-        CreateStockPickingParams {
-            company_id: Some(company_id),
-            name: format!("OUT/{order_label}"),
-            picking_type_id: 1,
-            location_id: src_location,
-            location_dest_id: dest_location,
-            move_type: "direct".to_string(),
-            priority: "1".to_string(),
-            partner_id: Some(order.partner_id),
-            contact_id: None,
-            scheduled_date: Some(ctx.timestamp),
-            origin: Some(format!("SO/{order_label}")),
-            note: order.note.clone(),
-            user_id: None,
-            sale_id: Some(order_id),
-            purchase_id: None,
-            group_id: None,
-            is_locked: false,
-            immediate_transfer: false,
-            is_printed: false,
-            is_return: false,
-            has_scrap_move: false,
-            has_tracking: false,
-            date: None,
-            date_done: None,
-            backorder_id: None,
-            backorder_ids: vec![],
-            show_operations: false,
-            show_lots_text: false,
-            show_reserved: !skip_stock,
-            show_check_availability: true,
-            show_validate: false,
-            show_mark_as_todo: true,
-            show_set_qty_button: false,
-            show_clear_qty_button: false,
-            show_lots_m2o: false,
-            product_id: Some(order_lines[0].product_id),
-            lot_id: None,
-            package_id: None,
-            result_package_id: None,
-            owner_id: None,
-            display_lot_id: None,
-            location_id_name: None,
-            location_dest_id_name: None,
-            picking_code: Some("outgoing".to_string()),
-            product_tracking: None,
-            product_barcode: None,
-            move_line_exist: false,
-            has_packages: false,
-            has_move_lines: false,
-            has_package: false,
-            has_lot: false,
-            has_owner: false,
-            has_entire_package_src: false,
-            has_entire_package_dest: false,
-            package_level_ids: vec![],
-            batch_id: None,
-            metadata: Some(format!(
-                r#"{{"sale_order_id":{order_id},"source_id":{},"medium_id":{},"route_ids":{:?}}}"#,
-                order.source_id.map(|v| v.to_string()).unwrap_or_else(|| "null".into()),
-                order.medium_id.map(|v| v.to_string()).unwrap_or_else(|| "null".into()),
-                order_lines
-                    .iter()
-                    .filter_map(|l| l.route_id)
-                    .collect::<Vec<_>>(),
-            )),
-        },
-    )?;
+    // Split fulfilment MVP: one OUT picking per distinct line route_id (0 = default route).
+    let mut route_groups: Vec<(u64, Vec<&SaleOrderLine>)> = Vec::new();
+    for line in &order_lines {
+        let route_key = line.route_id.unwrap_or(0);
+        if let Some((_, group)) = route_groups.iter_mut().find(|(k, _)| *k == route_key) {
+            group.push(line);
+        } else {
+            route_groups.push((route_key, vec![line]));
+        }
+    }
+    let route_group_count = route_groups.len();
+    let mut picking_ids = order.picking_ids.clone();
 
-    let picking = ctx
-        .db
-        .stock_picking()
-        .iter()
-        .find(|p| {
-            p.organization_id == organization_id && p.sale_id == Some(order_id) && !p.is_return
-        })
-        .ok_or("Outgoing picking not found after create")?;
+    for (route_key, group_lines) in &route_groups {
+        let picking_name = if *route_key == 0 || route_group_count == 1 {
+            format!("OUT/{order_label}")
+        } else {
+            format!("OUT/{order_label}/R{route_key}")
+        };
+        let first_product = group_lines
+            .first()
+            .map(|l| l.product_id)
+            .unwrap_or(order_lines[0].product_id);
 
-    for (idx, line) in order_lines.iter().enumerate() {
-        let product = ctx
-            .db
-            .product()
-            .id()
-            .find(&line.product_id)
-            .ok_or("Product not found for sale order line")?;
-
-        create_stock_move(
+        create_stock_picking(
             ctx,
             organization_id,
-            CreateStockMoveParams {
+            CreateStockPickingParams {
                 company_id: Some(company_id),
-                name: format!("{} x {}", line.product_uom_qty, product.name),
-                product_id: line.product_id,
-                product_tmpl_id: line.product_id,
-                product_uom: line.product_uom,
-                product_uom_qty: line.product_uom_qty,
+                name: picking_name.clone(),
+                picking_type_id: 1,
                 location_id: src_location,
                 location_dest_id: dest_location,
-                date_expected: ctx.timestamp,
-                move_type: "outgoing".to_string(),
+                move_type: "direct".to_string(),
                 priority: "1".to_string(),
-                reference: Some(format!("SO/{order_label}")),
-                sequence: ((idx + 1) as i32) * 10,
+                partner_id: Some(order.partner_id),
+                contact_id: None,
+                scheduled_date: Some(ctx.timestamp),
                 origin: Some(format!("SO/{order_label}")),
                 note: order.note.clone(),
-                date: None,
-                date_deadline: None,
-                picking_id: Some(picking.id),
-                picking_type_id: Some(1),
-                partner_id: Some(order.partner_id),
-                product_variant_id: None,
+                user_id: None,
+                sale_id: Some(order_id),
+                purchase_id: None,
                 group_id: None,
-                rule_id: None,
-                procure_method: if skip_stock {
-                    "make_to_order".to_string()
-                } else {
-                    "make_to_stock".to_string()
-                },
-                price_unit: line.price_unit,
-                scrapped: false,
-                to_refund: false,
-                propagate_cancel: true,
-                delay_alert: false,
-                product_packaging_id: None,
-                product_packaging_qty: 0.0,
-                warehouse_id: Some(warehouse_id),
-                production_id: None,
-                raw_material_production_id: None,
-                unbuild_id: None,
-                consume_unbuild_id: None,
-                cost_share: 0.0,
-                is_subcontract: false,
-                purchase_line_id: None,
-                need_release: false,
-                release_ready: false,
-                propagation_cancel: true,
+                is_locked: false,
+                immediate_transfer: false,
+                is_printed: false,
+                is_return: false,
+                has_scrap_move: false,
                 has_tracking: false,
-                inventory_id: None,
-                sale_line_id: Some(line.id),
+                date: None,
+                date_done: None,
+                backorder_id: None,
+                backorder_ids: vec![],
+                show_operations: false,
+                show_lots_text: false,
+                show_reserved: !skip_stock,
+                show_check_availability: true,
+                show_validate: false,
+                show_mark_as_todo: true,
+                show_set_qty_button: false,
+                show_clear_qty_button: false,
+                show_lots_m2o: false,
+                product_id: Some(first_product),
                 lot_id: None,
                 package_id: None,
                 result_package_id: None,
                 owner_id: None,
-                package_level_id: None,
-                product_type: Some(product.type_.clone()),
-                metadata: None,
+                display_lot_id: None,
+                location_id_name: None,
+                location_dest_id_name: None,
+                picking_code: Some("outgoing".to_string()),
+                product_tracking: None,
+                product_barcode: None,
+                move_line_exist: false,
+                has_packages: false,
+                has_move_lines: false,
+                has_package: false,
+                has_lot: false,
+                has_owner: false,
+                has_entire_package_src: false,
+                has_entire_package_dest: false,
+                package_level_ids: vec![],
+                batch_id: None,
+                metadata: Some(format!(
+                    r#"{{"sale_order_id":{order_id},"route_id":{route_key},"source_id":{},"medium_id":{}}}"#,
+                    order
+                        .source_id
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "null".into()),
+                    order
+                        .medium_id
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "null".into()),
+                )),
             },
         )?;
+
+        let picking = ctx
+            .db
+            .stock_picking()
+            .iter()
+            .find(|p| {
+                p.organization_id == organization_id
+                    && p.sale_id == Some(order_id)
+                    && !p.is_return
+                    && p.name == picking_name
+            })
+            .ok_or("Outgoing picking not found after create")?;
+
+        for (idx, line) in group_lines.iter().enumerate() {
+            let product = ctx
+                .db
+                .product()
+                .id()
+                .find(&line.product_id)
+                .ok_or("Product not found for sale order line")?;
+
+            create_stock_move(
+                ctx,
+                organization_id,
+                CreateStockMoveParams {
+                    company_id: Some(company_id),
+                    name: format!("{} x {}", line.product_uom_qty, product.name),
+                    product_id: line.product_id,
+                    product_tmpl_id: line.product_id,
+                    product_uom: line.product_uom,
+                    product_uom_qty: line.product_uom_qty,
+                    location_id: src_location,
+                    location_dest_id: dest_location,
+                    date_expected: ctx.timestamp,
+                    move_type: "outgoing".to_string(),
+                    priority: "1".to_string(),
+                    reference: Some(format!("SO/{order_label}")),
+                    sequence: ((idx + 1) as i32) * 10,
+                    origin: Some(format!("SO/{order_label}")),
+                    note: order.note.clone(),
+                    date: None,
+                    date_deadline: None,
+                    picking_id: Some(picking.id),
+                    picking_type_id: Some(1),
+                    partner_id: Some(order.partner_id),
+                    product_variant_id: None,
+                    group_id: None,
+                    rule_id: None,
+                    procure_method: if skip_stock {
+                        "make_to_order".to_string()
+                    } else {
+                        "make_to_stock".to_string()
+                    },
+                    price_unit: line.price_unit,
+                    scrapped: false,
+                    to_refund: false,
+                    propagate_cancel: true,
+                    delay_alert: false,
+                    product_packaging_id: None,
+                    product_packaging_qty: 0.0,
+                    warehouse_id: Some(warehouse_id),
+                    production_id: None,
+                    raw_material_production_id: None,
+                    unbuild_id: None,
+                    consume_unbuild_id: None,
+                    cost_share: 0.0,
+                    is_subcontract: false,
+                    purchase_line_id: None,
+                    need_release: false,
+                    release_ready: false,
+                    propagation_cancel: true,
+                    has_tracking: false,
+                    inventory_id: None,
+                    sale_line_id: Some(line.id),
+                    lot_id: None,
+                    package_id: None,
+                    result_package_id: None,
+                    owner_id: None,
+                    package_level_id: None,
+                    product_type: Some(product.type_.clone()),
+                    metadata: None,
+                },
+            )?;
+        }
+
+        if !picking_ids.contains(&picking.id) {
+            picking_ids.push(picking.id);
+        }
     }
 
-    let mut picking_ids = order.picking_ids.clone();
-    if !picking_ids.contains(&picking.id) {
-        picking_ids.push(picking.id);
-    }
     ctx.db.sale_order().id().update(SaleOrder {
         picking_ids,
         write_uid: ctx.sender(),
@@ -1052,6 +1124,9 @@ pub fn send_sale_order_quotation(
 
     validate_order_org_scope(&order, organization_id)?;
     check_permission(ctx, organization_id, "sale_order", "write")?;
+    if order.is_locked {
+        return Err("Sale order is locked".to_string());
+    }
 
     if order.state != SaleState::Draft {
         return Err("Only draft quotations can be sent".to_string());
@@ -1122,6 +1197,9 @@ pub fn confirm_sales_order_impl(
 
     validate_order_org_scope(&order, organization_id)?;
     check_permission(ctx, organization_id, "sale_order", "confirm")?;
+    if order.is_locked {
+        return Err("Sale order is locked".to_string());
+    }
 
     if order.state != SaleState::Draft
         && order.state != SaleState::Sent
@@ -1220,18 +1298,20 @@ pub fn confirm_sales_order_impl(
     let partner_id = order.partner_id;
     let company_id = order.company_id;
     let is_dropship = order.is_dropship;
+    let invoice_on_delivery = order.invoice_policy == "delivery";
 
     ctx.db.sale_order().id().update(SaleOrder {
         state: SaleState::Sale,
         confirmation_date: Some(ctx.timestamp),
         invoice_status: InvoiceStatus::ToInvoice,
+        currency_rate: exchange_rate,
         metadata: fx_metadata.or(order.metadata.clone()),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..order
     });
 
-    // Invoice-on-order: confirmed lines become billable (delivery-based qty is set on picking validate).
+    // Invoice-on-order: confirmed lines become billable. Delivery-based policy waits for qty_delivered.
     for line in ctx
         .db
         .sale_order_line()
@@ -1241,7 +1321,11 @@ pub fn confirm_sales_order_impl(
         if line.display_type.is_some() {
             continue;
         }
-        let qty_to_invoice = (line.product_uom_qty - line.qty_invoiced).max(0.0);
+        let qty_to_invoice = if invoice_on_delivery {
+            0.0
+        } else {
+            (line.product_uom_qty - line.qty_invoiced).max(0.0)
+        };
         if qty_to_invoice <= 0.0 {
             continue;
         }
@@ -1475,6 +1559,9 @@ pub fn update_sale_order(
     if order.company_id != company_id {
         return Err("Record does not belong to this company".to_string());
     }
+    if order.is_locked {
+        return Err("Sale order is locked".to_string());
+    }
 
     match order.state {
         SaleState::Draft | SaleState::Sent => {}
@@ -1512,6 +1599,7 @@ pub fn update_sale_order(
     let mut customer_lead = order.customer_lead;
     let mut analytic_account_id = order.analytic_account_id;
     let mut user_id = order.user_id;
+    let mut is_dropship = order.is_dropship;
     let mut metadata = order.metadata.clone();
 
     if let Some(v) = &params.client_order_ref {
@@ -1595,6 +1683,9 @@ pub fn update_sale_order(
     if let Some(v) = params.user_id {
         user_id = v;
     }
+    if let Some(v) = params.is_dropship {
+        is_dropship = v;
+    }
     if let Some(ref v) = params.metadata {
         metadata = Some(v.clone());
     }
@@ -1658,6 +1749,9 @@ pub fn update_sale_order(
     if params.user_id.is_some() {
         changed_fields.push("user_id".into());
     }
+    if params.is_dropship.is_some() {
+        changed_fields.push("is_dropship".into());
+    }
     if params.metadata.is_some() {
         changed_fields.push("metadata".into());
     }
@@ -1670,6 +1764,7 @@ pub fn update_sale_order(
         "client_order_ref": order.client_order_ref,
         "pricelist_id": order.pricelist_id,
         "warehouse_id": order.warehouse_id,
+        "is_dropship": order.is_dropship,
     })
     .to_string();
 
@@ -1694,6 +1789,7 @@ pub fn update_sale_order(
         customer_lead,
         analytic_account_id,
         user_id,
+        is_dropship,
         metadata,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
@@ -1748,6 +1844,9 @@ pub fn create_sale_order_line(
 
     validate_order_org_scope(&order, organization_id)?;
     check_permission(ctx, organization_id, "sale_order", "write")?;
+    if order.is_locked {
+        return Err("Sale order is locked".to_string());
+    }
 
     match order.state {
         SaleState::Draft | SaleState::Sent => {}
@@ -1804,6 +1903,377 @@ pub fn create_sale_order_line(
                 "order_id".to_string(),
                 "product_id".to_string(),
                 "quantity".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[reducer]
+pub fn lock_sale_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "sale_order", "write")?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .ok_or("Sale order not found")?;
+    validate_order_org_scope(&order, organization_id)?;
+
+    if matches!(order.state, SaleState::Done | SaleState::Cancelled) {
+        return Err("Cannot lock a completed or cancelled sale order".to_string());
+    }
+    if order.is_locked {
+        return Ok(());
+    }
+
+    let company_id = order.company_id;
+    ctx.db.sale_order().id().update(SaleOrder {
+        is_locked: true,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "sale_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "is_locked": false }).to_string()),
+            new_values: Some(serde_json::json!({ "is_locked": true }).to_string()),
+            changed_fields: vec!["is_locked".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[reducer]
+pub fn unlock_sale_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "sale_order", "write")?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .ok_or("Sale order not found")?;
+    validate_order_org_scope(&order, organization_id)?;
+
+    if !order.is_locked {
+        return Ok(());
+    }
+
+    let company_id = order.company_id;
+    ctx.db.sale_order().id().update(SaleOrder {
+        is_locked: false,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "sale_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "is_locked": true }).to_string()),
+            new_values: Some(serde_json::json!({ "is_locked": false }).to_string()),
+            changed_fields: vec!["is_locked".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[reducer]
+pub fn update_sale_order_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    line_id: u64,
+    params: UpdateSaleOrderLineParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "sale_order", "write")?;
+
+    let line = ctx
+        .db
+        .sale_order_line()
+        .id()
+        .find(&line_id)
+        .ok_or("Sale order line not found")?;
+    if line.organization_id != organization_id {
+        return Err("Line does not belong to this organization".to_string());
+    }
+
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&line.order_id)
+        .ok_or("Sale order not found")?;
+    validate_order_org_scope(&order, organization_id)?;
+    if order.is_locked {
+        return Err("Sale order is locked".to_string());
+    }
+    match order.state {
+        SaleState::Draft | SaleState::Sent => {}
+        _ => return Err("Only draft or sent orders can have lines updated".to_string()),
+    }
+
+    let product_id = params.product_id.unwrap_or(line.product_id);
+    let quantity = params.quantity.unwrap_or(line.product_uom_qty);
+    let uom_id = params.uom_id.unwrap_or(line.product_uom);
+    let price_unit = params.price_unit.unwrap_or(line.price_unit);
+    let discount = params.discount.unwrap_or(line.discount);
+    let tax_ids = params.tax_ids.clone().unwrap_or_else(|| line.tax_id.clone());
+    if quantity <= 0.0 {
+        return Err("Quantity must be greater than zero".to_string());
+    }
+    if !(0.0..=100.0).contains(&discount) {
+        return Err("Discount must be between 0 and 100".to_string());
+    }
+
+    let price_reduce = price_unit * (1.0 - discount / 100.0);
+    let subtotal = quantity * price_reduce;
+    let tax = calculate_tax(ctx, &tax_ids, subtotal);
+
+    let old_snapshot = serde_json::json!({
+        "product_id": line.product_id,
+        "quantity": line.product_uom_qty,
+        "price_unit": line.price_unit,
+        "discount": line.discount,
+    })
+    .to_string();
+
+    let name = params.name.clone().unwrap_or_else(|| line.name.clone());
+    let sequence = params.sequence.unwrap_or(line.sequence);
+    let product_variant_id = params.product_variant_id.or(line.product_variant_id);
+    let packaging_id = params.packaging_id.or(line.product_packaging_id);
+    let route_id = params.route_id.or(line.route_id);
+    let analytic_tag_ids = params
+        .analytic_tag_ids
+        .clone()
+        .unwrap_or_else(|| line.analytic_tag_ids.clone());
+    let customer_lead = params.customer_lead.unwrap_or(line.customer_lead);
+    let display_type = params.display_type.clone().or_else(|| line.display_type.clone());
+    let metadata = params.metadata.clone().or_else(|| line.metadata.clone());
+    let order_id = line.order_id;
+    let company_id = line.company_id;
+
+    ctx.db.sale_order_line().id().update(SaleOrderLine {
+        product_id,
+        product_uom_qty: quantity,
+        product_uom: uom_id,
+        price_unit,
+        discount,
+        price_reduce,
+        price_reduce_taxexcl: price_reduce,
+        price_reduce_taxinc: price_reduce + if quantity > 0.0 { tax / quantity } else { 0.0 },
+        price_subtotal: subtotal,
+        price_tax: tax,
+        price_total: subtotal + tax,
+        tax_id: tax_ids,
+        name,
+        sequence,
+        product_variant_id,
+        product_packaging_id: packaging_id,
+        route_id,
+        analytic_tag_ids,
+        customer_lead,
+        display_type,
+        metadata,
+        qty_to_invoice: (quantity - line.qty_invoiced).max(0.0),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..line
+    });
+
+    compute_so_totals(ctx, organization_id, order_id)?;
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "sale_order_line",
+            record_id: line_id,
+            action: "UPDATE",
+            old_values: Some(old_snapshot),
+            new_values: Some(
+                serde_json::json!({
+                    "product_id": product_id,
+                    "quantity": quantity,
+                    "price_unit": price_unit,
+                    "discount": discount,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "product_id".to_string(),
+                "quantity".to_string(),
+                "price_unit".to_string(),
+                "discount".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[reducer]
+pub fn delete_sale_order_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    line_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "sale_order", "write")?;
+
+    let line = ctx
+        .db
+        .sale_order_line()
+        .id()
+        .find(&line_id)
+        .ok_or("Sale order line not found")?;
+    if line.organization_id != organization_id {
+        return Err("Line does not belong to this organization".to_string());
+    }
+
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&line.order_id)
+        .ok_or("Sale order not found")?;
+    validate_order_org_scope(&order, organization_id)?;
+    if order.is_locked {
+        return Err("Sale order is locked".to_string());
+    }
+    match order.state {
+        SaleState::Draft | SaleState::Sent => {}
+        _ => return Err("Only draft or sent orders can have lines deleted".to_string()),
+    }
+
+    let order_id = line.order_id;
+    let company_id = order.company_id;
+    let old_snapshot = serde_json::json!({
+        "order_id": line.order_id,
+        "product_id": line.product_id,
+        "quantity": line.product_uom_qty,
+    })
+    .to_string();
+
+    let mut order_line = order.order_line.clone();
+    order_line.retain(|id| *id != line_id);
+
+    ctx.db.sale_order_line().id().delete(&line_id);
+    ctx.db.sale_order().id().update(SaleOrder {
+        order_line,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    compute_so_totals(ctx, organization_id, order_id)?;
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "sale_order_line",
+            record_id: line_id,
+            action: "DELETE",
+            old_values: Some(old_snapshot),
+            new_values: None,
+            changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Partner / sales acceptance of a Sent quotation (moves to confirm-eligible Draft-like Sent stay;
+/// acceptance clears expiry block by recording signed metadata and keeping Sent for confirm).
+#[reducer]
+pub fn accept_sale_order_quotation(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+    params: AcceptSaleOrderQuotationParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "sale_order", "write")?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .ok_or("Sale order not found")?;
+    validate_order_org_scope(&order, organization_id)?;
+    if order.is_locked {
+        return Err("Sale order is locked".to_string());
+    }
+    if order.state != SaleState::Sent {
+        return Err("Only sent quotations can be accepted".to_string());
+    }
+    if let Some(validity) = order.validity_date {
+        if ctx.timestamp > validity {
+            return Err("Quotation has expired".to_string());
+        }
+    }
+
+    let signed_by = params.signed_by.trim().to_string();
+    if signed_by.is_empty() {
+        return Err("signed_by is required".to_string());
+    }
+
+    let company_id = order.company_id;
+    ctx.db.sale_order().id().update(SaleOrder {
+        signed_by: Some(signed_by.clone()),
+        signed_on: Some(ctx.timestamp),
+        signature: params.signature.clone(),
+        is_expired: false,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "sale_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "signed_by": null }).to_string()),
+            new_values: Some(serde_json::json!({ "signed_by": signed_by }).to_string()),
+            changed_fields: vec![
+                "signed_by".to_string(),
+                "signed_on".to_string(),
+                "signature".to_string(),
             ],
             metadata: None,
         },

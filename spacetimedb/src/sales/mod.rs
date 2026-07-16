@@ -19,6 +19,7 @@
 /// └── delivery_shipping.rs ← 5.4 Delivery & Shipping
 /// ```
 pub mod delivery_shipping;
+pub mod oms_advanced;
 pub mod oms_extensions;
 pub mod pos_config;
 pub mod pos_transactions;
@@ -29,6 +30,10 @@ pub mod sales_core;
 // Re-export commonly used types for convenience
 pub use delivery_shipping::{
     DeliveryCarrier, DeliveryPriceRule, ShippingMethod, StockPickingBatch,
+};
+pub use oms_advanced::{
+    SaleCommissionPlan, SaleCommissionPlanSplit, SaleContract, SaleCpqConstraint,
+    SalesIntegrationIntent,
 };
 pub use oms_extensions::{
     AccountFiscalPosition, AccountFiscalPositionTax, AccountIncoterm, SaleCommission, SalePromotion,

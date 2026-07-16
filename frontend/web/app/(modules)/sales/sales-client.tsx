@@ -98,6 +98,9 @@ import {
   useCreatePickingBatch,
   useConfirmSaleOrder,
   useSendSaleOrderQuotation,
+  useAcceptSaleOrderQuotation,
+  useApplySalePromotion,
+  useApplySaleOrderOptions,
   useCancelSaleOrder,
   useComputeSoTotals,
   useUpdatePricelist,
@@ -137,10 +140,20 @@ import {
   useCreateCreditNoteFromReturnOrder,
   useCreateExchangeOrderFromReturn,
   useSaleCommissions,
+  useSaleOrdersToApprove,
+  useSaleCommissionsPending,
   useSettleSaleCommissions,
   useCancelSaleCommission,
   useReverseSaleCommissionSettlement,
   useAccrueSaleCommission,
+  useCreateSaleCommissionPlan,
+  useCreateSaleCommissionPlanSplit,
+  useCreateSaleContract,
+  useCreateSaleCpqConstraint,
+  useCreateSalesIntegrationIntent,
+  useRecordSalesIntegrationResult,
+  useApplyOmnichannelAllocation,
+  useScheduleSalesSlaEscalation,
 } from '@lumiere/query-hooks/hooks/sales';
 import {
   useAccountMoves,
@@ -149,6 +162,7 @@ import {
   useAccountPaymentTerms,
   useComputeInvoiceTotals,
   usePartnerCreditControls,
+  usePartnerCreditHolds,
   type AccountMove,
 } from '@lumiere/query-hooks/hooks/accounting';
 import {
@@ -414,11 +428,14 @@ function SalesClientLoaded({
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
   const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId);
+  const { data: partnerCreditHolds = [] } = usePartnerCreditHolds(orgId);
   const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
   const { data: stockMoves = [] } = useStockMoves(orgId);
   const { data: returnOrders = [] } = useReturnOrders(orgId, initialReturnOrders);
   const { data: returnOrderLines = [] } = useReturnOrderLines(orgId, initialReturnOrderLines);
   const { data: saleCommissions = [] } = useSaleCommissions(orgId);
+  const { data: saleOrdersToApprove = [] } = useSaleOrdersToApprove(orgId);
+  const { data: saleCommissionsPending = [] } = useSaleCommissionsPending(orgId);
   const settleSaleCommissions = useSettleSaleCommissions(orgId, operatingCompanyId);
   const cancelSaleCommission = useCancelSaleCommission(orgId, operatingCompanyId);
   const reverseSaleCommissionSettlement = useReverseSaleCommissionSettlement(
@@ -426,6 +443,254 @@ function SalesClientLoaded({
     operatingCompanyId,
   );
   const accrueSaleCommission = useAccrueSaleCommission(orgId);
+  const createSaleCommissionPlan = useCreateSaleCommissionPlan(
+    orgId,
+    operatingCompanyId,
+  );
+  const createSaleCommissionPlanSplit = useCreateSaleCommissionPlanSplit(
+    orgId,
+    operatingCompanyId,
+  );
+  const createSaleContract = useCreateSaleContract(orgId, operatingCompanyId);
+  const createSaleCpqConstraint = useCreateSaleCpqConstraint(
+    orgId,
+    operatingCompanyId,
+  );
+  const createSalesIntegrationIntent = useCreateSalesIntegrationIntent(
+    orgId,
+    operatingCompanyId,
+  );
+  const recordSalesIntegrationResult = useRecordSalesIntegrationResult(
+    orgId,
+    operatingCompanyId,
+  );
+  const applyOmnichannelAllocation = useApplyOmnichannelAllocation(
+    orgId,
+    operatingCompanyId,
+  );
+  const scheduleSalesSlaEscalation = useScheduleSalesSlaEscalation(
+    orgId,
+    operatingCompanyId,
+  );
+
+  const promptCreateCommissionPlan = async () => {
+    const name =
+      window
+        .prompt(
+          t('sales.ops.prompt.commissionPlanName', {
+            defaultValue: 'Commission plan name',
+          }),
+        )
+        ?.trim() ?? '';
+    if (!name) return;
+    const rateRaw =
+      window.prompt(
+        t('sales.ops.prompt.commissionPlanRate', {
+          defaultValue: 'Default rate percent (e.g. 5)',
+        }),
+        '5',
+      ) ?? '';
+    const defaultRatePercent = Number(rateRaw);
+    if (!Number.isFinite(defaultRatePercent)) {
+      throw new Error('Invalid rate percent');
+    }
+    await createSaleCommissionPlan.mutateAsync({
+      companyId: operatingCompanyId,
+      name,
+      isActive: true,
+      defaultRatePercent,
+      metadata: null,
+    });
+  };
+
+  const promptCreateCommissionPlanSplit = async () => {
+    const planId =
+      window
+        .prompt(
+          t('sales.ops.prompt.planId', { defaultValue: 'Commission plan id' }),
+        )
+        ?.trim() ?? '';
+    const partnerId =
+      window
+        .prompt(
+          t('sales.ops.prompt.partnerId', { defaultValue: 'Partner id' }),
+        )
+        ?.trim() ?? '';
+    const shareRaw =
+      window.prompt(
+        t('sales.ops.prompt.sharePercent', {
+          defaultValue: 'Share percent (0–100)',
+        }),
+        '50',
+      ) ?? '';
+    if (!planId || !partnerId) return;
+    const sharePercent = Number(shareRaw);
+    if (!Number.isFinite(sharePercent)) {
+      throw new Error('Invalid share percent');
+    }
+    await createSaleCommissionPlanSplit.mutateAsync({
+      planId: BigInt(planId),
+      partnerId: BigInt(partnerId),
+      sharePercent,
+      metadata: null,
+    });
+  };
+
+  const promptCreateSaleContract = async () => {
+    const name =
+      window
+        .prompt(
+          t('sales.ops.prompt.contractName', {
+            defaultValue: 'Contract name',
+          }),
+        )
+        ?.trim() ?? '';
+    const partnerId =
+      window
+        .prompt(
+          t('sales.ops.prompt.partnerId', { defaultValue: 'Partner id' }),
+        )
+        ?.trim() ?? '';
+    if (!name || !partnerId) return;
+    await createSaleContract.mutateAsync({
+      companyId: operatingCompanyId,
+      name,
+      partnerId: BigInt(partnerId),
+      dateStart: null,
+      dateEnd: null,
+      pricelistId: null,
+      metadata: null,
+    });
+  };
+
+  const promptCreateCpqConstraint = async () => {
+    const name =
+      window
+        .prompt(
+          t('sales.ops.prompt.cpqName', {
+            defaultValue: 'CPQ constraint name',
+          }),
+        )
+        ?.trim() ?? '';
+    const ruleJson =
+      window
+        .prompt(
+          t('sales.ops.prompt.cpqRuleJson', {
+            defaultValue: 'Rule JSON (e.g. {})',
+          }),
+          '{}',
+        )
+        ?.trim() ?? '';
+    if (!name || !ruleJson) return;
+    await createSaleCpqConstraint.mutateAsync({
+      companyId: operatingCompanyId,
+      name,
+      ruleJson,
+      isActive: true,
+      metadata: null,
+    });
+  };
+
+  const promptCreateIntegrationIntent = async () => {
+    const provider =
+      window
+        .prompt(
+          t('sales.ops.prompt.intentProvider', {
+            defaultValue: 'Provider (e.g. fiscal, carrier)',
+          }),
+          'fiscal',
+        )
+        ?.trim() ?? '';
+    const intentType =
+      window
+        .prompt(
+          t('sales.ops.prompt.intentType', {
+            defaultValue: 'Intent type (e.g. submit, book)',
+          }),
+          'submit',
+        )
+        ?.trim() ?? '';
+    const orderRaw =
+      window
+        .prompt(
+          t('sales.ops.prompt.intentOrderId', {
+            defaultValue: 'Sale order id (optional)',
+          }),
+        )
+        ?.trim() ?? '';
+    const idempotencyKey =
+      window
+        .prompt(
+          t('sales.ops.prompt.idempotencyKey', {
+            defaultValue: 'Idempotency key',
+          }),
+          `intent-${Date.now()}`,
+        )
+        ?.trim() ?? '';
+    if (!provider || !intentType || !idempotencyKey) return;
+    await createSalesIntegrationIntent.mutateAsync({
+      companyId: operatingCompanyId,
+      provider,
+      intentType,
+      saleOrderId: orderRaw ? BigInt(orderRaw) : null,
+      idempotencyKey,
+      requestPayload: null,
+      metadata: null,
+    });
+  };
+
+  const promptRecordIntegrationResult = async () => {
+    const intentId =
+      window
+        .prompt(
+          t('sales.ops.prompt.intentId', {
+            defaultValue: 'Integration intent id',
+          }),
+        )
+        ?.trim() ?? '';
+    const status =
+      window
+        .prompt(
+          t('sales.ops.prompt.intentStatus', {
+            defaultValue: 'Status (e.g. succeeded, failed)',
+          }),
+          'succeeded',
+        )
+        ?.trim() ?? '';
+    if (!intentId || !status) return;
+    const externalReference =
+      window
+        .prompt(
+          t('sales.ops.prompt.externalRef', {
+            defaultValue: 'External reference (optional)',
+          }),
+        )
+        ?.trim() || null;
+    await recordSalesIntegrationResult.mutateAsync({
+      intentId,
+      params: {
+        status,
+        externalReference,
+        lastError: status === 'failed' ? 'recorded via Ops' : null,
+        metadata: null,
+      },
+    });
+  };
+
+  const promptScheduleSlaEscalation = async () => {
+    const delayRaw =
+      window.prompt(
+        t('sales.ops.prompt.slaDelaySecs', {
+          defaultValue: 'Delay seconds (min 60)',
+        }),
+        '300',
+      ) ?? '';
+    const delaySecs = Number(delayRaw);
+    if (!Number.isFinite(delaySecs) || delaySecs <= 0) {
+      throw new Error('Invalid delay');
+    }
+    await scheduleSalesSlaEscalation.mutateAsync({ delaySecs });
+  };
 
   const createSaleOrder = useCreateSaleOrder(orgId, operatingCompanyId);
   const createPricelist = useCreatePricelist(orgId);
@@ -433,6 +698,9 @@ function SalesClientLoaded({
   const createPickingBatch = useCreatePickingBatch(orgId, operatingCompanyId);
   const confirmSaleOrder = useConfirmSaleOrder(orgId);
   const sendSaleOrderQuotation = useSendSaleOrderQuotation(orgId);
+  const acceptSaleOrderQuotation = useAcceptSaleOrderQuotation(orgId);
+  const applySalePromotion = useApplySalePromotion(orgId);
+  const applySaleOrderOptions = useApplySaleOrderOptions(orgId);
   const cancelSaleOrder = useCancelSaleOrder(orgId);
   const computeSoTotals = useComputeSoTotals(orgId);
   const updatePricelist = useUpdatePricelist(orgId);
@@ -1133,8 +1401,14 @@ function SalesClientLoaded({
               for (const r of rows) {
                 const st = saleOrderState(r);
                 if (st === 'Draft' || st === 'Sent') {
-                  confirmSaleOrder.mutate(r.id as string | number | bigint);
-                  phCapture('sale_order_confirmed', { organization_id: organizationId });
+                  void confirmSaleOrder
+                    .mutateAsync(r.id as string | number | bigint)
+                    .then(() => {
+                      phCapture('sale_order_confirmed', { organization_id: organizationId });
+                    })
+                    .catch((e: unknown) => {
+                      window.alert(e instanceof Error ? e.message : String(e));
+                    });
                 }
               }
             },
@@ -1146,9 +1420,111 @@ function SalesClientLoaded({
             onClick: (rows) => {
               for (const r of rows) {
                 if (saleOrderState(r) === 'Draft') {
-                  void sendSaleOrderQuotation.mutateAsync(r.id as string | number | bigint);
+                  void sendSaleOrderQuotation
+                    .mutateAsync(r.id as string | number | bigint)
+                    .catch((e: unknown) => {
+                      window.alert(e instanceof Error ? e.message : String(e));
+                    });
                 }
               }
+            },
+          },
+          {
+            id: 'accept-quotation',
+            label: t('sales.actions.acceptQuotation', { defaultValue: 'Accept quotation' }),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                if (saleOrderState(r) !== 'Sent') continue;
+                const signedBy =
+                  window.prompt(
+                    t('sales.actions.acceptQuotationPrompt', {
+                      defaultValue: 'Accepted by (name)',
+                    }),
+                  )?.trim() ?? '';
+                if (!signedBy) continue;
+                void acceptSaleOrderQuotation
+                  .mutateAsync({
+                    orderId: r.id as string | number | bigint,
+                    signedBy,
+                  })
+                  .catch((e: unknown) => {
+                    window.alert(e instanceof Error ? e.message : String(e));
+                  });
+              }
+            },
+          },
+          {
+            id: 'apply-promotion',
+            label: t('sales.actions.applyPromotion', { defaultValue: 'Apply promotion' }),
+            requiresSelection: true,
+            onClick: (rows) => {
+              if (rows.length !== 1) return;
+              const r = rows[0];
+              const st = saleOrderState(r);
+              if (st !== 'Draft' && st !== 'Sent') return;
+              const code =
+                window.prompt(
+                  t('sales.actions.applyPromotionPrompt', {
+                    defaultValue: 'Promotion code',
+                  }),
+                )?.trim() ?? '';
+              if (!code) return;
+              void applySalePromotion
+                .mutateAsync({
+                  orderId: r.id as string | number | bigint,
+                  promotionCode: code,
+                })
+                .catch((e: unknown) => {
+                  window.alert(e instanceof Error ? e.message : String(e));
+                });
+            },
+          },
+          {
+            id: 'apply-options',
+            label: t('sales.actions.applyOptions', { defaultValue: 'Apply CPQ options' }),
+            requiresSelection: true,
+            onClick: (rows) => {
+              for (const r of rows) {
+                const st = saleOrderState(r);
+                if (st !== 'Draft' && st !== 'Sent') continue;
+                void applySaleOrderOptions
+                  .mutateAsync(r.id as string | number | bigint)
+                  .catch((e: unknown) => {
+                    window.alert(e instanceof Error ? e.message : String(e));
+                  });
+              }
+            },
+          },
+          {
+            id: 'export-commercial-packet',
+            label: t('sales.actions.exportCommercialPacket', {
+              defaultValue: 'Export commercial packet',
+            }),
+            requiresSelection: true,
+            onClick: (rows) => {
+              if (rows.length !== 1) return;
+              const order = rows[0] as Record<string, unknown>;
+              const orderId = String(order.id ?? '');
+              const lines = (orderLines as Record<string, unknown>[]).filter(
+                (l) => String(l.orderId ?? l.order_id ?? '') === orderId,
+              );
+              const packet = {
+                documentType: 'commercial_invoice_packet',
+                generatedAt: new Date().toISOString(),
+                order,
+                lines,
+                note: 'Fiscal submit remains a worker/procedure; this packet is export data only.',
+              };
+              const blob = new Blob([JSON.stringify(packet, null, 2)], {
+                type: 'application/json',
+              });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `commercial-packet-SO-${orderId}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
             },
           },
           {
@@ -1173,10 +1549,16 @@ function SalesClientLoaded({
               for (const r of rows) {
                 const st = saleOrderState(r);
                 if (st !== 'Done' && st !== 'Cancelled' && st !== 'Cancel') {
-                  cancelSaleOrder.mutate({
-                    orderId: r.id as string | number | bigint,
-                  });
-                  phCapture('sale_order_cancelled', { organization_id: organizationId });
+                  void cancelSaleOrder
+                    .mutateAsync({
+                      orderId: r.id as string | number | bigint,
+                    })
+                    .then(() => {
+                      phCapture('sale_order_cancelled', { organization_id: organizationId });
+                    })
+                    .catch((e: unknown) => {
+                      window.alert(e instanceof Error ? e.message : String(e));
+                    });
                 }
               }
             },
@@ -1212,6 +1594,45 @@ function SalesClientLoaded({
                   ratePercent: rate,
                 });
               }
+            },
+          },
+          {
+            id: 'apply-omnichannel',
+            label: t('sales.actions.applyOmnichannel', {
+              defaultValue: 'Apply omnichannel allocation',
+            }),
+            requiresSelection: true,
+            onClick: (rows) => {
+              if (rows.length !== 1) return;
+              const r = rows[0] as Record<string, unknown>;
+              const channel =
+                window
+                  .prompt(
+                    t('sales.actions.omnichannelChannelPrompt', {
+                      defaultValue: 'Channel (optional, e.g. web, store)',
+                    }),
+                  )
+                  ?.trim() || null;
+              const routeRaw =
+                window
+                  .prompt(
+                    t('sales.actions.omnichannelRoutePrompt', {
+                      defaultValue: 'Preferred route id (optional)',
+                    }),
+                  )
+                  ?.trim() ?? '';
+              void applyOmnichannelAllocation
+                .mutateAsync({
+                  orderId: r.id as string | number | bigint,
+                  params: {
+                    preferredRouteId: routeRaw ? BigInt(routeRaw) : null,
+                    channel,
+                    metadata: null,
+                  },
+                })
+                .catch((e: unknown) => {
+                  window.alert(e instanceof Error ? e.message : String(e));
+                });
             },
           },
           {
@@ -1270,13 +1691,19 @@ function SalesClientLoaded({
     openCreateSaleOrder,
     confirmSaleOrder,
     sendSaleOrderQuotation,
+    acceptSaleOrderQuotation,
+    applySalePromotion,
+    applySaleOrderOptions,
     cancelSaleOrder,
     computeSoTotals,
     accrueSaleCommission,
+    applyOmnichannelAllocation,
     lockSaleOrder,
     unlockSaleOrder,
+    orderLines,
     setCsvKind,
     organizationId,
+    t,
   ]);
 
   const pricelistsEntityConfig = useMemo((): EntityViewConfig => {
@@ -1463,18 +1890,11 @@ function SalesClientLoaded({
       widgets: section.widgets.map((w) => {
         if (w.type === 'stat-cards') {
           if (w.id === 'sales-exception-queue-cards') {
-            const awaitingApproval = orders.filter(
-              (o) => saleOrderState(o as Record<string, unknown>) === 'ToApprove',
-            ).length;
+            const awaitingApproval = saleOrdersToApprove.length;
             const sentQuotes = orders.filter(
               (o) => saleOrderState(o as Record<string, unknown>) === 'Sent',
             ).length;
-            const creditHolds = partnerCreditControls.filter((c) =>
-              Boolean(
-                (c as Record<string, unknown>).paymentHold ??
-                  (c as Record<string, unknown>).payment_hold,
-              ),
-            ).length;
+            const creditHolds = partnerCreditHolds.length;
             const returnsToReceive = returnOrders.filter((r) => {
               const st = String(
                 (r as Record<string, unknown>).state ?? '',
@@ -1581,14 +2001,7 @@ function SalesClientLoaded({
                     label: t('sales.dashboard.queues.commissionsAccrued', {
                       defaultValue: 'Commissions accrued',
                     }),
-                    value: String(
-                      saleCommissions.filter(
-                        (c) =>
-                          String(
-                            (c as Record<string, unknown>).state ?? '',
-                          ).toLowerCase() === 'accrued',
-                      ).length,
-                    ),
+                    value: String(saleCommissionsPending.length),
                     icon: 'FileText',
                     testId: 'sales-queue-commissions',
                     onClick: () =>
@@ -1668,6 +2081,21 @@ function SalesClientLoaded({
                 action: 'createPickingBatch',
               }),
             view_pipeline: () => router.push('/crm'),
+            create_commission_plan: () => {
+              void promptCreateCommissionPlan().catch((e: unknown) => {
+                window.alert(e instanceof Error ? e.message : String(e));
+              });
+            },
+            create_sale_contract: () => {
+              void promptCreateSaleContract().catch((e: unknown) => {
+                window.alert(e instanceof Error ? e.message : String(e));
+              });
+            },
+            create_integration_intent: () => {
+              void promptCreateIntegrationIntent().catch((e: unknown) => {
+                window.alert(e instanceof Error ? e.message : String(e));
+              });
+            },
           };
           return {
             ...w,
@@ -1782,9 +2210,12 @@ function SalesClientLoaded({
     navigateToOrdersByState,
     navigateToSalesTab,
     partnerCreditControls,
+    partnerCreditHolds,
     returnOrders,
     stockPickings,
     saleCommissions,
+    saleOrdersToApprove,
+    saleCommissionsPending,
     dashboardTimeRange,
   ]);
 
@@ -1823,6 +2254,25 @@ function SalesClientLoaded({
                       id: 'csv-sale-order-lines',
                       label: t('sales.csvImport.toolbarOrderLines'),
                       onClick: () => setCsvKind('orderLine'),
+                    },
+                    {
+                      id: 'delete-sale-order-lines',
+                      label: t('sales.actions.deleteOrderLines', {
+                        defaultValue: 'Delete lines',
+                      }),
+                      requiresSelection: true,
+                      variant: 'destructive' as const,
+                      onClick: (rows) => {
+                        for (const r of rows) {
+                          void deleteSaleOrderLine
+                            .mutateAsync(r.id as string | number | bigint)
+                            .catch((e: unknown) => {
+                              window.alert(
+                                e instanceof Error ? e.message : String(e),
+                              );
+                            });
+                        }
+                      },
                     },
                     ...(view.actions ?? []),
                   ],
@@ -1926,6 +2376,18 @@ function SalesClientLoaded({
                   commissions={
                     saleCommissions as unknown as Record<string, unknown>[]
                   }
+                  ordersToApprove={
+                    saleOrdersToApprove as unknown as Record<string, unknown>[]
+                  }
+                  creditHolds={
+                    partnerCreditHolds as unknown as Record<string, unknown>[]
+                  }
+                  commissionsPending={
+                    saleCommissionsPending as unknown as Record<
+                      string,
+                      unknown
+                    >[]
+                  }
                   accountMoves={
                     accountMoves as unknown as Record<string, unknown>[]
                   }
@@ -1964,6 +2426,22 @@ function SalesClientLoaded({
                       await accrueSaleCommission.mutateAsync(item);
                     }
                   }}
+                  onCreateCommissionPlan={promptCreateCommissionPlan}
+                  onCreateCommissionPlanSplit={promptCreateCommissionPlanSplit}
+                  onCreateSaleContract={promptCreateSaleContract}
+                  onCreateCpqConstraint={promptCreateCpqConstraint}
+                  onCreateIntegrationIntent={promptCreateIntegrationIntent}
+                  onRecordIntegrationResult={promptRecordIntegrationResult}
+                  onScheduleSlaEscalation={promptScheduleSlaEscalation}
+                  advancedPending={
+                    createSaleCommissionPlan.isPending ||
+                    createSaleCommissionPlanSplit.isPending ||
+                    createSaleContract.isPending ||
+                    createSaleCpqConstraint.isPending ||
+                    createSalesIntegrationIntent.isPending ||
+                    recordSalesIntegrationResult.isPending ||
+                    scheduleSalesSlaEscalation.isPending
+                  }
                   onOpenOrdersTab={() => navigateToSalesTab('orders')}
                   onOpenFulfillment={() => navigateToSalesTab('fulfillment')}
                   onOpenReturns={() => navigateToSalesTab('returns')}
@@ -2021,8 +2499,11 @@ function SalesClientLoaded({
       orders,
       orderLines,
       partnerCreditControls,
+      partnerCreditHolds,
       stockPickings,
       saleCommissions,
+      saleOrdersToApprove,
+      saleCommissionsPending,
       accountMoves,
       accountJournals,
       accountAccounts,
@@ -2030,6 +2511,13 @@ function SalesClientLoaded({
       cancelSaleCommission,
       reverseSaleCommissionSettlement,
       accrueSaleCommission,
+      createSaleCommissionPlan,
+      createSaleCommissionPlanSplit,
+      createSaleContract,
+      createSaleCpqConstraint,
+      createSalesIntegrationIntent,
+      recordSalesIntegrationResult,
+      scheduleSalesSlaEscalation,
       // New mutations
       updateSaleOrder,
       lockSaleOrder,

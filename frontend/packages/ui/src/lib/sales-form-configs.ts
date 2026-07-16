@@ -94,6 +94,28 @@ export const newSaleOrderForm = (t: TFunction): FormConfig => ({
           ),
           width: "1/2",
         },
+        {
+          id: "isDropship",
+          name: "isDropship",
+          type: "checkbox",
+          label: t("sales.forms.newSaleOrder.fields.isDropship", {
+            defaultValue: "Dropship (vendor ships to customer)",
+          }),
+          width: "1/2",
+        },
+        {
+          id: "invoicePolicy",
+          name: "invoicePolicy",
+          type: "select",
+          label: t("sales.forms.newSaleOrder.fields.invoicePolicy", {
+            defaultValue: "Invoice policy",
+          }),
+          width: "1/2",
+          options: [
+            { value: "order", label: "On order" },
+            { value: "delivery", label: "On delivery" },
+          ],
+        },
       ],
     },
     {

@@ -907,6 +907,7 @@ pub fn convert_opportunity_to_sale_order(
         is_printed: None,
         is_locked: None,
         is_dropship: None,
+        invoice_policy: None,
         message_follower_ids: None,
         message_partner_ids: None,
         message_channel_ids: None,

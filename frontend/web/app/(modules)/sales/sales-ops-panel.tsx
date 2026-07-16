@@ -1,7 +1,14 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useErpSession } from '@lumiere/erp-session'
 import { useTranslation } from '@lumiere/i18n'
+import {
+  useApprovalInbox,
+  useApproveApprovalRequest,
+  useRejectApprovalRequest,
+} from '@lumiere/query-hooks/hooks/approvals'
+import { useOperatingCompanyId } from '@lumiere/query-hooks/hooks/use-operating-company'
 import { Button, FormModal } from '@lumiere/ui'
 import type { FormConfig } from '@lumiere/ui'
 
@@ -41,6 +48,30 @@ function saleOrderState(row: Record<string, unknown>): string {
     return String((raw as { tag: string }).tag)
   }
   return String(raw ?? '')
+}
+
+/** Normalize identity hex for SoD requester vs current user comparison. */
+function normalizeIdentityHex(v: unknown): string {
+  if (v == null || v === '') return ''
+  if (typeof v === 'string') {
+    return v.trim().replace(/^0x/i, '').toLowerCase()
+  }
+  if (typeof v === 'object' && v !== null && '__identity__' in (v as object)) {
+    return String((v as { __identity__: string }).__identity__)
+      .trim()
+      .replace(/^0x/i, '')
+      .toLowerCase()
+  }
+  if (typeof v === 'object' && v !== null && 'toHex' in v) {
+    const th = (v as { toHex: () => { toString: () => string } }).toHex
+    if (typeof th === 'function') {
+      return th.call(v).toString().replace(/^0x/i, '').toLowerCase()
+    }
+  }
+  return String(v)
+    .trim()
+    .replace(/^0x/i, '')
+    .toLowerCase()
 }
 
 export function parseCommissionRatePercent(
@@ -89,6 +120,12 @@ export interface SalesOpsPanelProps {
   stockPickings: Record<string, unknown>[]
   returnOrders: Record<string, unknown>[]
   commissions: Record<string, unknown>[]
+  /** Server-bounded `sale-orders-to-approve` when subscribed; falls back to client filter. */
+  ordersToApprove?: Record<string, unknown>[]
+  /** Server-bounded `partner-credit-holds` when subscribed; falls back to client filter. */
+  creditHolds?: Record<string, unknown>[]
+  /** Server-bounded `sale-commissions-pending` (accrued) when subscribed; falls back to client filter. */
+  commissionsPending?: Record<string, unknown>[]
   accountMoves: Record<string, unknown>[]
   accountJournals: Record<string, unknown>[]
   accountAccounts: Record<string, unknown>[]
@@ -107,6 +144,15 @@ export interface SalesOpsPanelProps {
   onAccrueCommissions: (
     items: Array<{ orderId: string; ratePercent: number }>,
   ) => Promise<void>
+  /** Wave D OMS advanced — prompt-driven creates (no QueryResourceKey lists yet). */
+  onCreateCommissionPlan?: () => Promise<void>
+  onCreateCommissionPlanSplit?: () => Promise<void>
+  onCreateSaleContract?: () => Promise<void>
+  onCreateCpqConstraint?: () => Promise<void>
+  onCreateIntegrationIntent?: () => Promise<void>
+  onRecordIntegrationResult?: () => Promise<void>
+  onScheduleSlaEscalation?: () => Promise<void>
+  advancedPending?: boolean
   onOpenOrdersTab?: (state?: string) => void
   onOpenFulfillment?: () => void
   onOpenReturns?: () => void
@@ -121,6 +167,9 @@ export function SalesOpsPanel({
   stockPickings,
   returnOrders,
   commissions,
+  ordersToApprove,
+  creditHolds,
+  commissionsPending,
   accountMoves,
   accountJournals,
   accountAccounts,
@@ -132,11 +181,33 @@ export function SalesOpsPanel({
   onCancelCommissions,
   onReverseCommissions,
   onAccrueCommissions,
+  onCreateCommissionPlan,
+  onCreateCommissionPlanSplit,
+  onCreateSaleContract,
+  onCreateCpqConstraint,
+  onCreateIntegrationIntent,
+  onRecordIntegrationResult,
+  onScheduleSlaEscalation,
+  advancedPending,
   onOpenOrdersTab,
   onOpenFulfillment,
   onOpenReturns,
 }: SalesOpsPanelProps) {
   const { t } = useTranslation()
+  const { organizationId, identity } = useErpSession()
+  const orgId =
+    organizationId != null && organizationId > 0 ? organizationId : 0
+  const operatingCompanyId = useOperatingCompanyId(orgId)
+  const inboxEnabled = activeQueue === 'to_approve' && orgId > 0
+  const inboxQuery = useApprovalInbox(orgId, inboxEnabled)
+  const approveRequest = useApproveApprovalRequest(
+    orgId,
+    operatingCompanyId ?? 0,
+  )
+  const rejectRequest = useRejectApprovalRequest(
+    orgId,
+    operatingCompanyId ?? 0,
+  )
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [selectedCommissionIds, setSelectedCommissionIds] = useState<string[]>([])
   const [selectedAccrueOrderIds, setSelectedAccrueOrderIds] = useState<string[]>(
@@ -144,6 +215,16 @@ export function SalesOpsPanel({
   )
   const [settleOpen, setSettleOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+
+  const runAdvanced = async (fn?: () => Promise<void>) => {
+    if (!fn) return
+    try {
+      setActionError(null)
+      await fn()
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   const orderIdsWithActiveCommission = useMemo(() => {
     const ids = new Set<string>()
@@ -158,12 +239,18 @@ export function SalesOpsPanel({
   const queueRows = useMemo(() => {
     switch (activeQueue) {
       case 'to_approve':
-        return orders.filter((o) => saleOrderState(o) === 'ToApprove')
+        return (
+          ordersToApprove ??
+          orders.filter((o) => saleOrderState(o) === 'ToApprove')
+        )
       case 'sent_quotes':
         return orders.filter((o) => saleOrderState(o) === 'Sent')
       case 'credit_holds':
-        return partnerCreditControls.filter((c) =>
-          Boolean(c.paymentHold ?? c.payment_hold),
+        return (
+          creditHolds ??
+          partnerCreditControls.filter((c) =>
+            Boolean(c.paymentHold ?? c.payment_hold),
+          )
         )
       case 'open_deliveries':
         return stockPickings.filter((p) => {
@@ -185,8 +272,11 @@ export function SalesOpsPanel({
           return !orderIdsWithActiveCommission.has(rowId(o))
         })
       case 'commissions_accrued':
-        return commissions.filter(
-          (c) => String(c.state ?? '').toLowerCase() === 'accrued',
+        return (
+          commissionsPending ??
+          commissions.filter(
+            (c) => String(c.state ?? '').toLowerCase() === 'accrued',
+          )
         )
       case 'commissions_settled':
         return commissions.filter(
@@ -198,10 +288,13 @@ export function SalesOpsPanel({
   }, [
     activeQueue,
     orders,
+    ordersToApprove,
     partnerCreditControls,
+    creditHolds,
     stockPickings,
     returnOrders,
     commissions,
+    commissionsPending,
     orderIdsWithActiveCommission,
   ])
 
@@ -209,6 +302,31 @@ export function SalesOpsPanel({
     () => orders.find((o) => rowId(o) === selectedOrderId) ?? null,
     [orders, selectedOrderId],
   )
+
+  const pendingApprovalForSelected = useMemo(() => {
+    if (!selectedOrderId) return null
+    const soId = Number(selectedOrderId)
+    if (!Number.isFinite(soId) || soId <= 0) return null
+    return (
+      (inboxQuery.data ?? []).find((row) => {
+        const status = row.status ?? 'pending'
+        if (status !== 'pending') return false
+        if ((row.model ?? '') !== 'sale_order') return false
+        const resId = Number(row.resId ?? row.res_id ?? 0)
+        return resId === soId
+      }) ?? null
+    )
+  }, [inboxQuery.data, selectedOrderId])
+
+  const isApprovalRequester = useMemo(() => {
+    if (!pendingApprovalForSelected || !identity) return false
+    const requester = normalizeIdentityHex(
+      pendingApprovalForSelected.requestedBy ??
+        pendingApprovalForSelected.requested_by,
+    )
+    const me = normalizeIdentityHex(identity)
+    return requester !== '' && me !== '' && requester === me
+  }, [pendingApprovalForSelected, identity])
 
   const drillLines = useMemo(() => {
     if (!selectedOrderId) return []
@@ -328,6 +446,102 @@ export function SalesOpsPanel({
         ))}
       </div>
 
+      <div
+        className="space-y-2 rounded-md border p-3"
+        data-testid="sales-ops-advanced-oms"
+      >
+        <h3 className="text-sm font-medium">
+          {t('sales.ops.advancedTitle', {
+            defaultValue: 'Advanced OMS',
+          })}
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          {t('sales.ops.advancedHelp', {
+            defaultValue:
+              'Create commission plans, contracts, and fiscal/carrier intents (no list subscriptions yet).',
+          })}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onCreateCommissionPlan}
+            data-testid="sales-ops-create-commission-plan"
+            onClick={() => void runAdvanced(onCreateCommissionPlan)}
+          >
+            {t('sales.ops.createCommissionPlan', {
+              defaultValue: 'Create commission plan',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onCreateCommissionPlanSplit}
+            data-testid="sales-ops-create-commission-split"
+            onClick={() => void runAdvanced(onCreateCommissionPlanSplit)}
+          >
+            {t('sales.ops.createCommissionSplit', {
+              defaultValue: 'Add plan split',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onCreateSaleContract}
+            data-testid="sales-ops-create-contract"
+            onClick={() => void runAdvanced(onCreateSaleContract)}
+          >
+            {t('sales.ops.createContract', {
+              defaultValue: 'Create contract',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onCreateCpqConstraint}
+            data-testid="sales-ops-create-cpq-constraint"
+            onClick={() => void runAdvanced(onCreateCpqConstraint)}
+          >
+            {t('sales.ops.createCpqConstraint', {
+              defaultValue: 'Create CPQ constraint',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onCreateIntegrationIntent}
+            data-testid="sales-ops-create-integration-intent"
+            onClick={() => void runAdvanced(onCreateIntegrationIntent)}
+          >
+            {t('sales.ops.createIntegrationIntent', {
+              defaultValue: 'Create fiscal/carrier intent',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onRecordIntegrationResult}
+            data-testid="sales-ops-record-integration-result"
+            onClick={() => void runAdvanced(onRecordIntegrationResult)}
+          >
+            {t('sales.ops.recordIntegrationResult', {
+              defaultValue: 'Record integration result',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onScheduleSlaEscalation}
+            data-testid="sales-ops-schedule-sla"
+            onClick={() => void runAdvanced(onScheduleSlaEscalation)}
+          >
+            {t('sales.ops.scheduleSla', {
+              defaultValue: 'Schedule SLA escalation',
+            })}
+          </Button>
+        </div>
+      </div>
+
       {actionError && (
         <p className="text-sm text-destructive" data-testid="sales-ops-action-error">
           {actionError}
@@ -423,6 +637,151 @@ export function SalesOpsPanel({
               )
             })}
           </ul>
+          {activeQueue === 'to_approve' && selectedOrderId && (
+            <div className="flex flex-wrap gap-2 border-t px-3 py-2">
+              <Button
+                size="sm"
+                data-testid="sales-ops-approve-request"
+                disabled={
+                  !pendingApprovalForSelected ||
+                  isApprovalRequester ||
+                  approveRequest.isPending ||
+                  rejectRequest.isPending ||
+                  operatingCompanyId == null
+                }
+                title={
+                  isApprovalRequester
+                    ? t('sales.ops.cannotSelfApprove', {
+                        defaultValue:
+                          'Requester cannot approve their own request (SoD)',
+                      })
+                    : undefined
+                }
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      setActionError(null)
+                      if (!pendingApprovalForSelected) {
+                        setActionError(
+                          t('sales.ops.noPendingApproval', {
+                            defaultValue:
+                              'No pending approval request for this order.',
+                          }),
+                        )
+                        return
+                      }
+                      if (operatingCompanyId == null) {
+                        setActionError(
+                          t('sales.ops.missingCompany', {
+                            defaultValue:
+                              'Select an operating company first.',
+                          }),
+                        )
+                        return
+                      }
+                      await approveRequest.mutateAsync(
+                        Number(pendingApprovalForSelected.id),
+                      )
+                    } catch (e) {
+                      const msg =
+                        e instanceof Error ? e.message : String(e)
+                      setActionError(msg)
+                      if (typeof window !== 'undefined') {
+                        window.alert(msg)
+                      }
+                    }
+                  })()
+                }}
+              >
+                {t('sales.ops.approve', { defaultValue: 'Approve' })}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="sales-ops-reject-request"
+                disabled={
+                  !pendingApprovalForSelected ||
+                  approveRequest.isPending ||
+                  rejectRequest.isPending ||
+                  operatingCompanyId == null
+                }
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      setActionError(null)
+                      if (!pendingApprovalForSelected) {
+                        setActionError(
+                          t('sales.ops.noPendingApproval', {
+                            defaultValue:
+                              'No pending approval request for this order.',
+                          }),
+                        )
+                        return
+                      }
+                      if (operatingCompanyId == null) {
+                        setActionError(
+                          t('sales.ops.missingCompany', {
+                            defaultValue:
+                              'Select an operating company first.',
+                          }),
+                        )
+                        return
+                      }
+                      const reason =
+                        typeof window !== 'undefined'
+                          ? (window
+                              .prompt(
+                                t('sales.ops.rejectReasonPrompt', {
+                                  defaultValue: 'Reason for rejection',
+                                }),
+                              )
+                              ?.trim() ?? '')
+                          : ''
+                      if (!reason) return
+                      await rejectRequest.mutateAsync({
+                        requestId: Number(pendingApprovalForSelected.id),
+                        reason,
+                      })
+                    } catch (e) {
+                      const msg =
+                        e instanceof Error ? e.message : String(e)
+                      setActionError(msg)
+                      if (typeof window !== 'undefined') {
+                        window.alert(msg)
+                      }
+                    }
+                  })()
+                }}
+              >
+                {t('sales.ops.reject', { defaultValue: 'Reject' })}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                data-testid="sales-ops-open-approvals"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.location.href = `/workflow?tab=approvals&model=sale_order&resId=${encodeURIComponent(selectedOrderId)}`
+                  }
+                }}
+              >
+                {t('sales.ops.approveInWorkflow', {
+                  defaultValue: 'Open in Workflow',
+                })}
+              </Button>
+              {isApprovalRequester && (
+                <p
+                  className="w-full text-xs text-muted-foreground"
+                  data-testid="sales-ops-sod-hint"
+                >
+                  {t('sales.ops.cannotSelfApprove', {
+                    defaultValue:
+                      'Requester cannot approve their own request (SoD)',
+                  })}
+                </p>
+              )}
+            </div>
+          )}
           {activeQueue === 'commissions_to_accrue' && (
             <div className="flex flex-wrap gap-2">
               <Button

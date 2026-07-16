@@ -106,6 +106,7 @@ fn create_draft_so_with_commission_meta(
             is_printed: None,
             is_locked: None,
             is_dropship: None,
+            invoice_policy: None,
             message_follower_ids: None,
             message_partner_ids: None,
             message_channel_ids: None,

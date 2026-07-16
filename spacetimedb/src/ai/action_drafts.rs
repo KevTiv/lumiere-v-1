@@ -714,6 +714,7 @@ fn build_create_sale_order_params(
         is_printed: json_bool(obj, "is_printed"),
         is_locked: json_bool(obj, "is_locked"),
         is_dropship: json_bool(obj, "is_dropship"),
+        invoice_policy: json_string(obj, "invoice_policy"),
         message_follower_ids: None,
         message_partner_ids: None,
         message_channel_ids: None,

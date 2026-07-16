@@ -348,8 +348,9 @@ pub fn open_pos_session(
 
     let sequence_number = config.sequence_number + 1;
     let name = format!("POS/{}-{}", config.id, sequence_number);
+    let company_id = config.company_id;
 
-    ctx.db.pos_session().insert(PosSession {
+    let session = ctx.db.pos_session().insert(PosSession {
         id: 0,
         name,
         user_id: ctx.sender(),
@@ -397,9 +398,32 @@ pub fn open_pos_session(
         ..config
     });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "pos_session",
+            record_id: session.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": session.name,
+                    "config_id": config_id,
+                    "cash_register_balance_start": cash_register_balance_start,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["state".to_string(), "cash_register_balance_start".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
+/// Derived-field recompute only — no `write_audit_log_v2` (intentional gap).
 #[reducer]
 pub fn compute_pos_session_totals(
     ctx: &ReducerContext,
@@ -472,6 +496,8 @@ pub fn close_pos_session(
         .find(&session_id)
         .ok_or("Session not found after totals recompute")?;
 
+    let company_id = config.company_id;
+    let old_state = format!("{:?}", refreshed_session.state);
     ctx.db.pos_session().id().update(PosSession {
         state: SessionState::Closed,
         stop_at: Some(ctx.timestamp),
@@ -488,6 +514,30 @@ pub fn close_pos_session(
         write_date: ctx.timestamp,
         ..config
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "pos_session",
+            record_id: session_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "state": "Closed",
+                    "cash_register_balance_end_real": cash_register_balance_end_real,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "state".to_string(),
+                "cash_register_balance_end_real".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -851,7 +901,7 @@ pub fn create_loyalty_card(
         ctx.timestamp + std::time::Duration::from_secs(seconds)
     });
 
-    ctx.db.pos_loyalty_card().insert(PosLoyaltyCard {
+    let card = ctx.db.pos_loyalty_card().insert(PosLoyaltyCard {
         id: 0,
         organization_id,
         partner_id,
@@ -870,6 +920,28 @@ pub fn create_loyalty_card(
         write_date: ctx.timestamp,
         metadata: None,
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "pos_loyalty_card",
+            record_id: card.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "code": card.code,
+                    "program_id": program_id,
+                    "points": points,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["code".to_string(), "points".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
