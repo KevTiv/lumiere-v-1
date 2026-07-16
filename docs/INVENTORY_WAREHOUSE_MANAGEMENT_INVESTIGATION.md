@@ -37,7 +37,7 @@ Current-state assessment of Lumiere inventory / WMS against a NetSuite *quality*
 | Valuation | `inventory_valuation` | `valuation.rs` | Mis-shaped (reorder-like fields); **no reducers / no inserts** |
 | UoM (adjacent) | `uom_cat`, `uom`, `uom_conversion` | `core/reference.rs` | Create-only reducers |
 | Landed cost (adjacent) | `stock_landed_cost`, `stock_landed_cost_lines` | `purchasing/landed_costs.rs` | Apply updates quant value |
-| Consignment (adjacent) | `consignment_agreement` | `purchasing/procurement_advanced.rs` | No quant ownership rules |
+| Consignment (adjacent) | `consignment_agreement` | `procurement_advanced` + `inventory/consignment.rs` | Activate/receive; owner_id excluded from ATP |
 
 ### 1.2 Backend reducers (callable SpacetimeDB surface)
 
