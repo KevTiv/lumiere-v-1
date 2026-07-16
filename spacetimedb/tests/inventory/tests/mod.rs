@@ -30,6 +30,9 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_replenishment_demand_test(ctx)?;
     run_inventory_qc_quarantine_test(ctx)?;
     run_inventory_wave_release_test(ctx)?;
+    run_inventory_uom_conversion_test(ctx)?;
+    run_inventory_close_lock_test(ctx)?;
+    run_inventory_3pl_asn_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -135,4 +138,21 @@ pub fn run_inventory_qc_quarantine_test(ctx: &ReducerContext) -> Result<(), Stri
 pub fn run_inventory_wave_release_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_wave_release_orchestrates_tasks(ctx)
         .map_err(|e| format!("wave_release: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_uom_conversion_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_uom_conversion_on_move_and_reserve(ctx)
+        .map_err(|e| format!("uom_conversion: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_close_lock_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_inventory_close_locks_stock(ctx)
+        .map_err(|e| format!("inventory_close: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_3pl_asn_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_3pl_asn_inbound_posts_stock(ctx).map_err(|e| format!("3pl_asn: {e}"))
 }

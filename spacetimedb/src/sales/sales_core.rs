@@ -840,7 +840,7 @@ fn create_outgoing_pickings_for_confirmed_order(
     use crate::inventory::stock::{
         create_stock_move, create_stock_picking, product_requires_stock,
         reserve_quantity_at_location, resolve_warehouse_stock_location, stock_picking,
-        CreateStockMoveParams, CreateStockPickingParams,
+        to_product_stock_qty, CreateStockMoveParams, CreateStockPickingParams,
     };
 
     let order = ctx
@@ -886,18 +886,26 @@ fn create_outgoing_pickings_for_confirmed_order(
         .unwrap_or_else(|| order_id.to_string());
 
     // ATP gate before creating logistics rows — fail closed on shortfall.
+    // Reserve in product stock UoM (convert from sale-line UoM when needed).
     if !skip_stock {
         for line in &order_lines {
             if !product_requires_stock(ctx, line.product_id) {
                 continue;
             }
+            let stock_qty = to_product_stock_qty(
+                ctx,
+                organization_id,
+                line.product_id,
+                line.product_uom,
+                line.product_uom_qty,
+            )?;
             reserve_quantity_at_location(
                 ctx,
                 organization_id,
                 company_id,
                 line.product_id,
                 src_location,
-                line.product_uom_qty,
+                stock_qty,
             )?;
         }
     }
@@ -1445,15 +1453,16 @@ pub fn cancel_sale_order(
         {
             if !order.is_dropship
                 && product_requires_stock(ctx, move_record.product_id)
-                && move_record.product_uom_qty > 0.0
+                && move_record.product_qty > 0.0
             {
+                // product_qty is stock UoM (converted at move create).
                 unreserve_quantity_at_location(
                     ctx,
                     organization_id,
                     company_id,
                     move_record.product_id,
                     move_record.location_id,
-                    move_record.product_uom_qty,
+                    move_record.product_qty,
                 )?;
             }
             ctx.db.stock_move().id().update(StockMove {

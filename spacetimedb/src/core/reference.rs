@@ -429,6 +429,88 @@ pub fn create_uom_conversion(
     Ok(())
 }
 
+/// Convert `qty` from `from_uom_id` into `to_uom_id`.
+///
+/// Resolution order:
+/// 1. Identity (same UoM)
+/// 2. Active `uom_conversion` row (product-specific, then category-wide)
+/// 3. Inverse of (2)
+/// 4. Same-category `UOM.factor` ratio (relative to category reference)
+pub(crate) fn convert_uom_quantity(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    from_uom_id: u64,
+    to_uom_id: u64,
+    qty: f64,
+    product_id: Option<u64>,
+) -> Result<f64, String> {
+    if qty == 0.0 || from_uom_id == to_uom_id {
+        return Ok(qty);
+    }
+    if qty < 0.0 {
+        return Err("Quantity for UoM conversion cannot be negative".to_string());
+    }
+
+    let from = ctx
+        .db
+        .uom()
+        .id()
+        .find(&from_uom_id)
+        .ok_or_else(|| format!("UoM {from_uom_id} not found"))?;
+    let to = ctx
+        .db
+        .uom()
+        .id()
+        .find(&to_uom_id)
+        .ok_or_else(|| format!("UoM {to_uom_id} not found"))?;
+    if from.organization_id != organization_id || to.organization_id != organization_id {
+        return Err("UoM does not belong to this organization".to_string());
+    }
+    if !from.is_active || !to.is_active {
+        return Err("Cannot convert using inactive UoM".to_string());
+    }
+
+    let mut candidates: Vec<UOMConversion> = ctx
+        .db
+        .uom_conversion()
+        .uom_conv_by_org()
+        .filter(&organization_id)
+        .filter(|c| c.is_active)
+        .collect();
+    // Prefer product-specific conversions over category-wide rows.
+    candidates.sort_by_key(|c| if c.product_id == product_id { 0u8 } else { 1u8 });
+
+    for c in &candidates {
+        if c.product_id.is_some() && c.product_id != product_id {
+            continue;
+        }
+        if c.from_uom_id == from_uom_id && c.to_uom_id == to_uom_id && c.factor > 0.0 {
+            return Ok(apply_uom_rounding(qty * c.factor, to.rounding));
+        }
+        if c.from_uom_id == to_uom_id && c.to_uom_id == from_uom_id && c.factor > 0.0 {
+            return Ok(apply_uom_rounding(qty / c.factor, to.rounding));
+        }
+    }
+
+    if from.category_id == to.category_id && from.factor > 0.0 && to.factor > 0.0 {
+        let ref_qty = qty * from.factor;
+        return Ok(apply_uom_rounding(ref_qty / to.factor, to.rounding));
+    }
+
+    Err(format!(
+        "No UoM conversion from {} to {} (product {:?})",
+        from_uom_id, to_uom_id, product_id
+    ))
+}
+
+fn apply_uom_rounding(qty: f64, rounding: f64) -> f64 {
+    if rounding <= 0.0 {
+        qty
+    } else {
+        (qty / rounding).round() * rounding
+    }
+}
+
 // ── Currency helpers (legacy `u64` id vs string PK on `currency`) ───────────────
 
 /// Maps ISO 4217 codes to the legacy numeric `currency_id` used on `Company` and related tables.

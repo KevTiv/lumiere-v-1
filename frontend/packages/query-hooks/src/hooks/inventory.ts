@@ -1587,6 +1587,95 @@ export function useCompletePickingWave(organizationId: bigint, companyId: bigint
   })
 }
 
+// ── Inventory close ──────────────────────────────────────────────────────────
+
+export function useCreateInventoryClose(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = inventoryBffPost("create_inventory_close", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object, "CreateInventoryCloseParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to create inventory close')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useRunInventoryClose(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (closeId) => {
+      const { urlPath, init } = inventoryBffPost("run_inventory_close", [
+        organizationId,
+        companyId,
+        toScalarU64(closeId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to run inventory close')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useReopenInventoryClose(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (closeId) => {
+      const { urlPath, init } = inventoryBffPost("reopen_inventory_close", [
+        organizationId,
+        companyId,
+        toScalarU64(closeId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to reopen inventory close')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+// ── 3PL / inventory integration intents ──────────────────────────────────────
+
+export function useCreateInventoryIntegrationIntent(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = inventoryBffPost("create_inventory_integration_intent", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object, "CreateInventoryIntegrationIntentParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to create inventory integration intent')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useRecordInventoryIntegrationResult(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { intentId: ScalarId; params: Record<string, unknown> }
+  >({
+    mutationFn: async ({ intentId, params }) => {
+      const { urlPath, init } = inventoryBffPost("record_inventory_integration_result", [
+        organizationId,
+        companyId,
+        toScalarU64(intentId),
+        stdbParamsToJson(params as object, "RecordInventoryIntegrationResultParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to record inventory integration result')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
 // ── Product Category ───────────────────────────────────────────────────────────
 
 export function useCreateProductCategory(organizationId: bigint, companyId?: bigint) {

@@ -19,9 +19,13 @@
 /// | replenishment | ReplenishmentRule · StockReorderGroup                         |
 /// | warehouse_operations | WarehouseTask · PickingWave · PackagingMaterial · CartonizationResult |
 /// | valuation   | InventoryValuation                                            |
+/// | inventory_close | InventoryClose · InventoryCloseLine                         |
+/// | integration | InventoryIntegrationIntent (3PL ASN)                          |
 pub mod barcode;
 pub mod cycle_count;
+pub mod integration;
 pub mod inventory_adjustments;
+pub mod inventory_close;
 pub mod product;
 pub mod product_category;
 pub mod quality;

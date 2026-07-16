@@ -17,6 +17,9 @@ Checklist for tranche-1 fixes from [INVENTORY_WAREHOUSE_MANAGEMENT_INVESTIGATION
 - [x] `execute_replenishment_rule` creates draft PO or internal transfer demand
 - [x] Quality fail → quarantine location + remove from ATP (`fail_quality_check` / `quarantine_quantity`)
 - [x] Wave release orchestration: `release_picking_wave` → confirm/assign + pick tasks; validate blocked by open tasks; complete requires tasks + pickings done
+- [x] UoM conversion on move create / reserve / validate (`convert_uom_quantity` → stock UoM)
+- [x] Inventory close: snapshot lines + lock stock mutations (`create/run/reopen_inventory_close`)
+- [x] 3PL durable intents: `create_inventory_integration_intent` + `record_inventory_integration_result` (ASN inbound can post stock)
 
 ## Verify after publish
 

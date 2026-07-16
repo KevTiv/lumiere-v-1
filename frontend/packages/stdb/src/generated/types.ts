@@ -3964,6 +3964,24 @@ export const CreateInventoryAdjustmentParams = __t.object("CreateInventoryAdjust
 });
 export type CreateInventoryAdjustmentParams = __Infer<typeof CreateInventoryAdjustmentParams>;
 
+export const CreateInventoryCloseParams = __t.object("CreateInventoryCloseParams", {
+  name: __t.string(),
+  asOf: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateInventoryCloseParams = __Infer<typeof CreateInventoryCloseParams>;
+
+export const CreateInventoryIntegrationIntentParams = __t.object("CreateInventoryIntegrationIntentParams", {
+  provider: __t.string(),
+  intentType: __t.string(),
+  warehouseId: __t.option(__t.u64()),
+  pickingId: __t.option(__t.u64()),
+  idempotencyKey: __t.string(),
+  requestPayload: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateInventoryIntegrationIntentParams = __Infer<typeof CreateInventoryIntegrationIntentParams>;
+
 export const CreateInvoiceFromSaleOrderParams = __t.object("CreateInvoiceFromSaleOrderParams", {
   journalId: __t.u64(),
   defaultIncomeAccountId: __t.u64(),
@@ -7454,6 +7472,65 @@ export const InventoryAdjustment = __t.object("InventoryAdjustment", {
 });
 export type InventoryAdjustment = __Infer<typeof InventoryAdjustment>;
 
+export const InventoryClose = __t.object("InventoryClose", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  asOf: __t.timestamp(),
+  state: __t.string(),
+  locked: __t.bool(),
+  lineCount: __t.u32(),
+  totalQuantity: __t.f64(),
+  totalValue: __t.f64(),
+  closedAt: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type InventoryClose = __Infer<typeof InventoryClose>;
+
+export const InventoryCloseLine = __t.object("InventoryCloseLine", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  closeId: __t.u64(),
+  productId: __t.u64(),
+  locationId: __t.u64(),
+  lotId: __t.option(__t.u64()),
+  quantity: __t.f64(),
+  reservedQuantity: __t.f64(),
+  availableQuantity: __t.f64(),
+  cost: __t.f64(),
+  value: __t.f64(),
+  metadata: __t.option(__t.string()),
+});
+export type InventoryCloseLine = __Infer<typeof InventoryCloseLine>;
+
+export const InventoryIntegrationIntent = __t.object("InventoryIntegrationIntent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  provider: __t.string(),
+  intentType: __t.string(),
+  warehouseId: __t.option(__t.u64()),
+  pickingId: __t.option(__t.u64()),
+  status: __t.string(),
+  idempotencyKey: __t.string(),
+  requestPayload: __t.option(__t.string()),
+  lastError: __t.option(__t.string()),
+  externalReference: __t.option(__t.string()),
+  attemptCount: __t.u32(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type InventoryIntegrationIntent = __Infer<typeof InventoryIntegrationIntent>;
+
 export const InventoryValuation = __t.object("InventoryValuation", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -10370,6 +10447,18 @@ export const RecordGeneratedOwnerReportParams = __t.object("RecordGeneratedOwner
   metadata: __t.option(__t.string()),
 });
 export type RecordGeneratedOwnerReportParams = __Infer<typeof RecordGeneratedOwnerReportParams>;
+
+export const RecordInventoryIntegrationResultParams = __t.object("RecordInventoryIntegrationResultParams", {
+  status: __t.string(),
+  externalReference: __t.option(__t.string()),
+  lastError: __t.option(__t.string()),
+  productId: __t.option(__t.u64()),
+  locationId: __t.option(__t.u64()),
+  quantity: __t.option(__t.f64()),
+  cost: __t.option(__t.f64()),
+  metadata: __t.option(__t.string()),
+});
+export type RecordInventoryIntegrationResultParams = __Infer<typeof RecordInventoryIntegrationResultParams>;
 
 export const RecordPrivacyConsentParams = __t.object("RecordPrivacyConsentParams", {
   contactId: __t.u64(),

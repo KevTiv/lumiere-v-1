@@ -1,8 +1,21 @@
-//! Inventory gap fixes — isolation, ATP, lot/serial, FEFO/expiry, replenishment, QC, waves.
+//! Inventory gap fixes — isolation, ATP, lot/serial, FEFO/expiry, replenishment, QC, waves,
+//! UoM conversion, inventory close, 3PL intents.
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::core::organization::{company, create_company, CompanyScopeParams, CreateCompanyParams};
+use crate::core::reference::{
+    create_uom, create_uom_conversion, uom, CreateUomConversionParams, CreateUomParams,
+};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::inventory::integration::{
+    create_inventory_integration_intent, inventory_integration_intent,
+    record_inventory_integration_result, CreateInventoryIntegrationIntentParams,
+    RecordInventoryIntegrationResultParams,
+};
+use crate::inventory::inventory_close::{
+    create_inventory_close, inventory_close, reopen_inventory_close, run_inventory_close,
+    CreateInventoryCloseParams,
+};
 use crate::inventory::product::{
     create_product, create_product_supplier_info, product, CreateProductParams,
     CreateProductSupplierInfoParams,
@@ -16,9 +29,10 @@ use crate::inventory::replenishment::{
 };
 use crate::inventory::stock::{
     assign_stock_picking, confirm_stock_picking, create_stock_move, create_stock_picking,
-    create_stock_quant, reserve_quantity_at_location, reserve_stock_quant, stock_picking,
-    stock_quant, validate_stock_picking, CreateStockMoveParams, CreateStockPickingParams,
-    CreateStockQuantParams, StockQuantReserveParams,
+    create_stock_quant, reserve_quantity_at_location, reserve_stock_quant, stock_move,
+    stock_picking, stock_quant, to_product_stock_qty, validate_stock_picking,
+    CreateStockMoveParams, CreateStockPickingParams, CreateStockQuantParams,
+    StockQuantReserveParams,
 };
 use crate::inventory::tracking::{
     create_stock_production_lot, create_stock_production_serial, stock_production_lot,
@@ -1639,6 +1653,270 @@ pub fn test_wave_release_orchestrates_tasks(ctx: &ReducerContext) -> Result<(), 
         .ok_or("wave after complete")?;
     if wave.state != "done" {
         return Err(format!("expected wave done, got {}", wave.state));
+    }
+    Ok(())
+}
+
+/// Move create + reserve convert sale/move UoM into product stock UoM.
+pub fn test_uom_conversion_on_move_and_reserve(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("product")?;
+    let unit_uom = product.uom_id;
+    let category_id = ctx
+        .db
+        .uom()
+        .id()
+        .find(&unit_uom)
+        .map(|u| u.category_id)
+        .ok_or("unit uom")?;
+
+    create_uom(
+        ctx,
+        org_id,
+        CreateUomParams {
+            category_id,
+            name: "Box10".to_string(),
+            symbol: "box10".to_string(),
+            factor: 10.0,
+            rounding: 0.0,
+            times_bigger: 10.0,
+            is_reference_unit: false,
+            is_active: true,
+            metadata: None,
+        },
+    )?;
+    let box_uom = ctx
+        .db
+        .uom()
+        .iter()
+        .find(|u| u.organization_id == org_id && u.name == "Box10")
+        .map(|u| u.id)
+        .ok_or("box uom")?;
+
+    create_uom_conversion(
+        ctx,
+        org_id,
+        category_id,
+        CreateUomConversionParams {
+            from_uom_id: box_uom,
+            to_uom_id: unit_uom,
+            factor: 10.0,
+            product_id: Some(fixture.product_id),
+            is_active: true,
+            metadata: None,
+        },
+    )?;
+
+    let stock_qty = to_product_stock_qty(ctx, org_id, fixture.product_id, box_uom, 2.0)?;
+    if (stock_qty - 20.0).abs() > 0.001 {
+        return Err(format!("expected 2 boxes → 20 units, got {stock_qty}"));
+    }
+
+    create_quant_for_fixture(ctx, &fixture, 20.0)?;
+    reserve_quantity_at_location(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        fixture.warehouse_id,
+        stock_qty,
+    )?;
+
+    create_stock_move(
+        ctx,
+        org_id,
+        CreateStockMoveParams {
+            company_id: Some(company_id),
+            name: "Box move".to_string(),
+            product_id: fixture.product_id,
+            product_tmpl_id: fixture.product_id,
+            product_uom: box_uom,
+            product_uom_qty: 1.0,
+            location_id: fixture.warehouse_id,
+            location_dest_id: fixture.partner_id,
+            date_expected: ctx.timestamp,
+            move_type: "outgoing".to_string(),
+            priority: "1".to_string(),
+            reference: None,
+            sequence: 10,
+            origin: None,
+            note: None,
+            date: None,
+            date_deadline: None,
+            picking_id: None,
+            picking_type_id: None,
+            partner_id: Some(fixture.partner_id),
+            product_variant_id: None,
+            group_id: None,
+            rule_id: None,
+            procure_method: "make_to_stock".to_string(),
+            price_unit: 0.0,
+            scrapped: false,
+            to_refund: false,
+            propagate_cancel: true,
+            delay_alert: false,
+            product_packaging_id: None,
+            product_packaging_qty: 0.0,
+            warehouse_id: Some(fixture.warehouse_id),
+            production_id: None,
+            raw_material_production_id: None,
+            unbuild_id: None,
+            consume_unbuild_id: None,
+            cost_share: 0.0,
+            is_subcontract: false,
+            purchase_line_id: None,
+            need_release: false,
+            release_ready: false,
+            propagation_cancel: true,
+            has_tracking: false,
+            inventory_id: None,
+            sale_line_id: None,
+            lot_id: None,
+            serial_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            package_level_id: None,
+            product_type: Some("product".to_string()),
+            metadata: None,
+        },
+    )?;
+    let mv = ctx
+        .db
+        .stock_move()
+        .iter()
+        .find(|m| m.organization_id == org_id && m.name.as_deref() == Some("Box move"))
+        .ok_or("move missing")?;
+    if (mv.product_qty - 10.0).abs() > 0.001 {
+        return Err(format!(
+            "expected product_qty 10 for 1 box, got {}",
+            mv.product_qty
+        ));
+    }
+    Ok(())
+}
+
+/// Closed inventory period locks ATP reserve until reopened.
+pub fn test_inventory_close_locks_stock(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    create_quant_for_fixture(ctx, &fixture, 5.0)?;
+
+    create_inventory_close(
+        ctx,
+        org_id,
+        company_id,
+        CreateInventoryCloseParams {
+            name: "IC-2026-07".to_string(),
+            as_of: Some(ctx.timestamp),
+            metadata: None,
+        },
+    )?;
+    let close_id = ctx
+        .db
+        .inventory_close()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.name == "IC-2026-07")
+        .map(|c| c.id)
+        .ok_or("close missing")?;
+
+    run_inventory_close(ctx, org_id, company_id, close_id)?;
+
+    match reserve_quantity_at_location(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        fixture.warehouse_id,
+        1.0,
+    ) {
+        Err(msg) if msg.to_lowercase().contains("locked") => {}
+        Err(msg) => return Err(format!("Expected locked error, got: {msg}")),
+        Ok(()) => return Err("reserve should fail while inventory close is locked".into()),
+    }
+
+    reopen_inventory_close(ctx, org_id, company_id, close_id)?;
+    reserve_quantity_at_location(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        fixture.warehouse_id,
+        1.0,
+    )?;
+    Ok(())
+}
+
+/// 3PL ASN inbound intent posts stock on successful result.
+pub fn test_3pl_asn_inbound_posts_stock(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    create_inventory_integration_intent(
+        ctx,
+        org_id,
+        company_id,
+        CreateInventoryIntegrationIntentParams {
+            provider: "demo-3pl".to_string(),
+            intent_type: "asn_inbound".to_string(),
+            warehouse_id: Some(fixture.warehouse_id),
+            picking_id: None,
+            idempotency_key: format!("asn-{}", fixture.product_id),
+            request_payload: Some(r#"{"asn":"A1"}"#.to_string()),
+            metadata: None,
+        },
+    )?;
+    let intent_id = ctx
+        .db
+        .inventory_integration_intent()
+        .iter()
+        .find(|i| {
+            i.organization_id == org_id && i.idempotency_key == format!("asn-{}", fixture.product_id)
+        })
+        .map(|i| i.id)
+        .ok_or("intent missing")?;
+
+    record_inventory_integration_result(
+        ctx,
+        org_id,
+        company_id,
+        intent_id,
+        RecordInventoryIntegrationResultParams {
+            status: "succeeded".to_string(),
+            external_reference: Some("EXT-ASN-1".to_string()),
+            last_error: None,
+            product_id: Some(fixture.product_id),
+            location_id: Some(fixture.warehouse_id),
+            quantity: Some(7.0),
+            cost: Some(3.5),
+            metadata: None,
+        },
+    )?;
+
+    let quant = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .find(|q| {
+            q.organization_id == org_id
+                && q.product_id == fixture.product_id
+                && q.location_id == fixture.warehouse_id
+        })
+        .ok_or("quant after ASN")?;
+    if (quant.quantity - 7.0).abs() > 0.001 {
+        return Err(format!("expected qty 7 after ASN, got {}", quant.quantity));
     }
     Ok(())
 }

@@ -259,6 +259,8 @@ import CreateIncotermReducer from "./create_incoterm_reducer";
 import CreateIntercompanyRuleReducer from "./create_intercompany_rule_reducer";
 import CreateIntercompanyTransactionReducer from "./create_intercompany_transaction_reducer";
 import CreateInventoryAdjustmentReducer from "./create_inventory_adjustment_reducer";
+import CreateInventoryCloseReducer from "./create_inventory_close_reducer";
+import CreateInventoryIntegrationIntentReducer from "./create_inventory_integration_intent_reducer";
 import CreateInvoiceFromSaleOrderReducer from "./create_invoice_from_sale_order_reducer";
 import CreateInvoiceReminderBatchReducer from "./create_invoice_reminder_batch_reducer";
 import CreateIotActionReducer from "./create_iot_action_reducer";
@@ -597,6 +599,7 @@ import RecordDocumentViewReducer from "./record_document_view_reducer";
 import RecordGeneratedOwnerReportReducer from "./record_generated_owner_report_reducer";
 import RecordGoogleDriveSyncReducer from "./record_google_drive_sync_reducer";
 import RecordGoogleDriveSyncErrorReducer from "./record_google_drive_sync_error_reducer";
+import RecordInventoryIntegrationResultReducer from "./record_inventory_integration_result_reducer";
 import RecordMessageCopiedReducer from "./record_message_copied_reducer";
 import RecordPrivacyConsentReducer from "./record_privacy_consent_reducer";
 import RecordPurchasingIntegrationResultReducer from "./record_purchasing_integration_result_reducer";
@@ -626,6 +629,7 @@ import RemoveMemberFromQualityTeamReducer from "./remove_member_from_quality_tea
 import RemovePurchaseOrderLineReducer from "./remove_purchase_order_line_reducer";
 import RemoveRuleFromNomenclatureReducer from "./remove_rule_from_nomenclature_reducer";
 import RemoveUserFromOrganizationReducer from "./remove_user_from_organization_reducer";
+import ReopenInventoryCloseReducer from "./reopen_inventory_close_reducer";
 import ReopenTicketReducer from "./reopen_ticket_reducer";
 import ReorderProposalLineItemsReducer from "./reorder_proposal_line_items_reducer";
 import RequestEmbeddingJobReducer from "./request_embedding_job_reducer";
@@ -678,8 +682,11 @@ import RunFxRevaluationReducer from "./run_fx_revaluation_reducer";
 import RunFxRevaluationBatchReducer from "./run_fx_revaluation_batch_reducer";
 import RunHelpdeskTicketTestReducer from "./run_helpdesk_ticket_test_reducer";
 import RunHrLeaveTypeTestReducer from "./run_hr_leave_type_test_reducer";
+import RunInventory3PlAsnTestReducer from "./run_inventory_3_pl_asn_test_reducer";
 import RunInventoryAdjustmentTestReducer from "./run_inventory_adjustment_test_reducer";
 import RunInventoryAtpFailClosedTestReducer from "./run_inventory_atp_fail_closed_test_reducer";
+import RunInventoryCloseReducer from "./run_inventory_close_reducer";
+import RunInventoryCloseLockTestReducer from "./run_inventory_close_lock_test_reducer";
 import RunInventoryCompanyIsolationTestReducer from "./run_inventory_company_isolation_test_reducer";
 import RunInventoryDeliveryQuantTestReducer from "./run_inventory_delivery_quant_test_reducer";
 import RunInventoryExpiredLotTestReducer from "./run_inventory_expired_lot_test_reducer";
@@ -695,6 +702,7 @@ import RunInventorySerialIdValidateTestReducer from "./run_inventory_serial_id_v
 import RunInventorySerialReserveTestReducer from "./run_inventory_serial_reserve_test_reducer";
 import RunInventoryStockInventoryTestReducer from "./run_inventory_stock_inventory_test_reducer";
 import RunInventoryStockQuantTestReducer from "./run_inventory_stock_quant_test_reducer";
+import RunInventoryUomConversionTestReducer from "./run_inventory_uom_conversion_test_reducer";
 import RunInventoryWaveReleaseTestReducer from "./run_inventory_wave_release_test_reducer";
 import RunManufacturingWorkcenterTestReducer from "./run_manufacturing_workcenter_test_reducer";
 import RunOwnerReportScheduleReducer from "./run_owner_report_schedule_reducer";
@@ -1104,6 +1112,9 @@ import ImportMappingTemplateRow from "./import_mapping_template_table";
 import IntercompanyRuleRow from "./intercompany_rule_table";
 import IntercompanyTransactionRow from "./intercompany_transaction_table";
 import InventoryAdjustmentRow from "./inventory_adjustment_table";
+import InventoryCloseRow from "./inventory_close_table";
+import InventoryCloseLineRow from "./inventory_close_line_table";
+import InventoryIntegrationIntentRow from "./inventory_integration_intent_table";
 import InventoryValuationRow from "./inventory_valuation_table";
 import IotActionRow from "./iot_action_table";
 import IotAlertRow from "./iot_alert_table";
@@ -3851,6 +3862,63 @@ const tablesSchema = __schema({
       { name: 'inventory_adjustment_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, InventoryAdjustmentRow),
+  inventory_close: __table({
+    name: 'inventory_close',
+    indexes: [
+      { name: 'inventory_close_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'inventory_close_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'inventory_close_by_state', algorithm: 'btree', columns: [
+        'state',
+      ] },
+    ],
+    constraints: [
+      { name: 'inventory_close_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, InventoryCloseRow),
+  inventory_close_line: __table({
+    name: 'inventory_close_line',
+    indexes: [
+      { name: 'inventory_close_line_by_close', algorithm: 'btree', columns: [
+        'closeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'inventory_close_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'inventory_close_line_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, InventoryCloseLineRow),
+  inventory_integration_intent: __table({
+    name: 'inventory_integration_intent',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'inventory_integration_intent_by_key', algorithm: 'btree', columns: [
+        'idempotencyKey',
+      ] },
+      { name: 'inventory_integration_intent_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'inventory_integration_intent_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'inventory_integration_intent_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, InventoryIntegrationIntentRow),
   inventory_valuation: __table({
     name: 'inventory_valuation',
     indexes: [
@@ -7078,6 +7146,8 @@ const reducersSchema = __reducers(
   __reducerSchema("create_intercompany_rule", CreateIntercompanyRuleReducer),
   __reducerSchema("create_intercompany_transaction", CreateIntercompanyTransactionReducer),
   __reducerSchema("create_inventory_adjustment", CreateInventoryAdjustmentReducer),
+  __reducerSchema("create_inventory_close", CreateInventoryCloseReducer),
+  __reducerSchema("create_inventory_integration_intent", CreateInventoryIntegrationIntentReducer),
   __reducerSchema("create_invoice_from_sale_order", CreateInvoiceFromSaleOrderReducer),
   __reducerSchema("create_invoice_reminder_batch", CreateInvoiceReminderBatchReducer),
   __reducerSchema("create_iot_action", CreateIotActionReducer),
@@ -7416,6 +7486,7 @@ const reducersSchema = __reducers(
   __reducerSchema("record_generated_owner_report", RecordGeneratedOwnerReportReducer),
   __reducerSchema("record_google_drive_sync", RecordGoogleDriveSyncReducer),
   __reducerSchema("record_google_drive_sync_error", RecordGoogleDriveSyncErrorReducer),
+  __reducerSchema("record_inventory_integration_result", RecordInventoryIntegrationResultReducer),
   __reducerSchema("record_message_copied", RecordMessageCopiedReducer),
   __reducerSchema("record_privacy_consent", RecordPrivacyConsentReducer),
   __reducerSchema("record_purchasing_integration_result", RecordPurchasingIntegrationResultReducer),
@@ -7445,6 +7516,7 @@ const reducersSchema = __reducers(
   __reducerSchema("remove_purchase_order_line", RemovePurchaseOrderLineReducer),
   __reducerSchema("remove_rule_from_nomenclature", RemoveRuleFromNomenclatureReducer),
   __reducerSchema("remove_user_from_organization", RemoveUserFromOrganizationReducer),
+  __reducerSchema("reopen_inventory_close", ReopenInventoryCloseReducer),
   __reducerSchema("reopen_ticket", ReopenTicketReducer),
   __reducerSchema("reorder_proposal_line_items", ReorderProposalLineItemsReducer),
   __reducerSchema("request_embedding_job", RequestEmbeddingJobReducer),
@@ -7497,8 +7569,11 @@ const reducersSchema = __reducers(
   __reducerSchema("run_fx_revaluation_batch", RunFxRevaluationBatchReducer),
   __reducerSchema("run_helpdesk_ticket_test", RunHelpdeskTicketTestReducer),
   __reducerSchema("run_hr_leave_type_test", RunHrLeaveTypeTestReducer),
+  __reducerSchema("run_inventory_3_pl_asn_test", RunInventory3PlAsnTestReducer),
   __reducerSchema("run_inventory_adjustment_test", RunInventoryAdjustmentTestReducer),
   __reducerSchema("run_inventory_atp_fail_closed_test", RunInventoryAtpFailClosedTestReducer),
+  __reducerSchema("run_inventory_close", RunInventoryCloseReducer),
+  __reducerSchema("run_inventory_close_lock_test", RunInventoryCloseLockTestReducer),
   __reducerSchema("run_inventory_company_isolation_test", RunInventoryCompanyIsolationTestReducer),
   __reducerSchema("run_inventory_delivery_quant_test", RunInventoryDeliveryQuantTestReducer),
   __reducerSchema("run_inventory_expired_lot_test", RunInventoryExpiredLotTestReducer),
@@ -7514,6 +7589,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_serial_reserve_test", RunInventorySerialReserveTestReducer),
   __reducerSchema("run_inventory_stock_inventory_test", RunInventoryStockInventoryTestReducer),
   __reducerSchema("run_inventory_stock_quant_test", RunInventoryStockQuantTestReducer),
+  __reducerSchema("run_inventory_uom_conversion_test", RunInventoryUomConversionTestReducer),
   __reducerSchema("run_inventory_wave_release_test", RunInventoryWaveReleaseTestReducer),
   __reducerSchema("run_manufacturing_workcenter_test", RunManufacturingWorkcenterTestReducer),
   __reducerSchema("run_owner_report_schedule", RunOwnerReportScheduleReducer),

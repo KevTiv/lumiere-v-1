@@ -8,7 +8,9 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company_id_from_scope, CompanyScopeParams};
+use crate::core::reference::convert_uom_quantity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::product::product;
 use crate::inventory::tracking::{
     stock_production_lot, stock_production_serial, StockProductionSerial,
@@ -1190,7 +1192,32 @@ fn ensure_picking_tasks_allow_validate(
     Ok(())
 }
 
+/// Convert a quantity expressed in `from_uom_id` into the product's stock UoM.
+pub(crate) fn to_product_stock_qty(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    product_id: u64,
+    from_uom_id: u64,
+    qty: f64,
+) -> Result<f64, String> {
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or("Product not found for UoM conversion")?;
+    convert_uom_quantity(
+        ctx,
+        organization_id,
+        from_uom_id,
+        product.uom_id,
+        qty,
+        Some(product_id),
+    )
+}
+
 /// Reserve qty at a location; fails closed when ATP is short.
+/// `qty` must be in the product's stock UoM (`product.uom_id`).
 pub(crate) fn reserve_quantity_at_location(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -1202,6 +1229,7 @@ pub(crate) fn reserve_quantity_at_location(
     if qty <= 0.0 {
         return Ok(());
     }
+    assert_inventory_writable(ctx, organization_id, company_id)?;
     if location_blocks_atp(ctx, location_id) {
         return Err(format!(
             "Cannot reserve ATP from quarantine/QC location {}",
@@ -1291,7 +1319,7 @@ pub(crate) fn unreserve_quantity_at_location(
     Ok(())
 }
 
-fn increase_quant_at_location(
+pub(crate) fn increase_quant_at_location(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -1901,6 +1929,14 @@ pub fn create_stock_move(
 
     ProcureMethod::from_str(&params.procure_method)?;
 
+    let product_qty = to_product_stock_qty(
+        ctx,
+        organization_id,
+        params.product_id,
+        params.product_uom,
+        params.product_uom_qty,
+    )?;
+
     let move_record = ctx.db.stock_move().insert(StockMove {
         id: 0,
         organization_id,
@@ -1919,7 +1955,7 @@ pub fn create_stock_move(
         product_variant_id: params.product_variant_id,
         product_uom_qty: params.product_uom_qty,
         product_uom: params.product_uom,
-        product_qty: params.product_uom_qty,
+        product_qty,
         product_tmpl_id: params.product_tmpl_id,
         location_id: params.location_id,
         location_dest_id: params.location_dest_id,
@@ -2519,6 +2555,7 @@ fn validate_stock_picking_impl(
     }
 
     ensure_picking_tasks_allow_validate(ctx, organization_id, company_id, picking_id)?;
+    assert_inventory_writable(ctx, organization_id, company_id)?;
 
     let is_inbound = picking.is_return
         || picking.picking_code.as_deref() == Some("incoming");
@@ -2534,8 +2571,12 @@ fn validate_stock_picking_impl(
         location_dest_id: u64,
         lot_id: Option<u64>,
         serial_id: Option<u64>,
+        /// Quantity done in move UoM (for move row bookkeeping).
         qty_done: f64,
+        /// Quantity done in product stock UoM (for quant mutations).
+        stock_qty_done: f64,
         residual: f64,
+        residual_stock: f64,
         product_uom: u64,
         sale_line_id: Option<u64>,
         purchase_line_id: Option<u64>,
@@ -2564,6 +2605,20 @@ fn validate_stock_picking_impl(
             move_record.product_uom_qty
         };
         let residual = (move_record.product_uom_qty - qty_done).max(0.0);
+        let stock_qty_done = to_product_stock_qty(
+            ctx,
+            organization_id,
+            move_record.product_id,
+            move_record.product_uom,
+            qty_done,
+        )?;
+        let residual_stock = to_product_stock_qty(
+            ctx,
+            organization_id,
+            move_record.product_id,
+            move_record.product_uom,
+            residual,
+        )?;
         validated_moves.push(ValidatedMove {
             move_id: move_record.id,
             product_id: move_record.product_id,
@@ -2572,7 +2627,9 @@ fn validate_stock_picking_impl(
             lot_id: move_record.lot_id,
             serial_id: move_record.serial_id,
             qty_done,
+            stock_qty_done,
             residual,
+            residual_stock,
             product_uom: move_record.product_uom,
             sale_line_id: move_record.sale_line_id,
             purchase_line_id: move_record.purchase_line_id,
@@ -2593,7 +2650,7 @@ fn validate_stock_picking_impl(
             vm.lot_id,
             vm.serial_id,
             vm.location_dest_id,
-            vm.qty_done,
+            vm.stock_qty_done,
             is_inbound,
         )?;
     }
@@ -2606,6 +2663,7 @@ fn validate_stock_picking_impl(
                 date: Some(ctx.timestamp),
                 quantity_done: vm.qty_done,
                 product_uom_qty_done: vm.qty_done,
+                product_qty: vm.stock_qty_done,
                 product_uom_qty: if create_backorder && vm.residual > 1e-9 {
                     vm.qty_done
                 } else {
@@ -2616,7 +2674,7 @@ fn validate_stock_picking_impl(
                 ..mv
             });
         }
-        if vm.qty_done > 0.0 {
+        if vm.stock_qty_done > 0.0 {
             apply_validated_move_to_quants(
                 ctx,
                 organization_id,
@@ -2624,11 +2682,11 @@ fn validate_stock_picking_impl(
                 vm.product_id,
                 vm.location_id,
                 vm.location_dest_id,
-                vm.qty_done,
+                vm.stock_qty_done,
                 is_inbound,
             )?;
         }
-        if vm.residual > 1e-9 && !create_backorder && !is_inbound {
+        if vm.residual_stock > 1e-9 && !create_backorder && !is_inbound {
             if product_requires_stock(ctx, vm.product_id) {
                 unreserve_quantity_at_location(
                     ctx,
@@ -2636,7 +2694,7 @@ fn validate_stock_picking_impl(
                     company_id,
                     vm.product_id,
                     vm.location_id,
-                    vm.residual,
+                    vm.residual_stock,
                 )?;
             }
         }

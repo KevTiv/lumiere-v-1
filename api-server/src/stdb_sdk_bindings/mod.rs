@@ -243,6 +243,8 @@ pub mod create_incoterm_params_type;
 pub mod create_intercompany_rule_params_type;
 pub mod create_intercompany_transaction_params_type;
 pub mod create_inventory_adjustment_params_type;
+pub mod create_inventory_close_params_type;
+pub mod create_inventory_integration_intent_params_type;
 pub mod create_invoice_from_sale_order_params_type;
 pub mod create_invoice_reminder_batch_params_type;
 pub mod create_job_position_params_type;
@@ -447,6 +449,9 @@ pub mod intercompany_rule_type;
 pub mod intercompany_state_type;
 pub mod intercompany_transaction_type;
 pub mod inventory_adjustment_type;
+pub mod inventory_close_type;
+pub mod inventory_close_line_type;
+pub mod inventory_integration_intent_type;
 pub mod inventory_valuation_type;
 pub mod invoice_status_type;
 pub mod io_t_action_type;
@@ -597,6 +602,7 @@ pub mod record_custom_field_entry_type;
 pub mod record_custom_field_value_type;
 pub mod record_cycle_count_line_params_type;
 pub mod record_generated_owner_report_params_type;
+pub mod record_inventory_integration_result_params_type;
 pub mod record_privacy_consent_params_type;
 pub mod record_purchasing_integration_result_params_type;
 pub mod record_sales_integration_result_params_type;
@@ -1087,6 +1093,8 @@ pub mod create_incoterm_reducer;
 pub mod create_intercompany_rule_reducer;
 pub mod create_intercompany_transaction_reducer;
 pub mod create_inventory_adjustment_reducer;
+pub mod create_inventory_close_reducer;
+pub mod create_inventory_integration_intent_reducer;
 pub mod create_invoice_from_sale_order_reducer;
 pub mod create_invoice_reminder_batch_reducer;
 pub mod create_iot_action_reducer;
@@ -1425,6 +1433,7 @@ pub mod record_document_view_reducer;
 pub mod record_generated_owner_report_reducer;
 pub mod record_google_drive_sync_reducer;
 pub mod record_google_drive_sync_error_reducer;
+pub mod record_inventory_integration_result_reducer;
 pub mod record_message_copied_reducer;
 pub mod record_privacy_consent_reducer;
 pub mod record_purchasing_integration_result_reducer;
@@ -1454,6 +1463,7 @@ pub mod remove_member_from_quality_team_reducer;
 pub mod remove_purchase_order_line_reducer;
 pub mod remove_rule_from_nomenclature_reducer;
 pub mod remove_user_from_organization_reducer;
+pub mod reopen_inventory_close_reducer;
 pub mod reopen_ticket_reducer;
 pub mod reorder_proposal_line_items_reducer;
 pub mod request_embedding_job_reducer;
@@ -1506,8 +1516,11 @@ pub mod run_fx_revaluation_reducer;
 pub mod run_fx_revaluation_batch_reducer;
 pub mod run_helpdesk_ticket_test_reducer;
 pub mod run_hr_leave_type_test_reducer;
+pub mod run_inventory_3_pl_asn_test_reducer;
 pub mod run_inventory_adjustment_test_reducer;
 pub mod run_inventory_atp_fail_closed_test_reducer;
+pub mod run_inventory_close_reducer;
+pub mod run_inventory_close_lock_test_reducer;
 pub mod run_inventory_company_isolation_test_reducer;
 pub mod run_inventory_delivery_quant_test_reducer;
 pub mod run_inventory_expired_lot_test_reducer;
@@ -1523,6 +1536,7 @@ pub mod run_inventory_serial_id_validate_test_reducer;
 pub mod run_inventory_serial_reserve_test_reducer;
 pub mod run_inventory_stock_inventory_test_reducer;
 pub mod run_inventory_stock_quant_test_reducer;
+pub mod run_inventory_uom_conversion_test_reducer;
 pub mod run_inventory_wave_release_test_reducer;
 pub mod run_manufacturing_workcenter_test_reducer;
 pub mod run_owner_report_schedule_reducer;
@@ -1928,6 +1942,9 @@ pub mod import_mapping_template_table;
 pub mod intercompany_rule_table;
 pub mod intercompany_transaction_table;
 pub mod inventory_adjustment_table;
+pub mod inventory_close_table;
+pub mod inventory_close_line_table;
+pub mod inventory_integration_intent_table;
 pub mod inventory_valuation_table;
 pub mod iot_action_table;
 pub mod iot_alert_table;
@@ -2333,6 +2350,8 @@ pub use create_incoterm_params_type::CreateIncotermParams;
 pub use create_intercompany_rule_params_type::CreateIntercompanyRuleParams;
 pub use create_intercompany_transaction_params_type::CreateIntercompanyTransactionParams;
 pub use create_inventory_adjustment_params_type::CreateInventoryAdjustmentParams;
+pub use create_inventory_close_params_type::CreateInventoryCloseParams;
+pub use create_inventory_integration_intent_params_type::CreateInventoryIntegrationIntentParams;
 pub use create_invoice_from_sale_order_params_type::CreateInvoiceFromSaleOrderParams;
 pub use create_invoice_reminder_batch_params_type::CreateInvoiceReminderBatchParams;
 pub use create_job_position_params_type::CreateJobPositionParams;
@@ -2537,6 +2556,9 @@ pub use intercompany_rule_type::IntercompanyRule;
 pub use intercompany_state_type::IntercompanyState;
 pub use intercompany_transaction_type::IntercompanyTransaction;
 pub use inventory_adjustment_type::InventoryAdjustment;
+pub use inventory_close_type::InventoryClose;
+pub use inventory_close_line_type::InventoryCloseLine;
+pub use inventory_integration_intent_type::InventoryIntegrationIntent;
 pub use inventory_valuation_type::InventoryValuation;
 pub use invoice_status_type::InvoiceStatus;
 pub use io_t_action_type::IoTAction;
@@ -2687,6 +2709,7 @@ pub use record_custom_field_entry_type::RecordCustomFieldEntry;
 pub use record_custom_field_value_type::RecordCustomFieldValue;
 pub use record_cycle_count_line_params_type::RecordCycleCountLineParams;
 pub use record_generated_owner_report_params_type::RecordGeneratedOwnerReportParams;
+pub use record_inventory_integration_result_params_type::RecordInventoryIntegrationResultParams;
 pub use record_privacy_consent_params_type::RecordPrivacyConsentParams;
 pub use record_purchasing_integration_result_params_type::RecordPurchasingIntegrationResultParams;
 pub use record_sales_integration_result_params_type::RecordSalesIntegrationResultParams;
@@ -3096,6 +3119,9 @@ pub use import_mapping_template_table::*;
 pub use intercompany_rule_table::*;
 pub use intercompany_transaction_table::*;
 pub use inventory_adjustment_table::*;
+pub use inventory_close_table::*;
+pub use inventory_close_line_table::*;
+pub use inventory_integration_intent_table::*;
 pub use inventory_valuation_table::*;
 pub use iot_action_table::*;
 pub use iot_alert_table::*;
@@ -3493,6 +3519,8 @@ pub use create_incoterm_reducer::create_incoterm;
 pub use create_intercompany_rule_reducer::create_intercompany_rule;
 pub use create_intercompany_transaction_reducer::create_intercompany_transaction;
 pub use create_inventory_adjustment_reducer::create_inventory_adjustment;
+pub use create_inventory_close_reducer::create_inventory_close;
+pub use create_inventory_integration_intent_reducer::create_inventory_integration_intent;
 pub use create_invoice_from_sale_order_reducer::create_invoice_from_sale_order;
 pub use create_invoice_reminder_batch_reducer::create_invoice_reminder_batch;
 pub use create_iot_action_reducer::create_iot_action;
@@ -3831,6 +3859,7 @@ pub use record_document_view_reducer::record_document_view;
 pub use record_generated_owner_report_reducer::record_generated_owner_report;
 pub use record_google_drive_sync_reducer::record_google_drive_sync;
 pub use record_google_drive_sync_error_reducer::record_google_drive_sync_error;
+pub use record_inventory_integration_result_reducer::record_inventory_integration_result;
 pub use record_message_copied_reducer::record_message_copied;
 pub use record_privacy_consent_reducer::record_privacy_consent;
 pub use record_purchasing_integration_result_reducer::record_purchasing_integration_result;
@@ -3860,6 +3889,7 @@ pub use remove_member_from_quality_team_reducer::remove_member_from_quality_team
 pub use remove_purchase_order_line_reducer::remove_purchase_order_line;
 pub use remove_rule_from_nomenclature_reducer::remove_rule_from_nomenclature;
 pub use remove_user_from_organization_reducer::remove_user_from_organization;
+pub use reopen_inventory_close_reducer::reopen_inventory_close;
 pub use reopen_ticket_reducer::reopen_ticket;
 pub use reorder_proposal_line_items_reducer::reorder_proposal_line_items;
 pub use request_embedding_job_reducer::request_embedding_job;
@@ -3912,8 +3942,11 @@ pub use run_fx_revaluation_reducer::run_fx_revaluation;
 pub use run_fx_revaluation_batch_reducer::run_fx_revaluation_batch;
 pub use run_helpdesk_ticket_test_reducer::run_helpdesk_ticket_test;
 pub use run_hr_leave_type_test_reducer::run_hr_leave_type_test;
+pub use run_inventory_3_pl_asn_test_reducer::run_inventory_3_pl_asn_test;
 pub use run_inventory_adjustment_test_reducer::run_inventory_adjustment_test;
 pub use run_inventory_atp_fail_closed_test_reducer::run_inventory_atp_fail_closed_test;
+pub use run_inventory_close_reducer::run_inventory_close;
+pub use run_inventory_close_lock_test_reducer::run_inventory_close_lock_test;
 pub use run_inventory_company_isolation_test_reducer::run_inventory_company_isolation_test;
 pub use run_inventory_delivery_quant_test_reducer::run_inventory_delivery_quant_test;
 pub use run_inventory_expired_lot_test_reducer::run_inventory_expired_lot_test;
@@ -3929,6 +3962,7 @@ pub use run_inventory_serial_id_validate_test_reducer::run_inventory_serial_id_v
 pub use run_inventory_serial_reserve_test_reducer::run_inventory_serial_reserve_test;
 pub use run_inventory_stock_inventory_test_reducer::run_inventory_stock_inventory_test;
 pub use run_inventory_stock_quant_test_reducer::run_inventory_stock_quant_test;
+pub use run_inventory_uom_conversion_test_reducer::run_inventory_uom_conversion_test;
 pub use run_inventory_wave_release_test_reducer::run_inventory_wave_release_test;
 pub use run_manufacturing_workcenter_test_reducer::run_manufacturing_workcenter_test;
 pub use run_owner_report_schedule_reducer::run_owner_report_schedule;
@@ -5266,6 +5300,16 @@ pub enum Reducer {
     CreateInventoryAdjustment {
         organization_id: u64,
         params: CreateInventoryAdjustmentParams,
+}    ,
+    CreateInventoryClose {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateInventoryCloseParams,
+}    ,
+    CreateInventoryIntegrationIntent {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateInventoryIntegrationIntentParams,
 }    ,
     CreateInvoiceFromSaleOrder {
         organization_id: u64,
@@ -6794,6 +6838,12 @@ pub enum Reducer {
         organization_id: u64,
         error_message: String,
 }    ,
+    RecordInventoryIntegrationResult {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
+        params: RecordInventoryIntegrationResultParams,
+}    ,
     RecordMessageCopied {
         organization_id: u64,
         message_id: u64,
@@ -6932,6 +6982,11 @@ pub enum Reducer {
         user_identity: __sdk::Identity,
         organization_id: u64,
 }    ,
+    ReopenInventoryClose {
+        organization_id: u64,
+        company_id: u64,
+        close_id: u64,
+}    ,
     ReopenTicket {
         organization_id: u64,
         ticket_id: u64,
@@ -7062,8 +7117,15 @@ pub enum Reducer {
 }    ,
     RunHelpdeskTicketTest ,
     RunHrLeaveTypeTest ,
+    RunInventory3PlAsnTest ,
     RunInventoryAdjustmentTest ,
     RunInventoryAtpFailClosedTest ,
+    RunInventoryClose {
+        organization_id: u64,
+        company_id: u64,
+        close_id: u64,
+}    ,
+    RunInventoryCloseLockTest ,
     RunInventoryCompanyIsolationTest ,
     RunInventoryDeliveryQuantTest ,
     RunInventoryExpiredLotTest ,
@@ -7079,6 +7141,7 @@ pub enum Reducer {
     RunInventorySerialReserveTest ,
     RunInventoryStockInventoryTest ,
     RunInventoryStockQuantTest ,
+    RunInventoryUomConversionTest ,
     RunInventoryWaveReleaseTest ,
     RunManufacturingWorkcenterTest ,
     RunOwnerReportSchedule {
@@ -8531,6 +8594,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateIntercompanyRule { .. } => "create_intercompany_rule",
             Reducer::CreateIntercompanyTransaction { .. } => "create_intercompany_transaction",
             Reducer::CreateInventoryAdjustment { .. } => "create_inventory_adjustment",
+            Reducer::CreateInventoryClose { .. } => "create_inventory_close",
+            Reducer::CreateInventoryIntegrationIntent { .. } => "create_inventory_integration_intent",
             Reducer::CreateInvoiceFromSaleOrder { .. } => "create_invoice_from_sale_order",
             Reducer::CreateInvoiceReminderBatch { .. } => "create_invoice_reminder_batch",
             Reducer::CreateIotAction { .. } => "create_iot_action",
@@ -8869,6 +8934,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordGeneratedOwnerReport { .. } => "record_generated_owner_report",
             Reducer::RecordGoogleDriveSync { .. } => "record_google_drive_sync",
             Reducer::RecordGoogleDriveSyncError { .. } => "record_google_drive_sync_error",
+            Reducer::RecordInventoryIntegrationResult { .. } => "record_inventory_integration_result",
             Reducer::RecordMessageCopied { .. } => "record_message_copied",
             Reducer::RecordPrivacyConsent { .. } => "record_privacy_consent",
             Reducer::RecordPurchasingIntegrationResult { .. } => "record_purchasing_integration_result",
@@ -8898,6 +8964,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RemovePurchaseOrderLine { .. } => "remove_purchase_order_line",
             Reducer::RemoveRuleFromNomenclature { .. } => "remove_rule_from_nomenclature",
             Reducer::RemoveUserFromOrganization { .. } => "remove_user_from_organization",
+            Reducer::ReopenInventoryClose { .. } => "reopen_inventory_close",
             Reducer::ReopenTicket { .. } => "reopen_ticket",
             Reducer::ReorderProposalLineItems { .. } => "reorder_proposal_line_items",
             Reducer::RequestEmbeddingJob { .. } => "request_embedding_job",
@@ -8950,8 +9017,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunFxRevaluationBatch { .. } => "run_fx_revaluation_batch",
             Reducer::RunHelpdeskTicketTest => "run_helpdesk_ticket_test",
             Reducer::RunHrLeaveTypeTest => "run_hr_leave_type_test",
+            Reducer::RunInventory3PlAsnTest => "run_inventory_3_pl_asn_test",
             Reducer::RunInventoryAdjustmentTest => "run_inventory_adjustment_test",
             Reducer::RunInventoryAtpFailClosedTest => "run_inventory_atp_fail_closed_test",
+            Reducer::RunInventoryClose { .. } => "run_inventory_close",
+            Reducer::RunInventoryCloseLockTest => "run_inventory_close_lock_test",
             Reducer::RunInventoryCompanyIsolationTest => "run_inventory_company_isolation_test",
             Reducer::RunInventoryDeliveryQuantTest => "run_inventory_delivery_quant_test",
             Reducer::RunInventoryExpiredLotTest => "run_inventory_expired_lot_test",
@@ -8967,6 +9037,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventorySerialReserveTest => "run_inventory_serial_reserve_test",
             Reducer::RunInventoryStockInventoryTest => "run_inventory_stock_inventory_test",
             Reducer::RunInventoryStockQuantTest => "run_inventory_stock_quant_test",
+            Reducer::RunInventoryUomConversionTest => "run_inventory_uom_conversion_test",
             Reducer::RunInventoryWaveReleaseTest => "run_inventory_wave_release_test",
             Reducer::RunManufacturingWorkcenterTest => "run_manufacturing_workcenter_test",
             Reducer::RunOwnerReportSchedule { .. } => "run_owner_report_schedule",
@@ -11145,6 +11216,24 @@ Reducer::BillTimesheets{
                 params,
 }             => __sats::bsatn::to_vec(&create_inventory_adjustment_reducer::CreateInventoryAdjustmentArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateInventoryClose{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_inventory_close_reducer::CreateInventoryCloseArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateInventoryIntegrationIntent{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_inventory_integration_intent_reducer::CreateInventoryIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateInvoiceFromSaleOrder{
@@ -13866,6 +13955,17 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 error_message: error_message.clone(),
 }),
+            Reducer::RecordInventoryIntegrationResult{
+                organization_id,
+                company_id,
+                intent_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_inventory_integration_result_reducer::RecordInventoryIntegrationResultArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                intent_id: intent_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RecordMessageCopied{
                 organization_id,
                 message_id,
@@ -14113,6 +14213,15 @@ Reducer::MoveStockQuant{
                 user_identity: user_identity.clone(),
                 organization_id: organization_id.clone(),
 }),
+            Reducer::ReopenInventoryClose{
+                organization_id,
+                company_id,
+                close_id,
+}             => __sats::bsatn::to_vec(&reopen_inventory_close_reducer::ReopenInventoryCloseArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                close_id: close_id.clone(),
+}),
             Reducer::ReopenTicket{
                 organization_id,
                 ticket_id,
@@ -14351,9 +14460,22 @@ Reducer::RunFxRevaluation{
                 }),
 Reducer::RunHrLeaveTypeTest => __sats::bsatn::to_vec(&run_hr_leave_type_test_reducer::RunHrLeaveTypeTestArgs {
                 }),
+Reducer::RunInventory3PlAsnTest => __sats::bsatn::to_vec(&run_inventory_3_pl_asn_test_reducer::RunInventory3PlAsnTestArgs {
+                }),
 Reducer::RunInventoryAdjustmentTest => __sats::bsatn::to_vec(&run_inventory_adjustment_test_reducer::RunInventoryAdjustmentTestArgs {
                 }),
 Reducer::RunInventoryAtpFailClosedTest => __sats::bsatn::to_vec(&run_inventory_atp_fail_closed_test_reducer::RunInventoryAtpFailClosedTestArgs {
+                }),
+Reducer::RunInventoryClose{
+                organization_id,
+                company_id,
+                close_id,
+}             => __sats::bsatn::to_vec(&run_inventory_close_reducer::RunInventoryCloseArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                close_id: close_id.clone(),
+}),
+            Reducer::RunInventoryCloseLockTest => __sats::bsatn::to_vec(&run_inventory_close_lock_test_reducer::RunInventoryCloseLockTestArgs {
                 }),
 Reducer::RunInventoryCompanyIsolationTest => __sats::bsatn::to_vec(&run_inventory_company_isolation_test_reducer::RunInventoryCompanyIsolationTestArgs {
                 }),
@@ -14384,6 +14506,8 @@ Reducer::RunInventorySerialReserveTest => __sats::bsatn::to_vec(&run_inventory_s
 Reducer::RunInventoryStockInventoryTest => __sats::bsatn::to_vec(&run_inventory_stock_inventory_test_reducer::RunInventoryStockInventoryTestArgs {
                 }),
 Reducer::RunInventoryStockQuantTest => __sats::bsatn::to_vec(&run_inventory_stock_quant_test_reducer::RunInventoryStockQuantTestArgs {
+                }),
+Reducer::RunInventoryUomConversionTest => __sats::bsatn::to_vec(&run_inventory_uom_conversion_test_reducer::RunInventoryUomConversionTestArgs {
                 }),
 Reducer::RunInventoryWaveReleaseTest => __sats::bsatn::to_vec(&run_inventory_wave_release_test_reducer::RunInventoryWaveReleaseTestArgs {
                 }),
@@ -16741,6 +16865,9 @@ pub struct DbUpdate {
     intercompany_rule: __sdk::TableUpdate<IntercompanyRule>,
     intercompany_transaction: __sdk::TableUpdate<IntercompanyTransaction>,
     inventory_adjustment: __sdk::TableUpdate<InventoryAdjustment>,
+    inventory_close: __sdk::TableUpdate<InventoryClose>,
+    inventory_close_line: __sdk::TableUpdate<InventoryCloseLine>,
+    inventory_integration_intent: __sdk::TableUpdate<InventoryIntegrationIntent>,
     inventory_valuation: __sdk::TableUpdate<InventoryValuation>,
     iot_action: __sdk::TableUpdate<IoTAction>,
     iot_alert: __sdk::TableUpdate<IoTAlert>,
@@ -17067,6 +17194,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "intercompany_rule" => db_update.intercompany_rule.append(intercompany_rule_table::parse_table_update(table_update)?),
     "intercompany_transaction" => db_update.intercompany_transaction.append(intercompany_transaction_table::parse_table_update(table_update)?),
     "inventory_adjustment" => db_update.inventory_adjustment.append(inventory_adjustment_table::parse_table_update(table_update)?),
+    "inventory_close" => db_update.inventory_close.append(inventory_close_table::parse_table_update(table_update)?),
+    "inventory_close_line" => db_update.inventory_close_line.append(inventory_close_line_table::parse_table_update(table_update)?),
+    "inventory_integration_intent" => db_update.inventory_integration_intent.append(inventory_integration_intent_table::parse_table_update(table_update)?),
     "inventory_valuation" => db_update.inventory_valuation.append(inventory_valuation_table::parse_table_update(table_update)?),
     "iot_action" => db_update.iot_action.append(iot_action_table::parse_table_update(table_update)?),
     "iot_alert" => db_update.iot_alert.append(iot_alert_table::parse_table_update(table_update)?),
@@ -17405,6 +17535,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.intercompany_rule = cache.apply_diff_to_table::<IntercompanyRule>("intercompany_rule", &self.intercompany_rule).with_updates_by_pk(|row| &row.id);
         diff.intercompany_transaction = cache.apply_diff_to_table::<IntercompanyTransaction>("intercompany_transaction", &self.intercompany_transaction).with_updates_by_pk(|row| &row.id);
         diff.inventory_adjustment = cache.apply_diff_to_table::<InventoryAdjustment>("inventory_adjustment", &self.inventory_adjustment).with_updates_by_pk(|row| &row.id);
+        diff.inventory_close = cache.apply_diff_to_table::<InventoryClose>("inventory_close", &self.inventory_close).with_updates_by_pk(|row| &row.id);
+        diff.inventory_close_line = cache.apply_diff_to_table::<InventoryCloseLine>("inventory_close_line", &self.inventory_close_line).with_updates_by_pk(|row| &row.id);
+        diff.inventory_integration_intent = cache.apply_diff_to_table::<InventoryIntegrationIntent>("inventory_integration_intent", &self.inventory_integration_intent).with_updates_by_pk(|row| &row.id);
         diff.inventory_valuation = cache.apply_diff_to_table::<InventoryValuation>("inventory_valuation", &self.inventory_valuation).with_updates_by_pk(|row| &row.id);
         diff.iot_action = cache.apply_diff_to_table::<IoTAction>("iot_action", &self.iot_action).with_updates_by_pk(|row| &row.id);
         diff.iot_alert = cache.apply_diff_to_table::<IoTAlert>("iot_alert", &self.iot_alert).with_updates_by_pk(|row| &row.id);
@@ -17728,6 +17861,9 @@ for table_rows in raw.tables {
                 "intercompany_rule" => db_update.intercompany_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "intercompany_transaction" => db_update.intercompany_transaction.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "inventory_adjustment" => db_update.inventory_adjustment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "inventory_close" => db_update.inventory_close.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "inventory_close_line" => db_update.inventory_close_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "inventory_integration_intent" => db_update.inventory_integration_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "inventory_valuation" => db_update.inventory_valuation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "iot_action" => db_update.iot_action.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "iot_alert" => db_update.iot_alert.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -18051,6 +18187,9 @@ for table_rows in raw.tables {
                 "intercompany_rule" => db_update.intercompany_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "intercompany_transaction" => db_update.intercompany_transaction.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "inventory_adjustment" => db_update.inventory_adjustment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "inventory_close" => db_update.inventory_close.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "inventory_close_line" => db_update.inventory_close_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "inventory_integration_intent" => db_update.inventory_integration_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "inventory_valuation" => db_update.inventory_valuation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "iot_action" => db_update.iot_action.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "iot_alert" => db_update.iot_alert.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -18376,6 +18515,9 @@ pub struct AppliedDiff<'r> {
     intercompany_rule: __sdk::TableAppliedDiff<'r, IntercompanyRule>,
     intercompany_transaction: __sdk::TableAppliedDiff<'r, IntercompanyTransaction>,
     inventory_adjustment: __sdk::TableAppliedDiff<'r, InventoryAdjustment>,
+    inventory_close: __sdk::TableAppliedDiff<'r, InventoryClose>,
+    inventory_close_line: __sdk::TableAppliedDiff<'r, InventoryCloseLine>,
+    inventory_integration_intent: __sdk::TableAppliedDiff<'r, InventoryIntegrationIntent>,
     inventory_valuation: __sdk::TableAppliedDiff<'r, InventoryValuation>,
     iot_action: __sdk::TableAppliedDiff<'r, IoTAction>,
     iot_alert: __sdk::TableAppliedDiff<'r, IoTAlert>,
@@ -18702,6 +18844,9 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<IntercompanyRule>("intercompany_rule", &self.intercompany_rule, event);
         callbacks.invoke_table_row_callbacks::<IntercompanyTransaction>("intercompany_transaction", &self.intercompany_transaction, event);
         callbacks.invoke_table_row_callbacks::<InventoryAdjustment>("inventory_adjustment", &self.inventory_adjustment, event);
+        callbacks.invoke_table_row_callbacks::<InventoryClose>("inventory_close", &self.inventory_close, event);
+        callbacks.invoke_table_row_callbacks::<InventoryCloseLine>("inventory_close_line", &self.inventory_close_line, event);
+        callbacks.invoke_table_row_callbacks::<InventoryIntegrationIntent>("inventory_integration_intent", &self.inventory_integration_intent, event);
         callbacks.invoke_table_row_callbacks::<InventoryValuation>("inventory_valuation", &self.inventory_valuation, event);
         callbacks.invoke_table_row_callbacks::<IoTAction>("iot_action", &self.iot_action, event);
         callbacks.invoke_table_row_callbacks::<IoTAlert>("iot_alert", &self.iot_alert, event);
@@ -19659,6 +19804,9 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         intercompany_rule_table::register_table(client_cache);
         intercompany_transaction_table::register_table(client_cache);
         inventory_adjustment_table::register_table(client_cache);
+        inventory_close_table::register_table(client_cache);
+        inventory_close_line_table::register_table(client_cache);
+        inventory_integration_intent_table::register_table(client_cache);
         inventory_valuation_table::register_table(client_cache);
         iot_action_table::register_table(client_cache);
         iot_alert_table::register_table(client_cache);
@@ -19977,6 +20125,9 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "intercompany_rule",
         "intercompany_transaction",
         "inventory_adjustment",
+        "inventory_close",
+        "inventory_close_line",
+        "inventory_integration_intent",
         "inventory_valuation",
         "iot_action",
         "iot_alert",
