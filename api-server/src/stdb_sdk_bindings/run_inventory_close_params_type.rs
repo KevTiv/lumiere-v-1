@@ -6,15 +6,13 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub struct CreateInventoryCloseParams {
-    pub name: String,
-    pub as_of: Option<__sdk::Timestamp>,
+pub struct RunInventoryCloseParams {
     pub journal_id: Option<u64>,
     pub inventory_account_id: Option<u64>,
     pub valuation_account_id: Option<u64>,
     pub metadata: Option<String>,
 }
 
-impl __sdk::InModule for CreateInventoryCloseParams {
+impl __sdk::InModule for RunInventoryCloseParams {
     type Module = super::RemoteModule;
 }

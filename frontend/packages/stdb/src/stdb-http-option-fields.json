@@ -4802,5 +4802,53 @@
   ],
   "CreateVendorCreditFromPurchaseReturnParams": [
     "metadata"
+  ],
+  "CreateInventoryCloseParams": [
+    "as_of",
+    "journal_id",
+    "inventory_account_id",
+    "valuation_account_id",
+    "metadata"
+  ],
+  "RunInventoryCloseParams": [
+    "journal_id",
+    "inventory_account_id",
+    "valuation_account_id",
+    "metadata"
+  ],
+  "ExecuteDirectedPutawayParams": [
+    "dest_location_id",
+    "metadata"
+  ],
+  "ReceiveConsignmentStockParams": [
+    "location_id",
+    "metadata"
+  ],
+  "RunCartonizationParams": [
+    "packaging_material_id",
+    "metadata"
+  ],
+  "ExecuteCrossDockParams": [
+    "location_dest_id",
+    "metadata"
+  ],
+  "CreatePackagingMaterialParams": [
+    "barcode",
+    "metadata"
+  ],
+  "CreateInventoryIntegrationIntentParams": [
+    "warehouse_id",
+    "picking_id",
+    "request_payload",
+    "metadata"
+  ],
+  "RecordInventoryIntegrationResultParams": [
+    "external_reference",
+    "last_error",
+    "product_id",
+    "location_id",
+    "quantity",
+    "cost",
+    "metadata"
   ]
 }

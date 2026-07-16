@@ -914,6 +914,7 @@ function categorizeByModule(reducerName: string): string {
     activate_consignment_agreement: 'inventory',
     receive_consignment_stock: 'inventory',
     execute_cross_dock: 'inventory',
+    execute_directed_putaway: 'inventory',
     run_inventory_close: 'inventory',
     reopen_inventory_close: 'inventory',
     create_inventory_integration_intent: 'inventory',

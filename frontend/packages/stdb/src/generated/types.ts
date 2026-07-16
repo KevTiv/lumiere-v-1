@@ -3967,6 +3967,9 @@ export type CreateInventoryAdjustmentParams = __Infer<typeof CreateInventoryAdju
 export const CreateInventoryCloseParams = __t.object("CreateInventoryCloseParams", {
   name: __t.string(),
   asOf: __t.option(__t.timestamp()),
+  journalId: __t.option(__t.u64()),
+  inventoryAccountId: __t.option(__t.u64()),
+  valuationAccountId: __t.option(__t.u64()),
   metadata: __t.option(__t.string()),
 });
 export type CreateInventoryCloseParams = __Infer<typeof CreateInventoryCloseParams>;
@@ -6642,6 +6645,17 @@ export const ExecuteCrossDockParams = __t.object("ExecuteCrossDockParams", {
 });
 export type ExecuteCrossDockParams = __Infer<typeof ExecuteCrossDockParams>;
 
+export const ExecuteDirectedPutawayParams = __t.object("ExecuteDirectedPutawayParams", {
+  warehouseId: __t.u64(),
+  productId: __t.u64(),
+  sourceLocationId: __t.u64(),
+  quantity: __t.f64(),
+  destLocationId: __t.option(__t.u64()),
+  strategy: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type ExecuteDirectedPutawayParams = __Infer<typeof ExecuteDirectedPutawayParams>;
+
 // The tagged union or sum type for the algebraic type `ExpenseSheetState`.
 export const ExpenseSheetState = __t.enum("ExpenseSheetState", {
   Draft: __t.unit(),
@@ -7510,6 +7524,10 @@ export const InventoryClose = __t.object("InventoryClose", {
   lineCount: __t.u32(),
   totalQuantity: __t.f64(),
   totalValue: __t.f64(),
+  journalId: __t.option(__t.u64()),
+  inventoryAccountId: __t.option(__t.u64()),
+  valuationAccountId: __t.option(__t.u64()),
+  accountMoveId: __t.option(__t.u64()),
   closedAt: __t.option(__t.timestamp()),
   createUid: __t.identity(),
   createDate: __t.timestamp(),
@@ -10810,6 +10828,14 @@ export const RunFxRevaluationParams = __t.object("RunFxRevaluationParams", {
   metadata: __t.option(__t.string()),
 });
 export type RunFxRevaluationParams = __Infer<typeof RunFxRevaluationParams>;
+
+export const RunInventoryCloseParams = __t.object("RunInventoryCloseParams", {
+  journalId: __t.option(__t.u64()),
+  inventoryAccountId: __t.option(__t.u64()),
+  valuationAccountId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type RunInventoryCloseParams = __Infer<typeof RunInventoryCloseParams>;
 
 export const SaleCommission = __t.object("SaleCommission", {
   id: __t.u64(),

@@ -76,6 +76,7 @@ export const INVENTORY_BFF_REDUCERS = [
   "delete_warehouse_3d_zone",
   "done_stock_move",
   "execute_cross_dock",
+  "execute_directed_putaway",
   "execute_replenishment_rule",
   "fail_quality_check",
   "import_lot_csv",

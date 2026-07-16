@@ -1,8 +1,10 @@
-//! Inventory period close — snapshot quants and lock stock mutations.
+//! Inventory period close — snapshot quants, lock stock mutations, optional GL valuation.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
+use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::inventory::stock::stock_quant;
+use crate::types::{AccountMoveState, PaymentState};
 use serde_json;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -30,6 +32,12 @@ pub struct InventoryClose {
     pub line_count: u32,
     pub total_quantity: f64,
     pub total_value: f64,
+    /// Optional GL posting accounts (set on create or overridden on run).
+    pub journal_id: Option<u64>,
+    pub inventory_account_id: Option<u64>,
+    pub valuation_account_id: Option<u64>,
+    /// Posted valuation move when GL accounts were supplied.
+    pub account_move_id: Option<u64>,
     pub closed_at: Option<Timestamp>,
     pub create_uid: Identity,
     pub create_date: Timestamp,
@@ -69,6 +77,18 @@ pub struct InventoryCloseLine {
 pub struct CreateInventoryCloseParams {
     pub name: String,
     pub as_of: Option<Timestamp>,
+    pub journal_id: Option<u64>,
+    pub inventory_account_id: Option<u64>,
+    pub valuation_account_id: Option<u64>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RunInventoryCloseParams {
+    /// Override create-time journal when posting valuation.
+    pub journal_id: Option<u64>,
+    pub inventory_account_id: Option<u64>,
+    pub valuation_account_id: Option<u64>,
     pub metadata: Option<String>,
 }
 
@@ -97,6 +117,240 @@ pub(crate) fn assert_inventory_writable(
     Ok(())
 }
 
+fn insert_valuation_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    move_id: u64,
+    move_name: &str,
+    journal_id: u64,
+    company_id: u64,
+    currency_id: u64,
+    account_id: u64,
+    line_name: &str,
+    debit: f64,
+    credit: f64,
+    sequence: u32,
+) {
+    ctx.db.account_move_line().insert(AccountMoveLine {
+        id: 0,
+        organization_id,
+        move_id,
+        move_name: Some(move_name.to_string()),
+        date: ctx.timestamp,
+        ref_: None,
+        parent_state: AccountMoveState::Posted,
+        journal_id,
+        company_id,
+        company_currency_id: currency_id,
+        sequence,
+        name: line_name.to_string(),
+        quantity: 0.0,
+        price_unit: 0.0,
+        price: 0.0,
+        price_subtotal: 0.0,
+        price_total: 0.0,
+        discount: 0.0,
+        balance: debit - credit,
+        currency_id,
+        amount_currency: 0.0,
+        amount_residual: 0.0,
+        amount_residual_currency: 0.0,
+        debit,
+        credit,
+        debit_currency: 0.0,
+        credit_currency: 0.0,
+        tax_base_amount: 0.0,
+        account_id,
+        account_internal_type: None,
+        account_internal_group: None,
+        account_root_id: None,
+        group_tax_id: None,
+        tax_line_id: None,
+        tax_group_id: None,
+        tax_ids: vec![],
+        tax_repartition_line_id: None,
+        tax_audit: None,
+        partner_id: None,
+        commercial_partner_id: None,
+        reconcile_model_id: None,
+        payment_id: None,
+        statement_line_id: None,
+        currency_id_field: None,
+        blocked: false,
+        matching_number: None,
+        matching_label: None,
+        is_matching: false,
+        expected_pay_date: None,
+        expected_pay_date_currency_id: None,
+        expected_pay_date_amount: 0.0,
+        expected_pay_date_residual: 0.0,
+        display_type: None,
+        is_downpayment: false,
+        exclude_from_invoice_tab: false,
+        analytic_account_id: None,
+        analytic_tag_ids: vec![],
+        product_id: None,
+        product_uom_id: None,
+        product_category_id: None,
+        cogs_amount: 0.0,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: None,
+    });
+}
+
+/// Post balanced Entry: Dr inventory asset / Cr valuation clearing for close total_value.
+fn post_close_valuation_move(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    close_id: u64,
+    close_name: &str,
+    as_of: Timestamp,
+    total_value: f64,
+    journal_id: u64,
+    inventory_account_id: u64,
+    valuation_account_id: u64,
+) -> Result<u64, String> {
+    if total_value.abs() < 1e-9 {
+        return Err("total_value is zero — nothing to post".to_string());
+    }
+    if inventory_account_id == valuation_account_id {
+        return Err("inventory_account_id and valuation_account_id must differ".to_string());
+    }
+
+    let amount = total_value.abs();
+    let name = next_doc_number(ctx, "INVCLS");
+    let currency_id = 1_u64;
+    let debit_inv = total_value >= 0.0;
+
+    let move_record = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        organization_id,
+        name: name.clone(),
+        ref_: Some(format!("Inventory close {close_id}: {close_name}")),
+        move_type: crate::types::MoveType::Entry,
+        auto_post: false,
+        state: AccountMoveState::Posted,
+        date: as_of,
+        invoice_date: None,
+        invoice_date_due: None,
+        invoice_payment_term_id: None,
+        invoice_origin: None,
+        invoice_partner_display_name: None,
+        invoice_cash_rounding_id: None,
+        payment_reference: Some(format!("INVCLS-{close_id}")),
+        partner_shipping_id: None,
+        sale_order_id: None,
+        partner_id: None,
+        commercial_partner_id: None,
+        partner_bank_id: None,
+        fiscal_position_id: None,
+        invoice_user_id: None,
+        invoice_incoterm_id: None,
+        incoterm_location: None,
+        campaign_id: None,
+        source_id: None,
+        medium_id: None,
+        company_id,
+        journal_id,
+        currency_id,
+        company_currency_id: currency_id,
+        amount_untaxed: amount,
+        amount_tax: 0.0,
+        amount_total: amount,
+        amount_residual: 0.0,
+        amount_untaxed_signed: if debit_inv { amount } else { -amount },
+        amount_tax_signed: 0.0,
+        amount_total_signed: if debit_inv { amount } else { -amount },
+        amount_total_in_currency_signed: if debit_inv { amount } else { -amount },
+        amount_residual_signed: 0.0,
+        to_check: false,
+        posted_before: true,
+        is_storno: false,
+        is_move_sent: false,
+        secure_sequence_number: None,
+        invoice_has_outstanding: false,
+        payment_state: PaymentState::NotPaid,
+        restrict_mode_hash_table: false,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some(
+            serde_json::json!({
+                "inventory_close_id": close_id,
+                "total_value": total_value,
+            })
+            .to_string(),
+        ),
+    });
+
+    if debit_inv {
+        insert_valuation_line(
+            ctx,
+            organization_id,
+            move_record.id,
+            &name,
+            journal_id,
+            company_id,
+            currency_id,
+            inventory_account_id,
+            "Inventory on-hand (close)",
+            amount,
+            0.0,
+            1,
+        );
+        insert_valuation_line(
+            ctx,
+            organization_id,
+            move_record.id,
+            &name,
+            journal_id,
+            company_id,
+            currency_id,
+            valuation_account_id,
+            "Inventory valuation (close)",
+            0.0,
+            amount,
+            2,
+        );
+    } else {
+        insert_valuation_line(
+            ctx,
+            organization_id,
+            move_record.id,
+            &name,
+            journal_id,
+            company_id,
+            currency_id,
+            valuation_account_id,
+            "Inventory valuation (close)",
+            amount,
+            0.0,
+            1,
+        );
+        insert_valuation_line(
+            ctx,
+            organization_id,
+            move_record.id,
+            &name,
+            journal_id,
+            company_id,
+            currency_id,
+            inventory_account_id,
+            "Inventory on-hand (close)",
+            0.0,
+            amount,
+            2,
+        );
+    }
+
+    Ok(move_record.id)
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 #[reducer]
@@ -121,6 +375,10 @@ pub fn create_inventory_close(
         line_count: 0,
         total_quantity: 0.0,
         total_value: 0.0,
+        journal_id: params.journal_id,
+        inventory_account_id: params.inventory_account_id,
+        valuation_account_id: params.valuation_account_id,
+        account_move_id: None,
         closed_at: None,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
@@ -147,13 +405,14 @@ pub fn create_inventory_close(
     Ok(())
 }
 
-/// Snapshot company quants and lock stock mutations.
+/// Snapshot company quants, lock stock mutations, optionally post valuation journal.
 #[reducer]
 pub fn run_inventory_close(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
     close_id: u64,
+    params: RunInventoryCloseParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_quant", "update")?;
     let close = ctx
@@ -212,15 +471,52 @@ pub fn run_inventory_close(
         total_value += quant.value;
     }
 
+    let journal_id = params.journal_id.or(close.journal_id);
+    let inventory_account_id = params.inventory_account_id.or(close.inventory_account_id);
+    let valuation_account_id = params.valuation_account_id.or(close.valuation_account_id);
+
+    let account_move_id = match (journal_id, inventory_account_id, valuation_account_id) {
+        (Some(j), Some(inv), Some(val)) if total_value.abs() >= 1e-9 => {
+            check_permission(ctx, organization_id, "account_move", "create")?;
+            Some(post_close_valuation_move(
+                ctx,
+                organization_id,
+                company_id,
+                close_id,
+                &close.name,
+                close.as_of,
+                total_value,
+                j,
+                inv,
+                val,
+            )?)
+        }
+        (Some(_), Some(_), Some(_)) => None, // zero value — skip GL
+        (None, None, None) => None,
+        _ => {
+            return Err(
+                "GL posting requires journal_id, inventory_account_id, and valuation_account_id together"
+                    .to_string(),
+            );
+        }
+    };
+
+    let metadata = params.metadata.or(close.metadata.clone());
+
     ctx.db.inventory_close().id().update(InventoryClose {
         state: "closed".to_string(),
         locked: true,
         line_count,
         total_quantity,
         total_value,
+        journal_id,
+        inventory_account_id,
+        valuation_account_id,
+        account_move_id,
         closed_at: Some(ctx.timestamp),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
+        metadata,
         ..close
     });
 
@@ -239,6 +535,7 @@ pub fn run_inventory_close(
                     "locked": true,
                     "line_count": line_count,
                     "total_value": total_value,
+                    "account_move_id": account_move_id,
                 })
                 .to_string(),
             ),
@@ -246,6 +543,7 @@ pub fn run_inventory_close(
                 "state".to_string(),
                 "locked".to_string(),
                 "line_count".to_string(),
+                "account_move_id".to_string(),
             ],
             metadata: None,
         },
@@ -282,6 +580,7 @@ pub fn reopen_inventory_close(
             serde_json::json!({
                 "reopened_at": ctx.timestamp.to_micros_since_unix_epoch(),
                 "prior": close.metadata,
+                "account_move_id": close.account_move_id,
             })
             .to_string(),
         ),

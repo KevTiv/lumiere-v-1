@@ -10,15 +10,4 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-import {
-  RunInventoryCloseParams,
-} from "./types";
-
-export default {
-  organizationId: __t.u64(),
-  companyId: __t.u64(),
-  closeId: __t.u64(),
-  get params() {
-    return RunInventoryCloseParams;
-  },
-};
+export default {};

@@ -398,6 +398,7 @@ pub mod end_contact_role_params_type;
 pub mod enqueue_job_params_type;
 pub mod error_intercompany_transaction_params_type;
 pub mod execute_cross_dock_params_type;
+pub mod execute_directed_putaway_params_type;
 pub mod expense_sheet_state_type;
 pub mod expense_state_type;
 pub mod export_financial_report_params_type;
@@ -632,6 +633,7 @@ pub mod rule_type_type;
 pub mod run_cartonization_params_type;
 pub mod run_fx_revaluation_batch_params_type;
 pub mod run_fx_revaluation_params_type;
+pub mod run_inventory_close_params_type;
 pub mod sale_commission_type;
 pub mod sale_commission_plan_type;
 pub mod sale_commission_plan_split_type;
@@ -1293,6 +1295,7 @@ pub mod ensure_dev_admin_reducer;
 pub mod error_intercompany_transaction_reducer;
 pub mod evaluate_dynamic_segment_reducer;
 pub mod execute_cross_dock_reducer;
+pub mod execute_directed_putaway_reducer;
 pub mod execute_replenishment_rule_reducer;
 pub mod execute_retention_purge_reducer;
 pub mod expire_ai_action_drafts_reducer;
@@ -1531,10 +1534,12 @@ pub mod run_inventory_atp_fail_closed_test_reducer;
 pub mod run_inventory_cartonization_test_reducer;
 pub mod run_inventory_close_reducer;
 pub mod run_inventory_close_lock_test_reducer;
+pub mod run_inventory_close_valuation_test_reducer;
 pub mod run_inventory_company_isolation_test_reducer;
 pub mod run_inventory_consignment_atp_test_reducer;
 pub mod run_inventory_cross_dock_test_reducer;
 pub mod run_inventory_delivery_quant_test_reducer;
+pub mod run_inventory_directed_putaway_test_reducer;
 pub mod run_inventory_expired_lot_test_reducer;
 pub mod run_inventory_fefo_test_reducer;
 pub mod run_inventory_lot_reserve_test_reducer;
@@ -2517,6 +2522,7 @@ pub use end_contact_role_params_type::EndContactRoleParams;
 pub use enqueue_job_params_type::EnqueueJobParams;
 pub use error_intercompany_transaction_params_type::ErrorIntercompanyTransactionParams;
 pub use execute_cross_dock_params_type::ExecuteCrossDockParams;
+pub use execute_directed_putaway_params_type::ExecuteDirectedPutawayParams;
 pub use expense_sheet_state_type::ExpenseSheetState;
 pub use expense_state_type::ExpenseState;
 pub use export_financial_report_params_type::ExportFinancialReportParams;
@@ -2751,6 +2757,7 @@ pub use rule_type_type::RuleType;
 pub use run_cartonization_params_type::RunCartonizationParams;
 pub use run_fx_revaluation_batch_params_type::RunFxRevaluationBatchParams;
 pub use run_fx_revaluation_params_type::RunFxRevaluationParams;
+pub use run_inventory_close_params_type::RunInventoryCloseParams;
 pub use sale_commission_type::SaleCommission;
 pub use sale_commission_plan_type::SaleCommissionPlan;
 pub use sale_commission_plan_split_type::SaleCommissionPlanSplit;
@@ -3731,6 +3738,7 @@ pub use ensure_dev_admin_reducer::ensure_dev_admin;
 pub use error_intercompany_transaction_reducer::error_intercompany_transaction;
 pub use evaluate_dynamic_segment_reducer::evaluate_dynamic_segment;
 pub use execute_cross_dock_reducer::execute_cross_dock;
+pub use execute_directed_putaway_reducer::execute_directed_putaway;
 pub use execute_replenishment_rule_reducer::execute_replenishment_rule;
 pub use execute_retention_purge_reducer::execute_retention_purge;
 pub use expire_ai_action_drafts_reducer::expire_ai_action_drafts;
@@ -3969,10 +3977,12 @@ pub use run_inventory_atp_fail_closed_test_reducer::run_inventory_atp_fail_close
 pub use run_inventory_cartonization_test_reducer::run_inventory_cartonization_test;
 pub use run_inventory_close_reducer::run_inventory_close;
 pub use run_inventory_close_lock_test_reducer::run_inventory_close_lock_test;
+pub use run_inventory_close_valuation_test_reducer::run_inventory_close_valuation_test;
 pub use run_inventory_company_isolation_test_reducer::run_inventory_company_isolation_test;
 pub use run_inventory_consignment_atp_test_reducer::run_inventory_consignment_atp_test;
 pub use run_inventory_cross_dock_test_reducer::run_inventory_cross_dock_test;
 pub use run_inventory_delivery_quant_test_reducer::run_inventory_delivery_quant_test;
+pub use run_inventory_directed_putaway_test_reducer::run_inventory_directed_putaway_test;
 pub use run_inventory_expired_lot_test_reducer::run_inventory_expired_lot_test;
 pub use run_inventory_fefo_test_reducer::run_inventory_fefo_test;
 pub use run_inventory_lot_reserve_test_reducer::run_inventory_lot_reserve_test;
@@ -6197,6 +6207,11 @@ pub enum Reducer {
         company_id: u64,
         params: ExecuteCrossDockParams,
 }    ,
+    ExecuteDirectedPutaway {
+        organization_id: u64,
+        company_id: u64,
+        params: ExecuteDirectedPutawayParams,
+}    ,
     ExecuteReplenishmentRule {
         organization_id: u64,
         company_id: u64,
@@ -7174,12 +7189,15 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         close_id: u64,
+        params: RunInventoryCloseParams,
 }    ,
     RunInventoryCloseLockTest ,
+    RunInventoryCloseValuationTest ,
     RunInventoryCompanyIsolationTest ,
     RunInventoryConsignmentAtpTest ,
     RunInventoryCrossDockTest ,
     RunInventoryDeliveryQuantTest ,
+    RunInventoryDirectedPutawayTest ,
     RunInventoryExpiredLotTest ,
     RunInventoryFefoTest ,
     RunInventoryLotReserveTest ,
@@ -8842,6 +8860,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ErrorIntercompanyTransaction { .. } => "error_intercompany_transaction",
             Reducer::EvaluateDynamicSegment { .. } => "evaluate_dynamic_segment",
             Reducer::ExecuteCrossDock { .. } => "execute_cross_dock",
+            Reducer::ExecuteDirectedPutaway { .. } => "execute_directed_putaway",
             Reducer::ExecuteReplenishmentRule { .. } => "execute_replenishment_rule",
             Reducer::ExecuteRetentionPurge { .. } => "execute_retention_purge",
             Reducer::ExpireAiActionDrafts { .. } => "expire_ai_action_drafts",
@@ -9080,10 +9099,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventoryCartonizationTest => "run_inventory_cartonization_test",
             Reducer::RunInventoryClose { .. } => "run_inventory_close",
             Reducer::RunInventoryCloseLockTest => "run_inventory_close_lock_test",
+            Reducer::RunInventoryCloseValuationTest => "run_inventory_close_valuation_test",
             Reducer::RunInventoryCompanyIsolationTest => "run_inventory_company_isolation_test",
             Reducer::RunInventoryConsignmentAtpTest => "run_inventory_consignment_atp_test",
             Reducer::RunInventoryCrossDockTest => "run_inventory_cross_dock_test",
             Reducer::RunInventoryDeliveryQuantTest => "run_inventory_delivery_quant_test",
+            Reducer::RunInventoryDirectedPutawayTest => "run_inventory_directed_putaway_test",
             Reducer::RunInventoryExpiredLotTest => "run_inventory_expired_lot_test",
             Reducer::RunInventoryFefoTest => "run_inventory_fefo_test",
             Reducer::RunInventoryLotReserveTest => "run_inventory_lot_reserve_test",
@@ -12828,6 +12849,15 @@ Reducer::ErrorIntercompanyTransaction{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::ExecuteDirectedPutaway{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&execute_directed_putaway_reducer::ExecuteDirectedPutawayArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ExecuteReplenishmentRule{
                 organization_id,
                 company_id,
@@ -14577,12 +14607,16 @@ Reducer::RunInventoryClose{
                 organization_id,
                 company_id,
                 close_id,
+                params,
 }             => __sats::bsatn::to_vec(&run_inventory_close_reducer::RunInventoryCloseArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 close_id: close_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RunInventoryCloseLockTest => __sats::bsatn::to_vec(&run_inventory_close_lock_test_reducer::RunInventoryCloseLockTestArgs {
+                }),
+Reducer::RunInventoryCloseValuationTest => __sats::bsatn::to_vec(&run_inventory_close_valuation_test_reducer::RunInventoryCloseValuationTestArgs {
                 }),
 Reducer::RunInventoryCompanyIsolationTest => __sats::bsatn::to_vec(&run_inventory_company_isolation_test_reducer::RunInventoryCompanyIsolationTestArgs {
                 }),
@@ -14591,6 +14625,8 @@ Reducer::RunInventoryConsignmentAtpTest => __sats::bsatn::to_vec(&run_inventory_
 Reducer::RunInventoryCrossDockTest => __sats::bsatn::to_vec(&run_inventory_cross_dock_test_reducer::RunInventoryCrossDockTestArgs {
                 }),
 Reducer::RunInventoryDeliveryQuantTest => __sats::bsatn::to_vec(&run_inventory_delivery_quant_test_reducer::RunInventoryDeliveryQuantTestArgs {
+                }),
+Reducer::RunInventoryDirectedPutawayTest => __sats::bsatn::to_vec(&run_inventory_directed_putaway_test_reducer::RunInventoryDirectedPutawayTestArgs {
                 }),
 Reducer::RunInventoryExpiredLotTest => __sats::bsatn::to_vec(&run_inventory_expired_lot_test_reducer::RunInventoryExpiredLotTestArgs {
                 }),

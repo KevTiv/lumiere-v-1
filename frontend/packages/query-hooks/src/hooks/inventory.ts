@@ -1607,12 +1607,17 @@ export function useCreateInventoryClose(organizationId: bigint, companyId: bigin
 
 export function useRunInventoryClose(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (closeId) => {
+  return useMutation<
+    void,
+    Error,
+    { closeId: ScalarId; params?: Record<string, unknown> }
+  >({
+    mutationFn: async ({ closeId, params }) => {
       const { urlPath, init } = inventoryBffPost("run_inventory_close", [
         organizationId,
         companyId,
         toScalarU64(closeId),
+        stdbParamsToJson(params ?? {}, "RunInventoryCloseParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to run inventory close')
@@ -1753,6 +1758,22 @@ export function useExecuteCrossDock(organizationId: bigint, companyId: bigint) {
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to execute cross-dock')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useExecuteDirectedPutaway(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = inventoryBffPost("execute_directed_putaway", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object, "ExecuteDirectedPutawayParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to execute directed putaway')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
   })

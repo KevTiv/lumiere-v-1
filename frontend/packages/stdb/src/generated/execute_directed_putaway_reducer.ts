@@ -11,14 +11,13 @@ import {
 } from "spacetimedb";
 
 import {
-  RunInventoryCloseParams,
+  ExecuteDirectedPutawayParams,
 } from "./types";
 
 export default {
   organizationId: __t.u64(),
   companyId: __t.u64(),
-  closeId: __t.u64(),
   get params() {
-    return RunInventoryCloseParams;
+    return ExecuteDirectedPutawayParams;
   },
 };

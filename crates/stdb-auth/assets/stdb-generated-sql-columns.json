@@ -3238,6 +3238,23 @@
     "reason_notes",
     "metadata"
   ],
+  "CreateInventoryCloseParams": [
+    "name",
+    "as_of",
+    "journal_id",
+    "inventory_account_id",
+    "valuation_account_id",
+    "metadata"
+  ],
+  "CreateInventoryIntegrationIntentParams": [
+    "provider",
+    "intent_type",
+    "warehouse_id",
+    "picking_id",
+    "idempotency_key",
+    "request_payload",
+    "metadata"
+  ],
   "CreateInvoiceFromSaleOrderParams": [
     "journal_id",
     "default_income_account_id",
@@ -3524,6 +3541,21 @@
     "email",
     "phone",
     "currency_id",
+    "metadata"
+  ],
+  "CreatePackagingMaterialParams": [
+    "name",
+    "material_type",
+    "weight",
+    "max_weight",
+    "length",
+    "width",
+    "height",
+    "volume",
+    "cost",
+    "currency_id",
+    "barcode",
+    "is_active",
     "metadata"
   ],
   "CreatePartnerBankParams": [
@@ -4439,6 +4471,7 @@
     "inventory_id",
     "sale_line_id",
     "lot_id",
+    "serial_id",
     "package_id",
     "result_package_id",
     "owner_id",
@@ -5501,6 +5534,23 @@
   "ErrorIntercompanyTransactionParams": [
     "error_message"
   ],
+  "ExecuteCrossDockParams": [
+    "inbound_picking_id",
+    "product_id",
+    "quantity",
+    "partner_id",
+    "location_dest_id",
+    "metadata"
+  ],
+  "ExecuteDirectedPutawayParams": [
+    "warehouse_id",
+    "product_id",
+    "source_location_id",
+    "quantity",
+    "dest_location_id",
+    "strategy",
+    "metadata"
+  ],
   "ExpenseSheet": [
     "id",
     "organization_id",
@@ -6093,6 +6143,63 @@
     "created_at",
     "approved_at",
     "posted_at",
+    "metadata"
+  ],
+  "InventoryClose": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "as_of",
+    "state",
+    "locked",
+    "line_count",
+    "total_quantity",
+    "total_value",
+    "journal_id",
+    "inventory_account_id",
+    "valuation_account_id",
+    "account_move_id",
+    "closed_at",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "InventoryCloseLine": [
+    "id",
+    "organization_id",
+    "company_id",
+    "close_id",
+    "product_id",
+    "location_id",
+    "lot_id",
+    "quantity",
+    "reserved_quantity",
+    "available_quantity",
+    "cost",
+    "value",
+    "metadata"
+  ],
+  "InventoryIntegrationIntent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "provider",
+    "intent_type",
+    "warehouse_id",
+    "picking_id",
+    "status",
+    "idempotency_key",
+    "request_payload",
+    "last_error",
+    "external_reference",
+    "attempt_count",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
     "metadata"
   ],
   "InventoryValuation": [
@@ -8448,6 +8555,13 @@
     "started_at",
     "metadata"
   ],
+  "ReceiveConsignmentStockParams": [
+    "agreement_id",
+    "location_id",
+    "quantity",
+    "cost",
+    "metadata"
+  ],
   "RecognizeAmortizationLineParams": [
     "reference",
     "metadata"
@@ -8514,6 +8628,16 @@
     "artifact_key",
     "artifact_size",
     "correlation_id",
+    "metadata"
+  ],
+  "RecordInventoryIntegrationResultParams": [
+    "status",
+    "external_reference",
+    "last_error",
+    "product_id",
+    "location_id",
+    "quantity",
+    "cost",
     "metadata"
   ],
   "RecordPrivacyConsentParams": [
@@ -8717,6 +8841,11 @@
     "updated_at",
     "metadata"
   ],
+  "RunCartonizationParams": [
+    "picking_id",
+    "packaging_material_id",
+    "metadata"
+  ],
   "RunFxRevaluationBatchParams": [
     "currency_code",
     "as_of_date",
@@ -8735,6 +8864,12 @@
     "loss_account_id",
     "lines",
     "reference",
+    "metadata"
+  ],
+  "RunInventoryCloseParams": [
+    "journal_id",
+    "inventory_account_id",
+    "valuation_account_id",
     "metadata"
   ],
   "SaleCommission": [
@@ -9550,6 +9685,7 @@
     "inventory_id",
     "sale_line_id",
     "lot_id",
+    "serial_id",
     "package_id",
     "result_package_id",
     "owner_id",

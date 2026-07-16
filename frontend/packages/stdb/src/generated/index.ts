@@ -455,6 +455,7 @@ import EnsureDevAdminReducer from "./ensure_dev_admin_reducer";
 import ErrorIntercompanyTransactionReducer from "./error_intercompany_transaction_reducer";
 import EvaluateDynamicSegmentReducer from "./evaluate_dynamic_segment_reducer";
 import ExecuteCrossDockReducer from "./execute_cross_dock_reducer";
+import ExecuteDirectedPutawayReducer from "./execute_directed_putaway_reducer";
 import ExecuteReplenishmentRuleReducer from "./execute_replenishment_rule_reducer";
 import ExecuteRetentionPurgeReducer from "./execute_retention_purge_reducer";
 import ExpireAiActionDraftsReducer from "./expire_ai_action_drafts_reducer";
@@ -693,10 +694,12 @@ import RunInventoryAtpFailClosedTestReducer from "./run_inventory_atp_fail_close
 import RunInventoryCartonizationTestReducer from "./run_inventory_cartonization_test_reducer";
 import RunInventoryCloseReducer from "./run_inventory_close_reducer";
 import RunInventoryCloseLockTestReducer from "./run_inventory_close_lock_test_reducer";
+import RunInventoryCloseValuationTestReducer from "./run_inventory_close_valuation_test_reducer";
 import RunInventoryCompanyIsolationTestReducer from "./run_inventory_company_isolation_test_reducer";
 import RunInventoryConsignmentAtpTestReducer from "./run_inventory_consignment_atp_test_reducer";
 import RunInventoryCrossDockTestReducer from "./run_inventory_cross_dock_test_reducer";
 import RunInventoryDeliveryQuantTestReducer from "./run_inventory_delivery_quant_test_reducer";
+import RunInventoryDirectedPutawayTestReducer from "./run_inventory_directed_putaway_test_reducer";
 import RunInventoryExpiredLotTestReducer from "./run_inventory_expired_lot_test_reducer";
 import RunInventoryFefoTestReducer from "./run_inventory_fefo_test_reducer";
 import RunInventoryLotReserveTestReducer from "./run_inventory_lot_reserve_test_reducer";
@@ -7350,6 +7353,7 @@ const reducersSchema = __reducers(
   __reducerSchema("error_intercompany_transaction", ErrorIntercompanyTransactionReducer),
   __reducerSchema("evaluate_dynamic_segment", EvaluateDynamicSegmentReducer),
   __reducerSchema("execute_cross_dock", ExecuteCrossDockReducer),
+  __reducerSchema("execute_directed_putaway", ExecuteDirectedPutawayReducer),
   __reducerSchema("execute_replenishment_rule", ExecuteReplenishmentRuleReducer),
   __reducerSchema("execute_retention_purge", ExecuteRetentionPurgeReducer),
   __reducerSchema("expire_ai_action_drafts", ExpireAiActionDraftsReducer),
@@ -7588,10 +7592,12 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_cartonization_test", RunInventoryCartonizationTestReducer),
   __reducerSchema("run_inventory_close", RunInventoryCloseReducer),
   __reducerSchema("run_inventory_close_lock_test", RunInventoryCloseLockTestReducer),
+  __reducerSchema("run_inventory_close_valuation_test", RunInventoryCloseValuationTestReducer),
   __reducerSchema("run_inventory_company_isolation_test", RunInventoryCompanyIsolationTestReducer),
   __reducerSchema("run_inventory_consignment_atp_test", RunInventoryConsignmentAtpTestReducer),
   __reducerSchema("run_inventory_cross_dock_test", RunInventoryCrossDockTestReducer),
   __reducerSchema("run_inventory_delivery_quant_test", RunInventoryDeliveryQuantTestReducer),
+  __reducerSchema("run_inventory_directed_putaway_test", RunInventoryDirectedPutawayTestReducer),
   __reducerSchema("run_inventory_expired_lot_test", RunInventoryExpiredLotTestReducer),
   __reducerSchema("run_inventory_fefo_test", RunInventoryFefoTestReducer),
   __reducerSchema("run_inventory_lot_reserve_test", RunInventoryLotReserveTestReducer),

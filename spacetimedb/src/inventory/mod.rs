@@ -23,6 +23,7 @@
 /// | integration | InventoryIntegrationIntent (3PL ASN)                          |
 /// | consignment | Consignment receive + ATP ownership                             |
 /// | cross_dock  | Cross-dock outbound from inbound dest                           |
+/// | putaway     | Directed putaway (rule / least-loaded / fixed)                  |
 pub mod barcode;
 pub mod consignment;
 pub mod cross_dock;
@@ -32,6 +33,7 @@ pub mod inventory_adjustments;
 pub mod inventory_close;
 pub mod product;
 pub mod product_category;
+pub mod putaway;
 pub mod quality;
 
 pub use cycle_count::*;

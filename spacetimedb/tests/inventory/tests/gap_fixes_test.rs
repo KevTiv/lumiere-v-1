@@ -16,10 +16,18 @@ use crate::inventory::integration::{
     record_inventory_integration_result, CreateInventoryIntegrationIntentParams,
     RecordInventoryIntegrationResultParams,
 };
+use crate::accounting::chart_of_accounts::{
+    account_account, account_account_type, account_journal, create_account_account,
+    create_account_account_type, create_account_journal, CreateAccountAccountParams,
+    CreateAccountAccountTypeParams, CreateAccountJournalParams,
+};
+use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::inventory::inventory_close::{
     create_inventory_close, inventory_close, reopen_inventory_close, run_inventory_close,
-    CreateInventoryCloseParams,
+    CreateInventoryCloseParams, RunInventoryCloseParams,
 };
+use crate::inventory::putaway::{execute_directed_putaway, ExecuteDirectedPutawayParams};
+use crate::types::{AccountInternalGroup, JournalType};
 use crate::inventory::product::{
     create_product, create_product_supplier_info, product, CreateProductParams,
     CreateProductSupplierInfoParams,
@@ -1830,6 +1838,9 @@ pub fn test_inventory_close_locks_stock(ctx: &ReducerContext) -> Result<(), Stri
         CreateInventoryCloseParams {
             name: "IC-2026-07".to_string(),
             as_of: Some(ctx.timestamp),
+            journal_id: None,
+            inventory_account_id: None,
+            valuation_account_id: None,
             metadata: None,
         },
     )?;
@@ -1841,7 +1852,18 @@ pub fn test_inventory_close_locks_stock(ctx: &ReducerContext) -> Result<(), Stri
         .map(|c| c.id)
         .ok_or("close missing")?;
 
-    run_inventory_close(ctx, org_id, company_id, close_id)?;
+    run_inventory_close(
+        ctx,
+        org_id,
+        company_id,
+        close_id,
+        RunInventoryCloseParams {
+            journal_id: None,
+            inventory_account_id: None,
+            valuation_account_id: None,
+            metadata: None,
+        },
+    )?;
 
     match reserve_quantity_at_location(
         ctx,
@@ -2365,6 +2387,360 @@ pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), Stri
         return Err(format!(
             "expected outbound source at inbound dest, got {}",
             outbound.location_id
+        ));
+    }
+    Ok(())
+}
+
+/// Directed putaway moves available stock to an explicit bin and records a putaway task.
+pub fn test_directed_putaway_moves_stock(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let wh = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&fixture.warehouse_id)
+        .ok_or("warehouse")?;
+
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "Input Stage".to_string(),
+            usage: "internal".to_string(),
+            location_category: "input".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: Some(wh.lot_stock_id),
+            complete_name: Some("Input Stage".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: None,
+        },
+    )?;
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "Bin-A1".to_string(),
+            usage: "internal".to_string(),
+            location_category: "bin".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: Some(wh.lot_stock_id),
+            complete_name: Some("Bin-A1".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: None,
+        },
+    )?;
+    let input_id = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "Input Stage")
+        .map(|l| l.id)
+        .ok_or("input loc")?;
+    let bin_id = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "Bin-A1")
+        .map(|l| l.id)
+        .ok_or("bin loc")?;
+
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        input_id,
+        12.0,
+        None,
+    )?;
+
+    execute_directed_putaway(
+        ctx,
+        org_id,
+        company_id,
+        ExecuteDirectedPutawayParams {
+            warehouse_id: fixture.warehouse_id,
+            product_id: fixture.product_id,
+            source_location_id: input_id,
+            quantity: 5.0,
+            dest_location_id: Some(bin_id),
+            strategy: "fixed".to_string(),
+            metadata: None,
+        },
+    )?;
+
+    let at_bin = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .find(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.product_id == fixture.product_id
+                && q.location_id == bin_id
+                && q.owner_id.is_none()
+        })
+        .ok_or("quant missing at bin")?;
+    if (at_bin.quantity - 5.0).abs() > 0.001 {
+        return Err(format!("expected 5 at bin, got {}", at_bin.quantity));
+    }
+
+    let task = ctx
+        .db
+        .warehouse_task()
+        .iter()
+        .find(|t| {
+            t.organization_id == org_id
+                && t.task_type == "putaway"
+                && t.location_dest_id == Some(bin_id)
+        })
+        .ok_or("putaway task missing")?;
+    if task.state != "done" {
+        return Err(format!("expected putaway task done, got {}", task.state));
+    }
+    Ok(())
+}
+
+/// Inventory close with GL accounts posts a balanced valuation Entry.
+pub fn test_inventory_close_posts_valuation_journal(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    let asset_type_name = format!("Inv Asset Type {company_id}");
+    create_account_account_type(
+        ctx,
+        org_id,
+        CreateAccountAccountTypeParams {
+            company_id: Some(company_id),
+            name: asset_type_name.clone(),
+            type_: "asset".into(),
+            include_initial_balance: false,
+            internal_group: AccountInternalGroup::Asset,
+            metadata: None,
+        },
+    )?;
+    let asset_type_id = ctx
+        .db
+        .account_account_type()
+        .iter()
+        .find(|t| t.organization_id == org_id && t.name == asset_type_name)
+        .map(|t| t.id)
+        .ok_or("asset type")?;
+
+    let inv_code = format!("1INV{company_id}");
+    create_account_account(
+        ctx,
+        org_id,
+        CreateAccountAccountParams {
+            company_id: Some(company_id),
+            code: inv_code.clone(),
+            name: "Inventory Asset".into(),
+            user_type_id: asset_type_id,
+            currency_id: None,
+            internal_type: None,
+            internal_group: Some(AccountInternalGroup::Asset),
+            group_id: None,
+            reconcile: false,
+            tax_ids: vec![],
+            note: None,
+            opening_debit: 0.0,
+            opening_credit: 0.0,
+            allowed_journal_ids: vec![],
+            non_trade: false,
+            is_off_balance: false,
+            metadata: None,
+        },
+    )?;
+    let inv_acct = ctx
+        .db
+        .account_account()
+        .iter()
+        .find(|a| a.organization_id == org_id && a.code == inv_code)
+        .map(|a| a.id)
+        .ok_or("inventory account")?;
+
+    let val_code = format!("1VAL{company_id}");
+    create_account_account(
+        ctx,
+        org_id,
+        CreateAccountAccountParams {
+            company_id: Some(company_id),
+            code: val_code.clone(),
+            name: "Inventory Valuation".into(),
+            user_type_id: asset_type_id,
+            currency_id: None,
+            internal_type: None,
+            internal_group: Some(AccountInternalGroup::Asset),
+            group_id: None,
+            reconcile: false,
+            tax_ids: vec![],
+            note: None,
+            opening_debit: 0.0,
+            opening_credit: 0.0,
+            allowed_journal_ids: vec![],
+            non_trade: false,
+            is_off_balance: false,
+            metadata: None,
+        },
+    )?;
+    let val_acct = ctx
+        .db
+        .account_account()
+        .iter()
+        .find(|a| a.organization_id == org_id && a.code == val_code)
+        .map(|a| a.id)
+        .ok_or("valuation account")?;
+
+    let journal_code = format!("STK{company_id}");
+    create_account_journal(
+        ctx,
+        org_id,
+        CreateAccountJournalParams {
+            company_id: Some(company_id),
+            name: "Stock Valuation".into(),
+            code: journal_code.clone(),
+            type_: JournalType::Inventory,
+            currency_id: Some(1),
+            default_account_id: Some(inv_acct),
+            suspense_account_id: None,
+            loss_account_id: None,
+            profit_account_id: None,
+            bank_account_id: None,
+            payment_credit_account_id: None,
+            payment_debit_account_id: None,
+            invoice_reference_type: None,
+            invoice_reference_model: None,
+            sequence_id: None,
+            refund_sequence_id: None,
+            sequence_override_regex: None,
+            secure_sequence_id: None,
+            alias_name: None,
+            alias_domain: None,
+            sale_activity_type_id: None,
+            sale_activity_user_id: None,
+            sale_activity_note: None,
+            sale_activity_date_deadline: None,
+            restrict_mode_hash_table: false,
+            active: true,
+            at_least_one_inbound: true,
+            at_least_one_outbound: true,
+            dedicated_payment_method_ids: vec![],
+            sale_activity_done: false,
+            metadata: None,
+        },
+    )?;
+    let journal_id = ctx
+        .db
+        .account_journal()
+        .iter()
+        .find(|j| j.organization_id == org_id && j.code == journal_code)
+        .map(|j| j.id)
+        .ok_or("stock journal")?;
+
+    create_inventory_close(
+        ctx,
+        org_id,
+        company_id,
+        CreateInventoryCloseParams {
+            name: "IC-VAL-2026".to_string(),
+            as_of: Some(ctx.timestamp),
+            journal_id: Some(journal_id),
+            inventory_account_id: Some(inv_acct),
+            valuation_account_id: Some(val_acct),
+            metadata: None,
+        },
+    )?;
+    let close_id = ctx
+        .db
+        .inventory_close()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.name == "IC-VAL-2026")
+        .map(|c| c.id)
+        .ok_or("close missing")?;
+
+    run_inventory_close(
+        ctx,
+        org_id,
+        company_id,
+        close_id,
+        RunInventoryCloseParams {
+            journal_id: None,
+            inventory_account_id: None,
+            valuation_account_id: None,
+            metadata: None,
+        },
+    )?;
+
+    let close = ctx
+        .db
+        .inventory_close()
+        .id()
+        .find(&close_id)
+        .ok_or("close after run")?;
+    let move_id = close.account_move_id.ok_or("account_move_id missing")?;
+    if close.total_value <= 0.0 {
+        return Err("expected positive total_value from harness quant".into());
+    }
+
+    let mv = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_id)
+        .ok_or("valuation move missing")?;
+    if mv.company_id != company_id {
+        return Err("move company mismatch".into());
+    }
+
+    let lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|l| l.move_id == move_id)
+        .collect();
+    if lines.len() != 2 {
+        return Err(format!("expected 2 valuation lines, got {}", lines.len()));
+    }
+    let debit: f64 = lines.iter().map(|l| l.debit).sum();
+    let credit: f64 = lines.iter().map(|l| l.credit).sum();
+    if (debit - credit).abs() > 0.001 || (debit - close.total_value).abs() > 0.001 {
+        return Err(format!(
+            "unbalanced or wrong amount: debit={debit} credit={credit} value={}",
+            close.total_value
         ));
     }
     Ok(())

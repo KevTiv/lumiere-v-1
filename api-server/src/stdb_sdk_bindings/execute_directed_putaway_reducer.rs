@@ -4,65 +4,61 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::run_inventory_close_params_type::RunInventoryCloseParams;
+use super::execute_directed_putaway_params_type::ExecuteDirectedPutawayParams;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub(super) struct RunInventoryCloseArgs {
+pub(super) struct ExecuteDirectedPutawayArgs {
     pub organization_id: u64,
     pub company_id: u64,
-    pub close_id: u64,
-    pub params: RunInventoryCloseParams,
+    pub params: ExecuteDirectedPutawayParams,
 }
 
-impl From<RunInventoryCloseArgs> for super::Reducer {
-    fn from(args: RunInventoryCloseArgs) -> Self {
-        Self::RunInventoryClose {
+impl From<ExecuteDirectedPutawayArgs> for super::Reducer {
+    fn from(args: ExecuteDirectedPutawayArgs) -> Self {
+        Self::ExecuteDirectedPutaway {
             organization_id: args.organization_id,
             company_id: args.company_id,
-            close_id: args.close_id,
             params: args.params,
         }
     }
 }
 
-impl __sdk::InModule for RunInventoryCloseArgs {
+impl __sdk::InModule for ExecuteDirectedPutawayArgs {
     type Module = super::RemoteModule;
 }
 
 #[allow(non_camel_case_types)]
-/// Extension trait for access to the reducer `run_inventory_close`.
+/// Extension trait for access to the reducer `execute_directed_putaway`.
 ///
 /// Implemented for [`super::RemoteReducers`].
-pub trait run_inventory_close {
-    /// Request that the remote module invoke the reducer `run_inventory_close` to run as soon as possible.
+pub trait execute_directed_putaway {
+    /// Request that the remote module invoke the reducer `execute_directed_putaway` to run as soon as possible.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
-    /// /// Use [`run_inventory_close:run_inventory_close_then`] to run a callback after the reducer completes.
-    fn run_inventory_close(
+    /// /// Use [`execute_directed_putaway:execute_directed_putaway_then`] to run a callback after the reducer completes.
+    fn execute_directed_putaway(
         &self,
         organization_id: u64,
         company_id: u64,
-        close_id: u64,
-        params: RunInventoryCloseParams,
+        params: ExecuteDirectedPutawayParams,
     ) -> __sdk::Result<()> {
-        self.run_inventory_close_then(organization_id, company_id, close_id, params, |_, _| {})
+        self.execute_directed_putaway_then(organization_id, company_id, params, |_, _| {})
     }
 
-    /// Request that the remote module invoke the reducer `run_inventory_close` to run as soon as possible,
+    /// Request that the remote module invoke the reducer `execute_directed_putaway` to run as soon as possible,
     /// registering `callback` to run when we are notified that the reducer completed.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and its status can be observed with the `callback`.
-    fn run_inventory_close_then(
+    fn execute_directed_putaway_then(
         &self,
         organization_id: u64,
         company_id: u64,
-        close_id: u64,
-        params: RunInventoryCloseParams,
+        params: ExecuteDirectedPutawayParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -70,23 +66,21 @@ pub trait run_inventory_close {
     ) -> __sdk::Result<()>;
 }
 
-impl run_inventory_close for super::RemoteReducers {
-    fn run_inventory_close_then(
+impl execute_directed_putaway for super::RemoteReducers {
+    fn execute_directed_putaway_then(
         &self,
         organization_id: u64,
         company_id: u64,
-        close_id: u64,
-        params: RunInventoryCloseParams,
+        params: ExecuteDirectedPutawayParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
             + 'static,
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
-            RunInventoryCloseArgs {
+            ExecuteDirectedPutawayArgs {
                 organization_id,
                 company_id,
-                close_id,
                 params,
             },
             callback,

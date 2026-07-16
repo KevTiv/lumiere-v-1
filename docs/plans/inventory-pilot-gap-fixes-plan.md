@@ -19,11 +19,13 @@ Checklist for tranche-1 fixes from [INVENTORY_WAREHOUSE_MANAGEMENT_INVESTIGATION
 - [x] Wave release orchestration: `release_picking_wave` → confirm/assign + pick tasks; validate blocked by open tasks; complete requires tasks + pickings done
 - [x] UoM conversion on move create / reserve / validate (`convert_uom_quantity` → stock UoM)
 - [x] Inventory close: snapshot lines + lock stock mutations (`create/run/reopen_inventory_close`)
+- [x] Inventory close GL valuation: optional posted `AccountMove` Entry + `account_move_id` on close
 - [x] 3PL durable intents: `create_inventory_integration_intent` + `record_inventory_integration_result` (ASN inbound can post stock)
 
 - [x] Cartonization: `create_packaging_material` + `run_cartonization` (FFD) stamps `result_package_id`
 - [x] Consignment ownership: activate/receive with `owner_id`; consigned excluded from company ATP
 - [x] Cross-dock: `execute_cross_dock` outbound from inbound dest when `warehouse.crossdock`
+- [x] Directed putaway: `execute_directed_putaway` (rule / least-loaded / fixed)
 
 ## Verify after publish
 

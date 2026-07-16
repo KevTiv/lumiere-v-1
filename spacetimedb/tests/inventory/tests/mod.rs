@@ -36,6 +36,8 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_cartonization_test(ctx)?;
     run_inventory_consignment_atp_test(ctx)?;
     run_inventory_cross_dock_test(ctx)?;
+    run_inventory_directed_putaway_test(ctx)?;
+    run_inventory_close_valuation_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -174,4 +176,16 @@ pub fn run_inventory_consignment_atp_test(ctx: &ReducerContext) -> Result<(), St
 #[spacetimedb::reducer]
 pub fn run_inventory_cross_dock_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_cross_dock_creates_outbound(ctx).map_err(|e| format!("cross_dock: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_directed_putaway_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_directed_putaway_moves_stock(ctx)
+        .map_err(|e| format!("directed_putaway: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_close_valuation_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_inventory_close_posts_valuation_journal(ctx)
+        .map_err(|e| format!("inventory_close_valuation: {e}"))
 }
