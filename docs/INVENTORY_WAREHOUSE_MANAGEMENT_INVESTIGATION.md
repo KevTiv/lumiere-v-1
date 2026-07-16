@@ -166,7 +166,7 @@ Definitions:
 | Quarantine | **Partial** | `fail_quality_check` → `quarantine_quantity` (uses `failure_location_id` or `wh_qc_stock_loc_id`); available=0; reserve blocked |
 | Cross-docking | **Partial** | `execute_cross_dock` creates outbound from inbound dest when `crossdock` |
 | 3PL interfaces | **Partial** | `inventory_integration_intent` create/record; ASN inbound can post stock on success (worker HTTP outside reducers) |
-| Inventory-close reconciliation | **Absent** | No period-close reducer; `inventory_valuation` unused/mis-shaped; adjustment process does not post quants |
+| Inventory-close reconciliation | **Partial** | Snapshot + lock/reopen Present; GL valuation journal / `inventory_valuation` still open |
 | PO receipt → stock | **Present** | `receive_po_line` → `validate_stock_picking_backorder` + receipt domain test |
 | Live stock subscriptions | **Present** (org-scoped) | Workspace keys wired in `ERP_ORG_SQL`; no bounded exception queues yet |
 | Phantom UI contracts | **Present** (cleared) | BFF ⊆ reducers after pilot fixes |
@@ -376,7 +376,7 @@ flowchart LR
 
 | Gap | Priority status | Notes |
 |-----|-----------------|-------|
-| Cartonization engine | **Open** | Tables exist; algorithms/procedures absent |
+| Cartonization engine | **Closed** (MVP) | FFD `run_cartonization` + packaging materials |
 | Consignment ownership on quants | **Closed** (MVP) | Vendor `owner_id` excluded from company ATP |
 | Cross-dock flow | **Closed** (MVP) | Outbound from inbound dest when `warehouse.crossdock` |
 | 3PL ASN / outbound interfaces | **Closed** (MVP) | Durable intents + ASN stock post; workers remain external |
