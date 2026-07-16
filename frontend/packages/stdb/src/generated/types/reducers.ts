@@ -653,9 +653,12 @@ import RunInventoryAdjustmentTestReducer from "../run_inventory_adjustment_test_
 import RunInventoryAtpFailClosedTestReducer from "../run_inventory_atp_fail_closed_test_reducer";
 import RunInventoryCompanyIsolationTestReducer from "../run_inventory_company_isolation_test_reducer";
 import RunInventoryDeliveryQuantTestReducer from "../run_inventory_delivery_quant_test_reducer";
+import RunInventoryLotReserveTestReducer from "../run_inventory_lot_reserve_test_reducer";
+import RunInventoryLotValidateTestReducer from "../run_inventory_lot_validate_test_reducer";
 import RunInventoryProductCategoryTestReducer from "../run_inventory_product_category_test_reducer";
 import RunInventoryProductUpdateTestReducer from "../run_inventory_product_update_test_reducer";
 import RunInventoryReceiptQuantTestReducer from "../run_inventory_receipt_quant_test_reducer";
+import RunInventorySerialReserveTestReducer from "../run_inventory_serial_reserve_test_reducer";
 import RunInventoryStockInventoryTestReducer from "../run_inventory_stock_inventory_test_reducer";
 import RunInventoryStockQuantTestReducer from "../run_inventory_stock_quant_test_reducer";
 import RunManufacturingWorkcenterTestReducer from "../run_manufacturing_workcenter_test_reducer";
@@ -1566,9 +1569,12 @@ export type RunInventoryAdjustmentTestParams = __Infer<typeof RunInventoryAdjust
 export type RunInventoryAtpFailClosedTestParams = __Infer<typeof RunInventoryAtpFailClosedTestReducer>;
 export type RunInventoryCompanyIsolationTestParams = __Infer<typeof RunInventoryCompanyIsolationTestReducer>;
 export type RunInventoryDeliveryQuantTestParams = __Infer<typeof RunInventoryDeliveryQuantTestReducer>;
+export type RunInventoryLotReserveTestParams = __Infer<typeof RunInventoryLotReserveTestReducer>;
+export type RunInventoryLotValidateTestParams = __Infer<typeof RunInventoryLotValidateTestReducer>;
 export type RunInventoryProductCategoryTestParams = __Infer<typeof RunInventoryProductCategoryTestReducer>;
 export type RunInventoryProductUpdateTestParams = __Infer<typeof RunInventoryProductUpdateTestReducer>;
 export type RunInventoryReceiptQuantTestParams = __Infer<typeof RunInventoryReceiptQuantTestReducer>;
+export type RunInventorySerialReserveTestParams = __Infer<typeof RunInventorySerialReserveTestReducer>;
 export type RunInventoryStockInventoryTestParams = __Infer<typeof RunInventoryStockInventoryTestReducer>;
 export type RunInventoryStockQuantTestParams = __Infer<typeof RunInventoryStockQuantTestReducer>;
 export type RunManufacturingWorkcenterTestParams = __Infer<typeof RunManufacturingWorkcenterTestReducer>;

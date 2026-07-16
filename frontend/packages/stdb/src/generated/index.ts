@@ -681,9 +681,12 @@ import RunInventoryAdjustmentTestReducer from "./run_inventory_adjustment_test_r
 import RunInventoryAtpFailClosedTestReducer from "./run_inventory_atp_fail_closed_test_reducer";
 import RunInventoryCompanyIsolationTestReducer from "./run_inventory_company_isolation_test_reducer";
 import RunInventoryDeliveryQuantTestReducer from "./run_inventory_delivery_quant_test_reducer";
+import RunInventoryLotReserveTestReducer from "./run_inventory_lot_reserve_test_reducer";
+import RunInventoryLotValidateTestReducer from "./run_inventory_lot_validate_test_reducer";
 import RunInventoryProductCategoryTestReducer from "./run_inventory_product_category_test_reducer";
 import RunInventoryProductUpdateTestReducer from "./run_inventory_product_update_test_reducer";
 import RunInventoryReceiptQuantTestReducer from "./run_inventory_receipt_quant_test_reducer";
+import RunInventorySerialReserveTestReducer from "./run_inventory_serial_reserve_test_reducer";
 import RunInventoryStockInventoryTestReducer from "./run_inventory_stock_inventory_test_reducer";
 import RunInventoryStockQuantTestReducer from "./run_inventory_stock_quant_test_reducer";
 import RunManufacturingWorkcenterTestReducer from "./run_manufacturing_workcenter_test_reducer";
@@ -7490,9 +7493,12 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_atp_fail_closed_test", RunInventoryAtpFailClosedTestReducer),
   __reducerSchema("run_inventory_company_isolation_test", RunInventoryCompanyIsolationTestReducer),
   __reducerSchema("run_inventory_delivery_quant_test", RunInventoryDeliveryQuantTestReducer),
+  __reducerSchema("run_inventory_lot_reserve_test", RunInventoryLotReserveTestReducer),
+  __reducerSchema("run_inventory_lot_validate_test", RunInventoryLotValidateTestReducer),
   __reducerSchema("run_inventory_product_category_test", RunInventoryProductCategoryTestReducer),
   __reducerSchema("run_inventory_product_update_test", RunInventoryProductUpdateTestReducer),
   __reducerSchema("run_inventory_receipt_quant_test", RunInventoryReceiptQuantTestReducer),
+  __reducerSchema("run_inventory_serial_reserve_test", RunInventorySerialReserveTestReducer),
   __reducerSchema("run_inventory_stock_inventory_test", RunInventoryStockInventoryTestReducer),
   __reducerSchema("run_inventory_stock_quant_test", RunInventoryStockQuantTestReducer),
   __reducerSchema("run_manufacturing_workcenter_test", RunManufacturingWorkcenterTestReducer),

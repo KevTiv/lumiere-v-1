@@ -10,6 +10,9 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::core::organization::{company_id_from_scope, CompanyScopeParams};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
+use crate::inventory::tracking::{
+    stock_production_lot, stock_production_serial, StockProductionSerial,
+};
 use crate::inventory::warehouse::warehouse;
 use crate::purchasing::purchase_orders::{purchase_order, purchase_order_line};
 use crate::sales::return_orders::return_order;
@@ -545,6 +548,348 @@ fn find_quant_at_location(
         })
 }
 
+/// Product tracking mode: `none` | `lot` | `serial`.
+fn product_tracking_mode(ctx: &ReducerContext, product_id: u64) -> Result<&'static str, String> {
+    let tracking = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or_else(|| format!("Product {} not found", product_id))?
+        .tracking
+        .to_ascii_lowercase();
+    Ok(match tracking.as_str() {
+        "lot" => "lot",
+        "serial" => "serial",
+        _ => "none",
+    })
+}
+
+fn whole_unit_qty(qty: f64, product_id: u64) -> Result<usize, String> {
+    if qty < 0.0 || (qty - qty.round()).abs() > 1e-9 {
+        return Err(format!(
+            "serial-tracked product {} requires a whole-number quantity (got {})",
+            product_id, qty
+        ));
+    }
+    Ok(qty.round() as usize)
+}
+
+fn find_lot_quant_at_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    location_id: u64,
+    qty: f64,
+) -> Result<StockQuant, String> {
+    ctx.db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&product_id)
+        .find(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.location_id == location_id
+                && q.lot_id.is_some()
+                && (q.quantity - q.reserved_quantity) + 1e-9 >= qty
+        })
+        .ok_or_else(|| {
+            format!(
+                "No lot-tracked stock quant for product {} at location {} — lot required",
+                product_id, location_id
+            )
+        })
+}
+
+fn ensure_lot_for_product(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    lot_id: u64,
+) -> Result<(), String> {
+    let lot = ctx
+        .db
+        .stock_production_lot()
+        .id()
+        .find(&lot_id)
+        .ok_or_else(|| format!("Lot {} not found", lot_id))?;
+    if lot.organization_id != organization_id {
+        return Err("Lot does not belong to this organization".to_string());
+    }
+    if lot.company_id != company_id {
+        return Err("Lot does not belong to this company".to_string());
+    }
+    if lot.product_id != product_id {
+        return Err(format!(
+            "Lot {} belongs to product {}, not {}",
+            lot_id, lot.product_id, product_id
+        ));
+    }
+    if lot.is_locked {
+        return Err(format!("Lot {} is locked", lot_id));
+    }
+    Ok(())
+}
+
+fn reserve_free_serials(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    qty: usize,
+    location_id: Option<u64>,
+) -> Result<(), String> {
+    if qty == 0 {
+        return Ok(());
+    }
+    let free: Vec<_> = ctx
+        .db
+        .stock_production_serial()
+        .serial_by_product()
+        .filter(&product_id)
+        .filter(|s| {
+            s.organization_id == organization_id
+                && s.company_id == company_id
+                && s.state == "free"
+                && !s.is_locked
+                && location_id
+                    .map(|lid| s.location_id.is_none() || s.location_id == Some(lid))
+                    .unwrap_or(true)
+        })
+        .take(qty)
+        .collect();
+    if free.len() < qty {
+        return Err(format!(
+            "Insufficient free serials for product {} (need {}, have {})",
+            product_id,
+            qty,
+            free.len()
+        ));
+    }
+    for serial in free {
+        ctx.db
+            .stock_production_serial()
+            .id()
+            .update(StockProductionSerial {
+                state: "reserved".to_string(),
+                write_date: ctx.timestamp,
+                ..serial
+            });
+    }
+    Ok(())
+}
+
+fn release_reserved_serials(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    qty: usize,
+) -> Result<(), String> {
+    if qty == 0 {
+        return Ok(());
+    }
+    let reserved: Vec<_> = ctx
+        .db
+        .stock_production_serial()
+        .serial_by_product()
+        .filter(&product_id)
+        .filter(|s| {
+            s.organization_id == organization_id
+                && s.company_id == company_id
+                && s.state == "reserved"
+                && !s.is_locked
+        })
+        .take(qty)
+        .collect();
+    if reserved.len() < qty {
+        return Err(format!(
+            "Cannot release serials for product {} (need {}, have {})",
+            product_id,
+            qty,
+            reserved.len()
+        ));
+    }
+    for serial in reserved {
+        ctx.db
+            .stock_production_serial()
+            .id()
+            .update(StockProductionSerial {
+                state: "free".to_string(),
+                write_date: ctx.timestamp,
+                ..serial
+            });
+    }
+    Ok(())
+}
+
+fn consume_reserved_serials(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    qty: usize,
+) -> Result<(), String> {
+    if qty == 0 {
+        return Ok(());
+    }
+    let reserved: Vec<_> = ctx
+        .db
+        .stock_production_serial()
+        .serial_by_product()
+        .filter(&product_id)
+        .filter(|s| {
+            s.organization_id == organization_id
+                && s.company_id == company_id
+                && s.state == "reserved"
+                && !s.is_locked
+        })
+        .take(qty)
+        .collect();
+    if reserved.len() < qty {
+        return Err(format!(
+            "Insufficient reserved serials for product {} (need {}, have {})",
+            product_id,
+            qty,
+            reserved.len()
+        ));
+    }
+    for serial in reserved {
+        ctx.db
+            .stock_production_serial()
+            .id()
+            .update(StockProductionSerial {
+                state: "in_use".to_string(),
+                write_date: ctx.timestamp,
+                ..serial
+            });
+    }
+    Ok(())
+}
+
+fn place_free_serials_at_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    qty: usize,
+    location_id: u64,
+) -> Result<(), String> {
+    if qty == 0 {
+        return Ok(());
+    }
+    let free: Vec<_> = ctx
+        .db
+        .stock_production_serial()
+        .serial_by_product()
+        .filter(&product_id)
+        .filter(|s| {
+            s.organization_id == organization_id
+                && s.company_id == company_id
+                && s.state == "free"
+                && !s.is_locked
+        })
+        .take(qty)
+        .collect();
+    if free.len() < qty {
+        return Err(format!(
+            "Insufficient free serials for inbound product {} (need {}, have {})",
+            product_id,
+            qty,
+            free.len()
+        ));
+    }
+    for serial in free {
+        ctx.db
+            .stock_production_serial()
+            .id()
+            .update(StockProductionSerial {
+                location_id: Some(location_id),
+                write_date: ctx.timestamp,
+                ..serial
+            });
+    }
+    Ok(())
+}
+
+fn enforce_tracking_on_quant_reserve(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    lot_id: Option<u64>,
+    location_id: u64,
+    qty: f64,
+) -> Result<(), String> {
+    match product_tracking_mode(ctx, product_id)? {
+        "lot" => {
+            let Some(lot_id) = lot_id else {
+                return Err(format!(
+                    "Lot required to reserve lot-tracked product {}",
+                    product_id
+                ));
+            };
+            ensure_lot_for_product(ctx, organization_id, company_id, product_id, lot_id)
+        }
+        "serial" => {
+            let n = whole_unit_qty(qty, product_id)?;
+            reserve_free_serials(
+                ctx,
+                organization_id,
+                company_id,
+                product_id,
+                n,
+                Some(location_id),
+            )
+        }
+        _ => Ok(()),
+    }
+}
+
+fn enforce_tracking_on_move_validate(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    lot_id: Option<u64>,
+    location_dest_id: u64,
+    qty_done: f64,
+    is_inbound: bool,
+) -> Result<(), String> {
+    if qty_done <= 0.0 {
+        return Ok(());
+    }
+    match product_tracking_mode(ctx, product_id)? {
+        "lot" => {
+            let Some(lot_id) = lot_id else {
+                return Err(format!(
+                    "Lot required to validate move for lot-tracked product {}",
+                    product_id
+                ));
+            };
+            ensure_lot_for_product(ctx, organization_id, company_id, product_id, lot_id)
+        }
+        "serial" => {
+            let n = whole_unit_qty(qty_done, product_id)?;
+            if is_inbound {
+                place_free_serials_at_location(
+                    ctx,
+                    organization_id,
+                    company_id,
+                    product_id,
+                    n,
+                    location_dest_id,
+                )
+            } else {
+                consume_reserved_serials(ctx, organization_id, company_id, product_id, n)
+            }
+        }
+        _ => Ok(()),
+    }
+}
+
 /// Reserve qty at a location; fails closed when ATP is short.
 pub(crate) fn reserve_quantity_at_location(
     ctx: &ReducerContext,
@@ -557,13 +902,25 @@ pub(crate) fn reserve_quantity_at_location(
     if qty <= 0.0 {
         return Ok(());
     }
-    let quant = find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
-        .ok_or_else(|| {
-            format!(
-                "No stock quant for product {} at location {} — cannot reserve",
-                product_id, location_id
-            )
-        })?;
+    let tracking = product_tracking_mode(ctx, product_id)?;
+    let quant = if tracking == "lot" {
+        find_lot_quant_at_location(
+            ctx,
+            organization_id,
+            company_id,
+            product_id,
+            location_id,
+            qty,
+        )?
+    } else {
+        find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
+            .ok_or_else(|| {
+                format!(
+                    "No stock quant for product {} at location {} — cannot reserve",
+                    product_id, location_id
+                )
+            })?
+    };
 
     let new_reserved = quant.reserved_quantity + qty;
     if new_reserved > quant.quantity + 1e-9 {
@@ -574,6 +931,16 @@ pub(crate) fn reserve_quantity_at_location(
             (quant.quantity - quant.reserved_quantity).max(0.0)
         ));
     }
+
+    enforce_tracking_on_quant_reserve(
+        ctx,
+        organization_id,
+        company_id,
+        product_id,
+        quant.lot_id,
+        location_id,
+        qty,
+    )?;
 
     let available_quantity = quant.quantity - new_reserved;
     ctx.db.stock_quant().id().update(StockQuant {
@@ -601,6 +968,12 @@ pub(crate) fn unreserve_quantity_at_location(
     else {
         return Ok(());
     };
+
+    if product_tracking_mode(ctx, product_id)? == "serial" {
+        let n = whole_unit_qty(qty, product_id)?;
+        // Best-effort: release what we can without failing cancel paths.
+        let _ = release_reserved_serials(ctx, organization_id, company_id, product_id, n);
+    }
 
     let new_reserved = (quant.reserved_quantity - qty).max(0.0);
     let available_quantity = quant.quantity - new_reserved;
@@ -919,6 +1292,16 @@ pub fn reserve_stock_quant(
         return Err("Cannot reserve more than available quantity".to_string());
     }
 
+    enforce_tracking_on_quant_reserve(
+        ctx,
+        organization_id,
+        company_id,
+        quant.product_id,
+        quant.lot_id,
+        quant.location_id,
+        reserve_qty,
+    )?;
+
     let available_quantity = quant.quantity - new_reserved;
 
     ctx.db.stock_quant().id().update(StockQuant {
@@ -970,6 +1353,16 @@ pub fn unreserve_stock_quant(
     }
 
     let unreserve_qty = params.unreserve_qty;
+    if product_tracking_mode(ctx, quant.product_id)? == "serial" {
+        let n = whole_unit_qty(unreserve_qty, quant.product_id)?;
+        let _ = release_reserved_serials(
+            ctx,
+            organization_id,
+            company_id,
+            quant.product_id,
+            n,
+        );
+    }
     let new_reserved = (quant.reserved_quantity - unreserve_qty).max(0.0);
     let available_quantity = quant.quantity - new_reserved;
 
@@ -1830,6 +2223,7 @@ fn validate_stock_picking_impl(
         product_id: u64,
         location_id: u64,
         location_dest_id: u64,
+        lot_id: Option<u64>,
         qty_done: f64,
         residual: f64,
         product_uom: u64,
@@ -1865,6 +2259,7 @@ fn validate_stock_picking_impl(
             product_id: move_record.product_id,
             location_id: move_record.location_id,
             location_dest_id: move_record.location_dest_id,
+            lot_id: move_record.lot_id,
             qty_done,
             residual,
             product_uom: move_record.product_uom,
@@ -1875,6 +2270,20 @@ fn validate_stock_picking_impl(
             name: move_record.name.clone(),
             price_unit: move_record.price_unit,
         });
+    }
+
+    // Fail closed on lot/serial tracking before mutating moves or quants.
+    for vm in &validated_moves {
+        enforce_tracking_on_move_validate(
+            ctx,
+            organization_id,
+            company_id,
+            vm.product_id,
+            vm.lot_id,
+            vm.location_dest_id,
+            vm.qty_done,
+            is_inbound,
+        )?;
     }
 
     for vm in &validated_moves {
@@ -2060,10 +2469,10 @@ fn validate_stock_picking_impl(
                         need_release: false,
                         release_ready: false,
                         propagation_cancel: true,
-                        has_tracking: false,
+                        has_tracking: vm.lot_id.is_some(),
                         inventory_id: None,
                         sale_line_id: vm.sale_line_id,
-                        lot_id: None,
+                        lot_id: vm.lot_id,
                         package_id: None,
                         result_package_id: None,
                         owner_id: None,

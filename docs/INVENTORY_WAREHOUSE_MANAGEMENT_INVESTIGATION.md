@@ -118,13 +118,13 @@ Tabs from `inventoryModuleConfig` + injected tabs ([`inventory-client.tsx`](../f
 | Replenishment | Create; execute rule | Execute still timestamp-only (Unsuitable for ops demand) |
 | Quality | Check lifecycle; alert lifecycle (wizard) | No update/delete check/alert |
 | Valuations | List (REST) | Read-only; table unused on backend; not in live workspace |
-| Lots / serials | CRUD; use/block serial | `reserve_serial` no UI; no FEFO on pick |
+| Lots / serials | CRUD; reserve/validate enforce lot_id / free→reserved→in_use | FEFO / expiry block still open; `reserve_serial` UI still thin |
 
 ### 1.6 Tests (existence only)
 
 | Layer | What exists | Not covered |
 |-------|-------------|-------------|
-| Domain | `run_all_inventory_tests`: category lifecycle, product update/delete, stock inventory create, adjustment create, quant create, **receipt→quant**, **delivery reserve/validate**, **company isolation on reserve**, **ATP fail-closed** | Cycle-count post, quality, lots/serials/expiry, waves/tasks, replenishment, barcode, routes, UoM conversion, costing, quarantine/cross-dock/3PL, close |
+| Domain | `run_all_inventory_tests`: category lifecycle, product update/delete, stock inventory create, adjustment create, quant create, **receipt→quant**, **delivery reserve/validate**, **company isolation on reserve**, **ATP fail-closed**, **lot required on reserve/validate**, **serial required on reserve** | Cycle-count post, quality, FEFO/expiry, waves/tasks, replenishment, barcode, routes, UoM conversion, costing, quarantine/cross-dock/3PL, close |
 | Sales (adjacent) | ATP shortfall / reserve-after-confirm / unreserve paths in sales domain tests | Multi-warehouse promise calendar |
 | Playwright | `inventory-module.spec.ts` (@dev-fixture) shell/tabs; `inventory-mutations.spec.ts` (@p0) product update + category delete; lead-to-cash / returns paths exercise picking validate | Full transfer lifecycle, waves, cycle post, phantoms |
 | Contract | `inventory.contract.ts` | Backend presence of BFF keys |
@@ -146,8 +146,8 @@ Definitions:
 | Variants | **Partial** | Variant create/update; attribute/value/line tables without reducers; no attribute-driven generation |
 | Units of measure | **Partial** | `uom` / conversion create; product `uom_id` / `uom_po_id`; **no** conversion on reserve/validate; no update/delete UoM reducers |
 | Bins / locations | **Partial** | Hierarchical `stock_location` + warehouse FKs; `ZoneDisplayType::Bin` is 3D metadata, not directed bin putaway |
-| Lots | **Partial** | Lot CRUD + `lot_id` on quants/moves; validate does **not** require/enforce lot for tracked products |
-| Serials | **Partial** | Serial CRUD + reserve/use/block state machine; **not** wired into SO confirm / picking validate |
+| Lots | **Partial** | Lot CRUD + `lot_id` on quants/moves; **reserve/validate fail-closed** when `product.tracking=lot` and lot missing; FEFO still open |
+| Serials | **Partial** | Serial CRUD + reserve/use/block; **reserve/validate** auto free→reserved→in_use when `product.tracking=serial`; no move-level `serial_id` / FEFO |
 | Expiry | **Partial** | `expiration_date` / alert / removal on lots/serials; **no** FEFO or expiry block on pick/reserve |
 | Quality status | **Partial** | Checks/alerts/points/teams; fail stamps location hint only — **no** ATP hold or quant move |
 | Transfers | **Present** | `move_stock_quant` + picking validate inbound/outbound quant apply |
@@ -231,7 +231,7 @@ SpacetimeDB atomicity model: each reducer runs in one transaction that commits o
 6. **Partial receive / backorder residual reservation** — Backend Present; UI underuses backorder validate.
 7. **Cycle count plan → post adjustments** — Present reducers + wizard.
 8. **Landed cost apply to quant value** — Present (purchasing UI/adjacency).
-9. **Lot/serial tracked pick with FEFO** — **Not implemented** (Partial schema only).
+9. **Lot/serial tracked pick with FEFO** — Lot/serial **required** on reserve/validate; **FEFO not implemented**.
 10. **Quality fail → quarantine hold** — **Not implemented**.
 11. **Wave release → directed pick tasks** — **Unsuitable** (state CRUD / phantoms).
 12. **Replenishment → PO/transfer demand** — **Unsuitable** (timestamp-only execute).
@@ -251,8 +251,8 @@ SpacetimeDB atomicity model: each reducer runs in one transaction that commits o
 5. PO confirm creates IN picking; `receive_po_line` validates and increases dest quant by received qty; PO `qty_received` matches.
 6. Cycle count: plan → start → record variance → validate → post adjusts quant quantity/value; audit POST/UPDATE.
 7. Landed cost: post/apply after receipt updates quant `value`/`cost` for allocated products.
-8. Lot-tracked product (target): receipt without lot rejected; pick prefers FEFO; expired lot blocked — **fails today** (Partial).
-9. Serial-tracked product (target): validate requires free serial → reserved → used; cannot double-assign — **fails today** (Partial).
+8. Lot-tracked product: reserve/validate without `lot_id` rejected — **passes**; FEFO / expired-lot block — **fails today**.
+9. Serial-tracked product: reserve requires free serial → reserved; outbound validate → in_use — **passes**; explicit move-level serial assignment / double-assign UI — **Partial**.
 10. Quality fail (target): moves/holds qty in QC location and removes from ATP — **fails today**.
 11. `execute_replenishment_rule` (target): creates draft PO or internal transfer when below min — **fails today** (timestamps only).
 12. Wave process/delete and warehouse-task start/complete/cancel/delete from UI return clear contract errors or are removed — **Unsuitable today** (phantom BFF).
@@ -353,7 +353,7 @@ flowchart LR
 | Wire inventory workspace keys into `ERP_ORG_SQL` (or shrink workspace) | **Closed** | 26 workspace keys live; orphans dropped |
 | Hot-path validate/reserve scale (`picking_key` + `move_by_picking`) | **Closed in-tree** | Option index not filterable in STDB 2.0.1; denormalized `picking_key` |
 | Reservation contention + company isolation domain tests | **Closed in-tree** | `run_inventory_company_isolation_test` + `run_inventory_atp_fail_closed_test` |
-| Lot/serial enforcement policy for tracked products | **Open** | Schema without enforce is Partial for food/ag pilots |
+| Lot/serial enforcement policy for tracked products | **Closed** (enforce) / **Open** (FEFO) | Reserve/validate fail-closed when `tracking` is lot/serial; FEFO/expiry still Open |
 | Reconcile purchasing docs with receive→quant truth | **Closed** | Purchasing investigation matrix updated |
 | Inventory e2e + `run_all_inventory_tests` green after publish | **Verify** | Expand beyond product shell mutations |
 
@@ -389,7 +389,7 @@ flowchart LR
 
 ## Bottom line
 
-Lumiere’s inventory spine is **reservation-and-validate strong, WMS-depth weak**: soft ATP and picking validate (including PO receive→quant) are real and tested at domain depth; pilot fixes cleared phantom BFF contracts, wired live inventory subscriptions, and indexed picking validate via `picking_key`. Lot/serial/expiry/quality still do not constrain stock; replenishment execute remains timestamp-only; inventory close / 3PL / cartonization / consignment / cross-dock remain Absent. Reconcile roadmap messaging: **masters + cycle-count + ATP/validate Present; competitive WMS and tracked-product enforcement still Open**.
+Lumiere’s inventory spine is **reservation-and-validate strong, WMS-depth weak**: soft ATP and picking validate (including PO receive→quant) are real and tested at domain depth; pilot fixes cleared phantom BFF contracts, wired live inventory subscriptions, and indexed picking validate via `picking_key`. Lot/serial **fail-closed on reserve/validate** when `product.tracking` is set; FEFO/expiry/quality still do not constrain picks; replenishment execute remains timestamp-only; inventory close / 3PL / cartonization / consignment / cross-dock remain Absent. Reconcile roadmap messaging: **masters + cycle-count + ATP/validate + tracking enforce Present; competitive WMS depth still Open**.
 
 ### Related docs
 

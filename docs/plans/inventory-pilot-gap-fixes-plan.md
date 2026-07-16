@@ -11,6 +11,7 @@ Checklist for tranche-1 fixes from [INVENTORY_WAREHOUSE_MANAGEMENT_INVESTIGATION
 - [x] Domain tests: company isolation on reserve + ATP fail-closed (`run_inventory_*` + `run_all_inventory_tests`)
 - [x] Reconcile purchasing investigation receipt narrative
 - [x] Update inventory investigation pilot-critical status
+- [x] Option 2: lot/serial enforcement on reserve/validate when `product.tracking` is lot/serial (+ domain tests)
 
 ## Verify after publish
 

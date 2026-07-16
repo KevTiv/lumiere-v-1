@@ -1509,9 +1509,12 @@ pub mod run_inventory_adjustment_test_reducer;
 pub mod run_inventory_atp_fail_closed_test_reducer;
 pub mod run_inventory_company_isolation_test_reducer;
 pub mod run_inventory_delivery_quant_test_reducer;
+pub mod run_inventory_lot_reserve_test_reducer;
+pub mod run_inventory_lot_validate_test_reducer;
 pub mod run_inventory_product_category_test_reducer;
 pub mod run_inventory_product_update_test_reducer;
 pub mod run_inventory_receipt_quant_test_reducer;
+pub mod run_inventory_serial_reserve_test_reducer;
 pub mod run_inventory_stock_inventory_test_reducer;
 pub mod run_inventory_stock_quant_test_reducer;
 pub mod run_manufacturing_workcenter_test_reducer;
@@ -3905,9 +3908,12 @@ pub use run_inventory_adjustment_test_reducer::run_inventory_adjustment_test;
 pub use run_inventory_atp_fail_closed_test_reducer::run_inventory_atp_fail_closed_test;
 pub use run_inventory_company_isolation_test_reducer::run_inventory_company_isolation_test;
 pub use run_inventory_delivery_quant_test_reducer::run_inventory_delivery_quant_test;
+pub use run_inventory_lot_reserve_test_reducer::run_inventory_lot_reserve_test;
+pub use run_inventory_lot_validate_test_reducer::run_inventory_lot_validate_test;
 pub use run_inventory_product_category_test_reducer::run_inventory_product_category_test;
 pub use run_inventory_product_update_test_reducer::run_inventory_product_update_test;
 pub use run_inventory_receipt_quant_test_reducer::run_inventory_receipt_quant_test;
+pub use run_inventory_serial_reserve_test_reducer::run_inventory_serial_reserve_test;
 pub use run_inventory_stock_inventory_test_reducer::run_inventory_stock_inventory_test;
 pub use run_inventory_stock_quant_test_reducer::run_inventory_stock_quant_test;
 pub use run_manufacturing_workcenter_test_reducer::run_manufacturing_workcenter_test;
@@ -7041,9 +7047,12 @@ pub enum Reducer {
     RunInventoryAtpFailClosedTest ,
     RunInventoryCompanyIsolationTest ,
     RunInventoryDeliveryQuantTest ,
+    RunInventoryLotReserveTest ,
+    RunInventoryLotValidateTest ,
     RunInventoryProductCategoryTest ,
     RunInventoryProductUpdateTest ,
     RunInventoryReceiptQuantTest ,
+    RunInventorySerialReserveTest ,
     RunInventoryStockInventoryTest ,
     RunInventoryStockQuantTest ,
     RunManufacturingWorkcenterTest ,
@@ -8919,9 +8928,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventoryAtpFailClosedTest => "run_inventory_atp_fail_closed_test",
             Reducer::RunInventoryCompanyIsolationTest => "run_inventory_company_isolation_test",
             Reducer::RunInventoryDeliveryQuantTest => "run_inventory_delivery_quant_test",
+            Reducer::RunInventoryLotReserveTest => "run_inventory_lot_reserve_test",
+            Reducer::RunInventoryLotValidateTest => "run_inventory_lot_validate_test",
             Reducer::RunInventoryProductCategoryTest => "run_inventory_product_category_test",
             Reducer::RunInventoryProductUpdateTest => "run_inventory_product_update_test",
             Reducer::RunInventoryReceiptQuantTest => "run_inventory_receipt_quant_test",
+            Reducer::RunInventorySerialReserveTest => "run_inventory_serial_reserve_test",
             Reducer::RunInventoryStockInventoryTest => "run_inventory_stock_inventory_test",
             Reducer::RunInventoryStockQuantTest => "run_inventory_stock_quant_test",
             Reducer::RunManufacturingWorkcenterTest => "run_manufacturing_workcenter_test",
@@ -14306,11 +14318,17 @@ Reducer::RunInventoryCompanyIsolationTest => __sats::bsatn::to_vec(&run_inventor
                 }),
 Reducer::RunInventoryDeliveryQuantTest => __sats::bsatn::to_vec(&run_inventory_delivery_quant_test_reducer::RunInventoryDeliveryQuantTestArgs {
                 }),
+Reducer::RunInventoryLotReserveTest => __sats::bsatn::to_vec(&run_inventory_lot_reserve_test_reducer::RunInventoryLotReserveTestArgs {
+                }),
+Reducer::RunInventoryLotValidateTest => __sats::bsatn::to_vec(&run_inventory_lot_validate_test_reducer::RunInventoryLotValidateTestArgs {
+                }),
 Reducer::RunInventoryProductCategoryTest => __sats::bsatn::to_vec(&run_inventory_product_category_test_reducer::RunInventoryProductCategoryTestArgs {
                 }),
 Reducer::RunInventoryProductUpdateTest => __sats::bsatn::to_vec(&run_inventory_product_update_test_reducer::RunInventoryProductUpdateTestArgs {
                 }),
 Reducer::RunInventoryReceiptQuantTest => __sats::bsatn::to_vec(&run_inventory_receipt_quant_test_reducer::RunInventoryReceiptQuantTestArgs {
+                }),
+Reducer::RunInventorySerialReserveTest => __sats::bsatn::to_vec(&run_inventory_serial_reserve_test_reducer::RunInventorySerialReserveTestArgs {
                 }),
 Reducer::RunInventoryStockInventoryTest => __sats::bsatn::to_vec(&run_inventory_stock_inventory_test_reducer::RunInventoryStockInventoryTestArgs {
                 }),

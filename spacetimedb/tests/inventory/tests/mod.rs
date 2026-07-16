@@ -21,6 +21,9 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_delivery_quant_test(ctx)?;
     run_inventory_company_isolation_test(ctx)?;
     run_inventory_atp_fail_closed_test(ctx)?;
+    run_inventory_lot_reserve_test(ctx)?;
+    run_inventory_serial_reserve_test(ctx)?;
+    run_inventory_lot_validate_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -76,4 +79,20 @@ pub fn run_inventory_company_isolation_test(ctx: &ReducerContext) -> Result<(), 
 pub fn run_inventory_atp_fail_closed_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_atp_fail_closed_on_over_reserve(ctx)
         .map_err(|e| format!("atp_fail_closed: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_lot_reserve_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_lot_required_on_reserve(ctx).map_err(|e| format!("lot_reserve: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_serial_reserve_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_serial_required_on_reserve(ctx)
+        .map_err(|e| format!("serial_reserve: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_lot_validate_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_lot_required_on_validate(ctx).map_err(|e| format!("lot_validate: {e}"))
 }
