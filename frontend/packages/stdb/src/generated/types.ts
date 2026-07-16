@@ -10,6 +10,12 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const AcceptSaleOrderQuotationParams = __t.object("AcceptSaleOrderQuotationParams", {
+  signedBy: __t.string(),
+  signature: __t.option(__t.string()),
+});
+export type AcceptSaleOrderQuotationParams = __Infer<typeof AcceptSaleOrderQuotationParams>;
+
 export const AccountAccount = __t.object("AccountAccount", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -887,6 +893,15 @@ export const AddPurchaseOrderLineParams = __t.object("AddPurchaseOrderLineParams
 });
 export type AddPurchaseOrderLineParams = __Infer<typeof AddPurchaseOrderLineParams>;
 
+export const AddPurchaseRfqLineParams = __t.object("AddPurchaseRfqLineParams", {
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  productUomQty: __t.f64(),
+  name: __t.option(__t.string()),
+  sequence: __t.option(__t.u32()),
+});
+export type AddPurchaseRfqLineParams = __Infer<typeof AddPurchaseRfqLineParams>;
+
 export const AddUserToOrganizationParams = __t.object("AddUserToOrganizationParams", {
   roleId: __t.u64(),
   companyId: __t.option(__t.u64()),
@@ -1463,6 +1478,13 @@ export const AppendCrmConversationMessageParams = __t.object("AppendCrmConversat
 });
 export type AppendCrmConversationMessageParams = __Infer<typeof AppendCrmConversationMessageParams>;
 
+export const ApplyOmnichannelAllocationParams = __t.object("ApplyOmnichannelAllocationParams", {
+  preferredRouteId: __t.option(__t.u64()),
+  channel: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type ApplyOmnichannelAllocationParams = __Infer<typeof ApplyOmnichannelAllocationParams>;
+
 export const ApplySalePromotionParams = __t.object("ApplySalePromotionParams", {
   promotionCode: __t.string(),
 });
@@ -1969,6 +1991,21 @@ export const CloseSubscriptionParams = __t.object("CloseSubscriptionParams", {
 });
 export type CloseSubscriptionParams = __Infer<typeof CloseSubscriptionParams>;
 
+export const CommodityPriceIndex = __t.object("CommodityPriceIndex", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  code: __t.string(),
+  rate: __t.f64(),
+  asOf: __t.timestamp(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type CommodityPriceIndex = __Infer<typeof CommodityPriceIndex>;
+
 export const Company = __t.object("Company", {
   id: __t.u64(),
   externalId: __t.string(),
@@ -2059,6 +2096,23 @@ export const ConfirmPayslipParams = __t.object("ConfirmPayslipParams", {
   netWage: __t.f64(),
 });
 export type ConfirmPayslipParams = __Infer<typeof ConfirmPayslipParams>;
+
+export const ConsignmentAgreement = __t.object("ConsignmentAgreement", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  partnerId: __t.u64(),
+  productId: __t.u64(),
+  warehouseId: __t.u64(),
+  state: __t.string(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ConsignmentAgreement = __Infer<typeof ConsignmentAgreement>;
 
 export const ConsolidationAccount = __t.object("ConsolidationAccount", {
   id: __t.u64(),
@@ -3199,6 +3253,15 @@ export const CreateCompanyParams = __t.object("CreateCompanyParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateCompanyParams = __Infer<typeof CreateCompanyParams>;
+
+export const CreateConsignmentAgreementParams = __t.object("CreateConsignmentAgreementParams", {
+  name: __t.string(),
+  partnerId: __t.u64(),
+  productId: __t.u64(),
+  warehouseId: __t.u64(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateConsignmentAgreementParams = __Infer<typeof CreateConsignmentAgreementParams>;
 
 export const CreateConsolidationAccountParams = __t.object("CreateConsolidationAccountParams", {
   name: __t.string(),
@@ -4682,6 +4745,25 @@ export const CreateProjectParams = __t.object("CreateProjectParams", {
 });
 export type CreateProjectParams = __Infer<typeof CreateProjectParams>;
 
+export const CreatePurchaseBlanketOrderParams = __t.object("CreatePurchaseBlanketOrderParams", {
+  name: __t.string(),
+  partnerId: __t.u64(),
+  currencyId: __t.u64(),
+  dateStart: __t.option(__t.timestamp()),
+  dateEnd: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type CreatePurchaseBlanketOrderParams = __Infer<typeof CreatePurchaseBlanketOrderParams>;
+
+export const CreatePurchaseContractParams = __t.object("CreatePurchaseContractParams", {
+  name: __t.string(),
+  partnerId: __t.u64(),
+  dateStart: __t.option(__t.timestamp()),
+  dateEnd: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type CreatePurchaseContractParams = __Infer<typeof CreatePurchaseContractParams>;
+
 export const CreatePurchaseOrderParams = __t.object("CreatePurchaseOrderParams", {
   companyId: __t.option(__t.u64()),
   partnerId: __t.u64(),
@@ -4724,6 +4806,64 @@ export const CreatePurchaseRequisitionParams = __t.object("CreatePurchaseRequisi
   metadata: __t.option(__t.string()),
 });
 export type CreatePurchaseRequisitionParams = __Infer<typeof CreatePurchaseRequisitionParams>;
+
+export const CreatePurchaseReturnLineParams = __t.object("CreatePurchaseReturnLineParams", {
+  purchaseOrderLineId: __t.option(__t.u64()),
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  productUomQty: __t.f64(),
+  priceUnit: __t.f64(),
+  toRefund: __t.bool(),
+});
+export type CreatePurchaseReturnLineParams = __Infer<typeof CreatePurchaseReturnLineParams>;
+
+export const CreatePurchaseReturnParams = __t.object("CreatePurchaseReturnParams", {
+  purchaseOrderId: __t.option(__t.u64()),
+  partnerId: __t.u64(),
+  returnReason: __t.option(__t.string()),
+  get lines() {
+    return __t.array(CreatePurchaseReturnLineParams);
+  },
+});
+export type CreatePurchaseReturnParams = __Infer<typeof CreatePurchaseReturnParams>;
+
+export const CreatePurchaseRfqBidParams = __t.object("CreatePurchaseRfqBidParams", {
+  partnerId: __t.u64(),
+  currencyId: __t.u64(),
+  priceUnit: __t.f64(),
+  notes: __t.option(__t.string()),
+});
+export type CreatePurchaseRfqBidParams = __Infer<typeof CreatePurchaseRfqBidParams>;
+
+export const CreatePurchaseRfqLineParams = __t.object("CreatePurchaseRfqLineParams", {
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  productUomQty: __t.f64(),
+  name: __t.option(__t.string()),
+  sequence: __t.option(__t.u32()),
+});
+export type CreatePurchaseRfqLineParams = __Infer<typeof CreatePurchaseRfqLineParams>;
+
+export const CreatePurchaseRfqParams = __t.object("CreatePurchaseRfqParams", {
+  requisitionId: __t.option(__t.u64()),
+  currencyId: __t.u64(),
+  notes: __t.option(__t.string()),
+  get lines() {
+    return __t.array(CreatePurchaseRfqLineParams);
+  },
+  metadata: __t.option(__t.string()),
+});
+export type CreatePurchaseRfqParams = __Infer<typeof CreatePurchaseRfqParams>;
+
+export const CreatePurchasingIntegrationIntentParams = __t.object("CreatePurchasingIntegrationIntentParams", {
+  provider: __t.string(),
+  intentType: __t.string(),
+  purchaseOrderId: __t.option(__t.u64()),
+  idempotencyKey: __t.string(),
+  requestPayload: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type CreatePurchasingIntegrationIntentParams = __Infer<typeof CreatePurchasingIntegrationIntentParams>;
 
 export const CreateQualityAlertParams = __t.object("CreateQualityAlertParams", {
   title: __t.string(),
@@ -4918,6 +5058,43 @@ export const CreateSalaryRuleParams = __t.object("CreateSalaryRuleParams", {
 });
 export type CreateSalaryRuleParams = __Infer<typeof CreateSalaryRuleParams>;
 
+export const CreateSaleCommissionPlanParams = __t.object("CreateSaleCommissionPlanParams", {
+  companyId: __t.option(__t.u64()),
+  name: __t.string(),
+  isActive: __t.bool(),
+  defaultRatePercent: __t.f64(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSaleCommissionPlanParams = __Infer<typeof CreateSaleCommissionPlanParams>;
+
+export const CreateSaleCommissionPlanSplitParams = __t.object("CreateSaleCommissionPlanSplitParams", {
+  planId: __t.u64(),
+  partnerId: __t.u64(),
+  sharePercent: __t.f64(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSaleCommissionPlanSplitParams = __Infer<typeof CreateSaleCommissionPlanSplitParams>;
+
+export const CreateSaleContractParams = __t.object("CreateSaleContractParams", {
+  companyId: __t.option(__t.u64()),
+  name: __t.string(),
+  partnerId: __t.u64(),
+  dateStart: __t.option(__t.timestamp()),
+  dateEnd: __t.option(__t.timestamp()),
+  pricelistId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSaleContractParams = __Infer<typeof CreateSaleContractParams>;
+
+export const CreateSaleCpqConstraintParams = __t.object("CreateSaleCpqConstraintParams", {
+  companyId: __t.option(__t.u64()),
+  name: __t.string(),
+  ruleJson: __t.string(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSaleCpqConstraintParams = __Infer<typeof CreateSaleCpqConstraintParams>;
+
 export const CreateSaleOrderLineParams = __t.object("CreateSaleOrderLineParams", {
   productId: __t.u64(),
   quantity: __t.f64(),
@@ -4987,6 +5164,7 @@ export const CreateSaleOrderParams = __t.object("CreateSaleOrderParams", {
   isPrinted: __t.option(__t.bool()),
   isLocked: __t.option(__t.bool()),
   isDropship: __t.option(__t.bool()),
+  invoicePolicy: __t.option(__t.string()),
   messageFollowerIds: __t.option(__t.array(__t.u64())),
   messagePartnerIds: __t.option(__t.array(__t.u64())),
   messageChannelIds: __t.option(__t.array(__t.u64())),
@@ -5008,6 +5186,17 @@ export const CreateSalePromotionParams = __t.object("CreateSalePromotionParams",
   metadata: __t.option(__t.string()),
 });
 export type CreateSalePromotionParams = __Infer<typeof CreateSalePromotionParams>;
+
+export const CreateSalesIntegrationIntentParams = __t.object("CreateSalesIntegrationIntentParams", {
+  companyId: __t.option(__t.u64()),
+  provider: __t.string(),
+  intentType: __t.string(),
+  saleOrderId: __t.option(__t.u64()),
+  idempotencyKey: __t.string(),
+  requestPayload: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSalesIntegrationIntentParams = __Infer<typeof CreateSalesIntegrationIntentParams>;
 
 export const CreateSavedReportParams = __t.object("CreateSavedReportParams", {
   name: __t.string(),
@@ -5704,6 +5893,14 @@ export const CreateUtmSourceParams = __t.object("CreateUtmSourceParams", {
   isActive: __t.bool(),
 });
 export type CreateUtmSourceParams = __Infer<typeof CreateUtmSourceParams>;
+
+export const CreateVendorCreditFromPurchaseReturnParams = __t.object("CreateVendorCreditFromPurchaseReturnParams", {
+  journalId: __t.u64(),
+  expenseAccountId: __t.u64(),
+  payableAccountId: __t.u64(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateVendorCreditFromPurchaseReturnParams = __Infer<typeof CreateVendorCreditFromPurchaseReturnParams>;
 
 export const CreateWarehouse3DZoneParams = __t.object("CreateWarehouse3DZoneParams", {
   get displayType() {
@@ -9618,6 +9815,58 @@ export const ProposalVersion = __t.object("ProposalVersion", {
 });
 export type ProposalVersion = __Infer<typeof ProposalVersion>;
 
+export const PurchaseApprovalDelegate = __t.object("PurchaseApprovalDelegate", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  principalIdentity: __t.identity(),
+  delegateIdentity: __t.identity(),
+  isActive: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type PurchaseApprovalDelegate = __Infer<typeof PurchaseApprovalDelegate>;
+
+export const PurchaseBlanketOrder = __t.object("PurchaseBlanketOrder", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  partnerId: __t.u64(),
+  currencyId: __t.u64(),
+  state: __t.string(),
+  dateStart: __t.option(__t.timestamp()),
+  dateEnd: __t.option(__t.timestamp()),
+  releaseCount: __t.u32(),
+  lastReleasePoId: __t.option(__t.u64()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type PurchaseBlanketOrder = __Infer<typeof PurchaseBlanketOrder>;
+
+export const PurchaseContract = __t.object("PurchaseContract", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  partnerId: __t.u64(),
+  state: __t.string(),
+  dateStart: __t.option(__t.timestamp()),
+  dateEnd: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type PurchaseContract = __Infer<typeof PurchaseContract>;
+
 export const PurchaseOrder = __t.object("PurchaseOrder", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -9650,6 +9899,8 @@ export const PurchaseOrder = __t.object("PurchaseOrder", {
   amountUntaxed: __t.f64(),
   amountTax: __t.f64(),
   amountTotal: __t.f64(),
+  currencyRate: __t.f64(),
+  matchQtyTolerance: __t.option(__t.f64()),
   receiptStatus: __t.string(),
   notes: __t.option(__t.string()),
   messageMainAttachmentId: __t.option(__t.u64()),
@@ -9758,6 +10009,112 @@ export const PurchaseRequisition = __t.object("PurchaseRequisition", {
   metadata: __t.option(__t.string()),
 });
 export type PurchaseRequisition = __Infer<typeof PurchaseRequisition>;
+
+export const PurchaseReturn = __t.object("PurchaseReturn", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  purchaseOrderId: __t.option(__t.u64()),
+  partnerId: __t.u64(),
+  state: __t.string(),
+  returnReason: __t.option(__t.string()),
+  pickingId: __t.option(__t.u64()),
+  creditMoveId: __t.option(__t.u64()),
+  lineIds: __t.array(__t.u64()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type PurchaseReturn = __Infer<typeof PurchaseReturn>;
+
+export const PurchaseReturnLine = __t.object("PurchaseReturnLine", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  purchaseReturnId: __t.u64(),
+  purchaseOrderLineId: __t.option(__t.u64()),
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  productUomQty: __t.f64(),
+  priceUnit: __t.f64(),
+  toRefund: __t.bool(),
+});
+export type PurchaseReturnLine = __Infer<typeof PurchaseReturnLine>;
+
+export const PurchaseRfq = __t.object("PurchaseRfq", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  requisitionId: __t.option(__t.u64()),
+  state: __t.string(),
+  currencyId: __t.u64(),
+  notes: __t.option(__t.string()),
+  awardedBidId: __t.option(__t.u64()),
+  purchaseOrderId: __t.option(__t.u64()),
+  lineIds: __t.array(__t.u64()),
+  bidIds: __t.array(__t.u64()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type PurchaseRfq = __Infer<typeof PurchaseRfq>;
+
+export const PurchaseRfqBid = __t.object("PurchaseRfqBid", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  rfqId: __t.u64(),
+  partnerId: __t.u64(),
+  currencyId: __t.u64(),
+  priceUnit: __t.f64(),
+  amountTotal: __t.f64(),
+  notes: __t.option(__t.string()),
+  state: __t.string(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type PurchaseRfqBid = __Infer<typeof PurchaseRfqBid>;
+
+export const PurchaseRfqLine = __t.object("PurchaseRfqLine", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  rfqId: __t.u64(),
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  productUomQty: __t.f64(),
+  name: __t.option(__t.string()),
+  sequence: __t.u32(),
+});
+export type PurchaseRfqLine = __Infer<typeof PurchaseRfqLine>;
+
+export const PurchasingIntegrationIntent = __t.object("PurchasingIntegrationIntent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  provider: __t.string(),
+  intentType: __t.string(),
+  purchaseOrderId: __t.option(__t.u64()),
+  status: __t.string(),
+  idempotencyKey: __t.string(),
+  requestPayload: __t.option(__t.string()),
+  lastError: __t.option(__t.string()),
+  externalReference: __t.option(__t.string()),
+  attemptCount: __t.u32(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type PurchasingIntegrationIntent = __Infer<typeof PurchasingIntegrationIntent>;
 
 export const QualityAlert = __t.object("QualityAlert", {
   id: __t.u64(),
@@ -10023,6 +10380,22 @@ export const RecordPrivacyConsentParams = __t.object("RecordPrivacyConsentParams
 });
 export type RecordPrivacyConsentParams = __Infer<typeof RecordPrivacyConsentParams>;
 
+export const RecordPurchasingIntegrationResultParams = __t.object("RecordPurchasingIntegrationResultParams", {
+  status: __t.string(),
+  externalReference: __t.option(__t.string()),
+  lastError: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type RecordPurchasingIntegrationResultParams = __Infer<typeof RecordPurchasingIntegrationResultParams>;
+
+export const RecordSalesIntegrationResultParams = __t.object("RecordSalesIntegrationResultParams", {
+  status: __t.string(),
+  externalReference: __t.option(__t.string()),
+  lastError: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type RecordSalesIntegrationResultParams = __Infer<typeof RecordSalesIntegrationResultParams>;
+
 export const RecordTelemetryParams = __t.object("RecordTelemetryParams", {
   sensorType: __t.string(),
   value: __t.f64(),
@@ -10067,6 +10440,13 @@ export const RejectApprovalRequestParams = __t.object("RejectApprovalRequestPara
   comment: __t.option(__t.string()),
 });
 export type RejectApprovalRequestParams = __Infer<typeof RejectApprovalRequestParams>;
+
+export const ReleaseBlanketToPoParams = __t.object("ReleaseBlanketToPoParams", {
+  notes: __t.option(__t.string()),
+  datePlanned: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type ReleaseBlanketToPoParams = __Infer<typeof ReleaseBlanketToPoParams>;
 
 export const ReplenishmentRule = __t.object("ReplenishmentRule", {
   id: __t.u64(),
@@ -10319,6 +10699,68 @@ export const SaleCommission = __t.object("SaleCommission", {
 });
 export type SaleCommission = __Infer<typeof SaleCommission>;
 
+export const SaleCommissionPlan = __t.object("SaleCommissionPlan", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  isActive: __t.bool(),
+  defaultRatePercent: __t.f64(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type SaleCommissionPlan = __Infer<typeof SaleCommissionPlan>;
+
+export const SaleCommissionPlanSplit = __t.object("SaleCommissionPlanSplit", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  planId: __t.u64(),
+  partnerId: __t.u64(),
+  sharePercent: __t.f64(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type SaleCommissionPlanSplit = __Infer<typeof SaleCommissionPlanSplit>;
+
+export const SaleContract = __t.object("SaleContract", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  partnerId: __t.u64(),
+  state: __t.string(),
+  dateStart: __t.option(__t.timestamp()),
+  dateEnd: __t.option(__t.timestamp()),
+  pricelistId: __t.option(__t.u64()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type SaleContract = __Infer<typeof SaleContract>;
+
+export const SaleCpqConstraint = __t.object("SaleCpqConstraint", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  ruleJson: __t.string(),
+  isActive: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type SaleCpqConstraint = __Infer<typeof SaleCpqConstraint>;
+
 export const SaleOrder = __t.object("SaleOrder", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -10394,6 +10836,8 @@ export const SaleOrder = __t.object("SaleOrder", {
   customerLead: __t.f64(),
   prepaidAmount: __t.f64(),
   creditAmount: __t.f64(),
+  currencyRate: __t.f64(),
+  invoicePolicy: __t.string(),
   isDropship: __t.bool(),
   dropshipPickingCount: __t.u32(),
   dropshipPickingIds: __t.array(__t.u64()),
@@ -10550,6 +10994,35 @@ export const SaleState = __t.enum("SaleState", {
   ToApprove: __t.unit(),
 });
 export type SaleState = __Infer<typeof SaleState>;
+
+export const SalesIntegrationIntent = __t.object("SalesIntegrationIntent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  provider: __t.string(),
+  intentType: __t.string(),
+  saleOrderId: __t.option(__t.u64()),
+  status: __t.string(),
+  idempotencyKey: __t.string(),
+  requestPayload: __t.option(__t.string()),
+  lastError: __t.option(__t.string()),
+  externalReference: __t.option(__t.string()),
+  attemptCount: __t.u32(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type SalesIntegrationIntent = __Infer<typeof SalesIntegrationIntent>;
+
+export const SalesSlaEscalationJob = __t.object("SalesSlaEscalationJob", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+});
+export type SalesSlaEscalationJob = __Infer<typeof SalesSlaEscalationJob>;
 
 export const SaveImportMappingTemplateParams = __t.object("SaveImportMappingTemplateParams", {
   name: __t.string(),
@@ -10751,6 +11224,14 @@ export const SetArticlePublishedParams = __t.object("SetArticlePublishedParams",
 });
 export type SetArticlePublishedParams = __Infer<typeof SetArticlePublishedParams>;
 
+export const SetCommodityPriceIndexParams = __t.object("SetCommodityPriceIndexParams", {
+  code: __t.string(),
+  rate: __t.f64(),
+  asOf: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type SetCommodityPriceIndexParams = __Infer<typeof SetCommodityPriceIndexParams>;
+
 export const SetCompanyCountryPackParams = __t.object("SetCompanyCountryPackParams", {
   packKey: __t.string(),
   enabled: __t.bool(),
@@ -10785,6 +11266,14 @@ export const SetContactSegmentRulesParams = __t.object("SetContactSegmentRulesPa
 });
 export type SetContactSegmentRulesParams = __Infer<typeof SetContactSegmentRulesParams>;
 
+export const SetPurchaseApprovalDelegateParams = __t.object("SetPurchaseApprovalDelegateParams", {
+  principalIdentity: __t.identity(),
+  delegateIdentity: __t.identity(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type SetPurchaseApprovalDelegateParams = __Infer<typeof SetPurchaseApprovalDelegateParams>;
+
 export const SetRecordCustomFieldValuesParams = __t.object("SetRecordCustomFieldValuesParams", {
   model: __t.string(),
   recordId: __t.u64(),
@@ -10793,6 +11282,15 @@ export const SetRecordCustomFieldValuesParams = __t.object("SetRecordCustomField
   },
 });
 export type SetRecordCustomFieldValuesParams = __Infer<typeof SetRecordCustomFieldValuesParams>;
+
+export const SetVendorRiskFlagParams = __t.object("SetVendorRiskFlagParams", {
+  partnerId: __t.u64(),
+  isFlagged: __t.bool(),
+  riskLevel: __t.string(),
+  reason: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type SetVendorRiskFlagParams = __Infer<typeof SetVendorRiskFlagParams>;
 
 export const SettleSaleCommissionsParams = __t.object("SettleSaleCommissionsParams", {
   commissionIds: __t.array(__t.u64()),
@@ -13012,6 +13510,7 @@ export const UpdatePurchaseOrderParams = __t.object("UpdatePurchaseOrderParams",
   incotermLocation: __t.option(__t.string()),
   partnerId: __t.option(__t.u64()),
   currencyId: __t.option(__t.u64()),
+  matchQtyTolerance: __t.option(__t.f64()),
   metadata: __t.option(__t.string()),
 });
 export type UpdatePurchaseOrderParams = __Infer<typeof UpdatePurchaseOrderParams>;
@@ -13061,6 +13560,25 @@ export const UpdateRoleParams = __t.object("UpdateRoleParams", {
 });
 export type UpdateRoleParams = __Infer<typeof UpdateRoleParams>;
 
+export const UpdateSaleOrderLineParams = __t.object("UpdateSaleOrderLineParams", {
+  productId: __t.option(__t.u64()),
+  quantity: __t.option(__t.f64()),
+  uomId: __t.option(__t.u64()),
+  priceUnit: __t.option(__t.f64()),
+  discount: __t.option(__t.f64()),
+  taxIds: __t.option(__t.array(__t.u64())),
+  name: __t.option(__t.string()),
+  sequence: __t.option(__t.u32()),
+  productVariantId: __t.option(__t.u64()),
+  packagingId: __t.option(__t.u64()),
+  routeId: __t.option(__t.u64()),
+  analyticTagIds: __t.option(__t.array(__t.u64())),
+  customerLead: __t.option(__t.f64()),
+  displayType: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateSaleOrderLineParams = __Infer<typeof UpdateSaleOrderLineParams>;
+
 export const UpdateSaleOrderOptionParams = __t.object("UpdateSaleOrderOptionParams", {
   name: __t.option(__t.string()),
   quantity: __t.option(__t.f64()),
@@ -13091,6 +13609,7 @@ export const UpdateSaleOrderParams = __t.object("UpdateSaleOrderParams", {
   customerLead: __t.option(__t.f64()),
   analyticAccountId: __t.option(__t.u64()),
   userId: __t.option(__t.identity()),
+  isDropship: __t.option(__t.bool()),
   metadata: __t.option(__t.string()),
 });
 export type UpdateSaleOrderParams = __Infer<typeof UpdateSaleOrderParams>;
@@ -13504,6 +14023,14 @@ export const UpsertSearchEmbeddingParams = __t.object("UpsertSearchEmbeddingPara
 });
 export type UpsertSearchEmbeddingParams = __Infer<typeof UpsertSearchEmbeddingParams>;
 
+export const UpsertVendorScorecardParams = __t.object("UpsertVendorScorecardParams", {
+  partnerId: __t.u64(),
+  otifScore: __t.f64(),
+  qualityScore: __t.f64(),
+  metadata: __t.option(__t.string()),
+});
+export type UpsertVendorScorecardParams = __Infer<typeof UpsertVendorScorecardParams>;
+
 export const UserCredential = __t.object("UserCredential", {
   id: __t.u64(),
   email: __t.string(),
@@ -13651,6 +14178,37 @@ export const VehicleStatus = __t.enum("VehicleStatus", {
   Offline: __t.unit(),
 });
 export type VehicleStatus = __Infer<typeof VehicleStatus>;
+
+export const VendorRiskFlag = __t.object("VendorRiskFlag", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  partnerId: __t.u64(),
+  isFlagged: __t.bool(),
+  riskLevel: __t.string(),
+  reason: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type VendorRiskFlag = __Infer<typeof VendorRiskFlag>;
+
+export const VendorScorecard = __t.object("VendorScorecard", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  partnerId: __t.u64(),
+  otifScore: __t.f64(),
+  qualityScore: __t.f64(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type VendorScorecard = __Infer<typeof VendorScorecard>;
 
 // The tagged union or sum type for the algebraic type `VerificationLevel`.
 export const VerificationLevel = __t.enum("VerificationLevel", {

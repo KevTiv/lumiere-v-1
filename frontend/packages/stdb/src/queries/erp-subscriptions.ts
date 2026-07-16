@@ -58,8 +58,10 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "tax-jurisdictions",
   "tax-schedules",
   "sale-orders",
+  "sale-orders-to-approve",
   "sale-order-lines",
   "sale-commissions",
+  "sale-commissions-pending",
   "return-orders",
   "return-order-lines",
   "pos-loyalty-programs",
@@ -107,9 +109,18 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "warehouses",
   "inventory-adjustments",
   "purchase-orders",
+  "purchase-orders-to-approve",
+  "purchase-orders-partial-receipt",
   "purchase-order-lines",
+  "landed-costs",
+  "supplier-intakes",
   "partner-banks",
   "purchase-requisitions",
+  "purchase-rfqs",
+  "purchase-rfq-lines",
+  "purchase-rfq-bids",
+  "purchase-returns",
+  "purchase-return-lines",
   "mrp-productions",
   "mrp-boms",
   "mrp-workorders",
@@ -173,6 +184,7 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "amortization-schedules",
   "amortization-lines",
   "partner-credit-controls",
+  "partner-credit-holds",
   "delegated-admin-scopes",
   "roles",
   "user-roles",
@@ -308,6 +320,14 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     ),
   "sale-orders": (id, fa) =>
     selectOrgScopedSql("sale-orders", "sale_order", id, fa, ""),
+  "sale-orders-to-approve": (id, fa) =>
+    selectOrgScopedSql(
+      "sale-orders-to-approve",
+      "sale_order",
+      id,
+      fa,
+      " AND state = 'ToApprove'",
+    ),
   "sale-order-lines": (id, fa) =>
     selectOrgScopedSql("sale-order-lines", "sale_order_line", id, fa, ""),
   "sale-commissions": (id, fa) =>
@@ -317,6 +337,15 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       id,
       fa,
       "",
+      " ORDER BY id DESC",
+    ),
+  "sale-commissions-pending": (id, fa) =>
+    selectOrgScopedSql(
+      "sale-commissions-pending",
+      "sale_commission",
+      id,
+      fa,
+      " AND state = 'accrued'",
       " ORDER BY id DESC",
     ),
   "return-orders": (id, fa) =>
@@ -530,10 +559,36 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     ),
   "purchase-orders": (id, fa) =>
     selectOrgScopedSql("purchase-orders", "purchase_order", id, fa, ""),
+  "purchase-orders-to-approve": (id, fa) =>
+    selectOrgScopedSql(
+      "purchase-orders-to-approve",
+      "purchase_order",
+      id,
+      fa,
+      " AND state = 'ToApprove'",
+    ),
+  "purchase-orders-partial-receipt": (id, fa) =>
+    selectOrgScopedSql(
+      "purchase-orders-partial-receipt",
+      "purchase_order",
+      id,
+      fa,
+      " AND receipt_status = 'partial'",
+    ),
   "purchase-order-lines": (id, fa) =>
     selectOrgScopedSql(
       "purchase-order-lines",
       "purchase_order_line",
+      id,
+      fa,
+      "",
+    ),
+  "landed-costs": (id, fa) =>
+    selectOrgScopedSql("landed-costs", "stock_landed_cost", id, fa, ""),
+  "supplier-intakes": (id, fa) =>
+    selectOrgScopedSql(
+      "supplier-intakes",
+      "supplier_intake_request",
       id,
       fa,
       "",
@@ -544,6 +599,35 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql(
       "purchase-requisitions",
       "purchase_requisition",
+      id,
+      fa,
+      "",
+    ),
+  "purchase-rfqs": (id, fa) =>
+    selectOrgScopedSql("purchase-rfqs", "purchase_rfq", id, fa, "", " ORDER BY id DESC"),
+  "purchase-rfq-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "purchase-rfq-lines",
+      "purchase_rfq_line",
+      id,
+      fa,
+      "",
+    ),
+  "purchase-rfq-bids": (id, fa) =>
+    selectOrgScopedSql("purchase-rfq-bids", "purchase_rfq_bid", id, fa, ""),
+  "purchase-returns": (id, fa) =>
+    selectOrgScopedSql(
+      "purchase-returns",
+      "purchase_return",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "purchase-return-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "purchase-return-lines",
+      "purchase_return_line",
       id,
       fa,
       "",
@@ -655,6 +739,14 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       id,
       fa,
       "",
+    ),
+  "partner-credit-holds": (id, fa) =>
+    selectOrgScopedSql(
+      "partner-credit-holds",
+      "partner_credit_control",
+      id,
+      fa,
+      " AND payment_hold = true",
     ),
   "delegated-admin-scopes": (id, fa) =>
     selectOrgScopedSql(

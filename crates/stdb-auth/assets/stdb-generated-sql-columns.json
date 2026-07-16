@@ -1,4 +1,8 @@
 {
+  "AcceptSaleOrderQuotationParams": [
+    "signed_by",
+    "signature"
+  ],
   "AccountAccount": [
     "id",
     "organization_id",
@@ -1226,6 +1230,11 @@
     "status",
     "provider_message_id",
     "operational_message_id",
+    "metadata"
+  ],
+  "ApplyOmnichannelAllocationParams": [
+    "preferred_route_id",
+    "channel",
     "metadata"
   ],
   "ApplySalePromotionParams": [
@@ -4034,6 +4043,35 @@
     "sequence",
     "is_active"
   ],
+  "CreateSaleCommissionPlanParams": [
+    "company_id",
+    "name",
+    "is_active",
+    "default_rate_percent",
+    "metadata"
+  ],
+  "CreateSaleCommissionPlanSplitParams": [
+    "plan_id",
+    "partner_id",
+    "share_percent",
+    "metadata"
+  ],
+  "CreateSaleContractParams": [
+    "company_id",
+    "name",
+    "partner_id",
+    "date_start",
+    "date_end",
+    "pricelist_id",
+    "metadata"
+  ],
+  "CreateSaleCpqConstraintParams": [
+    "company_id",
+    "name",
+    "rule_json",
+    "is_active",
+    "metadata"
+  ],
   "CreateSaleOrderLineParams": [
     "product_id",
     "quantity",
@@ -4097,6 +4135,7 @@
     "is_printed",
     "is_locked",
     "is_dropship",
+    "invoice_policy",
     "message_follower_ids",
     "message_partner_ids",
     "message_channel_ids",
@@ -4113,6 +4152,15 @@
     "is_active",
     "date_start",
     "date_end",
+    "metadata"
+  ],
+  "CreateSalesIntegrationIntentParams": [
+    "company_id",
+    "provider",
+    "intent_type",
+    "sale_order_id",
+    "idempotency_key",
+    "request_payload",
     "metadata"
   ],
   "CreateSavedReportParams": [
@@ -7904,6 +7952,8 @@
     "amount_untaxed",
     "amount_tax",
     "amount_total",
+    "currency_rate",
+    "match_qty_tolerance",
     "receipt_status",
     "notes",
     "message_main_attachment_id",
@@ -8229,6 +8279,12 @@
     "user_agent",
     "metadata"
   ],
+  "RecordSalesIntegrationResultParams": [
+    "status",
+    "external_reference",
+    "last_error",
+    "metadata"
+  ],
   "RecordTelemetryParams": [
     "sensor_type",
     "value",
@@ -8444,6 +8500,60 @@
     "write_date",
     "metadata"
   ],
+  "SaleCommissionPlan": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "is_active",
+    "default_rate_percent",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "SaleCommissionPlanSplit": [
+    "id",
+    "organization_id",
+    "plan_id",
+    "partner_id",
+    "share_percent",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "SaleContract": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "partner_id",
+    "state",
+    "date_start",
+    "date_end",
+    "pricelist_id",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "SaleCpqConstraint": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "rule_json",
+    "is_active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
   "SaleOrder": [
     "id",
     "organization_id",
@@ -8515,6 +8625,8 @@
     "customer_lead",
     "prepaid_amount",
     "credit_amount",
+    "currency_rate",
+    "invoice_policy",
     "is_dropship",
     "dropship_picking_count",
     "dropship_picking_ids",
@@ -8648,6 +8760,31 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "SalesIntegrationIntent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "provider",
+    "intent_type",
+    "sale_order_id",
+    "status",
+    "idempotency_key",
+    "request_payload",
+    "last_error",
+    "external_reference",
+    "attempt_count",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "SalesSlaEscalationJob": [
+    "scheduled_id",
+    "scheduled_at",
+    "organization_id",
+    "company_id"
   ],
   "SaveImportMappingTemplateParams": [
     "name",
@@ -10667,6 +10804,7 @@
     "incoterm_location",
     "partner_id",
     "currency_id",
+    "match_qty_tolerance",
     "metadata"
   ],
   "UpdateQualityAlertReasonParams": [
@@ -10704,6 +10842,23 @@
     "permissions",
     "is_active"
   ],
+  "UpdateSaleOrderLineParams": [
+    "product_id",
+    "quantity",
+    "uom_id",
+    "price_unit",
+    "discount",
+    "tax_ids",
+    "name",
+    "sequence",
+    "product_variant_id",
+    "packaging_id",
+    "route_id",
+    "analytic_tag_ids",
+    "customer_lead",
+    "display_type",
+    "metadata"
+  ],
   "UpdateSaleOrderOptionParams": [
     "name",
     "quantity",
@@ -10732,6 +10887,7 @@
     "customer_lead",
     "analytic_account_id",
     "user_id",
+    "is_dropship",
     "metadata"
   ],
   "UpdateSavedReportParams": [

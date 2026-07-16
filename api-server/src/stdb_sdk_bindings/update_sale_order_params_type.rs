@@ -26,6 +26,7 @@ pub struct UpdateSaleOrderParams {
     pub customer_lead: Option<f64>,
     pub analytic_account_id: Option<u64>,
     pub user_id: Option<__sdk::Identity>,
+    pub is_dropship: Option<bool>,
     pub metadata: Option<String>,
 }
 

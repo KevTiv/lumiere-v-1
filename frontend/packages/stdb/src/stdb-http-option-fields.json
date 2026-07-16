@@ -4776,5 +4776,31 @@
     "reference",
     "metadata"
   ],
-  "AccrueSaleCommissionParams": []
+  "AccrueSaleCommissionParams": [],
+  "CreatePurchaseRfqParams": [
+    "requisition_id",
+    "notes",
+    "metadata"
+  ],
+  "CreatePurchaseRfqLineParams": [
+    "name",
+    "sequence"
+  ],
+  "AddPurchaseRfqLineParams": [
+    "name",
+    "sequence"
+  ],
+  "CreatePurchaseRfqBidParams": [
+    "notes"
+  ],
+  "CreatePurchaseReturnParams": [
+    "purchase_order_id",
+    "return_reason"
+  ],
+  "CreatePurchaseReturnLineParams": [
+    "purchase_order_line_id"
+  ],
+  "CreateVendorCreditFromPurchaseReturnParams": [
+    "metadata"
+  ]
 }

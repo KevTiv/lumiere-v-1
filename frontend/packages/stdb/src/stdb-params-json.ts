@@ -17,6 +17,12 @@ const NESTED_ARRAY_STRUCTS: Partial<
   CreateReturnOrderParams: {
     lines: "CreateReturnOrderLineParams",
   },
+  CreatePurchaseRfqParams: {
+    lines: "CreatePurchaseRfqLineParams",
+  },
+  CreatePurchaseReturnParams: {
+    lines: "CreatePurchaseReturnLineParams",
+  },
   CreateSaleOrderParams: {
     order_lines: "CreateSaleOrderLineParams",
   },
@@ -368,6 +374,12 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_credit_note_from_return_order: "CreateCreditNoteFromReturnOrderParams",
   create_credit_note_from_invoice: "CreateCreditNoteParams",
   create_bill_from_purchase_order: "CreateBillFromPurchaseOrderParams",
+  create_purchase_rfq: "CreatePurchaseRfqParams",
+  add_purchase_rfq_bid: "CreatePurchaseRfqBidParams",
+  add_purchase_rfq_line: "AddPurchaseRfqLineParams",
+  create_purchase_return: "CreatePurchaseReturnParams",
+  create_vendor_credit_from_purchase_return:
+    "CreateVendorCreditFromPurchaseReturnParams",
   create_pricelist_item: "CreatePricelistItemParams",
   create_picking_batch: "CreatePickingBatchParams",
   create_purchase_requisition: "CreatePurchaseRequisitionParams",

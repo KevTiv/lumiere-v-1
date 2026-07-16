@@ -90,6 +90,8 @@ export default __t.row({
   customerLead: __t.f64().name("customer_lead"),
   prepaidAmount: __t.f64().name("prepaid_amount"),
   creditAmount: __t.f64().name("credit_amount"),
+  currencyRate: __t.f64().name("currency_rate"),
+  invoicePolicy: __t.string().name("invoice_policy"),
   isDropship: __t.bool().name("is_dropship"),
   dropshipPickingCount: __t.u32().name("dropship_picking_count"),
   dropshipPickingIds: __t.array(__t.u64()).name("dropship_picking_ids"),

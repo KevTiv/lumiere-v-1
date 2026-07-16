@@ -5,8 +5,9 @@ mod field_policy;
 mod resource_registry;
 
 pub use erp_subscriptions::{
-    auth_subscriptions, create_client_subscriptions, full_client_subscription_resources_vec,
-    subscription_queries_for_resource, subscription_resource_keys_vec, SubscriptionQueryContext,
+    auth_subscriptions, create_client_subscriptions, erp_org_extra_where,
+    full_client_subscription_resources_vec, subscription_queries_for_resource,
+    subscription_resource_keys_vec, SubscriptionQueryContext,
 };
 pub use field_policy::{
     assert_safe_sql_identifiers, identity_sql_literal, resolve_http_sql_columns,

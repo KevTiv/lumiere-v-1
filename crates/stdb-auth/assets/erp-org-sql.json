@@ -203,6 +203,13 @@
     "table": "sale_order"
   },
   {
+    "extra_where": " AND state = 'ToApprove'",
+    "mapKey": "sale-orders-to-approve",
+    "order_by": "",
+    "resource_key": "sale-orders-to-approve",
+    "table": "sale_order"
+  },
+  {
     "extra_where": "",
     "mapKey": "sale-order-lines",
     "order_by": "",
@@ -214,6 +221,13 @@
     "mapKey": "sale-commissions",
     "order_by": " ORDER BY id DESC",
     "resource_key": "sale-commissions",
+    "table": "sale_commission"
+  },
+  {
+    "extra_where": " AND state = 'accrued'",
+    "mapKey": "sale-commissions-pending",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "sale-commissions-pending",
     "table": "sale_commission"
   },
   {
@@ -546,11 +560,39 @@
     "table": "purchase_order"
   },
   {
+    "extra_where": " AND state = 'ToApprove'",
+    "mapKey": "purchase-orders-to-approve",
+    "order_by": "",
+    "resource_key": "purchase-orders-to-approve",
+    "table": "purchase_order"
+  },
+  {
+    "extra_where": " AND receipt_status = 'partial'",
+    "mapKey": "purchase-orders-partial-receipt",
+    "order_by": "",
+    "resource_key": "purchase-orders-partial-receipt",
+    "table": "purchase_order"
+  },
+  {
     "extra_where": "",
     "mapKey": "purchase-order-lines",
     "order_by": "",
     "resource_key": "purchase-order-lines",
     "table": "purchase_order_line"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "landed-costs",
+    "order_by": "",
+    "resource_key": "landed-costs",
+    "table": "stock_landed_cost"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "supplier-intakes",
+    "order_by": "",
+    "resource_key": "supplier-intakes",
+    "table": "supplier_intake_request"
   },
   {
     "extra_where": "",
@@ -788,6 +830,13 @@
     "mapKey": "partner-credit-controls",
     "order_by": "",
     "resource_key": "partner-credit-controls",
+    "table": "partner_credit_control"
+  },
+  {
+    "extra_where": " AND payment_hold = true",
+    "mapKey": "partner-credit-holds",
+    "order_by": "",
+    "resource_key": "partner-credit-holds",
     "table": "partner_credit_control"
   },
   {

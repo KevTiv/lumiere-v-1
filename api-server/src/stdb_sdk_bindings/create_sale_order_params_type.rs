@@ -43,6 +43,7 @@ pub struct CreateSaleOrderParams {
     pub is_printed: Option<bool>,
     pub is_locked: Option<bool>,
     pub is_dropship: Option<bool>,
+    pub invoice_policy: Option<String>,
     pub message_follower_ids: Option<Vec<u64>>,
     pub message_partner_ids: Option<Vec<u64>>,
     pub message_channel_ids: Option<Vec<u64>>,

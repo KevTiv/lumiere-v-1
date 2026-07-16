@@ -11,6 +11,7 @@ use spacetimedb_sdk::__codegen::{
 	__ws,
 };
 
+pub mod accept_sale_order_quotation_params_type;
 pub mod account_account_type;
 pub mod account_account_type_type;
 pub mod account_analytic_account_type;
@@ -47,6 +48,7 @@ pub mod add_document_version_params_type;
 pub mod add_landed_cost_line_params_type;
 pub mod add_org_member_params_type;
 pub mod add_purchase_order_line_params_type;
+pub mod add_purchase_rfq_line_params_type;
 pub mod add_user_to_organization_params_type;
 pub mod add_workflow_activity_params_type;
 pub mod add_workflow_transition_params_type;
@@ -78,6 +80,7 @@ pub mod analytics_metric_type;
 pub mod append_ai_agent_run_step_params_type;
 pub mod append_ai_chat_message_params_type;
 pub mod append_crm_conversation_message_params_type;
+pub mod apply_omnichannel_allocation_params_type;
 pub mod apply_sale_promotion_params_type;
 pub mod approval_request_type;
 pub mod approval_rule_type;
@@ -114,6 +117,7 @@ pub mod cartonization_result_type;
 pub mod casbin_rule_type;
 pub mod cash_flow_line_type;
 pub mod close_subscription_params_type;
+pub mod commodity_price_index_type;
 pub mod company_type;
 pub mod company_country_pack_type;
 pub mod company_scope_params_type;
@@ -122,6 +126,7 @@ pub mod complete_ai_agent_run_params_type;
 pub mod complete_document_processing_job_params_type;
 pub mod compute_price_type;
 pub mod confirm_payslip_params_type;
+pub mod consignment_agreement_type;
 pub mod consolidation_account_type;
 pub mod consolidation_company_rate_type;
 pub mod consolidation_elimination_entry_type;
@@ -190,6 +195,7 @@ pub mod create_bom_params_type;
 pub mod create_budget_post_params_type;
 pub mod create_calendar_event_params_type;
 pub mod create_company_params_type;
+pub mod create_consignment_agreement_params_type;
 pub mod create_consolidation_account_params_type;
 pub mod create_consolidation_journal_params_type;
 pub mod create_contact_identity_params_type;
@@ -282,8 +288,16 @@ pub mod create_product_params_type;
 pub mod create_product_supplier_info_params_type;
 pub mod create_product_variant_params_type;
 pub mod create_project_params_type;
+pub mod create_purchase_blanket_order_params_type;
+pub mod create_purchase_contract_params_type;
 pub mod create_purchase_order_params_type;
 pub mod create_purchase_requisition_params_type;
+pub mod create_purchase_return_line_params_type;
+pub mod create_purchase_return_params_type;
+pub mod create_purchase_rfq_bid_params_type;
+pub mod create_purchase_rfq_line_params_type;
+pub mod create_purchase_rfq_params_type;
+pub mod create_purchasing_integration_intent_params_type;
 pub mod create_quality_alert_params_type;
 pub mod create_quality_alert_reason_params_type;
 pub mod create_quality_check_params_type;
@@ -298,10 +312,15 @@ pub mod create_role_config_params_type;
 pub mod create_role_params_type;
 pub mod create_routing_workcenter_params_type;
 pub mod create_salary_rule_params_type;
+pub mod create_sale_commission_plan_params_type;
+pub mod create_sale_commission_plan_split_params_type;
+pub mod create_sale_contract_params_type;
+pub mod create_sale_cpq_constraint_params_type;
 pub mod create_sale_order_line_params_type;
 pub mod create_sale_order_option_params_type;
 pub mod create_sale_order_params_type;
 pub mod create_sale_promotion_params_type;
+pub mod create_sales_integration_intent_params_type;
 pub mod create_saved_report_params_type;
 pub mod create_scheduled_report_params_type;
 pub mod create_shipping_method_params_type;
@@ -334,6 +353,7 @@ pub mod create_user_session_params_type;
 pub mod create_utm_campaign_params_type;
 pub mod create_utm_medium_params_type;
 pub mod create_utm_source_params_type;
+pub mod create_vendor_credit_from_purchase_return_params_type;
 pub mod create_warehouse_3_d_zone_params_type;
 pub mod create_warehouse_params_type;
 pub mod create_warehouse_task_params_type;
@@ -548,9 +568,18 @@ pub mod proposal_section_type;
 pub mod proposal_source_doc_type;
 pub mod proposal_status_type;
 pub mod proposal_version_type;
+pub mod purchase_approval_delegate_type;
+pub mod purchase_blanket_order_type;
+pub mod purchase_contract_type;
 pub mod purchase_order_type;
 pub mod purchase_order_line_type;
 pub mod purchase_requisition_type;
+pub mod purchase_return_type;
+pub mod purchase_return_line_type;
+pub mod purchase_rfq_type;
+pub mod purchase_rfq_bid_type;
+pub mod purchase_rfq_line_type;
+pub mod purchasing_integration_intent_type;
 pub mod quality_alert_type;
 pub mod quality_alert_reason_type;
 pub mod quality_check_type;
@@ -569,12 +598,15 @@ pub mod record_custom_field_value_type;
 pub mod record_cycle_count_line_params_type;
 pub mod record_generated_owner_report_params_type;
 pub mod record_privacy_consent_params_type;
+pub mod record_purchasing_integration_result_params_type;
+pub mod record_sales_integration_result_params_type;
 pub mod record_telemetry_params_type;
 pub mod record_whats_app_health_check_params_type;
 pub mod register_device_params_type;
 pub mod register_hub_params_type;
 pub mod register_queue_worker_params_type;
 pub mod reject_approval_request_params_type;
+pub mod release_blanket_to_po_params_type;
 pub mod replenishment_rule_type;
 pub mod report_state_type;
 pub mod report_template_type;
@@ -591,11 +623,17 @@ pub mod rule_type_type;
 pub mod run_fx_revaluation_batch_params_type;
 pub mod run_fx_revaluation_params_type;
 pub mod sale_commission_type;
+pub mod sale_commission_plan_type;
+pub mod sale_commission_plan_split_type;
+pub mod sale_contract_type;
+pub mod sale_cpq_constraint_type;
 pub mod sale_order_type;
 pub mod sale_order_line_type;
 pub mod sale_order_option_type;
 pub mod sale_promotion_type;
 pub mod sale_state_type;
+pub mod sales_integration_intent_type;
+pub mod sales_sla_escalation_job_type;
 pub mod save_import_mapping_template_params_type;
 pub mod saved_report_type;
 pub mod scheduled_report_type;
@@ -610,11 +648,14 @@ pub mod segment_rule_op_type;
 pub mod serial_lot_traceability_type;
 pub mod session_state_type;
 pub mod set_article_published_params_type;
+pub mod set_commodity_price_index_params_type;
 pub mod set_company_country_pack_params_type;
 pub mod set_company_vertical_pack_params_type;
 pub mod set_consolidation_company_rate_params_type;
 pub mod set_contact_segment_rules_params_type;
+pub mod set_purchase_approval_delegate_params_type;
 pub mod set_record_custom_field_values_params_type;
+pub mod set_vendor_risk_flag_params_type;
 pub mod settle_sale_commissions_params_type;
 pub mod setup_fiscal_calendar_params_type;
 pub mod shipping_method_type;
@@ -757,6 +798,7 @@ pub mod update_quality_point_params_type;
 pub mod update_quality_team_params_type;
 pub mod update_report_template_params_type;
 pub mod update_role_params_type;
+pub mod update_sale_order_line_params_type;
 pub mod update_sale_order_option_params_type;
 pub mod update_sale_order_params_type;
 pub mod update_saved_report_params_type;
@@ -789,6 +831,7 @@ pub mod upsert_ai_skill_params_type;
 pub mod upsert_organization_settings_params_type;
 pub mod upsert_partner_credit_control_params_type;
 pub mod upsert_search_embedding_params_type;
+pub mod upsert_vendor_scorecard_params_type;
 pub mod user_credential_type;
 pub mod user_custom_field_type;
 pub mod user_invite_type;
@@ -801,6 +844,8 @@ pub mod utm_medium_type;
 pub mod utm_source_type;
 pub mod validate_timesheets_params_type;
 pub mod vehicle_status_type;
+pub mod vendor_risk_flag_type;
+pub mod vendor_scorecard_type;
 pub mod verification_level_type;
 pub mod verification_status_type;
 pub mod warehouse_type;
@@ -817,6 +862,7 @@ pub mod workflow_workitem_type;
 pub mod workitem_state_type;
 pub mod workorder_state_type;
 pub mod zone_display_type_type;
+pub mod accept_sale_order_quotation_reducer;
 pub mod accrue_sale_commission_reducer;
 pub mod acknowledge_insight_reducer;
 pub mod acknowledge_iot_action_reducer;
@@ -836,6 +882,8 @@ pub mod add_proposal_comment_reducer;
 pub mod add_proposal_line_item_reducer;
 pub mod add_proposal_source_doc_reducer;
 pub mod add_purchase_order_line_reducer;
+pub mod add_purchase_rfq_bid_reducer;
+pub mod add_purchase_rfq_line_reducer;
 pub mod add_rule_to_nomenclature_reducer;
 pub mod add_user_custom_field_reducer;
 pub mod add_user_to_organization_reducer;
@@ -848,6 +896,7 @@ pub mod append_ai_chat_message_reducer;
 pub mod append_crm_conversation_message_reducer;
 pub mod apply_global_migrations_reducer;
 pub mod apply_landed_costs_reducer;
+pub mod apply_omnichannel_allocation_reducer;
 pub mod apply_org_migrations_reducer;
 pub mod apply_reconciliation_rules_reducer;
 pub mod apply_sale_order_options_reducer;
@@ -876,6 +925,7 @@ pub mod assign_task_users_reducer;
 pub mod assign_team_member_skill_reducer;
 pub mod assign_ticket_reducer;
 pub mod assign_user_to_picking_reducer;
+pub mod award_purchase_rfq_bid_reducer;
 pub mod backfill_external_ids_reducer;
 pub mod bill_timesheets_reducer;
 pub mod block_serial_reducer;
@@ -937,6 +987,7 @@ pub mod confirm_budget_reducer;
 pub mod confirm_manufacturing_order_reducer;
 pub mod confirm_payslip_reducer;
 pub mod confirm_purchase_order_reducer;
+pub mod confirm_purchase_return_reducer;
 pub mod confirm_return_order_reducer;
 pub mod confirm_sales_order_reducer;
 pub mod confirm_stock_move_reducer;
@@ -944,6 +995,7 @@ pub mod confirm_stock_picking_reducer;
 pub mod consume_mo_materials_reducer;
 pub mod convert_lead_to_customer_reducer;
 pub mod convert_opportunity_to_sale_order_reducer;
+pub mod convert_purchase_requisition_to_po_reducer;
 pub mod create_account_account_reducer;
 pub mod create_account_account_type_reducer;
 pub mod create_account_asset_reducer;
@@ -986,6 +1038,7 @@ pub mod create_budget_line_reducer;
 pub mod create_budget_post_reducer;
 pub mod create_calendar_event_reducer;
 pub mod create_company_reducer;
+pub mod create_consignment_agreement_reducer;
 pub mod create_consolidation_account_reducer;
 pub mod create_consolidation_journal_reducer;
 pub mod create_contact_reducer;
@@ -1083,8 +1136,13 @@ pub mod create_product_supplier_info_reducer;
 pub mod create_product_variant_reducer;
 pub mod create_project_reducer;
 pub mod create_proposal_reducer;
+pub mod create_purchase_blanket_order_reducer;
+pub mod create_purchase_contract_reducer;
 pub mod create_purchase_order_reducer;
 pub mod create_purchase_requisition_reducer;
+pub mod create_purchase_return_reducer;
+pub mod create_purchase_rfq_reducer;
+pub mod create_purchasing_integration_intent_reducer;
 pub mod create_quality_alert_reducer;
 pub mod create_quality_alert_reason_reducer;
 pub mod create_quality_check_reducer;
@@ -1097,10 +1155,15 @@ pub mod create_revenue_recognition_rule_reducer;
 pub mod create_role_reducer;
 pub mod create_routing_workcenter_reducer;
 pub mod create_salary_rule_reducer;
+pub mod create_sale_commission_plan_reducer;
+pub mod create_sale_commission_plan_split_reducer;
+pub mod create_sale_contract_reducer;
+pub mod create_sale_cpq_constraint_reducer;
 pub mod create_sale_order_reducer;
 pub mod create_sale_order_line_reducer;
 pub mod create_sale_order_option_reducer;
 pub mod create_sale_promotion_reducer;
+pub mod create_sales_integration_intent_reducer;
 pub mod create_saved_report_reducer;
 pub mod create_scheduled_report_reducer;
 pub mod create_shipping_method_reducer;
@@ -1133,6 +1196,7 @@ pub mod create_user_session_reducer;
 pub mod create_utm_campaign_reducer;
 pub mod create_utm_medium_reducer;
 pub mod create_utm_source_reducer;
+pub mod create_vendor_credit_from_purchase_return_reducer;
 pub mod create_warehouse_reducer;
 pub mod create_warehouse_3_d_zone_reducer;
 pub mod create_warehouse_task_reducer;
@@ -1185,6 +1249,7 @@ pub mod delete_quality_alert_reason_reducer;
 pub mod delete_quality_point_reducer;
 pub mod delete_quality_team_reducer;
 pub mod delete_record_custom_field_values_reducer;
+pub mod delete_sale_order_line_reducer;
 pub mod delete_sale_order_option_reducer;
 pub mod delete_saved_report_reducer;
 pub mod delete_search_embedding_reducer;
@@ -1305,6 +1370,7 @@ pub mod link_workos_user_reducer;
 pub mod lock_document_reducer;
 pub mod lock_knowledge_article_reducer;
 pub mod lock_purchase_order_reducer;
+pub mod lock_sale_order_reducer;
 pub mod log_audit_event_reducer;
 pub mod log_timesheet_reducer;
 pub mod log_workcenter_productivity_reducer;
@@ -1361,7 +1427,9 @@ pub mod record_google_drive_sync_reducer;
 pub mod record_google_drive_sync_error_reducer;
 pub mod record_message_copied_reducer;
 pub mod record_privacy_consent_reducer;
+pub mod record_purchasing_integration_result_reducer;
 pub mod record_report_run_reducer;
+pub mod record_sales_integration_result_reducer;
 pub mod record_telemetry_reducer;
 pub mod record_telemetry_batch_reducer;
 pub mod record_whatsapp_health_check_reducer;
@@ -1377,6 +1445,7 @@ pub mod register_queue_worker_reducer;
 pub mod reject_ai_action_draft_reducer;
 pub mod reject_approval_request_reducer;
 pub mod reject_supplier_intake_reducer;
+pub mod release_blanket_to_po_reducer;
 pub mod remove_article_member_reducer;
 pub mod remove_casbin_rule_reducer;
 pub mod remove_landed_cost_line_reducer;
@@ -1420,6 +1489,7 @@ pub mod run_all_crm_tests_reducer;
 pub mod run_all_domain_tests_reducer;
 pub mod run_all_inventory_tests_reducer;
 pub mod run_all_platform_tests_reducer;
+pub mod run_all_purchasing_tests_reducer;
 pub mod run_all_sales_tests_reducer;
 pub mod run_core_operational_messaging_test_reducer;
 pub mod run_core_sod_test_reducer;
@@ -1445,13 +1515,22 @@ pub mod run_inventory_stock_quant_test_reducer;
 pub mod run_manufacturing_workcenter_test_reducer;
 pub mod run_owner_report_schedule_reducer;
 pub mod run_purchasing_bill_balanced_test_reducer;
+pub mod run_purchasing_company_isolation_test_reducer;
+pub mod run_purchasing_incoming_picking_test_reducer;
+pub mod run_purchasing_wave_c_smoke_test_reducer;
 pub mod run_sales_atp_shortfall_test_reducer;
 pub mod run_sales_backorder_test_reducer;
 pub mod run_sales_commission_accrue_test_reducer;
 pub mod run_sales_commission_clawback_test_reducer;
 pub mod run_sales_commission_settle_test_reducer;
+pub mod run_sales_company_isolation_test_reducer;
 pub mod run_sales_credit_hold_test_reducer;
+pub mod run_sales_dropship_confirm_test_reducer;
+pub mod run_sales_exchange_from_return_test_reducer;
 pub mod run_sales_fiscal_remap_test_reducer;
+pub mod run_sales_fx_fail_closed_test_reducer;
+pub mod run_sales_line_update_delete_test_reducer;
+pub mod run_sales_lock_blocks_update_test_reducer;
 pub mod run_sales_oms_extensions_test_reducer;
 pub mod run_sales_order_cancel_test_reducer;
 pub mod run_sales_order_delivery_test_reducer;
@@ -1465,6 +1544,7 @@ pub mod run_traceability_report_reducer;
 pub mod run_workflow_definition_test_reducer;
 pub mod save_import_mapping_template_reducer;
 pub mod save_proposal_version_reducer;
+pub mod schedule_sales_sla_escalation_reducer;
 pub mod schedule_tax_deadline_updates_reducer;
 pub mod seed_dev_data_reducer;
 pub mod seed_organization_form_configs_reducer;
@@ -1478,6 +1558,7 @@ pub mod set_approval_rule_active_reducer;
 pub mod set_article_published_reducer;
 pub mod set_asset_active_reducer;
 pub mod set_billing_status_reducer;
+pub mod set_commodity_price_index_reducer;
 pub mod set_company_country_pack_reducer;
 pub mod set_company_vertical_pack_reducer;
 pub mod set_consolidation_company_rate_reducer;
@@ -1487,8 +1568,10 @@ pub mod set_form_role_config_reducer;
 pub mod set_intercompany_rule_active_reducer;
 pub mod set_iot_threshold_reducer;
 pub mod set_project_active_reducer;
+pub mod set_purchase_approval_delegate_reducer;
 pub mod set_record_custom_field_values_reducer;
 pub mod set_task_parent_reducer;
+pub mod set_vendor_risk_flag_reducer;
 pub mod set_whatsapp_primary_account_reducer;
 pub mod set_workflow_active_reducer;
 pub mod set_workitem_exception_reducer;
@@ -1522,6 +1605,7 @@ pub mod unlink_device_reducer;
 pub mod unlock_document_reducer;
 pub mod unlock_knowledge_article_reducer;
 pub mod unlock_purchase_order_reducer;
+pub mod unlock_sale_order_reducer;
 pub mod unmatch_elimination_entry_reducer;
 pub mod unreconciled_account_bank_statement_line_reducer;
 pub mod unreserve_stock_quant_reducer;
@@ -1634,6 +1718,7 @@ pub mod update_quality_team_reducer;
 pub mod update_report_template_reducer;
 pub mod update_role_reducer;
 pub mod update_sale_order_reducer;
+pub mod update_sale_order_line_reducer;
 pub mod update_sale_order_option_reducer;
 pub mod update_saved_report_reducer;
 pub mod update_sod_conflict_rule_reducer;
@@ -1674,6 +1759,7 @@ pub mod upsert_organization_settings_reducer;
 pub mod upsert_partner_credit_control_reducer;
 pub mod upsert_proposal_section_reducer;
 pub mod upsert_search_embedding_reducer;
+pub mod upsert_vendor_scorecard_reducer;
 pub mod upsert_warehouse_geo_reducer;
 pub mod use_serial_reducer;
 pub mod validate_budget_reducer;
@@ -1753,9 +1839,11 @@ pub mod calendar_event_table;
 pub mod cartonization_result_table;
 pub mod casbin_rule_table;
 pub mod cash_flow_line_table;
+pub mod commodity_price_index_table;
 pub mod company_table;
 pub mod company_country_pack_table;
 pub mod company_vertical_pack_table;
+pub mod consignment_agreement_table;
 pub mod consolidation_account_table;
 pub mod consolidation_company_rate_table;
 pub mod consolidation_elimination_entry_table;
@@ -1904,9 +1992,18 @@ pub mod proposal_presence_table;
 pub mod proposal_section_table;
 pub mod proposal_source_doc_table;
 pub mod proposal_version_table;
+pub mod purchase_approval_delegate_table;
+pub mod purchase_blanket_order_table;
+pub mod purchase_contract_table;
 pub mod purchase_order_table;
 pub mod purchase_order_line_table;
 pub mod purchase_requisition_table;
+pub mod purchase_return_table;
+pub mod purchase_return_line_table;
+pub mod purchase_rfq_table;
+pub mod purchase_rfq_bid_table;
+pub mod purchase_rfq_line_table;
+pub mod purchasing_integration_intent_table;
 pub mod quality_alert_table;
 pub mod quality_alert_reason_table;
 pub mod quality_check_table;
@@ -1923,10 +2020,15 @@ pub mod return_order_line_table;
 pub mod revenue_recognition_rule_table;
 pub mod role_table;
 pub mod sale_commission_table;
+pub mod sale_commission_plan_table;
+pub mod sale_commission_plan_split_table;
+pub mod sale_contract_table;
+pub mod sale_cpq_constraint_table;
 pub mod sale_order_table;
 pub mod sale_order_line_table;
 pub mod sale_order_option_table;
 pub mod sale_promotion_table;
+pub mod sales_integration_intent_table;
 pub mod saved_report_table;
 pub mod scheduled_report_table;
 pub mod scheduled_report_run_table;
@@ -1974,6 +2076,8 @@ pub mod user_session_table;
 pub mod utm_campaign_table;
 pub mod utm_medium_table;
 pub mod utm_source_table;
+pub mod vendor_risk_flag_table;
+pub mod vendor_scorecard_table;
 pub mod warehouse_table;
 pub mod warehouse_3_d_zone_table;
 pub mod warehouse_geo_table;
@@ -1985,6 +2089,7 @@ pub mod workflow_instance_table;
 pub mod workflow_transition_table;
 pub mod workflow_workitem_table;
 
+pub use accept_sale_order_quotation_params_type::AcceptSaleOrderQuotationParams;
 pub use account_account_type::AccountAccount;
 pub use account_account_type_type::AccountAccountType;
 pub use account_analytic_account_type::AccountAnalyticAccount;
@@ -2021,6 +2126,7 @@ pub use add_document_version_params_type::AddDocumentVersionParams;
 pub use add_landed_cost_line_params_type::AddLandedCostLineParams;
 pub use add_org_member_params_type::AddOrgMemberParams;
 pub use add_purchase_order_line_params_type::AddPurchaseOrderLineParams;
+pub use add_purchase_rfq_line_params_type::AddPurchaseRfqLineParams;
 pub use add_user_to_organization_params_type::AddUserToOrganizationParams;
 pub use add_workflow_activity_params_type::AddWorkflowActivityParams;
 pub use add_workflow_transition_params_type::AddWorkflowTransitionParams;
@@ -2052,6 +2158,7 @@ pub use analytics_metric_type::AnalyticsMetric;
 pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
 pub use append_ai_chat_message_params_type::AppendAiChatMessageParams;
 pub use append_crm_conversation_message_params_type::AppendCrmConversationMessageParams;
+pub use apply_omnichannel_allocation_params_type::ApplyOmnichannelAllocationParams;
 pub use apply_sale_promotion_params_type::ApplySalePromotionParams;
 pub use approval_request_type::ApprovalRequest;
 pub use approval_rule_type::ApprovalRule;
@@ -2088,6 +2195,7 @@ pub use cartonization_result_type::CartonizationResult;
 pub use casbin_rule_type::CasbinRule;
 pub use cash_flow_line_type::CashFlowLine;
 pub use close_subscription_params_type::CloseSubscriptionParams;
+pub use commodity_price_index_type::CommodityPriceIndex;
 pub use company_type::Company;
 pub use company_country_pack_type::CompanyCountryPack;
 pub use company_scope_params_type::CompanyScopeParams;
@@ -2096,6 +2204,7 @@ pub use complete_ai_agent_run_params_type::CompleteAiAgentRunParams;
 pub use complete_document_processing_job_params_type::CompleteDocumentProcessingJobParams;
 pub use compute_price_type::ComputePrice;
 pub use confirm_payslip_params_type::ConfirmPayslipParams;
+pub use consignment_agreement_type::ConsignmentAgreement;
 pub use consolidation_account_type::ConsolidationAccount;
 pub use consolidation_company_rate_type::ConsolidationCompanyRate;
 pub use consolidation_elimination_entry_type::ConsolidationEliminationEntry;
@@ -2164,6 +2273,7 @@ pub use create_bom_params_type::CreateBomParams;
 pub use create_budget_post_params_type::CreateBudgetPostParams;
 pub use create_calendar_event_params_type::CreateCalendarEventParams;
 pub use create_company_params_type::CreateCompanyParams;
+pub use create_consignment_agreement_params_type::CreateConsignmentAgreementParams;
 pub use create_consolidation_account_params_type::CreateConsolidationAccountParams;
 pub use create_consolidation_journal_params_type::CreateConsolidationJournalParams;
 pub use create_contact_identity_params_type::CreateContactIdentityParams;
@@ -2256,8 +2366,16 @@ pub use create_product_params_type::CreateProductParams;
 pub use create_product_supplier_info_params_type::CreateProductSupplierInfoParams;
 pub use create_product_variant_params_type::CreateProductVariantParams;
 pub use create_project_params_type::CreateProjectParams;
+pub use create_purchase_blanket_order_params_type::CreatePurchaseBlanketOrderParams;
+pub use create_purchase_contract_params_type::CreatePurchaseContractParams;
 pub use create_purchase_order_params_type::CreatePurchaseOrderParams;
 pub use create_purchase_requisition_params_type::CreatePurchaseRequisitionParams;
+pub use create_purchase_return_line_params_type::CreatePurchaseReturnLineParams;
+pub use create_purchase_return_params_type::CreatePurchaseReturnParams;
+pub use create_purchase_rfq_bid_params_type::CreatePurchaseRfqBidParams;
+pub use create_purchase_rfq_line_params_type::CreatePurchaseRfqLineParams;
+pub use create_purchase_rfq_params_type::CreatePurchaseRfqParams;
+pub use create_purchasing_integration_intent_params_type::CreatePurchasingIntegrationIntentParams;
 pub use create_quality_alert_params_type::CreateQualityAlertParams;
 pub use create_quality_alert_reason_params_type::CreateQualityAlertReasonParams;
 pub use create_quality_check_params_type::CreateQualityCheckParams;
@@ -2272,10 +2390,15 @@ pub use create_role_config_params_type::CreateRoleConfigParams;
 pub use create_role_params_type::CreateRoleParams;
 pub use create_routing_workcenter_params_type::CreateRoutingWorkcenterParams;
 pub use create_salary_rule_params_type::CreateSalaryRuleParams;
+pub use create_sale_commission_plan_params_type::CreateSaleCommissionPlanParams;
+pub use create_sale_commission_plan_split_params_type::CreateSaleCommissionPlanSplitParams;
+pub use create_sale_contract_params_type::CreateSaleContractParams;
+pub use create_sale_cpq_constraint_params_type::CreateSaleCpqConstraintParams;
 pub use create_sale_order_line_params_type::CreateSaleOrderLineParams;
 pub use create_sale_order_option_params_type::CreateSaleOrderOptionParams;
 pub use create_sale_order_params_type::CreateSaleOrderParams;
 pub use create_sale_promotion_params_type::CreateSalePromotionParams;
+pub use create_sales_integration_intent_params_type::CreateSalesIntegrationIntentParams;
 pub use create_saved_report_params_type::CreateSavedReportParams;
 pub use create_scheduled_report_params_type::CreateScheduledReportParams;
 pub use create_shipping_method_params_type::CreateShippingMethodParams;
@@ -2308,6 +2431,7 @@ pub use create_user_session_params_type::CreateUserSessionParams;
 pub use create_utm_campaign_params_type::CreateUtmCampaignParams;
 pub use create_utm_medium_params_type::CreateUtmMediumParams;
 pub use create_utm_source_params_type::CreateUtmSourceParams;
+pub use create_vendor_credit_from_purchase_return_params_type::CreateVendorCreditFromPurchaseReturnParams;
 pub use create_warehouse_3_d_zone_params_type::CreateWarehouse3DZoneParams;
 pub use create_warehouse_params_type::CreateWarehouseParams;
 pub use create_warehouse_task_params_type::CreateWarehouseTaskParams;
@@ -2522,9 +2646,18 @@ pub use proposal_section_type::ProposalSection;
 pub use proposal_source_doc_type::ProposalSourceDoc;
 pub use proposal_status_type::ProposalStatus;
 pub use proposal_version_type::ProposalVersion;
+pub use purchase_approval_delegate_type::PurchaseApprovalDelegate;
+pub use purchase_blanket_order_type::PurchaseBlanketOrder;
+pub use purchase_contract_type::PurchaseContract;
 pub use purchase_order_type::PurchaseOrder;
 pub use purchase_order_line_type::PurchaseOrderLine;
 pub use purchase_requisition_type::PurchaseRequisition;
+pub use purchase_return_type::PurchaseReturn;
+pub use purchase_return_line_type::PurchaseReturnLine;
+pub use purchase_rfq_type::PurchaseRfq;
+pub use purchase_rfq_bid_type::PurchaseRfqBid;
+pub use purchase_rfq_line_type::PurchaseRfqLine;
+pub use purchasing_integration_intent_type::PurchasingIntegrationIntent;
 pub use quality_alert_type::QualityAlert;
 pub use quality_alert_reason_type::QualityAlertReason;
 pub use quality_check_type::QualityCheck;
@@ -2543,12 +2676,15 @@ pub use record_custom_field_value_type::RecordCustomFieldValue;
 pub use record_cycle_count_line_params_type::RecordCycleCountLineParams;
 pub use record_generated_owner_report_params_type::RecordGeneratedOwnerReportParams;
 pub use record_privacy_consent_params_type::RecordPrivacyConsentParams;
+pub use record_purchasing_integration_result_params_type::RecordPurchasingIntegrationResultParams;
+pub use record_sales_integration_result_params_type::RecordSalesIntegrationResultParams;
 pub use record_telemetry_params_type::RecordTelemetryParams;
 pub use record_whats_app_health_check_params_type::RecordWhatsAppHealthCheckParams;
 pub use register_device_params_type::RegisterDeviceParams;
 pub use register_hub_params_type::RegisterHubParams;
 pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
 pub use reject_approval_request_params_type::RejectApprovalRequestParams;
+pub use release_blanket_to_po_params_type::ReleaseBlanketToPoParams;
 pub use replenishment_rule_type::ReplenishmentRule;
 pub use report_state_type::ReportState;
 pub use report_template_type::ReportTemplate;
@@ -2565,11 +2701,17 @@ pub use rule_type_type::RuleType;
 pub use run_fx_revaluation_batch_params_type::RunFxRevaluationBatchParams;
 pub use run_fx_revaluation_params_type::RunFxRevaluationParams;
 pub use sale_commission_type::SaleCommission;
+pub use sale_commission_plan_type::SaleCommissionPlan;
+pub use sale_commission_plan_split_type::SaleCommissionPlanSplit;
+pub use sale_contract_type::SaleContract;
+pub use sale_cpq_constraint_type::SaleCpqConstraint;
 pub use sale_order_type::SaleOrder;
 pub use sale_order_line_type::SaleOrderLine;
 pub use sale_order_option_type::SaleOrderOption;
 pub use sale_promotion_type::SalePromotion;
 pub use sale_state_type::SaleState;
+pub use sales_integration_intent_type::SalesIntegrationIntent;
+pub use sales_sla_escalation_job_type::SalesSlaEscalationJob;
 pub use save_import_mapping_template_params_type::SaveImportMappingTemplateParams;
 pub use saved_report_type::SavedReport;
 pub use scheduled_report_type::ScheduledReport;
@@ -2584,11 +2726,14 @@ pub use segment_rule_op_type::SegmentRuleOp;
 pub use serial_lot_traceability_type::SerialLotTraceability;
 pub use session_state_type::SessionState;
 pub use set_article_published_params_type::SetArticlePublishedParams;
+pub use set_commodity_price_index_params_type::SetCommodityPriceIndexParams;
 pub use set_company_country_pack_params_type::SetCompanyCountryPackParams;
 pub use set_company_vertical_pack_params_type::SetCompanyVerticalPackParams;
 pub use set_consolidation_company_rate_params_type::SetConsolidationCompanyRateParams;
 pub use set_contact_segment_rules_params_type::SetContactSegmentRulesParams;
+pub use set_purchase_approval_delegate_params_type::SetPurchaseApprovalDelegateParams;
 pub use set_record_custom_field_values_params_type::SetRecordCustomFieldValuesParams;
+pub use set_vendor_risk_flag_params_type::SetVendorRiskFlagParams;
 pub use settle_sale_commissions_params_type::SettleSaleCommissionsParams;
 pub use setup_fiscal_calendar_params_type::SetupFiscalCalendarParams;
 pub use shipping_method_type::ShippingMethod;
@@ -2731,6 +2876,7 @@ pub use update_quality_point_params_type::UpdateQualityPointParams;
 pub use update_quality_team_params_type::UpdateQualityTeamParams;
 pub use update_report_template_params_type::UpdateReportTemplateParams;
 pub use update_role_params_type::UpdateRoleParams;
+pub use update_sale_order_line_params_type::UpdateSaleOrderLineParams;
 pub use update_sale_order_option_params_type::UpdateSaleOrderOptionParams;
 pub use update_sale_order_params_type::UpdateSaleOrderParams;
 pub use update_saved_report_params_type::UpdateSavedReportParams;
@@ -2763,6 +2909,7 @@ pub use upsert_ai_skill_params_type::UpsertAiSkillParams;
 pub use upsert_organization_settings_params_type::UpsertOrganizationSettingsParams;
 pub use upsert_partner_credit_control_params_type::UpsertPartnerCreditControlParams;
 pub use upsert_search_embedding_params_type::UpsertSearchEmbeddingParams;
+pub use upsert_vendor_scorecard_params_type::UpsertVendorScorecardParams;
 pub use user_credential_type::UserCredential;
 pub use user_custom_field_type::UserCustomField;
 pub use user_invite_type::UserInvite;
@@ -2775,6 +2922,8 @@ pub use utm_medium_type::UtmMedium;
 pub use utm_source_type::UtmSource;
 pub use validate_timesheets_params_type::ValidateTimesheetsParams;
 pub use vehicle_status_type::VehicleStatus;
+pub use vendor_risk_flag_type::VendorRiskFlag;
+pub use vendor_scorecard_type::VendorScorecard;
 pub use verification_level_type::VerificationLevel;
 pub use verification_status_type::VerificationStatus;
 pub use warehouse_type::Warehouse;
@@ -2858,9 +3007,11 @@ pub use calendar_event_table::*;
 pub use cartonization_result_table::*;
 pub use casbin_rule_table::*;
 pub use cash_flow_line_table::*;
+pub use commodity_price_index_table::*;
 pub use company_table::*;
 pub use company_country_pack_table::*;
 pub use company_vertical_pack_table::*;
+pub use consignment_agreement_table::*;
 pub use consolidation_account_table::*;
 pub use consolidation_company_rate_table::*;
 pub use consolidation_elimination_entry_table::*;
@@ -3009,9 +3160,18 @@ pub use proposal_presence_table::*;
 pub use proposal_section_table::*;
 pub use proposal_source_doc_table::*;
 pub use proposal_version_table::*;
+pub use purchase_approval_delegate_table::*;
+pub use purchase_blanket_order_table::*;
+pub use purchase_contract_table::*;
 pub use purchase_order_table::*;
 pub use purchase_order_line_table::*;
 pub use purchase_requisition_table::*;
+pub use purchase_return_table::*;
+pub use purchase_return_line_table::*;
+pub use purchase_rfq_table::*;
+pub use purchase_rfq_bid_table::*;
+pub use purchase_rfq_line_table::*;
+pub use purchasing_integration_intent_table::*;
 pub use quality_alert_table::*;
 pub use quality_alert_reason_table::*;
 pub use quality_check_table::*;
@@ -3028,10 +3188,15 @@ pub use return_order_line_table::*;
 pub use revenue_recognition_rule_table::*;
 pub use role_table::*;
 pub use sale_commission_table::*;
+pub use sale_commission_plan_table::*;
+pub use sale_commission_plan_split_table::*;
+pub use sale_contract_table::*;
+pub use sale_cpq_constraint_table::*;
 pub use sale_order_table::*;
 pub use sale_order_line_table::*;
 pub use sale_order_option_table::*;
 pub use sale_promotion_table::*;
+pub use sales_integration_intent_table::*;
 pub use saved_report_table::*;
 pub use scheduled_report_table::*;
 pub use scheduled_report_run_table::*;
@@ -3079,6 +3244,8 @@ pub use user_session_table::*;
 pub use utm_campaign_table::*;
 pub use utm_medium_table::*;
 pub use utm_source_table::*;
+pub use vendor_risk_flag_table::*;
+pub use vendor_scorecard_table::*;
 pub use warehouse_table::*;
 pub use warehouse_3_d_zone_table::*;
 pub use warehouse_geo_table::*;
@@ -3089,6 +3256,7 @@ pub use workflow_activity_table::*;
 pub use workflow_instance_table::*;
 pub use workflow_transition_table::*;
 pub use workflow_workitem_table::*;
+pub use accept_sale_order_quotation_reducer::accept_sale_order_quotation;
 pub use accrue_sale_commission_reducer::accrue_sale_commission;
 pub use acknowledge_insight_reducer::acknowledge_insight;
 pub use acknowledge_iot_action_reducer::acknowledge_iot_action;
@@ -3108,6 +3276,8 @@ pub use add_proposal_comment_reducer::add_proposal_comment;
 pub use add_proposal_line_item_reducer::add_proposal_line_item;
 pub use add_proposal_source_doc_reducer::add_proposal_source_doc;
 pub use add_purchase_order_line_reducer::add_purchase_order_line;
+pub use add_purchase_rfq_bid_reducer::add_purchase_rfq_bid;
+pub use add_purchase_rfq_line_reducer::add_purchase_rfq_line;
 pub use add_rule_to_nomenclature_reducer::add_rule_to_nomenclature;
 pub use add_user_custom_field_reducer::add_user_custom_field;
 pub use add_user_to_organization_reducer::add_user_to_organization;
@@ -3120,6 +3290,7 @@ pub use append_ai_chat_message_reducer::append_ai_chat_message;
 pub use append_crm_conversation_message_reducer::append_crm_conversation_message;
 pub use apply_global_migrations_reducer::apply_global_migrations;
 pub use apply_landed_costs_reducer::apply_landed_costs;
+pub use apply_omnichannel_allocation_reducer::apply_omnichannel_allocation;
 pub use apply_org_migrations_reducer::apply_org_migrations;
 pub use apply_reconciliation_rules_reducer::apply_reconciliation_rules;
 pub use apply_sale_order_options_reducer::apply_sale_order_options;
@@ -3148,6 +3319,7 @@ pub use assign_task_users_reducer::assign_task_users;
 pub use assign_team_member_skill_reducer::assign_team_member_skill;
 pub use assign_ticket_reducer::assign_ticket;
 pub use assign_user_to_picking_reducer::assign_user_to_picking;
+pub use award_purchase_rfq_bid_reducer::award_purchase_rfq_bid;
 pub use backfill_external_ids_reducer::backfill_external_ids;
 pub use bill_timesheets_reducer::bill_timesheets;
 pub use block_serial_reducer::block_serial;
@@ -3209,6 +3381,7 @@ pub use confirm_budget_reducer::confirm_budget;
 pub use confirm_manufacturing_order_reducer::confirm_manufacturing_order;
 pub use confirm_payslip_reducer::confirm_payslip;
 pub use confirm_purchase_order_reducer::confirm_purchase_order;
+pub use confirm_purchase_return_reducer::confirm_purchase_return;
 pub use confirm_return_order_reducer::confirm_return_order;
 pub use confirm_sales_order_reducer::confirm_sales_order;
 pub use confirm_stock_move_reducer::confirm_stock_move;
@@ -3216,6 +3389,7 @@ pub use confirm_stock_picking_reducer::confirm_stock_picking;
 pub use consume_mo_materials_reducer::consume_mo_materials;
 pub use convert_lead_to_customer_reducer::convert_lead_to_customer;
 pub use convert_opportunity_to_sale_order_reducer::convert_opportunity_to_sale_order;
+pub use convert_purchase_requisition_to_po_reducer::convert_purchase_requisition_to_po;
 pub use create_account_account_reducer::create_account_account;
 pub use create_account_account_type_reducer::create_account_account_type;
 pub use create_account_asset_reducer::create_account_asset;
@@ -3258,6 +3432,7 @@ pub use create_budget_line_reducer::create_budget_line;
 pub use create_budget_post_reducer::create_budget_post;
 pub use create_calendar_event_reducer::create_calendar_event;
 pub use create_company_reducer::create_company;
+pub use create_consignment_agreement_reducer::create_consignment_agreement;
 pub use create_consolidation_account_reducer::create_consolidation_account;
 pub use create_consolidation_journal_reducer::create_consolidation_journal;
 pub use create_contact_reducer::create_contact;
@@ -3355,8 +3530,13 @@ pub use create_product_supplier_info_reducer::create_product_supplier_info;
 pub use create_product_variant_reducer::create_product_variant;
 pub use create_project_reducer::create_project;
 pub use create_proposal_reducer::create_proposal;
+pub use create_purchase_blanket_order_reducer::create_purchase_blanket_order;
+pub use create_purchase_contract_reducer::create_purchase_contract;
 pub use create_purchase_order_reducer::create_purchase_order;
 pub use create_purchase_requisition_reducer::create_purchase_requisition;
+pub use create_purchase_return_reducer::create_purchase_return;
+pub use create_purchase_rfq_reducer::create_purchase_rfq;
+pub use create_purchasing_integration_intent_reducer::create_purchasing_integration_intent;
 pub use create_quality_alert_reducer::create_quality_alert;
 pub use create_quality_alert_reason_reducer::create_quality_alert_reason;
 pub use create_quality_check_reducer::create_quality_check;
@@ -3369,10 +3549,15 @@ pub use create_revenue_recognition_rule_reducer::create_revenue_recognition_rule
 pub use create_role_reducer::create_role;
 pub use create_routing_workcenter_reducer::create_routing_workcenter;
 pub use create_salary_rule_reducer::create_salary_rule;
+pub use create_sale_commission_plan_reducer::create_sale_commission_plan;
+pub use create_sale_commission_plan_split_reducer::create_sale_commission_plan_split;
+pub use create_sale_contract_reducer::create_sale_contract;
+pub use create_sale_cpq_constraint_reducer::create_sale_cpq_constraint;
 pub use create_sale_order_reducer::create_sale_order;
 pub use create_sale_order_line_reducer::create_sale_order_line;
 pub use create_sale_order_option_reducer::create_sale_order_option;
 pub use create_sale_promotion_reducer::create_sale_promotion;
+pub use create_sales_integration_intent_reducer::create_sales_integration_intent;
 pub use create_saved_report_reducer::create_saved_report;
 pub use create_scheduled_report_reducer::create_scheduled_report;
 pub use create_shipping_method_reducer::create_shipping_method;
@@ -3405,6 +3590,7 @@ pub use create_user_session_reducer::create_user_session;
 pub use create_utm_campaign_reducer::create_utm_campaign;
 pub use create_utm_medium_reducer::create_utm_medium;
 pub use create_utm_source_reducer::create_utm_source;
+pub use create_vendor_credit_from_purchase_return_reducer::create_vendor_credit_from_purchase_return;
 pub use create_warehouse_reducer::create_warehouse;
 pub use create_warehouse_3_d_zone_reducer::create_warehouse_3_d_zone;
 pub use create_warehouse_task_reducer::create_warehouse_task;
@@ -3457,6 +3643,7 @@ pub use delete_quality_alert_reason_reducer::delete_quality_alert_reason;
 pub use delete_quality_point_reducer::delete_quality_point;
 pub use delete_quality_team_reducer::delete_quality_team;
 pub use delete_record_custom_field_values_reducer::delete_record_custom_field_values;
+pub use delete_sale_order_line_reducer::delete_sale_order_line;
 pub use delete_sale_order_option_reducer::delete_sale_order_option;
 pub use delete_saved_report_reducer::delete_saved_report;
 pub use delete_search_embedding_reducer::delete_search_embedding;
@@ -3577,6 +3764,7 @@ pub use link_workos_user_reducer::link_workos_user;
 pub use lock_document_reducer::lock_document;
 pub use lock_knowledge_article_reducer::lock_knowledge_article;
 pub use lock_purchase_order_reducer::lock_purchase_order;
+pub use lock_sale_order_reducer::lock_sale_order;
 pub use log_audit_event_reducer::log_audit_event;
 pub use log_timesheet_reducer::log_timesheet;
 pub use log_workcenter_productivity_reducer::log_workcenter_productivity;
@@ -3633,7 +3821,9 @@ pub use record_google_drive_sync_reducer::record_google_drive_sync;
 pub use record_google_drive_sync_error_reducer::record_google_drive_sync_error;
 pub use record_message_copied_reducer::record_message_copied;
 pub use record_privacy_consent_reducer::record_privacy_consent;
+pub use record_purchasing_integration_result_reducer::record_purchasing_integration_result;
 pub use record_report_run_reducer::record_report_run;
+pub use record_sales_integration_result_reducer::record_sales_integration_result;
 pub use record_telemetry_reducer::record_telemetry;
 pub use record_telemetry_batch_reducer::record_telemetry_batch;
 pub use record_whatsapp_health_check_reducer::record_whatsapp_health_check;
@@ -3649,6 +3839,7 @@ pub use register_queue_worker_reducer::register_queue_worker;
 pub use reject_ai_action_draft_reducer::reject_ai_action_draft;
 pub use reject_approval_request_reducer::reject_approval_request;
 pub use reject_supplier_intake_reducer::reject_supplier_intake;
+pub use release_blanket_to_po_reducer::release_blanket_to_po;
 pub use remove_article_member_reducer::remove_article_member;
 pub use remove_casbin_rule_reducer::remove_casbin_rule;
 pub use remove_landed_cost_line_reducer::remove_landed_cost_line;
@@ -3692,6 +3883,7 @@ pub use run_all_crm_tests_reducer::run_all_crm_tests;
 pub use run_all_domain_tests_reducer::run_all_domain_tests;
 pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_platform_tests_reducer::run_all_platform_tests;
+pub use run_all_purchasing_tests_reducer::run_all_purchasing_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
 pub use run_core_operational_messaging_test_reducer::run_core_operational_messaging_test;
 pub use run_core_sod_test_reducer::run_core_sod_test;
@@ -3717,13 +3909,22 @@ pub use run_inventory_stock_quant_test_reducer::run_inventory_stock_quant_test;
 pub use run_manufacturing_workcenter_test_reducer::run_manufacturing_workcenter_test;
 pub use run_owner_report_schedule_reducer::run_owner_report_schedule;
 pub use run_purchasing_bill_balanced_test_reducer::run_purchasing_bill_balanced_test;
+pub use run_purchasing_company_isolation_test_reducer::run_purchasing_company_isolation_test;
+pub use run_purchasing_incoming_picking_test_reducer::run_purchasing_incoming_picking_test;
+pub use run_purchasing_wave_c_smoke_test_reducer::run_purchasing_wave_c_smoke_test;
 pub use run_sales_atp_shortfall_test_reducer::run_sales_atp_shortfall_test;
 pub use run_sales_backorder_test_reducer::run_sales_backorder_test;
 pub use run_sales_commission_accrue_test_reducer::run_sales_commission_accrue_test;
 pub use run_sales_commission_clawback_test_reducer::run_sales_commission_clawback_test;
 pub use run_sales_commission_settle_test_reducer::run_sales_commission_settle_test;
+pub use run_sales_company_isolation_test_reducer::run_sales_company_isolation_test;
 pub use run_sales_credit_hold_test_reducer::run_sales_credit_hold_test;
+pub use run_sales_dropship_confirm_test_reducer::run_sales_dropship_confirm_test;
+pub use run_sales_exchange_from_return_test_reducer::run_sales_exchange_from_return_test;
 pub use run_sales_fiscal_remap_test_reducer::run_sales_fiscal_remap_test;
+pub use run_sales_fx_fail_closed_test_reducer::run_sales_fx_fail_closed_test;
+pub use run_sales_line_update_delete_test_reducer::run_sales_line_update_delete_test;
+pub use run_sales_lock_blocks_update_test_reducer::run_sales_lock_blocks_update_test;
 pub use run_sales_oms_extensions_test_reducer::run_sales_oms_extensions_test;
 pub use run_sales_order_cancel_test_reducer::run_sales_order_cancel_test;
 pub use run_sales_order_delivery_test_reducer::run_sales_order_delivery_test;
@@ -3737,6 +3938,7 @@ pub use run_traceability_report_reducer::run_traceability_report;
 pub use run_workflow_definition_test_reducer::run_workflow_definition_test;
 pub use save_import_mapping_template_reducer::save_import_mapping_template;
 pub use save_proposal_version_reducer::save_proposal_version;
+pub use schedule_sales_sla_escalation_reducer::schedule_sales_sla_escalation;
 pub use schedule_tax_deadline_updates_reducer::schedule_tax_deadline_updates;
 pub use seed_dev_data_reducer::seed_dev_data;
 pub use seed_organization_form_configs_reducer::seed_organization_form_configs;
@@ -3750,6 +3952,7 @@ pub use set_approval_rule_active_reducer::set_approval_rule_active;
 pub use set_article_published_reducer::set_article_published;
 pub use set_asset_active_reducer::set_asset_active;
 pub use set_billing_status_reducer::set_billing_status;
+pub use set_commodity_price_index_reducer::set_commodity_price_index;
 pub use set_company_country_pack_reducer::set_company_country_pack;
 pub use set_company_vertical_pack_reducer::set_company_vertical_pack;
 pub use set_consolidation_company_rate_reducer::set_consolidation_company_rate;
@@ -3759,8 +3962,10 @@ pub use set_form_role_config_reducer::set_form_role_config;
 pub use set_intercompany_rule_active_reducer::set_intercompany_rule_active;
 pub use set_iot_threshold_reducer::set_iot_threshold;
 pub use set_project_active_reducer::set_project_active;
+pub use set_purchase_approval_delegate_reducer::set_purchase_approval_delegate;
 pub use set_record_custom_field_values_reducer::set_record_custom_field_values;
 pub use set_task_parent_reducer::set_task_parent;
+pub use set_vendor_risk_flag_reducer::set_vendor_risk_flag;
 pub use set_whatsapp_primary_account_reducer::set_whatsapp_primary_account;
 pub use set_workflow_active_reducer::set_workflow_active;
 pub use set_workitem_exception_reducer::set_workitem_exception;
@@ -3794,6 +3999,7 @@ pub use unlink_device_reducer::unlink_device;
 pub use unlock_document_reducer::unlock_document;
 pub use unlock_knowledge_article_reducer::unlock_knowledge_article;
 pub use unlock_purchase_order_reducer::unlock_purchase_order;
+pub use unlock_sale_order_reducer::unlock_sale_order;
 pub use unmatch_elimination_entry_reducer::unmatch_elimination_entry;
 pub use unreconciled_account_bank_statement_line_reducer::unreconciled_account_bank_statement_line;
 pub use unreserve_stock_quant_reducer::unreserve_stock_quant;
@@ -3906,6 +4112,7 @@ pub use update_quality_team_reducer::update_quality_team;
 pub use update_report_template_reducer::update_report_template;
 pub use update_role_reducer::update_role;
 pub use update_sale_order_reducer::update_sale_order;
+pub use update_sale_order_line_reducer::update_sale_order_line;
 pub use update_sale_order_option_reducer::update_sale_order_option;
 pub use update_saved_report_reducer::update_saved_report;
 pub use update_sod_conflict_rule_reducer::update_sod_conflict_rule;
@@ -3946,6 +4153,7 @@ pub use upsert_organization_settings_reducer::upsert_organization_settings;
 pub use upsert_partner_credit_control_reducer::upsert_partner_credit_control;
 pub use upsert_proposal_section_reducer::upsert_proposal_section;
 pub use upsert_search_embedding_reducer::upsert_search_embedding;
+pub use upsert_vendor_scorecard_reducer::upsert_vendor_scorecard;
 pub use upsert_warehouse_geo_reducer::upsert_warehouse_geo;
 pub use use_serial_reducer::use_serial;
 pub use validate_budget_reducer::validate_budget;
@@ -3967,7 +4175,12 @@ pub use worker_heartbeat_reducer::worker_heartbeat;
 /// to indicate which reducer caused the event.
 
 pub enum Reducer {
-        AccrueSaleCommission {
+        AcceptSaleOrderQuotation {
+        organization_id: u64,
+        order_id: u64,
+        params: AcceptSaleOrderQuotationParams,
+}    ,
+    AccrueSaleCommission {
         organization_id: u64,
         order_id: u64,
         params: AccrueSaleCommissionParams,
@@ -4070,6 +4283,18 @@ pub enum Reducer {
         order_id: u64,
         params: AddPurchaseOrderLineParams,
 }    ,
+    AddPurchaseRfqBid {
+        organization_id: u64,
+        company_id: u64,
+        rfq_id: u64,
+        params: CreatePurchaseRfqBidParams,
+}    ,
+    AddPurchaseRfqLine {
+        organization_id: u64,
+        company_id: u64,
+        rfq_id: u64,
+        params: AddPurchaseRfqLineParams,
+}    ,
     AddRuleToNomenclature {
         organization_id: u64,
         nomenclature_id: u64,
@@ -4126,6 +4351,12 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         landed_cost_id: u64,
+}    ,
+    ApplyOmnichannelAllocation {
+        organization_id: u64,
+        company_id: u64,
+        order_id: u64,
+        params: ApplyOmnichannelAllocationParams,
 }    ,
     ApplyOrgMigrations {
         organization_id: u64,
@@ -4260,6 +4491,12 @@ pub enum Reducer {
         organization_id: u64,
         picking_id: u64,
         params: AssignUserToPickingParams,
+}    ,
+    AwardPurchaseRfqBid {
+        organization_id: u64,
+        company_id: u64,
+        rfq_id: u64,
+        bid_id: u64,
 }    ,
     BackfillExternalIds ,
     BillTimesheets {
@@ -4537,6 +4774,11 @@ pub enum Reducer {
         organization_id: u64,
         order_id: u64,
 }    ,
+    ConfirmPurchaseReturn {
+        organization_id: u64,
+        company_id: u64,
+        purchase_return_id: u64,
+}    ,
     ConfirmReturnOrder {
         organization_id: u64,
         company_id: u64,
@@ -4570,6 +4812,11 @@ pub enum Reducer {
         company_id: u64,
         opportunity_id: u64,
         params: ConvertOpportunityParams,
+}    ,
+    ConvertPurchaseRequisitionToPo {
+        organization_id: u64,
+        company_id: u64,
+        requisition_id: u64,
 }    ,
     CreateAccountAccount {
         organization_id: u64,
@@ -4758,6 +5005,11 @@ pub enum Reducer {
     CreateCompany {
         organization_id: u64,
         params: CreateCompanyParams,
+}    ,
+    CreateConsignmentAgreement {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateConsignmentAgreementParams,
 }    ,
     CreateConsolidationAccount {
         organization_id: u64,
@@ -5214,6 +5466,16 @@ pub enum Reducer {
         description: Option::<String>,
         document_folder_id: Option::<u64>,
 }    ,
+    CreatePurchaseBlanketOrder {
+        organization_id: u64,
+        company_id: u64,
+        params: CreatePurchaseBlanketOrderParams,
+}    ,
+    CreatePurchaseContract {
+        organization_id: u64,
+        company_id: u64,
+        params: CreatePurchaseContractParams,
+}    ,
     CreatePurchaseOrder {
         organization_id: u64,
         params: CreatePurchaseOrderParams,
@@ -5221,6 +5483,21 @@ pub enum Reducer {
     CreatePurchaseRequisition {
         organization_id: u64,
         params: CreatePurchaseRequisitionParams,
+}    ,
+    CreatePurchaseReturn {
+        organization_id: u64,
+        company_id: u64,
+        params: CreatePurchaseReturnParams,
+}    ,
+    CreatePurchaseRfq {
+        organization_id: u64,
+        company_id: u64,
+        params: CreatePurchaseRfqParams,
+}    ,
+    CreatePurchasingIntegrationIntent {
+        organization_id: u64,
+        company_id: u64,
+        params: CreatePurchasingIntegrationIntentParams,
 }    ,
     CreateQualityAlert {
         organization_id: u64,
@@ -5279,6 +5556,26 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateSalaryRuleParams,
 }    ,
+    CreateSaleCommissionPlan {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateSaleCommissionPlanParams,
+}    ,
+    CreateSaleCommissionPlanSplit {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateSaleCommissionPlanSplitParams,
+}    ,
+    CreateSaleContract {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateSaleContractParams,
+}    ,
+    CreateSaleCpqConstraint {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateSaleCpqConstraintParams,
+}    ,
     CreateSaleOrder {
         organization_id: u64,
         params: CreateSaleOrderParams,
@@ -5296,6 +5593,11 @@ pub enum Reducer {
     CreateSalePromotion {
         organization_id: u64,
         params: CreateSalePromotionParams,
+}    ,
+    CreateSalesIntegrationIntent {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateSalesIntegrationIntentParams,
 }    ,
     CreateSavedReport {
         organization_id: u64,
@@ -5435,6 +5737,12 @@ pub enum Reducer {
     CreateUtmSource {
         organization_id: u64,
         params: CreateUtmSourceParams,
+}    ,
+    CreateVendorCreditFromPurchaseReturn {
+        organization_id: u64,
+        company_id: u64,
+        purchase_return_id: u64,
+        params: CreateVendorCreditFromPurchaseReturnParams,
 }    ,
     CreateWarehouse {
         organization_id: u64,
@@ -5661,6 +5969,10 @@ pub enum Reducer {
         company_id: u64,
         model: String,
         record_id: u64,
+}    ,
+    DeleteSaleOrderLine {
+        organization_id: u64,
+        line_id: u64,
 }    ,
     DeleteSaleOrderOption {
         organization_id: u64,
@@ -6192,6 +6504,10 @@ pub enum Reducer {
         organization_id: u64,
         order_id: u64,
 }    ,
+    LockSaleOrder {
+        organization_id: u64,
+        order_id: u64,
+}    ,
     LogAuditEvent {
         organization_id: u64,
         params: LogAuditEventParams,
@@ -6462,10 +6778,22 @@ pub enum Reducer {
         organization_id: u64,
         params: RecordPrivacyConsentParams,
 }    ,
+    RecordPurchasingIntegrationResult {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
+        params: RecordPurchasingIntegrationResultParams,
+}    ,
     RecordReportRun {
         organization_id: u64,
         report_id: u64,
         next_run: __sdk::Timestamp,
+}    ,
+    RecordSalesIntegrationResult {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
+        params: RecordSalesIntegrationResultParams,
 }    ,
     RecordTelemetry {
         organization_id: u64,
@@ -6537,6 +6865,12 @@ pub enum Reducer {
         organization_id: u64,
         intake_id: u64,
         rejection_reason: String,
+}    ,
+    ReleaseBlanketToPo {
+        organization_id: u64,
+        company_id: u64,
+        blanket_order_id: u64,
+        params: ReleaseBlanketToPoParams,
 }    ,
     RemoveArticleMember {
         organization_id: u64,
@@ -6675,6 +7009,7 @@ pub enum Reducer {
     RunAllDomainTests ,
     RunAllInventoryTests ,
     RunAllPlatformTests ,
+    RunAllPurchasingTests ,
     RunAllSalesTests ,
     RunCoreOperationalMessagingTest ,
     RunCoreSodTest ,
@@ -6711,13 +7046,22 @@ pub enum Reducer {
         report_id: u64,
 }    ,
     RunPurchasingBillBalancedTest ,
+    RunPurchasingCompanyIsolationTest ,
+    RunPurchasingIncomingPickingTest ,
+    RunPurchasingWaveCSmokeTest ,
     RunSalesAtpShortfallTest ,
     RunSalesBackorderTest ,
     RunSalesCommissionAccrueTest ,
     RunSalesCommissionClawbackTest ,
     RunSalesCommissionSettleTest ,
+    RunSalesCompanyIsolationTest ,
     RunSalesCreditHoldTest ,
+    RunSalesDropshipConfirmTest ,
+    RunSalesExchangeFromReturnTest ,
     RunSalesFiscalRemapTest ,
+    RunSalesFxFailClosedTest ,
+    RunSalesLineUpdateDeleteTest ,
+    RunSalesLockBlocksUpdateTest ,
     RunSalesOmsExtensionsTest ,
     RunSalesOrderCancelTest ,
     RunSalesOrderDeliveryTest ,
@@ -6741,6 +7085,11 @@ pub enum Reducer {
         proposal_id: u64,
         message: String,
         sections_json: String,
+}    ,
+    ScheduleSalesSlaEscalation {
+        organization_id: u64,
+        company_id: u64,
+        delay_secs: u64,
 }    ,
     ScheduleTaxDeadlineUpdates {
         organization_id: Option::<u64>,
@@ -6799,6 +7148,11 @@ pub enum Reducer {
         billing_account_id: u64,
         status: String,
 }    ,
+    SetCommodityPriceIndex {
+        organization_id: u64,
+        company_id: u64,
+        params: SetCommodityPriceIndexParams,
+}    ,
     SetCompanyCountryPack {
         organization_id: u64,
         company_id: u64,
@@ -6848,6 +7202,11 @@ pub enum Reducer {
         project_id: u64,
         active: bool,
 }    ,
+    SetPurchaseApprovalDelegate {
+        organization_id: u64,
+        company_id: u64,
+        params: SetPurchaseApprovalDelegateParams,
+}    ,
     SetRecordCustomFieldValues {
         organization_id: u64,
         company_id: u64,
@@ -6857,6 +7216,11 @@ pub enum Reducer {
         organization_id: u64,
         task_id: u64,
         parent_id: Option::<u64>,
+}    ,
+    SetVendorRiskFlag {
+        organization_id: u64,
+        company_id: u64,
+        params: SetVendorRiskFlagParams,
 }    ,
     SetWhatsappPrimaryAccount {
         organization_id: u64,
@@ -7011,6 +7375,10 @@ pub enum Reducer {
         article_id: u64,
 }    ,
     UnlockPurchaseOrder {
+        organization_id: u64,
+        order_id: u64,
+}    ,
+    UnlockSaleOrder {
         organization_id: u64,
         order_id: u64,
 }    ,
@@ -7616,6 +7984,11 @@ pub enum Reducer {
         order_id: u64,
         params: UpdateSaleOrderParams,
 }    ,
+    UpdateSaleOrderLine {
+        organization_id: u64,
+        line_id: u64,
+        params: UpdateSaleOrderLineParams,
+}    ,
     UpdateSaleOrderOption {
         organization_id: u64,
         option_id: u64,
@@ -7820,6 +8193,11 @@ pub enum Reducer {
         company_id: Option::<u64>,
         params: UpsertSearchEmbeddingParams,
 }    ,
+    UpsertVendorScorecard {
+        organization_id: u64,
+        company_id: u64,
+        params: UpsertVendorScorecardParams,
+}    ,
     UpsertWarehouseGeo {
         organization_id: u64,
         warehouse_id: u64,
@@ -7888,7 +8266,8 @@ impl __sdk::InModule for Reducer {
 impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
-                        Reducer::AccrueSaleCommission { .. } => "accrue_sale_commission",
+                        Reducer::AcceptSaleOrderQuotation { .. } => "accept_sale_order_quotation",
+            Reducer::AccrueSaleCommission { .. } => "accrue_sale_commission",
             Reducer::AcknowledgeInsight { .. } => "acknowledge_insight",
             Reducer::AcknowledgeIotAction { .. } => "acknowledge_iot_action",
             Reducer::ActivatePosConfig { .. } => "activate_pos_config",
@@ -7907,6 +8286,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::AddProposalLineItem { .. } => "add_proposal_line_item",
             Reducer::AddProposalSourceDoc { .. } => "add_proposal_source_doc",
             Reducer::AddPurchaseOrderLine { .. } => "add_purchase_order_line",
+            Reducer::AddPurchaseRfqBid { .. } => "add_purchase_rfq_bid",
+            Reducer::AddPurchaseRfqLine { .. } => "add_purchase_rfq_line",
             Reducer::AddRuleToNomenclature { .. } => "add_rule_to_nomenclature",
             Reducer::AddUserCustomField { .. } => "add_user_custom_field",
             Reducer::AddUserToOrganization { .. } => "add_user_to_organization",
@@ -7919,6 +8300,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AppendCrmConversationMessage { .. } => "append_crm_conversation_message",
             Reducer::ApplyGlobalMigrations => "apply_global_migrations",
             Reducer::ApplyLandedCosts { .. } => "apply_landed_costs",
+            Reducer::ApplyOmnichannelAllocation { .. } => "apply_omnichannel_allocation",
             Reducer::ApplyOrgMigrations { .. } => "apply_org_migrations",
             Reducer::ApplyReconciliationRules { .. } => "apply_reconciliation_rules",
             Reducer::ApplySaleOrderOptions { .. } => "apply_sale_order_options",
@@ -7947,6 +8329,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AssignTeamMemberSkill { .. } => "assign_team_member_skill",
             Reducer::AssignTicket { .. } => "assign_ticket",
             Reducer::AssignUserToPicking { .. } => "assign_user_to_picking",
+            Reducer::AwardPurchaseRfqBid { .. } => "award_purchase_rfq_bid",
             Reducer::BackfillExternalIds => "backfill_external_ids",
             Reducer::BillTimesheets { .. } => "bill_timesheets",
             Reducer::BlockSerial { .. } => "block_serial",
@@ -8008,6 +8391,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ConfirmManufacturingOrder { .. } => "confirm_manufacturing_order",
             Reducer::ConfirmPayslip { .. } => "confirm_payslip",
             Reducer::ConfirmPurchaseOrder { .. } => "confirm_purchase_order",
+            Reducer::ConfirmPurchaseReturn { .. } => "confirm_purchase_return",
             Reducer::ConfirmReturnOrder { .. } => "confirm_return_order",
             Reducer::ConfirmSalesOrder { .. } => "confirm_sales_order",
             Reducer::ConfirmStockMove { .. } => "confirm_stock_move",
@@ -8015,6 +8399,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ConsumeMoMaterials { .. } => "consume_mo_materials",
             Reducer::ConvertLeadToCustomer { .. } => "convert_lead_to_customer",
             Reducer::ConvertOpportunityToSaleOrder { .. } => "convert_opportunity_to_sale_order",
+            Reducer::ConvertPurchaseRequisitionToPo { .. } => "convert_purchase_requisition_to_po",
             Reducer::CreateAccountAccount { .. } => "create_account_account",
             Reducer::CreateAccountAccountType { .. } => "create_account_account_type",
             Reducer::CreateAccountAsset { .. } => "create_account_asset",
@@ -8057,6 +8442,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateBudgetPost { .. } => "create_budget_post",
             Reducer::CreateCalendarEvent { .. } => "create_calendar_event",
             Reducer::CreateCompany { .. } => "create_company",
+            Reducer::CreateConsignmentAgreement { .. } => "create_consignment_agreement",
             Reducer::CreateConsolidationAccount { .. } => "create_consolidation_account",
             Reducer::CreateConsolidationJournal { .. } => "create_consolidation_journal",
             Reducer::CreateContact { .. } => "create_contact",
@@ -8154,8 +8540,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateProductVariant { .. } => "create_product_variant",
             Reducer::CreateProject { .. } => "create_project",
             Reducer::CreateProposal { .. } => "create_proposal",
+            Reducer::CreatePurchaseBlanketOrder { .. } => "create_purchase_blanket_order",
+            Reducer::CreatePurchaseContract { .. } => "create_purchase_contract",
             Reducer::CreatePurchaseOrder { .. } => "create_purchase_order",
             Reducer::CreatePurchaseRequisition { .. } => "create_purchase_requisition",
+            Reducer::CreatePurchaseReturn { .. } => "create_purchase_return",
+            Reducer::CreatePurchaseRfq { .. } => "create_purchase_rfq",
+            Reducer::CreatePurchasingIntegrationIntent { .. } => "create_purchasing_integration_intent",
             Reducer::CreateQualityAlert { .. } => "create_quality_alert",
             Reducer::CreateQualityAlertReason { .. } => "create_quality_alert_reason",
             Reducer::CreateQualityCheck { .. } => "create_quality_check",
@@ -8168,10 +8559,15 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateRole { .. } => "create_role",
             Reducer::CreateRoutingWorkcenter { .. } => "create_routing_workcenter",
             Reducer::CreateSalaryRule { .. } => "create_salary_rule",
+            Reducer::CreateSaleCommissionPlan { .. } => "create_sale_commission_plan",
+            Reducer::CreateSaleCommissionPlanSplit { .. } => "create_sale_commission_plan_split",
+            Reducer::CreateSaleContract { .. } => "create_sale_contract",
+            Reducer::CreateSaleCpqConstraint { .. } => "create_sale_cpq_constraint",
             Reducer::CreateSaleOrder { .. } => "create_sale_order",
             Reducer::CreateSaleOrderLine { .. } => "create_sale_order_line",
             Reducer::CreateSaleOrderOption { .. } => "create_sale_order_option",
             Reducer::CreateSalePromotion { .. } => "create_sale_promotion",
+            Reducer::CreateSalesIntegrationIntent { .. } => "create_sales_integration_intent",
             Reducer::CreateSavedReport { .. } => "create_saved_report",
             Reducer::CreateScheduledReport { .. } => "create_scheduled_report",
             Reducer::CreateShippingMethod { .. } => "create_shipping_method",
@@ -8204,6 +8600,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateUtmCampaign { .. } => "create_utm_campaign",
             Reducer::CreateUtmMedium { .. } => "create_utm_medium",
             Reducer::CreateUtmSource { .. } => "create_utm_source",
+            Reducer::CreateVendorCreditFromPurchaseReturn { .. } => "create_vendor_credit_from_purchase_return",
             Reducer::CreateWarehouse { .. } => "create_warehouse",
             Reducer::CreateWarehouse3DZone { .. } => "create_warehouse_3_d_zone",
             Reducer::CreateWarehouseTask { .. } => "create_warehouse_task",
@@ -8256,6 +8653,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeleteQualityPoint { .. } => "delete_quality_point",
             Reducer::DeleteQualityTeam { .. } => "delete_quality_team",
             Reducer::DeleteRecordCustomFieldValues { .. } => "delete_record_custom_field_values",
+            Reducer::DeleteSaleOrderLine { .. } => "delete_sale_order_line",
             Reducer::DeleteSaleOrderOption { .. } => "delete_sale_order_option",
             Reducer::DeleteSavedReport { .. } => "delete_saved_report",
             Reducer::DeleteSearchEmbedding { .. } => "delete_search_embedding",
@@ -8376,6 +8774,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::LockDocument { .. } => "lock_document",
             Reducer::LockKnowledgeArticle { .. } => "lock_knowledge_article",
             Reducer::LockPurchaseOrder { .. } => "lock_purchase_order",
+            Reducer::LockSaleOrder { .. } => "lock_sale_order",
             Reducer::LogAuditEvent { .. } => "log_audit_event",
             Reducer::LogTimesheet { .. } => "log_timesheet",
             Reducer::LogWorkcenterProductivity { .. } => "log_workcenter_productivity",
@@ -8432,7 +8831,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordGoogleDriveSyncError { .. } => "record_google_drive_sync_error",
             Reducer::RecordMessageCopied { .. } => "record_message_copied",
             Reducer::RecordPrivacyConsent { .. } => "record_privacy_consent",
+            Reducer::RecordPurchasingIntegrationResult { .. } => "record_purchasing_integration_result",
             Reducer::RecordReportRun { .. } => "record_report_run",
+            Reducer::RecordSalesIntegrationResult { .. } => "record_sales_integration_result",
             Reducer::RecordTelemetry { .. } => "record_telemetry",
             Reducer::RecordTelemetryBatch { .. } => "record_telemetry_batch",
             Reducer::RecordWhatsappHealthCheck { .. } => "record_whatsapp_health_check",
@@ -8448,6 +8849,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RejectAiActionDraft { .. } => "reject_ai_action_draft",
             Reducer::RejectApprovalRequest { .. } => "reject_approval_request",
             Reducer::RejectSupplierIntake { .. } => "reject_supplier_intake",
+            Reducer::ReleaseBlanketToPo { .. } => "release_blanket_to_po",
             Reducer::RemoveArticleMember { .. } => "remove_article_member",
             Reducer::RemoveCasbinRule { .. } => "remove_casbin_rule",
             Reducer::RemoveLandedCostLine { .. } => "remove_landed_cost_line",
@@ -8491,6 +8893,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllDomainTests => "run_all_domain_tests",
             Reducer::RunAllInventoryTests => "run_all_inventory_tests",
             Reducer::RunAllPlatformTests => "run_all_platform_tests",
+            Reducer::RunAllPurchasingTests => "run_all_purchasing_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
             Reducer::RunCoreOperationalMessagingTest => "run_core_operational_messaging_test",
             Reducer::RunCoreSodTest => "run_core_sod_test",
@@ -8516,13 +8919,22 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunManufacturingWorkcenterTest => "run_manufacturing_workcenter_test",
             Reducer::RunOwnerReportSchedule { .. } => "run_owner_report_schedule",
             Reducer::RunPurchasingBillBalancedTest => "run_purchasing_bill_balanced_test",
+            Reducer::RunPurchasingCompanyIsolationTest => "run_purchasing_company_isolation_test",
+            Reducer::RunPurchasingIncomingPickingTest => "run_purchasing_incoming_picking_test",
+            Reducer::RunPurchasingWaveCSmokeTest => "run_purchasing_wave_c_smoke_test",
             Reducer::RunSalesAtpShortfallTest => "run_sales_atp_shortfall_test",
             Reducer::RunSalesBackorderTest => "run_sales_backorder_test",
             Reducer::RunSalesCommissionAccrueTest => "run_sales_commission_accrue_test",
             Reducer::RunSalesCommissionClawbackTest => "run_sales_commission_clawback_test",
             Reducer::RunSalesCommissionSettleTest => "run_sales_commission_settle_test",
+            Reducer::RunSalesCompanyIsolationTest => "run_sales_company_isolation_test",
             Reducer::RunSalesCreditHoldTest => "run_sales_credit_hold_test",
+            Reducer::RunSalesDropshipConfirmTest => "run_sales_dropship_confirm_test",
+            Reducer::RunSalesExchangeFromReturnTest => "run_sales_exchange_from_return_test",
             Reducer::RunSalesFiscalRemapTest => "run_sales_fiscal_remap_test",
+            Reducer::RunSalesFxFailClosedTest => "run_sales_fx_fail_closed_test",
+            Reducer::RunSalesLineUpdateDeleteTest => "run_sales_line_update_delete_test",
+            Reducer::RunSalesLockBlocksUpdateTest => "run_sales_lock_blocks_update_test",
             Reducer::RunSalesOmsExtensionsTest => "run_sales_oms_extensions_test",
             Reducer::RunSalesOrderCancelTest => "run_sales_order_cancel_test",
             Reducer::RunSalesOrderDeliveryTest => "run_sales_order_delivery_test",
@@ -8536,6 +8948,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunWorkflowDefinitionTest => "run_workflow_definition_test",
             Reducer::SaveImportMappingTemplate { .. } => "save_import_mapping_template",
             Reducer::SaveProposalVersion { .. } => "save_proposal_version",
+            Reducer::ScheduleSalesSlaEscalation { .. } => "schedule_sales_sla_escalation",
             Reducer::ScheduleTaxDeadlineUpdates { .. } => "schedule_tax_deadline_updates",
             Reducer::SeedDevData => "seed_dev_data",
             Reducer::SeedOrganizationFormConfigs { .. } => "seed_organization_form_configs",
@@ -8549,6 +8962,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetArticlePublished { .. } => "set_article_published",
             Reducer::SetAssetActive { .. } => "set_asset_active",
             Reducer::SetBillingStatus { .. } => "set_billing_status",
+            Reducer::SetCommodityPriceIndex { .. } => "set_commodity_price_index",
             Reducer::SetCompanyCountryPack { .. } => "set_company_country_pack",
             Reducer::SetCompanyVerticalPack { .. } => "set_company_vertical_pack",
             Reducer::SetConsolidationCompanyRate { .. } => "set_consolidation_company_rate",
@@ -8558,8 +8972,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetIntercompanyRuleActive { .. } => "set_intercompany_rule_active",
             Reducer::SetIotThreshold { .. } => "set_iot_threshold",
             Reducer::SetProjectActive { .. } => "set_project_active",
+            Reducer::SetPurchaseApprovalDelegate { .. } => "set_purchase_approval_delegate",
             Reducer::SetRecordCustomFieldValues { .. } => "set_record_custom_field_values",
             Reducer::SetTaskParent { .. } => "set_task_parent",
+            Reducer::SetVendorRiskFlag { .. } => "set_vendor_risk_flag",
             Reducer::SetWhatsappPrimaryAccount { .. } => "set_whatsapp_primary_account",
             Reducer::SetWorkflowActive { .. } => "set_workflow_active",
             Reducer::SetWorkitemException { .. } => "set_workitem_exception",
@@ -8593,6 +9009,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UnlockDocument { .. } => "unlock_document",
             Reducer::UnlockKnowledgeArticle { .. } => "unlock_knowledge_article",
             Reducer::UnlockPurchaseOrder { .. } => "unlock_purchase_order",
+            Reducer::UnlockSaleOrder { .. } => "unlock_sale_order",
             Reducer::UnmatchEliminationEntry { .. } => "unmatch_elimination_entry",
             Reducer::UnreconciledAccountBankStatementLine { .. } => "unreconciled_account_bank_statement_line",
             Reducer::UnreserveStockQuant { .. } => "unreserve_stock_quant",
@@ -8705,6 +9122,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateReportTemplate { .. } => "update_report_template",
             Reducer::UpdateRole { .. } => "update_role",
             Reducer::UpdateSaleOrder { .. } => "update_sale_order",
+            Reducer::UpdateSaleOrderLine { .. } => "update_sale_order_line",
             Reducer::UpdateSaleOrderOption { .. } => "update_sale_order_option",
             Reducer::UpdateSavedReport { .. } => "update_saved_report",
             Reducer::UpdateSodConflictRule { .. } => "update_sod_conflict_rule",
@@ -8745,6 +9163,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpsertPartnerCreditControl { .. } => "upsert_partner_credit_control",
             Reducer::UpsertProposalSection { .. } => "upsert_proposal_section",
             Reducer::UpsertSearchEmbedding { .. } => "upsert_search_embedding",
+            Reducer::UpsertVendorScorecard { .. } => "upsert_vendor_scorecard",
             Reducer::UpsertWarehouseGeo { .. } => "upsert_warehouse_geo",
             Reducer::UseSerial { .. } => "use_serial",
             Reducer::ValidateBudget { .. } => "validate_budget",
@@ -8763,7 +9182,16 @@ impl __sdk::Reducer for Reducer {
     #[allow(clippy::clone_on_copy)]
 fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
         match self {
-                        Reducer::AccrueSaleCommission{
+                        Reducer::AcceptSaleOrderQuotation{
+                organization_id,
+                order_id,
+                params,
+}             => __sats::bsatn::to_vec(&accept_sale_order_quotation_reducer::AcceptSaleOrderQuotationArgs {
+                organization_id: organization_id.clone(),
+                order_id: order_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::AccrueSaleCommission{
                 organization_id,
                 order_id,
                 params,
@@ -8950,6 +9378,28 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 order_id: order_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::AddPurchaseRfqBid{
+                organization_id,
+                company_id,
+                rfq_id,
+                params,
+}             => __sats::bsatn::to_vec(&add_purchase_rfq_bid_reducer::AddPurchaseRfqBidArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                rfq_id: rfq_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::AddPurchaseRfqLine{
+                organization_id,
+                company_id,
+                rfq_id,
+                params,
+}             => __sats::bsatn::to_vec(&add_purchase_rfq_line_reducer::AddPurchaseRfqLineArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                rfq_id: rfq_id.clone(),
+                params: params.clone(),
+}),
             Reducer::AddRuleToNomenclature{
                 organization_id,
                 nomenclature_id,
@@ -9052,6 +9502,17 @@ Reducer::ApplyLandedCosts{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 landed_cost_id: landed_cost_id.clone(),
+}),
+            Reducer::ApplyOmnichannelAllocation{
+                organization_id,
+                company_id,
+                order_id,
+                params,
+}             => __sats::bsatn::to_vec(&apply_omnichannel_allocation_reducer::ApplyOmnichannelAllocationArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                order_id: order_id.clone(),
+                params: params.clone(),
 }),
             Reducer::ApplyOrgMigrations{
                 organization_id,
@@ -9292,6 +9753,17 @@ Reducer::ApplyLandedCosts{
                 organization_id: organization_id.clone(),
                 picking_id: picking_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::AwardPurchaseRfqBid{
+                organization_id,
+                company_id,
+                rfq_id,
+                bid_id,
+}             => __sats::bsatn::to_vec(&award_purchase_rfq_bid_reducer::AwardPurchaseRfqBidArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                rfq_id: rfq_id.clone(),
+                bid_id: bid_id.clone(),
 }),
             Reducer::BackfillExternalIds => __sats::bsatn::to_vec(&backfill_external_ids_reducer::BackfillExternalIdsArgs {
                 }),
@@ -9785,6 +10257,15 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 order_id: order_id.clone(),
 }),
+            Reducer::ConfirmPurchaseReturn{
+                organization_id,
+                company_id,
+                purchase_return_id,
+}             => __sats::bsatn::to_vec(&confirm_purchase_return_reducer::ConfirmPurchaseReturnArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                purchase_return_id: purchase_return_id.clone(),
+}),
             Reducer::ConfirmReturnOrder{
                 organization_id,
                 company_id,
@@ -9845,6 +10326,15 @@ Reducer::BillTimesheets{
                 company_id: company_id.clone(),
                 opportunity_id: opportunity_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::ConvertPurchaseRequisitionToPo{
+                organization_id,
+                company_id,
+                requisition_id,
+}             => __sats::bsatn::to_vec(&convert_purchase_requisition_to_po_reducer::ConvertPurchaseRequisitionToPoArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                requisition_id: requisition_id.clone(),
 }),
             Reducer::CreateAccountAccount{
                 organization_id,
@@ -10178,6 +10668,15 @@ Reducer::BillTimesheets{
                 params,
 }             => __sats::bsatn::to_vec(&create_company_reducer::CreateCompanyArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateConsignmentAgreement{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_consignment_agreement_reducer::CreateConsignmentAgreementArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateConsolidationAccount{
@@ -10993,6 +11492,24 @@ Reducer::BillTimesheets{
                 description: description.clone(),
                 document_folder_id: document_folder_id.clone(),
 }),
+            Reducer::CreatePurchaseBlanketOrder{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_purchase_blanket_order_reducer::CreatePurchaseBlanketOrderArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreatePurchaseContract{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_purchase_contract_reducer::CreatePurchaseContractArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreatePurchaseOrder{
                 organization_id,
                 params,
@@ -11005,6 +11522,33 @@ Reducer::BillTimesheets{
                 params,
 }             => __sats::bsatn::to_vec(&create_purchase_requisition_reducer::CreatePurchaseRequisitionArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreatePurchaseReturn{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_purchase_return_reducer::CreatePurchaseReturnArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreatePurchaseRfq{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_purchase_rfq_reducer::CreatePurchaseRfqArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreatePurchasingIntegrationIntent{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_purchasing_integration_intent_reducer::CreatePurchasingIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateQualityAlert{
@@ -11109,6 +11653,42 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateSaleCommissionPlan{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_sale_commission_plan_reducer::CreateSaleCommissionPlanArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateSaleCommissionPlanSplit{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_sale_commission_plan_split_reducer::CreateSaleCommissionPlanSplitArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateSaleContract{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_sale_contract_reducer::CreateSaleContractArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateSaleCpqConstraint{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_sale_cpq_constraint_reducer::CreateSaleCpqConstraintArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateSaleOrder{
                 organization_id,
                 params,
@@ -11139,6 +11719,15 @@ Reducer::BillTimesheets{
                 params,
 }             => __sats::bsatn::to_vec(&create_sale_promotion_reducer::CreateSalePromotionArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateSalesIntegrationIntent{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_sales_integration_intent_reducer::CreateSalesIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateSavedReport{
@@ -11385,6 +11974,17 @@ Reducer::BillTimesheets{
                 params,
 }             => __sats::bsatn::to_vec(&create_utm_source_reducer::CreateUtmSourceArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateVendorCreditFromPurchaseReturn{
+                organization_id,
+                company_id,
+                purchase_return_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_vendor_credit_from_purchase_return_reducer::CreateVendorCreditFromPurchaseReturnArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                purchase_return_id: purchase_return_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateWarehouse{
@@ -11786,6 +12386,13 @@ Reducer::BillTimesheets{
                 company_id: company_id.clone(),
                 model: model.clone(),
                 record_id: record_id.clone(),
+}),
+            Reducer::DeleteSaleOrderLine{
+                organization_id,
+                line_id,
+}             => __sats::bsatn::to_vec(&delete_sale_order_line_reducer::DeleteSaleOrderLineArgs {
+                organization_id: organization_id.clone(),
+                line_id: line_id.clone(),
 }),
             Reducer::DeleteSaleOrderOption{
                 organization_id,
@@ -12729,6 +13336,13 @@ Reducer::ErrorIntercompanyTransaction{
                 organization_id: organization_id.clone(),
                 order_id: order_id.clone(),
 }),
+            Reducer::LockSaleOrder{
+                organization_id,
+                order_id,
+}             => __sats::bsatn::to_vec(&lock_sale_order_reducer::LockSaleOrderArgs {
+                organization_id: organization_id.clone(),
+                order_id: order_id.clone(),
+}),
             Reducer::LogAuditEvent{
                 organization_id,
                 params,
@@ -13214,6 +13828,17 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::RecordPurchasingIntegrationResult{
+                organization_id,
+                company_id,
+                intent_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_purchasing_integration_result_reducer::RecordPurchasingIntegrationResultArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                intent_id: intent_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RecordReportRun{
                 organization_id,
                 report_id,
@@ -13222,6 +13847,17 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 report_id: report_id.clone(),
                 next_run: next_run.clone(),
+}),
+            Reducer::RecordSalesIntegrationResult{
+                organization_id,
+                company_id,
+                intent_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_sales_integration_result_reducer::RecordSalesIntegrationResultArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                intent_id: intent_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RecordTelemetry{
                 organization_id,
@@ -13349,6 +13985,17 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 intake_id: intake_id.clone(),
                 rejection_reason: rejection_reason.clone(),
+}),
+            Reducer::ReleaseBlanketToPo{
+                organization_id,
+                company_id,
+                blanket_order_id,
+                params,
+}             => __sats::bsatn::to_vec(&release_blanket_to_po_reducer::ReleaseBlanketToPoArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                blanket_order_id: blanket_order_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RemoveArticleMember{
                 organization_id,
@@ -13597,6 +14244,8 @@ Reducer::RunAllInventoryTests => __sats::bsatn::to_vec(&run_all_inventory_tests_
                 }),
 Reducer::RunAllPlatformTests => __sats::bsatn::to_vec(&run_all_platform_tests_reducer::RunAllPlatformTestsArgs {
                 }),
+Reducer::RunAllPurchasingTests => __sats::bsatn::to_vec(&run_all_purchasing_tests_reducer::RunAllPurchasingTestsArgs {
+                }),
 Reducer::RunAllSalesTests => __sats::bsatn::to_vec(&run_all_sales_tests_reducer::RunAllSalesTestsArgs {
                 }),
 Reducer::RunCoreOperationalMessagingTest => __sats::bsatn::to_vec(&run_core_operational_messaging_test_reducer::RunCoreOperationalMessagingTestArgs {
@@ -13666,6 +14315,12 @@ Reducer::RunOwnerReportSchedule{
 }),
             Reducer::RunPurchasingBillBalancedTest => __sats::bsatn::to_vec(&run_purchasing_bill_balanced_test_reducer::RunPurchasingBillBalancedTestArgs {
                 }),
+Reducer::RunPurchasingCompanyIsolationTest => __sats::bsatn::to_vec(&run_purchasing_company_isolation_test_reducer::RunPurchasingCompanyIsolationTestArgs {
+                }),
+Reducer::RunPurchasingIncomingPickingTest => __sats::bsatn::to_vec(&run_purchasing_incoming_picking_test_reducer::RunPurchasingIncomingPickingTestArgs {
+                }),
+Reducer::RunPurchasingWaveCSmokeTest => __sats::bsatn::to_vec(&run_purchasing_wave_c_smoke_test_reducer::RunPurchasingWaveCSmokeTestArgs {
+                }),
 Reducer::RunSalesAtpShortfallTest => __sats::bsatn::to_vec(&run_sales_atp_shortfall_test_reducer::RunSalesAtpShortfallTestArgs {
                 }),
 Reducer::RunSalesBackorderTest => __sats::bsatn::to_vec(&run_sales_backorder_test_reducer::RunSalesBackorderTestArgs {
@@ -13676,9 +14331,21 @@ Reducer::RunSalesCommissionClawbackTest => __sats::bsatn::to_vec(&run_sales_comm
                 }),
 Reducer::RunSalesCommissionSettleTest => __sats::bsatn::to_vec(&run_sales_commission_settle_test_reducer::RunSalesCommissionSettleTestArgs {
                 }),
+Reducer::RunSalesCompanyIsolationTest => __sats::bsatn::to_vec(&run_sales_company_isolation_test_reducer::RunSalesCompanyIsolationTestArgs {
+                }),
 Reducer::RunSalesCreditHoldTest => __sats::bsatn::to_vec(&run_sales_credit_hold_test_reducer::RunSalesCreditHoldTestArgs {
                 }),
+Reducer::RunSalesDropshipConfirmTest => __sats::bsatn::to_vec(&run_sales_dropship_confirm_test_reducer::RunSalesDropshipConfirmTestArgs {
+                }),
+Reducer::RunSalesExchangeFromReturnTest => __sats::bsatn::to_vec(&run_sales_exchange_from_return_test_reducer::RunSalesExchangeFromReturnTestArgs {
+                }),
 Reducer::RunSalesFiscalRemapTest => __sats::bsatn::to_vec(&run_sales_fiscal_remap_test_reducer::RunSalesFiscalRemapTestArgs {
+                }),
+Reducer::RunSalesFxFailClosedTest => __sats::bsatn::to_vec(&run_sales_fx_fail_closed_test_reducer::RunSalesFxFailClosedTestArgs {
+                }),
+Reducer::RunSalesLineUpdateDeleteTest => __sats::bsatn::to_vec(&run_sales_line_update_delete_test_reducer::RunSalesLineUpdateDeleteTestArgs {
+                }),
+Reducer::RunSalesLockBlocksUpdateTest => __sats::bsatn::to_vec(&run_sales_lock_blocks_update_test_reducer::RunSalesLockBlocksUpdateTestArgs {
                 }),
 Reducer::RunSalesOmsExtensionsTest => __sats::bsatn::to_vec(&run_sales_oms_extensions_test_reducer::RunSalesOmsExtensionsTestArgs {
                 }),
@@ -13724,6 +14391,15 @@ Reducer::SaveImportMappingTemplate{
                 proposal_id: proposal_id.clone(),
                 message: message.clone(),
                 sections_json: sections_json.clone(),
+}),
+            Reducer::ScheduleSalesSlaEscalation{
+                organization_id,
+                company_id,
+                delay_secs,
+}             => __sats::bsatn::to_vec(&schedule_sales_sla_escalation_reducer::ScheduleSalesSlaEscalationArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                delay_secs: delay_secs.clone(),
 }),
             Reducer::ScheduleTaxDeadlineUpdates{
                 organization_id,
@@ -13827,6 +14503,15 @@ Reducer::SeedOrganizationFormConfigs{
                 billing_account_id: billing_account_id.clone(),
                 status: status.clone(),
 }),
+            Reducer::SetCommodityPriceIndex{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_commodity_price_index_reducer::SetCommodityPriceIndexArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::SetCompanyCountryPack{
                 organization_id,
                 company_id,
@@ -13916,6 +14601,15 @@ Reducer::SeedOrganizationFormConfigs{
                 project_id: project_id.clone(),
                 active: active.clone(),
 }),
+            Reducer::SetPurchaseApprovalDelegate{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_purchase_approval_delegate_reducer::SetPurchaseApprovalDelegateArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::SetRecordCustomFieldValues{
                 organization_id,
                 company_id,
@@ -13933,6 +14627,15 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 task_id: task_id.clone(),
                 parent_id: parent_id.clone(),
+}),
+            Reducer::SetVendorRiskFlag{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_vendor_risk_flag_reducer::SetVendorRiskFlagArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
 }),
             Reducer::SetWhatsappPrimaryAccount{
                 organization_id,
@@ -14210,6 +14913,13 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id,
                 order_id,
 }             => __sats::bsatn::to_vec(&unlock_purchase_order_reducer::UnlockPurchaseOrderArgs {
+                organization_id: organization_id.clone(),
+                order_id: order_id.clone(),
+}),
+            Reducer::UnlockSaleOrder{
+                organization_id,
+                order_id,
+}             => __sats::bsatn::to_vec(&unlock_sale_order_reducer::UnlockSaleOrderArgs {
                 organization_id: organization_id.clone(),
                 order_id: order_id.clone(),
 }),
@@ -15305,6 +16015,15 @@ Reducer::SeedOrganizationFormConfigs{
                 order_id: order_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateSaleOrderLine{
+                organization_id,
+                line_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_sale_order_line_reducer::UpdateSaleOrderLineArgs {
+                organization_id: organization_id.clone(),
+                line_id: line_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdateSaleOrderOption{
                 organization_id,
                 option_id,
@@ -15673,6 +16392,15 @@ Reducer::SeedOrganizationFormConfigs{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpsertVendorScorecard{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&upsert_vendor_scorecard_reducer::UpsertVendorScorecardArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpsertWarehouseGeo{
                 organization_id,
                 warehouse_id,
@@ -15853,9 +16581,11 @@ pub struct DbUpdate {
     cartonization_result: __sdk::TableUpdate<CartonizationResult>,
     casbin_rule: __sdk::TableUpdate<CasbinRule>,
     cash_flow_line: __sdk::TableUpdate<CashFlowLine>,
+    commodity_price_index: __sdk::TableUpdate<CommodityPriceIndex>,
     company: __sdk::TableUpdate<Company>,
     company_country_pack: __sdk::TableUpdate<CompanyCountryPack>,
     company_vertical_pack: __sdk::TableUpdate<CompanyVerticalPack>,
+    consignment_agreement: __sdk::TableUpdate<ConsignmentAgreement>,
     consolidation_account: __sdk::TableUpdate<ConsolidationAccount>,
     consolidation_company_rate: __sdk::TableUpdate<ConsolidationCompanyRate>,
     consolidation_elimination_entry: __sdk::TableUpdate<ConsolidationEliminationEntry>,
@@ -16004,9 +16734,18 @@ pub struct DbUpdate {
     proposal_section: __sdk::TableUpdate<ProposalSection>,
     proposal_source_doc: __sdk::TableUpdate<ProposalSourceDoc>,
     proposal_version: __sdk::TableUpdate<ProposalVersion>,
+    purchase_approval_delegate: __sdk::TableUpdate<PurchaseApprovalDelegate>,
+    purchase_blanket_order: __sdk::TableUpdate<PurchaseBlanketOrder>,
+    purchase_contract: __sdk::TableUpdate<PurchaseContract>,
     purchase_order: __sdk::TableUpdate<PurchaseOrder>,
     purchase_order_line: __sdk::TableUpdate<PurchaseOrderLine>,
     purchase_requisition: __sdk::TableUpdate<PurchaseRequisition>,
+    purchase_return: __sdk::TableUpdate<PurchaseReturn>,
+    purchase_return_line: __sdk::TableUpdate<PurchaseReturnLine>,
+    purchase_rfq: __sdk::TableUpdate<PurchaseRfq>,
+    purchase_rfq_bid: __sdk::TableUpdate<PurchaseRfqBid>,
+    purchase_rfq_line: __sdk::TableUpdate<PurchaseRfqLine>,
+    purchasing_integration_intent: __sdk::TableUpdate<PurchasingIntegrationIntent>,
     quality_alert: __sdk::TableUpdate<QualityAlert>,
     quality_alert_reason: __sdk::TableUpdate<QualityAlertReason>,
     quality_check: __sdk::TableUpdate<QualityCheck>,
@@ -16023,10 +16762,15 @@ pub struct DbUpdate {
     revenue_recognition_rule: __sdk::TableUpdate<RevenueRecognitionRule>,
     role: __sdk::TableUpdate<Role>,
     sale_commission: __sdk::TableUpdate<SaleCommission>,
+    sale_commission_plan: __sdk::TableUpdate<SaleCommissionPlan>,
+    sale_commission_plan_split: __sdk::TableUpdate<SaleCommissionPlanSplit>,
+    sale_contract: __sdk::TableUpdate<SaleContract>,
+    sale_cpq_constraint: __sdk::TableUpdate<SaleCpqConstraint>,
     sale_order: __sdk::TableUpdate<SaleOrder>,
     sale_order_line: __sdk::TableUpdate<SaleOrderLine>,
     sale_order_option: __sdk::TableUpdate<SaleOrderOption>,
     sale_promotion: __sdk::TableUpdate<SalePromotion>,
+    sales_integration_intent: __sdk::TableUpdate<SalesIntegrationIntent>,
     saved_report: __sdk::TableUpdate<SavedReport>,
     scheduled_report: __sdk::TableUpdate<ScheduledReport>,
     scheduled_report_run: __sdk::TableUpdate<ScheduledReportRun>,
@@ -16074,6 +16818,8 @@ pub struct DbUpdate {
     utm_campaign: __sdk::TableUpdate<UtmCampaign>,
     utm_medium: __sdk::TableUpdate<UtmMedium>,
     utm_source: __sdk::TableUpdate<UtmSource>,
+    vendor_risk_flag: __sdk::TableUpdate<VendorRiskFlag>,
+    vendor_scorecard: __sdk::TableUpdate<VendorScorecard>,
     warehouse: __sdk::TableUpdate<Warehouse>,
     warehouse_3_d_zone: __sdk::TableUpdate<Warehouse3DZone>,
     warehouse_geo: __sdk::TableUpdate<WarehouseGeo>,
@@ -16161,9 +16907,11 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "cartonization_result" => db_update.cartonization_result.append(cartonization_result_table::parse_table_update(table_update)?),
     "casbin_rule" => db_update.casbin_rule.append(casbin_rule_table::parse_table_update(table_update)?),
     "cash_flow_line" => db_update.cash_flow_line.append(cash_flow_line_table::parse_table_update(table_update)?),
+    "commodity_price_index" => db_update.commodity_price_index.append(commodity_price_index_table::parse_table_update(table_update)?),
     "company" => db_update.company.append(company_table::parse_table_update(table_update)?),
     "company_country_pack" => db_update.company_country_pack.append(company_country_pack_table::parse_table_update(table_update)?),
     "company_vertical_pack" => db_update.company_vertical_pack.append(company_vertical_pack_table::parse_table_update(table_update)?),
+    "consignment_agreement" => db_update.consignment_agreement.append(consignment_agreement_table::parse_table_update(table_update)?),
     "consolidation_account" => db_update.consolidation_account.append(consolidation_account_table::parse_table_update(table_update)?),
     "consolidation_company_rate" => db_update.consolidation_company_rate.append(consolidation_company_rate_table::parse_table_update(table_update)?),
     "consolidation_elimination_entry" => db_update.consolidation_elimination_entry.append(consolidation_elimination_entry_table::parse_table_update(table_update)?),
@@ -16312,9 +17060,18 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "proposal_section" => db_update.proposal_section.append(proposal_section_table::parse_table_update(table_update)?),
     "proposal_source_doc" => db_update.proposal_source_doc.append(proposal_source_doc_table::parse_table_update(table_update)?),
     "proposal_version" => db_update.proposal_version.append(proposal_version_table::parse_table_update(table_update)?),
+    "purchase_approval_delegate" => db_update.purchase_approval_delegate.append(purchase_approval_delegate_table::parse_table_update(table_update)?),
+    "purchase_blanket_order" => db_update.purchase_blanket_order.append(purchase_blanket_order_table::parse_table_update(table_update)?),
+    "purchase_contract" => db_update.purchase_contract.append(purchase_contract_table::parse_table_update(table_update)?),
     "purchase_order" => db_update.purchase_order.append(purchase_order_table::parse_table_update(table_update)?),
     "purchase_order_line" => db_update.purchase_order_line.append(purchase_order_line_table::parse_table_update(table_update)?),
     "purchase_requisition" => db_update.purchase_requisition.append(purchase_requisition_table::parse_table_update(table_update)?),
+    "purchase_return" => db_update.purchase_return.append(purchase_return_table::parse_table_update(table_update)?),
+    "purchase_return_line" => db_update.purchase_return_line.append(purchase_return_line_table::parse_table_update(table_update)?),
+    "purchase_rfq" => db_update.purchase_rfq.append(purchase_rfq_table::parse_table_update(table_update)?),
+    "purchase_rfq_bid" => db_update.purchase_rfq_bid.append(purchase_rfq_bid_table::parse_table_update(table_update)?),
+    "purchase_rfq_line" => db_update.purchase_rfq_line.append(purchase_rfq_line_table::parse_table_update(table_update)?),
+    "purchasing_integration_intent" => db_update.purchasing_integration_intent.append(purchasing_integration_intent_table::parse_table_update(table_update)?),
     "quality_alert" => db_update.quality_alert.append(quality_alert_table::parse_table_update(table_update)?),
     "quality_alert_reason" => db_update.quality_alert_reason.append(quality_alert_reason_table::parse_table_update(table_update)?),
     "quality_check" => db_update.quality_check.append(quality_check_table::parse_table_update(table_update)?),
@@ -16331,10 +17088,15 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "revenue_recognition_rule" => db_update.revenue_recognition_rule.append(revenue_recognition_rule_table::parse_table_update(table_update)?),
     "role" => db_update.role.append(role_table::parse_table_update(table_update)?),
     "sale_commission" => db_update.sale_commission.append(sale_commission_table::parse_table_update(table_update)?),
+    "sale_commission_plan" => db_update.sale_commission_plan.append(sale_commission_plan_table::parse_table_update(table_update)?),
+    "sale_commission_plan_split" => db_update.sale_commission_plan_split.append(sale_commission_plan_split_table::parse_table_update(table_update)?),
+    "sale_contract" => db_update.sale_contract.append(sale_contract_table::parse_table_update(table_update)?),
+    "sale_cpq_constraint" => db_update.sale_cpq_constraint.append(sale_cpq_constraint_table::parse_table_update(table_update)?),
     "sale_order" => db_update.sale_order.append(sale_order_table::parse_table_update(table_update)?),
     "sale_order_line" => db_update.sale_order_line.append(sale_order_line_table::parse_table_update(table_update)?),
     "sale_order_option" => db_update.sale_order_option.append(sale_order_option_table::parse_table_update(table_update)?),
     "sale_promotion" => db_update.sale_promotion.append(sale_promotion_table::parse_table_update(table_update)?),
+    "sales_integration_intent" => db_update.sales_integration_intent.append(sales_integration_intent_table::parse_table_update(table_update)?),
     "saved_report" => db_update.saved_report.append(saved_report_table::parse_table_update(table_update)?),
     "scheduled_report" => db_update.scheduled_report.append(scheduled_report_table::parse_table_update(table_update)?),
     "scheduled_report_run" => db_update.scheduled_report_run.append(scheduled_report_run_table::parse_table_update(table_update)?),
@@ -16382,6 +17144,8 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "utm_campaign" => db_update.utm_campaign.append(utm_campaign_table::parse_table_update(table_update)?),
     "utm_medium" => db_update.utm_medium.append(utm_medium_table::parse_table_update(table_update)?),
     "utm_source" => db_update.utm_source.append(utm_source_table::parse_table_update(table_update)?),
+    "vendor_risk_flag" => db_update.vendor_risk_flag.append(vendor_risk_flag_table::parse_table_update(table_update)?),
+    "vendor_scorecard" => db_update.vendor_scorecard.append(vendor_scorecard_table::parse_table_update(table_update)?),
     "warehouse" => db_update.warehouse.append(warehouse_table::parse_table_update(table_update)?),
     "warehouse_3_d_zone" => db_update.warehouse_3_d_zone.append(warehouse_3_d_zone_table::parse_table_update(table_update)?),
     "warehouse_geo" => db_update.warehouse_geo.append(warehouse_geo_table::parse_table_update(table_update)?),
@@ -16481,9 +17245,11 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.cartonization_result = cache.apply_diff_to_table::<CartonizationResult>("cartonization_result", &self.cartonization_result).with_updates_by_pk(|row| &row.id);
         diff.casbin_rule = cache.apply_diff_to_table::<CasbinRule>("casbin_rule", &self.casbin_rule).with_updates_by_pk(|row| &row.id);
         diff.cash_flow_line = cache.apply_diff_to_table::<CashFlowLine>("cash_flow_line", &self.cash_flow_line).with_updates_by_pk(|row| &row.id);
+        diff.commodity_price_index = cache.apply_diff_to_table::<CommodityPriceIndex>("commodity_price_index", &self.commodity_price_index).with_updates_by_pk(|row| &row.id);
         diff.company = cache.apply_diff_to_table::<Company>("company", &self.company).with_updates_by_pk(|row| &row.id);
         diff.company_country_pack = cache.apply_diff_to_table::<CompanyCountryPack>("company_country_pack", &self.company_country_pack).with_updates_by_pk(|row| &row.id);
         diff.company_vertical_pack = cache.apply_diff_to_table::<CompanyVerticalPack>("company_vertical_pack", &self.company_vertical_pack).with_updates_by_pk(|row| &row.id);
+        diff.consignment_agreement = cache.apply_diff_to_table::<ConsignmentAgreement>("consignment_agreement", &self.consignment_agreement).with_updates_by_pk(|row| &row.id);
         diff.consolidation_account = cache.apply_diff_to_table::<ConsolidationAccount>("consolidation_account", &self.consolidation_account).with_updates_by_pk(|row| &row.id);
         diff.consolidation_company_rate = cache.apply_diff_to_table::<ConsolidationCompanyRate>("consolidation_company_rate", &self.consolidation_company_rate).with_updates_by_pk(|row| &row.id);
         diff.consolidation_elimination_entry = cache.apply_diff_to_table::<ConsolidationEliminationEntry>("consolidation_elimination_entry", &self.consolidation_elimination_entry).with_updates_by_pk(|row| &row.id);
@@ -16632,9 +17398,18 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.proposal_section = cache.apply_diff_to_table::<ProposalSection>("proposal_section", &self.proposal_section).with_updates_by_pk(|row| &row.id);
         diff.proposal_source_doc = cache.apply_diff_to_table::<ProposalSourceDoc>("proposal_source_doc", &self.proposal_source_doc).with_updates_by_pk(|row| &row.id);
         diff.proposal_version = cache.apply_diff_to_table::<ProposalVersion>("proposal_version", &self.proposal_version).with_updates_by_pk(|row| &row.id);
+        diff.purchase_approval_delegate = cache.apply_diff_to_table::<PurchaseApprovalDelegate>("purchase_approval_delegate", &self.purchase_approval_delegate).with_updates_by_pk(|row| &row.id);
+        diff.purchase_blanket_order = cache.apply_diff_to_table::<PurchaseBlanketOrder>("purchase_blanket_order", &self.purchase_blanket_order).with_updates_by_pk(|row| &row.id);
+        diff.purchase_contract = cache.apply_diff_to_table::<PurchaseContract>("purchase_contract", &self.purchase_contract).with_updates_by_pk(|row| &row.id);
         diff.purchase_order = cache.apply_diff_to_table::<PurchaseOrder>("purchase_order", &self.purchase_order).with_updates_by_pk(|row| &row.id);
         diff.purchase_order_line = cache.apply_diff_to_table::<PurchaseOrderLine>("purchase_order_line", &self.purchase_order_line).with_updates_by_pk(|row| &row.id);
         diff.purchase_requisition = cache.apply_diff_to_table::<PurchaseRequisition>("purchase_requisition", &self.purchase_requisition).with_updates_by_pk(|row| &row.id);
+        diff.purchase_return = cache.apply_diff_to_table::<PurchaseReturn>("purchase_return", &self.purchase_return).with_updates_by_pk(|row| &row.id);
+        diff.purchase_return_line = cache.apply_diff_to_table::<PurchaseReturnLine>("purchase_return_line", &self.purchase_return_line).with_updates_by_pk(|row| &row.id);
+        diff.purchase_rfq = cache.apply_diff_to_table::<PurchaseRfq>("purchase_rfq", &self.purchase_rfq).with_updates_by_pk(|row| &row.id);
+        diff.purchase_rfq_bid = cache.apply_diff_to_table::<PurchaseRfqBid>("purchase_rfq_bid", &self.purchase_rfq_bid).with_updates_by_pk(|row| &row.id);
+        diff.purchase_rfq_line = cache.apply_diff_to_table::<PurchaseRfqLine>("purchase_rfq_line", &self.purchase_rfq_line).with_updates_by_pk(|row| &row.id);
+        diff.purchasing_integration_intent = cache.apply_diff_to_table::<PurchasingIntegrationIntent>("purchasing_integration_intent", &self.purchasing_integration_intent).with_updates_by_pk(|row| &row.id);
         diff.quality_alert = cache.apply_diff_to_table::<QualityAlert>("quality_alert", &self.quality_alert).with_updates_by_pk(|row| &row.id);
         diff.quality_alert_reason = cache.apply_diff_to_table::<QualityAlertReason>("quality_alert_reason", &self.quality_alert_reason).with_updates_by_pk(|row| &row.id);
         diff.quality_check = cache.apply_diff_to_table::<QualityCheck>("quality_check", &self.quality_check).with_updates_by_pk(|row| &row.id);
@@ -16651,10 +17426,15 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.revenue_recognition_rule = cache.apply_diff_to_table::<RevenueRecognitionRule>("revenue_recognition_rule", &self.revenue_recognition_rule).with_updates_by_pk(|row| &row.id);
         diff.role = cache.apply_diff_to_table::<Role>("role", &self.role).with_updates_by_pk(|row| &row.id);
         diff.sale_commission = cache.apply_diff_to_table::<SaleCommission>("sale_commission", &self.sale_commission).with_updates_by_pk(|row| &row.id);
+        diff.sale_commission_plan = cache.apply_diff_to_table::<SaleCommissionPlan>("sale_commission_plan", &self.sale_commission_plan).with_updates_by_pk(|row| &row.id);
+        diff.sale_commission_plan_split = cache.apply_diff_to_table::<SaleCommissionPlanSplit>("sale_commission_plan_split", &self.sale_commission_plan_split).with_updates_by_pk(|row| &row.id);
+        diff.sale_contract = cache.apply_diff_to_table::<SaleContract>("sale_contract", &self.sale_contract).with_updates_by_pk(|row| &row.id);
+        diff.sale_cpq_constraint = cache.apply_diff_to_table::<SaleCpqConstraint>("sale_cpq_constraint", &self.sale_cpq_constraint).with_updates_by_pk(|row| &row.id);
         diff.sale_order = cache.apply_diff_to_table::<SaleOrder>("sale_order", &self.sale_order).with_updates_by_pk(|row| &row.id);
         diff.sale_order_line = cache.apply_diff_to_table::<SaleOrderLine>("sale_order_line", &self.sale_order_line).with_updates_by_pk(|row| &row.id);
         diff.sale_order_option = cache.apply_diff_to_table::<SaleOrderOption>("sale_order_option", &self.sale_order_option).with_updates_by_pk(|row| &row.id);
         diff.sale_promotion = cache.apply_diff_to_table::<SalePromotion>("sale_promotion", &self.sale_promotion).with_updates_by_pk(|row| &row.id);
+        diff.sales_integration_intent = cache.apply_diff_to_table::<SalesIntegrationIntent>("sales_integration_intent", &self.sales_integration_intent).with_updates_by_pk(|row| &row.id);
         diff.saved_report = cache.apply_diff_to_table::<SavedReport>("saved_report", &self.saved_report).with_updates_by_pk(|row| &row.id);
         diff.scheduled_report = cache.apply_diff_to_table::<ScheduledReport>("scheduled_report", &self.scheduled_report).with_updates_by_pk(|row| &row.id);
         diff.scheduled_report_run = cache.apply_diff_to_table::<ScheduledReportRun>("scheduled_report_run", &self.scheduled_report_run).with_updates_by_pk(|row| &row.id);
@@ -16702,6 +17482,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.utm_campaign = cache.apply_diff_to_table::<UtmCampaign>("utm_campaign", &self.utm_campaign).with_updates_by_pk(|row| &row.id);
         diff.utm_medium = cache.apply_diff_to_table::<UtmMedium>("utm_medium", &self.utm_medium).with_updates_by_pk(|row| &row.id);
         diff.utm_source = cache.apply_diff_to_table::<UtmSource>("utm_source", &self.utm_source).with_updates_by_pk(|row| &row.id);
+        diff.vendor_risk_flag = cache.apply_diff_to_table::<VendorRiskFlag>("vendor_risk_flag", &self.vendor_risk_flag).with_updates_by_pk(|row| &row.id);
+        diff.vendor_scorecard = cache.apply_diff_to_table::<VendorScorecard>("vendor_scorecard", &self.vendor_scorecard).with_updates_by_pk(|row| &row.id);
         diff.warehouse = cache.apply_diff_to_table::<Warehouse>("warehouse", &self.warehouse).with_updates_by_pk(|row| &row.id);
         diff.warehouse_3_d_zone = cache.apply_diff_to_table::<Warehouse3DZone>("warehouse_3_d_zone", &self.warehouse_3_d_zone).with_updates_by_pk(|row| &row.id);
         diff.warehouse_geo = cache.apply_diff_to_table::<WarehouseGeo>("warehouse_geo", &self.warehouse_geo).with_updates_by_pk(|row| &row.id);
@@ -16786,9 +17568,11 @@ for table_rows in raw.tables {
                 "cartonization_result" => db_update.cartonization_result.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "casbin_rule" => db_update.casbin_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "cash_flow_line" => db_update.cash_flow_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "commodity_price_index" => db_update.commodity_price_index.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "company" => db_update.company.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "company_country_pack" => db_update.company_country_pack.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "company_vertical_pack" => db_update.company_vertical_pack.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "consignment_agreement" => db_update.consignment_agreement.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "consolidation_account" => db_update.consolidation_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "consolidation_company_rate" => db_update.consolidation_company_rate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "consolidation_elimination_entry" => db_update.consolidation_elimination_entry.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -16937,9 +17721,18 @@ for table_rows in raw.tables {
                 "proposal_section" => db_update.proposal_section.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_source_doc" => db_update.proposal_source_doc.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_version" => db_update.proposal_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_approval_delegate" => db_update.purchase_approval_delegate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_blanket_order" => db_update.purchase_blanket_order.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_contract" => db_update.purchase_contract.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_order" => db_update.purchase_order.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_order_line" => db_update.purchase_order_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_requisition" => db_update.purchase_requisition.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_return" => db_update.purchase_return.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_return_line" => db_update.purchase_return_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_rfq" => db_update.purchase_rfq.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_rfq_bid" => db_update.purchase_rfq_bid.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_rfq_line" => db_update.purchase_rfq_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchasing_integration_intent" => db_update.purchasing_integration_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "quality_alert" => db_update.quality_alert.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "quality_alert_reason" => db_update.quality_alert_reason.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "quality_check" => db_update.quality_check.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -16956,10 +17749,15 @@ for table_rows in raw.tables {
                 "revenue_recognition_rule" => db_update.revenue_recognition_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "role" => db_update.role.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "sale_commission" => db_update.sale_commission.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "sale_commission_plan" => db_update.sale_commission_plan.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "sale_commission_plan_split" => db_update.sale_commission_plan_split.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "sale_contract" => db_update.sale_contract.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "sale_cpq_constraint" => db_update.sale_cpq_constraint.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "sale_order" => db_update.sale_order.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "sale_order_line" => db_update.sale_order_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "sale_order_option" => db_update.sale_order_option.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "sale_promotion" => db_update.sale_promotion.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "sales_integration_intent" => db_update.sales_integration_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "saved_report" => db_update.saved_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "scheduled_report" => db_update.scheduled_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "scheduled_report_run" => db_update.scheduled_report_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -17007,6 +17805,8 @@ for table_rows in raw.tables {
                 "utm_campaign" => db_update.utm_campaign.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "utm_medium" => db_update.utm_medium.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "utm_source" => db_update.utm_source.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "vendor_risk_flag" => db_update.vendor_risk_flag.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "vendor_scorecard" => db_update.vendor_scorecard.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "warehouse" => db_update.warehouse.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "warehouse_3_d_zone" => db_update.warehouse_3_d_zone.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "warehouse_geo" => db_update.warehouse_geo.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -17091,9 +17891,11 @@ for table_rows in raw.tables {
                 "cartonization_result" => db_update.cartonization_result.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "casbin_rule" => db_update.casbin_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "cash_flow_line" => db_update.cash_flow_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "commodity_price_index" => db_update.commodity_price_index.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "company" => db_update.company.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "company_country_pack" => db_update.company_country_pack.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "company_vertical_pack" => db_update.company_vertical_pack.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "consignment_agreement" => db_update.consignment_agreement.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "consolidation_account" => db_update.consolidation_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "consolidation_company_rate" => db_update.consolidation_company_rate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "consolidation_elimination_entry" => db_update.consolidation_elimination_entry.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -17242,9 +18044,18 @@ for table_rows in raw.tables {
                 "proposal_section" => db_update.proposal_section.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_source_doc" => db_update.proposal_source_doc.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_version" => db_update.proposal_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_approval_delegate" => db_update.purchase_approval_delegate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_blanket_order" => db_update.purchase_blanket_order.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_contract" => db_update.purchase_contract.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_order" => db_update.purchase_order.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_order_line" => db_update.purchase_order_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_requisition" => db_update.purchase_requisition.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_return" => db_update.purchase_return.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_return_line" => db_update.purchase_return_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_rfq" => db_update.purchase_rfq.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_rfq_bid" => db_update.purchase_rfq_bid.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_rfq_line" => db_update.purchase_rfq_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchasing_integration_intent" => db_update.purchasing_integration_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "quality_alert" => db_update.quality_alert.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "quality_alert_reason" => db_update.quality_alert_reason.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "quality_check" => db_update.quality_check.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -17261,10 +18072,15 @@ for table_rows in raw.tables {
                 "revenue_recognition_rule" => db_update.revenue_recognition_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "role" => db_update.role.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "sale_commission" => db_update.sale_commission.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "sale_commission_plan" => db_update.sale_commission_plan.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "sale_commission_plan_split" => db_update.sale_commission_plan_split.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "sale_contract" => db_update.sale_contract.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "sale_cpq_constraint" => db_update.sale_cpq_constraint.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "sale_order" => db_update.sale_order.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "sale_order_line" => db_update.sale_order_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "sale_order_option" => db_update.sale_order_option.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "sale_promotion" => db_update.sale_promotion.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "sales_integration_intent" => db_update.sales_integration_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "saved_report" => db_update.saved_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "scheduled_report" => db_update.scheduled_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "scheduled_report_run" => db_update.scheduled_report_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -17312,6 +18128,8 @@ for table_rows in raw.tables {
                 "utm_campaign" => db_update.utm_campaign.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "utm_medium" => db_update.utm_medium.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "utm_source" => db_update.utm_source.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "vendor_risk_flag" => db_update.vendor_risk_flag.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "vendor_scorecard" => db_update.vendor_scorecard.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "warehouse" => db_update.warehouse.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "warehouse_3_d_zone" => db_update.warehouse_3_d_zone.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "warehouse_geo" => db_update.warehouse_geo.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -17398,9 +18216,11 @@ pub struct AppliedDiff<'r> {
     cartonization_result: __sdk::TableAppliedDiff<'r, CartonizationResult>,
     casbin_rule: __sdk::TableAppliedDiff<'r, CasbinRule>,
     cash_flow_line: __sdk::TableAppliedDiff<'r, CashFlowLine>,
+    commodity_price_index: __sdk::TableAppliedDiff<'r, CommodityPriceIndex>,
     company: __sdk::TableAppliedDiff<'r, Company>,
     company_country_pack: __sdk::TableAppliedDiff<'r, CompanyCountryPack>,
     company_vertical_pack: __sdk::TableAppliedDiff<'r, CompanyVerticalPack>,
+    consignment_agreement: __sdk::TableAppliedDiff<'r, ConsignmentAgreement>,
     consolidation_account: __sdk::TableAppliedDiff<'r, ConsolidationAccount>,
     consolidation_company_rate: __sdk::TableAppliedDiff<'r, ConsolidationCompanyRate>,
     consolidation_elimination_entry: __sdk::TableAppliedDiff<'r, ConsolidationEliminationEntry>,
@@ -17549,9 +18369,18 @@ pub struct AppliedDiff<'r> {
     proposal_section: __sdk::TableAppliedDiff<'r, ProposalSection>,
     proposal_source_doc: __sdk::TableAppliedDiff<'r, ProposalSourceDoc>,
     proposal_version: __sdk::TableAppliedDiff<'r, ProposalVersion>,
+    purchase_approval_delegate: __sdk::TableAppliedDiff<'r, PurchaseApprovalDelegate>,
+    purchase_blanket_order: __sdk::TableAppliedDiff<'r, PurchaseBlanketOrder>,
+    purchase_contract: __sdk::TableAppliedDiff<'r, PurchaseContract>,
     purchase_order: __sdk::TableAppliedDiff<'r, PurchaseOrder>,
     purchase_order_line: __sdk::TableAppliedDiff<'r, PurchaseOrderLine>,
     purchase_requisition: __sdk::TableAppliedDiff<'r, PurchaseRequisition>,
+    purchase_return: __sdk::TableAppliedDiff<'r, PurchaseReturn>,
+    purchase_return_line: __sdk::TableAppliedDiff<'r, PurchaseReturnLine>,
+    purchase_rfq: __sdk::TableAppliedDiff<'r, PurchaseRfq>,
+    purchase_rfq_bid: __sdk::TableAppliedDiff<'r, PurchaseRfqBid>,
+    purchase_rfq_line: __sdk::TableAppliedDiff<'r, PurchaseRfqLine>,
+    purchasing_integration_intent: __sdk::TableAppliedDiff<'r, PurchasingIntegrationIntent>,
     quality_alert: __sdk::TableAppliedDiff<'r, QualityAlert>,
     quality_alert_reason: __sdk::TableAppliedDiff<'r, QualityAlertReason>,
     quality_check: __sdk::TableAppliedDiff<'r, QualityCheck>,
@@ -17568,10 +18397,15 @@ pub struct AppliedDiff<'r> {
     revenue_recognition_rule: __sdk::TableAppliedDiff<'r, RevenueRecognitionRule>,
     role: __sdk::TableAppliedDiff<'r, Role>,
     sale_commission: __sdk::TableAppliedDiff<'r, SaleCommission>,
+    sale_commission_plan: __sdk::TableAppliedDiff<'r, SaleCommissionPlan>,
+    sale_commission_plan_split: __sdk::TableAppliedDiff<'r, SaleCommissionPlanSplit>,
+    sale_contract: __sdk::TableAppliedDiff<'r, SaleContract>,
+    sale_cpq_constraint: __sdk::TableAppliedDiff<'r, SaleCpqConstraint>,
     sale_order: __sdk::TableAppliedDiff<'r, SaleOrder>,
     sale_order_line: __sdk::TableAppliedDiff<'r, SaleOrderLine>,
     sale_order_option: __sdk::TableAppliedDiff<'r, SaleOrderOption>,
     sale_promotion: __sdk::TableAppliedDiff<'r, SalePromotion>,
+    sales_integration_intent: __sdk::TableAppliedDiff<'r, SalesIntegrationIntent>,
     saved_report: __sdk::TableAppliedDiff<'r, SavedReport>,
     scheduled_report: __sdk::TableAppliedDiff<'r, ScheduledReport>,
     scheduled_report_run: __sdk::TableAppliedDiff<'r, ScheduledReportRun>,
@@ -17619,6 +18453,8 @@ pub struct AppliedDiff<'r> {
     utm_campaign: __sdk::TableAppliedDiff<'r, UtmCampaign>,
     utm_medium: __sdk::TableAppliedDiff<'r, UtmMedium>,
     utm_source: __sdk::TableAppliedDiff<'r, UtmSource>,
+    vendor_risk_flag: __sdk::TableAppliedDiff<'r, VendorRiskFlag>,
+    vendor_scorecard: __sdk::TableAppliedDiff<'r, VendorScorecard>,
     warehouse: __sdk::TableAppliedDiff<'r, Warehouse>,
     warehouse_3_d_zone: __sdk::TableAppliedDiff<'r, Warehouse3DZone>,
     warehouse_geo: __sdk::TableAppliedDiff<'r, WarehouseGeo>,
@@ -17706,9 +18542,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<CartonizationResult>("cartonization_result", &self.cartonization_result, event);
         callbacks.invoke_table_row_callbacks::<CasbinRule>("casbin_rule", &self.casbin_rule, event);
         callbacks.invoke_table_row_callbacks::<CashFlowLine>("cash_flow_line", &self.cash_flow_line, event);
+        callbacks.invoke_table_row_callbacks::<CommodityPriceIndex>("commodity_price_index", &self.commodity_price_index, event);
         callbacks.invoke_table_row_callbacks::<Company>("company", &self.company, event);
         callbacks.invoke_table_row_callbacks::<CompanyCountryPack>("company_country_pack", &self.company_country_pack, event);
         callbacks.invoke_table_row_callbacks::<CompanyVerticalPack>("company_vertical_pack", &self.company_vertical_pack, event);
+        callbacks.invoke_table_row_callbacks::<ConsignmentAgreement>("consignment_agreement", &self.consignment_agreement, event);
         callbacks.invoke_table_row_callbacks::<ConsolidationAccount>("consolidation_account", &self.consolidation_account, event);
         callbacks.invoke_table_row_callbacks::<ConsolidationCompanyRate>("consolidation_company_rate", &self.consolidation_company_rate, event);
         callbacks.invoke_table_row_callbacks::<ConsolidationEliminationEntry>("consolidation_elimination_entry", &self.consolidation_elimination_entry, event);
@@ -17857,9 +18695,18 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<ProposalSection>("proposal_section", &self.proposal_section, event);
         callbacks.invoke_table_row_callbacks::<ProposalSourceDoc>("proposal_source_doc", &self.proposal_source_doc, event);
         callbacks.invoke_table_row_callbacks::<ProposalVersion>("proposal_version", &self.proposal_version, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseApprovalDelegate>("purchase_approval_delegate", &self.purchase_approval_delegate, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseBlanketOrder>("purchase_blanket_order", &self.purchase_blanket_order, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseContract>("purchase_contract", &self.purchase_contract, event);
         callbacks.invoke_table_row_callbacks::<PurchaseOrder>("purchase_order", &self.purchase_order, event);
         callbacks.invoke_table_row_callbacks::<PurchaseOrderLine>("purchase_order_line", &self.purchase_order_line, event);
         callbacks.invoke_table_row_callbacks::<PurchaseRequisition>("purchase_requisition", &self.purchase_requisition, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseReturn>("purchase_return", &self.purchase_return, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseReturnLine>("purchase_return_line", &self.purchase_return_line, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseRfq>("purchase_rfq", &self.purchase_rfq, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseRfqBid>("purchase_rfq_bid", &self.purchase_rfq_bid, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseRfqLine>("purchase_rfq_line", &self.purchase_rfq_line, event);
+        callbacks.invoke_table_row_callbacks::<PurchasingIntegrationIntent>("purchasing_integration_intent", &self.purchasing_integration_intent, event);
         callbacks.invoke_table_row_callbacks::<QualityAlert>("quality_alert", &self.quality_alert, event);
         callbacks.invoke_table_row_callbacks::<QualityAlertReason>("quality_alert_reason", &self.quality_alert_reason, event);
         callbacks.invoke_table_row_callbacks::<QualityCheck>("quality_check", &self.quality_check, event);
@@ -17876,10 +18723,15 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<RevenueRecognitionRule>("revenue_recognition_rule", &self.revenue_recognition_rule, event);
         callbacks.invoke_table_row_callbacks::<Role>("role", &self.role, event);
         callbacks.invoke_table_row_callbacks::<SaleCommission>("sale_commission", &self.sale_commission, event);
+        callbacks.invoke_table_row_callbacks::<SaleCommissionPlan>("sale_commission_plan", &self.sale_commission_plan, event);
+        callbacks.invoke_table_row_callbacks::<SaleCommissionPlanSplit>("sale_commission_plan_split", &self.sale_commission_plan_split, event);
+        callbacks.invoke_table_row_callbacks::<SaleContract>("sale_contract", &self.sale_contract, event);
+        callbacks.invoke_table_row_callbacks::<SaleCpqConstraint>("sale_cpq_constraint", &self.sale_cpq_constraint, event);
         callbacks.invoke_table_row_callbacks::<SaleOrder>("sale_order", &self.sale_order, event);
         callbacks.invoke_table_row_callbacks::<SaleOrderLine>("sale_order_line", &self.sale_order_line, event);
         callbacks.invoke_table_row_callbacks::<SaleOrderOption>("sale_order_option", &self.sale_order_option, event);
         callbacks.invoke_table_row_callbacks::<SalePromotion>("sale_promotion", &self.sale_promotion, event);
+        callbacks.invoke_table_row_callbacks::<SalesIntegrationIntent>("sales_integration_intent", &self.sales_integration_intent, event);
         callbacks.invoke_table_row_callbacks::<SavedReport>("saved_report", &self.saved_report, event);
         callbacks.invoke_table_row_callbacks::<ScheduledReport>("scheduled_report", &self.scheduled_report, event);
         callbacks.invoke_table_row_callbacks::<ScheduledReportRun>("scheduled_report_run", &self.scheduled_report_run, event);
@@ -17927,6 +18779,8 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<UtmCampaign>("utm_campaign", &self.utm_campaign, event);
         callbacks.invoke_table_row_callbacks::<UtmMedium>("utm_medium", &self.utm_medium, event);
         callbacks.invoke_table_row_callbacks::<UtmSource>("utm_source", &self.utm_source, event);
+        callbacks.invoke_table_row_callbacks::<VendorRiskFlag>("vendor_risk_flag", &self.vendor_risk_flag, event);
+        callbacks.invoke_table_row_callbacks::<VendorScorecard>("vendor_scorecard", &self.vendor_scorecard, event);
         callbacks.invoke_table_row_callbacks::<Warehouse>("warehouse", &self.warehouse, event);
         callbacks.invoke_table_row_callbacks::<Warehouse3DZone>("warehouse_3_d_zone", &self.warehouse_3_d_zone, event);
         callbacks.invoke_table_row_callbacks::<WarehouseGeo>("warehouse_geo", &self.warehouse_geo, event);
@@ -18645,9 +19499,11 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         cartonization_result_table::register_table(client_cache);
         casbin_rule_table::register_table(client_cache);
         cash_flow_line_table::register_table(client_cache);
+        commodity_price_index_table::register_table(client_cache);
         company_table::register_table(client_cache);
         company_country_pack_table::register_table(client_cache);
         company_vertical_pack_table::register_table(client_cache);
+        consignment_agreement_table::register_table(client_cache);
         consolidation_account_table::register_table(client_cache);
         consolidation_company_rate_table::register_table(client_cache);
         consolidation_elimination_entry_table::register_table(client_cache);
@@ -18796,9 +19652,18 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         proposal_section_table::register_table(client_cache);
         proposal_source_doc_table::register_table(client_cache);
         proposal_version_table::register_table(client_cache);
+        purchase_approval_delegate_table::register_table(client_cache);
+        purchase_blanket_order_table::register_table(client_cache);
+        purchase_contract_table::register_table(client_cache);
         purchase_order_table::register_table(client_cache);
         purchase_order_line_table::register_table(client_cache);
         purchase_requisition_table::register_table(client_cache);
+        purchase_return_table::register_table(client_cache);
+        purchase_return_line_table::register_table(client_cache);
+        purchase_rfq_table::register_table(client_cache);
+        purchase_rfq_bid_table::register_table(client_cache);
+        purchase_rfq_line_table::register_table(client_cache);
+        purchasing_integration_intent_table::register_table(client_cache);
         quality_alert_table::register_table(client_cache);
         quality_alert_reason_table::register_table(client_cache);
         quality_check_table::register_table(client_cache);
@@ -18815,10 +19680,15 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         revenue_recognition_rule_table::register_table(client_cache);
         role_table::register_table(client_cache);
         sale_commission_table::register_table(client_cache);
+        sale_commission_plan_table::register_table(client_cache);
+        sale_commission_plan_split_table::register_table(client_cache);
+        sale_contract_table::register_table(client_cache);
+        sale_cpq_constraint_table::register_table(client_cache);
         sale_order_table::register_table(client_cache);
         sale_order_line_table::register_table(client_cache);
         sale_order_option_table::register_table(client_cache);
         sale_promotion_table::register_table(client_cache);
+        sales_integration_intent_table::register_table(client_cache);
         saved_report_table::register_table(client_cache);
         scheduled_report_table::register_table(client_cache);
         scheduled_report_run_table::register_table(client_cache);
@@ -18866,6 +19736,8 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         utm_campaign_table::register_table(client_cache);
         utm_medium_table::register_table(client_cache);
         utm_source_table::register_table(client_cache);
+        vendor_risk_flag_table::register_table(client_cache);
+        vendor_scorecard_table::register_table(client_cache);
         warehouse_table::register_table(client_cache);
         warehouse_3_d_zone_table::register_table(client_cache);
         warehouse_geo_table::register_table(client_cache);
@@ -18945,9 +19817,11 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "cartonization_result",
         "casbin_rule",
         "cash_flow_line",
+        "commodity_price_index",
         "company",
         "company_country_pack",
         "company_vertical_pack",
+        "consignment_agreement",
         "consolidation_account",
         "consolidation_company_rate",
         "consolidation_elimination_entry",
@@ -19096,9 +19970,18 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "proposal_section",
         "proposal_source_doc",
         "proposal_version",
+        "purchase_approval_delegate",
+        "purchase_blanket_order",
+        "purchase_contract",
         "purchase_order",
         "purchase_order_line",
         "purchase_requisition",
+        "purchase_return",
+        "purchase_return_line",
+        "purchase_rfq",
+        "purchase_rfq_bid",
+        "purchase_rfq_line",
+        "purchasing_integration_intent",
         "quality_alert",
         "quality_alert_reason",
         "quality_check",
@@ -19115,10 +19998,15 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "revenue_recognition_rule",
         "role",
         "sale_commission",
+        "sale_commission_plan",
+        "sale_commission_plan_split",
+        "sale_contract",
+        "sale_cpq_constraint",
         "sale_order",
         "sale_order_line",
         "sale_order_option",
         "sale_promotion",
+        "sales_integration_intent",
         "saved_report",
         "scheduled_report",
         "scheduled_report_run",
@@ -19166,6 +20054,8 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "utm_campaign",
         "utm_medium",
         "utm_source",
+        "vendor_risk_flag",
+        "vendor_scorecard",
         "warehouse",
         "warehouse_3_d_zone",
         "warehouse_geo",

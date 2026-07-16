@@ -250,6 +250,18 @@ fn erp_org_line(
     )?))
 }
 
+/// `extra_where` clause from `erp-org-sql.json` for a map key (includes leading ` AND …`).
+/// Used by HTTP `query_exec` so bounded exception resources match WebSocket SQL.
+pub fn erp_org_extra_where(resource: &str) -> Option<&'static str> {
+    let idx = *ERP_ORG_INDEX.get(resource)?;
+    let extra = ERP_ORG_ROWS[idx].extra_where.as_str();
+    if extra.is_empty() {
+        None
+    } else {
+        Some(extra)
+    }
+}
+
 /// `Ok(None)` when the resource is unknown or required context is missing.
 pub fn subscription_queries_for_resource(
     resource: &str,

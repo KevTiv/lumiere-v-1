@@ -47,6 +47,8 @@ export default __t.row({
   amountUntaxed: __t.f64().name("amount_untaxed"),
   amountTax: __t.f64().name("amount_tax"),
   amountTotal: __t.f64().name("amount_total"),
+  currencyRate: __t.f64().name("currency_rate"),
+  matchQtyTolerance: __t.option(__t.f64()).name("match_qty_tolerance"),
   receiptStatus: __t.string().name("receipt_status"),
   notes: __t.option(__t.string()),
   messageMainAttachmentId: __t.option(__t.u64()).name("message_main_attachment_id"),

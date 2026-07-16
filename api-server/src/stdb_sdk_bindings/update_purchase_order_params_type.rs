@@ -17,6 +17,7 @@ pub struct UpdatePurchaseOrderParams {
     pub incoterm_location: Option<String>,
     pub partner_id: Option<u64>,
     pub currency_id: Option<u64>,
+    pub match_qty_tolerance: Option<f64>,
     pub metadata: Option<String>,
 }
 

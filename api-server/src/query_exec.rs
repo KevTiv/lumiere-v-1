@@ -8,8 +8,8 @@ use serde_json::Value;
 
 use crate::error::ApiError;
 use stdb_auth::{
-    identity_sql_literal, registry_get, resolve_http_sql_columns, select_company_scoped_sql,
-    select_org_scoped_sql, FieldAccessContext,
+    erp_org_extra_where, identity_sql_literal, registry_get, resolve_http_sql_columns,
+    select_company_scoped_sql, select_org_scoped_sql, FieldAccessContext,
 };
 use stdb_client::StdbClient;
 
@@ -938,6 +938,7 @@ pub async fn execute_resource_query(
         "activities" => "",
         "pricelist-items" => "",
         "pos-loyalty-programs" => " ORDER BY id DESC",
+        "sale-commissions" | "sale-commissions-pending" => " ORDER BY id DESC",
         "landed-costs" => " ORDER BY id DESC",
         "landed-cost-lines" => " ORDER BY landed_cost_id ASC, id ASC",
         "contact-tags" => "",
@@ -955,8 +956,17 @@ pub async fn execute_resource_query(
         _ => "",
     };
 
-    let sql = select_org_scoped_sql(resource, &reg.table, organization_id, fa, "", order)
-        .map_err(ApiError::Internal)?;
+    // Bounded exception resources (and any erp-org-sql extraWhere) share SQL with WS subscriptions.
+    let extra_where = erp_org_extra_where(resource).unwrap_or("");
+    let sql = select_org_scoped_sql(
+        resource,
+        &reg.table,
+        organization_id,
+        fa,
+        extra_where,
+        order,
+    )
+    .map_err(ApiError::Internal)?;
 
     let mut rows = client
         .query_sql(&sql)
