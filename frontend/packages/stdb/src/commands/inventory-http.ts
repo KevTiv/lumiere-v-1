@@ -8,6 +8,7 @@ import type { ReducerCommandContractMeta } from "./types";
  * Only real module reducers — no forward-compat phantoms.
  */
 export const INVENTORY_BFF_REDUCERS = [
+  "activate_consignment_agreement",
   "add_member_to_quality_team",
   "add_rule_to_nomenclature",
   "assign_quality_alert",
@@ -28,6 +29,7 @@ export const INVENTORY_BFF_REDUCERS = [
   "create_inventory_adjustment",
   "create_inventory_close",
   "create_inventory_integration_intent",
+  "create_packaging_material",
   "create_picking_wave",
   "create_product",
   "create_product_category",
@@ -73,6 +75,7 @@ export const INVENTORY_BFF_REDUCERS = [
   "delete_warehouse",
   "delete_warehouse_3d_zone",
   "done_stock_move",
+  "execute_cross_dock",
   "execute_replenishment_rule",
   "fail_quality_check",
   "import_lot_csv",
@@ -92,12 +95,14 @@ export const INVENTORY_BFF_REDUCERS = [
   "process_inventory_adjustment",
   "record_barcode_scan",
   "record_cycle_count_line",
+  "receive_consignment_stock",
   "record_inventory_integration_result",
   "remove_member_from_quality_team",
   "remove_rule_from_nomenclature",
   "release_picking_wave",
   "reopen_inventory_close",
   "reserve_serial",
+  "run_cartonization",
   "run_inventory_close",
   "reserve_stock_quant",
   "restore_product_category",

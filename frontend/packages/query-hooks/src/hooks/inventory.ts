@@ -1676,6 +1676,88 @@ export function useRecordInventoryIntegrationResult(organizationId: bigint, comp
   })
 }
 
+// ── Cartonization / consignment / cross-dock ─────────────────────────────────
+
+export function useCreatePackagingMaterial(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = inventoryBffPost("create_packaging_material", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object, "CreatePackagingMaterialParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to create packaging material')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useRunCartonization(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = inventoryBffPost("run_cartonization", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object, "RunCartonizationParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to run cartonization')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useActivateConsignmentAgreement(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (agreementId) => {
+      const { urlPath, init } = inventoryBffPost("activate_consignment_agreement", [
+        organizationId,
+        companyId,
+        toScalarU64(agreementId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to activate consignment agreement')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useReceiveConsignmentStock(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = inventoryBffPost("receive_consignment_stock", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object, "ReceiveConsignmentStockParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to receive consignment stock')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useExecuteCrossDock(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = inventoryBffPost("execute_cross_dock", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object, "ExecuteCrossDockParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to execute cross-dock')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
 // ── Product Category ───────────────────────────────────────────────────────────
 
 export function useCreateProductCategory(organizationId: bigint, companyId?: bigint) {

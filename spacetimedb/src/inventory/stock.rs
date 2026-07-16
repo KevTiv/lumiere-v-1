@@ -535,12 +535,31 @@ pub(crate) fn product_requires_stock(ctx: &ReducerContext, product_id: u64) -> b
         .unwrap_or(true)
 }
 
+/// Company-owned ATP quant (`owner_id` is None). Vendor-consigned stock is excluded.
 fn find_quant_at_location(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
     product_id: u64,
     location_id: u64,
+) -> Option<StockQuant> {
+    find_quant_at_location_with_owner(
+        ctx,
+        organization_id,
+        company_id,
+        product_id,
+        location_id,
+        None,
+    )
+}
+
+fn find_quant_at_location_with_owner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    location_id: u64,
+    owner_id: Option<u64>,
 ) -> Option<StockQuant> {
     ctx.db
         .stock_quant()
@@ -550,6 +569,7 @@ fn find_quant_at_location(
             q.organization_id == organization_id
                 && q.company_id == company_id
                 && q.location_id == location_id
+                && q.owner_id == owner_id
         })
 }
 
@@ -622,6 +642,7 @@ fn find_lot_quant_at_location(
             q.organization_id == organization_id
                 && q.company_id == company_id
                 && q.location_id == location_id
+                && q.owner_id.is_none() // exclude vendor-consigned from general ATP
                 && q.lot_id.is_some()
                 && (q.quantity - q.reserved_quantity) + 1e-9 >= qty
         })
@@ -1328,14 +1349,47 @@ pub(crate) fn increase_quant_at_location(
     qty: f64,
     cost: f64,
 ) -> Result<(), String> {
+    increase_quant_at_location_owned(
+        ctx,
+        organization_id,
+        company_id,
+        product_id,
+        location_id,
+        qty,
+        cost,
+        None,
+    )
+}
+
+/// Increase on-hand at a location, optionally under a vendor owner (consignment).
+pub(crate) fn increase_quant_at_location_owned(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    location_id: u64,
+    qty: f64,
+    cost: f64,
+    owner_id: Option<u64>,
+) -> Result<(), String> {
     if qty <= 0.0 {
         return Ok(());
     }
-    if let Some(quant) =
-        find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
-    {
+    if let Some(quant) = find_quant_at_location_with_owner(
+        ctx,
+        organization_id,
+        company_id,
+        product_id,
+        location_id,
+        owner_id,
+    ) {
         let new_qty = quant.quantity + qty;
-        let available_quantity = new_qty - quant.reserved_quantity;
+        let available_quantity = if owner_id.is_some() {
+            // Consigned stock is not company ATP.
+            0.0
+        } else {
+            new_qty - quant.reserved_quantity
+        };
         ctx.db.stock_quant().id().update(StockQuant {
             quantity: new_qty,
             available_quantity,
@@ -1343,6 +1397,7 @@ pub(crate) fn increase_quant_at_location(
             ..quant
         });
     } else {
+        let available_quantity = if owner_id.is_some() { 0.0 } else { qty };
         ctx.db.stock_quant().insert(StockQuant {
             id: 0,
             organization_id,
@@ -1351,11 +1406,11 @@ pub(crate) fn increase_quant_at_location(
             location_id,
             lot_id: None,
             package_id: None,
-            owner_id: None,
+            owner_id,
             company_id,
             quantity: qty,
             reserved_quantity: 0.0,
-            available_quantity: qty,
+            available_quantity,
             in_date: Some(ctx.timestamp),
             inventory_quantity: qty,
             inventory_diff_quantity: 0.0,
@@ -1369,7 +1424,11 @@ pub(crate) fn increase_quant_at_location(
             accounting_date: None,
             currency_id: None,
             accounting_entry_ids: vec![],
-            metadata: None,
+            metadata: if owner_id.is_some() {
+                Some(r#"{"consignment":true}"#.to_string())
+            } else {
+                None
+            },
         });
     }
     Ok(())

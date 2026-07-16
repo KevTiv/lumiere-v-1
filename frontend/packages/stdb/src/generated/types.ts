@@ -4330,6 +4330,23 @@ export const CreateOrganizationParams = __t.object("CreateOrganizationParams", {
 });
 export type CreateOrganizationParams = __Infer<typeof CreateOrganizationParams>;
 
+export const CreatePackagingMaterialParams = __t.object("CreatePackagingMaterialParams", {
+  name: __t.string(),
+  materialType: __t.string(),
+  weight: __t.f64(),
+  maxWeight: __t.f64(),
+  length: __t.f64(),
+  width: __t.f64(),
+  height: __t.f64(),
+  volume: __t.f64(),
+  cost: __t.f64(),
+  currencyId: __t.u64(),
+  barcode: __t.option(__t.string()),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreatePackagingMaterialParams = __Infer<typeof CreatePackagingMaterialParams>;
+
 export const CreatePartnerBankParams = __t.object("CreatePartnerBankParams", {
   partnerId: __t.u64(),
   accNumber: __t.string(),
@@ -6614,6 +6631,16 @@ export const ErrorIntercompanyTransactionParams = __t.object("ErrorIntercompanyT
   errorMessage: __t.string(),
 });
 export type ErrorIntercompanyTransactionParams = __Infer<typeof ErrorIntercompanyTransactionParams>;
+
+export const ExecuteCrossDockParams = __t.object("ExecuteCrossDockParams", {
+  inboundPickingId: __t.u64(),
+  productId: __t.u64(),
+  quantity: __t.f64(),
+  partnerId: __t.u64(),
+  locationDestId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type ExecuteCrossDockParams = __Infer<typeof ExecuteCrossDockParams>;
 
 // The tagged union or sum type for the algebraic type `ExpenseSheetState`.
 export const ExpenseSheetState = __t.enum("ExpenseSheetState", {
@@ -10362,6 +10389,15 @@ export const QueueWorker = __t.object("QueueWorker", {
 });
 export type QueueWorker = __Infer<typeof QueueWorker>;
 
+export const ReceiveConsignmentStockParams = __t.object("ReceiveConsignmentStockParams", {
+  agreementId: __t.u64(),
+  locationId: __t.option(__t.u64()),
+  quantity: __t.f64(),
+  cost: __t.f64(),
+  metadata: __t.option(__t.string()),
+});
+export type ReceiveConsignmentStockParams = __Infer<typeof ReceiveConsignmentStockParams>;
+
 export const RecognizeAmortizationLineParams = __t.object("RecognizeAmortizationLineParams", {
   reference: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
@@ -10741,6 +10777,13 @@ export const RuleType = __t.enum("RuleType", {
   Transfer: __t.unit(),
 });
 export type RuleType = __Infer<typeof RuleType>;
+
+export const RunCartonizationParams = __t.object("RunCartonizationParams", {
+  pickingId: __t.u64(),
+  packagingMaterialId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type RunCartonizationParams = __Infer<typeof RunCartonizationParams>;
 
 export const RunFxRevaluationBatchParams = __t.object("RunFxRevaluationBatchParams", {
   currencyCode: __t.string(),

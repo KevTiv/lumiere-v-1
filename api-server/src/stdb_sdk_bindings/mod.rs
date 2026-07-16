@@ -266,6 +266,7 @@ pub mod create_opportunity_line_params_type;
 pub mod create_opportunity_params_type;
 pub mod create_opportunity_stage_params_type;
 pub mod create_organization_params_type;
+pub mod create_packaging_material_params_type;
 pub mod create_partner_bank_params_type;
 pub mod create_payment_account_params_type;
 pub mod create_payment_fee_params_type;
@@ -396,6 +397,7 @@ pub mod employment_type_type;
 pub mod end_contact_role_params_type;
 pub mod enqueue_job_params_type;
 pub mod error_intercompany_transaction_params_type;
+pub mod execute_cross_dock_params_type;
 pub mod expense_sheet_state_type;
 pub mod expense_state_type;
 pub mod export_financial_report_params_type;
@@ -593,6 +595,7 @@ pub mod quality_team_type;
 pub mod queue_job_type;
 pub mod queue_mail_from_template_params_type;
 pub mod queue_worker_type;
+pub mod receive_consignment_stock_params_type;
 pub mod recognize_amortization_line_params_type;
 pub mod recognize_deferred_revenue_params_type;
 pub mod reconcile_account_bank_statement_line_params_type;
@@ -626,6 +629,7 @@ pub mod reverse_payment_transaction_params_type;
 pub mod review_message_batch_params_type;
 pub mod role_type;
 pub mod rule_type_type;
+pub mod run_cartonization_params_type;
 pub mod run_fx_revaluation_batch_params_type;
 pub mod run_fx_revaluation_params_type;
 pub mod sale_commission_type;
@@ -872,6 +876,7 @@ pub mod accept_sale_order_quotation_reducer;
 pub mod accrue_sale_commission_reducer;
 pub mod acknowledge_insight_reducer;
 pub mod acknowledge_iot_action_reducer;
+pub mod activate_consignment_agreement_reducer;
 pub mod activate_pos_config_reducer;
 pub mod activate_revenue_recognition_rule_reducer;
 pub mod activate_subscription_reducer;
@@ -1119,6 +1124,7 @@ pub mod create_opportunity_reducer;
 pub mod create_opportunity_line_reducer;
 pub mod create_opportunity_stage_reducer;
 pub mod create_organization_reducer;
+pub mod create_packaging_material_reducer;
 pub mod create_partner_bank_reducer;
 pub mod create_password_reset_token_reducer;
 pub mod create_payment_reducer;
@@ -1286,6 +1292,7 @@ pub mod enqueue_job_reducer;
 pub mod ensure_dev_admin_reducer;
 pub mod error_intercompany_transaction_reducer;
 pub mod evaluate_dynamic_segment_reducer;
+pub mod execute_cross_dock_reducer;
 pub mod execute_replenishment_rule_reducer;
 pub mod execute_retention_purge_reducer;
 pub mod expire_ai_action_drafts_reducer;
@@ -1417,6 +1424,7 @@ pub mod process_pending_scans_reducer;
 pub mod produce_manufacturing_order_reducer;
 pub mod promote_ai_skill_version_reducer;
 pub mod queue_mail_from_template_reducer;
+pub mod receive_consignment_stock_reducer;
 pub mod receive_po_line_reducer;
 pub mod recognize_amortization_line_reducer;
 pub mod recognize_deferred_revenue_reducer;
@@ -1502,6 +1510,7 @@ pub mod run_all_inventory_tests_reducer;
 pub mod run_all_platform_tests_reducer;
 pub mod run_all_purchasing_tests_reducer;
 pub mod run_all_sales_tests_reducer;
+pub mod run_cartonization_reducer;
 pub mod run_core_operational_messaging_test_reducer;
 pub mod run_core_sod_test_reducer;
 pub mod run_country_pack_test_reducer;
@@ -1519,9 +1528,12 @@ pub mod run_hr_leave_type_test_reducer;
 pub mod run_inventory_3_pl_asn_test_reducer;
 pub mod run_inventory_adjustment_test_reducer;
 pub mod run_inventory_atp_fail_closed_test_reducer;
+pub mod run_inventory_cartonization_test_reducer;
 pub mod run_inventory_close_reducer;
 pub mod run_inventory_close_lock_test_reducer;
 pub mod run_inventory_company_isolation_test_reducer;
+pub mod run_inventory_consignment_atp_test_reducer;
+pub mod run_inventory_cross_dock_test_reducer;
 pub mod run_inventory_delivery_quant_test_reducer;
 pub mod run_inventory_expired_lot_test_reducer;
 pub mod run_inventory_fefo_test_reducer;
@@ -2373,6 +2385,7 @@ pub use create_opportunity_line_params_type::CreateOpportunityLineParams;
 pub use create_opportunity_params_type::CreateOpportunityParams;
 pub use create_opportunity_stage_params_type::CreateOpportunityStageParams;
 pub use create_organization_params_type::CreateOrganizationParams;
+pub use create_packaging_material_params_type::CreatePackagingMaterialParams;
 pub use create_partner_bank_params_type::CreatePartnerBankParams;
 pub use create_payment_account_params_type::CreatePaymentAccountParams;
 pub use create_payment_fee_params_type::CreatePaymentFeeParams;
@@ -2503,6 +2516,7 @@ pub use employment_type_type::EmploymentType;
 pub use end_contact_role_params_type::EndContactRoleParams;
 pub use enqueue_job_params_type::EnqueueJobParams;
 pub use error_intercompany_transaction_params_type::ErrorIntercompanyTransactionParams;
+pub use execute_cross_dock_params_type::ExecuteCrossDockParams;
 pub use expense_sheet_state_type::ExpenseSheetState;
 pub use expense_state_type::ExpenseState;
 pub use export_financial_report_params_type::ExportFinancialReportParams;
@@ -2700,6 +2714,7 @@ pub use quality_team_type::QualityTeam;
 pub use queue_job_type::QueueJob;
 pub use queue_mail_from_template_params_type::QueueMailFromTemplateParams;
 pub use queue_worker_type::QueueWorker;
+pub use receive_consignment_stock_params_type::ReceiveConsignmentStockParams;
 pub use recognize_amortization_line_params_type::RecognizeAmortizationLineParams;
 pub use recognize_deferred_revenue_params_type::RecognizeDeferredRevenueParams;
 pub use reconcile_account_bank_statement_line_params_type::ReconcileAccountBankStatementLineParams;
@@ -2733,6 +2748,7 @@ pub use reverse_payment_transaction_params_type::ReversePaymentTransactionParams
 pub use review_message_batch_params_type::ReviewMessageBatchParams;
 pub use role_type::Role;
 pub use rule_type_type::RuleType;
+pub use run_cartonization_params_type::RunCartonizationParams;
 pub use run_fx_revaluation_batch_params_type::RunFxRevaluationBatchParams;
 pub use run_fx_revaluation_params_type::RunFxRevaluationParams;
 pub use sale_commission_type::SaleCommission;
@@ -3298,6 +3314,7 @@ pub use accept_sale_order_quotation_reducer::accept_sale_order_quotation;
 pub use accrue_sale_commission_reducer::accrue_sale_commission;
 pub use acknowledge_insight_reducer::acknowledge_insight;
 pub use acknowledge_iot_action_reducer::acknowledge_iot_action;
+pub use activate_consignment_agreement_reducer::activate_consignment_agreement;
 pub use activate_pos_config_reducer::activate_pos_config;
 pub use activate_revenue_recognition_rule_reducer::activate_revenue_recognition_rule;
 pub use activate_subscription_reducer::activate_subscription;
@@ -3545,6 +3562,7 @@ pub use create_opportunity_reducer::create_opportunity;
 pub use create_opportunity_line_reducer::create_opportunity_line;
 pub use create_opportunity_stage_reducer::create_opportunity_stage;
 pub use create_organization_reducer::create_organization;
+pub use create_packaging_material_reducer::create_packaging_material;
 pub use create_partner_bank_reducer::create_partner_bank;
 pub use create_password_reset_token_reducer::create_password_reset_token;
 pub use create_payment_reducer::create_payment;
@@ -3712,6 +3730,7 @@ pub use enqueue_job_reducer::enqueue_job;
 pub use ensure_dev_admin_reducer::ensure_dev_admin;
 pub use error_intercompany_transaction_reducer::error_intercompany_transaction;
 pub use evaluate_dynamic_segment_reducer::evaluate_dynamic_segment;
+pub use execute_cross_dock_reducer::execute_cross_dock;
 pub use execute_replenishment_rule_reducer::execute_replenishment_rule;
 pub use execute_retention_purge_reducer::execute_retention_purge;
 pub use expire_ai_action_drafts_reducer::expire_ai_action_drafts;
@@ -3843,6 +3862,7 @@ pub use process_pending_scans_reducer::process_pending_scans;
 pub use produce_manufacturing_order_reducer::produce_manufacturing_order;
 pub use promote_ai_skill_version_reducer::promote_ai_skill_version;
 pub use queue_mail_from_template_reducer::queue_mail_from_template;
+pub use receive_consignment_stock_reducer::receive_consignment_stock;
 pub use receive_po_line_reducer::receive_po_line;
 pub use recognize_amortization_line_reducer::recognize_amortization_line;
 pub use recognize_deferred_revenue_reducer::recognize_deferred_revenue;
@@ -3928,6 +3948,7 @@ pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_platform_tests_reducer::run_all_platform_tests;
 pub use run_all_purchasing_tests_reducer::run_all_purchasing_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
+pub use run_cartonization_reducer::run_cartonization;
 pub use run_core_operational_messaging_test_reducer::run_core_operational_messaging_test;
 pub use run_core_sod_test_reducer::run_core_sod_test;
 pub use run_country_pack_test_reducer::run_country_pack_test;
@@ -3945,9 +3966,12 @@ pub use run_hr_leave_type_test_reducer::run_hr_leave_type_test;
 pub use run_inventory_3_pl_asn_test_reducer::run_inventory_3_pl_asn_test;
 pub use run_inventory_adjustment_test_reducer::run_inventory_adjustment_test;
 pub use run_inventory_atp_fail_closed_test_reducer::run_inventory_atp_fail_closed_test;
+pub use run_inventory_cartonization_test_reducer::run_inventory_cartonization_test;
 pub use run_inventory_close_reducer::run_inventory_close;
 pub use run_inventory_close_lock_test_reducer::run_inventory_close_lock_test;
 pub use run_inventory_company_isolation_test_reducer::run_inventory_company_isolation_test;
+pub use run_inventory_consignment_atp_test_reducer::run_inventory_consignment_atp_test;
+pub use run_inventory_cross_dock_test_reducer::run_inventory_cross_dock_test;
 pub use run_inventory_delivery_quant_test_reducer::run_inventory_delivery_quant_test;
 pub use run_inventory_expired_lot_test_reducer::run_inventory_expired_lot_test;
 pub use run_inventory_fefo_test_reducer::run_inventory_fefo_test;
@@ -4253,6 +4277,11 @@ pub enum Reducer {
         organization_id: u64,
         action_id: u64,
         result_payload: Option::<String>,
+}    ,
+    ActivateConsignmentAgreement {
+        organization_id: u64,
+        company_id: u64,
+        agreement_id: u64,
 }    ,
     ActivatePosConfig {
         organization_id: u64,
@@ -5420,6 +5449,11 @@ pub enum Reducer {
     CreateOrganization {
         params: CreateOrganizationParams,
 }    ,
+    CreatePackagingMaterial {
+        organization_id: u64,
+        company_id: u64,
+        params: CreatePackagingMaterialParams,
+}    ,
     CreatePartnerBank {
         organization_id: u64,
         params: CreatePartnerBankParams,
@@ -6158,6 +6192,11 @@ pub enum Reducer {
         organization_id: u64,
         segment_id: u64,
 }    ,
+    ExecuteCrossDock {
+        organization_id: u64,
+        company_id: u64,
+        params: ExecuteCrossDockParams,
+}    ,
     ExecuteReplenishmentRule {
         organization_id: u64,
         company_id: u64,
@@ -6758,6 +6797,11 @@ pub enum Reducer {
         company_id: u64,
         params: QueueMailFromTemplateParams,
 }    ,
+    ReceiveConsignmentStock {
+        organization_id: u64,
+        company_id: u64,
+        params: ReceiveConsignmentStockParams,
+}    ,
     ReceivePoLine {
         organization_id: u64,
         line_id: u64,
@@ -7095,6 +7139,11 @@ pub enum Reducer {
     RunAllPlatformTests ,
     RunAllPurchasingTests ,
     RunAllSalesTests ,
+    RunCartonization {
+        organization_id: u64,
+        company_id: u64,
+        params: RunCartonizationParams,
+}    ,
     RunCoreOperationalMessagingTest ,
     RunCoreSodTest ,
     RunCountryPackTest ,
@@ -7120,6 +7169,7 @@ pub enum Reducer {
     RunInventory3PlAsnTest ,
     RunInventoryAdjustmentTest ,
     RunInventoryAtpFailClosedTest ,
+    RunInventoryCartonizationTest ,
     RunInventoryClose {
         organization_id: u64,
         company_id: u64,
@@ -7127,6 +7177,8 @@ pub enum Reducer {
 }    ,
     RunInventoryCloseLockTest ,
     RunInventoryCompanyIsolationTest ,
+    RunInventoryConsignmentAtpTest ,
+    RunInventoryCrossDockTest ,
     RunInventoryDeliveryQuantTest ,
     RunInventoryExpiredLotTest ,
     RunInventoryFefoTest ,
@@ -8373,6 +8425,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AccrueSaleCommission { .. } => "accrue_sale_commission",
             Reducer::AcknowledgeInsight { .. } => "acknowledge_insight",
             Reducer::AcknowledgeIotAction { .. } => "acknowledge_iot_action",
+            Reducer::ActivateConsignmentAgreement { .. } => "activate_consignment_agreement",
             Reducer::ActivatePosConfig { .. } => "activate_pos_config",
             Reducer::ActivateRevenueRecognitionRule { .. } => "activate_revenue_recognition_rule",
             Reducer::ActivateSubscription { .. } => "activate_subscription",
@@ -8620,6 +8673,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateOpportunityLine { .. } => "create_opportunity_line",
             Reducer::CreateOpportunityStage { .. } => "create_opportunity_stage",
             Reducer::CreateOrganization { .. } => "create_organization",
+            Reducer::CreatePackagingMaterial { .. } => "create_packaging_material",
             Reducer::CreatePartnerBank { .. } => "create_partner_bank",
             Reducer::CreatePasswordResetToken { .. } => "create_password_reset_token",
             Reducer::CreatePayment { .. } => "create_payment",
@@ -8787,6 +8841,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::EnsureDevAdmin => "ensure_dev_admin",
             Reducer::ErrorIntercompanyTransaction { .. } => "error_intercompany_transaction",
             Reducer::EvaluateDynamicSegment { .. } => "evaluate_dynamic_segment",
+            Reducer::ExecuteCrossDock { .. } => "execute_cross_dock",
             Reducer::ExecuteReplenishmentRule { .. } => "execute_replenishment_rule",
             Reducer::ExecuteRetentionPurge { .. } => "execute_retention_purge",
             Reducer::ExpireAiActionDrafts { .. } => "expire_ai_action_drafts",
@@ -8918,6 +8973,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ProduceManufacturingOrder { .. } => "produce_manufacturing_order",
             Reducer::PromoteAiSkillVersion { .. } => "promote_ai_skill_version",
             Reducer::QueueMailFromTemplate { .. } => "queue_mail_from_template",
+            Reducer::ReceiveConsignmentStock { .. } => "receive_consignment_stock",
             Reducer::ReceivePoLine { .. } => "receive_po_line",
             Reducer::RecognizeAmortizationLine { .. } => "recognize_amortization_line",
             Reducer::RecognizeDeferredRevenue { .. } => "recognize_deferred_revenue",
@@ -9003,6 +9059,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllPlatformTests => "run_all_platform_tests",
             Reducer::RunAllPurchasingTests => "run_all_purchasing_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
+            Reducer::RunCartonization { .. } => "run_cartonization",
             Reducer::RunCoreOperationalMessagingTest => "run_core_operational_messaging_test",
             Reducer::RunCoreSodTest => "run_core_sod_test",
             Reducer::RunCountryPackTest => "run_country_pack_test",
@@ -9020,9 +9077,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventory3PlAsnTest => "run_inventory_3_pl_asn_test",
             Reducer::RunInventoryAdjustmentTest => "run_inventory_adjustment_test",
             Reducer::RunInventoryAtpFailClosedTest => "run_inventory_atp_fail_closed_test",
+            Reducer::RunInventoryCartonizationTest => "run_inventory_cartonization_test",
             Reducer::RunInventoryClose { .. } => "run_inventory_close",
             Reducer::RunInventoryCloseLockTest => "run_inventory_close_lock_test",
             Reducer::RunInventoryCompanyIsolationTest => "run_inventory_company_isolation_test",
+            Reducer::RunInventoryConsignmentAtpTest => "run_inventory_consignment_atp_test",
+            Reducer::RunInventoryCrossDockTest => "run_inventory_cross_dock_test",
             Reducer::RunInventoryDeliveryQuantTest => "run_inventory_delivery_quant_test",
             Reducer::RunInventoryExpiredLotTest => "run_inventory_expired_lot_test",
             Reducer::RunInventoryFefoTest => "run_inventory_fefo_test",
@@ -9342,6 +9402,15 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 organization_id: organization_id.clone(),
                 action_id: action_id.clone(),
                 result_payload: result_payload.clone(),
+}),
+            Reducer::ActivateConsignmentAgreement{
+                organization_id,
+                company_id,
+                agreement_id,
+}             => __sats::bsatn::to_vec(&activate_consignment_agreement_reducer::ActivateConsignmentAgreementArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                agreement_id: agreement_id.clone(),
 }),
             Reducer::ActivatePosConfig{
                 organization_id,
@@ -11430,6 +11499,15 @@ Reducer::BillTimesheets{
 }             => __sats::bsatn::to_vec(&create_organization_reducer::CreateOrganizationArgs {
                 params: params.clone(),
 }),
+            Reducer::CreatePackagingMaterial{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_packaging_material_reducer::CreatePackagingMaterialArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreatePartnerBank{
                 organization_id,
                 params,
@@ -12741,6 +12819,15 @@ Reducer::ErrorIntercompanyTransaction{
                 organization_id: organization_id.clone(),
                 segment_id: segment_id.clone(),
 }),
+            Reducer::ExecuteCrossDock{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&execute_cross_dock_reducer::ExecuteCrossDockArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ExecuteReplenishmentRule{
                 organization_id,
                 company_id,
@@ -13811,6 +13898,15 @@ Reducer::MoveStockQuant{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::ReceiveConsignmentStock{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&receive_consignment_stock_reducer::ReceiveConsignmentStockArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ReceivePoLine{
                 organization_id,
                 line_id,
@@ -14418,7 +14514,16 @@ Reducer::RunAllPurchasingTests => __sats::bsatn::to_vec(&run_all_purchasing_test
                 }),
 Reducer::RunAllSalesTests => __sats::bsatn::to_vec(&run_all_sales_tests_reducer::RunAllSalesTestsArgs {
                 }),
-Reducer::RunCoreOperationalMessagingTest => __sats::bsatn::to_vec(&run_core_operational_messaging_test_reducer::RunCoreOperationalMessagingTestArgs {
+Reducer::RunCartonization{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&run_cartonization_reducer::RunCartonizationArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RunCoreOperationalMessagingTest => __sats::bsatn::to_vec(&run_core_operational_messaging_test_reducer::RunCoreOperationalMessagingTestArgs {
                 }),
 Reducer::RunCoreSodTest => __sats::bsatn::to_vec(&run_core_sod_test_reducer::RunCoreSodTestArgs {
                 }),
@@ -14466,6 +14571,8 @@ Reducer::RunInventoryAdjustmentTest => __sats::bsatn::to_vec(&run_inventory_adju
                 }),
 Reducer::RunInventoryAtpFailClosedTest => __sats::bsatn::to_vec(&run_inventory_atp_fail_closed_test_reducer::RunInventoryAtpFailClosedTestArgs {
                 }),
+Reducer::RunInventoryCartonizationTest => __sats::bsatn::to_vec(&run_inventory_cartonization_test_reducer::RunInventoryCartonizationTestArgs {
+                }),
 Reducer::RunInventoryClose{
                 organization_id,
                 company_id,
@@ -14478,6 +14585,10 @@ Reducer::RunInventoryClose{
             Reducer::RunInventoryCloseLockTest => __sats::bsatn::to_vec(&run_inventory_close_lock_test_reducer::RunInventoryCloseLockTestArgs {
                 }),
 Reducer::RunInventoryCompanyIsolationTest => __sats::bsatn::to_vec(&run_inventory_company_isolation_test_reducer::RunInventoryCompanyIsolationTestArgs {
+                }),
+Reducer::RunInventoryConsignmentAtpTest => __sats::bsatn::to_vec(&run_inventory_consignment_atp_test_reducer::RunInventoryConsignmentAtpTestArgs {
+                }),
+Reducer::RunInventoryCrossDockTest => __sats::bsatn::to_vec(&run_inventory_cross_dock_test_reducer::RunInventoryCrossDockTestArgs {
                 }),
 Reducer::RunInventoryDeliveryQuantTest => __sats::bsatn::to_vec(&run_inventory_delivery_quant_test_reducer::RunInventoryDeliveryQuantTestArgs {
                 }),

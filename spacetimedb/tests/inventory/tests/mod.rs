@@ -33,6 +33,9 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_uom_conversion_test(ctx)?;
     run_inventory_close_lock_test(ctx)?;
     run_inventory_3pl_asn_test(ctx)?;
+    run_inventory_cartonization_test(ctx)?;
+    run_inventory_consignment_atp_test(ctx)?;
+    run_inventory_cross_dock_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -155,4 +158,20 @@ pub fn run_inventory_close_lock_test(ctx: &ReducerContext) -> Result<(), String>
 #[spacetimedb::reducer]
 pub fn run_inventory_3pl_asn_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_3pl_asn_inbound_posts_stock(ctx).map_err(|e| format!("3pl_asn: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_cartonization_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_cartonization_packs_moves(ctx).map_err(|e| format!("cartonization: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_consignment_atp_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_consignment_excluded_from_atp(ctx)
+        .map_err(|e| format!("consignment_atp: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_cross_dock_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_cross_dock_creates_outbound(ctx).map_err(|e| format!("cross_dock: {e}"))
 }

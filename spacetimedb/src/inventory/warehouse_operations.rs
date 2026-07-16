@@ -9,8 +9,10 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::CompanyScopeParams;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::inventory_close::assert_inventory_writable;
+use crate::inventory::product::product;
 use crate::inventory::stock::{
-    assign_stock_picking, confirm_stock_picking, stock_move, stock_picking,
+    assign_stock_picking, confirm_stock_picking, stock_move, stock_picking, StockMove,
 };
 use serde_json;
 
@@ -183,6 +185,41 @@ pub struct CreateWarehouseTaskParams {
     pub duration_real: Option<f64>,
     pub notes: Option<String>,
     pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreatePackagingMaterialParams {
+    pub name: String,
+    pub material_type: String,
+    pub weight: f64,
+    pub max_weight: f64,
+    pub length: f64,
+    pub width: f64,
+    pub height: f64,
+    pub volume: f64,
+    pub cost: f64,
+    pub currency_id: u64,
+    pub barcode: Option<String>,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RunCartonizationParams {
+    pub picking_id: u64,
+    /// Prefer this material; otherwise choose smallest fit by volume.
+    pub packaging_material_id: Option<u64>,
+    pub metadata: Option<String>,
+}
+
+struct CartonLine {
+    move_id: u64,
+    #[allow(dead_code)]
+    product_id: u64,
+    #[allow(dead_code)]
+    qty: f64,
+    volume: f64,
+    weight: f64,
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -625,5 +662,272 @@ pub fn update_warehouse_task_status(
         },
     );
 
+    Ok(())
+}
+
+#[reducer]
+pub fn create_packaging_material(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: CreatePackagingMaterialParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "warehouse_task", "create")?;
+    let _ = company_id;
+    if params.name.trim().is_empty() {
+        return Err("Packaging material name cannot be empty".to_string());
+    }
+    if params.volume <= 0.0 && params.max_weight <= 0.0 {
+        return Err("Packaging material needs positive volume or max_weight".to_string());
+    }
+    let row = ctx.db.packaging_material().insert(PackagingMaterial {
+        id: 0,
+        organization_id,
+        name: params.name.clone(),
+        material_type: params.material_type.clone(),
+        weight: params.weight,
+        max_weight: params.max_weight,
+        length: params.length,
+        width: params.width,
+        height: params.height,
+        volume: params.volume,
+        cost: params.cost,
+        currency_id: params.currency_id,
+        barcode: params.barcode,
+        is_active: params.is_active,
+        created_at: ctx.timestamp,
+        metadata: params.metadata,
+    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "packaging_material",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": row.name,
+                    "volume": row.volume,
+                    "max_weight": row.max_weight,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+/// Greedy first-fit decreasing cartonization for a picking's open moves.
+#[reducer]
+pub fn run_cartonization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: RunCartonizationParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "warehouse_task", "create")?;
+    assert_inventory_writable(ctx, organization_id, company_id)?;
+
+    let picking = ctx
+        .db
+        .stock_picking()
+        .id()
+        .find(&params.picking_id)
+        .ok_or("Picking not found")?;
+    if picking.organization_id != organization_id || picking.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+
+    let mut lines: Vec<CartonLine> = Vec::new();
+    for mv in ctx
+        .db
+        .stock_move()
+        .move_by_picking()
+        .filter(&params.picking_id)
+    {
+        if mv.state == "done" || mv.state == "cancel" {
+            continue;
+        }
+        let prod = ctx
+            .db
+            .product()
+            .id()
+            .find(&mv.product_id)
+            .ok_or_else(|| format!("Product {} not found", mv.product_id))?;
+        let qty = mv.product_qty.max(mv.product_uom_qty).max(0.0);
+        if qty <= 0.0 {
+            continue;
+        }
+        let unit_vol = if prod.volume > 0.0 { prod.volume } else { 1.0 };
+        let unit_wt = if prod.weight > 0.0 { prod.weight } else { 0.1 };
+        lines.push(CartonLine {
+            move_id: mv.id,
+            product_id: mv.product_id,
+            qty,
+            volume: unit_vol * qty,
+            weight: unit_wt * qty,
+        });
+    }
+    if lines.is_empty() {
+        return Err("Picking has no open moves to cartonize".to_string());
+    }
+    lines.sort_by(|a, b| {
+        b.volume
+            .partial_cmp(&a.volume)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut materials: Vec<_> = ctx
+        .db
+        .packaging_material()
+        .material_by_org()
+        .filter(&organization_id)
+        .filter(|m| m.is_active)
+        .collect();
+    if materials.is_empty() {
+        return Err("No active packaging materials — create_packaging_material first".to_string());
+    }
+    if let Some(pref) = params.packaging_material_id {
+        materials.sort_by_key(|m| if m.id == pref { 0u8 } else { 1u8 });
+    } else {
+        materials.sort_by(|a, b| {
+            a.volume
+                .partial_cmp(&b.volume)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+
+    struct OpenCarton {
+        material_id: u64,
+        max_volume: f64,
+        max_weight: f64,
+        used_volume: f64,
+        used_weight: f64,
+        move_ids: Vec<u64>,
+        item_count: i32,
+    }
+
+    let mut cartons: Vec<OpenCarton> = Vec::new();
+
+    for line in &lines {
+        let mut placed = false;
+        for carton in &mut cartons {
+            let vol_ok = carton.max_volume <= 0.0
+                || carton.used_volume + line.volume <= carton.max_volume + 1e-9;
+            let wt_ok = carton.max_weight <= 0.0
+                || carton.used_weight + line.weight <= carton.max_weight + 1e-9;
+            if vol_ok && wt_ok {
+                carton.used_volume += line.volume;
+                carton.used_weight += line.weight;
+                carton.move_ids.push(line.move_id);
+                carton.item_count += 1;
+                placed = true;
+                break;
+            }
+        }
+        if placed {
+            continue;
+        }
+
+        let material = materials
+            .iter()
+            .find(|m| {
+                (m.volume <= 0.0 || line.volume <= m.volume + 1e-9)
+                    && (m.max_weight <= 0.0 || line.weight <= m.max_weight + 1e-9)
+            })
+            .ok_or_else(|| {
+                format!(
+                    "No packaging material fits move {} (vol {}, wt {})",
+                    line.move_id, line.volume, line.weight
+                )
+            })?;
+        cartons.push(OpenCarton {
+            material_id: material.id,
+            max_volume: material.volume,
+            max_weight: material.max_weight,
+            used_volume: line.volume,
+            used_weight: line.weight,
+            move_ids: vec![line.move_id],
+            item_count: 1,
+        });
+    }
+
+    let mut results_created = 0u32;
+    for (idx, carton) in cartons.iter().enumerate() {
+        let util = if carton.max_volume > 0.0 {
+            (carton.used_volume / carton.max_volume) * 100.0
+        } else if carton.max_weight > 0.0 {
+            (carton.used_weight / carton.max_weight) * 100.0
+        } else {
+            0.0
+        };
+        // Stable package key until a real package table exists.
+        let package_id = params.picking_id.saturating_mul(1000).saturating_add(idx as u64 + 1);
+        let row = ctx.db.cartonization_result().insert(CartonizationResult {
+            id: 0,
+            organization_id,
+            package_id,
+            packaging_material_id: carton.material_id,
+            total_items: carton.item_count,
+            total_volume: carton.used_volume,
+            total_weight: carton.used_weight,
+            utilization_percentage: util,
+            move_line_ids: carton.move_ids.clone(),
+            is_optimal: false,
+            algorithm_used: "first_fit_decreasing".to_string(),
+            created_at: ctx.timestamp,
+            metadata: Some(
+                serde_json::json!({
+                    "picking_id": params.picking_id,
+                    "company_id": company_id,
+                    "carton_index": idx + 1,
+                })
+                .to_string(),
+            ),
+        });
+        results_created += 1;
+
+        for &move_id in &carton.move_ids {
+            if let Some(mv) = ctx.db.stock_move().id().find(&move_id) {
+                ctx.db.stock_move().id().update(StockMove {
+                    result_package_id: Some(package_id),
+                    write_uid: ctx.sender(),
+                    write_date: ctx.timestamp,
+                    ..mv
+                });
+            }
+        }
+
+        write_audit_log_v2(
+            ctx,
+            organization_id,
+            AuditLogParams {
+                company_id: Some(company_id),
+                table_name: "cartonization_result",
+                record_id: row.id,
+                action: "CREATE",
+                old_values: None,
+                new_values: Some(
+                    serde_json::json!({
+                        "package_id": package_id,
+                        "utilization_percentage": util,
+                        "total_items": carton.item_count,
+                    })
+                    .to_string(),
+                ),
+                changed_fields: vec!["package_id".to_string()],
+                metadata: params.metadata.clone(),
+            },
+        );
+    }
+
+    if results_created == 0 {
+        return Err("Cartonization produced no cartons".to_string());
+    }
     Ok(())
 }

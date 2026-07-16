@@ -1,5 +1,5 @@
 //! Inventory gap fixes — isolation, ATP, lot/serial, FEFO/expiry, replenishment, QC, waves,
-//! UoM conversion, inventory close, 3PL intents.
+//! UoM conversion, inventory close, 3PL, cartonization, consignment, cross-dock.
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::core::organization::{company, create_company, CompanyScopeParams, CreateCompanyParams};
@@ -7,6 +7,10 @@ use crate::core::reference::{
     create_uom, create_uom_conversion, uom, CreateUomConversionParams, CreateUomParams,
 };
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::inventory::consignment::{
+    activate_consignment_agreement, receive_consignment_stock, ReceiveConsignmentStockParams,
+};
+use crate::inventory::cross_dock::{execute_cross_dock, ExecuteCrossDockParams};
 use crate::inventory::integration::{
     create_inventory_integration_intent, inventory_integration_intent,
     record_inventory_integration_result, CreateInventoryIntegrationIntentParams,
@@ -38,10 +42,17 @@ use crate::inventory::tracking::{
     create_stock_production_lot, create_stock_production_serial, stock_production_lot,
     stock_production_serial, CreateStockProductionLotParams, CreateStockProductionSerialParams,
 };
-use crate::inventory::warehouse::{create_stock_location, stock_location, CreateStockLocationParams};
+use crate::inventory::warehouse::{
+    create_stock_location, stock_location, update_warehouse, warehouse, CreateStockLocationParams,
+    UpdateWarehouseParams,
+};
 use crate::inventory::warehouse_operations::{
-    complete_picking_wave, create_picking_wave, picking_wave, release_picking_wave,
-    update_warehouse_task_status, warehouse_task, CreatePickingWaveParams,
+    cartonization_result, complete_picking_wave, create_packaging_material, create_picking_wave,
+    picking_wave, release_picking_wave, run_cartonization, update_warehouse_task_status,
+    warehouse_task, CreatePackagingMaterialParams, CreatePickingWaveParams, RunCartonizationParams,
+};
+use crate::purchasing::procurement_advanced::{
+    consignment_agreement, create_consignment_agreement, CreateConsignmentAgreementParams,
 };
 use crate::purchasing::purchase_orders::purchase_order;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
@@ -1917,6 +1928,444 @@ pub fn test_3pl_asn_inbound_posts_stock(ctx: &ReducerContext) -> Result<(), Stri
         .ok_or("quant after ASN")?;
     if (quant.quantity - 7.0).abs() > 0.001 {
         return Err(format!("expected qty 7 after ASN, got {}", quant.quantity));
+    }
+    Ok(())
+}
+
+/// Cartonization packs open moves into packaging materials (FFD).
+pub fn test_cartonization_packs_moves(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("product")?;
+
+    create_packaging_material(
+        ctx,
+        org_id,
+        company_id,
+        CreatePackagingMaterialParams {
+            name: "Carton-S".to_string(),
+            material_type: "box".to_string(),
+            weight: 0.2,
+            max_weight: 50.0,
+            length: 40.0,
+            width: 30.0,
+            height: 20.0,
+            volume: 100.0,
+            cost: 1.0,
+            currency_id: 1,
+            barcode: None,
+            is_active: true,
+            metadata: None,
+        },
+    )?;
+
+    create_stock_picking(
+        ctx,
+        org_id,
+        CreateStockPickingParams {
+            company_id: Some(company_id),
+            name: "OUT-CARTON".to_string(),
+            picking_type_id: 0,
+            location_id: fixture.warehouse_id,
+            location_dest_id: fixture.partner_id,
+            move_type: "direct".to_string(),
+            priority: "1".to_string(),
+            partner_id: Some(fixture.partner_id),
+            contact_id: None,
+            scheduled_date: Some(ctx.timestamp),
+            origin: Some("carton-test".to_string()),
+            note: None,
+            user_id: None,
+            sale_id: None,
+            purchase_id: None,
+            group_id: None,
+            is_locked: false,
+            immediate_transfer: false,
+            is_printed: false,
+            is_return: false,
+            has_scrap_move: false,
+            has_tracking: false,
+            date: None,
+            date_done: None,
+            backorder_id: None,
+            backorder_ids: vec![],
+            show_operations: false,
+            show_lots_text: false,
+            show_reserved: true,
+            show_check_availability: true,
+            show_validate: true,
+            show_mark_as_todo: true,
+            show_set_qty_button: false,
+            show_clear_qty_button: false,
+            show_lots_m2o: false,
+            product_id: Some(fixture.product_id),
+            lot_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            display_lot_id: None,
+            location_id_name: None,
+            location_dest_id_name: None,
+            picking_code: Some("outgoing".to_string()),
+            product_tracking: None,
+            product_barcode: None,
+            move_line_exist: false,
+            has_packages: false,
+            has_move_lines: true,
+            has_package: false,
+            has_lot: false,
+            has_owner: false,
+            has_entire_package_src: false,
+            has_entire_package_dest: false,
+            package_level_ids: vec![],
+            batch_id: None,
+            metadata: None,
+        },
+    )?;
+    let picking_id = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "OUT-CARTON")
+        .map(|p| p.id)
+        .ok_or("picking")?;
+
+    create_stock_move(
+        ctx,
+        org_id,
+        CreateStockMoveParams {
+            company_id: Some(company_id),
+            name: "Carton move".to_string(),
+            product_id: fixture.product_id,
+            product_tmpl_id: fixture.product_id,
+            product_uom: product.uom_id,
+            product_uom_qty: 2.0,
+            location_id: fixture.warehouse_id,
+            location_dest_id: fixture.partner_id,
+            date_expected: ctx.timestamp,
+            move_type: "outgoing".to_string(),
+            priority: "1".to_string(),
+            reference: None,
+            sequence: 10,
+            origin: None,
+            note: None,
+            date: None,
+            date_deadline: None,
+            picking_id: Some(picking_id),
+            picking_type_id: None,
+            partner_id: Some(fixture.partner_id),
+            product_variant_id: None,
+            group_id: None,
+            rule_id: None,
+            procure_method: "make_to_stock".to_string(),
+            price_unit: 0.0,
+            scrapped: false,
+            to_refund: false,
+            propagate_cancel: true,
+            delay_alert: false,
+            product_packaging_id: None,
+            product_packaging_qty: 0.0,
+            warehouse_id: Some(fixture.warehouse_id),
+            production_id: None,
+            raw_material_production_id: None,
+            unbuild_id: None,
+            consume_unbuild_id: None,
+            cost_share: 0.0,
+            is_subcontract: false,
+            purchase_line_id: None,
+            need_release: false,
+            release_ready: false,
+            propagation_cancel: true,
+            has_tracking: false,
+            inventory_id: None,
+            sale_line_id: None,
+            lot_id: None,
+            serial_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            package_level_id: None,
+            product_type: Some("product".to_string()),
+            metadata: None,
+        },
+    )?;
+
+    run_cartonization(
+        ctx,
+        org_id,
+        company_id,
+        RunCartonizationParams {
+            picking_id,
+            packaging_material_id: None,
+            metadata: None,
+        },
+    )?;
+
+    let result = ctx
+        .db
+        .cartonization_result()
+        .iter()
+        .find(|r| r.organization_id == org_id && r.total_items >= 1)
+        .ok_or("cartonization result missing")?;
+    let mv = ctx
+        .db
+        .stock_move()
+        .iter()
+        .find(|m| m.organization_id == org_id && m.picking_id == Some(picking_id))
+        .ok_or("move")?;
+    if mv.result_package_id != Some(result.package_id) {
+        return Err(format!(
+            "expected move result_package_id {:?}, got {:?}",
+            result.package_id, mv.result_package_id
+        ));
+    }
+    Ok(())
+}
+
+/// Vendor-consigned stock is excluded from company ATP reserve.
+pub fn test_consignment_excluded_from_atp(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let wh = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&fixture.warehouse_id)
+        .ok_or("warehouse")?;
+
+    create_consignment_agreement(
+        ctx,
+        org_id,
+        company_id,
+        CreateConsignmentAgreementParams {
+            name: "CONS-1".to_string(),
+            partner_id: fixture.partner_id,
+            product_id: fixture.product_id,
+            warehouse_id: fixture.warehouse_id,
+            metadata: None,
+        },
+    )?;
+    let agreement_id = ctx
+        .db
+        .consignment_agreement()
+        .iter()
+        .find(|a| a.organization_id == org_id && a.name == "CONS-1")
+        .map(|a| a.id)
+        .ok_or("agreement")?;
+
+    activate_consignment_agreement(ctx, org_id, company_id, agreement_id)?;
+    receive_consignment_stock(
+        ctx,
+        org_id,
+        company_id,
+        ReceiveConsignmentStockParams {
+            agreement_id,
+            location_id: Some(wh.lot_stock_id),
+            quantity: 12.0,
+            cost: 5.0,
+            metadata: None,
+        },
+    )?;
+
+    let consigned = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .find(|q| {
+            q.organization_id == org_id
+                && q.product_id == fixture.product_id
+                && q.owner_id == Some(fixture.partner_id)
+        })
+        .ok_or("consigned quant")?;
+    if consigned.available_quantity > 0.001 {
+        return Err("consigned stock must not be ATP-available".into());
+    }
+
+    match reserve_quantity_at_location(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        wh.lot_stock_id,
+        1.0,
+    ) {
+        Err(msg)
+            if msg.to_lowercase().contains("no stock")
+                || msg.to_lowercase().contains("cannot reserve")
+                || msg.to_lowercase().contains("insufficient") =>
+        {
+            Ok(())
+        }
+        Err(msg) => Err(format!("Expected ATP fail on consigned-only stock, got: {msg}")),
+        Ok(()) => {
+            // Harness also seeds company-owned qty at lot_stock — reserve may succeed on that.
+            // Ensure consigned quant reserved stayed 0.
+            let c = ctx
+                .db
+                .stock_quant()
+                .id()
+                .find(&consigned.id)
+                .ok_or("consigned after")?;
+            if c.reserved_quantity > 0.001 {
+                Err("must not reserve against consigned owner_id quant".into())
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
+/// Cross-dock creates outbound picking from inbound dest when warehouse.crossdock.
+pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    update_warehouse(
+        ctx,
+        org_id,
+        company_id,
+        fixture.warehouse_id,
+        UpdateWarehouseParams {
+            name: None,
+            code: None,
+            active: None,
+            reception_steps: None,
+            delivery_steps: None,
+            manufacture_steps: None,
+            buy_to_resupply: None,
+            manufacture_to_resupply: None,
+            crossdock: Some(true),
+            sequence: None,
+            partner_id: None,
+            metadata: None,
+        },
+    )?;
+
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        fixture.warehouse_id,
+        8.0,
+        None,
+    )?;
+
+    create_stock_picking(
+        ctx,
+        org_id,
+        CreateStockPickingParams {
+            company_id: Some(company_id),
+            name: "IN-XDOCK".to_string(),
+            picking_type_id: 0,
+            location_id: fixture.partner_id,
+            location_dest_id: fixture.warehouse_id,
+            move_type: "direct".to_string(),
+            priority: "1".to_string(),
+            partner_id: Some(fixture.partner_id),
+            contact_id: None,
+            scheduled_date: Some(ctx.timestamp),
+            origin: Some("xdock-in".to_string()),
+            note: None,
+            user_id: None,
+            sale_id: None,
+            purchase_id: None,
+            group_id: None,
+            is_locked: false,
+            immediate_transfer: false,
+            is_printed: false,
+            is_return: false,
+            has_scrap_move: false,
+            has_tracking: false,
+            date: None,
+            date_done: None,
+            backorder_id: None,
+            backorder_ids: vec![],
+            show_operations: false,
+            show_lots_text: false,
+            show_reserved: true,
+            show_check_availability: true,
+            show_validate: true,
+            show_mark_as_todo: true,
+            show_set_qty_button: false,
+            show_clear_qty_button: false,
+            show_lots_m2o: false,
+            product_id: Some(fixture.product_id),
+            lot_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            display_lot_id: None,
+            location_id_name: None,
+            location_dest_id_name: None,
+            picking_code: Some("incoming".to_string()),
+            product_tracking: None,
+            product_barcode: None,
+            move_line_exist: false,
+            has_packages: false,
+            has_move_lines: true,
+            has_package: false,
+            has_lot: false,
+            has_owner: false,
+            has_entire_package_src: false,
+            has_entire_package_dest: false,
+            package_level_ids: vec![],
+            batch_id: None,
+            metadata: None,
+        },
+    )?;
+    let inbound_id = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "IN-XDOCK")
+        .map(|p| p.id)
+        .ok_or("inbound")?;
+
+    let scope = CompanyScopeParams {
+        company_id: Some(company_id),
+    };
+    confirm_stock_picking(ctx, org_id, inbound_id, scope.clone())?;
+    assign_stock_picking(ctx, org_id, inbound_id, scope)?;
+
+    execute_cross_dock(
+        ctx,
+        org_id,
+        company_id,
+        ExecuteCrossDockParams {
+            inbound_picking_id: inbound_id,
+            product_id: fixture.product_id,
+            quantity: 3.0,
+            partner_id: fixture.partner_id,
+            location_dest_id: Some(fixture.partner_id),
+            metadata: None,
+        },
+    )?;
+
+    let outbound = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| {
+            p.organization_id == org_id && p.name == format!("XD-{inbound_id}")
+        })
+        .ok_or("cross-dock outbound missing")?;
+    if outbound.location_id != fixture.warehouse_id {
+        return Err(format!(
+            "expected outbound source at inbound dest, got {}",
+            outbound.location_id
+        ));
     }
     Ok(())
 }

@@ -38,6 +38,7 @@ import AcceptSaleOrderQuotationReducer from "./accept_sale_order_quotation_reduc
 import AccrueSaleCommissionReducer from "./accrue_sale_commission_reducer";
 import AcknowledgeInsightReducer from "./acknowledge_insight_reducer";
 import AcknowledgeIotActionReducer from "./acknowledge_iot_action_reducer";
+import ActivateConsignmentAgreementReducer from "./activate_consignment_agreement_reducer";
 import ActivatePosConfigReducer from "./activate_pos_config_reducer";
 import ActivateRevenueRecognitionRuleReducer from "./activate_revenue_recognition_rule_reducer";
 import ActivateSubscriptionReducer from "./activate_subscription_reducer";
@@ -285,6 +286,7 @@ import CreateOpportunityReducer from "./create_opportunity_reducer";
 import CreateOpportunityLineReducer from "./create_opportunity_line_reducer";
 import CreateOpportunityStageReducer from "./create_opportunity_stage_reducer";
 import CreateOrganizationReducer from "./create_organization_reducer";
+import CreatePackagingMaterialReducer from "./create_packaging_material_reducer";
 import CreatePartnerBankReducer from "./create_partner_bank_reducer";
 import CreatePasswordResetTokenReducer from "./create_password_reset_token_reducer";
 import CreatePaymentReducer from "./create_payment_reducer";
@@ -452,6 +454,7 @@ import EnqueueJobReducer from "./enqueue_job_reducer";
 import EnsureDevAdminReducer from "./ensure_dev_admin_reducer";
 import ErrorIntercompanyTransactionReducer from "./error_intercompany_transaction_reducer";
 import EvaluateDynamicSegmentReducer from "./evaluate_dynamic_segment_reducer";
+import ExecuteCrossDockReducer from "./execute_cross_dock_reducer";
 import ExecuteReplenishmentRuleReducer from "./execute_replenishment_rule_reducer";
 import ExecuteRetentionPurgeReducer from "./execute_retention_purge_reducer";
 import ExpireAiActionDraftsReducer from "./expire_ai_action_drafts_reducer";
@@ -583,6 +586,7 @@ import ProcessPendingScansReducer from "./process_pending_scans_reducer";
 import ProduceManufacturingOrderReducer from "./produce_manufacturing_order_reducer";
 import PromoteAiSkillVersionReducer from "./promote_ai_skill_version_reducer";
 import QueueMailFromTemplateReducer from "./queue_mail_from_template_reducer";
+import ReceiveConsignmentStockReducer from "./receive_consignment_stock_reducer";
 import ReceivePoLineReducer from "./receive_po_line_reducer";
 import RecognizeAmortizationLineReducer from "./recognize_amortization_line_reducer";
 import RecognizeDeferredRevenueReducer from "./recognize_deferred_revenue_reducer";
@@ -668,6 +672,7 @@ import RunAllInventoryTestsReducer from "./run_all_inventory_tests_reducer";
 import RunAllPlatformTestsReducer from "./run_all_platform_tests_reducer";
 import RunAllPurchasingTestsReducer from "./run_all_purchasing_tests_reducer";
 import RunAllSalesTestsReducer from "./run_all_sales_tests_reducer";
+import RunCartonizationReducer from "./run_cartonization_reducer";
 import RunCoreOperationalMessagingTestReducer from "./run_core_operational_messaging_test_reducer";
 import RunCoreSodTestReducer from "./run_core_sod_test_reducer";
 import RunCountryPackTestReducer from "./run_country_pack_test_reducer";
@@ -685,9 +690,12 @@ import RunHrLeaveTypeTestReducer from "./run_hr_leave_type_test_reducer";
 import RunInventory3PlAsnTestReducer from "./run_inventory_3_pl_asn_test_reducer";
 import RunInventoryAdjustmentTestReducer from "./run_inventory_adjustment_test_reducer";
 import RunInventoryAtpFailClosedTestReducer from "./run_inventory_atp_fail_closed_test_reducer";
+import RunInventoryCartonizationTestReducer from "./run_inventory_cartonization_test_reducer";
 import RunInventoryCloseReducer from "./run_inventory_close_reducer";
 import RunInventoryCloseLockTestReducer from "./run_inventory_close_lock_test_reducer";
 import RunInventoryCompanyIsolationTestReducer from "./run_inventory_company_isolation_test_reducer";
+import RunInventoryConsignmentAtpTestReducer from "./run_inventory_consignment_atp_test_reducer";
+import RunInventoryCrossDockTestReducer from "./run_inventory_cross_dock_test_reducer";
 import RunInventoryDeliveryQuantTestReducer from "./run_inventory_delivery_quant_test_reducer";
 import RunInventoryExpiredLotTestReducer from "./run_inventory_expired_lot_test_reducer";
 import RunInventoryFefoTestReducer from "./run_inventory_fefo_test_reducer";
@@ -6925,6 +6933,7 @@ const reducersSchema = __reducers(
   __reducerSchema("accrue_sale_commission", AccrueSaleCommissionReducer),
   __reducerSchema("acknowledge_insight", AcknowledgeInsightReducer),
   __reducerSchema("acknowledge_iot_action", AcknowledgeIotActionReducer),
+  __reducerSchema("activate_consignment_agreement", ActivateConsignmentAgreementReducer),
   __reducerSchema("activate_pos_config", ActivatePosConfigReducer),
   __reducerSchema("activate_revenue_recognition_rule", ActivateRevenueRecognitionRuleReducer),
   __reducerSchema("activate_subscription", ActivateSubscriptionReducer),
@@ -7172,6 +7181,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_opportunity_line", CreateOpportunityLineReducer),
   __reducerSchema("create_opportunity_stage", CreateOpportunityStageReducer),
   __reducerSchema("create_organization", CreateOrganizationReducer),
+  __reducerSchema("create_packaging_material", CreatePackagingMaterialReducer),
   __reducerSchema("create_partner_bank", CreatePartnerBankReducer),
   __reducerSchema("create_password_reset_token", CreatePasswordResetTokenReducer),
   __reducerSchema("create_payment", CreatePaymentReducer),
@@ -7339,6 +7349,7 @@ const reducersSchema = __reducers(
   __reducerSchema("ensure_dev_admin", EnsureDevAdminReducer),
   __reducerSchema("error_intercompany_transaction", ErrorIntercompanyTransactionReducer),
   __reducerSchema("evaluate_dynamic_segment", EvaluateDynamicSegmentReducer),
+  __reducerSchema("execute_cross_dock", ExecuteCrossDockReducer),
   __reducerSchema("execute_replenishment_rule", ExecuteReplenishmentRuleReducer),
   __reducerSchema("execute_retention_purge", ExecuteRetentionPurgeReducer),
   __reducerSchema("expire_ai_action_drafts", ExpireAiActionDraftsReducer),
@@ -7470,6 +7481,7 @@ const reducersSchema = __reducers(
   __reducerSchema("produce_manufacturing_order", ProduceManufacturingOrderReducer),
   __reducerSchema("promote_ai_skill_version", PromoteAiSkillVersionReducer),
   __reducerSchema("queue_mail_from_template", QueueMailFromTemplateReducer),
+  __reducerSchema("receive_consignment_stock", ReceiveConsignmentStockReducer),
   __reducerSchema("receive_po_line", ReceivePoLineReducer),
   __reducerSchema("recognize_amortization_line", RecognizeAmortizationLineReducer),
   __reducerSchema("recognize_deferred_revenue", RecognizeDeferredRevenueReducer),
@@ -7555,6 +7567,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_all_platform_tests", RunAllPlatformTestsReducer),
   __reducerSchema("run_all_purchasing_tests", RunAllPurchasingTestsReducer),
   __reducerSchema("run_all_sales_tests", RunAllSalesTestsReducer),
+  __reducerSchema("run_cartonization", RunCartonizationReducer),
   __reducerSchema("run_core_operational_messaging_test", RunCoreOperationalMessagingTestReducer),
   __reducerSchema("run_core_sod_test", RunCoreSodTestReducer),
   __reducerSchema("run_country_pack_test", RunCountryPackTestReducer),
@@ -7572,9 +7585,12 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_3_pl_asn_test", RunInventory3PlAsnTestReducer),
   __reducerSchema("run_inventory_adjustment_test", RunInventoryAdjustmentTestReducer),
   __reducerSchema("run_inventory_atp_fail_closed_test", RunInventoryAtpFailClosedTestReducer),
+  __reducerSchema("run_inventory_cartonization_test", RunInventoryCartonizationTestReducer),
   __reducerSchema("run_inventory_close", RunInventoryCloseReducer),
   __reducerSchema("run_inventory_close_lock_test", RunInventoryCloseLockTestReducer),
   __reducerSchema("run_inventory_company_isolation_test", RunInventoryCompanyIsolationTestReducer),
+  __reducerSchema("run_inventory_consignment_atp_test", RunInventoryConsignmentAtpTestReducer),
+  __reducerSchema("run_inventory_cross_dock_test", RunInventoryCrossDockTestReducer),
   __reducerSchema("run_inventory_delivery_quant_test", RunInventoryDeliveryQuantTestReducer),
   __reducerSchema("run_inventory_expired_lot_test", RunInventoryExpiredLotTestReducer),
   __reducerSchema("run_inventory_fefo_test", RunInventoryFefoTestReducer),

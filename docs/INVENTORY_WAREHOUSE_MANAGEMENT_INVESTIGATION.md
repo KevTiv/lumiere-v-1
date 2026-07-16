@@ -5,7 +5,7 @@ Current-state assessment of Lumiere inventory / WMS against a NetSuite *quality*
 **Investigation date:** 2026-07-16  
 **Method:** Source-traced inventory. “Verified” means present in code. Domain/E2E test names are listed as *existence*; this document does not claim those suites were executed as part of this investigation unless noted under Validation.
 
-**Verdict:** Lumiere has a usable **MVP stock spine** — product/warehouse/location masters, quants with reserved/available, stock moves/pickings whose validate posts quants, SO confirm soft ATP reservation (fail-closed), PO confirm → IN picking + `receive_po_line` → validate/backorder (quant increase), cycle-count post-to-quant, and landed-cost apply to quant value. Against the quality bar it is **strong** on reservation + picking validate + lead-to-cash/P2P stock consequences and (after 2026-07-16 pilot fixes) clean BFF contracts + live inventory WS coverage, **partial** on lots/serials/expiry/quality/UoM/costing, and **absent or schema-only / Unsuitable** for directed putaway algorithms, packing/cartonization, cross-docking, and consignment ownership. Wave/QC/UoM conversion/inventory close/3PL intents are now Present (Partial vs full WMS depth).
+**Verdict:** Lumiere has a usable **MVP stock spine** — product/warehouse/location masters, quants with reserved/available, stock moves/pickings whose validate posts quants, SO confirm soft ATP reservation (fail-closed), PO confirm → IN picking + `receive_po_line` → validate/backorder (quant increase), cycle-count post-to-quant, and landed-cost apply to quant value. Against the quality bar it is **strong** on reservation + picking validate + lead-to-cash/P2P stock consequences and (after 2026-07-16 pilot fixes) clean BFF contracts + live inventory WS coverage, **partial** on lots/serials/expiry/quality/UoM/costing, and **absent or schema-only / Unsuitable** for directed putaway algorithms. Wave/QC/UoM/close/3PL/cartonization/consignment ownership/cross-dock are now Present (Partial vs full WMS depth).
 
 **Pilot-critical tranche (2026-07-16):** Phantom BFF keys removed; workspace keys wired into `ERP_ORG_SQL` (orphans `warehouse-3d` / `inventory-valuations` dropped); validate hot path uses `picking_key` + `move_by_picking`; company-isolation + ATP fail-closed domain tests added. See [`docs/plans/inventory-pilot-gap-fixes-plan.md`](./plans/inventory-pilot-gap-fixes-plan.md).
 
@@ -33,7 +33,7 @@ Current-state assessment of Lumiere inventory / WMS against a NetSuite *quality*
 | Adjustments | `stock_inventory`, `stock_inventory_line`, `inventory_adjustment`, `adjustment_reason` | `inventory_adjustments.rs` | `process_inventory_adjustment` state-only |
 | Cycle count | `stock_cycle_count`, `stock_count_sheet` | `cycle_count.rs` | Post upserts quants |
 | Replenishment | `replenishment_rule`, `stock_reorder_group` | `replenishment.rs` | Execute creates draft PO/transfer; reorder group unused |
-| WMS ops | `warehouse_task`, `picking_wave`, `packaging_material`, `cartonization_result` | `warehouse_operations.rs` | Carton/material: **table only** |
+| WMS ops | `warehouse_task`, `picking_wave`, `packaging_material`, `cartonization_result` | `warehouse_operations.rs` | Waves + cartonization FFD Present |
 | Valuation | `inventory_valuation` | `valuation.rs` | Mis-shaped (reorder-like fields); **no reducers / no inserts** |
 | UoM (adjacent) | `uom_cat`, `uom`, `uom_conversion` | `core/reference.rs` | Create-only reducers |
 | Landed cost (adjacent) | `stock_landed_cost`, `stock_landed_cost_lines` | `purchasing/landed_costs.rs` | Apply updates quant value |
@@ -161,7 +161,7 @@ Definitions:
 | Directed putaway / picking | **Absent** | No putaway strategy reducers; tasks are free-string CRUD |
 | Wave planning | **Unsuitable** | Wave stores `picking_ids`; create/complete flip state only — no pick orchestration |
 | Packing | **Partial** | Pack location IDs on warehouse; product packaging CRUD; no pack-operation workflow |
-| Cartonization | **Absent** | `packaging_material` / `cartonization_result` tables only — zero reducers |
+| Cartonization | **Partial** | `create_packaging_material` + `run_cartonization` (FFD); stamps move `result_package_id` |
 | Consignment | **Absent** (inventory) | Purchasing agreement table; no vendor-owned quant rules |
 | Quarantine | **Partial** | `fail_quality_check` → `quarantine_quantity` (uses `failure_location_id` or `wh_qc_stock_loc_id`); available=0; reserve blocked |
 | Cross-docking | **Absent** | `warehouse.crossdock` stored; no flow |
@@ -236,7 +236,7 @@ SpacetimeDB atomicity model: each reducer runs in one transaction that commits o
 11. **Wave release → directed pick tasks** — **Unsuitable** (state CRUD / phantoms).
 12. **Replenishment → PO/transfer demand** — **Unsuitable** (timestamp-only execute).
 13. **Cartonization / pack** — **Absent**.
-14. **Consignment / cross-dock / 3PL** — **Absent**.
+14. **Consignment / cross-dock / 3PL** — Present (MVP): consignment owner_id ATP rules, `execute_cross_dock`, 3PL intents.
 15. **Inventory period close** — Present (snapshot + lock); valuation journal post still open.
 16. **Cross-company isolation** — Org filters; dedicated tests **missing**.
 17. **Live exception subscriptions** — Absent (client-derived KPIs).
@@ -261,7 +261,7 @@ SpacetimeDB atomicity model: each reducer runs in one transaction that commits o
 15. Subscription clients see live short-ATP / expired-lot / open-QC queues without polling (target: server-bounded filters) — **fails today**.
 16. Inventory close: snapshot quants + lock stock mutations; reopen unlocks — Present (valuation journal post still open).
 17. Remote warehouse with intermittent connectivity can queue scans and reconcile without double-post (target) — **Absent**.
-18. 3PL ASN inbound via durable intent/result can post stock — Present; cross-dock still Absent.
+18. 3PL ASN + cross-dock outbound from inbound dest — Present (MVP).
 
 ---
 
@@ -389,7 +389,7 @@ flowchart LR
 
 ## Bottom line
 
-Lumiere’s inventory spine is **reservation-and-validate strong, WMS-depth still partial**: soft ATP, picking validate, lot/serial/FEFO, replenishment demand, QC quarantine→ATP, wave/tasks, UoM conversion, inventory close lock, and 3PL ASN intents are real and tested. Cartonization, consignment ownership rules, and cross-dock remain Open/Absent.
+Lumiere’s inventory spine is **reservation-and-validate strong, WMS-depth still partial**: soft ATP, picking validate, lot/serial/FEFO, replenishment, QC quarantine, waves/tasks, UoM conversion, inventory close, 3PL ASN, cartonization (FFD), consignment ownership (ATP exclusion), and cross-dock outbound are real and tested. Directed putaway algorithms and GL valuation journal on close remain Open.
 
 ### Related docs
 

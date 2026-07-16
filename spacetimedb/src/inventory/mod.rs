@@ -21,7 +21,11 @@
 /// | valuation   | InventoryValuation                                            |
 /// | inventory_close | InventoryClose · InventoryCloseLine                         |
 /// | integration | InventoryIntegrationIntent (3PL ASN)                          |
+/// | consignment | Consignment receive + ATP ownership                             |
+/// | cross_dock  | Cross-dock outbound from inbound dest                           |
 pub mod barcode;
+pub mod consignment;
+pub mod cross_dock;
 pub mod cycle_count;
 pub mod integration;
 pub mod inventory_adjustments;

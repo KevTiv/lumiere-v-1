@@ -21,6 +21,10 @@ Checklist for tranche-1 fixes from [INVENTORY_WAREHOUSE_MANAGEMENT_INVESTIGATION
 - [x] Inventory close: snapshot lines + lock stock mutations (`create/run/reopen_inventory_close`)
 - [x] 3PL durable intents: `create_inventory_integration_intent` + `record_inventory_integration_result` (ASN inbound can post stock)
 
+- [x] Cartonization: `create_packaging_material` + `run_cartonization` (FFD) stamps `result_package_id`
+- [x] Consignment ownership: activate/receive with `owner_id`; consigned excluded from company ATP
+- [x] Cross-dock: `execute_cross_dock` outbound from inbound dest when `warehouse.crossdock`
+
 ## Verify after publish
 
 - [ ] `spacetime call <db> run_all_inventory_tests`
