@@ -541,6 +541,24 @@ export const salesDashboard: DashboardConfig = {
               { id: "create_pricelist", label: "New Pricelist", icon: "settings", color: "purple" },
               { id: "new_delivery", label: "New Delivery", icon: "package", color: "green" },
               { id: "view_pipeline", label: "View Pipeline", icon: "trending", color: "teal" },
+              {
+                id: "create_commission_plan",
+                label: "Commission plan",
+                icon: "users",
+                color: "orange",
+              },
+              {
+                id: "create_sale_contract",
+                label: "Sale contract",
+                icon: "file",
+                color: "teal",
+              },
+              {
+                id: "create_integration_intent",
+                label: "Fiscal/carrier intent",
+                icon: "settings",
+                color: "green",
+              },
             ],
           },
         },
@@ -654,7 +672,7 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "ops",
-      label: "Ops",
+      label: t("sales.tabs.ops", { defaultValue: "Ops" }),
       type: "custom" as const,
     },
     {
@@ -1255,6 +1273,24 @@ export const purchasingDashboard: DashboardConfig = {
               { id: "create_requisition", label: "New Requisition", icon: "plus", color: "orange" },
               { id: "receive_goods", label: "Receive Goods", icon: "download", color: "green" },
               { id: "view_vendors", label: "View Vendors", icon: "users", color: "teal" },
+              {
+                id: "create_purchase_blanket_order",
+                label: "Blanket order",
+                icon: "file",
+                color: "purple",
+              },
+              {
+                id: "create_purchase_contract",
+                label: "Purchase contract",
+                icon: "file",
+                color: "teal",
+              },
+              {
+                id: "create_purchasing_integration_intent",
+                label: "Customs/e-invoice intent",
+                icon: "settings",
+                color: "green",
+              },
             ],
           },
         },

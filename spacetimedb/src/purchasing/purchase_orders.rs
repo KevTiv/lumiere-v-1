@@ -13,6 +13,7 @@ use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
 };
+use crate::inventory::product::product;
 use crate::types::{
     ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState,
 };
@@ -59,6 +60,10 @@ pub struct PurchaseOrder {
     pub amount_untaxed: f64,
     pub amount_tax: f64,
     pub amount_total: f64,
+    /// FX snapshot at confirm (`1.0` when PO currency matches company currency).
+    pub currency_rate: f64,
+    /// Optional qty three-way match epsilon; `None` → [`DEFAULT_QTY_MATCH_TOLERANCE`].
+    pub match_qty_tolerance: Option<f64>,
     pub receipt_status: String,
     pub notes: Option<String>,
     pub message_main_attachment_id: Option<u64>,
@@ -238,6 +243,7 @@ pub struct UpdatePurchaseOrderParams {
     pub incoterm_location: Option<String>,
     pub partner_id: Option<u64>,
     pub currency_id: Option<u64>,
+    pub match_qty_tolerance: Option<f64>,
     pub metadata: Option<String>,
 }
 
@@ -294,6 +300,148 @@ fn validate_order_in_organization(
         return Err("Purchase order does not belong to this organization".to_string());
     }
     Ok(order)
+}
+
+/// Effective qty match tolerance for a PO (`match_qty_tolerance` or default).
+pub fn qty_match_tolerance_for_order(order: &PurchaseOrder) -> f64 {
+    order
+        .match_qty_tolerance
+        .filter(|t| *t >= 0.0)
+        .unwrap_or(DEFAULT_QTY_MATCH_TOLERANCE)
+}
+
+fn merge_match_state_metadata(existing: &Option<String>, match_state: &str) -> Option<String> {
+    let mut metadata = existing
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|parsed| parsed.as_object().cloned())
+        .unwrap_or_default();
+    metadata.insert(
+        "match_state".to_string(),
+        serde_json::Value::String(match_state.to_string()),
+    );
+    Some(serde_json::Value::Object(metadata).to_string())
+}
+
+/// Persist `metadata.match_state` from [`compute_line_match_state`] using the PO tolerance.
+pub fn persist_line_match_state(
+    ctx: &ReducerContext,
+    order: &PurchaseOrder,
+    mut line: PurchaseOrderLine,
+) {
+    let tolerance = qty_match_tolerance_for_order(order);
+    let match_state = compute_line_match_state(&line, tolerance);
+    line.metadata = merge_match_state_metadata(&line.metadata, &match_state);
+    line.write_uid = ctx.sender();
+    line.write_date = ctx.timestamp;
+    ctx.db.purchase_order_line().id().update(line);
+}
+
+/// Snapshots PO→company FX at confirm (fail closed if rate missing for multi-currency).
+fn confirm_po_exchange_rate_snapshot(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order: &PurchaseOrder,
+) -> Result<(f64, String, String), String> {
+    use crate::core::organization::company;
+    use crate::core::reference::{currency_rate, legacy_currency_code_for_id};
+
+    let company_row = ctx
+        .db
+        .company()
+        .id()
+        .find(&order.company_id)
+        .ok_or("Company not found for purchase order")?;
+    let from = legacy_currency_code_for_id(order.currency_id).to_string();
+    let to = legacy_currency_code_for_id(company_row.currency_id).to_string();
+    if from.eq_ignore_ascii_case(&to) {
+        return Ok((1.0, from, to));
+    }
+
+    let mut best_rate: Option<(Timestamp, f64)> = None;
+    for rate in ctx
+        .db
+        .currency_rate()
+        .rate_by_org()
+        .filter(&organization_id)
+    {
+        if !rate.from_currency.eq_ignore_ascii_case(&from)
+            || !rate.to_currency.eq_ignore_ascii_case(&to)
+        {
+            continue;
+        }
+        if let Some(cid) = rate.company_id {
+            if cid != order.company_id {
+                continue;
+            }
+        }
+        match best_rate {
+            Some((prev_date, _)) if rate.date <= prev_date => {}
+            _ => best_rate = Some((rate.date, rate.rate)),
+        }
+    }
+
+    let rate = best_rate.map(|(_, r)| r).ok_or_else(|| {
+        format!(
+            "No exchange rate for {} → {} (company {}); seed currency_rate before confirming multi-currency POs",
+            from, to, order.company_id
+        )
+    })?;
+    if rate <= 0.0 {
+        return Err("Exchange rate must be positive".to_string());
+    }
+    Ok((rate, from, to))
+}
+
+fn merge_po_exchange_rate_metadata(
+    existing: &Option<String>,
+    rate: f64,
+    from: &str,
+    to: &str,
+    at: Timestamp,
+) -> Option<String> {
+    let mut metadata = existing
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|parsed| parsed.as_object().cloned())
+        .unwrap_or_default();
+    metadata.insert("exchange_rate".to_string(), serde_json::json!(rate));
+    metadata.insert(
+        "exchange_rate_from".to_string(),
+        serde_json::Value::String(from.to_string()),
+    );
+    metadata.insert(
+        "exchange_rate_to".to_string(),
+        serde_json::Value::String(to.to_string()),
+    );
+    let at_micros = at
+        .to_duration_since_unix_epoch()
+        .unwrap_or_default()
+        .as_micros() as u64;
+    metadata.insert(
+        "exchange_rate_at_micros".to_string(),
+        serde_json::json!(at_micros),
+    );
+    Some(serde_json::Value::Object(metadata).to_string())
+}
+
+/// Wave C encumbrance MVP: stamp commitment amount on PO metadata at confirm.
+/// Does not mutate crossovered_budget / budget_post (actuals stay on journal post).
+fn merge_po_encumbrance_metadata(existing: &Option<String>, amount_total: f64) -> Option<String> {
+    let mut metadata = existing
+        .as_ref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|parsed| parsed.as_object().cloned())
+        .unwrap_or_default();
+    metadata.insert("encumbrance".to_string(), serde_json::json!(amount_total));
+    metadata.insert(
+        "encumbrance_note".to_string(),
+        serde_json::Value::String(
+            "PO commitment recorded in metadata only; budget actuals sync on journal post"
+                .to_string(),
+        ),
+    );
+    Some(serde_json::Value::Object(metadata).to_string())
 }
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
@@ -358,6 +506,8 @@ pub fn create_purchase_order(
         amount_untaxed: 0.0,
         amount_tax: 0.0,
         amount_total: 0.0,
+        currency_rate: 0.0,
+        match_qty_tolerance: None,
         receipt_status: "nothing".to_string(),
         notes: params.notes,
         message_main_attachment_id: None,
@@ -568,12 +718,28 @@ pub fn confirm_purchase_order_impl(
         }
     }
 
+    let (exchange_rate, fx_from, fx_to) =
+        confirm_po_exchange_rate_snapshot(ctx, organization_id, &order)?;
+    let fx_metadata = merge_po_exchange_rate_metadata(
+        &order.metadata,
+        exchange_rate,
+        &fx_from,
+        &fx_to,
+        ctx.timestamp,
+    );
+    // Encumbrance MVP: commitment note in metadata (no budget-line mutation).
+    let confirm_metadata =
+        merge_po_encumbrance_metadata(&fx_metadata.or(order.metadata.clone()), order.amount_total);
+
     let partner_id = order.partner_id;
     let company_id = order.company_id;
+    let amount_total = order.amount_total;
 
     ctx.db.purchase_order().id().update(PurchaseOrder {
         state: PoState::Purchase,
         date_approve: Some(ctx.timestamp),
+        currency_rate: exchange_rate,
+        metadata: confirm_metadata,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..order
@@ -587,6 +753,8 @@ pub fn confirm_purchase_order_impl(
         });
     }
 
+    create_incoming_pickings_for_confirmed_order(ctx, organization_id, order_id)?;
+
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -597,12 +765,261 @@ pub fn confirm_purchase_order_impl(
             action: "UPDATE",
             old_values: Some("Sent".to_string()),
             new_values: Some("Purchase".to_string()),
-            changed_fields: vec!["state".to_string(), "date_approve".to_string()],
-            metadata: None,
+            changed_fields: vec![
+                "state".to_string(),
+                "date_approve".to_string(),
+                "currency_rate".to_string(),
+                "metadata".to_string(),
+            ],
+            metadata: Some(
+                serde_json::json!({ "encumbrance": amount_total }).to_string(),
+            ),
         },
     );
 
     log::info!("Purchase order {} confirmed", order_id);
+    Ok(())
+}
+
+/// Create one draft IN picking with moves for inventoriable PO lines (mirrors sales OUT confirm).
+fn create_incoming_pickings_for_confirmed_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    use crate::inventory::stock::{
+        create_stock_move, create_stock_picking, product_requires_stock,
+        resolve_warehouse_stock_location, stock_picking, CreateStockMoveParams,
+        CreateStockPickingParams,
+    };
+    use crate::inventory::warehouse::warehouse;
+
+    let order = ctx
+        .db
+        .purchase_order()
+        .id()
+        .find(&order_id)
+        .ok_or("Purchase order not found for picking creation")?;
+
+    if ctx.db.stock_picking().iter().any(|p| {
+        p.organization_id == organization_id
+            && p.purchase_id == Some(order_id)
+            && !p.is_return
+            && p.picking_code.as_deref() == Some("incoming")
+    }) {
+        return Ok(());
+    }
+
+    let order_lines: Vec<_> = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&order_id)
+        .filter(|l| l.display_type.is_none() && l.product_qty > 0.0)
+        .collect();
+
+    if order_lines.is_empty() {
+        return Ok(());
+    }
+
+    // Service-only POs: no stock receipt picking.
+    let has_stock_line = order_lines
+        .iter()
+        .any(|l| product_requires_stock(ctx, l.product_id));
+    if !has_stock_line {
+        return Ok(());
+    }
+
+    let company_id = order.company_id;
+    let warehouse_id = ctx
+        .db
+        .warehouse()
+        .iter()
+        .find(|w| {
+            w.organization_id == organization_id && w.company_id == company_id && w.active
+        })
+        .map(|w| w.id)
+        .ok_or_else(|| {
+            format!(
+                "No active warehouse for company {} — cannot create PO receipt picking",
+                company_id
+            )
+        })?;
+
+    let dest_location = resolve_warehouse_stock_location(ctx, warehouse_id);
+    // MVP vendor location stub (mirrors sales customer = stock+1).
+    let src_location = dest_location.saturating_add(1);
+    let order_label = order
+        .name
+        .as_deref()
+        .or(order.origin.as_deref())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| order_id.to_string());
+
+    let first_product = order_lines[0].product_id;
+    let picking_name = format!("IN/{order_label}");
+
+    create_stock_picking(
+        ctx,
+        organization_id,
+        CreateStockPickingParams {
+            company_id: Some(company_id),
+            name: picking_name.clone(),
+            picking_type_id: 0,
+            location_id: src_location,
+            location_dest_id: dest_location,
+            move_type: "direct".to_string(),
+            priority: "1".to_string(),
+            partner_id: Some(order.partner_id),
+            contact_id: None,
+            scheduled_date: Some(ctx.timestamp),
+            origin: Some(format!("PO/{order_label}")),
+            note: order.notes.clone(),
+            user_id: None,
+            sale_id: None,
+            purchase_id: Some(order_id),
+            group_id: None,
+            is_locked: false,
+            immediate_transfer: false,
+            is_printed: false,
+            is_return: false,
+            has_scrap_move: false,
+            has_tracking: false,
+            date: None,
+            date_done: None,
+            backorder_id: None,
+            backorder_ids: vec![],
+            show_operations: false,
+            show_lots_text: false,
+            show_reserved: false,
+            show_check_availability: true,
+            show_validate: false,
+            show_mark_as_todo: true,
+            show_set_qty_button: false,
+            show_clear_qty_button: false,
+            show_lots_m2o: false,
+            product_id: Some(first_product),
+            lot_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            display_lot_id: None,
+            location_id_name: None,
+            location_dest_id_name: None,
+            picking_code: Some("incoming".to_string()),
+            product_tracking: None,
+            product_barcode: None,
+            move_line_exist: false,
+            has_packages: false,
+            has_move_lines: false,
+            has_package: false,
+            has_lot: false,
+            has_owner: false,
+            has_entire_package_src: false,
+            has_entire_package_dest: false,
+            package_level_ids: vec![],
+            batch_id: None,
+            metadata: Some(format!(r#"{{"purchase_order_id":{order_id}}}"#)),
+        },
+    )?;
+
+    let picking = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| {
+            p.organization_id == organization_id
+                && p.purchase_id == Some(order_id)
+                && !p.is_return
+                && p.name == picking_name
+        })
+        .ok_or("Incoming picking not found after create")?;
+
+    for (idx, line) in order_lines.iter().enumerate() {
+        if !product_requires_stock(ctx, line.product_id) {
+            continue;
+        }
+        let product = ctx
+            .db
+            .product()
+            .id()
+            .find(&line.product_id)
+            .ok_or("Product not found for purchase order line")?;
+
+        create_stock_move(
+            ctx,
+            organization_id,
+            CreateStockMoveParams {
+                company_id: Some(company_id),
+                name: format!("{} x {}", line.product_qty, product.name),
+                product_id: line.product_id,
+                product_tmpl_id: line.product_id,
+                product_uom: line.product_uom,
+                product_uom_qty: line.product_qty,
+                location_id: src_location,
+                location_dest_id: dest_location,
+                date_expected: ctx.timestamp,
+                move_type: "incoming".to_string(),
+                priority: "1".to_string(),
+                reference: Some(format!("PO/{order_label}")),
+                sequence: ((idx + 1) as i32) * 10,
+                origin: Some(format!("PO/{order_label}")),
+                note: order.notes.clone(),
+                date: None,
+                date_deadline: None,
+                picking_id: Some(picking.id),
+                picking_type_id: Some(0),
+                partner_id: Some(order.partner_id),
+                product_variant_id: None,
+                group_id: None,
+                rule_id: None,
+                procure_method: "make_to_stock".to_string(),
+                price_unit: line.price_unit,
+                scrapped: false,
+                to_refund: false,
+                propagate_cancel: true,
+                delay_alert: false,
+                product_packaging_id: None,
+                product_packaging_qty: 0.0,
+                warehouse_id: Some(warehouse_id),
+                production_id: None,
+                raw_material_production_id: None,
+                unbuild_id: None,
+                consume_unbuild_id: None,
+                cost_share: 0.0,
+                is_subcontract: false,
+                purchase_line_id: Some(line.id),
+                need_release: false,
+                release_ready: false,
+                propagation_cancel: true,
+                has_tracking: false,
+                inventory_id: None,
+                sale_line_id: None,
+                lot_id: None,
+                package_id: None,
+                result_package_id: None,
+                owner_id: None,
+                package_level_id: None,
+                product_type: line.product_type.clone(),
+                metadata: None,
+            },
+        )?;
+    }
+
+    let mut picking_ids = order.picking_ids.clone();
+    if !picking_ids.contains(&picking.id) {
+        picking_ids.push(picking.id);
+    }
+    ctx.db.purchase_order().id().update(PurchaseOrder {
+        picking_ids: picking_ids.clone(),
+        picking_count: picking_ids.len() as u32,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
+
     Ok(())
 }
 
@@ -715,6 +1132,12 @@ pub fn update_purchase_order(
     if let Some(cid) = params.currency_id {
         updated.currency_id = cid;
     }
+    if let Some(tol) = params.match_qty_tolerance {
+        if tol < 0.0 {
+            return Err("match_qty_tolerance must be non-negative".to_string());
+        }
+        updated.match_qty_tolerance = Some(tol);
+    }
     if let Some(ref m) = params.metadata {
         updated.metadata = Some(m.clone());
     }
@@ -756,12 +1179,28 @@ pub fn lock_purchase_order(
         return Err("Cannot lock a completed or cancelled purchase order".to_string());
     }
 
+    let company_id = order.company_id;
     ctx.db.purchase_order().id().update(PurchaseOrder {
         is_locked: true,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..order
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "is_locked": false }).to_string()),
+            new_values: Some(serde_json::json!({ "is_locked": true }).to_string()),
+            changed_fields: vec!["is_locked".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -776,12 +1215,28 @@ pub fn unlock_purchase_order(
 
     let order = validate_order_in_organization(ctx, organization_id, order_id)?;
 
+    let company_id = order.company_id;
     ctx.db.purchase_order().id().update(PurchaseOrder {
         is_locked: false,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..order
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "is_locked": true }).to_string()),
+            new_values: Some(serde_json::json!({ "is_locked": false }).to_string()),
+            changed_fields: vec!["is_locked".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -804,8 +1259,9 @@ pub fn add_purchase_order_line(
 
     let subtotal = params.quantity * params.price_unit;
     let tax = calculate_tax(ctx, &params.tax_ids, subtotal);
+    let company_id = order.company_id;
 
-    ctx.db.purchase_order_line().insert(PurchaseOrderLine {
+    let line = ctx.db.purchase_order_line().insert(PurchaseOrderLine {
         id: 0,
         organization_id,
         sequence: params.sequence.unwrap_or(0),
@@ -826,7 +1282,7 @@ pub fn add_purchase_order_line(
         order_id,
         account_analytic_id: params.account_analytic_id,
         analytic_tag_ids: Vec::new(),
-        company_id: order.company_id,
+        company_id,
         state: LineState::Draft,
         invoice_lines: Vec::new(),
         qty_invoiced: 0.0,
@@ -861,6 +1317,29 @@ pub fn add_purchase_order_line(
     compute_purchase_order_totals(ctx, organization_id, order_id)?;
     update_po_receipt_status(ctx, organization_id, order_id)?;
     update_po_invoice_status(ctx, organization_id, order_id)?;
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order_line",
+            record_id: line.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "line_id": line.id,
+                    "order_id": order_id,
+                    "product_id": line.product_id,
+                    "quantity": line.product_qty,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
+    );
 
     log::info!("Line added to purchase order {}", order_id);
     Ok(())
@@ -967,6 +1446,9 @@ pub fn update_purchase_order_line(
     let propagate_cancel = params.propagate_cancel.unwrap_or(line.propagate_cancel);
     let metadata = params.metadata.or(line.metadata.clone());
     let order_id = line.order_id;
+    let company_id = order.company_id;
+    let old_qty = line.product_qty;
+    let old_price = line.price_unit;
 
     ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
         product_id,
@@ -993,6 +1475,38 @@ pub fn update_purchase_order_line(
     compute_purchase_order_totals(ctx, organization_id, order_id)?;
     update_po_receipt_status(ctx, organization_id, order_id)?;
     update_po_invoice_status(ctx, organization_id, order_id)?;
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order_line",
+            record_id: line_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "product_qty": old_qty,
+                    "price_unit": old_price,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "product_qty": quantity,
+                    "price_unit": price_unit,
+                    "product_id": product_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "product_qty".to_string(),
+                "price_unit".to_string(),
+                "product_id".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     log::info!("Purchase order line {} updated", line_id);
     Ok(())
@@ -1097,12 +1611,32 @@ pub fn update_po_receipt_status(
         "partial".to_string()
     };
 
+    let company_id = order.company_id;
+    let old_receipt_status = order.receipt_status.clone();
+
     ctx.db.purchase_order().id().update(PurchaseOrder {
-        receipt_status,
+        receipt_status: receipt_status.clone(),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..order
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({ "receipt_status": old_receipt_status }).to_string(),
+            ),
+            new_values: Some(serde_json::json!({ "receipt_status": receipt_status }).to_string()),
+            changed_fields: vec!["receipt_status".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -1136,6 +1670,10 @@ pub fn update_po_invoice_status(
         PoInvoiceStatus::Partial
     };
 
+    let company_id = order.company_id;
+    let old_invoice_status = format!("{:?}", order.invoice_status);
+    let new_invoice_status = format!("{:?}", invoice_status);
+
     ctx.db.purchase_order().id().update(PurchaseOrder {
         invoice_status,
         write_uid: ctx.sender(),
@@ -1143,11 +1681,34 @@ pub fn update_po_invoice_status(
         ..order
     });
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({ "invoice_status": old_invoice_status }).to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({ "invoice_status": new_invoice_status }).to_string(),
+            ),
+            changed_fields: vec!["invoice_status".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
 /// Default quantity tolerance for PO three-way match (ordered / received / billed).
 pub const DEFAULT_QTY_MATCH_TOLERANCE: f64 = 0.001;
+
+/// Default absolute price variance tolerance for competitive 3-way match (bill unit vs PO).
+/// Not yet enforced on `post_invoice`; use with PO `match_qty_tolerance` for qty.
+pub const DEFAULT_PRICE_MATCH_TOLERANCE: f64 = 0.01;
 
 /// Compute three-way match state for a purchase order line.
 ///
@@ -1200,7 +1761,9 @@ pub fn validate_three_way_match_po_lines(
     Ok(())
 }
 
-/// Increment received quantity on a purchase order line and refresh statuses/totals.
+/// Receive quantity on a PO line. When an open IN picking/move exists, advances
+/// confirm→assign→validate (stock + `qty_received` atomically). Falls back to
+/// qty-only for service lines or legacy POs without pickings.
 #[reducer]
 pub fn receive_po_line(
     ctx: &ReducerContext,
@@ -1208,6 +1771,12 @@ pub fn receive_po_line(
     line_id: u64,
     qty: f64,
 ) -> Result<(), String> {
+    use crate::core::organization::CompanyScopeParams;
+    use crate::inventory::stock::{
+        assign_stock_picking, confirm_stock_picking, product_requires_stock, stock_move,
+        stock_picking, validate_stock_picking_backorder,
+    };
+
     check_permission(ctx, organization_id, "purchase_order_line", "write")?;
 
     if qty <= 0.0 {
@@ -1222,20 +1791,137 @@ pub fn receive_po_line(
         .ok_or("Purchase order line not found")?;
 
     let order = validate_order_in_organization(ctx, organization_id, line.order_id)?;
-    let new_qty_received = line.qty_received + qty;
-    if new_qty_received > line.product_qty {
+    let qty_before = line.qty_received;
+    let new_qty_received = qty_before + qty;
+    if new_qty_received > line.product_qty + 1e-9 {
         return Err(format!(
             "Cannot receive {:.4}. Line {} would exceed ordered quantity {:.4} (current received: {:.4})",
-            qty, line_id, line.product_qty, line.qty_received
+            qty, line_id, line.product_qty, qty_before
         ));
     }
-    let order_id = order.id;
 
-    ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
+    let company_id = order.company_id;
+    let order_id = order.id;
+    let scope = CompanyScopeParams {
+        company_id: Some(company_id),
+    };
+
+    // Prefer open inbound move linked to this PO line.
+    let open_move = ctx.db.stock_move().iter().find(|m| {
+        m.organization_id == organization_id
+            && m.purchase_line_id == Some(line_id)
+            && !m.is_done
+            && m.state != "cancel"
+            && m.state != "done"
+    });
+
+    if let Some(mv) = open_move {
+        let picking_id = mv
+            .picking_id
+            .ok_or("Purchase receipt move has no picking")?;
+        let picking = ctx
+            .db
+            .stock_picking()
+            .id()
+            .find(&picking_id)
+            .ok_or("Purchase receipt picking not found")?;
+
+        if picking.state == "draft" {
+            confirm_stock_picking(ctx, organization_id, picking_id, scope.clone())?;
+        }
+        let picking = ctx
+            .db
+            .stock_picking()
+            .id()
+            .find(&picking_id)
+            .ok_or("Purchase receipt picking not found after confirm")?;
+        if picking.state == "confirmed" {
+            assign_stock_picking(ctx, organization_id, picking_id, scope.clone())?;
+        }
+
+        let mv = ctx
+            .db
+            .stock_move()
+            .id()
+            .find(&mv.id)
+            .ok_or("Purchase receipt move not found after assign")?;
+        let residual = (mv.product_uom_qty - mv.quantity_done).max(0.0);
+        if qty > residual + 1e-9 {
+            return Err(format!(
+                "Cannot receive {:.4}. Open move residual is {:.4}",
+                qty, residual
+            ));
+        }
+        let target_done = mv.quantity_done + qty;
+        ctx.db.stock_move().id().update(crate::inventory::stock::StockMove {
+            quantity_done: target_done,
+            product_uom_qty_done: target_done,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..mv
+        });
+
+        // Validate with backorder so sibling lines / residual stay open.
+        validate_stock_picking_backorder(ctx, organization_id, picking_id, scope)?;
+
+        let line_after = ctx
+            .db
+            .purchase_order_line()
+            .id()
+            .find(&line_id)
+            .ok_or("Purchase order line not found after validate")?;
+        let order_after = validate_order_in_organization(ctx, organization_id, order_id)?;
+        let qty_received_after = line_after.qty_received;
+        let match_state =
+            compute_line_match_state(&line_after, qty_match_tolerance_for_order(&order_after));
+        persist_line_match_state(ctx, &order_after, line_after);
+
+        write_audit_log_v2(
+            ctx,
+            organization_id,
+            AuditLogParams {
+                company_id: Some(company_id),
+                table_name: "purchase_order_line",
+                record_id: line_id,
+                action: "UPDATE",
+                old_values: Some(
+                    serde_json::json!({ "qty_received_before": qty_before }).to_string(),
+                ),
+                new_values: Some(
+                    serde_json::json!({
+                        "qty_received_after": qty_received_after,
+                        "qty_delta": qty,
+                        "via": "stock_picking_validate",
+                        "match_state": match_state
+                    })
+                    .to_string(),
+                ),
+                changed_fields: vec!["qty_received".to_string(), "metadata".to_string()],
+                metadata: None,
+            },
+        );
+        return Ok(());
+    }
+
+    // Legacy / service path: qty-only when no stock move (or non-stock product).
+    if product_requires_stock(ctx, line.product_id) {
+        return Err(
+            "No open receipt picking for this line. Confirm the purchase order to create an IN picking, then receive again."
+                .to_string(),
+        );
+    }
+
+    let updated = PurchaseOrderLine {
         qty_received: new_qty_received,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..line
+    };
+    let match_state =
+        compute_line_match_state(&updated, qty_match_tolerance_for_order(&order));
+    ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
+        metadata: merge_match_state_metadata(&updated.metadata, &match_state),
+        ..updated
     });
 
     update_po_receipt_status(ctx, organization_id, order_id)?;
@@ -1245,21 +1931,23 @@ pub fn receive_po_line(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(line.company_id),
+            company_id: Some(company_id),
             table_name: "purchase_order_line",
             record_id: line_id,
             action: "UPDATE",
             old_values: Some(
-                serde_json::json!({ "qty_received_before": line.qty_received }).to_string(),
+                serde_json::json!({ "qty_received_before": qty_before }).to_string(),
             ),
             new_values: Some(
                 serde_json::json!({
                     "qty_received_after": new_qty_received,
-                    "qty_delta": qty
+                    "qty_delta": qty,
+                    "via": "qty_only",
+                    "match_state": match_state
                 })
                 .to_string(),
             ),
-            changed_fields: vec!["qty_received".to_string()],
+            changed_fields: vec!["qty_received".to_string(), "metadata".to_string()],
             metadata: None,
         },
     );
@@ -1298,13 +1986,22 @@ pub fn invoice_po_line(
     }
     let qty_to_invoice = line.product_qty - new_qty_invoiced;
     let order_id = order.id;
+    let company_id = line.company_id;
+    let qty_invoiced_before = line.qty_invoiced;
+    let qty_to_invoice_before = line.qty_to_invoice;
 
-    ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
+    let updated = PurchaseOrderLine {
         qty_invoiced: new_qty_invoiced,
         qty_to_invoice,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..line
+    };
+    let match_state =
+        compute_line_match_state(&updated, qty_match_tolerance_for_order(&order));
+    ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
+        metadata: merge_match_state_metadata(&updated.metadata, &match_state),
+        ..updated
     });
 
     update_po_invoice_status(ctx, organization_id, order_id)?;
@@ -1314,14 +2011,14 @@ pub fn invoice_po_line(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(line.company_id),
+            company_id: Some(company_id),
             table_name: "purchase_order_line",
             record_id: line_id,
             action: "UPDATE",
             old_values: Some(
                 serde_json::json!({
-                    "qty_invoiced_before": line.qty_invoiced,
-                    "qty_to_invoice_before": line.qty_to_invoice
+                    "qty_invoiced_before": qty_invoiced_before,
+                    "qty_to_invoice_before": qty_to_invoice_before
                 })
                 .to_string(),
             ),
@@ -1329,11 +2026,16 @@ pub fn invoice_po_line(
                 serde_json::json!({
                     "qty_invoiced_after": new_qty_invoiced,
                     "qty_to_invoice_after": qty_to_invoice,
-                    "qty_delta": qty
+                    "qty_delta": qty,
+                    "match_state": match_state
                 })
                 .to_string(),
             ),
-            changed_fields: vec!["qty_invoiced".to_string(), "qty_to_invoice".to_string()],
+            changed_fields: vec![
+                "qty_invoiced".to_string(),
+                "qty_to_invoice".to_string(),
+                "metadata".to_string(),
+            ],
             metadata: None,
         },
     );
@@ -1503,6 +2205,138 @@ pub fn approve_purchase_requisition(
     );
 
     log::info!("Purchase requisition {} approved", requisition_id);
+    Ok(())
+}
+
+/// Convert an approved purchase requisition into a draft PO (vendor from `vendor_id`).
+#[reducer]
+pub fn convert_purchase_requisition_to_po(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    requisition_id: u64,
+) -> Result<(), String> {
+    use crate::core::organization::company;
+
+    check_permission(ctx, organization_id, "purchase_order", "create")?;
+    check_permission(ctx, organization_id, "purchase_requisition", "write")?;
+
+    let requisition = ctx
+        .db
+        .purchase_requisition()
+        .id()
+        .find(&requisition_id)
+        .ok_or("Purchase requisition not found")?;
+
+    if requisition.organization_id != organization_id {
+        return Err("Purchase requisition does not belong to this organization".to_string());
+    }
+    if requisition.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+    if !matches!(requisition.state, RequisitionState::Approved) {
+        return Err("Purchase requisition must be Approved to convert to a PO".to_string());
+    }
+    let vendor_id = requisition
+        .vendor_id
+        .ok_or("Purchase requisition has no vendor_id — set a vendor before converting")?;
+
+    let company_row = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+
+    let origin = format!("requisition:{requisition_id}");
+    create_purchase_order(
+        ctx,
+        organization_id,
+        CreatePurchaseOrderParams {
+            company_id: Some(company_id),
+            partner_id: vendor_id,
+            currency_id: company_row.currency_id,
+            origin: Some(origin.clone()),
+            partner_ref: None,
+            notes: requisition.description.clone(),
+            date_planned: requisition.schedule_date,
+            payment_term_id: None,
+            fiscal_position_id: None,
+            incoterm_id: None,
+            incoterm_location: None,
+            user_id: Some(requisition.user_id),
+            invoice_ids: vec![],
+            picking_ids: vec![],
+            message_follower_ids: vec![],
+            message_ids: vec![],
+            activity_ids: vec![],
+            is_quantity_copy: None,
+            metadata: Some(format!(
+                r#"{{"requisition_id":{requisition_id},"converted_from_requisition":true}}"#
+            )),
+        },
+    )?;
+
+    let po = ctx
+        .db
+        .purchase_order()
+        .iter()
+        .filter(|p| {
+            p.organization_id == organization_id
+                && p.company_id == company_id
+                && p.partner_id == vendor_id
+                && p.origin.as_deref() == Some(origin.as_str())
+        })
+        .max_by_key(|p| p.id)
+        .ok_or("Purchase order not found after requisition conversion")?;
+
+    let old_order_count = requisition.order_count;
+    let mut purchase_ids = requisition.purchase_ids.clone();
+    if !purchase_ids.contains(&po.id) {
+        purchase_ids.push(po.id);
+    }
+    let order_count = purchase_ids.len() as u32;
+    let po_id = po.id;
+
+    ctx.db
+        .purchase_requisition()
+        .id()
+        .update(PurchaseRequisition {
+            purchase_ids,
+            order_count,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..requisition
+        });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_requisition",
+            record_id: requisition_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({ "order_count": old_order_count }).to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "purchase_order_id": po_id,
+                    "order_count": order_count
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["purchase_ids".to_string(), "order_count".to_string()],
+            metadata: None,
+        },
+    );
+
+    log::info!(
+        "Purchase requisition {} converted to PO {}",
+        requisition_id,
+        po_id
+    );
     Ok(())
 }
 

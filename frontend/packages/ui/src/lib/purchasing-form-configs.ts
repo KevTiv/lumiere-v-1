@@ -88,6 +88,81 @@ export const newPurchaseOrderForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const editPurchaseOrderForm = (t: TFunction): FormConfig => ({
+  id: "edit-purchase-order",
+  title: t("purchasing.forms.editPurchaseOrder.title", {
+    defaultValue: "Edit purchase order",
+  }),
+  description: t("purchasing.forms.editPurchaseOrder.description", {
+    defaultValue: "Update draft purchase order header fields.",
+  }),
+  sections: [
+    {
+      id: "po-header",
+      title: t("purchasing.forms.editPurchaseOrder.sections.header", {
+        defaultValue: "Header",
+      }),
+      fields: [
+        {
+          id: "orderId",
+          name: "orderId",
+          type: "select",
+          label: t("purchasing.forms.editPurchaseOrder.fields.orderId", {
+            defaultValue: "Purchase order",
+          }),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "partnerId",
+          name: "partnerId",
+          type: "select",
+          label: t("purchasing.forms.newPurchaseOrder.fields.partnerId"),
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "origin",
+          name: "origin",
+          type: "text",
+          label: t("purchasing.forms.newPurchaseOrder.fields.origin"),
+          width: "1/2",
+        },
+        {
+          id: "partnerRef",
+          name: "partnerRef",
+          type: "text",
+          label: t("purchasing.forms.newPurchaseOrder.fields.partnerRef"),
+          width: "1/2",
+        },
+        {
+          id: "datePlanned",
+          name: "datePlanned",
+          type: "date",
+          label: t("purchasing.forms.newPurchaseOrder.fields.datePlanned"),
+          width: "1/2",
+        },
+        {
+          id: "paymentTermId",
+          name: "paymentTermId",
+          type: "select",
+          label: t("purchasing.forms.newPurchaseOrder.fields.paymentTermId"),
+          width: "1/2",
+          options: [{ value: "", label: "—" }],
+        },
+        {
+          id: "notes",
+          name: "notes",
+          type: "textarea",
+          label: t("purchasing.forms.newPurchaseOrder.fields.notes"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
 export const newPurchaseRequisitionForm = (t: TFunction): FormConfig => ({
   id: "new-purchase-requisition",
   title: t("purchasing.forms.newPurchaseRequisition.title"),
@@ -947,6 +1022,7 @@ export const createBillFromPurchaseOrderForm = (t: TFunction): FormConfig => ({
 
 export const purchasingFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-purchase-order": newPurchaseOrderForm(t),
+  "edit-purchase-order": editPurchaseOrderForm(t),
   "new-purchase-requisition": newPurchaseRequisitionForm(t),
   "add-purchase-order-line": addPurchaseOrderLineForm(t),
   "receive-purchase-order-line": receivePurchaseOrderLineForm(t),

@@ -1,15 +1,15 @@
 /// Inventory / procurement receipt and delivery domain tests.
 ///
-/// Note: `receive_po_line` updates PO line `qty_received` and order `receipt_status` — it does
-/// not post stock quants (no incoming picking validate in that path). Quant changes are covered
-/// by `stock_test::test_stock_quant_create` via `update_stock_quant_quantity`.
+/// PO confirm creates a draft IN picking; `receive_po_line` validates it and posts quants
+/// into warehouse stock while syncing `qty_received` / `receipt_status`.
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::organization::CompanyScopeParams;
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
-    assign_stock_picking, confirm_stock_picking, stock_picking, validate_stock_picking,
+    assign_stock_picking, confirm_stock_picking, resolve_warehouse_stock_location, stock_picking,
+    stock_quant, validate_stock_picking,
 };
 use crate::purchasing::purchase_orders::{
     add_purchase_order_line, confirm_purchase_order, create_purchase_order, purchase_order,
@@ -148,6 +148,27 @@ pub fn test_receipt_increases_quant(ctx: &ReducerContext) -> Result<(), String> 
 
     confirm_purchase_order(ctx, org_id, order.id)?;
 
+    let confirmed = ctx
+        .db
+        .purchase_order()
+        .id()
+        .find(&order.id)
+        .ok_or("Purchase order not found after confirm")?;
+    if confirmed.picking_count == 0 || confirmed.picking_ids.is_empty() {
+        return Err("Expected IN picking on PO confirm".to_string());
+    }
+    let picking_id = confirmed.picking_ids[0];
+    let picking = ctx
+        .db
+        .stock_picking()
+        .id()
+        .find(&picking_id)
+        .ok_or("IN picking not found")?;
+    if picking.picking_code.as_deref() != Some("incoming") || picking.purchase_id != Some(order.id)
+    {
+        return Err("Confirm picking is not a PO inbound receipt".to_string());
+    }
+
     let line = ctx
         .db
         .purchase_order_line()
@@ -155,6 +176,20 @@ pub fn test_receipt_increases_quant(ctx: &ReducerContext) -> Result<(), String> 
         .filter(&order.id)
         .next()
         .ok_or("PO line not found")?;
+
+    let stock_loc = resolve_warehouse_stock_location(ctx, fixture.warehouse_id);
+    let qty_before = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.product_id == fixture.product_id
+                && q.location_id == stock_loc
+        })
+        .map(|q| q.quantity)
+        .sum::<f64>();
 
     let qty_to_receive = line.product_qty;
     receive_po_line(ctx, org_id, line.id, qty_to_receive)?;
@@ -184,6 +219,24 @@ pub fn test_receipt_increases_quant(ctx: &ReducerContext) -> Result<(), String> 
         return Err(format!(
             "Expected receipt_status full after full receive, got {}",
             updated_order.receipt_status
+        ));
+    }
+
+    let qty_after = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.product_id == fixture.product_id
+                && q.location_id == stock_loc
+        })
+        .map(|q| q.quantity)
+        .sum::<f64>();
+    if (qty_after - qty_before - qty_to_receive).abs() > 0.001 {
+        return Err(format!(
+            "Expected stock quant +{qty_to_receive} at warehouse (before {qty_before}, after {qty_after})"
         ));
     }
 
@@ -276,6 +329,7 @@ pub fn test_delivery_decreases_reserved_or_moves_quant(ctx: &ReducerContext) -> 
             is_printed: None,
             is_locked: None,
             is_dropship: None,
+            invoice_policy: None,
             message_follower_ids: None,
             message_partner_ids: None,
             message_channel_ids: None,

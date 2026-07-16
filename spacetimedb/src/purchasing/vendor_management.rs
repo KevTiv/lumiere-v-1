@@ -729,6 +729,21 @@ pub fn update_supplier_intake(
 
     ctx.db.supplier_intake_request().id().update(updated);
 
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "supplier_intake_request",
+            record_id: intake_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "id": intake_id }).to_string()),
+            new_values: Some("updated".to_string()),
+            changed_fields: vec!["updated_at".to_string()],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -760,6 +775,28 @@ pub fn delete_supplier_intake(
     }
 
     ctx.db.supplier_intake_request().id().delete(&intake_id);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "supplier_intake_request",
+            record_id: intake_id,
+            action: "DELETE",
+            old_values: Some(
+                serde_json::json!({
+                    "id": intake_id,
+                    "company_name": intake.company_name,
+                    "state": format!("{:?}", intake.state),
+                })
+                .to_string(),
+            ),
+            new_values: None,
+            changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

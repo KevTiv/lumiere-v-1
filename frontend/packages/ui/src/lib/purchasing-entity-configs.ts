@@ -147,6 +147,26 @@ export const purchaseOrdersTableConfig = (
       },
       { key: "partnerId", label: t("purchasing.purchaseOrders.columns.partnerId"), width: "min-w-32" },
       {
+        key: "fulfillmentLabel",
+        label: t("purchasing.purchaseOrders.columns.fulfillment", {
+          defaultValue: "Fulfillment",
+        }),
+        type: "badge",
+        width: "min-w-28",
+        badgeVariants: {
+          Dropship: "outline",
+          Standard: "secondary",
+        },
+        badgeLabels: {
+          Dropship: t("purchasing.purchaseOrders.fulfillment.dropship", {
+            defaultValue: "Dropship",
+          }),
+          Standard: t("purchasing.purchaseOrders.fulfillment.standard", {
+            defaultValue: "Standard",
+          }),
+        },
+      },
+      {
         key: "state",
         label: t("purchasing.purchaseOrders.columns.state"),
         type: "status",

@@ -6,8 +6,11 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{account_move, AccountMove};
+use crate::accounting::tax_management::account_tax;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
-use crate::types::{AccountMoveState, MoveType, PartnerType, PaymentState, PaymentType};
+use crate::types::{
+    AccountMoveState, MoveType, PartnerType, PaymentState, PaymentType, TaxAmountType, TaxTypeUse,
+};
 use crate::workflow::approval_gate::gate_action_with_approval;
 
 // ── Table ─────────────────────────────────────────────────────────────────────
@@ -59,6 +62,54 @@ pub struct CreatePaymentParams {
     pub journal_id: u64,
     pub ref_: Option<String>,
     pub memo: Option<String>,
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Wave C WHT MVP: if outbound supplier payment and company has active pack WHT taxes,
+/// record withhold amount on the payment journal move metadata (no full WHT certificate engine).
+fn wht_metadata_for_vendor_payment(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    payment: &AccountPayment,
+) -> Option<String> {
+    if payment.payment_type != PaymentType::OutBound
+        || payment.partner_type != PartnerType::Supplier
+    {
+        return None;
+    }
+
+    let wht_tax = ctx.db.account_tax().iter().find(|t| {
+        t.organization_id == organization_id
+            && t.company_id == payment.company_id
+            && t.active
+            && t.type_tax_use == TaxTypeUse::Withholding
+    })?;
+
+    let rate = match wht_tax.amount_type {
+        TaxAmountType::Percent => wht_tax.amount / 100.0,
+        _ => wht_tax.amount,
+    };
+    if rate <= 0.0 {
+        return None;
+    }
+
+    let withhold_amount = payment.amount * rate;
+    let net_payable = payment.amount - withhold_amount;
+    Some(
+        serde_json::json!({
+            "wht": {
+                "tax_id": wht_tax.id,
+                "tax_name": wht_tax.name,
+                "rate": rate,
+                "gross_amount": payment.amount,
+                "withhold_amount": withhold_amount,
+                "net_payable": net_payable,
+                "note": "MVP: metadata only — no separate WHT liability journal lines yet"
+            }
+        })
+        .to_string(),
+    )
 }
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
@@ -188,6 +239,9 @@ pub fn post_payment_impl(
         PaymentType::OutBound => MoveType::Entry,
     };
 
+    // WHT on AP payment (country-pack seeds): metadata hook when Withholding tax exists.
+    let wht_metadata = wht_metadata_for_vendor_payment(ctx, organization_id, &payment);
+
     // Create a corresponding journal entry (AccountMove)
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
@@ -242,7 +296,7 @@ pub fn post_payment_impl(
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: None,
+        metadata: wht_metadata,
     });
 
     // Update payment to Posted

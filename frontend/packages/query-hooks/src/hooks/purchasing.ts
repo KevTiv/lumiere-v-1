@@ -17,7 +17,12 @@ import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tansta
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../http"
 import { purchasingBffPost } from "@lumiere/stdb/commands"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import {
+  encodeIdentity,
+  encodeOptionalString,
+  encodeOptionalU64,
+  stdbParamsToJson,
+} from "@lumiere/erp-shared/stdb-params-json"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import type { CreatePurchaseOrderParams, CreatePartnerBankParams, CreatePurchaseRequisitionParams } from "@lumiere/stdb/types"
 
@@ -92,6 +97,34 @@ export function usePurchaseOrders(
   return useQuery<QueryRows>({
     queryKey: ['purchase-orders', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/purchase-orders', 'Failed to fetch purchase orders'),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+/** Server-bounded: `purchase_order.state = ToApprove`. */
+export function usePurchaseOrdersToApprove(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['purchase-orders-to-approve', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/purchase-orders-to-approve',
+        'Failed to fetch purchase orders awaiting approval',
+      ),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+/** Server-bounded: `purchase_order.receipt_status = partial`. */
+export function usePurchaseOrdersPartialReceipt(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['purchase-orders-partial-receipt', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/purchase-orders-partial-receipt',
+        'Failed to fetch partially received purchase orders',
+      ),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
   })
@@ -368,6 +401,36 @@ export function useApprovePurchaseRequisition(organizationId: bigint) {
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useConvertPurchaseRequisitionToPo(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (requisitionId) => {
+      const cid = companyId != null ? Number(companyId) : undefined
+      if (cid == null || !Number.isFinite(cid)) {
+        throw new Error('companyId is required to convert requisition to PO')
+      }
+      const { urlPath, init } = purchasingBffPost("convert_purchase_requisition_to_po", [
+        organizationId,
+        BigInt(cid),
+        toScalarU64(requisitionId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: async () => {
+      const k = rqBigIntKey(organizationId)
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['purchase-requisitions', k] }),
+        qc.invalidateQueries({ queryKey: ['purchase-orders', k] }),
+        qc.invalidateQueries({ queryKey: ['purchase-orders-to-approve', k] }),
+      ])
+    },
   })
 }
 
@@ -986,6 +1049,603 @@ export function useDeletePartnerBank(organizationId: bigint) {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['partner-banks', rqBigIntKey(organizationId)] })
+    },
+  })
+}
+
+// ── Wave C — RFQ / purchase returns (prompt-driven MVP) ───────────────────────
+
+export function useCreatePurchaseRfq(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      requisitionId?: ScalarId | null
+      currencyId: ScalarId
+      notes?: string | null
+      lines: Array<{
+        productId: ScalarId
+        productUom: ScalarId
+        productUomQty: number
+        name?: string | null
+        sequence?: number | null
+      }>
+      metadata?: string | null
+    }
+  >({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson(
+        {
+          requisitionId:
+            params.requisitionId != null
+              ? toScalarU64(params.requisitionId)
+              : null,
+          currencyId: toScalarU64(params.currencyId),
+          notes: params.notes ?? null,
+          lines: params.lines.map((l) => ({
+            productId: toScalarU64(l.productId),
+            productUom: toScalarU64(l.productUom),
+            productUomQty: l.productUomQty,
+            name: l.name ?? null,
+            sequence: l.sequence ?? null,
+          })),
+          metadata: params.metadata ?? null,
+        },
+        "CreatePurchaseRfqParams",
+      )
+      const { urlPath, init } = purchasingBffPost("create_purchase_rfq", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ["purchase-rfqs", k] })
+      void qc.invalidateQueries({ queryKey: ["purchase-rfq-lines", k] })
+    },
+  })
+}
+
+export function useAddPurchaseRfqBid(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      rfqId: ScalarId
+      partnerId: ScalarId
+      currencyId: ScalarId
+      priceUnit: number
+      notes?: string | null
+    }
+  >({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson(
+        {
+          partnerId: toScalarU64(params.partnerId),
+          currencyId: toScalarU64(params.currencyId),
+          priceUnit: params.priceUnit,
+          notes: params.notes ?? null,
+        },
+        "CreatePurchaseRfqBidParams",
+      )
+      const { urlPath, init } = purchasingBffPost("add_purchase_rfq_bid", [
+        organizationId,
+        companyId,
+        toScalarU64(params.rfqId),
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ["purchase-rfqs", k] })
+      void qc.invalidateQueries({ queryKey: ["purchase-rfq-bids", k] })
+    },
+  })
+}
+
+export function useAwardPurchaseRfqBid(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { rfqId: ScalarId; bidId: ScalarId }>({
+    mutationFn: async ({ rfqId, bidId }) => {
+      const { urlPath, init } = purchasingBffPost("award_purchase_rfq_bid", [
+        organizationId,
+        companyId,
+        toScalarU64(rfqId),
+        toScalarU64(bidId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: async () => {
+      const k = rqBigIntKey(organizationId)
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["purchase-rfqs", k] }),
+        qc.invalidateQueries({ queryKey: ["purchase-rfq-bids", k] }),
+        qc.invalidateQueries({ queryKey: ["purchase-orders", k] }),
+        qc.invalidateQueries({ queryKey: ["purchase-order-lines", k] }),
+      ])
+    },
+  })
+}
+
+export function useCreatePurchaseReturn(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      purchaseOrderId?: ScalarId | null
+      partnerId: ScalarId
+      returnReason?: string | null
+      lines: Array<{
+        purchaseOrderLineId?: ScalarId | null
+        productId: ScalarId
+        productUom: ScalarId
+        productUomQty: number
+        priceUnit: number
+        toRefund: boolean
+      }>
+    }
+  >({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson(
+        {
+          purchaseOrderId:
+            params.purchaseOrderId != null
+              ? toScalarU64(params.purchaseOrderId)
+              : null,
+          partnerId: toScalarU64(params.partnerId),
+          returnReason: params.returnReason ?? null,
+          lines: params.lines.map((l) => ({
+            purchaseOrderLineId:
+              l.purchaseOrderLineId != null
+                ? toScalarU64(l.purchaseOrderLineId)
+                : null,
+            productId: toScalarU64(l.productId),
+            productUom: toScalarU64(l.productUom),
+            productUomQty: l.productUomQty,
+            priceUnit: l.priceUnit,
+            toRefund: l.toRefund,
+          })),
+        },
+        "CreatePurchaseReturnParams",
+      )
+      const { urlPath, init } = purchasingBffPost("create_purchase_return", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ["purchase-returns", k] })
+      void qc.invalidateQueries({ queryKey: ["purchase-return-lines", k] })
+    },
+  })
+}
+
+export function useConfirmPurchaseReturn(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (purchaseReturnId) => {
+      const { urlPath, init } = purchasingBffPost("confirm_purchase_return", [
+        organizationId,
+        companyId,
+        toScalarU64(purchaseReturnId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: async () => {
+      const k = rqBigIntKey(organizationId)
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["purchase-returns", k] }),
+        qc.invalidateQueries({ queryKey: ["stock-pickings", k] }),
+        qc.invalidateQueries({ queryKey: ["stock-moves", k] }),
+      ])
+    },
+  })
+}
+
+export function useCreateVendorCreditFromPurchaseReturn(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      purchaseReturnId: ScalarId
+      journalId: ScalarId
+      expenseAccountId: ScalarId
+      payableAccountId: ScalarId
+      metadata?: string | null
+    }
+  >({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson(
+        {
+          journalId: toScalarU64(params.journalId),
+          expenseAccountId: toScalarU64(params.expenseAccountId),
+          payableAccountId: toScalarU64(params.payableAccountId),
+          metadata: params.metadata ?? null,
+        },
+        "CreateVendorCreditFromPurchaseReturnParams",
+      )
+      const { urlPath, init } = purchasingBffPost(
+        "create_vendor_credit_from_purchase_return",
+        [
+          organizationId,
+          companyId,
+          toScalarU64(params.purchaseReturnId),
+          encoded,
+        ],
+      )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: async () => {
+      const k = rqBigIntKey(organizationId)
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["purchase-returns", k] }),
+        qc.invalidateQueries({ queryKey: ["account-moves", k] }),
+      ])
+    },
+  })
+}
+
+// ── Procurement advanced (Wave D) — creates via BFF; no QueryResourceKey lists yet ─
+
+export type CreatePurchaseBlanketOrderParams = {
+  name: string
+  partnerId: bigint
+  currencyId: bigint
+  dateStart?: unknown | null
+  dateEnd?: unknown | null
+  metadata?: string | null
+}
+
+export type ReleaseBlanketToPoParams = {
+  notes?: string | null
+  datePlanned?: unknown | null
+  metadata?: string | null
+}
+
+export type CreatePurchaseContractParams = {
+  name: string
+  partnerId: bigint
+  dateStart?: unknown | null
+  dateEnd?: unknown | null
+  metadata?: string | null
+}
+
+export type UpsertVendorScorecardParams = {
+  partnerId: bigint
+  otifScore: number
+  qualityScore: number
+  metadata?: string | null
+}
+
+export type SetVendorRiskFlagParams = {
+  partnerId: bigint
+  isFlagged: boolean
+  riskLevel: string
+  reason?: string | null
+  metadata?: string | null
+}
+
+export type CreateConsignmentAgreementParams = {
+  name: string
+  partnerId: bigint
+  productId: bigint
+  warehouseId: bigint
+  metadata?: string | null
+}
+
+export type SetPurchaseApprovalDelegateParams = {
+  principalIdentity: string
+  delegateIdentity: string
+  isActive: boolean
+  metadata?: string | null
+}
+
+export type SetCommodityPriceIndexParams = {
+  code: string
+  rate: number
+  asOf: Date | string
+  metadata?: string | null
+}
+
+export type CreatePurchasingIntegrationIntentParams = {
+  provider: string
+  intentType: string
+  purchaseOrderId?: bigint | null
+  idempotencyKey: string
+  requestPayload?: string | null
+  metadata?: string | null
+}
+
+export type RecordPurchasingIntegrationResultParams = {
+  status: string
+  externalReference?: string | null
+  lastError?: string | null
+  metadata?: string | null
+}
+
+function optTs(v: unknown | null | undefined): { none: [] } | { some: unknown } {
+  if (v == null || v === "") return { none: [] }
+  return { some: v }
+}
+
+export function useCreatePurchaseBlanketOrder(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, CreatePurchaseBlanketOrderParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson({
+        name: params.name,
+        partnerId: params.partnerId,
+        currencyId: params.currencyId,
+        dateStart: optTs(params.dateStart),
+        dateEnd: optTs(params.dateEnd),
+        metadata: encodeOptionalString(params.metadata),
+      })
+      const { urlPath, init } = purchasingBffPost("create_purchase_blanket_order", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+  })
+}
+
+export function useReleaseBlanketToPo(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { blanketOrderId: ScalarId; params?: ReleaseBlanketToPoParams }
+  >({
+    mutationFn: async ({ blanketOrderId, params }) => {
+      const encoded = stdbParamsToJson({
+        notes: encodeOptionalString(params?.notes),
+        datePlanned: optTs(params?.datePlanned),
+        metadata: encodeOptionalString(params?.metadata),
+      })
+      const { urlPath, init } = purchasingBffPost("release_blanket_to_po", [
+        organizationId,
+        companyId,
+        toScalarU64(blanketOrderId),
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ["purchase-orders", rqBigIntKey(organizationId)],
+      })
+    },
+  })
+}
+
+export function useCreatePurchaseContract(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, CreatePurchaseContractParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson({
+        name: params.name,
+        partnerId: params.partnerId,
+        dateStart: optTs(params.dateStart),
+        dateEnd: optTs(params.dateEnd),
+        metadata: encodeOptionalString(params.metadata),
+      })
+      const { urlPath, init } = purchasingBffPost("create_purchase_contract", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+  })
+}
+
+export function useUpsertVendorScorecard(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, UpsertVendorScorecardParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson({
+        partnerId: params.partnerId,
+        otifScore: params.otifScore,
+        qualityScore: params.qualityScore,
+        metadata: encodeOptionalString(params.metadata),
+      })
+      const { urlPath, init } = purchasingBffPost("upsert_vendor_scorecard", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+  })
+}
+
+export function useSetVendorRiskFlag(organizationId: bigint, companyId: bigint) {
+  return useMutation<void, Error, SetVendorRiskFlagParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson({
+        partnerId: params.partnerId,
+        isFlagged: params.isFlagged,
+        riskLevel: params.riskLevel,
+        reason: encodeOptionalString(params.reason),
+        metadata: encodeOptionalString(params.metadata),
+      })
+      const { urlPath, init } = purchasingBffPost("set_vendor_risk_flag", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+  })
+}
+
+export function useCreateConsignmentAgreement(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, CreateConsignmentAgreementParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson({
+        name: params.name,
+        partnerId: params.partnerId,
+        productId: params.productId,
+        warehouseId: params.warehouseId,
+        metadata: encodeOptionalString(params.metadata),
+      })
+      const { urlPath, init } = purchasingBffPost("create_consignment_agreement", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+  })
+}
+
+export function useSetPurchaseApprovalDelegate(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, SetPurchaseApprovalDelegateParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson({
+        principalIdentity: encodeIdentity(params.principalIdentity),
+        delegateIdentity: encodeIdentity(params.delegateIdentity),
+        isActive: params.isActive,
+        metadata: encodeOptionalString(params.metadata),
+      })
+      const { urlPath, init } = purchasingBffPost("set_purchase_approval_delegate", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+  })
+}
+
+export function useSetCommodityPriceIndex(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, SetCommodityPriceIndexParams>({
+    mutationFn: async (params) => {
+      const asOfDate =
+        params.asOf instanceof Date ? params.asOf : new Date(String(params.asOf))
+      const encoded = stdbParamsToJson({
+        code: params.code,
+        rate: params.rate,
+        asOf: stbTimestampFromDate(asOfDate),
+        metadata: encodeOptionalString(params.metadata),
+      })
+      const { urlPath, init } = purchasingBffPost("set_commodity_price_index", [
+        organizationId,
+        companyId,
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+  })
+}
+
+export function useCreatePurchasingIntegrationIntent(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<void, Error, CreatePurchasingIntegrationIntentParams>({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson({
+        provider: params.provider,
+        intentType: params.intentType,
+        purchaseOrderId: encodeOptionalU64(params.purchaseOrderId ?? null),
+        idempotencyKey: params.idempotencyKey,
+        requestPayload: encodeOptionalString(params.requestPayload),
+        metadata: encodeOptionalString(params.metadata),
+      })
+      const { urlPath, init } = purchasingBffPost(
+        "create_purchasing_integration_intent",
+        [organizationId, companyId, encoded],
+      )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+  })
+}
+
+export function useRecordPurchasingIntegrationResult(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  return useMutation<
+    void,
+    Error,
+    {
+      intentId: ScalarId
+      params: RecordPurchasingIntegrationResultParams
+    }
+  >({
+    mutationFn: async ({ intentId, params }) => {
+      const encoded = stdbParamsToJson({
+        status: params.status,
+        externalReference: encodeOptionalString(params.externalReference),
+        lastError: encodeOptionalString(params.lastError),
+        metadata: encodeOptionalString(params.metadata),
+      })
+      const { urlPath, init } = purchasingBffPost(
+        "record_purchasing_integration_result",
+        [organizationId, companyId, toScalarU64(intentId), encoded],
+      )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
   })
 }

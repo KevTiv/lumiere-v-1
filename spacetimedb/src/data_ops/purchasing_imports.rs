@@ -92,6 +92,8 @@ pub fn import_purchase_order_csv(
             amount_untaxed: 0.0,
             amount_tax: 0.0,
             amount_total: 0.0,
+            currency_rate: 0.0,
+            match_qty_tolerance: None,
             receipt_status: "nothing".to_string(),
             notes: opt_str(col(&headers, row, "notes")),
             message_main_attachment_id: None,

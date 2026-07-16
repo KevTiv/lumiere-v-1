@@ -23,7 +23,7 @@ use crate::purchasing::purchase_orders::{
     purchase_order, purchase_order_line, validate_three_way_match_po_lines,
     DEFAULT_QTY_MATCH_TOLERANCE,
 };
-use crate::sales::sales_core::{sale_order, sale_order_line};
+use crate::sales::sales_core::{sale_order, sale_order_line, SaleOrderLine};
 use crate::types::{
     AccountMoveState, BudgetState, InvoiceStatus, LineInvoiceStatus, MoveType, PaymentState,
     PoInvoiceStatus,
@@ -839,7 +839,13 @@ fn validate_in_invoice_three_way_match(
         return Ok(());
     }
 
-    let tolerance = DEFAULT_QTY_MATCH_TOLERANCE;
+    let tolerance = ctx
+        .db
+        .purchase_order()
+        .id()
+        .find(&po_id)
+        .map(|o| crate::purchasing::purchase_orders::qty_match_tolerance_for_order(&o))
+        .unwrap_or(DEFAULT_QTY_MATCH_TOLERANCE);
     validate_three_way_match_po_lines(&po_lines, tolerance)?;
 
     for ml in ctx
@@ -1734,6 +1740,29 @@ pub fn create_invoice_from_sale_order(
     use crate::types::SaleState;
     if order.state != SaleState::Sale && order.state != SaleState::Done {
         return Err("Sale order must be confirmed before invoicing".to_string());
+    }
+
+    // Delivery-based policy: refresh qty_to_invoice from delivered residual before selecting lines.
+    if order.invoice_policy == "delivery" {
+        for line in ctx
+            .db
+            .sale_order_line()
+            .order_line_by_order()
+            .filter(&sale_order_id)
+        {
+            if line.display_type.is_some() {
+                continue;
+            }
+            let qty_to_invoice = (line.qty_delivered - line.qty_invoiced).max(0.0);
+            if (qty_to_invoice - line.qty_to_invoice).abs() > f64::EPSILON {
+                ctx.db.sale_order_line().id().update(SaleOrderLine {
+                    qty_to_invoice,
+                    write_uid: ctx.sender(),
+                    write_date: ctx.timestamp,
+                    ..line
+                });
+            }
+        }
     }
 
     let invoiceable_lines: Vec<_> = ctx

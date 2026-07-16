@@ -338,6 +338,8 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
         ("au", "GST-AU", "GST 10%", 0.10, "sale"),
         ("nz", "GST-NZ", "GST 15%", 0.15, "sale"),
         ("za", "VAT-ZA", "VAT 15%", 0.15, "sale"),
+        // WHT seeds: consumed on AP OutBound payment post as AccountMove.metadata.wht
+        // (see accounting/payments.rs::wht_metadata_for_vendor_payment) — not a full WHT engine.
         ("za", "WHT-ZA", "Withholding 20%", 0.20, "withholding"),
         ("sg", "GST-SG", "GST 9%", 0.09, "sale"),
         ("br", "ICMS-BR", "ICMS 18%", 0.18, "sale"),

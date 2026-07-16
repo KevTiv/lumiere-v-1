@@ -11,6 +11,7 @@ use crate::core::organization::{company_id_from_scope, CompanyScopeParams};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::warehouse::warehouse;
+use crate::purchasing::purchase_orders::{purchase_order, purchase_order_line};
 use crate::sales::return_orders::return_order;
 use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::types::{InvoiceStatus, LineInvoiceStatus, ProcureMethod};
@@ -673,14 +674,14 @@ pub(crate) fn apply_validated_move_to_quants(
     location_id: u64,
     location_dest_id: u64,
     qty: f64,
-    is_return: bool,
+    is_inbound: bool,
 ) -> Result<(), String> {
     if qty <= 0.0 || !product_requires_stock(ctx, product_id) {
         return Ok(());
     }
 
-    if is_return {
-        // Customer → warehouse: receive into destination stock location.
+    if is_inbound {
+        // Vendor/customer → warehouse: receive into destination stock location.
         let cost = find_quant_at_location(ctx, organization_id, company_id, product_id, location_dest_id)
             .map(|q| q.cost)
             .or_else(|| {
@@ -1819,6 +1820,13 @@ fn validate_stock_picking_impl(
         return Err("Picking must be assigned before validation".to_string());
     }
 
+    let is_inbound = picking.is_return
+        || picking.picking_code.as_deref() == Some("incoming");
+    // PO receipts require explicit `quantity_done` (0 means skip / not received).
+    let po_receipt = picking.purchase_id.is_some()
+        && picking.picking_code.as_deref() == Some("incoming")
+        && !picking.is_return;
+
     struct ValidatedMove {
         move_id: u64,
         product_id: u64,
@@ -1828,6 +1836,7 @@ fn validate_stock_picking_impl(
         residual: f64,
         product_uom: u64,
         sale_line_id: Option<u64>,
+        purchase_line_id: Option<u64>,
         warehouse_id: Option<u64>,
         partner_id: Option<u64>,
         name: Option<String>,
@@ -1848,7 +1857,9 @@ fn validate_stock_picking_impl(
         if move_record.state != "assigned" {
             continue;
         }
-        let qty_done = if move_record.quantity_done > 0.0 {
+        let qty_done = if po_receipt {
+            move_record.quantity_done.min(move_record.product_uom_qty).max(0.0)
+        } else if move_record.quantity_done > 0.0 {
             move_record.quantity_done.min(move_record.product_uom_qty)
         } else {
             move_record.product_uom_qty
@@ -1863,6 +1874,7 @@ fn validate_stock_picking_impl(
             residual,
             product_uom: move_record.product_uom,
             sale_line_id: move_record.sale_line_id,
+            purchase_line_id: move_record.purchase_line_id,
             warehouse_id: move_record.warehouse_id,
             partner_id: move_record.partner_id,
             name: move_record.name.clone(),
@@ -1897,10 +1909,10 @@ fn validate_stock_picking_impl(
                 vm.location_id,
                 vm.location_dest_id,
                 vm.qty_done,
-                picking.is_return,
+                is_inbound,
             )?;
         }
-        if vm.residual > 1e-9 && !create_backorder && !picking.is_return {
+        if vm.residual > 1e-9 && !create_backorder && !is_inbound {
             if product_requires_stock(ctx, vm.product_id) {
                 unreserve_quantity_at_location(
                     ctx,
@@ -1998,6 +2010,11 @@ fn validate_stock_picking_impl(
                 .ok_or("Backorder picking not found after create")?;
             backorder_picking_id = Some(bo_picking.id);
 
+            let bo_move_type = if picking.picking_code.as_deref() == Some("incoming") {
+                "incoming".to_string()
+            } else {
+                "outgoing".to_string()
+            };
             for (idx, vm) in residual_moves.iter().enumerate() {
                 create_stock_move(
                     ctx,
@@ -2015,7 +2032,7 @@ fn validate_stock_picking_impl(
                         location_id: vm.location_id,
                         location_dest_id: vm.location_dest_id,
                         date_expected: ctx.timestamp,
-                        move_type: "outgoing".to_string(),
+                        move_type: bo_move_type.clone(),
                         priority: "1".to_string(),
                         reference: picking.origin.clone(),
                         sequence: ((idx + 1) as i32) * 10,
@@ -2044,7 +2061,7 @@ fn validate_stock_picking_impl(
                         consume_unbuild_id: None,
                         cost_share: 0.0,
                         is_subcontract: false,
-                        purchase_line_id: None,
+                        purchase_line_id: vm.purchase_line_id,
                         need_release: false,
                         release_ready: false,
                         propagation_cancel: true,
@@ -2219,6 +2236,73 @@ fn validate_stock_picking_impl(
                                 write_date: ctx.timestamp,
                                 ..so
                             });
+                    }
+                }
+            }
+        }
+    } else if let Some(po_id) = picking.purchase_id {
+        let mut received: std::collections::HashMap<u64, f64> = std::collections::HashMap::new();
+        for move_record in ctx
+            .db
+            .stock_move()
+            .move_by_org()
+            .filter(&picking.organization_id)
+        {
+            if move_record.picking_id != Some(picking_id) || !move_record.is_done {
+                continue;
+            }
+            if let Some(pl_id) = move_record.purchase_line_id {
+                *received.entry(pl_id).or_default() += move_record.quantity_done;
+            }
+        }
+
+        for (pl_id, qty_done) in &received {
+            if *qty_done <= 0.0 {
+                continue;
+            }
+            if let Some(pol) = ctx.db.purchase_order_line().id().find(pl_id) {
+                let new_qty_received = (pol.qty_received + qty_done).min(pol.product_qty);
+                let updated = crate::purchasing::purchase_orders::PurchaseOrderLine {
+                    qty_received: new_qty_received,
+                    write_uid: ctx.sender(),
+                    write_date: ctx.timestamp,
+                    ..pol
+                };
+                if let Some(order) = ctx.db.purchase_order().id().find(&updated.order_id) {
+                    crate::purchasing::purchase_orders::persist_line_match_state(
+                        ctx, &order, updated,
+                    );
+                } else {
+                    ctx.db.purchase_order_line().id().update(updated);
+                }
+            }
+        }
+
+        if !received.is_empty() {
+            let _ = crate::purchasing::purchase_orders::update_po_receipt_status(
+                ctx,
+                organization_id,
+                po_id,
+            );
+            let _ = crate::purchasing::purchase_orders::compute_purchase_order_totals(
+                ctx,
+                organization_id,
+                po_id,
+            );
+            if let Some(bo_id) = backorder_picking_id {
+                if let Some(po) = ctx.db.purchase_order().id().find(&po_id) {
+                    let mut picking_ids = po.picking_ids.clone();
+                    if !picking_ids.contains(&bo_id) {
+                        picking_ids.push(bo_id);
+                        ctx.db.purchase_order().id().update(
+                            crate::purchasing::purchase_orders::PurchaseOrder {
+                                picking_ids: picking_ids.clone(),
+                                picking_count: picking_ids.len() as u32,
+                                write_uid: ctx.sender(),
+                                write_date: ctx.timestamp,
+                                ..po
+                            },
+                        );
                     }
                 }
             }

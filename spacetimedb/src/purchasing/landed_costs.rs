@@ -459,10 +459,26 @@ pub fn update_landed_cost(
         updated.metadata = Some(m.clone());
     }
 
+    let company_id = updated.company_id;
     updated.write_uid = ctx.sender();
     updated.write_date = ctx.timestamp;
 
     ctx.db.stock_landed_cost().id().update(updated);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_landed_cost",
+            record_id: landed_cost_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "id": landed_cost_id }).to_string()),
+            new_values: Some("updated".to_string()),
+            changed_fields: vec!["write_date".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -491,6 +507,8 @@ pub fn delete_landed_cost(
         return Err("Can only delete draft landed costs".to_string());
     }
 
+    let company_id = landed_cost.company_id;
+
     let lines: Vec<_> = ctx
         .db
         .stock_landed_cost_lines()
@@ -503,6 +521,23 @@ pub fn delete_landed_cost(
     }
 
     ctx.db.stock_landed_cost().id().delete(&landed_cost_id);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_landed_cost",
+            record_id: landed_cost_id,
+            action: "DELETE",
+            old_values: Some(
+                serde_json::json!({ "id": landed_cost_id, "action": "deleted" }).to_string(),
+            ),
+            new_values: None,
+            changed_fields: vec!["id".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
