@@ -4,11 +4,14 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::refuse_expense_sheet_params_type::RefuseExpenseSheetParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct RefuseExpenseSheetArgs {
     pub organization_id: u64,
     pub sheet_id: u64,
+    pub params: RefuseExpenseSheetParams,
 }
 
 impl From<RefuseExpenseSheetArgs> for super::Reducer {
@@ -16,6 +19,7 @@ impl From<RefuseExpenseSheetArgs> for super::Reducer {
         Self::RefuseExpenseSheet {
             organization_id: args.organization_id,
             sheet_id: args.sheet_id,
+            params: args.params,
         }
     }
 }
@@ -35,8 +39,13 @@ pub trait refuse_expense_sheet {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`refuse_expense_sheet:refuse_expense_sheet_then`] to run a callback after the reducer completes.
-    fn refuse_expense_sheet(&self, organization_id: u64, sheet_id: u64) -> __sdk::Result<()> {
-        self.refuse_expense_sheet_then(organization_id, sheet_id, |_, _| {})
+    fn refuse_expense_sheet(
+        &self,
+        organization_id: u64,
+        sheet_id: u64,
+        params: RefuseExpenseSheetParams,
+    ) -> __sdk::Result<()> {
+        self.refuse_expense_sheet_then(organization_id, sheet_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `refuse_expense_sheet` to run as soon as possible,
@@ -49,6 +58,7 @@ pub trait refuse_expense_sheet {
         &self,
         organization_id: u64,
         sheet_id: u64,
+        params: RefuseExpenseSheetParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -61,6 +71,7 @@ impl refuse_expense_sheet for super::RemoteReducers {
         &self,
         organization_id: u64,
         sheet_id: u64,
+        params: RefuseExpenseSheetParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -70,6 +81,7 @@ impl refuse_expense_sheet for super::RemoteReducers {
             RefuseExpenseSheetArgs {
                 organization_id,
                 sheet_id,
+                params,
             },
             callback,
         )

@@ -64,6 +64,8 @@ pub struct PurchaseOrder {
     pub currency_rate: f64,
     /// Optional qty three-way match epsilon; `None` → [`DEFAULT_QTY_MATCH_TOLERANCE`].
     pub match_qty_tolerance: Option<f64>,
+    /// Optional absolute price variance tolerance; `None` → [`DEFAULT_PRICE_MATCH_TOLERANCE`].
+    pub match_price_tolerance: Option<f64>,
     pub receipt_status: String,
     pub notes: Option<String>,
     pub message_main_attachment_id: Option<u64>,
@@ -140,6 +142,8 @@ pub struct PurchaseOrderLine {
     pub sale_order_id: Option<u64>,
     pub move_dest_ids: Vec<u64>,
     pub move_ids: Vec<u64>,
+    /// First-class three-way match label (`pending`, `matched`, `over_billed`, …).
+    pub match_state: String,
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -186,6 +190,27 @@ pub struct PurchaseRequisition {
     pub write_uid: Identity,
     pub write_date: Timestamp,
     pub metadata: Option<String>,
+}
+
+/// Purchase requisition line — products/qty requested for conversion or RFQ.
+#[spacetimedb::table(
+    accessor = purchase_requisition_line,
+    public,
+    index(accessor = purchase_requisition_line_by_req, btree(columns = [requisition_id])),
+    index(accessor = purchase_requisition_line_by_org, btree(columns = [organization_id]))
+)]
+pub struct PurchaseRequisitionLine {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub requisition_id: u64,
+    pub product_id: u64,
+    pub product_uom: u64,
+    pub product_uom_qty: f64,
+    pub name: Option<String>,
+    pub sequence: u32,
 }
 
 // ── Input Params ──────────────────────────────────────────────────────────────
@@ -244,6 +269,7 @@ pub struct UpdatePurchaseOrderParams {
     pub partner_id: Option<u64>,
     pub currency_id: Option<u64>,
     pub match_qty_tolerance: Option<f64>,
+    pub match_price_tolerance: Option<f64>,
     pub metadata: Option<String>,
 }
 
@@ -263,6 +289,24 @@ pub struct UpdatePurchaseOrderLineParams {
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
+pub struct CreatePurchaseRequisitionLineParams {
+    pub product_id: u64,
+    pub product_uom: u64,
+    pub product_uom_qty: f64,
+    pub name: Option<String>,
+    pub sequence: Option<u32>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AddPurchaseRequisitionLineParams {
+    pub product_id: u64,
+    pub product_uom: u64,
+    pub product_uom_qty: f64,
+    pub name: Option<String>,
+    pub sequence: Option<u32>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
 pub struct CreatePurchaseRequisitionParams {
     pub company_id: Option<u64>,
     pub origin: Option<String>,
@@ -273,7 +317,9 @@ pub struct CreatePurchaseRequisitionParams {
     pub department_id: Option<u64>,
     pub exclusive: Option<String>,
     pub multiple_product: bool,
+    /// Legacy relation bookkeeping; prefer `lines` for product/qty.
     pub line_ids: Vec<u64>,
+    pub lines: Vec<CreatePurchaseRequisitionLineParams>,
     pub purchase_ids: Vec<u64>,
     pub vendor_id: Option<u64>,
     pub activity_ids: Vec<u64>,
@@ -310,6 +356,14 @@ pub fn qty_match_tolerance_for_order(order: &PurchaseOrder) -> f64 {
         .unwrap_or(DEFAULT_QTY_MATCH_TOLERANCE)
 }
 
+/// Effective price match tolerance for a PO (`match_price_tolerance` or default).
+pub fn price_match_tolerance_for_order(order: &PurchaseOrder) -> f64 {
+    order
+        .match_price_tolerance
+        .filter(|t| *t >= 0.0)
+        .unwrap_or(DEFAULT_PRICE_MATCH_TOLERANCE)
+}
+
 fn merge_match_state_metadata(existing: &Option<String>, match_state: &str) -> Option<String> {
     let mut metadata = existing
         .as_ref()
@@ -323,7 +377,51 @@ fn merge_match_state_metadata(existing: &Option<String>, match_state: &str) -> O
     Some(serde_json::Value::Object(metadata).to_string())
 }
 
-/// Persist `metadata.match_state` from [`compute_line_match_state`] using the PO tolerance.
+fn requisition_lines(ctx: &ReducerContext, requisition_id: u64) -> Vec<PurchaseRequisitionLine> {
+    ctx.db
+        .purchase_requisition_line()
+        .purchase_requisition_line_by_req()
+        .filter(&requisition_id)
+        .collect()
+}
+
+/// Resolve unit price for convert: preferred vendor supplier info, else product standard/list, else 0.
+fn resolve_requisition_line_price(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    vendor_id: u64,
+    product_id: u64,
+) -> f64 {
+    use crate::inventory::product::product_supplier_info;
+
+    if let Some(info) = ctx
+        .db
+        .product_supplier_info()
+        .iter()
+        .find(|s| {
+            s.organization_id == organization_id
+                && s.partner_id == vendor_id
+                && s.is_active
+                && (s.product_id == Some(product_id) || s.product_tmpl_id == Some(product_id))
+        })
+    {
+        return info.price;
+    }
+    ctx.db
+        .product()
+        .id()
+        .find(&product_id)
+        .map(|p| {
+            if p.standard_price > 0.0 {
+                p.standard_price
+            } else {
+                p.list_price
+            }
+        })
+        .unwrap_or(0.0)
+}
+
+/// Persist column + `metadata.match_state` from [`compute_line_match_state`] using the PO tolerance.
 pub fn persist_line_match_state(
     ctx: &ReducerContext,
     order: &PurchaseOrder,
@@ -331,6 +429,7 @@ pub fn persist_line_match_state(
 ) {
     let tolerance = qty_match_tolerance_for_order(order);
     let match_state = compute_line_match_state(&line, tolerance);
+    line.match_state = match_state.clone();
     line.metadata = merge_match_state_metadata(&line.metadata, &match_state);
     line.write_uid = ctx.sender();
     line.write_date = ctx.timestamp;
@@ -508,6 +607,7 @@ pub fn create_purchase_order(
         amount_total: 0.0,
         currency_rate: 0.0,
         match_qty_tolerance: None,
+        match_price_tolerance: None,
         receipt_status: "nothing".to_string(),
         notes: params.notes,
         message_main_attachment_id: None,
@@ -1139,6 +1239,12 @@ pub fn update_purchase_order(
         }
         updated.match_qty_tolerance = Some(tol);
     }
+    if let Some(tol) = params.match_price_tolerance {
+        if tol < 0.0 {
+            return Err("match_price_tolerance must be non-negative".to_string());
+        }
+        updated.match_price_tolerance = Some(tol);
+    }
     if let Some(ref m) = params.metadata {
         updated.metadata = Some(m.clone());
     }
@@ -1301,6 +1407,7 @@ pub fn add_purchase_order_line(
         sale_order_id: None,
         move_dest_ids: Vec::new(),
         move_ids: Vec::new(),
+        match_state: "pending".to_string(),
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
@@ -1522,6 +1629,7 @@ pub fn compute_purchase_order_line_totals(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order_line", "write")?;
 
+    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
     let lines: Vec<_> = ctx
         .db
         .purchase_order_line()
@@ -1545,6 +1653,28 @@ pub fn compute_purchase_order_line_totals(
             ..line
         });
     }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(order.company_id),
+            table_name: "purchase_order",
+            record_id: order_id,
+            action: "COMPUTE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "computed": "purchase_order_line_totals" }).to_string(),
+            ),
+            changed_fields: vec![
+                "price_subtotal".to_string(),
+                "price_tax".to_string(),
+                "price_total".to_string(),
+                "qty_to_invoice".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -1570,6 +1700,7 @@ pub fn compute_purchase_order_totals(
     let amount_untaxed: f64 = lines.iter().map(|l| l.price_subtotal).sum();
     let amount_tax: f64 = lines.iter().map(|l| l.price_tax).sum();
     let amount_total = amount_untaxed + amount_tax;
+    let company_id = order.company_id;
 
     ctx.db.purchase_order().id().update(PurchaseOrder {
         amount_untaxed,
@@ -1579,6 +1710,32 @@ pub fn compute_purchase_order_totals(
         write_date: ctx.timestamp,
         ..order
     });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order",
+            record_id: order_id,
+            action: "COMPUTE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "amount_untaxed": amount_untaxed,
+                    "amount_tax": amount_tax,
+                    "amount_total": amount_total
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "amount_untaxed".to_string(),
+                "amount_tax".to_string(),
+                "amount_total".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -1708,7 +1865,7 @@ pub fn update_po_invoice_status(
 pub const DEFAULT_QTY_MATCH_TOLERANCE: f64 = 0.001;
 
 /// Default absolute price variance tolerance for competitive 3-way match (bill unit vs PO).
-/// Not yet enforced on `post_invoice`; use with PO `match_qty_tolerance` for qty.
+/// Enforced on `post_invoice` for `InInvoice` lines linked via `invoice_origin = PO{id}`.
 pub const DEFAULT_PRICE_MATCH_TOLERANCE: f64 = 0.01;
 
 /// Compute three-way match state for a purchase order line.
@@ -1921,6 +2078,7 @@ pub fn receive_po_line(
     let match_state =
         compute_line_match_state(&updated, qty_match_tolerance_for_order(&order));
     ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
+        match_state: match_state.clone(),
         metadata: merge_match_state_metadata(&updated.metadata, &match_state),
         ..updated
     });
@@ -1948,7 +2106,11 @@ pub fn receive_po_line(
                 })
                 .to_string(),
             ),
-            changed_fields: vec!["qty_received".to_string(), "metadata".to_string()],
+            changed_fields: vec![
+                "qty_received".to_string(),
+                "match_state".to_string(),
+                "metadata".to_string(),
+            ],
             metadata: None,
         },
     );
@@ -2001,6 +2163,7 @@ pub fn invoice_po_line(
     let match_state =
         compute_line_match_state(&updated, qty_match_tolerance_for_order(&order));
     ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
+        match_state: match_state.clone(),
         metadata: merge_match_state_metadata(&updated.metadata, &match_state),
         ..updated
     });
@@ -2035,6 +2198,7 @@ pub fn invoice_po_line(
             changed_fields: vec![
                 "qty_invoiced".to_string(),
                 "qty_to_invoice".to_string(),
+                "match_state".to_string(),
                 "metadata".to_string(),
             ],
             metadata: None,
@@ -2059,8 +2223,20 @@ pub fn create_purchase_requisition(
         ExclusiveMode::from_str(excl)?;
     }
 
+    for line in &params.lines {
+        if line.product_uom_qty <= 0.0 {
+            return Err("Requisition line quantity must be greater than zero".to_string());
+        }
+        ctx.db
+            .product()
+            .id()
+            .find(&line.product_id)
+            .ok_or("Product not found")?;
+    }
+
     let order_count = params.purchase_ids.len() as u32;
     let exclusive = params.exclusive.unwrap_or_else(|| "multiple".to_string());
+    let multiple_product = params.multiple_product || params.lines.len() > 1;
 
     let requisition = ctx.db.purchase_requisition().insert(PurchaseRequisition {
         id: 0,
@@ -2077,11 +2253,11 @@ pub fn create_purchase_requisition(
         exclusive,
         account_analytic_id: None,
         picking_type_id: None,
-        line_ids: params.line_ids,
+        line_ids: vec![],
         purchase_ids: params.purchase_ids,
         order_count,
         vendor_id: params.vendor_id,
-        multiple_product: params.multiple_product,
+        multiple_product,
         activity_ids: params.activity_ids,
         message_follower_ids: params.message_follower_ids,
         message_ids: params.message_ids,
@@ -2092,22 +2268,147 @@ pub fn create_purchase_requisition(
         metadata: params.metadata,
     });
 
+    let mut line_ids = Vec::with_capacity(params.lines.len());
+    for (idx, line) in params.lines.iter().enumerate() {
+        let row = ctx.db.purchase_requisition_line().insert(PurchaseRequisitionLine {
+            id: 0,
+            organization_id,
+            company_id,
+            requisition_id: requisition.id,
+            product_id: line.product_id,
+            product_uom: line.product_uom,
+            product_uom_qty: line.product_uom_qty,
+            name: line.name.clone(),
+            sequence: line.sequence.unwrap_or(((idx + 1) as u32) * 10),
+        });
+        line_ids.push(row.id);
+    }
+
+    let requisition_id = requisition.id;
+    ctx.db.purchase_requisition().id().update(PurchaseRequisition {
+        line_ids: line_ids.clone(),
+        ..requisition
+    });
+
     write_audit_log_v2(
         ctx,
         organization_id,
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_requisition",
-            record_id: requisition.id,
+            record_id: requisition_id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(serde_json::json!({ "id": requisition.id }).to_string()),
-            changed_fields: vec!["id".to_string()],
+            new_values: Some(
+                serde_json::json!({
+                    "id": requisition_id,
+                    "line_count": line_ids.len()
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["id".to_string(), "line_ids".to_string()],
             metadata: None,
         },
     );
 
-    log::info!("Purchase requisition {} created", requisition.id);
+    log::info!(
+        "Purchase requisition {} created with {} lines",
+        requisition_id,
+        line_ids.len()
+    );
+    Ok(())
+}
+
+/// Add a product line to a draft purchase requisition.
+#[reducer]
+pub fn add_purchase_requisition_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    requisition_id: u64,
+    params: AddPurchaseRequisitionLineParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_requisition", "write")?;
+
+    if params.product_uom_qty <= 0.0 {
+        return Err("Requisition line quantity must be greater than zero".to_string());
+    }
+
+    let requisition = ctx
+        .db
+        .purchase_requisition()
+        .id()
+        .find(&requisition_id)
+        .ok_or("Purchase requisition not found")?;
+    if requisition.organization_id != organization_id {
+        return Err("Purchase requisition does not belong to this organization".to_string());
+    }
+    if requisition.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+    if !matches!(requisition.state, RequisitionState::Draft) {
+        return Err("Can only add lines to draft purchase requisitions".to_string());
+    }
+
+    ctx.db
+        .product()
+        .id()
+        .find(&params.product_id)
+        .ok_or("Product not found")?;
+
+    let sequence = params
+        .sequence
+        .unwrap_or_else(|| ((requisition.line_ids.len() + 1) as u32) * 10);
+
+    let row = ctx.db.purchase_requisition_line().insert(PurchaseRequisitionLine {
+        id: 0,
+        organization_id,
+        company_id,
+        requisition_id,
+        product_id: params.product_id,
+        product_uom: params.product_uom,
+        product_uom_qty: params.product_uom_qty,
+        name: params.name.clone(),
+        sequence,
+    });
+
+    let mut line_ids = requisition.line_ids.clone();
+    line_ids.push(row.id);
+    let multiple_product = line_ids.len() > 1;
+    ctx.db.purchase_requisition().id().update(PurchaseRequisition {
+        line_ids,
+        multiple_product,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..requisition
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_requisition_line",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "requisition_id": requisition_id,
+                    "product_id": params.product_id,
+                    "product_uom_qty": params.product_uom_qty
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "product_id".to_string(),
+                "product_uom".to_string(),
+                "product_uom_qty".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
     Ok(())
 }
 
@@ -2242,6 +2543,14 @@ pub fn convert_purchase_requisition_to_po(
         .vendor_id
         .ok_or("Purchase requisition has no vendor_id — set a vendor before converting")?;
 
+    let req_lines = requisition_lines(ctx, requisition_id);
+    if req_lines.is_empty() {
+        return Err(
+            "Purchase requisition has no lines — add product lines before converting to a PO"
+                .to_string(),
+        );
+    }
+
     let company_row = ctx
         .db
         .company()
@@ -2290,6 +2599,32 @@ pub fn convert_purchase_requisition_to_po(
         })
         .max_by_key(|p| p.id)
         .ok_or("Purchase order not found after requisition conversion")?;
+
+    for line in &req_lines {
+        let price_unit =
+            resolve_requisition_line_price(ctx, organization_id, vendor_id, line.product_id);
+        add_purchase_order_line(
+            ctx,
+            organization_id,
+            po.id,
+            AddPurchaseOrderLineParams {
+                product_id: line.product_id,
+                quantity: line.product_uom_qty,
+                uom_id: line.product_uom,
+                price_unit,
+                discount: 0.0,
+                tax_ids: vec![],
+                name: line.name.clone(),
+                sequence: Some(line.sequence),
+                display_type: None,
+                product_variant_id: None,
+                account_analytic_id: None,
+                date_planned: requisition.schedule_date,
+                propagate_cancel: None,
+                metadata: Some(format!(r#"{{"requisition_line_id":{}}}"#, line.id)),
+            },
+        )?;
+    }
 
     let old_order_count = requisition.order_count;
     let mut purchase_ids = requisition.purchase_ids.clone();

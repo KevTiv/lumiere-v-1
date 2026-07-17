@@ -10,8 +10,14 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  PostExpenseSheetParams,
+} from "./types";
+
 export default {
   organizationId: __t.u64(),
   sheetId: __t.u64(),
-  accountingDate: __t.timestamp(),
+  get params() {
+    return PostExpenseSheetParams;
+  },
 };

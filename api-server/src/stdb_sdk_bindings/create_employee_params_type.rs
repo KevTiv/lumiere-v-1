@@ -22,6 +22,7 @@ pub struct CreateEmployeeParams {
     pub work_phone: Option<String>,
     pub mobile_phone: Option<String>,
     pub work_location: Option<String>,
+    pub work_contact_partner_id: Option<u64>,
     pub date_hired: Option<__sdk::Timestamp>,
     pub gender: Option<String>,
     pub birthday: Option<__sdk::Timestamp>,

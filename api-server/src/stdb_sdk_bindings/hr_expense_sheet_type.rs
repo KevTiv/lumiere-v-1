@@ -17,10 +17,16 @@ pub struct HrExpenseSheet {
     pub state: ExpenseSheetState,
     pub total_amount: f64,
     pub currency_id: u64,
+    pub currency_rate: f64,
+    pub company_currency_id: u64,
     pub accounting_date: Option<__sdk::Timestamp>,
     pub account_move_id: Option<u64>,
+    pub reimbursement_move_id: Option<u64>,
+    pub rebill_move_id: Option<u64>,
+    pub submitted_by: Option<__sdk::Identity>,
     pub approver_id: Option<__sdk::Identity>,
     pub notes: Option<String>,
+    pub metadata: Option<String>,
     pub created_at: __sdk::Timestamp,
 }
 
@@ -40,10 +46,16 @@ pub struct HrExpenseSheetCols {
     pub state: __sdk::__query_builder::Col<HrExpenseSheet, ExpenseSheetState>,
     pub total_amount: __sdk::__query_builder::Col<HrExpenseSheet, f64>,
     pub currency_id: __sdk::__query_builder::Col<HrExpenseSheet, u64>,
+    pub currency_rate: __sdk::__query_builder::Col<HrExpenseSheet, f64>,
+    pub company_currency_id: __sdk::__query_builder::Col<HrExpenseSheet, u64>,
     pub accounting_date: __sdk::__query_builder::Col<HrExpenseSheet, Option<__sdk::Timestamp>>,
     pub account_move_id: __sdk::__query_builder::Col<HrExpenseSheet, Option<u64>>,
+    pub reimbursement_move_id: __sdk::__query_builder::Col<HrExpenseSheet, Option<u64>>,
+    pub rebill_move_id: __sdk::__query_builder::Col<HrExpenseSheet, Option<u64>>,
+    pub submitted_by: __sdk::__query_builder::Col<HrExpenseSheet, Option<__sdk::Identity>>,
     pub approver_id: __sdk::__query_builder::Col<HrExpenseSheet, Option<__sdk::Identity>>,
     pub notes: __sdk::__query_builder::Col<HrExpenseSheet, Option<String>>,
+    pub metadata: __sdk::__query_builder::Col<HrExpenseSheet, Option<String>>,
     pub created_at: __sdk::__query_builder::Col<HrExpenseSheet, __sdk::Timestamp>,
 }
 
@@ -59,10 +71,22 @@ impl __sdk::__query_builder::HasCols for HrExpenseSheet {
             state: __sdk::__query_builder::Col::new(table_name, "state"),
             total_amount: __sdk::__query_builder::Col::new(table_name, "total_amount"),
             currency_id: __sdk::__query_builder::Col::new(table_name, "currency_id"),
+            currency_rate: __sdk::__query_builder::Col::new(table_name, "currency_rate"),
+            company_currency_id: __sdk::__query_builder::Col::new(
+                table_name,
+                "company_currency_id",
+            ),
             accounting_date: __sdk::__query_builder::Col::new(table_name, "accounting_date"),
             account_move_id: __sdk::__query_builder::Col::new(table_name, "account_move_id"),
+            reimbursement_move_id: __sdk::__query_builder::Col::new(
+                table_name,
+                "reimbursement_move_id",
+            ),
+            rebill_move_id: __sdk::__query_builder::Col::new(table_name, "rebill_move_id"),
+            submitted_by: __sdk::__query_builder::Col::new(table_name, "submitted_by"),
             approver_id: __sdk::__query_builder::Col::new(table_name, "approver_id"),
             notes: __sdk::__query_builder::Col::new(table_name, "notes"),
+            metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
         }
     }

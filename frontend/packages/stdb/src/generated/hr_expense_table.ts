@@ -10,6 +10,8 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 import {
+  ExpenseLineKind,
+  ExpensePaymentMode,
   ExpenseState,
 } from "./types";
 
@@ -29,11 +31,29 @@ export default __t.row({
   taxIds: __t.array(__t.u64()).name("tax_ids"),
   accountId: __t.option(__t.u64()).name("account_id"),
   analyticAccountId: __t.option(__t.u64()).name("analytic_account_id"),
+  projectId: __t.option(__t.u64()).name("project_id"),
+  get lineKind() {
+    return ExpenseLineKind.name("line_kind");
+  },
+  mileageDistance: __t.option(__t.f64()).name("mileage_distance"),
+  mileageRateId: __t.option(__t.u64()).name("mileage_rate_id"),
+  perDiemDays: __t.option(__t.f64()).name("per_diem_days"),
+  perDiemRateId: __t.option(__t.u64()).name("per_diem_rate_id"),
   sheetId: __t.option(__t.u64()).name("sheet_id"),
   get state() {
     return ExpenseState;
   },
   description: __t.option(__t.string()),
   attachmentIds: __t.array(__t.u64()).name("attachment_ids"),
+  hasReceipt: __t.bool().name("has_receipt"),
+  clientRequestId: __t.option(__t.string()).name("client_request_id"),
+  get paymentMode() {
+    return ExpensePaymentMode.name("payment_mode");
+  },
+  merchantKey: __t.option(__t.string()).name("merchant_key"),
+  fraudHold: __t.bool().name("fraud_hold"),
+  fraudReason: __t.option(__t.string()).name("fraud_reason"),
+  duplicateOfId: __t.option(__t.u64()).name("duplicate_of_id"),
+  policyHold: __t.bool().name("policy_hold"),
   createdAt: __t.timestamp().name("created_at"),
 });

@@ -4,12 +4,14 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::post_expense_sheet_params_type::PostExpenseSheetParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct PostExpenseSheetArgs {
     pub organization_id: u64,
     pub sheet_id: u64,
-    pub accounting_date: __sdk::Timestamp,
+    pub params: PostExpenseSheetParams,
 }
 
 impl From<PostExpenseSheetArgs> for super::Reducer {
@@ -17,7 +19,7 @@ impl From<PostExpenseSheetArgs> for super::Reducer {
         Self::PostExpenseSheet {
             organization_id: args.organization_id,
             sheet_id: args.sheet_id,
-            accounting_date: args.accounting_date,
+            params: args.params,
         }
     }
 }
@@ -41,9 +43,9 @@ pub trait post_expense_sheet {
         &self,
         organization_id: u64,
         sheet_id: u64,
-        accounting_date: __sdk::Timestamp,
+        params: PostExpenseSheetParams,
     ) -> __sdk::Result<()> {
-        self.post_expense_sheet_then(organization_id, sheet_id, accounting_date, |_, _| {})
+        self.post_expense_sheet_then(organization_id, sheet_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `post_expense_sheet` to run as soon as possible,
@@ -56,7 +58,7 @@ pub trait post_expense_sheet {
         &self,
         organization_id: u64,
         sheet_id: u64,
-        accounting_date: __sdk::Timestamp,
+        params: PostExpenseSheetParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -69,7 +71,7 @@ impl post_expense_sheet for super::RemoteReducers {
         &self,
         organization_id: u64,
         sheet_id: u64,
-        accounting_date: __sdk::Timestamp,
+        params: PostExpenseSheetParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -79,7 +81,7 @@ impl post_expense_sheet for super::RemoteReducers {
             PostExpenseSheetArgs {
                 organization_id,
                 sheet_id,
-                accounting_date,
+                params,
             },
             callback,
         )

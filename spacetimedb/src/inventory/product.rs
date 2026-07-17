@@ -397,6 +397,8 @@ pub struct UpdateProductPricingParams {
     pub standard_price: Option<f64>,
     pub list_price: Option<f64>,
     pub currency_id: Option<u64>,
+    /// standard | average | fifo | lifo
+    pub cost_method: Option<String>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -706,6 +708,21 @@ pub fn update_product_pricing(
     check_permission(ctx, organization_id, "product", "write")?;
 
     let new_list_price = params.list_price.unwrap_or(product.list_price);
+    let new_cost_method = if let Some(ref m) = params.cost_method {
+        let normalized = crate::inventory::costing::normalize_cost_method(m);
+        if !matches!(
+            normalized.as_str(),
+            "standard" | "average" | "fifo" | "lifo"
+        ) {
+            return Err(format!(
+                "Invalid cost_method '{}'; expected standard|average|fifo|lifo",
+                m
+            ));
+        }
+        normalized
+    } else {
+        product.cost_method.clone()
+    };
 
     ctx.db.product().id().update(Product {
         standard_price: params.standard_price.unwrap_or(product.standard_price),
@@ -714,6 +731,7 @@ pub fn update_product_pricing(
         price: new_list_price,
         public_price: new_list_price,
         currency_id: params.currency_id.unwrap_or(product.currency_id),
+        cost_method: new_cost_method.clone(),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..product
@@ -729,13 +747,18 @@ pub fn update_product_pricing(
             action: "UPDATE",
             old_values: None,
             new_values: Some(
-                serde_json::json!({ "product_id": product_id, "list_price": new_list_price })
-                    .to_string(),
+                serde_json::json!({
+                    "product_id": product_id,
+                    "list_price": new_list_price,
+                    "cost_method": new_cost_method,
+                })
+                .to_string(),
             ),
             changed_fields: vec![
                 "standard_price".to_string(),
                 "list_price".to_string(),
                 "currency_id".to_string(),
+                "cost_method".to_string(),
             ],
             metadata: None,
         },

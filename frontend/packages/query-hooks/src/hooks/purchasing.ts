@@ -55,6 +55,7 @@ const CREATE_PURCHASE_ORDER_DEFAULTS: Record<string, unknown> = {
 const CREATE_PURCHASE_REQUISITION_DEFAULTS: Record<string, unknown> = {
   multipleProduct: false,
   lineIds: [],
+  lines: [],
   purchaseIds: [],
   activityIds: [],
   messageFollowerIds: [],
@@ -124,6 +125,20 @@ export function usePurchaseOrdersPartialReceipt(organizationId: bigint, initialD
       fetchQueryList(
         '/api/query/purchase-orders-partial-receipt',
         'Failed to fetch partially received purchase orders',
+      ),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+/** Server-bounded: `purchase_order_line.match_state = over_billed`. */
+export function usePurchaseOrderLinesOverBilled(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['purchase-order-lines-over-billed', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/purchase-order-lines-over-billed',
+        'Failed to fetch over-billed purchase order lines',
       ),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
@@ -231,8 +246,56 @@ export function useCreatePurchaseRequisition(
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create purchase requisition')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['purchase-requisitions', k] })
+      void qc.invalidateQueries({ queryKey: ['purchase-requisition-lines', k] })
+    },
+  })
+}
+
+export function useAddPurchaseRequisitionLine(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    {
+      requisitionId: ScalarId
+      productId: ScalarId
+      productUom: ScalarId
+      productUomQty: number
+      name?: string | null
+      sequence?: number | null
+    }
+  >({
+    mutationFn: async (params) => {
+      const encoded = stdbParamsToJson(
+        {
+          productId: toScalarU64(params.productId),
+          productUom: toScalarU64(params.productUom),
+          productUomQty: params.productUomQty,
+          name: params.name ?? null,
+          sequence: params.sequence ?? null,
+        },
+        "AddPurchaseRequisitionLineParams",
+      )
+      const { urlPath, init } = purchasingBffPost("add_purchase_requisition_line", [
+        organizationId,
+        companyId,
+        toScalarU64(params.requisitionId),
+        encoded,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorPo(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['purchase-requisitions', k] })
+      void qc.invalidateQueries({ queryKey: ['purchase-requisition-lines', k] })
+    },
   })
 }
 

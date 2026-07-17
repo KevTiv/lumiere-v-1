@@ -262,6 +262,31 @@ export function useConfirmSaleOrder(organizationId: bigint) {
   })
 }
 
+/** Multi-WH promise ATP: refresh line scheduled_date / free_qty_today / SO commitment_date. */
+export function useRefreshSaleOrderPromiseDates(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (orderId: bigint | number | string) => {
+      const { urlPath, init } = salesBffPost("refresh_sale_order_promise_dates", [
+        organizationId,
+        companyId,
+        orderId,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw await salesReducerError(r, "Failed to refresh promise dates")
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      qc.invalidateQueries({ queryKey: ['sale-orders', k] })
+      qc.invalidateQueries({ queryKey: ['sale-orders-to-approve', k] })
+      qc.invalidateQueries({ queryKey: ['sale-order-lines', k] })
+    },
+  })
+}
+
 export function useSendSaleOrderQuotation(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({

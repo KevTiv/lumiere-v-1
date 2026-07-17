@@ -18,6 +18,7 @@ pub struct UpdateEmployeeParams {
     pub work_phone: Option<String>,
     pub mobile_phone: Option<String>,
     pub work_location: Option<String>,
+    pub work_contact_partner_id: Option<u64>,
     pub employment_type: Option<EmploymentType>,
     pub user_id: Option<__sdk::Identity>,
 }

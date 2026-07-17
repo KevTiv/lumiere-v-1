@@ -739,6 +739,13 @@
     "propagate_cancel",
     "metadata"
   ],
+  "AddPurchaseRequisitionLineParams": [
+    "product_id",
+    "product_uom",
+    "product_uom_qty",
+    "name",
+    "sequence"
+  ],
   "AddPurchaseRfqLineParams": [
     "product_id",
     "product_uom",
@@ -1237,6 +1244,10 @@
     "status",
     "provider_message_id",
     "operational_message_id",
+    "metadata"
+  ],
+  "ApplyExpenseAdvanceParams": [
+    "amount",
     "metadata"
   ],
   "ApplyOmnichannelAllocationParams": [
@@ -3056,6 +3067,7 @@
     "work_phone",
     "mobile_phone",
     "work_location",
+    "work_contact_partner_id",
     "date_hired",
     "gender",
     "birthday",
@@ -3067,6 +3079,23 @@
     "image_url",
     "color",
     "is_active",
+    "metadata"
+  ],
+  "CreateExpenseAdvanceParams": [
+    "company_id",
+    "employee_id",
+    "name",
+    "amount",
+    "currency_id",
+    "client_request_id",
+    "metadata"
+  ],
+  "CreateExpenseIntegrationIntentParams": [
+    "company_id",
+    "intent_type",
+    "idempotency_key",
+    "device_id",
+    "payload",
     "metadata"
   ],
   "CreateExpenseParams": [
@@ -3082,7 +3111,32 @@
     "tax_ids",
     "account_id",
     "analytic_account_id",
-    "attachment_ids"
+    "project_id",
+    "line_kind",
+    "mileage_distance",
+    "mileage_rate_id",
+    "per_diem_days",
+    "per_diem_rate_id",
+    "attachment_ids",
+    "client_request_id",
+    "payment_mode",
+    "merchant_key",
+    "policy_exception_reason"
+  ],
+  "CreateExpenseProjectRebillParams": [
+    "journal_id",
+    "receivable_account_id",
+    "income_account_id",
+    "invoice_date",
+    "partner_id",
+    "client_request_id"
+  ],
+  "CreateExpenseReimbursementParams": [
+    "journal_id",
+    "liquidity_account_id",
+    "payable_account_id",
+    "payment_date",
+    "client_request_id"
   ],
   "CreateExpenseSheetParams": [
     "company_id",
@@ -3951,6 +4005,13 @@
     "is_quantity_copy",
     "metadata"
   ],
+  "CreatePurchaseRequisitionLineParams": [
+    "product_id",
+    "product_uom",
+    "product_uom_qty",
+    "name",
+    "sequence"
+  ],
   "CreatePurchaseRequisitionParams": [
     "company_id",
     "origin",
@@ -3962,6 +4023,7 @@
     "exclusive",
     "multiple_product",
     "line_ids",
+    "lines",
     "purchase_ids",
     "vendor_id",
     "activity_ids",
@@ -4975,6 +5037,14 @@
     "pbh_dpm_ids",
     "metadata"
   ],
+  "CreateWarehouseSyncIntentParams": [
+    "warehouse_id",
+    "op_type",
+    "idempotency_key",
+    "device_id",
+    "payload",
+    "metadata"
+  ],
   "CreateWarehouseTaskParams": [
     "name",
     "task_type",
@@ -5562,6 +5632,33 @@
     "strategy",
     "metadata"
   ],
+  "ExpenseAllocationLineParams": [
+    "analytic_account_id",
+    "project_id",
+    "share_percent",
+    "billable",
+    "metadata"
+  ],
+  "ExpenseIntegrationIntent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "intent_type",
+    "status",
+    "idempotency_key",
+    "device_id",
+    "payload",
+    "result_expense_id",
+    "result_sheet_id",
+    "last_error",
+    "attempt_count",
+    "applied_at",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
   "ExpenseSheet": [
     "id",
     "organization_id",
@@ -5571,14 +5668,28 @@
     "state",
     "total_amount",
     "currency_id",
+    "currency_rate",
+    "company_currency_id",
     "accounting_date",
     "account_move_id",
+    "reimbursement_move_id",
+    "rebill_move_id",
+    "submitted_by",
     "approver_id",
     "notes",
+    "metadata",
     "created_at"
   ],
   "ExportFinancialReportParams": [
     "export_format"
+  ],
+  "FailExpenseIntegrationIntentParams": [
+    "last_error",
+    "metadata"
+  ],
+  "FailWarehouseSyncIntentParams": [
+    "last_error",
+    "metadata"
   ],
   "FieldOption": [
     "value",
@@ -5888,6 +5999,7 @@
     "work_phone",
     "mobile_phone",
     "work_location",
+    "work_contact_partner_id",
     "date_hired",
     "date_terminated",
     "employment_type",
@@ -5920,11 +6032,108 @@
     "tax_ids",
     "account_id",
     "analytic_account_id",
+    "project_id",
+    "line_kind",
+    "mileage_distance",
+    "mileage_rate_id",
+    "per_diem_days",
+    "per_diem_rate_id",
     "sheet_id",
     "state",
     "description",
     "attachment_ids",
+    "has_receipt",
+    "client_request_id",
+    "payment_mode",
+    "merchant_key",
+    "fraud_hold",
+    "fraud_reason",
+    "duplicate_of_id",
+    "policy_hold",
     "created_at"
+  ],
+  "HrExpenseAdvance": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "name",
+    "amount",
+    "residual",
+    "currency_id",
+    "state",
+    "client_request_id",
+    "metadata",
+    "created_at"
+  ],
+  "HrExpenseAdvanceApplication": [
+    "id",
+    "organization_id",
+    "company_id",
+    "advance_id",
+    "sheet_id",
+    "amount",
+    "created_at"
+  ],
+  "HrExpenseAllocation": [
+    "id",
+    "organization_id",
+    "company_id",
+    "expense_id",
+    "analytic_account_id",
+    "project_id",
+    "share_percent",
+    "amount",
+    "billable",
+    "metadata"
+  ],
+  "HrExpenseMileageRate": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "currency_id",
+    "rate_per_unit",
+    "unit",
+    "effective_from",
+    "effective_to",
+    "active",
+    "metadata"
+  ],
+  "HrExpensePerDiemRate": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "currency_id",
+    "location_code",
+    "amount_per_day",
+    "effective_from",
+    "effective_to",
+    "active",
+    "metadata"
+  ],
+  "HrExpensePolicy": [
+    "id",
+    "organization_id",
+    "company_id",
+    "max_line_amount",
+    "max_sheet_amount",
+    "active",
+    "metadata"
+  ],
+  "HrExpensePolicyException": [
+    "id",
+    "organization_id",
+    "company_id",
+    "expense_id",
+    "reason",
+    "state",
+    "requested_by",
+    "approved_by",
+    "created_at",
+    "resolved_at",
+    "metadata"
   ],
   "HrExpenseSheet": [
     "id",
@@ -5935,10 +6144,16 @@
     "state",
     "total_amount",
     "currency_id",
+    "currency_rate",
+    "company_currency_id",
     "accounting_date",
     "account_move_id",
+    "reimbursement_move_id",
+    "rebill_move_id",
+    "submitted_by",
     "approver_id",
     "notes",
+    "metadata",
     "created_at"
   ],
   "HrJobPosition": [
@@ -7653,6 +7868,16 @@
     "write_date",
     "metadata"
   ],
+  "PostExpenseSheetParams": [
+    "journal_id",
+    "payable_account_id",
+    "default_expense_account_id",
+    "default_tax_account_id",
+    "card_liability_account_id",
+    "advance_account_id",
+    "accounting_date",
+    "client_request_id"
+  ],
   "PostRealizedFxParams": [
     "payment_id",
     "invoice_move_id",
@@ -8250,6 +8475,7 @@
     "amount_total",
     "currency_rate",
     "match_qty_tolerance",
+    "match_price_tolerance",
     "receipt_status",
     "notes",
     "message_main_attachment_id",
@@ -8314,6 +8540,7 @@
     "sale_order_id",
     "move_dest_ids",
     "move_ids",
+    "match_state",
     "create_uid",
     "create_date",
     "write_uid",
@@ -8348,6 +8575,17 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "PurchaseRequisitionLine": [
+    "id",
+    "organization_id",
+    "company_id",
+    "requisition_id",
+    "product_id",
+    "product_uom",
+    "product_uom_qty",
+    "name",
+    "sequence"
   ],
   "PurchaseReturn": [
     "id",
@@ -8712,6 +8950,9 @@
     "upsert_only",
     "metadata"
   ],
+  "RefuseExpenseSheetParams": [
+    "reason"
+  ],
   "RegisterDeviceParams": [
     "name",
     "device_type",
@@ -8790,6 +9031,10 @@
     "create_date",
     "write_uid",
     "write_date",
+    "metadata"
+  ],
+  "RequestExpensePolicyExceptionParams": [
+    "reason",
     "metadata"
   ],
   "ResPartnerBank": [
@@ -9382,6 +9627,14 @@
   "SetContactSegmentRulesParams": [
     "replace_all",
     "rules",
+    "metadata"
+  ],
+  "SetExpenseAllocationsParams": [
+    "lines"
+  ],
+  "SetExpenseFraudHoldParams": [
+    "fraud_hold",
+    "fraud_reason",
     "metadata"
   ],
   "SetPurchaseApprovalDelegateParams": [
@@ -10089,9 +10342,6 @@
     "created_by",
     "created_at",
     "metadata"
-  ],
-  "SubmitExpenseSheetParams": [
-    "total_amount"
   ],
   "SubmitSupplierIntakeParams": [
     "company_name",
@@ -10903,6 +11153,7 @@
     "work_phone",
     "mobile_phone",
     "work_location",
+    "work_contact_partner_id",
     "employment_type",
     "user_id"
   ],
@@ -10912,7 +11163,8 @@
     "unit_amount",
     "quantity",
     "description",
-    "account_id"
+    "account_id",
+    "attachment_ids"
   ],
   "UpdateFinancialReportParams": [
     "name",
@@ -11184,7 +11436,8 @@
   "UpdateProductPricingParams": [
     "standard_price",
     "list_price",
-    "currency_id"
+    "currency_id",
+    "cost_method"
   ],
   "UpdateProductSupplierInfoParams": [
     "min_qty",
@@ -11279,6 +11532,7 @@
     "partner_id",
     "currency_id",
     "match_qty_tolerance",
+    "match_price_tolerance",
     "metadata"
   ],
   "UpdateQualityAlertReasonParams": [
@@ -11604,6 +11858,7 @@
     "crossdock",
     "sequence",
     "partner_id",
+    "resupply_wh_ids",
     "metadata"
   ],
   "UpdateWhatsAppBusinessAccountParams": [
@@ -11680,6 +11935,35 @@
     "allowed_action_drafts",
     "is_active",
     "is_system",
+    "metadata"
+  ],
+  "UpsertExpenseMileageRateParams": [
+    "company_id",
+    "name",
+    "currency_id",
+    "rate_per_unit",
+    "unit",
+    "effective_from",
+    "effective_to",
+    "active",
+    "metadata"
+  ],
+  "UpsertExpensePerDiemRateParams": [
+    "company_id",
+    "name",
+    "currency_id",
+    "location_code",
+    "amount_per_day",
+    "effective_from",
+    "effective_to",
+    "active",
+    "metadata"
+  ],
+  "UpsertExpensePolicyParams": [
+    "company_id",
+    "max_line_amount",
+    "max_sheet_amount",
+    "active",
     "metadata"
   ],
   "UpsertOrganizationSettingsParams": [
@@ -11925,6 +12209,25 @@
     "create_date",
     "write_uid",
     "write_date"
+  ],
+  "WarehouseSyncIntent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "warehouse_id",
+    "op_type",
+    "status",
+    "idempotency_key",
+    "device_id",
+    "payload",
+    "last_error",
+    "attempt_count",
+    "applied_at",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
   ],
   "WarehouseTask": [
     "id",

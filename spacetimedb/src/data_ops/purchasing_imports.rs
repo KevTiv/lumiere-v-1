@@ -3,7 +3,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::{product_supplier_info, ProductSupplierInfo};
 use crate::purchasing::purchase_orders::{
     purchase_order, purchase_order_line, PurchaseOrder, PurchaseOrderLine,
@@ -94,6 +94,7 @@ pub fn import_purchase_order_csv(
             amount_total: 0.0,
             currency_rate: 0.0,
             match_qty_tolerance: None,
+            match_price_tolerance: None,
             receipt_status: "nothing".to_string(),
             notes: opt_str(col(&headers, row, "notes")),
             message_main_attachment_id: None,
@@ -122,7 +123,24 @@ pub fn import_purchase_order_csv(
         imported += 1;
     }
 
+    let job_id = job.id;
     finish_import_job(ctx, job, imported, errors);
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order",
+            record_id: job_id,
+            action: "IMPORT",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "imported": imported, "errors": errors }).to_string(),
+            ),
+            changed_fields: vec!["csv".to_string()],
+            metadata: Some(format!(r#"{{"import_job_id":{job_id}}}"#)),
+        },
+    );
     log::info!(
         "Import purchase_order: imported={}, errors={}",
         imported,
@@ -224,6 +242,7 @@ pub fn import_purchase_order_line_csv(
             sale_order_id: None,
             move_dest_ids: vec![],
             move_ids: vec![],
+            match_state: "pending".to_string(),
             create_uid: ctx.sender(),
             create_date: ctx.timestamp,
             write_uid: ctx.sender(),
@@ -233,7 +252,24 @@ pub fn import_purchase_order_line_csv(
         imported += 1;
     }
 
+    let job_id = job.id;
     finish_import_job(ctx, job, imported, errors);
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order_line",
+            record_id: job_id,
+            action: "IMPORT",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "imported": imported, "errors": errors }).to_string(),
+            ),
+            changed_fields: vec!["csv".to_string()],
+            metadata: Some(format!(r#"{{"import_job_id":{job_id}}}"#)),
+        },
+    );
     log::info!(
         "Import purchase_order_line: imported={}, errors={}",
         imported,
@@ -315,7 +351,24 @@ pub fn import_supplier_info_csv(
         imported += 1;
     }
 
+    let job_id = job.id;
     finish_import_job(ctx, job, imported, errors);
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "product_supplier_info",
+            record_id: job_id,
+            action: "IMPORT",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "imported": imported, "errors": errors }).to_string(),
+            ),
+            changed_fields: vec!["csv".to_string()],
+            metadata: Some(format!(r#"{{"import_job_id":{job_id}}}"#)),
+        },
+    );
     log::info!(
         "Import supplier_info: imported={}, errors={}",
         imported,

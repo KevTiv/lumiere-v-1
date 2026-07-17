@@ -48,6 +48,7 @@ pub mod add_document_version_params_type;
 pub mod add_landed_cost_line_params_type;
 pub mod add_org_member_params_type;
 pub mod add_purchase_order_line_params_type;
+pub mod add_purchase_requisition_line_params_type;
 pub mod add_purchase_rfq_line_params_type;
 pub mod add_user_to_organization_params_type;
 pub mod add_workflow_activity_params_type;
@@ -80,6 +81,7 @@ pub mod analytics_metric_type;
 pub mod append_ai_agent_run_step_params_type;
 pub mod append_ai_chat_message_params_type;
 pub mod append_crm_conversation_message_params_type;
+pub mod apply_expense_advance_params_type;
 pub mod apply_omnichannel_allocation_params_type;
 pub mod apply_sale_promotion_params_type;
 pub mod approval_request_type;
@@ -228,7 +230,11 @@ pub mod create_document_processing_job_params_type;
 pub mod create_document_template_params_type;
 pub mod create_elimination_entry_params_type;
 pub mod create_employee_params_type;
+pub mod create_expense_advance_params_type;
+pub mod create_expense_integration_intent_params_type;
 pub mod create_expense_params_type;
+pub mod create_expense_project_rebill_params_type;
+pub mod create_expense_reimbursement_params_type;
 pub mod create_expense_sheet_params_type;
 pub mod create_financial_report_params_type;
 pub mod create_fiscal_position_params_type;
@@ -294,6 +300,7 @@ pub mod create_project_params_type;
 pub mod create_purchase_blanket_order_params_type;
 pub mod create_purchase_contract_params_type;
 pub mod create_purchase_order_params_type;
+pub mod create_purchase_requisition_line_params_type;
 pub mod create_purchase_requisition_params_type;
 pub mod create_purchase_return_line_params_type;
 pub mod create_purchase_return_params_type;
@@ -360,6 +367,7 @@ pub mod create_utm_source_params_type;
 pub mod create_vendor_credit_from_purchase_return_params_type;
 pub mod create_warehouse_3_d_zone_params_type;
 pub mod create_warehouse_params_type;
+pub mod create_warehouse_sync_intent_params_type;
 pub mod create_warehouse_task_params_type;
 pub mod create_whats_app_business_account_params_type;
 pub mod create_workcenter_params_type;
@@ -400,9 +408,17 @@ pub mod enqueue_job_params_type;
 pub mod error_intercompany_transaction_params_type;
 pub mod execute_cross_dock_params_type;
 pub mod execute_directed_putaway_params_type;
+pub mod expense_advance_state_type;
+pub mod expense_allocation_line_params_type;
+pub mod expense_integration_intent_type;
+pub mod expense_line_kind_type;
+pub mod expense_payment_mode_type;
+pub mod expense_policy_exception_state_type;
 pub mod expense_sheet_state_type;
 pub mod expense_state_type;
 pub mod export_financial_report_params_type;
+pub mod fail_expense_integration_intent_params_type;
+pub mod fail_warehouse_sync_intent_params_type;
 pub mod field_option_type;
 pub mod field_type_type;
 pub mod field_validation_type;
@@ -431,6 +447,13 @@ pub mod hr_contract_type;
 pub mod hr_department_type;
 pub mod hr_employee_type;
 pub mod hr_expense_type;
+pub mod hr_expense_advance_type;
+pub mod hr_expense_advance_application_type;
+pub mod hr_expense_allocation_type;
+pub mod hr_expense_mileage_rate_type;
+pub mod hr_expense_per_diem_rate_type;
+pub mod hr_expense_policy_type;
+pub mod hr_expense_policy_exception_type;
 pub mod hr_expense_sheet_type;
 pub mod hr_job_position_type;
 pub mod hr_leave_type;
@@ -554,6 +577,7 @@ pub mod pos_payment_method_type;
 pub mod pos_session_type;
 pub mod pos_status_type;
 pub mod pos_terminal_type;
+pub mod post_expense_sheet_params_type;
 pub mod post_realized_fx_params_type;
 pub mod pricelist_applied_on_type;
 pub mod privacy_consent_type;
@@ -586,6 +610,7 @@ pub mod purchase_contract_type;
 pub mod purchase_order_type;
 pub mod purchase_order_line_type;
 pub mod purchase_requisition_type;
+pub mod purchase_requisition_line_type;
 pub mod purchase_return_type;
 pub mod purchase_return_line_type;
 pub mod purchase_rfq_type;
@@ -617,6 +642,7 @@ pub mod record_sales_integration_result_params_type;
 pub mod record_telemetry_params_type;
 pub mod record_whats_app_health_check_params_type;
 pub mod refresh_inventory_exceptions_params_type;
+pub mod refuse_expense_sheet_params_type;
 pub mod register_device_params_type;
 pub mod register_hub_params_type;
 pub mod register_queue_worker_params_type;
@@ -626,6 +652,7 @@ pub mod replenishment_rule_type;
 pub mod report_state_type;
 pub mod report_template_type;
 pub mod report_type_type;
+pub mod request_expense_policy_exception_params_type;
 pub mod requisition_state_type;
 pub mod res_partner_bank_type;
 pub mod return_order_type;
@@ -670,6 +697,8 @@ pub mod set_company_country_pack_params_type;
 pub mod set_company_vertical_pack_params_type;
 pub mod set_consolidation_company_rate_params_type;
 pub mod set_contact_segment_rules_params_type;
+pub mod set_expense_allocations_params_type;
+pub mod set_expense_fraud_hold_params_type;
 pub mod set_purchase_approval_delegate_params_type;
 pub mod set_record_custom_field_values_params_type;
 pub mod set_vendor_risk_flag_params_type;
@@ -702,7 +731,6 @@ pub mod stock_reorder_group_type;
 pub mod stock_route_type;
 pub mod stock_rule_type;
 pub mod stock_traceability_report_type;
-pub mod submit_expense_sheet_params_type;
 pub mod submit_supplier_intake_params_type;
 pub mod subscription_type;
 pub mod subscription_line_type;
@@ -846,6 +874,9 @@ pub mod update_widget_layout_params_type;
 pub mod update_workcenter_params_type;
 pub mod upsert_ai_skill_config_params_type;
 pub mod upsert_ai_skill_params_type;
+pub mod upsert_expense_mileage_rate_params_type;
+pub mod upsert_expense_per_diem_rate_params_type;
+pub mod upsert_expense_policy_params_type;
 pub mod upsert_organization_settings_params_type;
 pub mod upsert_partner_credit_control_params_type;
 pub mod upsert_search_embedding_params_type;
@@ -869,6 +900,7 @@ pub mod verification_status_type;
 pub mod warehouse_type;
 pub mod warehouse_3_d_zone_type;
 pub mod warehouse_geo_type;
+pub mod warehouse_sync_intent_type;
 pub mod warehouse_task_type;
 pub mod whats_app_business_account_type;
 pub mod widget_type_type;
@@ -901,6 +933,7 @@ pub mod add_proposal_comment_reducer;
 pub mod add_proposal_line_item_reducer;
 pub mod add_proposal_source_doc_reducer;
 pub mod add_purchase_order_line_reducer;
+pub mod add_purchase_requisition_line_reducer;
 pub mod add_purchase_rfq_bid_reducer;
 pub mod add_purchase_rfq_line_reducer;
 pub mod add_rule_to_nomenclature_reducer;
@@ -913,6 +946,8 @@ pub mod allocate_payment_transaction_reducer;
 pub mod append_ai_agent_run_step_reducer;
 pub mod append_ai_chat_message_reducer;
 pub mod append_crm_conversation_message_reducer;
+pub mod apply_expense_advance_to_sheet_reducer;
+pub mod apply_expense_integration_intent_reducer;
 pub mod apply_global_migrations_reducer;
 pub mod apply_landed_costs_reducer;
 pub mod apply_omnichannel_allocation_reducer;
@@ -920,10 +955,12 @@ pub mod apply_org_migrations_reducer;
 pub mod apply_reconciliation_rules_reducer;
 pub mod apply_sale_order_options_reducer;
 pub mod apply_sale_promotion_to_order_reducer;
+pub mod apply_warehouse_sync_intent_reducer;
 pub mod approve_ai_action_draft_reducer;
 pub mod approve_approval_request_reducer;
 pub mod approve_bank_statement_import_reducer;
 pub mod approve_document_processing_job_reducer;
+pub mod approve_expense_policy_exception_reducer;
 pub mod approve_expense_sheet_reducer;
 pub mod approve_intercompany_transaction_reducer;
 pub mod approve_leave_reducer;
@@ -1092,6 +1129,10 @@ pub mod create_elimination_entry_reducer;
 pub mod create_employee_reducer;
 pub mod create_exchange_order_from_return_reducer;
 pub mod create_expense_reducer;
+pub mod create_expense_advance_reducer;
+pub mod create_expense_integration_intent_reducer;
+pub mod create_expense_project_rebill_reducer;
+pub mod create_expense_reimbursement_payment_reducer;
 pub mod create_expense_sheet_reducer;
 pub mod create_financial_report_reducer;
 pub mod create_fiscal_position_reducer;
@@ -1224,6 +1265,7 @@ pub mod create_utm_source_reducer;
 pub mod create_vendor_credit_from_purchase_return_reducer;
 pub mod create_warehouse_reducer;
 pub mod create_warehouse_3_d_zone_reducer;
+pub mod create_warehouse_sync_intent_reducer;
 pub mod create_warehouse_task_reducer;
 pub mod create_whatsapp_business_account_reducer;
 pub mod create_workcenter_reducer;
@@ -1312,9 +1354,11 @@ pub mod expire_ai_action_drafts_reducer;
 pub mod expire_contract_reducer;
 pub mod explode_bom_reducer;
 pub mod export_financial_report_reducer;
+pub mod fail_expense_integration_intent_reducer;
 pub mod fail_iot_action_reducer;
 pub mod fail_quality_check_reducer;
 pub mod fail_scheduled_owner_report_run_reducer;
+pub mod fail_warehouse_sync_intent_reducer;
 pub mod finalize_import_assistant_job_reducer;
 pub mod find_duplicate_contacts_reducer;
 pub mod finish_manufacturing_order_reducer;
@@ -1468,6 +1512,7 @@ pub mod record_whatsapp_health_check_reducer;
 pub mod record_whatsapp_message_sent_reducer;
 pub mod refresh_inventory_exceptions_reducer;
 pub mod refresh_policy_snapshot_reducer;
+pub mod refresh_sale_order_promise_dates_reducer;
 pub mod refresh_tax_deadline_statuses_reducer;
 pub mod refuse_expense_sheet_reducer;
 pub mod refuse_leave_reducer;
@@ -1491,6 +1536,7 @@ pub mod reopen_inventory_close_reducer;
 pub mod reopen_ticket_reducer;
 pub mod reorder_proposal_line_items_reducer;
 pub mod request_embedding_job_reducer;
+pub mod request_expense_policy_exception_reducer;
 pub mod reserve_serial_reducer;
 pub mod reserve_stock_quant_reducer;
 pub mod reset_leave_to_draft_reducer;
@@ -1523,6 +1569,7 @@ pub mod run_all_accounting_tests_reducer;
 pub mod run_all_core_tests_reducer;
 pub mod run_all_crm_tests_reducer;
 pub mod run_all_domain_tests_reducer;
+pub mod run_all_expenses_tests_reducer;
 pub mod run_all_inventory_tests_reducer;
 pub mod run_all_platform_tests_reducer;
 pub mod run_all_purchasing_tests_reducer;
@@ -1538,6 +1585,10 @@ pub mod run_crm_opportunity_convert_test_reducer;
 pub mod run_crm_relationship_admin_test_reducer;
 pub mod run_crm_wave_2_test_reducer;
 pub mod run_documents_folder_test_reducer;
+pub mod run_expenses_wave_a_test_reducer;
+pub mod run_expenses_wave_b_test_reducer;
+pub mod run_expenses_wave_c_test_reducer;
+pub mod run_expenses_wave_d_test_reducer;
 pub mod run_fx_revaluation_reducer;
 pub mod run_fx_revaluation_batch_reducer;
 pub mod run_helpdesk_ticket_test_reducer;
@@ -1559,10 +1610,13 @@ pub mod run_inventory_expired_lot_test_reducer;
 pub mod run_inventory_fefo_test_reducer;
 pub mod run_inventory_lot_reserve_test_reducer;
 pub mod run_inventory_lot_validate_test_reducer;
+pub mod run_inventory_multi_wh_promise_atp_test_reducer;
 pub mod run_inventory_packing_workflow_test_reducer;
 pub mod run_inventory_product_category_test_reducer;
 pub mod run_inventory_product_update_test_reducer;
 pub mod run_inventory_qc_quarantine_test_reducer;
+pub mod run_inventory_receipt_average_costing_test_reducer;
+pub mod run_inventory_receipt_fifo_layers_test_reducer;
 pub mod run_inventory_receipt_quant_test_reducer;
 pub mod run_inventory_replenishment_demand_test_reducer;
 pub mod run_inventory_serial_id_validate_test_reducer;
@@ -1570,6 +1624,7 @@ pub mod run_inventory_serial_reserve_test_reducer;
 pub mod run_inventory_stock_inventory_test_reducer;
 pub mod run_inventory_stock_quant_test_reducer;
 pub mod run_inventory_uom_conversion_test_reducer;
+pub mod run_inventory_warehouse_sync_test_reducer;
 pub mod run_inventory_wave_release_test_reducer;
 pub mod run_manufacturing_workcenter_test_reducer;
 pub mod run_owner_report_schedule_reducer;
@@ -1577,6 +1632,7 @@ pub mod run_purchasing_bill_balanced_test_reducer;
 pub mod run_purchasing_company_isolation_test_reducer;
 pub mod run_purchasing_incoming_picking_test_reducer;
 pub mod run_purchasing_wave_c_smoke_test_reducer;
+pub mod run_purchasing_wave_e_test_reducer;
 pub mod run_sales_atp_shortfall_test_reducer;
 pub mod run_sales_backorder_test_reducer;
 pub mod run_sales_commission_accrue_test_reducer;
@@ -1623,6 +1679,8 @@ pub mod set_company_vertical_pack_reducer;
 pub mod set_consolidation_company_rate_reducer;
 pub mod set_contact_communication_preference_reducer;
 pub mod set_contact_segment_rules_reducer;
+pub mod set_expense_allocations_reducer;
+pub mod set_expense_fraud_hold_reducer;
 pub mod set_form_role_config_reducer;
 pub mod set_intercompany_rule_active_reducer;
 pub mod set_iot_threshold_reducer;
@@ -1814,6 +1872,9 @@ pub mod update_widget_layout_reducer;
 pub mod update_workcenter_reducer;
 pub mod upsert_ai_skill_reducer;
 pub mod upsert_ai_skill_config_reducer;
+pub mod upsert_expense_mileage_rate_reducer;
+pub mod upsert_expense_per_diem_rate_reducer;
+pub mod upsert_expense_policy_reducer;
 pub mod upsert_organization_settings_reducer;
 pub mod upsert_partner_credit_control_reducer;
 pub mod upsert_proposal_section_reducer;
@@ -1944,6 +2005,7 @@ pub mod document_table;
 pub mod document_sequence_table;
 pub mod document_template_table;
 pub mod document_version_table;
+pub mod expense_integration_intent_table;
 pub mod expense_sheet_table;
 pub mod financial_report_table;
 pub mod fleet_vehicle_table;
@@ -1961,6 +2023,13 @@ pub mod hr_contract_table;
 pub mod hr_department_table;
 pub mod hr_employee_table;
 pub mod hr_expense_table;
+pub mod hr_expense_advance_table;
+pub mod hr_expense_advance_application_table;
+pub mod hr_expense_allocation_table;
+pub mod hr_expense_mileage_rate_table;
+pub mod hr_expense_per_diem_rate_table;
+pub mod hr_expense_policy_table;
+pub mod hr_expense_policy_exception_table;
 pub mod hr_job_position_table;
 pub mod hr_leave_table;
 pub mod hr_leave_type_table;
@@ -2061,6 +2130,7 @@ pub mod purchase_contract_table;
 pub mod purchase_order_table;
 pub mod purchase_order_line_table;
 pub mod purchase_requisition_table;
+pub mod purchase_requisition_line_table;
 pub mod purchase_return_table;
 pub mod purchase_return_line_table;
 pub mod purchase_rfq_table;
@@ -2145,6 +2215,7 @@ pub mod vendor_scorecard_table;
 pub mod warehouse_table;
 pub mod warehouse_3_d_zone_table;
 pub mod warehouse_geo_table;
+pub mod warehouse_sync_intent_table;
 pub mod warehouse_task_table;
 pub mod whatsapp_business_account_table;
 pub mod workflow_table;
@@ -2190,6 +2261,7 @@ pub use add_document_version_params_type::AddDocumentVersionParams;
 pub use add_landed_cost_line_params_type::AddLandedCostLineParams;
 pub use add_org_member_params_type::AddOrgMemberParams;
 pub use add_purchase_order_line_params_type::AddPurchaseOrderLineParams;
+pub use add_purchase_requisition_line_params_type::AddPurchaseRequisitionLineParams;
 pub use add_purchase_rfq_line_params_type::AddPurchaseRfqLineParams;
 pub use add_user_to_organization_params_type::AddUserToOrganizationParams;
 pub use add_workflow_activity_params_type::AddWorkflowActivityParams;
@@ -2222,6 +2294,7 @@ pub use analytics_metric_type::AnalyticsMetric;
 pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
 pub use append_ai_chat_message_params_type::AppendAiChatMessageParams;
 pub use append_crm_conversation_message_params_type::AppendCrmConversationMessageParams;
+pub use apply_expense_advance_params_type::ApplyExpenseAdvanceParams;
 pub use apply_omnichannel_allocation_params_type::ApplyOmnichannelAllocationParams;
 pub use apply_sale_promotion_params_type::ApplySalePromotionParams;
 pub use approval_request_type::ApprovalRequest;
@@ -2370,7 +2443,11 @@ pub use create_document_processing_job_params_type::CreateDocumentProcessingJobP
 pub use create_document_template_params_type::CreateDocumentTemplateParams;
 pub use create_elimination_entry_params_type::CreateEliminationEntryParams;
 pub use create_employee_params_type::CreateEmployeeParams;
+pub use create_expense_advance_params_type::CreateExpenseAdvanceParams;
+pub use create_expense_integration_intent_params_type::CreateExpenseIntegrationIntentParams;
 pub use create_expense_params_type::CreateExpenseParams;
+pub use create_expense_project_rebill_params_type::CreateExpenseProjectRebillParams;
+pub use create_expense_reimbursement_params_type::CreateExpenseReimbursementParams;
 pub use create_expense_sheet_params_type::CreateExpenseSheetParams;
 pub use create_financial_report_params_type::CreateFinancialReportParams;
 pub use create_fiscal_position_params_type::CreateFiscalPositionParams;
@@ -2436,6 +2513,7 @@ pub use create_project_params_type::CreateProjectParams;
 pub use create_purchase_blanket_order_params_type::CreatePurchaseBlanketOrderParams;
 pub use create_purchase_contract_params_type::CreatePurchaseContractParams;
 pub use create_purchase_order_params_type::CreatePurchaseOrderParams;
+pub use create_purchase_requisition_line_params_type::CreatePurchaseRequisitionLineParams;
 pub use create_purchase_requisition_params_type::CreatePurchaseRequisitionParams;
 pub use create_purchase_return_line_params_type::CreatePurchaseReturnLineParams;
 pub use create_purchase_return_params_type::CreatePurchaseReturnParams;
@@ -2502,6 +2580,7 @@ pub use create_utm_source_params_type::CreateUtmSourceParams;
 pub use create_vendor_credit_from_purchase_return_params_type::CreateVendorCreditFromPurchaseReturnParams;
 pub use create_warehouse_3_d_zone_params_type::CreateWarehouse3DZoneParams;
 pub use create_warehouse_params_type::CreateWarehouseParams;
+pub use create_warehouse_sync_intent_params_type::CreateWarehouseSyncIntentParams;
 pub use create_warehouse_task_params_type::CreateWarehouseTaskParams;
 pub use create_whats_app_business_account_params_type::CreateWhatsAppBusinessAccountParams;
 pub use create_workcenter_params_type::CreateWorkcenterParams;
@@ -2542,9 +2621,17 @@ pub use enqueue_job_params_type::EnqueueJobParams;
 pub use error_intercompany_transaction_params_type::ErrorIntercompanyTransactionParams;
 pub use execute_cross_dock_params_type::ExecuteCrossDockParams;
 pub use execute_directed_putaway_params_type::ExecuteDirectedPutawayParams;
+pub use expense_advance_state_type::ExpenseAdvanceState;
+pub use expense_allocation_line_params_type::ExpenseAllocationLineParams;
+pub use expense_integration_intent_type::ExpenseIntegrationIntent;
+pub use expense_line_kind_type::ExpenseLineKind;
+pub use expense_payment_mode_type::ExpensePaymentMode;
+pub use expense_policy_exception_state_type::ExpensePolicyExceptionState;
 pub use expense_sheet_state_type::ExpenseSheetState;
 pub use expense_state_type::ExpenseState;
 pub use export_financial_report_params_type::ExportFinancialReportParams;
+pub use fail_expense_integration_intent_params_type::FailExpenseIntegrationIntentParams;
+pub use fail_warehouse_sync_intent_params_type::FailWarehouseSyncIntentParams;
 pub use field_option_type::FieldOption;
 pub use field_type_type::FieldType;
 pub use field_validation_type::FieldValidation;
@@ -2573,6 +2660,13 @@ pub use hr_contract_type::HrContract;
 pub use hr_department_type::HrDepartment;
 pub use hr_employee_type::HrEmployee;
 pub use hr_expense_type::HrExpense;
+pub use hr_expense_advance_type::HrExpenseAdvance;
+pub use hr_expense_advance_application_type::HrExpenseAdvanceApplication;
+pub use hr_expense_allocation_type::HrExpenseAllocation;
+pub use hr_expense_mileage_rate_type::HrExpenseMileageRate;
+pub use hr_expense_per_diem_rate_type::HrExpensePerDiemRate;
+pub use hr_expense_policy_type::HrExpensePolicy;
+pub use hr_expense_policy_exception_type::HrExpensePolicyException;
 pub use hr_expense_sheet_type::HrExpenseSheet;
 pub use hr_job_position_type::HrJobPosition;
 pub use hr_leave_type::HrLeave;
@@ -2696,6 +2790,7 @@ pub use pos_payment_method_type::PosPaymentMethod;
 pub use pos_session_type::PosSession;
 pub use pos_status_type::PosStatus;
 pub use pos_terminal_type::PosTerminal;
+pub use post_expense_sheet_params_type::PostExpenseSheetParams;
 pub use post_realized_fx_params_type::PostRealizedFxParams;
 pub use pricelist_applied_on_type::PricelistAppliedOn;
 pub use privacy_consent_type::PrivacyConsent;
@@ -2728,6 +2823,7 @@ pub use purchase_contract_type::PurchaseContract;
 pub use purchase_order_type::PurchaseOrder;
 pub use purchase_order_line_type::PurchaseOrderLine;
 pub use purchase_requisition_type::PurchaseRequisition;
+pub use purchase_requisition_line_type::PurchaseRequisitionLine;
 pub use purchase_return_type::PurchaseReturn;
 pub use purchase_return_line_type::PurchaseReturnLine;
 pub use purchase_rfq_type::PurchaseRfq;
@@ -2759,6 +2855,7 @@ pub use record_sales_integration_result_params_type::RecordSalesIntegrationResul
 pub use record_telemetry_params_type::RecordTelemetryParams;
 pub use record_whats_app_health_check_params_type::RecordWhatsAppHealthCheckParams;
 pub use refresh_inventory_exceptions_params_type::RefreshInventoryExceptionsParams;
+pub use refuse_expense_sheet_params_type::RefuseExpenseSheetParams;
 pub use register_device_params_type::RegisterDeviceParams;
 pub use register_hub_params_type::RegisterHubParams;
 pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
@@ -2768,6 +2865,7 @@ pub use replenishment_rule_type::ReplenishmentRule;
 pub use report_state_type::ReportState;
 pub use report_template_type::ReportTemplate;
 pub use report_type_type::ReportType;
+pub use request_expense_policy_exception_params_type::RequestExpensePolicyExceptionParams;
 pub use requisition_state_type::RequisitionState;
 pub use res_partner_bank_type::ResPartnerBank;
 pub use return_order_type::ReturnOrder;
@@ -2812,6 +2910,8 @@ pub use set_company_country_pack_params_type::SetCompanyCountryPackParams;
 pub use set_company_vertical_pack_params_type::SetCompanyVerticalPackParams;
 pub use set_consolidation_company_rate_params_type::SetConsolidationCompanyRateParams;
 pub use set_contact_segment_rules_params_type::SetContactSegmentRulesParams;
+pub use set_expense_allocations_params_type::SetExpenseAllocationsParams;
+pub use set_expense_fraud_hold_params_type::SetExpenseFraudHoldParams;
 pub use set_purchase_approval_delegate_params_type::SetPurchaseApprovalDelegateParams;
 pub use set_record_custom_field_values_params_type::SetRecordCustomFieldValuesParams;
 pub use set_vendor_risk_flag_params_type::SetVendorRiskFlagParams;
@@ -2844,7 +2944,6 @@ pub use stock_reorder_group_type::StockReorderGroup;
 pub use stock_route_type::StockRoute;
 pub use stock_rule_type::StockRule;
 pub use stock_traceability_report_type::StockTraceabilityReport;
-pub use submit_expense_sheet_params_type::SubmitExpenseSheetParams;
 pub use submit_supplier_intake_params_type::SubmitSupplierIntakeParams;
 pub use subscription_type::Subscription;
 pub use subscription_line_type::SubscriptionLine;
@@ -2988,6 +3087,9 @@ pub use update_widget_layout_params_type::UpdateWidgetLayoutParams;
 pub use update_workcenter_params_type::UpdateWorkcenterParams;
 pub use upsert_ai_skill_config_params_type::UpsertAiSkillConfigParams;
 pub use upsert_ai_skill_params_type::UpsertAiSkillParams;
+pub use upsert_expense_mileage_rate_params_type::UpsertExpenseMileageRateParams;
+pub use upsert_expense_per_diem_rate_params_type::UpsertExpensePerDiemRateParams;
+pub use upsert_expense_policy_params_type::UpsertExpensePolicyParams;
 pub use upsert_organization_settings_params_type::UpsertOrganizationSettingsParams;
 pub use upsert_partner_credit_control_params_type::UpsertPartnerCreditControlParams;
 pub use upsert_search_embedding_params_type::UpsertSearchEmbeddingParams;
@@ -3011,6 +3113,7 @@ pub use verification_status_type::VerificationStatus;
 pub use warehouse_type::Warehouse;
 pub use warehouse_3_d_zone_type::Warehouse3DZone;
 pub use warehouse_geo_type::WarehouseGeo;
+pub use warehouse_sync_intent_type::WarehouseSyncIntent;
 pub use warehouse_task_type::WarehouseTask;
 pub use whats_app_business_account_type::WhatsAppBusinessAccount;
 pub use widget_type_type::WidgetType;
@@ -3135,6 +3238,7 @@ pub use document_table::*;
 pub use document_sequence_table::*;
 pub use document_template_table::*;
 pub use document_version_table::*;
+pub use expense_integration_intent_table::*;
 pub use expense_sheet_table::*;
 pub use financial_report_table::*;
 pub use fleet_vehicle_table::*;
@@ -3152,6 +3256,13 @@ pub use hr_contract_table::*;
 pub use hr_department_table::*;
 pub use hr_employee_table::*;
 pub use hr_expense_table::*;
+pub use hr_expense_advance_table::*;
+pub use hr_expense_advance_application_table::*;
+pub use hr_expense_allocation_table::*;
+pub use hr_expense_mileage_rate_table::*;
+pub use hr_expense_per_diem_rate_table::*;
+pub use hr_expense_policy_table::*;
+pub use hr_expense_policy_exception_table::*;
 pub use hr_job_position_table::*;
 pub use hr_leave_table::*;
 pub use hr_leave_type_table::*;
@@ -3252,6 +3363,7 @@ pub use purchase_contract_table::*;
 pub use purchase_order_table::*;
 pub use purchase_order_line_table::*;
 pub use purchase_requisition_table::*;
+pub use purchase_requisition_line_table::*;
 pub use purchase_return_table::*;
 pub use purchase_return_line_table::*;
 pub use purchase_rfq_table::*;
@@ -3336,6 +3448,7 @@ pub use vendor_scorecard_table::*;
 pub use warehouse_table::*;
 pub use warehouse_3_d_zone_table::*;
 pub use warehouse_geo_table::*;
+pub use warehouse_sync_intent_table::*;
 pub use warehouse_task_table::*;
 pub use whatsapp_business_account_table::*;
 pub use workflow_table::*;
@@ -3364,6 +3477,7 @@ pub use add_proposal_comment_reducer::add_proposal_comment;
 pub use add_proposal_line_item_reducer::add_proposal_line_item;
 pub use add_proposal_source_doc_reducer::add_proposal_source_doc;
 pub use add_purchase_order_line_reducer::add_purchase_order_line;
+pub use add_purchase_requisition_line_reducer::add_purchase_requisition_line;
 pub use add_purchase_rfq_bid_reducer::add_purchase_rfq_bid;
 pub use add_purchase_rfq_line_reducer::add_purchase_rfq_line;
 pub use add_rule_to_nomenclature_reducer::add_rule_to_nomenclature;
@@ -3376,6 +3490,8 @@ pub use allocate_payment_transaction_reducer::allocate_payment_transaction;
 pub use append_ai_agent_run_step_reducer::append_ai_agent_run_step;
 pub use append_ai_chat_message_reducer::append_ai_chat_message;
 pub use append_crm_conversation_message_reducer::append_crm_conversation_message;
+pub use apply_expense_advance_to_sheet_reducer::apply_expense_advance_to_sheet;
+pub use apply_expense_integration_intent_reducer::apply_expense_integration_intent;
 pub use apply_global_migrations_reducer::apply_global_migrations;
 pub use apply_landed_costs_reducer::apply_landed_costs;
 pub use apply_omnichannel_allocation_reducer::apply_omnichannel_allocation;
@@ -3383,10 +3499,12 @@ pub use apply_org_migrations_reducer::apply_org_migrations;
 pub use apply_reconciliation_rules_reducer::apply_reconciliation_rules;
 pub use apply_sale_order_options_reducer::apply_sale_order_options;
 pub use apply_sale_promotion_to_order_reducer::apply_sale_promotion_to_order;
+pub use apply_warehouse_sync_intent_reducer::apply_warehouse_sync_intent;
 pub use approve_ai_action_draft_reducer::approve_ai_action_draft;
 pub use approve_approval_request_reducer::approve_approval_request;
 pub use approve_bank_statement_import_reducer::approve_bank_statement_import;
 pub use approve_document_processing_job_reducer::approve_document_processing_job;
+pub use approve_expense_policy_exception_reducer::approve_expense_policy_exception;
 pub use approve_expense_sheet_reducer::approve_expense_sheet;
 pub use approve_intercompany_transaction_reducer::approve_intercompany_transaction;
 pub use approve_leave_reducer::approve_leave;
@@ -3555,6 +3673,10 @@ pub use create_elimination_entry_reducer::create_elimination_entry;
 pub use create_employee_reducer::create_employee;
 pub use create_exchange_order_from_return_reducer::create_exchange_order_from_return;
 pub use create_expense_reducer::create_expense;
+pub use create_expense_advance_reducer::create_expense_advance;
+pub use create_expense_integration_intent_reducer::create_expense_integration_intent;
+pub use create_expense_project_rebill_reducer::create_expense_project_rebill;
+pub use create_expense_reimbursement_payment_reducer::create_expense_reimbursement_payment;
 pub use create_expense_sheet_reducer::create_expense_sheet;
 pub use create_financial_report_reducer::create_financial_report;
 pub use create_fiscal_position_reducer::create_fiscal_position;
@@ -3687,6 +3809,7 @@ pub use create_utm_source_reducer::create_utm_source;
 pub use create_vendor_credit_from_purchase_return_reducer::create_vendor_credit_from_purchase_return;
 pub use create_warehouse_reducer::create_warehouse;
 pub use create_warehouse_3_d_zone_reducer::create_warehouse_3_d_zone;
+pub use create_warehouse_sync_intent_reducer::create_warehouse_sync_intent;
 pub use create_warehouse_task_reducer::create_warehouse_task;
 pub use create_whatsapp_business_account_reducer::create_whatsapp_business_account;
 pub use create_workcenter_reducer::create_workcenter;
@@ -3775,9 +3898,11 @@ pub use expire_ai_action_drafts_reducer::expire_ai_action_drafts;
 pub use expire_contract_reducer::expire_contract;
 pub use explode_bom_reducer::explode_bom;
 pub use export_financial_report_reducer::export_financial_report;
+pub use fail_expense_integration_intent_reducer::fail_expense_integration_intent;
 pub use fail_iot_action_reducer::fail_iot_action;
 pub use fail_quality_check_reducer::fail_quality_check;
 pub use fail_scheduled_owner_report_run_reducer::fail_scheduled_owner_report_run;
+pub use fail_warehouse_sync_intent_reducer::fail_warehouse_sync_intent;
 pub use finalize_import_assistant_job_reducer::finalize_import_assistant_job;
 pub use find_duplicate_contacts_reducer::find_duplicate_contacts;
 pub use finish_manufacturing_order_reducer::finish_manufacturing_order;
@@ -3931,6 +4056,7 @@ pub use record_whatsapp_health_check_reducer::record_whatsapp_health_check;
 pub use record_whatsapp_message_sent_reducer::record_whatsapp_message_sent;
 pub use refresh_inventory_exceptions_reducer::refresh_inventory_exceptions;
 pub use refresh_policy_snapshot_reducer::refresh_policy_snapshot;
+pub use refresh_sale_order_promise_dates_reducer::refresh_sale_order_promise_dates;
 pub use refresh_tax_deadline_statuses_reducer::refresh_tax_deadline_statuses;
 pub use refuse_expense_sheet_reducer::refuse_expense_sheet;
 pub use refuse_leave_reducer::refuse_leave;
@@ -3954,6 +4080,7 @@ pub use reopen_inventory_close_reducer::reopen_inventory_close;
 pub use reopen_ticket_reducer::reopen_ticket;
 pub use reorder_proposal_line_items_reducer::reorder_proposal_line_items;
 pub use request_embedding_job_reducer::request_embedding_job;
+pub use request_expense_policy_exception_reducer::request_expense_policy_exception;
 pub use reserve_serial_reducer::reserve_serial;
 pub use reserve_stock_quant_reducer::reserve_stock_quant;
 pub use reset_leave_to_draft_reducer::reset_leave_to_draft;
@@ -3986,6 +4113,7 @@ pub use run_all_accounting_tests_reducer::run_all_accounting_tests;
 pub use run_all_core_tests_reducer::run_all_core_tests;
 pub use run_all_crm_tests_reducer::run_all_crm_tests;
 pub use run_all_domain_tests_reducer::run_all_domain_tests;
+pub use run_all_expenses_tests_reducer::run_all_expenses_tests;
 pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_platform_tests_reducer::run_all_platform_tests;
 pub use run_all_purchasing_tests_reducer::run_all_purchasing_tests;
@@ -4001,6 +4129,10 @@ pub use run_crm_opportunity_convert_test_reducer::run_crm_opportunity_convert_te
 pub use run_crm_relationship_admin_test_reducer::run_crm_relationship_admin_test;
 pub use run_crm_wave_2_test_reducer::run_crm_wave_2_test;
 pub use run_documents_folder_test_reducer::run_documents_folder_test;
+pub use run_expenses_wave_a_test_reducer::run_expenses_wave_a_test;
+pub use run_expenses_wave_b_test_reducer::run_expenses_wave_b_test;
+pub use run_expenses_wave_c_test_reducer::run_expenses_wave_c_test;
+pub use run_expenses_wave_d_test_reducer::run_expenses_wave_d_test;
 pub use run_fx_revaluation_reducer::run_fx_revaluation;
 pub use run_fx_revaluation_batch_reducer::run_fx_revaluation_batch;
 pub use run_helpdesk_ticket_test_reducer::run_helpdesk_ticket_test;
@@ -4022,10 +4154,13 @@ pub use run_inventory_expired_lot_test_reducer::run_inventory_expired_lot_test;
 pub use run_inventory_fefo_test_reducer::run_inventory_fefo_test;
 pub use run_inventory_lot_reserve_test_reducer::run_inventory_lot_reserve_test;
 pub use run_inventory_lot_validate_test_reducer::run_inventory_lot_validate_test;
+pub use run_inventory_multi_wh_promise_atp_test_reducer::run_inventory_multi_wh_promise_atp_test;
 pub use run_inventory_packing_workflow_test_reducer::run_inventory_packing_workflow_test;
 pub use run_inventory_product_category_test_reducer::run_inventory_product_category_test;
 pub use run_inventory_product_update_test_reducer::run_inventory_product_update_test;
 pub use run_inventory_qc_quarantine_test_reducer::run_inventory_qc_quarantine_test;
+pub use run_inventory_receipt_average_costing_test_reducer::run_inventory_receipt_average_costing_test;
+pub use run_inventory_receipt_fifo_layers_test_reducer::run_inventory_receipt_fifo_layers_test;
 pub use run_inventory_receipt_quant_test_reducer::run_inventory_receipt_quant_test;
 pub use run_inventory_replenishment_demand_test_reducer::run_inventory_replenishment_demand_test;
 pub use run_inventory_serial_id_validate_test_reducer::run_inventory_serial_id_validate_test;
@@ -4033,6 +4168,7 @@ pub use run_inventory_serial_reserve_test_reducer::run_inventory_serial_reserve_
 pub use run_inventory_stock_inventory_test_reducer::run_inventory_stock_inventory_test;
 pub use run_inventory_stock_quant_test_reducer::run_inventory_stock_quant_test;
 pub use run_inventory_uom_conversion_test_reducer::run_inventory_uom_conversion_test;
+pub use run_inventory_warehouse_sync_test_reducer::run_inventory_warehouse_sync_test;
 pub use run_inventory_wave_release_test_reducer::run_inventory_wave_release_test;
 pub use run_manufacturing_workcenter_test_reducer::run_manufacturing_workcenter_test;
 pub use run_owner_report_schedule_reducer::run_owner_report_schedule;
@@ -4040,6 +4176,7 @@ pub use run_purchasing_bill_balanced_test_reducer::run_purchasing_bill_balanced_
 pub use run_purchasing_company_isolation_test_reducer::run_purchasing_company_isolation_test;
 pub use run_purchasing_incoming_picking_test_reducer::run_purchasing_incoming_picking_test;
 pub use run_purchasing_wave_c_smoke_test_reducer::run_purchasing_wave_c_smoke_test;
+pub use run_purchasing_wave_e_test_reducer::run_purchasing_wave_e_test;
 pub use run_sales_atp_shortfall_test_reducer::run_sales_atp_shortfall_test;
 pub use run_sales_backorder_test_reducer::run_sales_backorder_test;
 pub use run_sales_commission_accrue_test_reducer::run_sales_commission_accrue_test;
@@ -4086,6 +4223,8 @@ pub use set_company_vertical_pack_reducer::set_company_vertical_pack;
 pub use set_consolidation_company_rate_reducer::set_consolidation_company_rate;
 pub use set_contact_communication_preference_reducer::set_contact_communication_preference;
 pub use set_contact_segment_rules_reducer::set_contact_segment_rules;
+pub use set_expense_allocations_reducer::set_expense_allocations;
+pub use set_expense_fraud_hold_reducer::set_expense_fraud_hold;
 pub use set_form_role_config_reducer::set_form_role_config;
 pub use set_intercompany_rule_active_reducer::set_intercompany_rule_active;
 pub use set_iot_threshold_reducer::set_iot_threshold;
@@ -4277,6 +4416,9 @@ pub use update_widget_layout_reducer::update_widget_layout;
 pub use update_workcenter_reducer::update_workcenter;
 pub use upsert_ai_skill_reducer::upsert_ai_skill;
 pub use upsert_ai_skill_config_reducer::upsert_ai_skill_config;
+pub use upsert_expense_mileage_rate_reducer::upsert_expense_mileage_rate;
+pub use upsert_expense_per_diem_rate_reducer::upsert_expense_per_diem_rate;
+pub use upsert_expense_policy_reducer::upsert_expense_policy;
 pub use upsert_organization_settings_reducer::upsert_organization_settings;
 pub use upsert_partner_credit_control_reducer::upsert_partner_credit_control;
 pub use upsert_proposal_section_reducer::upsert_proposal_section;
@@ -4416,6 +4558,12 @@ pub enum Reducer {
         order_id: u64,
         params: AddPurchaseOrderLineParams,
 }    ,
+    AddPurchaseRequisitionLine {
+        organization_id: u64,
+        company_id: u64,
+        requisition_id: u64,
+        params: AddPurchaseRequisitionLineParams,
+}    ,
     AddPurchaseRfqBid {
         organization_id: u64,
         company_id: u64,
@@ -4479,6 +4627,16 @@ pub enum Reducer {
         conversation_id: u64,
         params: AppendCrmConversationMessageParams,
 }    ,
+    ApplyExpenseAdvanceToSheet {
+        organization_id: u64,
+        advance_id: u64,
+        sheet_id: u64,
+        params: ApplyExpenseAdvanceParams,
+}    ,
+    ApplyExpenseIntegrationIntent {
+        organization_id: u64,
+        intent_id: u64,
+}    ,
     ApplyGlobalMigrations ,
     ApplyLandedCosts {
         organization_id: u64,
@@ -4508,6 +4666,11 @@ pub enum Reducer {
         order_id: u64,
         params: ApplySalePromotionParams,
 }    ,
+    ApplyWarehouseSyncIntent {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
+}    ,
     ApproveAiActionDraft {
         organization_id: u64,
         company_id: u64,
@@ -4526,6 +4689,10 @@ pub enum Reducer {
         organization_id: u64,
         company_id: Option::<u64>,
         job_id: u64,
+}    ,
+    ApproveExpensePolicyException {
+        organization_id: u64,
+        exception_id: u64,
 }    ,
     ApproveExpenseSheet {
         organization_id: u64,
@@ -5300,6 +5467,24 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateExpenseParams,
 }    ,
+    CreateExpenseAdvance {
+        organization_id: u64,
+        params: CreateExpenseAdvanceParams,
+}    ,
+    CreateExpenseIntegrationIntent {
+        organization_id: u64,
+        params: CreateExpenseIntegrationIntentParams,
+}    ,
+    CreateExpenseProjectRebill {
+        organization_id: u64,
+        sheet_id: u64,
+        params: CreateExpenseProjectRebillParams,
+}    ,
+    CreateExpenseReimbursementPayment {
+        organization_id: u64,
+        sheet_id: u64,
+        params: CreateExpenseReimbursementParams,
+}    ,
     CreateExpenseSheet {
         organization_id: u64,
         params: CreateExpenseSheetParams,
@@ -5918,6 +6103,11 @@ pub enum Reducer {
         location_id: u64,
         params: CreateWarehouse3DZoneParams,
 }    ,
+    CreateWarehouseSyncIntent {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateWarehouseSyncIntentParams,
+}    ,
     CreateWarehouseTask {
         organization_id: u64,
         company_id: u64,
@@ -6295,6 +6485,11 @@ pub enum Reducer {
         report_id: u64,
         params: ExportFinancialReportParams,
 }    ,
+    FailExpenseIntegrationIntent {
+        organization_id: u64,
+        intent_id: u64,
+        params: FailExpenseIntegrationIntentParams,
+}    ,
     FailIotAction {
         organization_id: u64,
         action_id: u64,
@@ -6313,6 +6508,12 @@ pub enum Reducer {
         organization_id: u64,
         run_id: u64,
         error_message: String,
+}    ,
+    FailWarehouseSyncIntent {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
+        params: FailWarehouseSyncIntentParams,
 }    ,
     FinalizeImportAssistantJob {
         organization_id: u64,
@@ -6808,7 +7009,7 @@ pub enum Reducer {
     PostExpenseSheet {
         organization_id: u64,
         sheet_id: u64,
-        accounting_date: __sdk::Timestamp,
+        params: PostExpenseSheetParams,
 }    ,
     PostInternalNote {
         organization_id: u64,
@@ -7022,12 +7223,18 @@ pub enum Reducer {
     RefreshPolicySnapshot {
         organization_id: u64,
 }    ,
+    RefreshSaleOrderPromiseDates {
+        organization_id: u64,
+        company_id: u64,
+        order_id: u64,
+}    ,
     RefreshTaxDeadlineStatuses {
         organization_id: u64,
 }    ,
     RefuseExpenseSheet {
         organization_id: u64,
         sheet_id: u64,
+        params: RefuseExpenseSheetParams,
 }    ,
     RefuseLeave {
         organization_id: u64,
@@ -7133,6 +7340,11 @@ pub enum Reducer {
         content_id: u64,
         text: String,
 }    ,
+    RequestExpensePolicyException {
+        organization_id: u64,
+        expense_id: u64,
+        params: RequestExpensePolicyExceptionParams,
+}    ,
     ReserveSerial {
         organization_id: u64,
         serial_id: u64,
@@ -7227,6 +7439,7 @@ pub enum Reducer {
     RunAllCoreTests ,
     RunAllCrmTests ,
     RunAllDomainTests ,
+    RunAllExpensesTests ,
     RunAllInventoryTests ,
     RunAllPlatformTests ,
     RunAllPurchasingTests ,
@@ -7246,6 +7459,10 @@ pub enum Reducer {
     RunCrmRelationshipAdminTest ,
     RunCrmWave2Test ,
     RunDocumentsFolderTest ,
+    RunExpensesWaveATest ,
+    RunExpensesWaveBTest ,
+    RunExpensesWaveCTest ,
+    RunExpensesWaveDTest ,
     RunFxRevaluation {
         organization_id: u64,
         company_id: u64,
@@ -7280,10 +7497,13 @@ pub enum Reducer {
     RunInventoryFefoTest ,
     RunInventoryLotReserveTest ,
     RunInventoryLotValidateTest ,
+    RunInventoryMultiWhPromiseAtpTest ,
     RunInventoryPackingWorkflowTest ,
     RunInventoryProductCategoryTest ,
     RunInventoryProductUpdateTest ,
     RunInventoryQcQuarantineTest ,
+    RunInventoryReceiptAverageCostingTest ,
+    RunInventoryReceiptFifoLayersTest ,
     RunInventoryReceiptQuantTest ,
     RunInventoryReplenishmentDemandTest ,
     RunInventorySerialIdValidateTest ,
@@ -7291,6 +7511,7 @@ pub enum Reducer {
     RunInventoryStockInventoryTest ,
     RunInventoryStockQuantTest ,
     RunInventoryUomConversionTest ,
+    RunInventoryWarehouseSyncTest ,
     RunInventoryWaveReleaseTest ,
     RunManufacturingWorkcenterTest ,
     RunOwnerReportSchedule {
@@ -7301,6 +7522,7 @@ pub enum Reducer {
     RunPurchasingCompanyIsolationTest ,
     RunPurchasingIncomingPickingTest ,
     RunPurchasingWaveCSmokeTest ,
+    RunPurchasingWaveETest ,
     RunSalesAtpShortfallTest ,
     RunSalesBackorderTest ,
     RunSalesCommissionAccrueTest ,
@@ -7429,6 +7651,16 @@ pub enum Reducer {
         organization_id: u64,
         segment_id: u64,
         params: SetContactSegmentRulesParams,
+}    ,
+    SetExpenseAllocations {
+        organization_id: u64,
+        expense_id: u64,
+        params: SetExpenseAllocationsParams,
+}    ,
+    SetExpenseFraudHold {
+        organization_id: u64,
+        expense_id: u64,
+        params: SetExpenseFraudHoldParams,
 }    ,
     SetFormRoleConfig {
         organization_id: u64,
@@ -7577,7 +7809,6 @@ pub enum Reducer {
     SubmitExpenseSheet {
         organization_id: u64,
         sheet_id: u64,
-        params: SubmitExpenseSheetParams,
 }    ,
     SubmitPurchaseRequisition {
         organization_id: u64,
@@ -8422,6 +8653,20 @@ pub enum Reducer {
         organization_id: u64,
         params: UpsertAiSkillConfigParams,
 }    ,
+    UpsertExpenseMileageRate {
+        organization_id: u64,
+        rate_id: Option::<u64>,
+        params: UpsertExpenseMileageRateParams,
+}    ,
+    UpsertExpensePerDiemRate {
+        organization_id: u64,
+        rate_id: Option::<u64>,
+        params: UpsertExpensePerDiemRateParams,
+}    ,
+    UpsertExpensePolicy {
+        organization_id: u64,
+        params: UpsertExpensePolicyParams,
+}    ,
     UpsertOrganizationSettings {
         organization_id: u64,
         params: UpsertOrganizationSettingsParams,
@@ -8539,6 +8784,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AddProposalLineItem { .. } => "add_proposal_line_item",
             Reducer::AddProposalSourceDoc { .. } => "add_proposal_source_doc",
             Reducer::AddPurchaseOrderLine { .. } => "add_purchase_order_line",
+            Reducer::AddPurchaseRequisitionLine { .. } => "add_purchase_requisition_line",
             Reducer::AddPurchaseRfqBid { .. } => "add_purchase_rfq_bid",
             Reducer::AddPurchaseRfqLine { .. } => "add_purchase_rfq_line",
             Reducer::AddRuleToNomenclature { .. } => "add_rule_to_nomenclature",
@@ -8551,6 +8797,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::AppendAiAgentRunStep { .. } => "append_ai_agent_run_step",
             Reducer::AppendAiChatMessage { .. } => "append_ai_chat_message",
             Reducer::AppendCrmConversationMessage { .. } => "append_crm_conversation_message",
+            Reducer::ApplyExpenseAdvanceToSheet { .. } => "apply_expense_advance_to_sheet",
+            Reducer::ApplyExpenseIntegrationIntent { .. } => "apply_expense_integration_intent",
             Reducer::ApplyGlobalMigrations => "apply_global_migrations",
             Reducer::ApplyLandedCosts { .. } => "apply_landed_costs",
             Reducer::ApplyOmnichannelAllocation { .. } => "apply_omnichannel_allocation",
@@ -8558,10 +8806,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApplyReconciliationRules { .. } => "apply_reconciliation_rules",
             Reducer::ApplySaleOrderOptions { .. } => "apply_sale_order_options",
             Reducer::ApplySalePromotionToOrder { .. } => "apply_sale_promotion_to_order",
+            Reducer::ApplyWarehouseSyncIntent { .. } => "apply_warehouse_sync_intent",
             Reducer::ApproveAiActionDraft { .. } => "approve_ai_action_draft",
             Reducer::ApproveApprovalRequest { .. } => "approve_approval_request",
             Reducer::ApproveBankStatementImport { .. } => "approve_bank_statement_import",
             Reducer::ApproveDocumentProcessingJob { .. } => "approve_document_processing_job",
+            Reducer::ApproveExpensePolicyException { .. } => "approve_expense_policy_exception",
             Reducer::ApproveExpenseSheet { .. } => "approve_expense_sheet",
             Reducer::ApproveIntercompanyTransaction { .. } => "approve_intercompany_transaction",
             Reducer::ApproveLeave { .. } => "approve_leave",
@@ -8730,6 +8980,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateEmployee { .. } => "create_employee",
             Reducer::CreateExchangeOrderFromReturn { .. } => "create_exchange_order_from_return",
             Reducer::CreateExpense { .. } => "create_expense",
+            Reducer::CreateExpenseAdvance { .. } => "create_expense_advance",
+            Reducer::CreateExpenseIntegrationIntent { .. } => "create_expense_integration_intent",
+            Reducer::CreateExpenseProjectRebill { .. } => "create_expense_project_rebill",
+            Reducer::CreateExpenseReimbursementPayment { .. } => "create_expense_reimbursement_payment",
             Reducer::CreateExpenseSheet { .. } => "create_expense_sheet",
             Reducer::CreateFinancialReport { .. } => "create_financial_report",
             Reducer::CreateFiscalPosition { .. } => "create_fiscal_position",
@@ -8862,6 +9116,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateVendorCreditFromPurchaseReturn { .. } => "create_vendor_credit_from_purchase_return",
             Reducer::CreateWarehouse { .. } => "create_warehouse",
             Reducer::CreateWarehouse3DZone { .. } => "create_warehouse_3_d_zone",
+            Reducer::CreateWarehouseSyncIntent { .. } => "create_warehouse_sync_intent",
             Reducer::CreateWarehouseTask { .. } => "create_warehouse_task",
             Reducer::CreateWhatsappBusinessAccount { .. } => "create_whatsapp_business_account",
             Reducer::CreateWorkcenter { .. } => "create_workcenter",
@@ -8950,9 +9205,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::ExpireContract { .. } => "expire_contract",
             Reducer::ExplodeBom { .. } => "explode_bom",
             Reducer::ExportFinancialReport { .. } => "export_financial_report",
+            Reducer::FailExpenseIntegrationIntent { .. } => "fail_expense_integration_intent",
             Reducer::FailIotAction { .. } => "fail_iot_action",
             Reducer::FailQualityCheck { .. } => "fail_quality_check",
             Reducer::FailScheduledOwnerReportRun { .. } => "fail_scheduled_owner_report_run",
+            Reducer::FailWarehouseSyncIntent { .. } => "fail_warehouse_sync_intent",
             Reducer::FinalizeImportAssistantJob { .. } => "finalize_import_assistant_job",
             Reducer::FindDuplicateContacts { .. } => "find_duplicate_contacts",
             Reducer::FinishManufacturingOrder { .. } => "finish_manufacturing_order",
@@ -9106,6 +9363,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordWhatsappMessageSent { .. } => "record_whatsapp_message_sent",
             Reducer::RefreshInventoryExceptions { .. } => "refresh_inventory_exceptions",
             Reducer::RefreshPolicySnapshot { .. } => "refresh_policy_snapshot",
+            Reducer::RefreshSaleOrderPromiseDates { .. } => "refresh_sale_order_promise_dates",
             Reducer::RefreshTaxDeadlineStatuses { .. } => "refresh_tax_deadline_statuses",
             Reducer::RefuseExpenseSheet { .. } => "refuse_expense_sheet",
             Reducer::RefuseLeave { .. } => "refuse_leave",
@@ -9129,6 +9387,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReopenTicket { .. } => "reopen_ticket",
             Reducer::ReorderProposalLineItems { .. } => "reorder_proposal_line_items",
             Reducer::RequestEmbeddingJob { .. } => "request_embedding_job",
+            Reducer::RequestExpensePolicyException { .. } => "request_expense_policy_exception",
             Reducer::ReserveSerial { .. } => "reserve_serial",
             Reducer::ReserveStockQuant { .. } => "reserve_stock_quant",
             Reducer::ResetLeaveToDraft { .. } => "reset_leave_to_draft",
@@ -9161,6 +9420,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllCoreTests => "run_all_core_tests",
             Reducer::RunAllCrmTests => "run_all_crm_tests",
             Reducer::RunAllDomainTests => "run_all_domain_tests",
+            Reducer::RunAllExpensesTests => "run_all_expenses_tests",
             Reducer::RunAllInventoryTests => "run_all_inventory_tests",
             Reducer::RunAllPlatformTests => "run_all_platform_tests",
             Reducer::RunAllPurchasingTests => "run_all_purchasing_tests",
@@ -9176,6 +9436,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunCrmRelationshipAdminTest => "run_crm_relationship_admin_test",
             Reducer::RunCrmWave2Test => "run_crm_wave_2_test",
             Reducer::RunDocumentsFolderTest => "run_documents_folder_test",
+            Reducer::RunExpensesWaveATest => "run_expenses_wave_a_test",
+            Reducer::RunExpensesWaveBTest => "run_expenses_wave_b_test",
+            Reducer::RunExpensesWaveCTest => "run_expenses_wave_c_test",
+            Reducer::RunExpensesWaveDTest => "run_expenses_wave_d_test",
             Reducer::RunFxRevaluation { .. } => "run_fx_revaluation",
             Reducer::RunFxRevaluationBatch { .. } => "run_fx_revaluation_batch",
             Reducer::RunHelpdeskTicketTest => "run_helpdesk_ticket_test",
@@ -9197,10 +9461,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventoryFefoTest => "run_inventory_fefo_test",
             Reducer::RunInventoryLotReserveTest => "run_inventory_lot_reserve_test",
             Reducer::RunInventoryLotValidateTest => "run_inventory_lot_validate_test",
+            Reducer::RunInventoryMultiWhPromiseAtpTest => "run_inventory_multi_wh_promise_atp_test",
             Reducer::RunInventoryPackingWorkflowTest => "run_inventory_packing_workflow_test",
             Reducer::RunInventoryProductCategoryTest => "run_inventory_product_category_test",
             Reducer::RunInventoryProductUpdateTest => "run_inventory_product_update_test",
             Reducer::RunInventoryQcQuarantineTest => "run_inventory_qc_quarantine_test",
+            Reducer::RunInventoryReceiptAverageCostingTest => "run_inventory_receipt_average_costing_test",
+            Reducer::RunInventoryReceiptFifoLayersTest => "run_inventory_receipt_fifo_layers_test",
             Reducer::RunInventoryReceiptQuantTest => "run_inventory_receipt_quant_test",
             Reducer::RunInventoryReplenishmentDemandTest => "run_inventory_replenishment_demand_test",
             Reducer::RunInventorySerialIdValidateTest => "run_inventory_serial_id_validate_test",
@@ -9208,6 +9475,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventoryStockInventoryTest => "run_inventory_stock_inventory_test",
             Reducer::RunInventoryStockQuantTest => "run_inventory_stock_quant_test",
             Reducer::RunInventoryUomConversionTest => "run_inventory_uom_conversion_test",
+            Reducer::RunInventoryWarehouseSyncTest => "run_inventory_warehouse_sync_test",
             Reducer::RunInventoryWaveReleaseTest => "run_inventory_wave_release_test",
             Reducer::RunManufacturingWorkcenterTest => "run_manufacturing_workcenter_test",
             Reducer::RunOwnerReportSchedule { .. } => "run_owner_report_schedule",
@@ -9215,6 +9483,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunPurchasingCompanyIsolationTest => "run_purchasing_company_isolation_test",
             Reducer::RunPurchasingIncomingPickingTest => "run_purchasing_incoming_picking_test",
             Reducer::RunPurchasingWaveCSmokeTest => "run_purchasing_wave_c_smoke_test",
+            Reducer::RunPurchasingWaveETest => "run_purchasing_wave_e_test",
             Reducer::RunSalesAtpShortfallTest => "run_sales_atp_shortfall_test",
             Reducer::RunSalesBackorderTest => "run_sales_backorder_test",
             Reducer::RunSalesCommissionAccrueTest => "run_sales_commission_accrue_test",
@@ -9261,6 +9530,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetConsolidationCompanyRate { .. } => "set_consolidation_company_rate",
             Reducer::SetContactCommunicationPreference { .. } => "set_contact_communication_preference",
             Reducer::SetContactSegmentRules { .. } => "set_contact_segment_rules",
+            Reducer::SetExpenseAllocations { .. } => "set_expense_allocations",
+            Reducer::SetExpenseFraudHold { .. } => "set_expense_fraud_hold",
             Reducer::SetFormRoleConfig { .. } => "set_form_role_config",
             Reducer::SetIntercompanyRuleActive { .. } => "set_intercompany_rule_active",
             Reducer::SetIotThreshold { .. } => "set_iot_threshold",
@@ -9452,6 +9723,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateWorkcenter { .. } => "update_workcenter",
             Reducer::UpsertAiSkill { .. } => "upsert_ai_skill",
             Reducer::UpsertAiSkillConfig { .. } => "upsert_ai_skill_config",
+            Reducer::UpsertExpenseMileageRate { .. } => "upsert_expense_mileage_rate",
+            Reducer::UpsertExpensePerDiemRate { .. } => "upsert_expense_per_diem_rate",
+            Reducer::UpsertExpensePolicy { .. } => "upsert_expense_policy",
             Reducer::UpsertOrganizationSettings { .. } => "upsert_organization_settings",
             Reducer::UpsertPartnerCreditControl { .. } => "upsert_partner_credit_control",
             Reducer::UpsertProposalSection { .. } => "upsert_proposal_section",
@@ -9680,6 +9954,17 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 order_id: order_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::AddPurchaseRequisitionLine{
+                organization_id,
+                company_id,
+                requisition_id,
+                params,
+}             => __sats::bsatn::to_vec(&add_purchase_requisition_line_reducer::AddPurchaseRequisitionLineArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                requisition_id: requisition_id.clone(),
+                params: params.clone(),
+}),
             Reducer::AddPurchaseRfqBid{
                 organization_id,
                 company_id,
@@ -9794,6 +10079,24 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 conversation_id: conversation_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::ApplyExpenseAdvanceToSheet{
+                organization_id,
+                advance_id,
+                sheet_id,
+                params,
+}             => __sats::bsatn::to_vec(&apply_expense_advance_to_sheet_reducer::ApplyExpenseAdvanceToSheetArgs {
+                organization_id: organization_id.clone(),
+                advance_id: advance_id.clone(),
+                sheet_id: sheet_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::ApplyExpenseIntegrationIntent{
+                organization_id,
+                intent_id,
+}             => __sats::bsatn::to_vec(&apply_expense_integration_intent_reducer::ApplyExpenseIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                intent_id: intent_id.clone(),
+}),
             Reducer::ApplyGlobalMigrations => __sats::bsatn::to_vec(&apply_global_migrations_reducer::ApplyGlobalMigrationsArgs {
                 }),
 Reducer::ApplyLandedCosts{
@@ -9846,6 +10149,15 @@ Reducer::ApplyLandedCosts{
                 order_id: order_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::ApplyWarehouseSyncIntent{
+                organization_id,
+                company_id,
+                intent_id,
+}             => __sats::bsatn::to_vec(&apply_warehouse_sync_intent_reducer::ApplyWarehouseSyncIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                intent_id: intent_id.clone(),
+}),
             Reducer::ApproveAiActionDraft{
                 organization_id,
                 company_id,
@@ -9879,6 +10191,13 @@ Reducer::ApplyLandedCosts{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 job_id: job_id.clone(),
+}),
+            Reducer::ApproveExpensePolicyException{
+                organization_id,
+                exception_id,
+}             => __sats::bsatn::to_vec(&approve_expense_policy_exception_reducer::ApproveExpensePolicyExceptionArgs {
+                organization_id: organization_id.clone(),
+                exception_id: exception_id.clone(),
 }),
             Reducer::ApproveExpenseSheet{
                 organization_id,
@@ -11259,6 +11578,38 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateExpenseAdvance{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_expense_advance_reducer::CreateExpenseAdvanceArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateExpenseIntegrationIntent{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_expense_integration_intent_reducer::CreateExpenseIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateExpenseProjectRebill{
+                organization_id,
+                sheet_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_expense_project_rebill_reducer::CreateExpenseProjectRebillArgs {
+                organization_id: organization_id.clone(),
+                sheet_id: sheet_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateExpenseReimbursementPayment{
+                organization_id,
+                sheet_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_expense_reimbursement_payment_reducer::CreateExpenseReimbursementPaymentArgs {
+                organization_id: organization_id.clone(),
+                sheet_id: sheet_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateExpenseSheet{
                 organization_id,
                 params,
@@ -12363,6 +12714,15 @@ Reducer::BillTimesheets{
                 location_id: location_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateWarehouseSyncIntent{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_warehouse_sync_intent_reducer::CreateWarehouseSyncIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateWarehouseTask{
                 organization_id,
                 company_id,
@@ -13031,6 +13391,15 @@ Reducer::ErrorIntercompanyTransaction{
                 report_id: report_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::FailExpenseIntegrationIntent{
+                organization_id,
+                intent_id,
+                params,
+}             => __sats::bsatn::to_vec(&fail_expense_integration_intent_reducer::FailExpenseIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                intent_id: intent_id.clone(),
+                params: params.clone(),
+}),
             Reducer::FailIotAction{
                 organization_id,
                 action_id,
@@ -13065,6 +13434,17 @@ Reducer::ErrorIntercompanyTransaction{
                 organization_id: organization_id.clone(),
                 run_id: run_id.clone(),
                 error_message: error_message.clone(),
+}),
+            Reducer::FailWarehouseSyncIntent{
+                organization_id,
+                company_id,
+                intent_id,
+                params,
+}             => __sats::bsatn::to_vec(&fail_warehouse_sync_intent_reducer::FailWarehouseSyncIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                intent_id: intent_id.clone(),
+                params: params.clone(),
 }),
             Reducer::FinalizeImportAssistantJob{
                 organization_id,
@@ -13943,11 +14323,11 @@ Reducer::MoveStockQuant{
             Reducer::PostExpenseSheet{
                 organization_id,
                 sheet_id,
-                accounting_date,
+                params,
 }             => __sats::bsatn::to_vec(&post_expense_sheet_reducer::PostExpenseSheetArgs {
                 organization_id: organization_id.clone(),
                 sheet_id: sheet_id.clone(),
-                accounting_date: accounting_date.clone(),
+                params: params.clone(),
 }),
             Reducer::PostInternalNote{
                 organization_id,
@@ -14330,6 +14710,15 @@ Reducer::MoveStockQuant{
 }             => __sats::bsatn::to_vec(&refresh_policy_snapshot_reducer::RefreshPolicySnapshotArgs {
                 organization_id: organization_id.clone(),
 }),
+            Reducer::RefreshSaleOrderPromiseDates{
+                organization_id,
+                company_id,
+                order_id,
+}             => __sats::bsatn::to_vec(&refresh_sale_order_promise_dates_reducer::RefreshSaleOrderPromiseDatesArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                order_id: order_id.clone(),
+}),
             Reducer::RefreshTaxDeadlineStatuses{
                 organization_id,
 }             => __sats::bsatn::to_vec(&refresh_tax_deadline_statuses_reducer::RefreshTaxDeadlineStatusesArgs {
@@ -14338,9 +14727,11 @@ Reducer::MoveStockQuant{
             Reducer::RefuseExpenseSheet{
                 organization_id,
                 sheet_id,
+                params,
 }             => __sats::bsatn::to_vec(&refuse_expense_sheet_reducer::RefuseExpenseSheetArgs {
                 organization_id: organization_id.clone(),
                 sheet_id: sheet_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RefuseLeave{
                 organization_id,
@@ -14529,6 +14920,15 @@ Reducer::MoveStockQuant{
                 content_id: content_id.clone(),
                 text: text.clone(),
 }),
+            Reducer::RequestExpensePolicyException{
+                organization_id,
+                expense_id,
+                params,
+}             => __sats::bsatn::to_vec(&request_expense_policy_exception_reducer::RequestExpensePolicyExceptionArgs {
+                organization_id: organization_id.clone(),
+                expense_id: expense_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ReserveSerial{
                 organization_id,
                 serial_id,
@@ -14699,6 +15099,8 @@ Reducer::RunAllCrmTests => __sats::bsatn::to_vec(&run_all_crm_tests_reducer::Run
                 }),
 Reducer::RunAllDomainTests => __sats::bsatn::to_vec(&run_all_domain_tests_reducer::RunAllDomainTestsArgs {
                 }),
+Reducer::RunAllExpensesTests => __sats::bsatn::to_vec(&run_all_expenses_tests_reducer::RunAllExpensesTestsArgs {
+                }),
 Reducer::RunAllInventoryTests => __sats::bsatn::to_vec(&run_all_inventory_tests_reducer::RunAllInventoryTestsArgs {
                 }),
 Reducer::RunAllPlatformTests => __sats::bsatn::to_vec(&run_all_platform_tests_reducer::RunAllPlatformTestsArgs {
@@ -14735,6 +15137,14 @@ Reducer::RunCrmRelationshipAdminTest => __sats::bsatn::to_vec(&run_crm_relations
 Reducer::RunCrmWave2Test => __sats::bsatn::to_vec(&run_crm_wave_2_test_reducer::RunCrmWave2TestArgs {
                 }),
 Reducer::RunDocumentsFolderTest => __sats::bsatn::to_vec(&run_documents_folder_test_reducer::RunDocumentsFolderTestArgs {
+                }),
+Reducer::RunExpensesWaveATest => __sats::bsatn::to_vec(&run_expenses_wave_a_test_reducer::RunExpensesWaveATestArgs {
+                }),
+Reducer::RunExpensesWaveBTest => __sats::bsatn::to_vec(&run_expenses_wave_b_test_reducer::RunExpensesWaveBTestArgs {
+                }),
+Reducer::RunExpensesWaveCTest => __sats::bsatn::to_vec(&run_expenses_wave_c_test_reducer::RunExpensesWaveCTestArgs {
+                }),
+Reducer::RunExpensesWaveDTest => __sats::bsatn::to_vec(&run_expenses_wave_d_test_reducer::RunExpensesWaveDTestArgs {
                 }),
 Reducer::RunFxRevaluation{
                 organization_id,
@@ -14801,6 +15211,8 @@ Reducer::RunInventoryLotReserveTest => __sats::bsatn::to_vec(&run_inventory_lot_
                 }),
 Reducer::RunInventoryLotValidateTest => __sats::bsatn::to_vec(&run_inventory_lot_validate_test_reducer::RunInventoryLotValidateTestArgs {
                 }),
+Reducer::RunInventoryMultiWhPromiseAtpTest => __sats::bsatn::to_vec(&run_inventory_multi_wh_promise_atp_test_reducer::RunInventoryMultiWhPromiseAtpTestArgs {
+                }),
 Reducer::RunInventoryPackingWorkflowTest => __sats::bsatn::to_vec(&run_inventory_packing_workflow_test_reducer::RunInventoryPackingWorkflowTestArgs {
                 }),
 Reducer::RunInventoryProductCategoryTest => __sats::bsatn::to_vec(&run_inventory_product_category_test_reducer::RunInventoryProductCategoryTestArgs {
@@ -14808,6 +15220,10 @@ Reducer::RunInventoryProductCategoryTest => __sats::bsatn::to_vec(&run_inventory
 Reducer::RunInventoryProductUpdateTest => __sats::bsatn::to_vec(&run_inventory_product_update_test_reducer::RunInventoryProductUpdateTestArgs {
                 }),
 Reducer::RunInventoryQcQuarantineTest => __sats::bsatn::to_vec(&run_inventory_qc_quarantine_test_reducer::RunInventoryQcQuarantineTestArgs {
+                }),
+Reducer::RunInventoryReceiptAverageCostingTest => __sats::bsatn::to_vec(&run_inventory_receipt_average_costing_test_reducer::RunInventoryReceiptAverageCostingTestArgs {
+                }),
+Reducer::RunInventoryReceiptFifoLayersTest => __sats::bsatn::to_vec(&run_inventory_receipt_fifo_layers_test_reducer::RunInventoryReceiptFifoLayersTestArgs {
                 }),
 Reducer::RunInventoryReceiptQuantTest => __sats::bsatn::to_vec(&run_inventory_receipt_quant_test_reducer::RunInventoryReceiptQuantTestArgs {
                 }),
@@ -14822,6 +15238,8 @@ Reducer::RunInventoryStockInventoryTest => __sats::bsatn::to_vec(&run_inventory_
 Reducer::RunInventoryStockQuantTest => __sats::bsatn::to_vec(&run_inventory_stock_quant_test_reducer::RunInventoryStockQuantTestArgs {
                 }),
 Reducer::RunInventoryUomConversionTest => __sats::bsatn::to_vec(&run_inventory_uom_conversion_test_reducer::RunInventoryUomConversionTestArgs {
+                }),
+Reducer::RunInventoryWarehouseSyncTest => __sats::bsatn::to_vec(&run_inventory_warehouse_sync_test_reducer::RunInventoryWarehouseSyncTestArgs {
                 }),
 Reducer::RunInventoryWaveReleaseTest => __sats::bsatn::to_vec(&run_inventory_wave_release_test_reducer::RunInventoryWaveReleaseTestArgs {
                 }),
@@ -14841,6 +15259,8 @@ Reducer::RunPurchasingCompanyIsolationTest => __sats::bsatn::to_vec(&run_purchas
 Reducer::RunPurchasingIncomingPickingTest => __sats::bsatn::to_vec(&run_purchasing_incoming_picking_test_reducer::RunPurchasingIncomingPickingTestArgs {
                 }),
 Reducer::RunPurchasingWaveCSmokeTest => __sats::bsatn::to_vec(&run_purchasing_wave_c_smoke_test_reducer::RunPurchasingWaveCSmokeTestArgs {
+                }),
+Reducer::RunPurchasingWaveETest => __sats::bsatn::to_vec(&run_purchasing_wave_e_test_reducer::RunPurchasingWaveETestArgs {
                 }),
 Reducer::RunSalesAtpShortfallTest => __sats::bsatn::to_vec(&run_sales_atp_shortfall_test_reducer::RunSalesAtpShortfallTestArgs {
                 }),
@@ -15076,6 +15496,24 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&set_contact_segment_rules_reducer::SetContactSegmentRulesArgs {
                 organization_id: organization_id.clone(),
                 segment_id: segment_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::SetExpenseAllocations{
+                organization_id,
+                expense_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_expense_allocations_reducer::SetExpenseAllocationsArgs {
+                organization_id: organization_id.clone(),
+                expense_id: expense_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::SetExpenseFraudHold{
+                organization_id,
+                expense_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_expense_fraud_hold_reducer::SetExpenseFraudHoldArgs {
+                organization_id: organization_id.clone(),
+                expense_id: expense_id.clone(),
                 params: params.clone(),
 }),
             Reducer::SetFormRoleConfig{
@@ -15341,11 +15779,9 @@ Reducer::SeedOrganizationFormConfigs{
             Reducer::SubmitExpenseSheet{
                 organization_id,
                 sheet_id,
-                params,
 }             => __sats::bsatn::to_vec(&submit_expense_sheet_reducer::SubmitExpenseSheetArgs {
                 organization_id: organization_id.clone(),
                 sheet_id: sheet_id.clone(),
-                params: params.clone(),
 }),
             Reducer::SubmitPurchaseRequisition{
                 organization_id,
@@ -16871,6 +17307,31 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpsertExpenseMileageRate{
+                organization_id,
+                rate_id,
+                params,
+}             => __sats::bsatn::to_vec(&upsert_expense_mileage_rate_reducer::UpsertExpenseMileageRateArgs {
+                organization_id: organization_id.clone(),
+                rate_id: rate_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpsertExpensePerDiemRate{
+                organization_id,
+                rate_id,
+                params,
+}             => __sats::bsatn::to_vec(&upsert_expense_per_diem_rate_reducer::UpsertExpensePerDiemRateArgs {
+                organization_id: organization_id.clone(),
+                rate_id: rate_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpsertExpensePolicy{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&upsert_expense_policy_reducer::UpsertExpensePolicyArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpsertOrganizationSettings{
                 organization_id,
                 params,
@@ -17148,6 +17609,7 @@ pub struct DbUpdate {
     document_sequence: __sdk::TableUpdate<DocumentSequence>,
     document_template: __sdk::TableUpdate<DocumentTemplate>,
     document_version: __sdk::TableUpdate<DocumentVersion>,
+    expense_integration_intent: __sdk::TableUpdate<ExpenseIntegrationIntent>,
     expense_sheet: __sdk::TableUpdate<HrExpenseSheet>,
     financial_report: __sdk::TableUpdate<FinancialReport>,
     fleet_vehicle: __sdk::TableUpdate<FleetVehicle>,
@@ -17165,6 +17627,13 @@ pub struct DbUpdate {
     hr_department: __sdk::TableUpdate<HrDepartment>,
     hr_employee: __sdk::TableUpdate<HrEmployee>,
     hr_expense: __sdk::TableUpdate<HrExpense>,
+    hr_expense_advance: __sdk::TableUpdate<HrExpenseAdvance>,
+    hr_expense_advance_application: __sdk::TableUpdate<HrExpenseAdvanceApplication>,
+    hr_expense_allocation: __sdk::TableUpdate<HrExpenseAllocation>,
+    hr_expense_mileage_rate: __sdk::TableUpdate<HrExpenseMileageRate>,
+    hr_expense_per_diem_rate: __sdk::TableUpdate<HrExpensePerDiemRate>,
+    hr_expense_policy: __sdk::TableUpdate<HrExpensePolicy>,
+    hr_expense_policy_exception: __sdk::TableUpdate<HrExpensePolicyException>,
     hr_job_position: __sdk::TableUpdate<HrJobPosition>,
     hr_leave: __sdk::TableUpdate<HrLeave>,
     hr_leave_type: __sdk::TableUpdate<HrLeaveType>,
@@ -17265,6 +17734,7 @@ pub struct DbUpdate {
     purchase_order: __sdk::TableUpdate<PurchaseOrder>,
     purchase_order_line: __sdk::TableUpdate<PurchaseOrderLine>,
     purchase_requisition: __sdk::TableUpdate<PurchaseRequisition>,
+    purchase_requisition_line: __sdk::TableUpdate<PurchaseRequisitionLine>,
     purchase_return: __sdk::TableUpdate<PurchaseReturn>,
     purchase_return_line: __sdk::TableUpdate<PurchaseReturnLine>,
     purchase_rfq: __sdk::TableUpdate<PurchaseRfq>,
@@ -17349,6 +17819,7 @@ pub struct DbUpdate {
     warehouse: __sdk::TableUpdate<Warehouse>,
     warehouse_3_d_zone: __sdk::TableUpdate<Warehouse3DZone>,
     warehouse_geo: __sdk::TableUpdate<WarehouseGeo>,
+    warehouse_sync_intent: __sdk::TableUpdate<WarehouseSyncIntent>,
     warehouse_task: __sdk::TableUpdate<WarehouseTask>,
     whatsapp_business_account: __sdk::TableUpdate<WhatsAppBusinessAccount>,
     workflow: __sdk::TableUpdate<Workflow>,
@@ -17479,6 +17950,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "document_sequence" => db_update.document_sequence.append(document_sequence_table::parse_table_update(table_update)?),
     "document_template" => db_update.document_template.append(document_template_table::parse_table_update(table_update)?),
     "document_version" => db_update.document_version.append(document_version_table::parse_table_update(table_update)?),
+    "expense_integration_intent" => db_update.expense_integration_intent.append(expense_integration_intent_table::parse_table_update(table_update)?),
     "expense_sheet" => db_update.expense_sheet.append(expense_sheet_table::parse_table_update(table_update)?),
     "financial_report" => db_update.financial_report.append(financial_report_table::parse_table_update(table_update)?),
     "fleet_vehicle" => db_update.fleet_vehicle.append(fleet_vehicle_table::parse_table_update(table_update)?),
@@ -17496,6 +17968,13 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "hr_department" => db_update.hr_department.append(hr_department_table::parse_table_update(table_update)?),
     "hr_employee" => db_update.hr_employee.append(hr_employee_table::parse_table_update(table_update)?),
     "hr_expense" => db_update.hr_expense.append(hr_expense_table::parse_table_update(table_update)?),
+    "hr_expense_advance" => db_update.hr_expense_advance.append(hr_expense_advance_table::parse_table_update(table_update)?),
+    "hr_expense_advance_application" => db_update.hr_expense_advance_application.append(hr_expense_advance_application_table::parse_table_update(table_update)?),
+    "hr_expense_allocation" => db_update.hr_expense_allocation.append(hr_expense_allocation_table::parse_table_update(table_update)?),
+    "hr_expense_mileage_rate" => db_update.hr_expense_mileage_rate.append(hr_expense_mileage_rate_table::parse_table_update(table_update)?),
+    "hr_expense_per_diem_rate" => db_update.hr_expense_per_diem_rate.append(hr_expense_per_diem_rate_table::parse_table_update(table_update)?),
+    "hr_expense_policy" => db_update.hr_expense_policy.append(hr_expense_policy_table::parse_table_update(table_update)?),
+    "hr_expense_policy_exception" => db_update.hr_expense_policy_exception.append(hr_expense_policy_exception_table::parse_table_update(table_update)?),
     "hr_job_position" => db_update.hr_job_position.append(hr_job_position_table::parse_table_update(table_update)?),
     "hr_leave" => db_update.hr_leave.append(hr_leave_table::parse_table_update(table_update)?),
     "hr_leave_type" => db_update.hr_leave_type.append(hr_leave_type_table::parse_table_update(table_update)?),
@@ -17596,6 +18075,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "purchase_order" => db_update.purchase_order.append(purchase_order_table::parse_table_update(table_update)?),
     "purchase_order_line" => db_update.purchase_order_line.append(purchase_order_line_table::parse_table_update(table_update)?),
     "purchase_requisition" => db_update.purchase_requisition.append(purchase_requisition_table::parse_table_update(table_update)?),
+    "purchase_requisition_line" => db_update.purchase_requisition_line.append(purchase_requisition_line_table::parse_table_update(table_update)?),
     "purchase_return" => db_update.purchase_return.append(purchase_return_table::parse_table_update(table_update)?),
     "purchase_return_line" => db_update.purchase_return_line.append(purchase_return_line_table::parse_table_update(table_update)?),
     "purchase_rfq" => db_update.purchase_rfq.append(purchase_rfq_table::parse_table_update(table_update)?),
@@ -17680,6 +18160,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "warehouse" => db_update.warehouse.append(warehouse_table::parse_table_update(table_update)?),
     "warehouse_3_d_zone" => db_update.warehouse_3_d_zone.append(warehouse_3_d_zone_table::parse_table_update(table_update)?),
     "warehouse_geo" => db_update.warehouse_geo.append(warehouse_geo_table::parse_table_update(table_update)?),
+    "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(warehouse_sync_intent_table::parse_table_update(table_update)?),
     "warehouse_task" => db_update.warehouse_task.append(warehouse_task_table::parse_table_update(table_update)?),
     "whatsapp_business_account" => db_update.whatsapp_business_account.append(whatsapp_business_account_table::parse_table_update(table_update)?),
     "workflow" => db_update.workflow.append(workflow_table::parse_table_update(table_update)?),
@@ -17822,6 +18303,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.document_sequence = cache.apply_diff_to_table::<DocumentSequence>("document_sequence", &self.document_sequence).with_updates_by_pk(|row| &row.doc_type);
         diff.document_template = cache.apply_diff_to_table::<DocumentTemplate>("document_template", &self.document_template).with_updates_by_pk(|row| &row.id);
         diff.document_version = cache.apply_diff_to_table::<DocumentVersion>("document_version", &self.document_version).with_updates_by_pk(|row| &row.id);
+        diff.expense_integration_intent = cache.apply_diff_to_table::<ExpenseIntegrationIntent>("expense_integration_intent", &self.expense_integration_intent).with_updates_by_pk(|row| &row.id);
         diff.expense_sheet = cache.apply_diff_to_table::<HrExpenseSheet>("expense_sheet", &self.expense_sheet).with_updates_by_pk(|row| &row.id);
         diff.financial_report = cache.apply_diff_to_table::<FinancialReport>("financial_report", &self.financial_report).with_updates_by_pk(|row| &row.id);
         diff.fleet_vehicle = cache.apply_diff_to_table::<FleetVehicle>("fleet_vehicle", &self.fleet_vehicle).with_updates_by_pk(|row| &row.id);
@@ -17839,6 +18321,13 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.hr_department = cache.apply_diff_to_table::<HrDepartment>("hr_department", &self.hr_department).with_updates_by_pk(|row| &row.id);
         diff.hr_employee = cache.apply_diff_to_table::<HrEmployee>("hr_employee", &self.hr_employee).with_updates_by_pk(|row| &row.id);
         diff.hr_expense = cache.apply_diff_to_table::<HrExpense>("hr_expense", &self.hr_expense).with_updates_by_pk(|row| &row.id);
+        diff.hr_expense_advance = cache.apply_diff_to_table::<HrExpenseAdvance>("hr_expense_advance", &self.hr_expense_advance).with_updates_by_pk(|row| &row.id);
+        diff.hr_expense_advance_application = cache.apply_diff_to_table::<HrExpenseAdvanceApplication>("hr_expense_advance_application", &self.hr_expense_advance_application).with_updates_by_pk(|row| &row.id);
+        diff.hr_expense_allocation = cache.apply_diff_to_table::<HrExpenseAllocation>("hr_expense_allocation", &self.hr_expense_allocation).with_updates_by_pk(|row| &row.id);
+        diff.hr_expense_mileage_rate = cache.apply_diff_to_table::<HrExpenseMileageRate>("hr_expense_mileage_rate", &self.hr_expense_mileage_rate).with_updates_by_pk(|row| &row.id);
+        diff.hr_expense_per_diem_rate = cache.apply_diff_to_table::<HrExpensePerDiemRate>("hr_expense_per_diem_rate", &self.hr_expense_per_diem_rate).with_updates_by_pk(|row| &row.id);
+        diff.hr_expense_policy = cache.apply_diff_to_table::<HrExpensePolicy>("hr_expense_policy", &self.hr_expense_policy).with_updates_by_pk(|row| &row.id);
+        diff.hr_expense_policy_exception = cache.apply_diff_to_table::<HrExpensePolicyException>("hr_expense_policy_exception", &self.hr_expense_policy_exception).with_updates_by_pk(|row| &row.id);
         diff.hr_job_position = cache.apply_diff_to_table::<HrJobPosition>("hr_job_position", &self.hr_job_position).with_updates_by_pk(|row| &row.id);
         diff.hr_leave = cache.apply_diff_to_table::<HrLeave>("hr_leave", &self.hr_leave).with_updates_by_pk(|row| &row.id);
         diff.hr_leave_type = cache.apply_diff_to_table::<HrLeaveType>("hr_leave_type", &self.hr_leave_type).with_updates_by_pk(|row| &row.id);
@@ -17939,6 +18428,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.purchase_order = cache.apply_diff_to_table::<PurchaseOrder>("purchase_order", &self.purchase_order).with_updates_by_pk(|row| &row.id);
         diff.purchase_order_line = cache.apply_diff_to_table::<PurchaseOrderLine>("purchase_order_line", &self.purchase_order_line).with_updates_by_pk(|row| &row.id);
         diff.purchase_requisition = cache.apply_diff_to_table::<PurchaseRequisition>("purchase_requisition", &self.purchase_requisition).with_updates_by_pk(|row| &row.id);
+        diff.purchase_requisition_line = cache.apply_diff_to_table::<PurchaseRequisitionLine>("purchase_requisition_line", &self.purchase_requisition_line).with_updates_by_pk(|row| &row.id);
         diff.purchase_return = cache.apply_diff_to_table::<PurchaseReturn>("purchase_return", &self.purchase_return).with_updates_by_pk(|row| &row.id);
         diff.purchase_return_line = cache.apply_diff_to_table::<PurchaseReturnLine>("purchase_return_line", &self.purchase_return_line).with_updates_by_pk(|row| &row.id);
         diff.purchase_rfq = cache.apply_diff_to_table::<PurchaseRfq>("purchase_rfq", &self.purchase_rfq).with_updates_by_pk(|row| &row.id);
@@ -18023,6 +18513,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.warehouse = cache.apply_diff_to_table::<Warehouse>("warehouse", &self.warehouse).with_updates_by_pk(|row| &row.id);
         diff.warehouse_3_d_zone = cache.apply_diff_to_table::<Warehouse3DZone>("warehouse_3_d_zone", &self.warehouse_3_d_zone).with_updates_by_pk(|row| &row.id);
         diff.warehouse_geo = cache.apply_diff_to_table::<WarehouseGeo>("warehouse_geo", &self.warehouse_geo).with_updates_by_pk(|row| &row.id);
+        diff.warehouse_sync_intent = cache.apply_diff_to_table::<WarehouseSyncIntent>("warehouse_sync_intent", &self.warehouse_sync_intent).with_updates_by_pk(|row| &row.id);
         diff.warehouse_task = cache.apply_diff_to_table::<WarehouseTask>("warehouse_task", &self.warehouse_task).with_updates_by_pk(|row| &row.id);
         diff.whatsapp_business_account = cache.apply_diff_to_table::<WhatsAppBusinessAccount>("whatsapp_business_account", &self.whatsapp_business_account).with_updates_by_pk(|row| &row.id);
         diff.workflow = cache.apply_diff_to_table::<Workflow>("workflow", &self.workflow).with_updates_by_pk(|row| &row.id);
@@ -18150,6 +18641,7 @@ for table_rows in raw.tables {
                 "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_version" => db_update.document_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "expense_integration_intent" => db_update.expense_integration_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "expense_sheet" => db_update.expense_sheet.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "financial_report" => db_update.financial_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "fleet_vehicle" => db_update.fleet_vehicle.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -18167,6 +18659,13 @@ for table_rows in raw.tables {
                 "hr_department" => db_update.hr_department.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_employee" => db_update.hr_employee.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_expense" => db_update.hr_expense.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_expense_advance" => db_update.hr_expense_advance.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_expense_advance_application" => db_update.hr_expense_advance_application.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_expense_allocation" => db_update.hr_expense_allocation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_expense_mileage_rate" => db_update.hr_expense_mileage_rate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_expense_per_diem_rate" => db_update.hr_expense_per_diem_rate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_expense_policy" => db_update.hr_expense_policy.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_expense_policy_exception" => db_update.hr_expense_policy_exception.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_job_position" => db_update.hr_job_position.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_leave" => db_update.hr_leave.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_leave_type" => db_update.hr_leave_type.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -18267,6 +18766,7 @@ for table_rows in raw.tables {
                 "purchase_order" => db_update.purchase_order.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_order_line" => db_update.purchase_order_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_requisition" => db_update.purchase_requisition.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_requisition_line" => db_update.purchase_requisition_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_return" => db_update.purchase_return.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_return_line" => db_update.purchase_return_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_rfq" => db_update.purchase_rfq.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -18351,6 +18851,7 @@ for table_rows in raw.tables {
                 "warehouse" => db_update.warehouse.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "warehouse_3_d_zone" => db_update.warehouse_3_d_zone.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "warehouse_geo" => db_update.warehouse_geo.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "warehouse_task" => db_update.warehouse_task.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "whatsapp_business_account" => db_update.whatsapp_business_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "workflow" => db_update.workflow.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -18478,6 +18979,7 @@ for table_rows in raw.tables {
                 "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_version" => db_update.document_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "expense_integration_intent" => db_update.expense_integration_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "expense_sheet" => db_update.expense_sheet.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "financial_report" => db_update.financial_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "fleet_vehicle" => db_update.fleet_vehicle.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -18495,6 +18997,13 @@ for table_rows in raw.tables {
                 "hr_department" => db_update.hr_department.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_employee" => db_update.hr_employee.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_expense" => db_update.hr_expense.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_expense_advance" => db_update.hr_expense_advance.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_expense_advance_application" => db_update.hr_expense_advance_application.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_expense_allocation" => db_update.hr_expense_allocation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_expense_mileage_rate" => db_update.hr_expense_mileage_rate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_expense_per_diem_rate" => db_update.hr_expense_per_diem_rate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_expense_policy" => db_update.hr_expense_policy.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_expense_policy_exception" => db_update.hr_expense_policy_exception.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_job_position" => db_update.hr_job_position.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_leave" => db_update.hr_leave.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_leave_type" => db_update.hr_leave_type.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -18595,6 +19104,7 @@ for table_rows in raw.tables {
                 "purchase_order" => db_update.purchase_order.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_order_line" => db_update.purchase_order_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_requisition" => db_update.purchase_requisition.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_requisition_line" => db_update.purchase_requisition_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_return" => db_update.purchase_return.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_return_line" => db_update.purchase_return_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_rfq" => db_update.purchase_rfq.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -18679,6 +19189,7 @@ for table_rows in raw.tables {
                 "warehouse" => db_update.warehouse.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "warehouse_3_d_zone" => db_update.warehouse_3_d_zone.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "warehouse_geo" => db_update.warehouse_geo.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "warehouse_task" => db_update.warehouse_task.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "whatsapp_business_account" => db_update.whatsapp_business_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "workflow" => db_update.workflow.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -18808,6 +19319,7 @@ pub struct AppliedDiff<'r> {
     document_sequence: __sdk::TableAppliedDiff<'r, DocumentSequence>,
     document_template: __sdk::TableAppliedDiff<'r, DocumentTemplate>,
     document_version: __sdk::TableAppliedDiff<'r, DocumentVersion>,
+    expense_integration_intent: __sdk::TableAppliedDiff<'r, ExpenseIntegrationIntent>,
     expense_sheet: __sdk::TableAppliedDiff<'r, HrExpenseSheet>,
     financial_report: __sdk::TableAppliedDiff<'r, FinancialReport>,
     fleet_vehicle: __sdk::TableAppliedDiff<'r, FleetVehicle>,
@@ -18825,6 +19337,13 @@ pub struct AppliedDiff<'r> {
     hr_department: __sdk::TableAppliedDiff<'r, HrDepartment>,
     hr_employee: __sdk::TableAppliedDiff<'r, HrEmployee>,
     hr_expense: __sdk::TableAppliedDiff<'r, HrExpense>,
+    hr_expense_advance: __sdk::TableAppliedDiff<'r, HrExpenseAdvance>,
+    hr_expense_advance_application: __sdk::TableAppliedDiff<'r, HrExpenseAdvanceApplication>,
+    hr_expense_allocation: __sdk::TableAppliedDiff<'r, HrExpenseAllocation>,
+    hr_expense_mileage_rate: __sdk::TableAppliedDiff<'r, HrExpenseMileageRate>,
+    hr_expense_per_diem_rate: __sdk::TableAppliedDiff<'r, HrExpensePerDiemRate>,
+    hr_expense_policy: __sdk::TableAppliedDiff<'r, HrExpensePolicy>,
+    hr_expense_policy_exception: __sdk::TableAppliedDiff<'r, HrExpensePolicyException>,
     hr_job_position: __sdk::TableAppliedDiff<'r, HrJobPosition>,
     hr_leave: __sdk::TableAppliedDiff<'r, HrLeave>,
     hr_leave_type: __sdk::TableAppliedDiff<'r, HrLeaveType>,
@@ -18925,6 +19444,7 @@ pub struct AppliedDiff<'r> {
     purchase_order: __sdk::TableAppliedDiff<'r, PurchaseOrder>,
     purchase_order_line: __sdk::TableAppliedDiff<'r, PurchaseOrderLine>,
     purchase_requisition: __sdk::TableAppliedDiff<'r, PurchaseRequisition>,
+    purchase_requisition_line: __sdk::TableAppliedDiff<'r, PurchaseRequisitionLine>,
     purchase_return: __sdk::TableAppliedDiff<'r, PurchaseReturn>,
     purchase_return_line: __sdk::TableAppliedDiff<'r, PurchaseReturnLine>,
     purchase_rfq: __sdk::TableAppliedDiff<'r, PurchaseRfq>,
@@ -19009,6 +19529,7 @@ pub struct AppliedDiff<'r> {
     warehouse: __sdk::TableAppliedDiff<'r, Warehouse>,
     warehouse_3_d_zone: __sdk::TableAppliedDiff<'r, Warehouse3DZone>,
     warehouse_geo: __sdk::TableAppliedDiff<'r, WarehouseGeo>,
+    warehouse_sync_intent: __sdk::TableAppliedDiff<'r, WarehouseSyncIntent>,
     warehouse_task: __sdk::TableAppliedDiff<'r, WarehouseTask>,
     whatsapp_business_account: __sdk::TableAppliedDiff<'r, WhatsAppBusinessAccount>,
     workflow: __sdk::TableAppliedDiff<'r, Workflow>,
@@ -19139,6 +19660,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<DocumentSequence>("document_sequence", &self.document_sequence, event);
         callbacks.invoke_table_row_callbacks::<DocumentTemplate>("document_template", &self.document_template, event);
         callbacks.invoke_table_row_callbacks::<DocumentVersion>("document_version", &self.document_version, event);
+        callbacks.invoke_table_row_callbacks::<ExpenseIntegrationIntent>("expense_integration_intent", &self.expense_integration_intent, event);
         callbacks.invoke_table_row_callbacks::<HrExpenseSheet>("expense_sheet", &self.expense_sheet, event);
         callbacks.invoke_table_row_callbacks::<FinancialReport>("financial_report", &self.financial_report, event);
         callbacks.invoke_table_row_callbacks::<FleetVehicle>("fleet_vehicle", &self.fleet_vehicle, event);
@@ -19156,6 +19678,13 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<HrDepartment>("hr_department", &self.hr_department, event);
         callbacks.invoke_table_row_callbacks::<HrEmployee>("hr_employee", &self.hr_employee, event);
         callbacks.invoke_table_row_callbacks::<HrExpense>("hr_expense", &self.hr_expense, event);
+        callbacks.invoke_table_row_callbacks::<HrExpenseAdvance>("hr_expense_advance", &self.hr_expense_advance, event);
+        callbacks.invoke_table_row_callbacks::<HrExpenseAdvanceApplication>("hr_expense_advance_application", &self.hr_expense_advance_application, event);
+        callbacks.invoke_table_row_callbacks::<HrExpenseAllocation>("hr_expense_allocation", &self.hr_expense_allocation, event);
+        callbacks.invoke_table_row_callbacks::<HrExpenseMileageRate>("hr_expense_mileage_rate", &self.hr_expense_mileage_rate, event);
+        callbacks.invoke_table_row_callbacks::<HrExpensePerDiemRate>("hr_expense_per_diem_rate", &self.hr_expense_per_diem_rate, event);
+        callbacks.invoke_table_row_callbacks::<HrExpensePolicy>("hr_expense_policy", &self.hr_expense_policy, event);
+        callbacks.invoke_table_row_callbacks::<HrExpensePolicyException>("hr_expense_policy_exception", &self.hr_expense_policy_exception, event);
         callbacks.invoke_table_row_callbacks::<HrJobPosition>("hr_job_position", &self.hr_job_position, event);
         callbacks.invoke_table_row_callbacks::<HrLeave>("hr_leave", &self.hr_leave, event);
         callbacks.invoke_table_row_callbacks::<HrLeaveType>("hr_leave_type", &self.hr_leave_type, event);
@@ -19256,6 +19785,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<PurchaseOrder>("purchase_order", &self.purchase_order, event);
         callbacks.invoke_table_row_callbacks::<PurchaseOrderLine>("purchase_order_line", &self.purchase_order_line, event);
         callbacks.invoke_table_row_callbacks::<PurchaseRequisition>("purchase_requisition", &self.purchase_requisition, event);
+        callbacks.invoke_table_row_callbacks::<PurchaseRequisitionLine>("purchase_requisition_line", &self.purchase_requisition_line, event);
         callbacks.invoke_table_row_callbacks::<PurchaseReturn>("purchase_return", &self.purchase_return, event);
         callbacks.invoke_table_row_callbacks::<PurchaseReturnLine>("purchase_return_line", &self.purchase_return_line, event);
         callbacks.invoke_table_row_callbacks::<PurchaseRfq>("purchase_rfq", &self.purchase_rfq, event);
@@ -19340,6 +19870,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Warehouse>("warehouse", &self.warehouse, event);
         callbacks.invoke_table_row_callbacks::<Warehouse3DZone>("warehouse_3_d_zone", &self.warehouse_3_d_zone, event);
         callbacks.invoke_table_row_callbacks::<WarehouseGeo>("warehouse_geo", &self.warehouse_geo, event);
+        callbacks.invoke_table_row_callbacks::<WarehouseSyncIntent>("warehouse_sync_intent", &self.warehouse_sync_intent, event);
         callbacks.invoke_table_row_callbacks::<WarehouseTask>("warehouse_task", &self.warehouse_task, event);
         callbacks.invoke_table_row_callbacks::<WhatsAppBusinessAccount>("whatsapp_business_account", &self.whatsapp_business_account, event);
         callbacks.invoke_table_row_callbacks::<Workflow>("workflow", &self.workflow, event);
@@ -20101,6 +20632,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         document_sequence_table::register_table(client_cache);
         document_template_table::register_table(client_cache);
         document_version_table::register_table(client_cache);
+        expense_integration_intent_table::register_table(client_cache);
         expense_sheet_table::register_table(client_cache);
         financial_report_table::register_table(client_cache);
         fleet_vehicle_table::register_table(client_cache);
@@ -20118,6 +20650,13 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         hr_department_table::register_table(client_cache);
         hr_employee_table::register_table(client_cache);
         hr_expense_table::register_table(client_cache);
+        hr_expense_advance_table::register_table(client_cache);
+        hr_expense_advance_application_table::register_table(client_cache);
+        hr_expense_allocation_table::register_table(client_cache);
+        hr_expense_mileage_rate_table::register_table(client_cache);
+        hr_expense_per_diem_rate_table::register_table(client_cache);
+        hr_expense_policy_table::register_table(client_cache);
+        hr_expense_policy_exception_table::register_table(client_cache);
         hr_job_position_table::register_table(client_cache);
         hr_leave_table::register_table(client_cache);
         hr_leave_type_table::register_table(client_cache);
@@ -20218,6 +20757,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         purchase_order_table::register_table(client_cache);
         purchase_order_line_table::register_table(client_cache);
         purchase_requisition_table::register_table(client_cache);
+        purchase_requisition_line_table::register_table(client_cache);
         purchase_return_table::register_table(client_cache);
         purchase_return_line_table::register_table(client_cache);
         purchase_rfq_table::register_table(client_cache);
@@ -20302,6 +20842,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         warehouse_table::register_table(client_cache);
         warehouse_3_d_zone_table::register_table(client_cache);
         warehouse_geo_table::register_table(client_cache);
+        warehouse_sync_intent_table::register_table(client_cache);
         warehouse_task_table::register_table(client_cache);
         whatsapp_business_account_table::register_table(client_cache);
         workflow_table::register_table(client_cache);
@@ -20424,6 +20965,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "document_sequence",
         "document_template",
         "document_version",
+        "expense_integration_intent",
         "expense_sheet",
         "financial_report",
         "fleet_vehicle",
@@ -20441,6 +20983,13 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "hr_department",
         "hr_employee",
         "hr_expense",
+        "hr_expense_advance",
+        "hr_expense_advance_application",
+        "hr_expense_allocation",
+        "hr_expense_mileage_rate",
+        "hr_expense_per_diem_rate",
+        "hr_expense_policy",
+        "hr_expense_policy_exception",
         "hr_job_position",
         "hr_leave",
         "hr_leave_type",
@@ -20541,6 +21090,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "purchase_order",
         "purchase_order_line",
         "purchase_requisition",
+        "purchase_requisition_line",
         "purchase_return",
         "purchase_return_line",
         "purchase_rfq",
@@ -20625,6 +21175,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "warehouse",
         "warehouse_3_d_zone",
         "warehouse_geo",
+        "warehouse_sync_intent",
         "warehouse_task",
         "whatsapp_business_account",
         "workflow",

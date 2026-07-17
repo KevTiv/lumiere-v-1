@@ -9,8 +9,10 @@ import {
   newExpenseSheetForm,
   editExpenseForm,
   addExpenseToReportForm,
-  submitExpenseReportForm,
   postExpenseReportForm,
+  reimburseExpenseReportForm,
+  setExpenseAllocationsForm,
+  projectRebillExpenseReportForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
   mergeFieldDefaultValues,
@@ -29,6 +31,8 @@ import { useExpensesModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useExpenses,
   useExpenseSheets,
+  useExpenseSheetsToApprove,
+  useExpensesMissingReceipt,
   useCreateExpense,
   useCreateExpenseSheet,
   useUpdateExpense,
@@ -37,8 +41,15 @@ import {
   useApproveExpenseSheet,
   useRefuseExpenseSheet,
   usePostExpenseSheet,
+  useCreateExpenseReimbursementPayment,
+  useCreateExpenseProjectRebill,
+  useSetExpenseAllocations,
   useExpensesCsvImportMutations,
 } from "@lumiere/query-hooks/hooks/expenses"
+import { optionalBigIntU64 } from "@/lib/form-coercion"
+import { ExpensesCapturePanel } from "./expenses-capture-panel"
+import { useExpenseSheetApprovalTimeline } from "@lumiere/query-hooks/hooks/approvals"
+import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
@@ -51,12 +62,14 @@ import {
   pricelistRowsToSelectOptions,
   employeeRowsToSelectOptions,
   expenseSheetRowsToDraftSelectOptions,
+  accountJournalRowsToSelectOptions,
+  accountAccountRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
   mapExpenseRow,
   mapExpenseSheetRow,
-  sumExpenseAmountsForSheet,
 } from "@/lib/expense-state"
+import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 interface ExpensesClientProps {
   initialExpenses?: Record<string, unknown>[]
@@ -73,8 +86,10 @@ type ExpensesClientLoadedProps = Omit<ExpensesClientProps, "organizationId"> & {
 type WorkflowForm =
   | { kind: "editExpense"; row: Record<string, unknown> }
   | { kind: "addToReport"; row: Record<string, unknown> }
-  | { kind: "submitReport"; row: Record<string, unknown> }
   | { kind: "postReport"; row: Record<string, unknown> }
+  | { kind: "reimburseReport"; row: Record<string, unknown> }
+  | { kind: "setAllocations"; row: Record<string, unknown> }
+  | { kind: "projectRebill"; row: Record<string, unknown> }
 
 type ExpensesCsvImportKind = "expense" | "sheet"
 
@@ -115,16 +130,26 @@ function ExpensesClientLoaded({
   >(null)
   const [workflowForm, setWorkflowForm] = useState<WorkflowForm | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<
-    { kind: "approve" | "refuse"; row: Record<string, unknown> } | null
+    { kind: "approve" | "refuse" | "submit"; row: Record<string, unknown> } | null
   >(null)
   const [csvKind, setCsvKind] = useState<ExpensesCsvImportKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
   const [toolbarError, setToolbarError] = useState<string | null>(null)
+  const [timelineSheet, setTimelineSheet] = useState<Record<string, unknown> | null>(null)
 
   const { data: expensesRaw = [] } = useExpenses(orgId, initialExpenses)
   const { data: sheetsRaw = [] } = useExpenseSheets(orgId, initialSheets)
+  const { data: sheetsToApprove = [] } = useExpenseSheetsToApprove(orgId)
+  const { data: missingReceipts = [] } = useExpensesMissingReceipt(orgId)
+  const timelineQuery = useExpenseSheetApprovalTimeline(
+    organizationId,
+    timelineSheet ? rowId(timelineSheet) : undefined,
+    timelineSheet != null,
+  )
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: employees = [] } = useEmployees(orgId, initialEmployees)
+  const { data: accountJournals = [] } = useAccountJournals(orgId)
+  const { data: accountAccounts = [] } = useAccountAccounts(orgId)
 
   const expenses = useMemo(
     () => expensesRaw.map((e) => mapExpenseRow(e as Record<string, unknown>)),
@@ -143,6 +168,9 @@ function ExpensesClientLoaded({
   const approveExpenseSheet = useApproveExpenseSheet(orgId)
   const refuseExpenseSheet = useRefuseExpenseSheet(orgId)
   const postExpenseSheet = usePostExpenseSheet(orgId)
+  const reimburseExpenseSheet = useCreateExpenseReimbursementPayment(orgId)
+  const setExpenseAllocations = useSetExpenseAllocations(orgId)
+  const projectRebill = useCreateExpenseProjectRebill(orgId)
   const csvImports = useExpensesCsvImportMutations(orgId)
 
   useEffect(() => {
@@ -228,12 +256,52 @@ function ExpensesClientLoaded({
 
   const editExpenseFormConfig = useMemo(() => editExpenseForm(t), [t])
   const addToReportFormBase = useMemo(() => addExpenseToReportForm(t), [t])
-  const submitReportFormBase = useMemo(() => submitExpenseReportForm(t), [t])
-  const postReportFormBase = useMemo(() => postExpenseReportForm(t), [t])
+  const journalFieldOptions = useMemo(() => {
+    const fromApi = accountJournalRowsToSelectOptions(accountJournals)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noJournals"), disabled: true }]
+  }, [accountJournals, t])
+  const accountFieldOptions = useMemo(() => {
+    const fromApi = accountAccountRowsToSelectOptions(accountAccounts)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
+  }, [accountAccounts, t])
+  const postReportFormBase = useMemo(
+    () =>
+      mergeSelectOptionsForFields(postExpenseReportForm(t), {
+        journalId: journalFieldOptions,
+        defaultExpenseAccountId: accountFieldOptions,
+        payableAccountId: accountFieldOptions,
+        defaultTaxAccountId: accountFieldOptions,
+        cardLiabilityAccountId: accountFieldOptions,
+        advanceAccountId: accountFieldOptions,
+      }),
+    [t, journalFieldOptions, accountFieldOptions],
+  )
+  const reimburseReportFormBase = useMemo(
+    () =>
+      mergeSelectOptionsForFields(reimburseExpenseReportForm(t), {
+        journalId: journalFieldOptions,
+        payableAccountId: accountFieldOptions,
+        liquidityAccountId: accountFieldOptions,
+      }),
+    [t, journalFieldOptions, accountFieldOptions],
+  )
+  const allocationsFormConfig = useMemo(() => setExpenseAllocationsForm(t), [t])
+  const projectRebillFormBase = useMemo(
+    () =>
+      mergeSelectOptionsForFields(projectRebillExpenseReportForm(t), {
+        journalId: journalFieldOptions,
+        receivableAccountId: accountFieldOptions,
+        incomeAccountId: accountFieldOptions,
+      }),
+    [t, journalFieldOptions, accountFieldOptions],
+  )
 
   const liveSections = useMemo(() => {
-    const pendingApproval = sheets.filter((s) => String(s.state) === "Submitted").length
-    const totalAmount = expenses.reduce((sum, e) => sum + Number(e.totalAmount ?? 0), 0)
+    const pendingApproval = sheetsToApprove.length
+    const missingReceiptCount = missingReceipts.length
+    const totalAmount = sheets.reduce((sum, s) => sum + Number(s.totalAmount ?? 0), 0)
     const approved = sheets.filter((s) => {
       const st = String(s.state)
       return st === "Approved" || st === "Posted" || st === "Done"
@@ -252,6 +320,7 @@ function ExpensesClientLoaded({
               stats: [
                 { label: t("expenses.dashboard.totalExpenses"), value: String(expenses.length), icon: "Receipt" },
                 { label: t("expenses.dashboard.pendingApproval"), value: String(pendingApproval), icon: "Clock" },
+                { label: t("expenses.dashboard.missingReceipts"), value: String(missingReceiptCount), icon: "FileWarning" },
                 { label: t("expenses.dashboard.approved"), value: String(approved), icon: "CheckCircle" },
                 { label: t("expenses.dashboard.totalAmount"), value: `$${totalAmount.toLocaleString()}`, icon: "DollarSign" },
               ],
@@ -274,7 +343,16 @@ function ExpensesClientLoaded({
         return w
       }),
     }))
-  }, [expenses, sheets, moduleConfig, t, expenseFormConfig, expenseSheetFormConfig])
+  }, [
+    expenses,
+    sheets,
+    sheetsToApprove.length,
+    missingReceipts.length,
+    moduleConfig,
+    t,
+    expenseFormConfig,
+    expenseSheetFormConfig,
+  ])
 
   const config = useMemo(
     () =>
@@ -315,14 +393,9 @@ function ExpensesClientLoaded({
                       setToolbarError(t("expenses.workflow.noDraftSheets"))
                       return
                     }
-                    void runSheetAction(draft, "report", (row) => {
-                      const total = sumExpenseAmountsForSheet(expenses as Record<string, unknown>[], rowId(row))
-                      const fallback = Number(row.totalAmount ?? row.total_amount ?? 0)
-                      return submitExpenseSheet.mutateAsync({
-                        sheetId: rowId(row),
-                        params: { totalAmount: total > 0 ? total : fallback },
-                      })
-                    })
+                    void runSheetAction(draft, "report", (row) =>
+                      submitExpenseSheet.mutateAsync(rowId(row)),
+                    )
                   },
                 },
                 {
@@ -352,7 +425,7 @@ function ExpensesClientLoaded({
                       return
                     }
                     void runSheetAction(submitted, "report", (row) =>
-                      refuseExpenseSheet.mutateAsync(rowId(row)),
+                      refuseExpenseSheet.mutateAsync({ sheetId: rowId(row), params: {} }),
                     )
                   },
                 },
@@ -366,13 +439,28 @@ function ExpensesClientLoaded({
                       setToolbarError(t("expenses.workflow.noApprovedSheets"))
                       return
                     }
-                    const today = new Date()
-                    void runSheetAction(approved, "report", (row) =>
-                      postExpenseSheet.mutateAsync({
-                        sheetId: rowId(row),
-                        accountingDate: today,
-                      }),
-                    )
+                    if (approved.length === 1) {
+                      setWorkflowForm({ kind: "postReport", row: approved[0]! })
+                      return
+                    }
+                    setToolbarError("Select one approved report to post (accounts required).")
+                  },
+                },
+                {
+                  id: "reimburse-sheets",
+                  label: t("expenses.workflow.reimburseReport"),
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const posted = rows.filter((r) => rowState(r) === "Posted")
+                    if (posted.length === 0) {
+                      setToolbarError(t("expenses.workflow.noPostedSheets"))
+                      return
+                    }
+                    if (posted.length === 1) {
+                      setWorkflowForm({ kind: "reimburseReport", row: posted[0]! })
+                      return
+                    }
+                    setToolbarError("Select one posted report to reimburse.")
                   },
                 },
               ]),
@@ -381,7 +469,7 @@ function ExpensesClientLoaded({
           return tab
         }),
       }) as ModuleConfig,
-    [liveSections, moduleConfig, expenseFormConfig, expenseSheetFormConfig, expenses, t, submitExpenseSheet, approveExpenseSheet, refuseExpenseSheet, postExpenseSheet],
+    [liveSections, moduleConfig, expenseFormConfig, expenseSheetFormConfig, t, submitExpenseSheet, approveExpenseSheet, refuseExpenseSheet],
   )
 
   const data = useMemo(
@@ -433,6 +521,9 @@ function ExpensesClientLoaded({
     approveExpenseSheet.isPending ||
     refuseExpenseSheet.isPending ||
     postExpenseSheet.isPending ||
+    reimburseExpenseSheet.isPending ||
+    setExpenseAllocations.isPending ||
+    projectRebill.isPending ||
     csvImports.importExpense.isPending ||
     csvImports.importExpenseSheet.isPending
 
@@ -463,30 +554,44 @@ function ExpensesClientLoaded({
     if (workflowForm.kind === "addToReport") {
       return addToReportFormForRow(workflowForm.row)
     }
-    if (workflowForm.kind === "submitReport") {
-      const row = workflowForm.row
-      const sid = rowId(row)
-      const suggested = sumExpenseAmountsForSheet(expenses as Record<string, unknown>[], sid)
-      const fallback = Number(row.totalAmount ?? row.total_amount ?? 0)
-      const total = suggested > 0 ? suggested : fallback
-      return mergeFieldDefaultValues(submitReportFormBase, {
-        totalAmount: total,
-      })
-    }
     if (workflowForm.kind === "postReport") {
       const today = new Date().toISOString().slice(0, 10)
       return mergeFieldDefaultValues(postReportFormBase, {
         accountingDate: today,
       })
     }
+    if (workflowForm.kind === "reimburseReport") {
+      const today = new Date().toISOString().slice(0, 10)
+      return mergeFieldDefaultValues(reimburseReportFormBase, {
+        paymentDate: today,
+      })
+    }
+    if (workflowForm.kind === "setAllocations") {
+      return allocationsFormConfig
+    }
+    if (workflowForm.kind === "projectRebill") {
+      const today = new Date().toISOString().slice(0, 10)
+      return mergeFieldDefaultValues(projectRebillFormBase, {
+        invoiceDate: today,
+      })
+    }
     return null
-  }, [workflowForm, editExpenseFormConfig, addToReportFormForRow, submitReportFormBase, postReportFormBase, expenses])
+  }, [
+    workflowForm,
+    editExpenseFormConfig,
+    addToReportFormForRow,
+    postReportFormBase,
+    reimburseReportFormBase,
+    allocationsFormConfig,
+    projectRebillFormBase,
+  ])
 
   const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {
     if (!workflowForm) return
     if (workflowForm.kind === "editExpense") {
       const id = rowId(workflowForm.row)
       if (!id) return
+      const hasReceipt = formData.hasReceipt !== false && formData.hasReceipt !== "false"
       await updateExpense.mutateAsync({
         expenseId: id,
         params: {
@@ -497,6 +602,7 @@ function ExpensesClientLoaded({
             formData.description != null && String(formData.description).trim() !== ""
               ? String(formData.description)
               : undefined,
+          attachmentIds: hasReceipt ? [1n] : [],
         },
       })
     } else if (workflowForm.kind === "addToReport") {
@@ -506,17 +612,91 @@ function ExpensesClientLoaded({
         expenseId: rowId(workflowForm.row),
         sheetId: String(sheetRaw),
       })
-    } else if (workflowForm.kind === "submitReport") {
-      await submitExpenseSheet.mutateAsync({
-        sheetId: rowId(workflowForm.row),
-        params: { totalAmount: Number(formData.totalAmount ?? 0) },
-      })
     } else if (workflowForm.kind === "postReport") {
       const d = formData.accountingDate
-      if (d == null || d === "") return
+      const journalId = formData.journalId
+      const payableAccountId = formData.payableAccountId
+      const defaultExpenseAccountId = formData.defaultExpenseAccountId
+      const defaultTaxAccountId = formData.defaultTaxAccountId
+      const cardLiabilityAccountId = formData.cardLiabilityAccountId
+      const advanceAccountId = formData.advanceAccountId
+      if (d == null || d === "" || !journalId || !payableAccountId || !defaultExpenseAccountId) return
       await postExpenseSheet.mutateAsync({
         sheetId: rowId(workflowForm.row),
-        accountingDate: new Date(String(d)),
+        params: {
+          accountingDate: stbTimestampFromDate(new Date(String(d))),
+          journalId: BigInt(String(journalId)),
+          payableAccountId: BigInt(String(payableAccountId)),
+          defaultExpenseAccountId: BigInt(String(defaultExpenseAccountId)),
+          defaultTaxAccountId:
+            defaultTaxAccountId != null && String(defaultTaxAccountId).trim() !== ""
+              ? BigInt(String(defaultTaxAccountId))
+              : undefined,
+          cardLiabilityAccountId:
+            cardLiabilityAccountId != null && String(cardLiabilityAccountId).trim() !== ""
+              ? BigInt(String(cardLiabilityAccountId))
+              : undefined,
+          advanceAccountId:
+            advanceAccountId != null && String(advanceAccountId).trim() !== ""
+              ? BigInt(String(advanceAccountId))
+              : undefined,
+        },
+      })
+    } else if (workflowForm.kind === "reimburseReport") {
+      const d = formData.paymentDate
+      const journalId = formData.journalId
+      const payableAccountId = formData.payableAccountId
+      const liquidityAccountId = formData.liquidityAccountId
+      if (d == null || d === "" || !journalId || !payableAccountId || !liquidityAccountId) return
+      await reimburseExpenseSheet.mutateAsync({
+        sheetId: rowId(workflowForm.row),
+        params: {
+          paymentDate: stbTimestampFromDate(new Date(String(d))),
+          journalId: BigInt(String(journalId)),
+          payableAccountId: BigInt(String(payableAccountId)),
+          liquidityAccountId: BigInt(String(liquidityAccountId)),
+        },
+      })
+    } else if (workflowForm.kind === "setAllocations") {
+      const lines = []
+      const share1 = Number(formData.sharePercent1 ?? 0)
+      if (share1 > 0) {
+        lines.push({
+          analyticAccountId: optionalBigIntU64(formData.analyticAccountId1),
+          projectId: optionalBigIntU64(formData.projectId1),
+          sharePercent: share1,
+          billable: formData.billable1 !== false && formData.billable1 !== "false",
+          metadata: undefined as string | undefined,
+        })
+      }
+      const share2 = Number(formData.sharePercent2 ?? 0)
+      if (share2 > 0) {
+        lines.push({
+          analyticAccountId: optionalBigIntU64(formData.analyticAccountId2),
+          projectId: optionalBigIntU64(formData.projectId2),
+          sharePercent: share2,
+          billable: formData.billable2 === true || formData.billable2 === "true",
+          metadata: undefined as string | undefined,
+        })
+      }
+      await setExpenseAllocations.mutateAsync({
+        expenseId: rowId(workflowForm.row),
+        params: { lines },
+      })
+    } else if (workflowForm.kind === "projectRebill") {
+      const d = formData.invoiceDate
+      const journalId = formData.journalId
+      const receivableAccountId = formData.receivableAccountId
+      const incomeAccountId = formData.incomeAccountId
+      if (d == null || d === "" || !journalId || !receivableAccountId || !incomeAccountId) return
+      await projectRebill.mutateAsync({
+        sheetId: rowId(workflowForm.row),
+        params: {
+          invoiceDate: stbTimestampFromDate(new Date(String(d))),
+          journalId: BigInt(String(journalId)),
+          receivableAccountId: BigInt(String(receivableAccountId)),
+          incomeAccountId: BigInt(String(incomeAccountId)),
+        },
       })
     }
     setWorkflowForm(null)
@@ -537,6 +717,7 @@ function ExpensesClientLoaded({
           {toolbarError}
         </p>
       ) : null}
+      <ExpensesCapturePanel organizationId={organizationId} />
       <ModuleView
         config={config}
         data={data}
@@ -626,6 +807,17 @@ function ExpensesClientLoaded({
                 >
                   {t("expenses.workflow.addToReport")}
                 </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start"
+                  onClick={() => {
+                    const row = rowAction.row
+                    setRowAction(null)
+                    setWorkflowForm({ kind: "setAllocations", row })
+                  }}
+                >
+                  {t("expenses.workflow.setAllocations")}
+                </Button>
               </>
             )}
             {rowAction?.tabId === "expense-sheets" && rowState(rowAction.row) === "Draft" && (
@@ -635,7 +827,7 @@ function ExpensesClientLoaded({
                 onClick={() => {
                   const row = rowAction.row
                   setRowAction(null)
-                  setWorkflowForm({ kind: "submitReport", row })
+                  setConfirmDialog({ kind: "submit", row })
                 }}
               >
                 {t("expenses.workflow.submitReport")}
@@ -667,6 +859,19 @@ function ExpensesClientLoaded({
                 </Button>
               </>
             )}
+            {rowAction?.tabId === "expense-sheets" && (
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => {
+                  const row = rowAction.row
+                  setRowAction(null)
+                  setTimelineSheet(row)
+                }}
+              >
+                {t("expenses.workflow.approvalTimeline")}
+              </Button>
+            )}
             {rowAction?.tabId === "expense-sheets" && rowState(rowAction.row) === "Approved" && (
               <Button
                 variant="default"
@@ -680,15 +885,108 @@ function ExpensesClientLoaded({
                 {t("expenses.workflow.postReport")}
               </Button>
             )}
+            {rowAction?.tabId === "expense-sheets" && rowState(rowAction.row) === "Posted" && (
+              <>
+                <Button
+                  variant="default"
+                  className="justify-start"
+                  onClick={() => {
+                    const row = rowAction.row
+                    setRowAction(null)
+                    setWorkflowForm({ kind: "reimburseReport", row })
+                  }}
+                >
+                  {t("expenses.workflow.reimburseReport")}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start"
+                  onClick={() => {
+                    const row = rowAction.row
+                    setRowAction(null)
+                    setWorkflowForm({ kind: "projectRebill", row })
+                  }}
+                >
+                  {t("expenses.workflow.projectRebill")}
+                </Button>
+              </>
+            )}
+            {rowAction?.tabId === "expense-sheets" && rowState(rowAction.row) === "Done" && (
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => {
+                  const row = rowAction.row
+                  setRowAction(null)
+                  setWorkflowForm({ kind: "projectRebill", row })
+                }}
+              >
+                {t("expenses.workflow.projectRebill")}
+              </Button>
+            )}
             {rowAction &&
-              ((rowAction.tabId === "expenses" && rowState(rowAction.row) !== "Draft") ||
-                (rowAction.tabId === "expense-sheets" &&
-                  !["Draft", "Submitted", "Approved"].includes(rowState(rowAction.row)))) && (
+              rowAction.tabId === "expenses" &&
+              rowState(rowAction.row) !== "Draft" && (
                 <p className="text-sm text-muted-foreground">{t("expenses.workflow.noActions")}</p>
               )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRowAction(null)}>
+              {t("common.close")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={timelineSheet !== null} onOpenChange={(open) => !open && setTimelineSheet(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("expenses.workflow.approvalTimeline")}</DialogTitle>
+            <DialogDescription>
+              {timelineSheet
+                ? String(timelineSheet.name ?? timelineSheet.id ?? "")
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-80 overflow-y-auto">
+            {timelineSheet && (
+              <div className="rounded-md border p-3 text-sm space-y-1">
+                <div>
+                  <span className="text-muted-foreground">{t("expenses.workflow.timelineState")}: </span>
+                  {rowState(timelineSheet)}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("expenses.workflow.timelineSubmittedBy")}: </span>
+                  {String(timelineSheet.submittedBy ?? timelineSheet.submitted_by ?? "—")}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("expenses.workflow.timelineApprover")}: </span>
+                  {String(timelineSheet.approverId ?? timelineSheet.approver_id ?? "—")}
+                </div>
+              </div>
+            )}
+            {timelineQuery.isLoading && (
+              <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+            )}
+            {!timelineQuery.isLoading && timelineQuery.rows.length === 0 && (
+              <p className="text-sm text-muted-foreground">{t("expenses.workflow.noApprovalRequests")}</p>
+            )}
+            {timelineQuery.rows.map((row) => (
+              <div key={String(row.id)} className="rounded-md border p-3 text-sm space-y-1">
+                <div className="font-medium">{String(row.summary ?? row.action ?? "Approval")}</div>
+                <div className="text-muted-foreground">
+                  {String(row.status ?? "pending")} · {String(row.action ?? "")}
+                </div>
+                {row.rejectReason || row.reject_reason ? (
+                  <div className="text-destructive">
+                    {String(row.rejectReason ?? row.reject_reason)}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTimelineSheet(null)}>
               {t("common.close")}
             </Button>
           </DialogFooter>
@@ -701,19 +999,36 @@ function ExpensesClientLoaded({
             <DialogTitle>
               {confirmDialog?.kind === "approve"
                 ? t("expenses.workflow.confirmApprove")
-                : t("expenses.workflow.confirmRefuse")}
+                : confirmDialog?.kind === "submit"
+                  ? t("expenses.workflow.confirmSubmit")
+                  : t("expenses.workflow.confirmRefuse")}
             </DialogTitle>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setConfirmDialog(null)}>
               {t("common.cancel")}
             </Button>
+            {confirmDialog?.kind === "submit" && (
+              <Button
+                onClick={() => {
+                  const row = confirmDialog.row
+                  setConfirmDialog(null)
+                  void submitExpenseSheet.mutateAsync(rowId(row)).catch((e) =>
+                    setToolbarError(e instanceof Error ? e.message : String(e)),
+                  )
+                }}
+              >
+                {t("common.confirm")}
+              </Button>
+            )}
             {confirmDialog?.kind === "approve" && (
               <Button
                 onClick={() => {
                   const row = confirmDialog.row
                   setConfirmDialog(null)
-                  void approveExpenseSheet.mutateAsync(rowId(row))
+                  void approveExpenseSheet.mutateAsync(rowId(row)).catch((e) =>
+                    setToolbarError(e instanceof Error ? e.message : String(e)),
+                  )
                 }}
               >
                 {t("common.confirm")}
@@ -725,7 +1040,9 @@ function ExpensesClientLoaded({
                 onClick={() => {
                   const row = confirmDialog.row
                   setConfirmDialog(null)
-                  void refuseExpenseSheet.mutateAsync(rowId(row))
+                  void refuseExpenseSheet
+                    .mutateAsync({ sheetId: rowId(row), params: {} })
+                    .catch((e) => setToolbarError(e instanceof Error ? e.message : String(e)))
                 }}
               >
                 {t("common.confirm")}

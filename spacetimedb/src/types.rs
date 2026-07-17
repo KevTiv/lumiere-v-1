@@ -1076,6 +1076,37 @@ pub enum ExpenseSheetState {
     Refused,
 }
 
+/// Expense line kind — standard receipt vs calculated mileage / per diem.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ExpenseLineKind {
+    Standard,
+    Mileage,
+    PerDiem,
+}
+
+/// How the expense was paid — drives GL credit on sheet post.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ExpensePaymentMode {
+    OutOfPocket,
+    CorporateCard,
+}
+
+/// Policy-exception lifecycle for over-cap / blocked expense lines.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ExpensePolicyExceptionState {
+    Pending,
+    Approved,
+    Rejected,
+}
+
+/// Employee expense advance lifecycle.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum ExpenseAdvanceState {
+    Open,
+    PartiallyApplied,
+    Closed,
+}
+
 // IoT Module
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum DeviceType {

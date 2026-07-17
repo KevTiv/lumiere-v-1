@@ -102,6 +102,8 @@ pub struct HrEmployee {
     pub work_phone: Option<String>,
     pub mobile_phone: Option<String>,
     pub work_location: Option<String>,
+    /// Optional res.partner used as remittance / payable partner on expense posts.
+    pub work_contact_partner_id: Option<u64>,
     pub date_hired: Option<Timestamp>,
     pub date_terminated: Option<Timestamp>,
     pub employment_type: EmploymentType,
@@ -183,6 +185,7 @@ pub struct CreateEmployeeParams {
     pub work_phone: Option<String>,
     pub mobile_phone: Option<String>,
     pub work_location: Option<String>,
+    pub work_contact_partner_id: Option<u64>,
     pub date_hired: Option<Timestamp>,
     pub gender: Option<String>,
     pub birthday: Option<Timestamp>,
@@ -208,6 +211,7 @@ pub struct UpdateEmployeeParams {
     pub work_phone: Option<String>,
     pub mobile_phone: Option<String>,
     pub work_location: Option<String>,
+    pub work_contact_partner_id: Option<u64>,
     pub employment_type: Option<EmploymentType>,
     pub user_id: Option<Identity>,
 }
@@ -435,6 +439,7 @@ pub fn create_employee(
         work_phone: params.work_phone,
         mobile_phone: params.mobile_phone,
         work_location: params.work_location,
+        work_contact_partner_id: params.work_contact_partner_id,
         date_hired,
         date_terminated: None,
         employment_type: params.employment_type,
@@ -500,6 +505,9 @@ pub fn update_employee(
         work_phone: params.work_phone.or(emp.work_phone),
         mobile_phone: params.mobile_phone.or(emp.mobile_phone),
         work_location: params.work_location.or(emp.work_location),
+        work_contact_partner_id: params
+            .work_contact_partner_id
+            .or(emp.work_contact_partner_id),
         employment_type: params.employment_type.unwrap_or(emp.employment_type),
         user_id: params.user_id.or(emp.user_id),
         ..emp

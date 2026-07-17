@@ -240,6 +240,7 @@ pub struct UpdateWarehouseParams {
     pub crossdock: Option<bool>,
     pub sequence: Option<i32>,
     pub partner_id: Option<u64>,
+    pub resupply_wh_ids: Option<Vec<u64>>,
     pub metadata: Option<String>,
 }
 
@@ -475,6 +476,9 @@ pub fn update_warehouse(
         crossdock: params.crossdock.unwrap_or(warehouse.crossdock),
         sequence: params.sequence.unwrap_or(warehouse.sequence),
         partner_id: params.partner_id.or(warehouse.partner_id),
+        resupply_wh_ids: params
+            .resupply_wh_ids
+            .unwrap_or_else(|| warehouse.resupply_wh_ids.clone()),
         metadata: params.metadata.or(warehouse.metadata),
         updated_at: ctx.timestamp,
         ..warehouse

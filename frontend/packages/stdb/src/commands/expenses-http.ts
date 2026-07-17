@@ -7,16 +7,30 @@ import type { ReducerCommandContractMeta } from "./types";
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` expenses hooks.
  */
 export const EXPENSES_BFF_REDUCERS = [
+  "apply_expense_advance_to_sheet",
+  "apply_expense_integration_intent",
+  "approve_expense_policy_exception",
   "approve_expense_sheet",
   "create_expense",
+  "create_expense_advance",
+  "create_expense_integration_intent",
+  "create_expense_project_rebill",
+  "create_expense_reimbursement_payment",
   "create_expense_sheet",
+  "fail_expense_integration_intent",
   "import_expense_csv",
   "import_expense_sheet_csv",
   "post_expense_sheet",
   "refuse_expense_sheet",
+  "request_expense_policy_exception",
+  "set_expense_allocations",
+  "set_expense_fraud_hold",
   "submit_expense",
   "submit_expense_sheet",
   "update_expense",
+  "upsert_expense_mileage_rate",
+  "upsert_expense_per_diem_rate",
+  "upsert_expense_policy",
 ] as const;
 
 export type ExpensesBffReducerKey = (typeof EXPENSES_BFF_REDUCERS)[number];
@@ -46,16 +60,42 @@ export function expensesBffPost(
 const EXPENSES_HINT_OVERRIDES: Partial<
   Record<ExpensesBffReducerKey, readonly string[]>
 > = {
-  approve_expense_sheet: ["expense-sheets", "expenses"],
-  create_expense: ["expenses"],
+  apply_expense_advance_to_sheet: ["expense-sheets", "expenses"],
+  apply_expense_integration_intent: ["expenses"],
+  approve_expense_policy_exception: ["expenses"],
+  approve_expense_sheet: [
+    "expense-sheets",
+    "expenses",
+    "expense-sheets-to-approve",
+  ],
+  create_expense: ["expenses", "expenses-missing-receipt"],
+  create_expense_advance: ["expenses"],
+  create_expense_integration_intent: ["expenses"],
+  create_expense_project_rebill: ["expense-sheets", "expenses"],
+  create_expense_reimbursement_payment: ["expense-sheets", "expenses"],
   create_expense_sheet: ["expense-sheets"],
-  import_expense_csv: ["expenses"],
+  fail_expense_integration_intent: ["expenses"],
+  import_expense_csv: ["expenses", "expenses-missing-receipt"],
   import_expense_sheet_csv: ["expense-sheets"],
   post_expense_sheet: ["expenses", "expense-sheets"],
-  refuse_expense_sheet: ["expense-sheets", "expenses"],
+  refuse_expense_sheet: [
+    "expense-sheets",
+    "expenses",
+    "expense-sheets-to-approve",
+  ],
+  request_expense_policy_exception: ["expenses"],
+  set_expense_allocations: ["expenses"],
+  set_expense_fraud_hold: ["expenses", "expenses-missing-receipt"],
   submit_expense: ["expenses", "expense-sheets"],
-  submit_expense_sheet: ["expense-sheets", "expenses"],
-  update_expense: ["expenses"],
+  submit_expense_sheet: [
+    "expense-sheets",
+    "expenses",
+    "expense-sheets-to-approve",
+  ],
+  update_expense: ["expenses", "expenses-missing-receipt"],
+  upsert_expense_mileage_rate: ["expenses"],
+  upsert_expense_per_diem_rate: ["expenses"],
+  upsert_expense_policy: ["expense-sheets", "expenses"],
 };
 
 function expensesReducerHints(): Record<ExpensesBffReducerKey, readonly string[]> {

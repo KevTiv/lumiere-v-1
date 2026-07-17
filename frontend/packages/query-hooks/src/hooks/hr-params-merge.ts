@@ -61,6 +61,7 @@ export function finalizeCreateEmployeeParams(
     workPhone: partial.workPhone,
     mobilePhone: partial.mobilePhone,
     workLocation: partial.workLocation,
+    workContactPartnerId: partial.workContactPartnerId,
     dateHired: partial.dateHired,
     gender: partial.gender,
     birthday: partial.birthday,

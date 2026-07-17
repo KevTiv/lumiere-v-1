@@ -40,6 +40,10 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_close_valuation_test(ctx)?;
     run_inventory_packing_workflow_test(ctx)?;
     run_inventory_exception_queues_test(ctx)?;
+    run_inventory_receipt_average_costing_test(ctx)?;
+    run_inventory_receipt_fifo_layers_test(ctx)?;
+    run_inventory_warehouse_sync_test(ctx)?;
+    run_inventory_multi_wh_promise_atp_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -201,4 +205,25 @@ pub fn run_inventory_packing_workflow_test(ctx: &ReducerContext) -> Result<(), S
 pub fn run_inventory_exception_queues_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_inventory_exception_queues(ctx)
         .map_err(|e| format!("exception_queues: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_receipt_average_costing_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_receipt_average_costing(ctx)
+        .map_err(|e| format!("receipt_average_costing: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_receipt_fifo_layers_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_receipt_fifo_layers(ctx).map_err(|e| format!("receipt_fifo_layers: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_warehouse_sync_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_warehouse_sync_intent(ctx).map_err(|e| format!("warehouse_sync: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_multi_wh_promise_atp_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_multi_wh_promise_atp(ctx).map_err(|e| format!("multi_wh_promise_atp: {e}"))
 }

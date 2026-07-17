@@ -6,10 +6,15 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub struct SubmitExpenseSheetParams {
-    pub total_amount: f64,
+pub struct CreateExpenseProjectRebillParams {
+    pub journal_id: u64,
+    pub receivable_account_id: u64,
+    pub income_account_id: u64,
+    pub invoice_date: __sdk::Timestamp,
+    pub partner_id: Option<u64>,
+    pub client_request_id: Option<String>,
 }
 
-impl __sdk::InModule for SubmitExpenseSheetParams {
+impl __sdk::InModule for CreateExpenseProjectRebillParams {
     type Module = super::RemoteModule;
 }

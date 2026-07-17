@@ -26,8 +26,13 @@
 /// | putaway     | Directed putaway (rule / least-loaded / fixed)                  |
 /// | packing     | StockPackage pack / confirm / done workflow                     |
 /// | exceptions  | Short ATP / expired lot / open QC exception queues              |
+/// | costing     | Inbound FIFO/LIFO/average/standard quant layer helpers          |
+/// | warehouse_sync | Offline remote warehouse sync intents                        |
+/// | atp_promise | Multi-WH promise dates + network ATP                            |
+pub mod atp_promise;
 pub mod barcode;
 pub mod consignment;
+pub mod costing;
 pub mod cross_dock;
 pub mod cycle_count;
 pub mod exceptions;
@@ -48,3 +53,4 @@ pub mod tracking;
 pub mod valuation;
 pub mod warehouse;
 pub mod warehouse_operations;
+pub mod warehouse_sync;

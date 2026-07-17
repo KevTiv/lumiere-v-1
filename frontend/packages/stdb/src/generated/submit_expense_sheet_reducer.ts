@@ -10,14 +10,7 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-import {
-  SubmitExpenseSheetParams,
-} from "./types";
-
 export default {
   organizationId: __t.u64(),
   sheetId: __t.u64(),
-  get params() {
-    return SubmitExpenseSheetParams;
-  },
 };

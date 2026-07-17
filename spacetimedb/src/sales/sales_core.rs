@@ -854,6 +854,7 @@ fn create_outgoing_pickings_for_confirmed_order(
         p.organization_id == organization_id
             && p.sale_id == Some(order_id)
             && !p.is_return
+            && p.picking_code.as_deref() == Some("outgoing")
     }) {
         return Ok(());
     }
@@ -872,8 +873,6 @@ fn create_outgoing_pickings_for_confirmed_order(
 
     let company_id = order.company_id;
     let warehouse_id = order.warehouse_id;
-    let src_location = resolve_warehouse_stock_location(ctx, warehouse_id);
-    let dest_location = src_location.saturating_add(1);
     let skip_stock = order.is_dropship;
     let order_label = order
         .reference
@@ -885,9 +884,15 @@ fn create_outgoing_pickings_for_confirmed_order(
         .map(str::to_string)
         .unwrap_or_else(|| order_id.to_string());
 
-    // ATP gate before creating logistics rows — fail closed on shortfall.
-    // Reserve in product stock UoM (convert from sale-line UoM when needed).
+    // Multi-WH ATP: pick first network WH that can cover all storable lines, then reserve there.
+    // Fulfillment WH becomes the OUT picking source; off-primary creates draft INT demand(s).
+    let mut fulfillment_warehouse_id = warehouse_id;
     if !skip_stock {
+        use crate::inventory::atp_promise::{
+            available_qty_at_warehouse, create_network_transfer_demand, warehouse_network,
+        };
+        let network = warehouse_network(ctx, warehouse_id);
+        let mut line_needs: Vec<(u64, f64)> = Vec::new();
         for line in &order_lines {
             if !product_requires_stock(ctx, line.product_id) {
                 continue;
@@ -899,16 +904,51 @@ fn create_outgoing_pickings_for_confirmed_order(
                 line.product_uom,
                 line.product_uom_qty,
             )?;
+            line_needs.push((line.product_id, stock_qty));
+        }
+
+        let mut chosen: Option<u64> = None;
+        for wh_id in &network {
+            let all_ok = line_needs.iter().all(|(pid, qty)| {
+                available_qty_at_warehouse(ctx, organization_id, company_id, *pid, *wh_id) + 1e-9
+                    >= *qty
+            });
+            if all_ok {
+                chosen = Some(*wh_id);
+                break;
+            }
+        }
+        let fulfill_wh = chosen.ok_or_else(|| {
+            "Insufficient available quantity across warehouse network for one or more lines"
+                .to_string()
+        })?;
+        fulfillment_warehouse_id = fulfill_wh;
+        let fulfill_loc = resolve_warehouse_stock_location(ctx, fulfill_wh);
+        for (product_id, stock_qty) in &line_needs {
             reserve_quantity_at_location(
                 ctx,
                 organization_id,
                 company_id,
-                line.product_id,
-                src_location,
-                stock_qty,
+                *product_id,
+                fulfill_loc,
+                *stock_qty,
             )?;
+            if fulfill_wh != warehouse_id {
+                let _ = create_network_transfer_demand(
+                    ctx,
+                    organization_id,
+                    company_id,
+                    *product_id,
+                    *stock_qty,
+                    fulfill_wh,
+                    warehouse_id,
+                    order_id,
+                )?;
+            }
         }
     }
+    let src_location = resolve_warehouse_stock_location(ctx, fulfillment_warehouse_id);
+    let dest_location = src_location.saturating_add(1);
 
     // Split fulfilment MVP: one OUT picking per distinct line route_id (0 = default route).
     let mut route_groups: Vec<(u64, Vec<&SaleOrderLine>)> = Vec::new();
@@ -994,17 +1034,17 @@ fn create_outgoing_pickings_for_confirmed_order(
                 has_entire_package_dest: false,
                 package_level_ids: vec![],
                 batch_id: None,
-                metadata: Some(format!(
-                    r#"{{"sale_order_id":{order_id},"route_id":{route_key},"source_id":{},"medium_id":{}}}"#,
-                    order
-                        .source_id
-                        .map(|v| v.to_string())
-                        .unwrap_or_else(|| "null".into()),
-                    order
-                        .medium_id
-                        .map(|v| v.to_string())
-                        .unwrap_or_else(|| "null".into()),
-                )),
+                metadata: Some(
+                    serde_json::json!({
+                        "sale_order_id": order_id,
+                        "route_id": route_key,
+                        "source_id": order.source_id,
+                        "medium_id": order.medium_id,
+                        "fulfillment_warehouse_id": fulfillment_warehouse_id,
+                        "primary_warehouse_id": warehouse_id,
+                    })
+                    .to_string(),
+                ),
             },
         )?;
 
@@ -1067,7 +1107,7 @@ fn create_outgoing_pickings_for_confirmed_order(
                     delay_alert: false,
                     product_packaging_id: None,
                     product_packaging_qty: 0.0,
-                    warehouse_id: Some(warehouse_id),
+                    warehouse_id: Some(fulfillment_warehouse_id),
                     production_id: None,
                     raw_material_production_id: None,
                     unbuild_id: None,

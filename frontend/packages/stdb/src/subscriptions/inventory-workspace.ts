@@ -44,6 +44,8 @@ export const INVENTORY_WORKSPACE_RESOURCE_KEYS = [
   "stock-traceability-reports",
   "uoms",
   "warehouse-3d-zones",
+  "warehouse-sync-intents",
+  "warehouse-sync-intents-pending",
   "warehouse-tasks",
   "warehouses",
 ] as const;

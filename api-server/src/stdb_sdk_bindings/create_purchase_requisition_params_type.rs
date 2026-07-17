@@ -4,6 +4,8 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::create_purchase_requisition_line_params_type::CreatePurchaseRequisitionLineParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreatePurchaseRequisitionParams {
@@ -17,6 +19,7 @@ pub struct CreatePurchaseRequisitionParams {
     pub exclusive: Option<String>,
     pub multiple_product: bool,
     pub line_ids: Vec<u64>,
+    pub lines: Vec<CreatePurchaseRequisitionLineParams>,
     pub purchase_ids: Vec<u64>,
     pub vendor_id: Option<u64>,
     pub activity_ids: Vec<u64>,

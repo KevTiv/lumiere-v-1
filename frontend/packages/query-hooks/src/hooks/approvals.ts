@@ -179,9 +179,42 @@ export function approvalRecordHref(model?: string, resId?: number): string | und
       return `/accounting?payment=${resId}`
     case "ai_action_draft":
       return `/ai-action-drafts?draft=${resId}`
+    case "hr_expense_sheet":
+      return `/expenses?sheet=${resId}`
     default:
       return undefined
   }
+}
+
+export async function fetchApprovalRequestRows(): Promise<ApprovalRequestRow[]> {
+  const r = await apiFetch("/api/query/approval-requests")
+  if (!r.ok) throw new Error(await parseCallError(r))
+  const j = (await r.json()) as { data?: ApprovalRequestRow[] }
+  return j.data ?? []
+}
+
+export function useApprovalRequests(organizationId: number, enabled = true) {
+  return useQuery({
+    queryKey: ["approval-requests", String(organizationId)] as const,
+    queryFn: fetchApprovalRequestRows,
+    enabled: enabled && organizationId > 0,
+    staleTime: 30_000,
+  })
+}
+
+export function useExpenseSheetApprovalTimeline(
+  organizationId: number,
+  sheetId: number | string | undefined,
+  enabled = true,
+) {
+  const query = useApprovalRequests(organizationId, enabled && sheetId != null)
+  const resId = sheetId != null ? Number(sheetId) : NaN
+  const rows = (query.data ?? []).filter((row) => {
+    const model = row.model ?? ""
+    const id = Number(row.resId ?? row.res_id ?? 0)
+    return model === "hr_expense_sheet" && id === resId
+  })
+  return { ...query, rows }
 }
 
 export function isAiDraftApprovalRequest(row: ApprovalRequestRow): boolean {

@@ -4,6 +4,9 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::expense_line_kind_type::ExpenseLineKind;
+use super::expense_payment_mode_type::ExpensePaymentMode;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateExpenseParams {
@@ -19,7 +22,17 @@ pub struct CreateExpenseParams {
     pub tax_ids: Vec<u64>,
     pub account_id: Option<u64>,
     pub analytic_account_id: Option<u64>,
+    pub project_id: Option<u64>,
+    pub line_kind: ExpenseLineKind,
+    pub mileage_distance: Option<f64>,
+    pub mileage_rate_id: Option<u64>,
+    pub per_diem_days: Option<f64>,
+    pub per_diem_rate_id: Option<u64>,
     pub attachment_ids: Vec<u64>,
+    pub client_request_id: Option<String>,
+    pub payment_mode: ExpensePaymentMode,
+    pub merchant_key: Option<String>,
+    pub policy_exception_reason: Option<String>,
 }
 
 impl __sdk::InModule for CreateExpenseParams {

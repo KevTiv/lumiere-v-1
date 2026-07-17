@@ -4,7 +4,7 @@
 ///
 /// | Submodule | Description | Tables |
 /// |-----------|-------------|--------|
-/// | **purchase_orders** | Purchase orders and requisitions | `PurchaseOrder`, `PurchaseOrderLine`, `PurchaseRequisition` |
+/// | **purchase_orders** | Purchase orders and requisitions | `PurchaseOrder`, `PurchaseOrderLine`, `PurchaseRequisition`, `PurchaseRequisitionLine` |
 /// | **vendor_management** | Partner bank accounts and supplier intake | `ResPartnerBank`, `SupplierIntakeRequest` |
 /// | **landed_costs** | Landed cost allocation | `StockLandedCost`, `StockLandedCostLines` |
 /// | **sourcing** | RFQ / multi-vendor tender MVP | `PurchaseRfq`, `PurchaseRfqLine`, `PurchaseRfqBid` |
@@ -31,7 +31,9 @@ pub mod vendor_management;
 
 // Re-export commonly used types for convenience
 pub use landed_costs::{StockLandedCost, StockLandedCostLines};
-pub use purchase_orders::{PurchaseOrder, PurchaseOrderLine, PurchaseRequisition};
+pub use purchase_orders::{
+    PurchaseOrder, PurchaseOrderLine, PurchaseRequisition, PurchaseRequisitionLine,
+};
 pub use purchase_returns::{PurchaseReturn, PurchaseReturnLine};
 pub use sourcing::{PurchaseRfq, PurchaseRfqBid, PurchaseRfqLine};
 pub use vendor_management::{ResPartnerBank, SupplierIntakeRequest};

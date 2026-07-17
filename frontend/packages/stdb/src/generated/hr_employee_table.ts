@@ -31,6 +31,7 @@ export default __t.row({
   workPhone: __t.option(__t.string()).name("work_phone"),
   mobilePhone: __t.option(__t.string()).name("mobile_phone"),
   workLocation: __t.option(__t.string()).name("work_location"),
+  workContactPartnerId: __t.option(__t.u64()).name("work_contact_partner_id"),
   dateHired: __t.option(__t.timestamp()).name("date_hired"),
   dateTerminated: __t.option(__t.timestamp()).name("date_terminated"),
   get employmentType() {

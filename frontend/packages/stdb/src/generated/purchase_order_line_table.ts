@@ -55,6 +55,7 @@ export default __t.row({
   saleOrderId: __t.option(__t.u64()).name("sale_order_id"),
   moveDestIds: __t.array(__t.u64()).name("move_dest_ids"),
   moveIds: __t.array(__t.u64()).name("move_ids"),
+  matchState: __t.string().name("match_state"),
   createUid: __t.identity().name("create_uid"),
   createDate: __t.timestamp().name("create_date"),
   writeUid: __t.identity().name("write_uid"),

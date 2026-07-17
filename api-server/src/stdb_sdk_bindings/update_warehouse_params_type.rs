@@ -18,6 +18,7 @@ pub struct UpdateWarehouseParams {
     pub crossdock: Option<bool>,
     pub sequence: Option<i32>,
     pub partner_id: Option<u64>,
+    pub resupply_wh_ids: Option<Vec<u64>>,
     pub metadata: Option<String>,
 }
 

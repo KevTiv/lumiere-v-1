@@ -55,6 +55,7 @@ import AddProposalCommentReducer from "./add_proposal_comment_reducer";
 import AddProposalLineItemReducer from "./add_proposal_line_item_reducer";
 import AddProposalSourceDocReducer from "./add_proposal_source_doc_reducer";
 import AddPurchaseOrderLineReducer from "./add_purchase_order_line_reducer";
+import AddPurchaseRequisitionLineReducer from "./add_purchase_requisition_line_reducer";
 import AddPurchaseRfqBidReducer from "./add_purchase_rfq_bid_reducer";
 import AddPurchaseRfqLineReducer from "./add_purchase_rfq_line_reducer";
 import AddRuleToNomenclatureReducer from "./add_rule_to_nomenclature_reducer";
@@ -67,6 +68,8 @@ import AllocatePaymentTransactionReducer from "./allocate_payment_transaction_re
 import AppendAiAgentRunStepReducer from "./append_ai_agent_run_step_reducer";
 import AppendAiChatMessageReducer from "./append_ai_chat_message_reducer";
 import AppendCrmConversationMessageReducer from "./append_crm_conversation_message_reducer";
+import ApplyExpenseAdvanceToSheetReducer from "./apply_expense_advance_to_sheet_reducer";
+import ApplyExpenseIntegrationIntentReducer from "./apply_expense_integration_intent_reducer";
 import ApplyGlobalMigrationsReducer from "./apply_global_migrations_reducer";
 import ApplyLandedCostsReducer from "./apply_landed_costs_reducer";
 import ApplyOmnichannelAllocationReducer from "./apply_omnichannel_allocation_reducer";
@@ -74,10 +77,12 @@ import ApplyOrgMigrationsReducer from "./apply_org_migrations_reducer";
 import ApplyReconciliationRulesReducer from "./apply_reconciliation_rules_reducer";
 import ApplySaleOrderOptionsReducer from "./apply_sale_order_options_reducer";
 import ApplySalePromotionToOrderReducer from "./apply_sale_promotion_to_order_reducer";
+import ApplyWarehouseSyncIntentReducer from "./apply_warehouse_sync_intent_reducer";
 import ApproveAiActionDraftReducer from "./approve_ai_action_draft_reducer";
 import ApproveApprovalRequestReducer from "./approve_approval_request_reducer";
 import ApproveBankStatementImportReducer from "./approve_bank_statement_import_reducer";
 import ApproveDocumentProcessingJobReducer from "./approve_document_processing_job_reducer";
+import ApproveExpensePolicyExceptionReducer from "./approve_expense_policy_exception_reducer";
 import ApproveExpenseSheetReducer from "./approve_expense_sheet_reducer";
 import ApproveIntercompanyTransactionReducer from "./approve_intercompany_transaction_reducer";
 import ApproveLeaveReducer from "./approve_leave_reducer";
@@ -246,6 +251,10 @@ import CreateEliminationEntryReducer from "./create_elimination_entry_reducer";
 import CreateEmployeeReducer from "./create_employee_reducer";
 import CreateExchangeOrderFromReturnReducer from "./create_exchange_order_from_return_reducer";
 import CreateExpenseReducer from "./create_expense_reducer";
+import CreateExpenseAdvanceReducer from "./create_expense_advance_reducer";
+import CreateExpenseIntegrationIntentReducer from "./create_expense_integration_intent_reducer";
+import CreateExpenseProjectRebillReducer from "./create_expense_project_rebill_reducer";
+import CreateExpenseReimbursementPaymentReducer from "./create_expense_reimbursement_payment_reducer";
 import CreateExpenseSheetReducer from "./create_expense_sheet_reducer";
 import CreateFinancialReportReducer from "./create_financial_report_reducer";
 import CreateFiscalPositionReducer from "./create_fiscal_position_reducer";
@@ -378,6 +387,7 @@ import CreateUtmSourceReducer from "./create_utm_source_reducer";
 import CreateVendorCreditFromPurchaseReturnReducer from "./create_vendor_credit_from_purchase_return_reducer";
 import CreateWarehouseReducer from "./create_warehouse_reducer";
 import CreateWarehouse3DZoneReducer from "./create_warehouse_3_d_zone_reducer";
+import CreateWarehouseSyncIntentReducer from "./create_warehouse_sync_intent_reducer";
 import CreateWarehouseTaskReducer from "./create_warehouse_task_reducer";
 import CreateWhatsappBusinessAccountReducer from "./create_whatsapp_business_account_reducer";
 import CreateWorkcenterReducer from "./create_workcenter_reducer";
@@ -466,9 +476,11 @@ import ExpireAiActionDraftsReducer from "./expire_ai_action_drafts_reducer";
 import ExpireContractReducer from "./expire_contract_reducer";
 import ExplodeBomReducer from "./explode_bom_reducer";
 import ExportFinancialReportReducer from "./export_financial_report_reducer";
+import FailExpenseIntegrationIntentReducer from "./fail_expense_integration_intent_reducer";
 import FailIotActionReducer from "./fail_iot_action_reducer";
 import FailQualityCheckReducer from "./fail_quality_check_reducer";
 import FailScheduledOwnerReportRunReducer from "./fail_scheduled_owner_report_run_reducer";
+import FailWarehouseSyncIntentReducer from "./fail_warehouse_sync_intent_reducer";
 import FinalizeImportAssistantJobReducer from "./finalize_import_assistant_job_reducer";
 import FindDuplicateContactsReducer from "./find_duplicate_contacts_reducer";
 import FinishManufacturingOrderReducer from "./finish_manufacturing_order_reducer";
@@ -622,6 +634,7 @@ import RecordWhatsappHealthCheckReducer from "./record_whatsapp_health_check_red
 import RecordWhatsappMessageSentReducer from "./record_whatsapp_message_sent_reducer";
 import RefreshInventoryExceptionsReducer from "./refresh_inventory_exceptions_reducer";
 import RefreshPolicySnapshotReducer from "./refresh_policy_snapshot_reducer";
+import RefreshSaleOrderPromiseDatesReducer from "./refresh_sale_order_promise_dates_reducer";
 import RefreshTaxDeadlineStatusesReducer from "./refresh_tax_deadline_statuses_reducer";
 import RefuseExpenseSheetReducer from "./refuse_expense_sheet_reducer";
 import RefuseLeaveReducer from "./refuse_leave_reducer";
@@ -645,6 +658,7 @@ import ReopenInventoryCloseReducer from "./reopen_inventory_close_reducer";
 import ReopenTicketReducer from "./reopen_ticket_reducer";
 import ReorderProposalLineItemsReducer from "./reorder_proposal_line_items_reducer";
 import RequestEmbeddingJobReducer from "./request_embedding_job_reducer";
+import RequestExpensePolicyExceptionReducer from "./request_expense_policy_exception_reducer";
 import ReserveSerialReducer from "./reserve_serial_reducer";
 import ReserveStockQuantReducer from "./reserve_stock_quant_reducer";
 import ResetLeaveToDraftReducer from "./reset_leave_to_draft_reducer";
@@ -677,6 +691,7 @@ import RunAllAccountingTestsReducer from "./run_all_accounting_tests_reducer";
 import RunAllCoreTestsReducer from "./run_all_core_tests_reducer";
 import RunAllCrmTestsReducer from "./run_all_crm_tests_reducer";
 import RunAllDomainTestsReducer from "./run_all_domain_tests_reducer";
+import RunAllExpensesTestsReducer from "./run_all_expenses_tests_reducer";
 import RunAllInventoryTestsReducer from "./run_all_inventory_tests_reducer";
 import RunAllPlatformTestsReducer from "./run_all_platform_tests_reducer";
 import RunAllPurchasingTestsReducer from "./run_all_purchasing_tests_reducer";
@@ -692,6 +707,10 @@ import RunCrmOpportunityConvertTestReducer from "./run_crm_opportunity_convert_t
 import RunCrmRelationshipAdminTestReducer from "./run_crm_relationship_admin_test_reducer";
 import RunCrmWave2TestReducer from "./run_crm_wave_2_test_reducer";
 import RunDocumentsFolderTestReducer from "./run_documents_folder_test_reducer";
+import RunExpensesWaveATestReducer from "./run_expenses_wave_a_test_reducer";
+import RunExpensesWaveBTestReducer from "./run_expenses_wave_b_test_reducer";
+import RunExpensesWaveCTestReducer from "./run_expenses_wave_c_test_reducer";
+import RunExpensesWaveDTestReducer from "./run_expenses_wave_d_test_reducer";
 import RunFxRevaluationReducer from "./run_fx_revaluation_reducer";
 import RunFxRevaluationBatchReducer from "./run_fx_revaluation_batch_reducer";
 import RunHelpdeskTicketTestReducer from "./run_helpdesk_ticket_test_reducer";
@@ -713,10 +732,13 @@ import RunInventoryExpiredLotTestReducer from "./run_inventory_expired_lot_test_
 import RunInventoryFefoTestReducer from "./run_inventory_fefo_test_reducer";
 import RunInventoryLotReserveTestReducer from "./run_inventory_lot_reserve_test_reducer";
 import RunInventoryLotValidateTestReducer from "./run_inventory_lot_validate_test_reducer";
+import RunInventoryMultiWhPromiseAtpTestReducer from "./run_inventory_multi_wh_promise_atp_test_reducer";
 import RunInventoryPackingWorkflowTestReducer from "./run_inventory_packing_workflow_test_reducer";
 import RunInventoryProductCategoryTestReducer from "./run_inventory_product_category_test_reducer";
 import RunInventoryProductUpdateTestReducer from "./run_inventory_product_update_test_reducer";
 import RunInventoryQcQuarantineTestReducer from "./run_inventory_qc_quarantine_test_reducer";
+import RunInventoryReceiptAverageCostingTestReducer from "./run_inventory_receipt_average_costing_test_reducer";
+import RunInventoryReceiptFifoLayersTestReducer from "./run_inventory_receipt_fifo_layers_test_reducer";
 import RunInventoryReceiptQuantTestReducer from "./run_inventory_receipt_quant_test_reducer";
 import RunInventoryReplenishmentDemandTestReducer from "./run_inventory_replenishment_demand_test_reducer";
 import RunInventorySerialIdValidateTestReducer from "./run_inventory_serial_id_validate_test_reducer";
@@ -724,6 +746,7 @@ import RunInventorySerialReserveTestReducer from "./run_inventory_serial_reserve
 import RunInventoryStockInventoryTestReducer from "./run_inventory_stock_inventory_test_reducer";
 import RunInventoryStockQuantTestReducer from "./run_inventory_stock_quant_test_reducer";
 import RunInventoryUomConversionTestReducer from "./run_inventory_uom_conversion_test_reducer";
+import RunInventoryWarehouseSyncTestReducer from "./run_inventory_warehouse_sync_test_reducer";
 import RunInventoryWaveReleaseTestReducer from "./run_inventory_wave_release_test_reducer";
 import RunManufacturingWorkcenterTestReducer from "./run_manufacturing_workcenter_test_reducer";
 import RunOwnerReportScheduleReducer from "./run_owner_report_schedule_reducer";
@@ -731,6 +754,7 @@ import RunPurchasingBillBalancedTestReducer from "./run_purchasing_bill_balanced
 import RunPurchasingCompanyIsolationTestReducer from "./run_purchasing_company_isolation_test_reducer";
 import RunPurchasingIncomingPickingTestReducer from "./run_purchasing_incoming_picking_test_reducer";
 import RunPurchasingWaveCSmokeTestReducer from "./run_purchasing_wave_c_smoke_test_reducer";
+import RunPurchasingWaveETestReducer from "./run_purchasing_wave_e_test_reducer";
 import RunSalesAtpShortfallTestReducer from "./run_sales_atp_shortfall_test_reducer";
 import RunSalesBackorderTestReducer from "./run_sales_backorder_test_reducer";
 import RunSalesCommissionAccrueTestReducer from "./run_sales_commission_accrue_test_reducer";
@@ -777,6 +801,8 @@ import SetCompanyVerticalPackReducer from "./set_company_vertical_pack_reducer";
 import SetConsolidationCompanyRateReducer from "./set_consolidation_company_rate_reducer";
 import SetContactCommunicationPreferenceReducer from "./set_contact_communication_preference_reducer";
 import SetContactSegmentRulesReducer from "./set_contact_segment_rules_reducer";
+import SetExpenseAllocationsReducer from "./set_expense_allocations_reducer";
+import SetExpenseFraudHoldReducer from "./set_expense_fraud_hold_reducer";
 import SetFormRoleConfigReducer from "./set_form_role_config_reducer";
 import SetIntercompanyRuleActiveReducer from "./set_intercompany_rule_active_reducer";
 import SetIotThresholdReducer from "./set_iot_threshold_reducer";
@@ -968,6 +994,9 @@ import UpdateWidgetLayoutReducer from "./update_widget_layout_reducer";
 import UpdateWorkcenterReducer from "./update_workcenter_reducer";
 import UpsertAiSkillReducer from "./upsert_ai_skill_reducer";
 import UpsertAiSkillConfigReducer from "./upsert_ai_skill_config_reducer";
+import UpsertExpenseMileageRateReducer from "./upsert_expense_mileage_rate_reducer";
+import UpsertExpensePerDiemRateReducer from "./upsert_expense_per_diem_rate_reducer";
+import UpsertExpensePolicyReducer from "./upsert_expense_policy_reducer";
 import UpsertOrganizationSettingsReducer from "./upsert_organization_settings_reducer";
 import UpsertPartnerCreditControlReducer from "./upsert_partner_credit_control_reducer";
 import UpsertProposalSectionReducer from "./upsert_proposal_section_reducer";
@@ -1102,6 +1131,7 @@ import DocumentRow from "./document_table";
 import DocumentSequenceRow from "./document_sequence_table";
 import DocumentTemplateRow from "./document_template_table";
 import DocumentVersionRow from "./document_version_table";
+import ExpenseIntegrationIntentRow from "./expense_integration_intent_table";
 import ExpenseSheetRow from "./expense_sheet_table";
 import FinancialReportRow from "./financial_report_table";
 import FleetVehicleRow from "./fleet_vehicle_table";
@@ -1119,6 +1149,13 @@ import HrContractRow from "./hr_contract_table";
 import HrDepartmentRow from "./hr_department_table";
 import HrEmployeeRow from "./hr_employee_table";
 import HrExpenseRow from "./hr_expense_table";
+import HrExpenseAdvanceRow from "./hr_expense_advance_table";
+import HrExpenseAdvanceApplicationRow from "./hr_expense_advance_application_table";
+import HrExpenseAllocationRow from "./hr_expense_allocation_table";
+import HrExpenseMileageRateRow from "./hr_expense_mileage_rate_table";
+import HrExpensePerDiemRateRow from "./hr_expense_per_diem_rate_table";
+import HrExpensePolicyRow from "./hr_expense_policy_table";
+import HrExpensePolicyExceptionRow from "./hr_expense_policy_exception_table";
 import HrJobPositionRow from "./hr_job_position_table";
 import HrLeaveRow from "./hr_leave_table";
 import HrLeaveTypeRow from "./hr_leave_type_table";
@@ -1219,6 +1256,7 @@ import PurchaseContractRow from "./purchase_contract_table";
 import PurchaseOrderRow from "./purchase_order_table";
 import PurchaseOrderLineRow from "./purchase_order_line_table";
 import PurchaseRequisitionRow from "./purchase_requisition_table";
+import PurchaseRequisitionLineRow from "./purchase_requisition_line_table";
 import PurchaseReturnRow from "./purchase_return_table";
 import PurchaseReturnLineRow from "./purchase_return_line_table";
 import PurchaseRfqRow from "./purchase_rfq_table";
@@ -1303,6 +1341,7 @@ import VendorScorecardRow from "./vendor_scorecard_table";
 import WarehouseRow from "./warehouse_table";
 import Warehouse3DZoneRow from "./warehouse_3_d_zone_table";
 import WarehouseGeoRow from "./warehouse_geo_table";
+import WarehouseSyncIntentRow from "./warehouse_sync_intent_table";
 import WarehouseTaskRow from "./warehouse_task_table";
 import WhatsappBusinessAccountRow from "./whatsapp_business_account_table";
 import WorkflowRow from "./workflow_table";
@@ -3347,6 +3386,29 @@ const tablesSchema = __schema({
       { name: 'document_version_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, DocumentVersionRow),
+  expense_integration_intent: __table({
+    name: 'expense_integration_intent',
+    indexes: [
+      { name: 'expense_intent_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'expense_intent_by_key', algorithm: 'btree', columns: [
+        'idempotencyKey',
+      ] },
+      { name: 'expense_intent_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'expense_intent_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'expense_integration_intent_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ExpenseIntegrationIntentRow),
   expense_sheet: __table({
     name: 'expense_sheet',
     indexes: [
@@ -3649,6 +3711,128 @@ const tablesSchema = __schema({
       { name: 'hr_expense_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrExpenseRow),
+  hr_expense_advance: __table({
+    name: 'hr_expense_advance',
+    indexes: [
+      { name: 'expense_advance_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'expense_advance_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'expense_advance_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_expense_advance_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrExpenseAdvanceRow),
+  hr_expense_advance_application: __table({
+    name: 'hr_expense_advance_application',
+    indexes: [
+      { name: 'advance_app_by_advance', algorithm: 'btree', columns: [
+        'advanceId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'advance_app_by_sheet', algorithm: 'btree', columns: [
+        'sheetId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_expense_advance_application_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrExpenseAdvanceApplicationRow),
+  hr_expense_allocation: __table({
+    name: 'hr_expense_allocation',
+    indexes: [
+      { name: 'allocation_by_expense', algorithm: 'btree', columns: [
+        'expenseId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'allocation_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_expense_allocation_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrExpenseAllocationRow),
+  hr_expense_mileage_rate: __table({
+    name: 'hr_expense_mileage_rate',
+    indexes: [
+      { name: 'mileage_rate_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'mileage_rate_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_expense_mileage_rate_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrExpenseMileageRateRow),
+  hr_expense_per_diem_rate: __table({
+    name: 'hr_expense_per_diem_rate',
+    indexes: [
+      { name: 'per_diem_rate_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'per_diem_rate_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_expense_per_diem_rate_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrExpensePerDiemRateRow),
+  hr_expense_policy: __table({
+    name: 'hr_expense_policy',
+    indexes: [
+      { name: 'expense_policy_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'expense_policy_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_expense_policy_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrExpensePolicyRow),
+  hr_expense_policy_exception: __table({
+    name: 'hr_expense_policy_exception',
+    indexes: [
+      { name: 'policy_exception_by_expense', algorithm: 'btree', columns: [
+        'expenseId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'policy_exception_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_expense_policy_exception_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrExpensePolicyExceptionRow),
   hr_job_position: __table({
     name: 'hr_job_position',
     indexes: [
@@ -5399,6 +5583,23 @@ const tablesSchema = __schema({
       { name: 'purchase_requisition_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PurchaseRequisitionRow),
+  purchase_requisition_line: __table({
+    name: 'purchase_requisition_line',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'purchase_requisition_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'purchase_requisition_line_by_req', algorithm: 'btree', columns: [
+        'requisitionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'purchase_requisition_line_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PurchaseRequisitionLineRow),
   purchase_return: __table({
     name: 'purchase_return',
     indexes: [
@@ -6867,6 +7068,29 @@ const tablesSchema = __schema({
       { name: 'warehouse_geo_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, WarehouseGeoRow),
+  warehouse_sync_intent: __table({
+    name: 'warehouse_sync_intent',
+    indexes: [
+      { name: 'warehouse_sync_intent_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'warehouse_sync_intent_by_key', algorithm: 'btree', columns: [
+        'idempotencyKey',
+      ] },
+      { name: 'warehouse_sync_intent_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'warehouse_sync_intent_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'warehouse_sync_intent_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WarehouseSyncIntentRow),
   warehouse_task: __table({
     name: 'warehouse_task',
     indexes: [
@@ -7014,6 +7238,7 @@ const reducersSchema = __reducers(
   __reducerSchema("add_proposal_line_item", AddProposalLineItemReducer),
   __reducerSchema("add_proposal_source_doc", AddProposalSourceDocReducer),
   __reducerSchema("add_purchase_order_line", AddPurchaseOrderLineReducer),
+  __reducerSchema("add_purchase_requisition_line", AddPurchaseRequisitionLineReducer),
   __reducerSchema("add_purchase_rfq_bid", AddPurchaseRfqBidReducer),
   __reducerSchema("add_purchase_rfq_line", AddPurchaseRfqLineReducer),
   __reducerSchema("add_rule_to_nomenclature", AddRuleToNomenclatureReducer),
@@ -7026,6 +7251,8 @@ const reducersSchema = __reducers(
   __reducerSchema("append_ai_agent_run_step", AppendAiAgentRunStepReducer),
   __reducerSchema("append_ai_chat_message", AppendAiChatMessageReducer),
   __reducerSchema("append_crm_conversation_message", AppendCrmConversationMessageReducer),
+  __reducerSchema("apply_expense_advance_to_sheet", ApplyExpenseAdvanceToSheetReducer),
+  __reducerSchema("apply_expense_integration_intent", ApplyExpenseIntegrationIntentReducer),
   __reducerSchema("apply_global_migrations", ApplyGlobalMigrationsReducer),
   __reducerSchema("apply_landed_costs", ApplyLandedCostsReducer),
   __reducerSchema("apply_omnichannel_allocation", ApplyOmnichannelAllocationReducer),
@@ -7033,10 +7260,12 @@ const reducersSchema = __reducers(
   __reducerSchema("apply_reconciliation_rules", ApplyReconciliationRulesReducer),
   __reducerSchema("apply_sale_order_options", ApplySaleOrderOptionsReducer),
   __reducerSchema("apply_sale_promotion_to_order", ApplySalePromotionToOrderReducer),
+  __reducerSchema("apply_warehouse_sync_intent", ApplyWarehouseSyncIntentReducer),
   __reducerSchema("approve_ai_action_draft", ApproveAiActionDraftReducer),
   __reducerSchema("approve_approval_request", ApproveApprovalRequestReducer),
   __reducerSchema("approve_bank_statement_import", ApproveBankStatementImportReducer),
   __reducerSchema("approve_document_processing_job", ApproveDocumentProcessingJobReducer),
+  __reducerSchema("approve_expense_policy_exception", ApproveExpensePolicyExceptionReducer),
   __reducerSchema("approve_expense_sheet", ApproveExpenseSheetReducer),
   __reducerSchema("approve_intercompany_transaction", ApproveIntercompanyTransactionReducer),
   __reducerSchema("approve_leave", ApproveLeaveReducer),
@@ -7205,6 +7434,10 @@ const reducersSchema = __reducers(
   __reducerSchema("create_employee", CreateEmployeeReducer),
   __reducerSchema("create_exchange_order_from_return", CreateExchangeOrderFromReturnReducer),
   __reducerSchema("create_expense", CreateExpenseReducer),
+  __reducerSchema("create_expense_advance", CreateExpenseAdvanceReducer),
+  __reducerSchema("create_expense_integration_intent", CreateExpenseIntegrationIntentReducer),
+  __reducerSchema("create_expense_project_rebill", CreateExpenseProjectRebillReducer),
+  __reducerSchema("create_expense_reimbursement_payment", CreateExpenseReimbursementPaymentReducer),
   __reducerSchema("create_expense_sheet", CreateExpenseSheetReducer),
   __reducerSchema("create_financial_report", CreateFinancialReportReducer),
   __reducerSchema("create_fiscal_position", CreateFiscalPositionReducer),
@@ -7337,6 +7570,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_vendor_credit_from_purchase_return", CreateVendorCreditFromPurchaseReturnReducer),
   __reducerSchema("create_warehouse", CreateWarehouseReducer),
   __reducerSchema("create_warehouse_3_d_zone", CreateWarehouse3DZoneReducer),
+  __reducerSchema("create_warehouse_sync_intent", CreateWarehouseSyncIntentReducer),
   __reducerSchema("create_warehouse_task", CreateWarehouseTaskReducer),
   __reducerSchema("create_whatsapp_business_account", CreateWhatsappBusinessAccountReducer),
   __reducerSchema("create_workcenter", CreateWorkcenterReducer),
@@ -7425,9 +7659,11 @@ const reducersSchema = __reducers(
   __reducerSchema("expire_contract", ExpireContractReducer),
   __reducerSchema("explode_bom", ExplodeBomReducer),
   __reducerSchema("export_financial_report", ExportFinancialReportReducer),
+  __reducerSchema("fail_expense_integration_intent", FailExpenseIntegrationIntentReducer),
   __reducerSchema("fail_iot_action", FailIotActionReducer),
   __reducerSchema("fail_quality_check", FailQualityCheckReducer),
   __reducerSchema("fail_scheduled_owner_report_run", FailScheduledOwnerReportRunReducer),
+  __reducerSchema("fail_warehouse_sync_intent", FailWarehouseSyncIntentReducer),
   __reducerSchema("finalize_import_assistant_job", FinalizeImportAssistantJobReducer),
   __reducerSchema("find_duplicate_contacts", FindDuplicateContactsReducer),
   __reducerSchema("finish_manufacturing_order", FinishManufacturingOrderReducer),
@@ -7581,6 +7817,7 @@ const reducersSchema = __reducers(
   __reducerSchema("record_whatsapp_message_sent", RecordWhatsappMessageSentReducer),
   __reducerSchema("refresh_inventory_exceptions", RefreshInventoryExceptionsReducer),
   __reducerSchema("refresh_policy_snapshot", RefreshPolicySnapshotReducer),
+  __reducerSchema("refresh_sale_order_promise_dates", RefreshSaleOrderPromiseDatesReducer),
   __reducerSchema("refresh_tax_deadline_statuses", RefreshTaxDeadlineStatusesReducer),
   __reducerSchema("refuse_expense_sheet", RefuseExpenseSheetReducer),
   __reducerSchema("refuse_leave", RefuseLeaveReducer),
@@ -7604,6 +7841,7 @@ const reducersSchema = __reducers(
   __reducerSchema("reopen_ticket", ReopenTicketReducer),
   __reducerSchema("reorder_proposal_line_items", ReorderProposalLineItemsReducer),
   __reducerSchema("request_embedding_job", RequestEmbeddingJobReducer),
+  __reducerSchema("request_expense_policy_exception", RequestExpensePolicyExceptionReducer),
   __reducerSchema("reserve_serial", ReserveSerialReducer),
   __reducerSchema("reserve_stock_quant", ReserveStockQuantReducer),
   __reducerSchema("reset_leave_to_draft", ResetLeaveToDraftReducer),
@@ -7636,6 +7874,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_all_core_tests", RunAllCoreTestsReducer),
   __reducerSchema("run_all_crm_tests", RunAllCrmTestsReducer),
   __reducerSchema("run_all_domain_tests", RunAllDomainTestsReducer),
+  __reducerSchema("run_all_expenses_tests", RunAllExpensesTestsReducer),
   __reducerSchema("run_all_inventory_tests", RunAllInventoryTestsReducer),
   __reducerSchema("run_all_platform_tests", RunAllPlatformTestsReducer),
   __reducerSchema("run_all_purchasing_tests", RunAllPurchasingTestsReducer),
@@ -7651,6 +7890,10 @@ const reducersSchema = __reducers(
   __reducerSchema("run_crm_relationship_admin_test", RunCrmRelationshipAdminTestReducer),
   __reducerSchema("run_crm_wave_2_test", RunCrmWave2TestReducer),
   __reducerSchema("run_documents_folder_test", RunDocumentsFolderTestReducer),
+  __reducerSchema("run_expenses_wave_a_test", RunExpensesWaveATestReducer),
+  __reducerSchema("run_expenses_wave_b_test", RunExpensesWaveBTestReducer),
+  __reducerSchema("run_expenses_wave_c_test", RunExpensesWaveCTestReducer),
+  __reducerSchema("run_expenses_wave_d_test", RunExpensesWaveDTestReducer),
   __reducerSchema("run_fx_revaluation", RunFxRevaluationReducer),
   __reducerSchema("run_fx_revaluation_batch", RunFxRevaluationBatchReducer),
   __reducerSchema("run_helpdesk_ticket_test", RunHelpdeskTicketTestReducer),
@@ -7672,10 +7915,13 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_fefo_test", RunInventoryFefoTestReducer),
   __reducerSchema("run_inventory_lot_reserve_test", RunInventoryLotReserveTestReducer),
   __reducerSchema("run_inventory_lot_validate_test", RunInventoryLotValidateTestReducer),
+  __reducerSchema("run_inventory_multi_wh_promise_atp_test", RunInventoryMultiWhPromiseAtpTestReducer),
   __reducerSchema("run_inventory_packing_workflow_test", RunInventoryPackingWorkflowTestReducer),
   __reducerSchema("run_inventory_product_category_test", RunInventoryProductCategoryTestReducer),
   __reducerSchema("run_inventory_product_update_test", RunInventoryProductUpdateTestReducer),
   __reducerSchema("run_inventory_qc_quarantine_test", RunInventoryQcQuarantineTestReducer),
+  __reducerSchema("run_inventory_receipt_average_costing_test", RunInventoryReceiptAverageCostingTestReducer),
+  __reducerSchema("run_inventory_receipt_fifo_layers_test", RunInventoryReceiptFifoLayersTestReducer),
   __reducerSchema("run_inventory_receipt_quant_test", RunInventoryReceiptQuantTestReducer),
   __reducerSchema("run_inventory_replenishment_demand_test", RunInventoryReplenishmentDemandTestReducer),
   __reducerSchema("run_inventory_serial_id_validate_test", RunInventorySerialIdValidateTestReducer),
@@ -7683,6 +7929,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_stock_inventory_test", RunInventoryStockInventoryTestReducer),
   __reducerSchema("run_inventory_stock_quant_test", RunInventoryStockQuantTestReducer),
   __reducerSchema("run_inventory_uom_conversion_test", RunInventoryUomConversionTestReducer),
+  __reducerSchema("run_inventory_warehouse_sync_test", RunInventoryWarehouseSyncTestReducer),
   __reducerSchema("run_inventory_wave_release_test", RunInventoryWaveReleaseTestReducer),
   __reducerSchema("run_manufacturing_workcenter_test", RunManufacturingWorkcenterTestReducer),
   __reducerSchema("run_owner_report_schedule", RunOwnerReportScheduleReducer),
@@ -7690,6 +7937,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_purchasing_company_isolation_test", RunPurchasingCompanyIsolationTestReducer),
   __reducerSchema("run_purchasing_incoming_picking_test", RunPurchasingIncomingPickingTestReducer),
   __reducerSchema("run_purchasing_wave_c_smoke_test", RunPurchasingWaveCSmokeTestReducer),
+  __reducerSchema("run_purchasing_wave_e_test", RunPurchasingWaveETestReducer),
   __reducerSchema("run_sales_atp_shortfall_test", RunSalesAtpShortfallTestReducer),
   __reducerSchema("run_sales_backorder_test", RunSalesBackorderTestReducer),
   __reducerSchema("run_sales_commission_accrue_test", RunSalesCommissionAccrueTestReducer),
@@ -7736,6 +7984,8 @@ const reducersSchema = __reducers(
   __reducerSchema("set_consolidation_company_rate", SetConsolidationCompanyRateReducer),
   __reducerSchema("set_contact_communication_preference", SetContactCommunicationPreferenceReducer),
   __reducerSchema("set_contact_segment_rules", SetContactSegmentRulesReducer),
+  __reducerSchema("set_expense_allocations", SetExpenseAllocationsReducer),
+  __reducerSchema("set_expense_fraud_hold", SetExpenseFraudHoldReducer),
   __reducerSchema("set_form_role_config", SetFormRoleConfigReducer),
   __reducerSchema("set_intercompany_rule_active", SetIntercompanyRuleActiveReducer),
   __reducerSchema("set_iot_threshold", SetIotThresholdReducer),
@@ -7927,6 +8177,9 @@ const reducersSchema = __reducers(
   __reducerSchema("update_workcenter", UpdateWorkcenterReducer),
   __reducerSchema("upsert_ai_skill", UpsertAiSkillReducer),
   __reducerSchema("upsert_ai_skill_config", UpsertAiSkillConfigReducer),
+  __reducerSchema("upsert_expense_mileage_rate", UpsertExpenseMileageRateReducer),
+  __reducerSchema("upsert_expense_per_diem_rate", UpsertExpensePerDiemRateReducer),
+  __reducerSchema("upsert_expense_policy", UpsertExpensePolicyReducer),
   __reducerSchema("upsert_organization_settings", UpsertOrganizationSettingsReducer),
   __reducerSchema("upsert_partner_credit_control", UpsertPartnerCreditControlReducer),
   __reducerSchema("upsert_proposal_section", UpsertProposalSectionReducer),

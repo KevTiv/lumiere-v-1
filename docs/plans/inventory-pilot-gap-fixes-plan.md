@@ -28,6 +28,9 @@ Checklist for tranche-1 fixes from [INVENTORY_WAREHOUSE_MANAGEMENT_INVESTIGATION
 - [x] Directed putaway: `execute_directed_putaway` (rule / least-loaded / fixed)
 - [x] Packing workflow: `stock_package` + pack/confirm/done (+ cartonization creates real packages)
 - [x] Exception Ops queues: `inventory_exception` + bounded subscriptions + Inventory Ops panel
+- [x] Costing on receipt: average blend + FIFO/LIFO layers; `cost_method` on product pricing
+- [x] Offline warehouse sync: `warehouse_sync_intent` + apply + local outbox + Ops flush
+- [x] Multi-WH promise ATP: `refresh_sale_order_promise_dates` + network reserve on confirm
 
 ## Verify after publish
 

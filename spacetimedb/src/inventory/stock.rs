@@ -1349,6 +1349,9 @@ pub(crate) fn increase_quant_at_location(
     qty: f64,
     cost: f64,
 ) -> Result<(), String> {
+    let method = crate::inventory::costing::product_for_costing(ctx, product_id)
+        .map(|p| crate::inventory::costing::normalize_cost_method(&p.cost_method))
+        .unwrap_or_else(|_| "standard".to_string());
     increase_quant_at_location_owned(
         ctx,
         organization_id,
@@ -1358,10 +1361,15 @@ pub(crate) fn increase_quant_at_location(
         qty,
         cost,
         None,
+        &method,
     )
 }
 
 /// Increase on-hand at a location, optionally under a vendor owner (consignment).
+///
+/// Cost-method behavior:
+/// - `standard` / `average`: merge into an existing quant (average blends unit cost)
+/// - `fifo` / `lifo`: merge only when unit cost matches; otherwise insert a new layer
 pub(crate) fn increase_quant_at_location_owned(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -1371,21 +1379,53 @@ pub(crate) fn increase_quant_at_location_owned(
     qty: f64,
     cost: f64,
     owner_id: Option<u64>,
+    cost_method: &str,
 ) -> Result<(), String> {
     if qty <= 0.0 {
         return Ok(());
     }
-    if let Some(quant) = find_quant_at_location_with_owner(
-        ctx,
-        organization_id,
-        company_id,
-        product_id,
-        location_id,
-        owner_id,
-    ) {
+    let method = crate::inventory::costing::normalize_cost_method(cost_method);
+    let layered = method == "fifo" || method == "lifo";
+
+    let merge_target = if layered {
+        find_quant_at_location_with_owner_and_cost(
+            ctx,
+            organization_id,
+            company_id,
+            product_id,
+            location_id,
+            owner_id,
+            cost,
+        )
+    } else {
+        find_quant_at_location_with_owner(
+            ctx,
+            organization_id,
+            company_id,
+            product_id,
+            location_id,
+            owner_id,
+        )
+    };
+
+    if let Some(quant) = merge_target {
         let new_qty = quant.quantity + qty;
+        let (new_cost, new_value) = if method == "average" {
+            let old_value = quant.value.max(0.0);
+            let added = qty * cost;
+            let blended = if new_qty > 1e-9 {
+                (old_value + added) / new_qty
+            } else {
+                cost
+            };
+            (blended, new_qty * blended)
+        } else if method == "standard" {
+            (cost, new_qty * cost)
+        } else {
+            // Same-cost merge for fifo/lifo layers.
+            (quant.cost, new_qty * quant.cost)
+        };
         let available_quantity = if owner_id.is_some() {
-            // Consigned stock is not company ATP.
             0.0
         } else {
             new_qty - quant.reserved_quantity
@@ -1393,7 +1433,9 @@ pub(crate) fn increase_quant_at_location_owned(
         ctx.db.stock_quant().id().update(StockQuant {
             quantity: new_qty,
             available_quantity,
-            value: new_qty * quant.cost,
+            cost: new_cost,
+            value: new_value,
+            cost_method: Some(method),
             ..quant
         });
     } else {
@@ -1420,7 +1462,7 @@ pub(crate) fn increase_quant_at_location_owned(
             inventory_date: Some(ctx.timestamp),
             cost,
             value: qty * cost,
-            cost_method: Some("standard".to_string()),
+            cost_method: Some(method),
             accounting_date: None,
             currency_id: None,
             accounting_entry_ids: vec![],
@@ -1434,6 +1476,28 @@ pub(crate) fn increase_quant_at_location_owned(
     Ok(())
 }
 
+fn find_quant_at_location_with_owner_and_cost(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    location_id: u64,
+    owner_id: Option<u64>,
+    cost: f64,
+) -> Option<StockQuant> {
+    ctx.db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&product_id)
+        .find(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.location_id == location_id
+                && q.owner_id == owner_id
+                && crate::inventory::costing::costs_match(q.cost, cost)
+        })
+}
+
 /// Apply inventory consequences for a validated stock move (outbound consume or inbound receive).
 pub(crate) fn apply_validated_move_to_quants(
     ctx: &ReducerContext,
@@ -1444,20 +1508,17 @@ pub(crate) fn apply_validated_move_to_quants(
     location_dest_id: u64,
     qty: f64,
     is_inbound: bool,
+    move_price_unit: f64,
 ) -> Result<(), String> {
     if qty <= 0.0 || !product_requires_stock(ctx, product_id) {
         return Ok(());
     }
 
     if is_inbound {
-        // Vendor/customer → warehouse: receive into destination stock location.
-        let cost = find_quant_at_location(ctx, organization_id, company_id, product_id, location_dest_id)
-            .map(|q| q.cost)
-            .or_else(|| {
-                find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
-                    .map(|q| q.cost)
-            })
-            .unwrap_or(0.0);
+        let product = crate::inventory::costing::product_for_costing(ctx, product_id)?;
+        let method = crate::inventory::costing::normalize_cost_method(&product.cost_method);
+        let cost =
+            crate::inventory::costing::resolve_inbound_unit_cost(&product, move_price_unit);
         if let Some(src) =
             find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
         {
@@ -1474,7 +1535,7 @@ pub(crate) fn apply_validated_move_to_quants(
                 });
             }
         }
-        return increase_quant_at_location(
+        return increase_quant_at_location_owned(
             ctx,
             organization_id,
             company_id,
@@ -1482,6 +1543,8 @@ pub(crate) fn apply_validated_move_to_quants(
             location_dest_id,
             qty,
             cost,
+            None,
+            &method,
         );
     }
 
@@ -2743,6 +2806,7 @@ fn validate_stock_picking_impl(
                 vm.location_dest_id,
                 vm.stock_qty_done,
                 is_inbound,
+                vm.price_unit,
             )?;
         }
         if vm.residual_stock > 1e-9 && !create_backorder && !is_inbound {

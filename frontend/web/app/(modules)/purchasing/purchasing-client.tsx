@@ -59,6 +59,7 @@ import {
   usePurchaseOrders,
   usePurchaseOrdersToApprove,
   usePurchaseOrdersPartialReceipt,
+  usePurchaseOrderLinesOverBilled,
   usePurchaseOrderLines,
   usePurchaseRequisitions,
   useCreatePurchaseOrder,
@@ -471,6 +472,7 @@ function PurchasingClientLoaded({
   const { data: orders = [], isLoading: ordersLoading } = usePurchaseOrders(orgId, initialOrders)
   const { data: ordersToApprove = [] } = usePurchaseOrdersToApprove(orgId)
   const { data: ordersPartialReceipt = [] } = usePurchaseOrdersPartialReceipt(orgId)
+  const { data: linesOverBilled = [] } = usePurchaseOrderLinesOverBilled(orgId)
   const { data: lines = [] } = usePurchaseOrderLines(orgId, initialLines)
   const { data: requisitions = [] } = usePurchaseRequisitions(orgId, initialRequisitions)
   const { data: allContacts = [] } = useContacts(orgId, initialContacts)
@@ -1335,8 +1337,10 @@ function PurchasingClientLoaded({
       mergeSelectOptionsForFields(newPurchaseRequisitionForm(t), {
         vendorId: vendorFieldOptions,
         departmentId: departmentFieldOptions,
+        productId: productFieldOptions,
+        uomId: uomFieldOptions,
       }),
-    [t, vendorFieldOptions, departmentFieldOptions],
+    [t, vendorFieldOptions, departmentFieldOptions, productFieldOptions, uomFieldOptions],
   )
 
   const editPurchaseOrderFormConfig = useMemo(
@@ -2219,6 +2223,17 @@ function PurchasingClientLoaded({
         ? ordersPartialReceipt.length
         : orders.filter((o) => String(o.receiptStatus ?? o.receipt_status) === "partial")
             .length
+    const overBilled =
+      linesOverBilled.length > 0
+        ? linesOverBilled.length
+        : lines.filter((l) => {
+            const state = String(
+              (l as Record<string, unknown>).matchState ??
+                (l as Record<string, unknown>).match_state ??
+                "",
+            )
+            return state === "over_billed"
+          }).length
     // MVP on-time: confirmed POs with date_planned that are fully received by planned date (or still open past planned).
     const confirmedWithPlan = orders.filter((o) => {
       if (!isConfirmedOrder(o as Record<string, unknown>)) return false
@@ -2268,6 +2283,13 @@ function PurchasingClientLoaded({
                   }),
                   value: partialReceipt.toString(),
                   icon: "Package",
+                },
+                {
+                  label: t("purchasing.dashboard.overBilled", {
+                    defaultValue: "Over-billed lines",
+                  }),
+                  value: overBilled.toString(),
+                  icon: "AlertTriangle",
                 },
                 {
                   label: t("purchasing.dashboard.onTimePct", {
@@ -2352,6 +2374,8 @@ function PurchasingClientLoaded({
     orders,
     ordersToApprove,
     ordersPartialReceipt,
+    linesOverBilled,
+    lines,
     moduleConfig,
     t,
     purchaseOrderFormConfig,

@@ -134,14 +134,19 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "inventory-exceptions-short-atp",
   "inventory-exceptions-expired-lots",
   "inventory-exceptions-open-qc",
+  "warehouse-sync-intents",
+  "warehouse-sync-intents-pending",
   "purchase-orders",
   "purchase-orders-to-approve",
   "purchase-orders-partial-receipt",
   "purchase-order-lines",
+  "purchase-order-lines-over-billed",
   "landed-costs",
+  "landed-cost-lines",
   "supplier-intakes",
   "partner-banks",
   "purchase-requisitions",
+  "purchase-requisition-lines",
   "purchase-rfqs",
   "purchase-rfq-lines",
   "purchase-rfq-bids",
@@ -198,6 +203,8 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "mail-messages",
   "expenses",
   "expense-sheets",
+  "expense-sheets-to-approve",
+  "expenses-missing-receipt",
   "iot-devices",
   "iot-hubs",
   "iot-alerts",
@@ -699,6 +706,24 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       " AND state = 'open' AND exception_type = 'open_qc'",
       " ORDER BY id DESC",
     ),
+  "warehouse-sync-intents": (id, fa) =>
+    selectOrgScopedSql(
+      "warehouse-sync-intents",
+      "warehouse_sync_intent",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "warehouse-sync-intents-pending": (id, fa) =>
+    selectOrgScopedSql(
+      "warehouse-sync-intents-pending",
+      "warehouse_sync_intent",
+      id,
+      fa,
+      " AND status = 'pending'",
+      " ORDER BY id DESC",
+    ),
   "purchase-orders": (id, fa) =>
     selectOrgScopedSql("purchase-orders", "purchase_order", id, fa, ""),
   "purchase-orders-to-approve": (id, fa) =>
@@ -725,8 +750,24 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       fa,
       "",
     ),
+  "purchase-order-lines-over-billed": (id, fa) =>
+    selectOrgScopedSql(
+      "purchase-order-lines-over-billed",
+      "purchase_order_line",
+      id,
+      fa,
+      " AND match_state = 'over_billed'",
+    ),
   "landed-costs": (id, fa) =>
     selectOrgScopedSql("landed-costs", "stock_landed_cost", id, fa, ""),
+  "landed-cost-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "landed-cost-lines",
+      "stock_landed_cost_lines",
+      id,
+      fa,
+      "",
+    ),
   "supplier-intakes": (id, fa) =>
     selectOrgScopedSql(
       "supplier-intakes",
@@ -741,6 +782,14 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql(
       "purchase-requisitions",
       "purchase_requisition",
+      id,
+      fa,
+      "",
+    ),
+  "purchase-requisition-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "purchase-requisition-lines",
+      "purchase_requisition_line",
       id,
       fa,
       "",
@@ -1001,6 +1050,22 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
   expenses: (id, fa) => selectOrgScopedSql("expenses", "hr_expense", id, fa, ""),
   "expense-sheets": (id, fa) =>
     selectOrgScopedSql("expense-sheets", "expense_sheet", id, fa, ""),
+  "expense-sheets-to-approve": (id, fa) =>
+    selectOrgScopedSql(
+      "expense-sheets-to-approve",
+      "expense_sheet",
+      id,
+      fa,
+      " AND state = 'Submitted'",
+    ),
+  "expenses-missing-receipt": (id, fa) =>
+    selectOrgScopedSql(
+      "expenses-missing-receipt",
+      "hr_expense",
+      id,
+      fa,
+      " AND has_receipt = false AND state = 'Draft'",
+    ),
   "iot-devices": (id, fa) =>
     selectOrgScopedSql("iot-devices", "iot_device", id, fa, ""),
   "iot-hubs": (id, fa) => selectOrgScopedSql("iot-hubs", "iot_hub", id, fa, ""),

@@ -124,7 +124,7 @@ Tabs from `inventoryModuleConfig` + injected tabs ([`inventory-client.tsx`](../f
 
 | Layer | What exists | Not covered |
 |-------|-------------|-------------|
-| Domain | `run_all_inventory_tests`: … + **putaway**, **packing**, **exception queues** | Costing layers, offline sync |
+| Domain | `run_all_inventory_tests`: … + **putaway**, **packing**, **exception queues**, **costing**, **warehouse sync**, **multi-WH promise ATP** | Outbound layer consumption, holiday calendars |
 | Sales (adjacent) | ATP shortfall / reserve-after-confirm / unreserve paths in sales domain tests | Multi-warehouse promise calendar |
 | Playwright | `inventory-module.spec.ts` (@dev-fixture) shell/tabs; `inventory-mutations.spec.ts` (@p0) product update + category delete; lead-to-cash / returns paths exercise picking validate | Full transfer lifecycle, waves, cycle post, phantoms |
 | Contract | `inventory.contract.ts` | Backend presence of BFF keys |
@@ -152,12 +152,12 @@ Definitions:
 | Quality status | **Partial** | Checks/alerts/points/teams; **fail quarantines qty** to QC loc and blocks ATP reserve from that loc |
 | Transfers | **Present** | `move_stock_quant` + picking validate inbound/outbound quant apply |
 | Reservations | **Present** | Soft reserve on quant; SO confirm uses `reserve_quantity_at_location`; fail-closed |
-| Available-to-promise | **Present** (location-scoped soft ATP) | `reserved + qty > quantity` rejected; services skipped; not multi-WH / promise-date ATP |
+| Available-to-promise | **Present** (multi-WH network + promise dates) | Soft reserve; Mon–Fri working days; inbound-PO date buckets still deferred |
 | Safety stock | **Absent** | No dedicated field/reducer; variant min/max reorder unused for auto reorder |
 | Replenishment | **Partial** | `execute_replenishment_rule` creates draft **PO** (supplier) or **internal transfer** when below min; still no scheduled scheduler worker |
 | Cycle counting | **Present** | Plan → start → record → validate → `post_cycle_count_adjustments` upserts quants |
 | Landed cost | **Present** (adjacent) | Allocate / post / apply to done-move dest quant `value`/`cost` |
-| Costing methods | **Partial** | Product `cost_method` / `standard_price`; COGS helpers read quants (fifo/lifo/average/standard); stock ops default new quants to `"standard"` without layer maintenance |
+| Costing methods | **Present** (receipt-aligned) | Inbound validate maintains average blend / FIFO·LIFO layers from move price; outbound layer consumption still deferred |
 | Directed putaway / picking | **Partial** | `execute_directed_putaway` (rule / least-loaded / fixed) moves stock + done putaway task; pick orchestration via waves |
 | Wave planning | **Partial** | `release_picking_wave` assign + pick tasks; validate gated on open tasks |
 | Packing | **Partial** | `stock_package` create/pack/confirm/done; `pack_stock_picking` one-shot; pack loc on done |
@@ -185,7 +185,7 @@ Definitions:
 | Quant quantity/value integrity on validate | Yes (txn) | `apply_validated_move_to_quants` in picking validate | Lot/serial/cost layer consistency |
 | Soft ATP on SO confirm | Yes | `reserve_quantity_at_location` fail-closed | Multi-location allocation policy; serial ATP |
 | Landed cost into inventory value | Partial | `apply_landed_costs` updates quant value | Period lock; bill/duty linkage |
-| COGS costing methods | Partial | Journal helpers read quants by method | Maintain layers on receipt; inventory close |
+| COGS costing methods | Present (receipt) | Inbound layers + journal helpers | Outbound layer consumption; close adjacency |
 | Inventory period close / recon | Partial | Snapshot + lock + optional posted valuation Entry | COGS close adjacency / reversal on reopen |
 | Adjustment → stock | Partial | Cycle-count post mutates quants; `process_inventory_adjustment` does not | One documented post path for all adjustments |
 
@@ -240,7 +240,7 @@ SpacetimeDB atomicity model: each reducer runs in one transaction that commits o
 15. **Inventory period close** — Present (snapshot + lock + optional GL valuation Entry).
 16. **Cross-company isolation** — Org filters; dedicated company-isolation domain test Present.
 17. **Live exception subscriptions** — Present (bounded short ATP / expired lots / open QC).
-18. **Remote / intermittent warehouse ops** — No offline queue; live WS only for core 7 keys.
+18. **Remote / intermittent warehouse ops** — Present (MVP): `warehouse_sync_intent` + local outbox + Ops flush/apply.
 
 ### Acceptance scenarios (18)
 
@@ -260,7 +260,7 @@ SpacetimeDB atomicity model: each reducer runs in one transaction that commits o
 14. Multi-UoM: reserve/validate convert via `uom_conversion` — Present (Partial vs full UoM UX).
 15. Subscription clients see live short-ATP / expired-lot / open-QC queues — Present (`inventory-exceptions-*` + Ops panel).
 16. Inventory close: snapshot + lock + optional GL valuation Entry; reopen unlocks — Present.
-17. Remote warehouse with intermittent connectivity can queue scans and reconcile without double-post (target) — **Absent**.
+17. Remote warehouse with intermittent connectivity can queue scans and reconcile without double-post — Present (`warehouse_sync_intent` idempotency + apply).
 18. 3PL ASN + cross-dock outbound from inbound dest — Present (MVP).
 
 ---
@@ -370,7 +370,7 @@ flowchart LR
 | UoM conversion on reserve/validate | **Closed** | Convert to `product.uom_id` before ATP/quant ops |
 | Inventory period close + valuation snapshot | **Closed** | Snapshot/lock + optional GL valuation Entry |
 | Exception queues (short ATP, expired lots, QC) | **Closed** (MVP) | `inventory_exception` + bounded subs + Ops |
-| Costing layer maintenance on receipt | **Open** | Align with COGS methods |
+| Costing layer maintenance on receipt | **Closed** (MVP) | Average blend + FIFO/LIFO layers on inbound |
 
 ### Differentiating
 
@@ -380,16 +380,16 @@ flowchart LR
 | Consignment ownership on quants | **Closed** (MVP) | Vendor `owner_id` excluded from company ATP |
 | Cross-dock flow | **Closed** (MVP) | Outbound from inbound dest when `warehouse.crossdock` |
 | 3PL ASN / outbound interfaces | **Closed** (MVP) | Durable intents + ASN stock post; workers remain external |
-| Offline / intermittent remote warehouse sync | **Open** | Oceania / island / mine sites |
+| Offline / intermittent remote warehouse sync | **Closed** (MVP) | Intent + outbox + Ops flush; barcode/cycle-count ops |
 | Attribute-driven variant generation | **Open** | Competitive PIM depth |
-| Advanced multi-warehouse promise ATP | **Open** | Calendar / lead-time ATP |
+| Advanced multi-warehouse promise ATP | **Closed** (MVP) | Promise refresh + network reserve; Mon–Fri calendar |
 | Integration observability for WMS/customs | **Open** | Intent/result pattern |
 
 ---
 
 ## Bottom line
 
-Lumiere’s inventory spine is **reservation-and-validate strong, WMS-depth still partial**: soft ATP, picking validate, lot/serial/FEFO, replenishment, QC quarantine, waves/tasks, UoM conversion, inventory close (+ optional GL valuation), 3PL ASN, cartonization + packing packages, consignment ownership, cross-dock, directed putaway, and bounded exception Ops queues are real and tested. Remaining notable gaps: costing layer maintenance, offline sync, and advanced multi-WH promise ATP.
+Lumiere’s inventory spine is **reservation-and-validate strong, WMS-depth still partial**: soft ATP (including multi-WH network + promise dates), picking validate, lot/serial/FEFO, replenishment, QC quarantine, waves/tasks, UoM conversion, inventory close (+ optional GL valuation), 3PL ASN, cartonization + packing packages, consignment ownership, cross-dock, directed putaway, bounded exception Ops queues, receipt-aligned costing layers, and offline warehouse sync intents are real and tested. Remaining notable gaps: outbound layer consumption, warehouse holiday calendars, inbound-PO-aware promise buckets, and fuller offline picking.
 
 ### Related docs
 

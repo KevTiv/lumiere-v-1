@@ -4221,7 +4221,8 @@
   "UpdateProductPricingParams": [
     "standard_price",
     "list_price",
-    "currency_id"
+    "currency_id",
+    "costMethod"
   ],
   "UpdateProductSupplierInfoParams": [
     "min_qty",
@@ -4592,7 +4593,8 @@
     "crossdock",
     "sequence",
     "partner_id",
-    "metadata"
+    "metadata",
+    "resupplyWhIds"
   ],
   "UpdateWhatsAppBusinessAccountParams": [
     "name",
@@ -4867,6 +4869,13 @@
     "metadata"
   ],
   "RefreshInventoryExceptionsParams": [
+    "metadata"
+  ],
+  "CreateWarehouseSyncIntentParams": [
+    "deviceId",
+    "metadata"
+  ],
+  "FailWarehouseSyncIntentParams": [
     "metadata"
   ]
 }

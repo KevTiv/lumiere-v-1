@@ -839,13 +839,15 @@ fn validate_in_invoice_three_way_match(
         return Ok(());
     }
 
-    let tolerance = ctx
-        .db
-        .purchase_order()
-        .id()
-        .find(&po_id)
-        .map(|o| crate::purchasing::purchase_orders::qty_match_tolerance_for_order(&o))
+    let po = ctx.db.purchase_order().id().find(&po_id);
+    let tolerance = po
+        .as_ref()
+        .map(|o| crate::purchasing::purchase_orders::qty_match_tolerance_for_order(o))
         .unwrap_or(DEFAULT_QTY_MATCH_TOLERANCE);
+    let price_tol = po
+        .as_ref()
+        .map(|o| crate::purchasing::purchase_orders::price_match_tolerance_for_order(o))
+        .unwrap_or(crate::purchasing::purchase_orders::DEFAULT_PRICE_MATCH_TOLERANCE);
     validate_three_way_match_po_lines(&po_lines, tolerance)?;
 
     for ml in ctx
@@ -867,6 +869,12 @@ fn validate_in_invoice_three_way_match(
             return Err(format!(
                 "three-way match failed: line {} billed {:.4} exceeds received {:.4}",
                 po_line.id, ml.quantity, po_line.qty_received
+            ));
+        }
+        if (ml.price_unit - po_line.price_unit).abs() > price_tol {
+            return Err(format!(
+                "three-way match failed: line {} bill price {:.4} differs from PO price {:.4} (tol {:.4})",
+                po_line.id, ml.price_unit, po_line.price_unit, price_tol
             ));
         }
     }
@@ -2031,6 +2039,10 @@ pub fn create_bill_from_purchase_order(
         .id()
         .find(&purchase_order_id)
         .ok_or("Purchase order not found")?;
+
+    if po.organization_id != organization_id {
+        return Err("Purchase order does not belong to this organization".to_string());
+    }
 
     use crate::types::PoState;
     if po.state != PoState::Purchase && po.state != PoState::Done {

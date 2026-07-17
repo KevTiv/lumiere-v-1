@@ -5,7 +5,7 @@ use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
 use crate::expenses::expenses::{expense_sheet, hr_expense, HrExpense, HrExpenseSheet};
 use crate::helpers::check_permission;
-use crate::types::{ExpenseSheetState, ExpenseState};
+use crate::types::{ExpenseLineKind, ExpenseSheetState, ExpenseState};
 
 // ── HrExpense ─────────────────────────────────────────────────────────────────
 
@@ -54,6 +54,8 @@ pub fn import_expense_csv(
             "refused" => ExpenseState::Refused,
             _ => ExpenseState::Draft,
         };
+        let attachment_ids = vec_u64(col(&headers, row, "attachment_ids"));
+        let has_receipt = !attachment_ids.is_empty();
 
         ctx.db.hr_expense().insert(HrExpense {
             id: 0,
@@ -77,10 +79,31 @@ pub fn import_expense_csv(
             tax_ids: vec_u64(col(&headers, row, "tax_ids")),
             account_id: opt_u64(col(&headers, row, "account_id")),
             analytic_account_id: opt_u64(col(&headers, row, "analytic_account_id")),
+            project_id: opt_u64(col(&headers, row, "project_id")),
+            line_kind: match col(&headers, row, "line_kind") {
+                "mileage" => ExpenseLineKind::Mileage,
+                "per_diem" | "perdiem" => ExpenseLineKind::PerDiem,
+                _ => ExpenseLineKind::Standard,
+            },
+            mileage_distance: opt_f64(col(&headers, row, "mileage_distance")),
+            mileage_rate_id: opt_u64(col(&headers, row, "mileage_rate_id")),
+            per_diem_days: opt_f64(col(&headers, row, "per_diem_days")),
+            per_diem_rate_id: opt_u64(col(&headers, row, "per_diem_rate_id")),
             sheet_id: opt_u64(col(&headers, row, "sheet_id")),
             state,
             description: opt_str(col(&headers, row, "description")),
-            attachment_ids: vec_u64(col(&headers, row, "attachment_ids")),
+            attachment_ids,
+            has_receipt,
+            client_request_id: opt_str(col(&headers, row, "client_request_id")),
+            payment_mode: match col(&headers, row, "payment_mode") {
+                "corporate_card" | "card" => crate::types::ExpensePaymentMode::CorporateCard,
+                _ => crate::types::ExpensePaymentMode::OutOfPocket,
+            },
+            merchant_key: opt_str(col(&headers, row, "merchant_key")),
+            fraud_hold: false,
+            fraud_reason: None,
+            duplicate_of_id: None,
+            policy_hold: false,
             created_at: ctx.timestamp,
         });
         imported += 1;
@@ -140,15 +163,26 @@ pub fn import_expense_sheet_csv(
             continue;
         }
 
-        let state = match col(&headers, row, "state") {
-            "submitted" => ExpenseSheetState::Submitted,
-            "approved" => ExpenseSheetState::Approved,
-            "posted" => ExpenseSheetState::Posted,
-            "done" => ExpenseSheetState::Done,
-            "refused" => ExpenseSheetState::Refused,
+        // Wave B: Draft-only by default — reject terminal states without break-glass.
+        let state_raw = col(&headers, row, "state");
+        let state = match state_raw {
+            "" | "draft" => ExpenseSheetState::Draft,
+            "submitted" | "approved" | "posted" | "done" | "refused" => {
+                record_import_error(
+                    ctx,
+                    job.id,
+                    row_num,
+                    Some("state"),
+                    Some(state_raw),
+                    "CSV import allows Draft sheets only",
+                );
+                errors += 1;
+                continue;
+            }
             _ => ExpenseSheetState::Draft,
         };
 
+        let currency_id = parse_u64(col(&headers, row, "currency_id"));
         ctx.db.expense_sheet().insert(HrExpenseSheet {
             id: 0,
             organization_id,
@@ -157,11 +191,17 @@ pub fn import_expense_sheet_csv(
             employee_id,
             state,
             total_amount: parse_f64(col(&headers, row, "total_amount")),
-            currency_id: parse_u64(col(&headers, row, "currency_id")),
+            currency_id,
+            currency_rate: 1.0,
+            company_currency_id: currency_id,
             accounting_date: opt_timestamp(col(&headers, row, "accounting_date")),
-            account_move_id: opt_u64(col(&headers, row, "account_move_id")),
+            account_move_id: None,
+            reimbursement_move_id: None,
+            rebill_move_id: None,
+            submitted_by: None,
             approver_id: None,
             notes: opt_str(col(&headers, row, "notes")),
+            metadata: None,
             created_at: ctx.timestamp,
         });
         imported += 1;

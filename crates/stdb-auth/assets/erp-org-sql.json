@@ -736,6 +736,20 @@
   },
   {
     "extra_where": "",
+    "mapKey": "warehouse-sync-intents",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "warehouse-sync-intents",
+    "table": "warehouse_sync_intent"
+  },
+  {
+    "extra_where": " AND status = 'pending'",
+    "mapKey": "warehouse-sync-intents-pending",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "warehouse-sync-intents-pending",
+    "table": "warehouse_sync_intent"
+  },
+  {
+    "extra_where": "",
     "mapKey": "purchase-orders",
     "order_by": "",
     "resource_key": "purchase-orders",
@@ -763,11 +777,25 @@
     "table": "purchase_order_line"
   },
   {
+    "extra_where": " AND match_state = 'over_billed'",
+    "mapKey": "purchase-order-lines-over-billed",
+    "order_by": "",
+    "resource_key": "purchase-order-lines-over-billed",
+    "table": "purchase_order_line"
+  },
+  {
     "extra_where": "",
     "mapKey": "landed-costs",
     "order_by": "",
     "resource_key": "landed-costs",
     "table": "stock_landed_cost"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "landed-cost-lines",
+    "order_by": "",
+    "resource_key": "landed-cost-lines",
+    "table": "stock_landed_cost_lines"
   },
   {
     "extra_where": "",
@@ -789,6 +817,13 @@
     "order_by": "",
     "resource_key": "purchase-requisitions",
     "table": "purchase_requisition"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "purchase-requisition-lines",
+    "order_by": "",
+    "resource_key": "purchase-requisition-lines",
+    "table": "purchase_requisition_line"
   },
   {
     "extra_where": "",
@@ -1216,6 +1251,20 @@
     "order_by": "",
     "resource_key": "expense-sheets",
     "table": "expense_sheet"
+  },
+  {
+    "extra_where": " AND state = 'Submitted'",
+    "mapKey": "expense-sheets-to-approve",
+    "order_by": "",
+    "resource_key": "expense-sheets-to-approve",
+    "table": "expense_sheet"
+  },
+  {
+    "extra_where": " AND has_receipt = false AND state = 'Draft'",
+    "mapKey": "expenses-missing-receipt",
+    "order_by": "",
+    "resource_key": "expenses-missing-receipt",
+    "table": "hr_expense"
   },
   {
     "extra_where": "",

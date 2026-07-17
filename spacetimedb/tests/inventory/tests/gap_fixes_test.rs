@@ -35,9 +35,15 @@ use crate::inventory::packing::{
 };
 use crate::inventory::putaway::{execute_directed_putaway, ExecuteDirectedPutawayParams};
 use crate::types::{AccountInternalGroup, JournalType};
+use crate::inventory::atp_promise::refresh_sale_order_promise_dates;
+use crate::inventory::barcode::barcode_scan;
 use crate::inventory::product::{
-    create_product, create_product_supplier_info, product, CreateProductParams,
-    CreateProductSupplierInfoParams,
+    create_product, create_product_supplier_info, product, update_product_pricing,
+    CreateProductParams, CreateProductSupplierInfoParams, UpdateProductPricingParams,
+};
+use crate::inventory::warehouse_sync::{
+    apply_warehouse_sync_intent, create_warehouse_sync_intent, warehouse_sync_intent,
+    CreateWarehouseSyncIntentParams,
 };
 use crate::inventory::quality::{
     create_quality_check, fail_quality_check, quality_check, CreateQualityCheckParams,
@@ -48,10 +54,10 @@ use crate::inventory::replenishment::{
 };
 use crate::inventory::stock::{
     assign_stock_picking, confirm_stock_picking, create_stock_move, create_stock_picking,
-    create_stock_quant, reserve_quantity_at_location, reserve_stock_quant, stock_move,
-    stock_picking, stock_quant, to_product_stock_qty, validate_stock_picking,
-    CreateStockMoveParams, CreateStockPickingParams, CreateStockQuantParams,
-    StockQuantReserveParams,
+    create_stock_quant, increase_quant_at_location, reserve_quantity_at_location,
+    reserve_stock_quant, resolve_warehouse_stock_location, stock_move, stock_picking, stock_quant,
+    to_product_stock_qty, validate_stock_picking, CreateStockMoveParams, CreateStockPickingParams,
+    CreateStockQuantParams, StockQuantReserveParams,
 };
 use crate::inventory::tracking::{
     create_stock_production_lot, create_stock_production_serial, stock_production_lot,
@@ -2278,6 +2284,7 @@ pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), Stri
             crossdock: Some(true),
             sequence: None,
             partner_id: None,
+            resupply_wh_ids: None,
             metadata: None,
         },
     )?;
@@ -3162,6 +3169,556 @@ pub fn test_inventory_exception_queues(ctx: &ReducerContext) -> Result<(), Strin
 
     if expired.state != "open" || open_qc.state != "open" {
         return Err("expired_lot and open_qc should remain open".into());
+    }
+    Ok(())
+}
+
+/// Average costing: two inbound increases at different unit costs blend into one quant.
+pub fn test_receipt_average_costing(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let stock_loc = resolve_warehouse_stock_location(ctx, fixture.warehouse_id);
+
+    update_product_pricing(
+        ctx,
+        org_id,
+        fixture.product_id,
+        UpdateProductPricingParams {
+            standard_price: None,
+            list_price: None,
+            currency_id: None,
+            cost_method: Some("average".to_string()),
+        },
+    )?;
+
+    // Clear harness quant so we start clean.
+    for q in ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.product_id == fixture.product_id
+                && q.location_id == stock_loc
+        })
+        .collect::<Vec<_>>()
+    {
+        ctx.db.stock_quant().id().delete(&q.id);
+    }
+
+    increase_quant_at_location(ctx, org_id, company_id, fixture.product_id, stock_loc, 10.0, 5.0)?;
+    increase_quant_at_location(ctx, org_id, company_id, fixture.product_id, stock_loc, 10.0, 15.0)?;
+
+    let quants: Vec<_> = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.product_id == fixture.product_id
+                && q.location_id == stock_loc
+        })
+        .collect();
+    if quants.len() != 1 {
+        return Err(format!("average should merge to 1 quant, got {}", quants.len()));
+    }
+    let q = &quants[0];
+    if (q.quantity - 20.0).abs() > 1e-6 {
+        return Err(format!("expected qty 20, got {}", q.quantity));
+    }
+    // (10*5 + 10*15) / 20 = 10
+    if (q.cost - 10.0).abs() > 1e-6 {
+        return Err(format!("expected blended cost 10, got {}", q.cost));
+    }
+    if q.cost_method.as_deref() != Some("average") {
+        return Err(format!("expected cost_method average, got {:?}", q.cost_method));
+    }
+    Ok(())
+}
+
+/// FIFO costing: different unit costs create separate layers at the same location.
+pub fn test_receipt_fifo_layers(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let stock_loc = resolve_warehouse_stock_location(ctx, fixture.warehouse_id);
+
+    update_product_pricing(
+        ctx,
+        org_id,
+        fixture.product_id,
+        UpdateProductPricingParams {
+            standard_price: None,
+            list_price: None,
+            currency_id: None,
+            cost_method: Some("fifo".to_string()),
+        },
+    )?;
+
+    for q in ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.product_id == fixture.product_id
+                && q.location_id == stock_loc
+        })
+        .collect::<Vec<_>>()
+    {
+        ctx.db.stock_quant().id().delete(&q.id);
+    }
+
+    increase_quant_at_location(ctx, org_id, company_id, fixture.product_id, stock_loc, 4.0, 8.0)?;
+    increase_quant_at_location(ctx, org_id, company_id, fixture.product_id, stock_loc, 6.0, 12.0)?;
+
+    let quants: Vec<_> = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.product_id == fixture.product_id
+                && q.location_id == stock_loc
+        })
+        .collect();
+    if quants.len() != 2 {
+        return Err(format!("fifo should keep 2 layers, got {}", quants.len()));
+    }
+    let mut costs: Vec<f64> = quants.iter().map(|q| q.cost).collect();
+    costs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    if (costs[0] - 8.0).abs() > 1e-6 || (costs[1] - 12.0).abs() > 1e-6 {
+        return Err(format!("expected layer costs 8 and 12, got {:?}", costs));
+    }
+    Ok(())
+}
+
+/// Warehouse sync: idempotent create, apply barcode once, second apply no-ops, bad apply → failed.
+pub fn test_warehouse_sync_intent(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("product")?;
+    ctx.db.product().id().update(crate::inventory::product::Product {
+        barcode: Some("SYNC-BC-001".to_string()),
+        ..product
+    });
+
+    let key = format!("sync-{}-1", org_id);
+    let payload = serde_json::json!({
+        "barcode": "SYNC-BC-001",
+        "barcode_type": "ean13",
+        "device_id": "dev-1",
+        "quantity": 1.0,
+    })
+    .to_string();
+
+    create_warehouse_sync_intent(
+        ctx,
+        org_id,
+        company_id,
+        CreateWarehouseSyncIntentParams {
+            warehouse_id: fixture.warehouse_id,
+            op_type: "barcode_scan".to_string(),
+            idempotency_key: key.clone(),
+            device_id: Some("dev-1".to_string()),
+            payload: payload.clone(),
+            metadata: None,
+        },
+    )?;
+    create_warehouse_sync_intent(
+        ctx,
+        org_id,
+        company_id,
+        CreateWarehouseSyncIntentParams {
+            warehouse_id: fixture.warehouse_id,
+            op_type: "barcode_scan".to_string(),
+            idempotency_key: key.clone(),
+            device_id: Some("dev-1".to_string()),
+            payload: payload.clone(),
+            metadata: None,
+        },
+    )?;
+
+    let count = ctx
+        .db
+        .warehouse_sync_intent()
+        .iter()
+        .filter(|i| i.organization_id == org_id && i.idempotency_key == key)
+        .count();
+    if count != 1 {
+        return Err(format!("expected 1 intent for key, got {count}"));
+    }
+    let intent_id = ctx
+        .db
+        .warehouse_sync_intent()
+        .iter()
+        .find(|i| i.organization_id == org_id && i.idempotency_key == key)
+        .map(|i| i.id)
+        .ok_or("intent")?;
+
+    apply_warehouse_sync_intent(ctx, org_id, company_id, intent_id)?;
+    apply_warehouse_sync_intent(ctx, org_id, company_id, intent_id)?;
+
+    let applied = ctx
+        .db
+        .warehouse_sync_intent()
+        .id()
+        .find(&intent_id)
+        .ok_or("intent after apply")?;
+    if applied.status != "applied" {
+        return Err(format!("expected applied, got {}", applied.status));
+    }
+    let scans = ctx
+        .db
+        .barcode_scan()
+        .iter()
+        .filter(|s| s.organization_id == org_id && s.barcode == "SYNC-BC-001")
+        .count();
+    if scans != 1 {
+        return Err(format!("expected 1 barcode scan, got {scans}"));
+    }
+
+    let fail_key = format!("sync-{}-fail", org_id);
+    create_warehouse_sync_intent(
+        ctx,
+        org_id,
+        company_id,
+        CreateWarehouseSyncIntentParams {
+            warehouse_id: fixture.warehouse_id,
+            op_type: "cycle_count_line".to_string(),
+            idempotency_key: fail_key.clone(),
+            device_id: Some("dev-1".to_string()),
+            payload: serde_json::json!({
+                "cycle_count_id": 999999u64,
+                "product_id": fixture.product_id,
+                "location_id": fixture.warehouse_id,
+                "qty_counted": 1.0,
+                "uom_id": 1u64,
+            })
+            .to_string(),
+            metadata: None,
+        },
+    )?;
+    let fail_id = ctx
+        .db
+        .warehouse_sync_intent()
+        .iter()
+        .find(|i| i.organization_id == org_id && i.idempotency_key == fail_key)
+        .map(|i| i.id)
+        .ok_or("fail intent")?;
+    apply_warehouse_sync_intent(ctx, org_id, company_id, fail_id)?;
+    let failed = ctx
+        .db
+        .warehouse_sync_intent()
+        .id()
+        .find(&fail_id)
+        .ok_or("fail after")?;
+    if failed.status != "failed" {
+        return Err(format!("expected failed status, got {}", failed.status));
+    }
+    Ok(())
+}
+
+/// Multi-WH promise: stock only on resupply WH → promise + confirm reserves there.
+pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::inventory::warehouse::{Warehouse, StockLocation};
+    use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
+    use crate::sales::sales_core::{
+        confirm_sales_order, create_sale_order, sale_order, sale_order_line,
+        CreateSaleOrderLineParams, CreateSaleOrderParams,
+    };
+    use crate::types::DiscountPolicy;
+
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let primary_loc = resolve_warehouse_stock_location(ctx, fixture.warehouse_id);
+
+    // Drain primary ATP
+    for q in ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.product_id == fixture.product_id
+                && q.location_id == primary_loc
+        })
+        .collect::<Vec<_>>()
+    {
+        ctx.db.stock_quant().id().delete(&q.id);
+    }
+
+    // Secondary warehouse with stock
+    let wh_b = ctx.db.warehouse().insert(Warehouse {
+        id: 0,
+        organization_id: org_id,
+        name: "Resupply WH B".to_string(),
+        code: "WHB".to_string(),
+        active: true,
+        company_id,
+        partner_id: Some(fixture.partner_id),
+        lot_stock_id: 0,
+        wh_input_stock_loc_id: None,
+        wh_pack_stock_loc_id: None,
+        wh_output_stock_loc_id: None,
+        wh_qc_stock_loc_id: None,
+        wh_scrap_loc_id: None,
+        in_type_id: 0,
+        out_type_id: 0,
+        int_type_id: 0,
+        pack_type_id: 0,
+        pick_type_id: 0,
+        qc_type_id: None,
+        return_type_id: None,
+        crossdock: false,
+        reception_steps: "one_step".to_string(),
+        delivery_steps: "one_step".to_string(),
+        resupply_wh_ids: vec![],
+        resupply_from_ids: vec![],
+        buy_to_resupply: true,
+        manufacture_to_resupply: false,
+        manufacture_steps: "mrp_one_step".to_string(),
+        resupply_subcontractor_on_order: false,
+        subcontracting_to_resupply: false,
+        view_location_id: None,
+        mto_pull_id: None,
+        buy_pull_id: None,
+        pbh_dpm_ids: vec![],
+        sequence: 2,
+        is_active: true,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        metadata: Some(r#"{"test":"multi_wh"}"#.to_string()),
+    });
+    let loc_b = ctx.db.stock_location().insert(StockLocation {
+        id: 0,
+        organization_id: org_id,
+        name: "Stock B".to_string(),
+        complete_name: Some("WHB/Stock".to_string()),
+        location_id: None,
+        parent_path: "".to_string(),
+        child_ids: vec![],
+        child_left: 0,
+        child_right: 0,
+        usage: "internal".to_string(),
+        company_id: Some(company_id),
+        scrap_location: false,
+        return_location: false,
+        valuation_in_account_id: None,
+        valuation_out_account_id: None,
+        active: true,
+        comment: None,
+        posx: 0.0,
+        posy: 0.0,
+        posz: 0.0,
+        barcode: None,
+        cyclic_inventory_frequency: 0,
+        last_inventory_date: None,
+        next_inventory_date: None,
+        location_category: "internal".to_string(),
+        is_active: true,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        metadata: None,
+    });
+    ctx.db.warehouse().id().update(Warehouse {
+        lot_stock_id: loc_b.id,
+        ..wh_b
+    });
+
+    create_quant(ctx, org_id, company_id, fixture.product_id, loc_b.id, 20.0, None)?;
+
+    update_warehouse(
+        ctx,
+        org_id,
+        company_id,
+        fixture.warehouse_id,
+        UpdateWarehouseParams {
+            name: None,
+            code: None,
+            active: None,
+            reception_steps: None,
+            delivery_steps: None,
+            manufacture_steps: None,
+            buy_to_resupply: None,
+            manufacture_to_resupply: None,
+            crossdock: None,
+            sequence: None,
+            partner_id: None,
+            resupply_wh_ids: Some(vec![wh_b.id]),
+            metadata: None,
+        },
+    )?;
+
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("product")?;
+
+    create_pricelist(
+        ctx,
+        org_id,
+        CreatePricelistParams {
+            name: "MultiWH PL".to_string(),
+            currency_id: 1,
+            discount_policy: DiscountPolicy::WithDiscount,
+        },
+    )?;
+    let pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "MultiWH PL")
+        .map(|p| p.id)
+        .ok_or("pricelist")?;
+
+    create_sale_order(
+        ctx,
+        org_id,
+        CreateSaleOrderParams {
+            company_id: Some(company_id),
+            partner_id: fixture.partner_id,
+            partner_invoice_id: fixture.partner_id,
+            partner_shipping_id: fixture.partner_id,
+            pricelist_id,
+            currency_id: 1,
+            warehouse_id: fixture.warehouse_id,
+            order_lines: vec![CreateSaleOrderLineParams {
+                product_id: fixture.product_id,
+                quantity: 5.0,
+                uom_id: product.uom_id,
+                price_unit: Some(product.list_price),
+                discount: 0.0,
+                tax_ids: vec![],
+                name: None,
+                sequence: 1,
+                is_downpayment: false,
+                display_type: None,
+                product_variant_id: None,
+                packaging_id: None,
+                route_id: None,
+                analytic_tag_ids: vec![],
+                customer_lead: Some(2.0),
+                metadata: None,
+            }],
+            origin: Some("MultiWH SO".to_string()),
+            client_order_ref: Some("MWH-001".to_string()),
+            payment_term_id: None,
+            fiscal_position_id: None,
+            team_id: None,
+            opportunity_id: None,
+            note: None,
+            terms_and_conditions: None,
+            validity_days: None,
+            shipping_policy: None,
+            picking_policy: None,
+            campaign_id: None,
+            medium_id: None,
+            source_id: None,
+            commitment_date: None,
+            expected_date: None,
+            incoterm_id: None,
+            incoterm: None,
+            incoterm_location: None,
+            carrier_id: None,
+            customer_lead: Some(2.0),
+            analytic_account_id: None,
+            user_id: None,
+            is_printed: None,
+            is_locked: None,
+            is_dropship: None,
+            invoice_policy: None,
+            message_follower_ids: None,
+            message_partner_ids: None,
+            message_channel_ids: None,
+            activity_ids: None,
+            metadata: Some(r#"{"test":"multi_wh"}"#.to_string()),
+        },
+    )?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|o| {
+            o.organization_id == org_id && o.client_order_ref == Some("MWH-001".to_string())
+        })
+        .ok_or("SO missing")?;
+
+    refresh_sale_order_promise_dates(ctx, org_id, company_id, order.id)?;
+
+    let line = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&order.id)
+        .next()
+        .ok_or("line")?;
+    if line.free_qty_today < 5.0 {
+        return Err(format!(
+            "expected free_qty_today >= 5 from WH-B, got {}",
+            line.free_qty_today
+        ));
+    }
+    if line.scheduled_date.is_none() {
+        return Err("scheduled_date should be set by promise refresh".into());
+    }
+
+    let order_after = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order.id)
+        .ok_or("order after promise")?;
+    if order_after.commitment_date.is_none() {
+        return Err("commitment_date should be set".into());
+    }
+
+    confirm_sales_order(ctx, org_id, order.id)?;
+
+    let reserved_b: f64 = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.product_id == fixture.product_id
+                && q.location_id == loc_b.id
+        })
+        .map(|q| q.reserved_quantity)
+        .sum();
+    if (reserved_b - 5.0).abs() > 1e-6 {
+        return Err(format!("expected 5 reserved at WH-B, got {reserved_b}"));
+    }
+
+    let xfer = ctx.db.stock_picking().iter().any(|p| {
+        p.organization_id == org_id
+            && p.picking_code.as_deref() == Some("internal")
+            && p.origin.as_deref() == Some(&format!("SO-ATP-{}", order.id))
+    });
+    if !xfer {
+        return Err("expected draft INT ATP transfer demand".into());
     }
     Ok(())
 }

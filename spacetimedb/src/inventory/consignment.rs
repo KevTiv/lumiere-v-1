@@ -108,6 +108,9 @@ pub fn receive_consignment_stock(
     }
 
     let location_id = params.location_id.unwrap_or(wh.lot_stock_id);
+    let method = crate::inventory::costing::product_for_costing(ctx, agreement.product_id)
+        .map(|p| crate::inventory::costing::normalize_cost_method(&p.cost_method))
+        .unwrap_or_else(|_| "standard".to_string());
     increase_quant_at_location_owned(
         ctx,
         organization_id,
@@ -117,6 +120,7 @@ pub fn receive_consignment_stock(
         params.quantity,
         params.cost,
         Some(agreement.partner_id),
+        &method,
     )?;
 
     write_audit_log_v2(

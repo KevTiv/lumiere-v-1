@@ -8,6 +8,7 @@ import {
   useApproveApprovalRequest,
   useRejectApprovalRequest,
 } from '@lumiere/query-hooks/hooks/approvals'
+import { useRefreshSaleOrderPromiseDates } from '@lumiere/query-hooks/hooks/sales'
 import { useOperatingCompanyId } from '@lumiere/query-hooks/hooks/use-operating-company'
 import { Button, FormModal } from '@lumiere/ui'
 import type { FormConfig } from '@lumiere/ui'
@@ -215,6 +216,10 @@ export function SalesOpsPanel({
   )
   const [settleOpen, setSettleOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const refreshPromise = useRefreshSaleOrderPromiseDates(
+    orgId,
+    operatingCompanyId ?? 0,
+  )
 
   const runAdvanced = async (fn?: () => Promise<void>) => {
     if (!fn) return
@@ -444,6 +449,36 @@ export function SalesOpsPanel({
             {queueLabel(id)}
           </Button>
         ))}
+      </div>
+
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+        data-testid="sales-ops-promise-atp"
+      >
+        <div>
+          <h3 className="text-sm font-medium">Multi-WH promise ATP</h3>
+          <p className="text-xs text-muted-foreground">
+            Refresh commitment / line schedule from warehouse network + lead days.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!operatingCompanyId || refreshPromise.isPending}
+          data-testid="sales-ops-refresh-promise"
+          onClick={async () => {
+            const raw = window.prompt('Sale order id to refresh promise dates')
+            if (!raw?.trim()) return
+            try {
+              setActionError(null)
+              await refreshPromise.mutateAsync(raw.trim())
+            } catch (e) {
+              setActionError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        >
+          {refreshPromise.isPending ? 'Refreshing…' : 'Refresh promise dates'}
+        </Button>
       </div>
 
       <div

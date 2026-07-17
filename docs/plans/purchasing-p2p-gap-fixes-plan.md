@@ -38,9 +38,30 @@ Executable tracker for the full backlog (Pilot → Competitive → Differentiati
 - [x] Cross-border integration intents (customs/e-invoice) (`purchasing_integration_intent` create + record result)
 - [x] BFF + query-hooks + Ops/dashboard `window.prompt` quick actions (sales `oms_advanced` pattern)
 
+## Wave E — Remaining pilot + match controls (2026-07-17)
+
+- [x] `purchase_requisition_line` table + create/add reducers; convert copies lines to PO
+- [x] Requisition create form product/uom/qty → `lines`; BFF `add_purchase_requisition_line`; workspace/ERP_ORG_SQL `purchase-requisition-lines`
+- [x] Audit `compute_purchase_order_*_totals` + CSV import reducers
+- [x] Isolation: org B cannot receive/bill org A PO (`create_bill_from_purchase_order` org guard + `run_purchasing_wave_e_test`)
+- [x] Wire `landed-cost-lines` into workspace + `ERP_ORG_SQL`
+- [x] `match_price_tolerance` on PO; price variance enforced on `post_invoice`
+- [x] First-class `purchase_order_line.match_state` + `purchase-order-lines-over-billed` exception queue + dashboard KPI
+- [x] Domain tests: requisition convert, receive/bill isolation, price match block (`run_purchasing_wave_e_test`)
+
+## Wave F — Deferred
+
+- [ ] Real encumbrance / budget-line ledger + release on cancel/bill
+- [ ] WHT liability JE / certificates
+- [ ] Full RFQ compare / returns / blanket entity tabs
+- [ ] Requisition workflow-gate approval
+- [ ] Delegation resolution inside approval gate
+- [ ] Commodity indexation / HS duty / integration workers
+
 ## Ops checklist after merge
 
-1. `make generate-stdb-ts-sdk` and `make generate-stdb-rust-sdk`
-2. `spacetime publish` (or local) with module path
-3. `spacetime call <db> run_purchasing_bill_balanced_test` (+ new receipt/isolation tests)
-4. Playwright: `mvp-procure-to-pay`, `purchasing-module`
+1. `make generate-stdb-ts-sdk` and `make generate-stdb-rust-sdk` (done in Wave E)
+2. `make codegen` (done in Wave E)
+3. `spacetime publish` (or local) with module path
+4. `spacetime call <db> run_all_purchasing_tests` (includes Wave E)
+5. Playwright: `mvp-procure-to-pay`, `purchasing-module`

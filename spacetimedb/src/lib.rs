@@ -103,6 +103,10 @@ pub mod crm_tests;
 #[path = "../tests/purchasing/mod.rs"]
 pub mod purchasing_tests;
 
+/// Expenses domain tests — call `run_all_expenses_tests` reducer to execute.
+#[path = "../tests/expenses/mod.rs"]
+pub mod expenses_tests;
+
 /// Platform module smoke tests — helpdesk, HR, manufacturing, documents, workflow, subscriptions.
 #[path = "../tests/platform/mod.rs"]
 pub mod platform_tests;
@@ -130,6 +134,7 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
     crm_tests::run_all_crm_tests(ctx).map_err(|e| format!("crm: {e}"))?;
     purchasing_tests::run_purchasing_bill_balanced_test(ctx)
         .map_err(|e| format!("purchasing: {e}"))?;
+    expenses_tests::run_all_expenses_tests(ctx).map_err(|e| format!("expenses: {e}"))?;
     platform_tests::run_all_platform_tests(ctx).map_err(|e| format!("platform: {e}"))?;
     log::info!("✅ run_all_domain_tests complete");
     Ok(())

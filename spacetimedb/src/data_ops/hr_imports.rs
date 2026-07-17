@@ -251,6 +251,7 @@ pub fn import_hr_employee_csv(
             work_phone: opt_str(col(&headers, row, "work_phone")),
             mobile_phone: opt_str(col(&headers, row, "mobile_phone")),
             work_location: opt_str(col(&headers, row, "work_location")),
+            work_contact_partner_id: opt_u64(col(&headers, row, "work_contact_partner_id")),
             date_hired: opt_timestamp(col(&headers, row, "date_hired")),
             date_terminated: opt_timestamp(col(&headers, row, "date_terminated")),
             employment_type,

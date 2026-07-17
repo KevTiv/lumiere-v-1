@@ -181,6 +181,25 @@ export function toCreatePurchaseOrderParams(
 export function toCreatePurchaseRequisitionParams(
   formData: Record<string, unknown>,
 ): CreatePurchaseRequisitionParams {
+  const productId = requiredBigIntU64(formData.productId)
+  const productUom = requiredBigIntU64(formData.uomId ?? formData.productUom)
+  const productUomQty = Number(formData.quantity ?? formData.productUomQty)
+  const lines =
+    productId != null &&
+    productUom != null &&
+    Number.isFinite(productUomQty) &&
+    productUomQty > 0
+      ? [
+          {
+            productId,
+            productUom,
+            productUomQty,
+            name: optionalTrimmedString(formData.lineName ?? formData.description),
+            sequence: 10,
+          },
+        ]
+      : []
+
   return {
     companyId: undefined,
     origin: optionalTrimmedString(formData.origin),
@@ -192,6 +211,7 @@ export function toCreatePurchaseRequisitionParams(
     exclusive: undefined,
     multipleProduct: false,
     lineIds: [],
+    lines,
     purchaseIds: [],
     vendorId: optionalBigIntU64(formData.vendorId),
     activityIds: [],

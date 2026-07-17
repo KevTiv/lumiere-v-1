@@ -1,6 +1,7 @@
 //! Purchasing domain test suite — invoke via `run_purchasing_*_test` reducers.
 pub mod gap_fixes_test;
 pub mod purchase_bill_test;
+pub mod wave_e_test;
 
 use spacetimedb::ReducerContext;
 
@@ -29,10 +30,22 @@ pub fn run_purchasing_wave_c_smoke_test(ctx: &ReducerContext) -> Result<(), Stri
 }
 
 #[spacetimedb::reducer]
+pub fn run_purchasing_wave_e_test(ctx: &ReducerContext) -> Result<(), String> {
+    wave_e_test::test_requisition_convert_copies_lines(ctx)
+        .map_err(|e| format!("requisition_convert_copies_lines: {e}"))?;
+    wave_e_test::test_company_isolation_on_receive_and_bill(ctx)
+        .map_err(|e| format!("company_isolation_on_receive_and_bill: {e}"))?;
+    wave_e_test::test_price_match_blocks_post_invoice(ctx)
+        .map_err(|e| format!("price_match_blocks_post_invoice: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_purchasing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_purchasing_bill_balanced_test(ctx)?;
     run_purchasing_incoming_picking_test(ctx)?;
     run_purchasing_company_isolation_test(ctx)?;
     run_purchasing_wave_c_smoke_test(ctx)?;
+    run_purchasing_wave_e_test(ctx)?;
     Ok(())
 }

@@ -1929,6 +1929,73 @@ export function useResolveInventoryException(organizationId: bigint, companyId: 
   })
 }
 
+// ── Warehouse sync (offline / intermittent) ───────────────────────────────────
+
+export function useWarehouseSyncIntentsPending(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['warehouse-sync-intents-pending', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/warehouse-sync-intents-pending',
+        'Failed to fetch pending warehouse sync intents',
+      ),
+    staleTime: 15_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+export function useCreateWarehouseSyncIntent(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = inventoryBffPost("create_warehouse_sync_intent", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object, "CreateWarehouseSyncIntentParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to create warehouse sync intent')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useApplyWarehouseSyncIntent(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (intentId) => {
+      const { urlPath, init } = inventoryBffPost("apply_warehouse_sync_intent", [
+        organizationId,
+        companyId,
+        toScalarU64(intentId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to apply warehouse sync intent')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useFailWarehouseSyncIntent(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { intentId: ScalarId; lastError: string }>({
+    mutationFn: async ({ intentId, lastError }) => {
+      const { urlPath, init } = inventoryBffPost("fail_warehouse_sync_intent", [
+        organizationId,
+        companyId,
+        toScalarU64(intentId),
+        stdbParamsToJson({ lastError }, "FailWarehouseSyncIntentParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to fail warehouse sync intent')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
 // ── Product Category ───────────────────────────────────────────────────────────
 
 export function useCreateProductCategory(organizationId: bigint, companyId?: bigint) {

@@ -8012,6 +8012,7 @@
     "dashboard": {
       "totalExpenses": "Total Expenses",
       "pendingApproval": "Pending Approval",
+      "missingReceipts": "Missing Receipts",
       "approved": "Approved",
       "totalAmount": "Total Amount"
     },
@@ -8096,13 +8097,35 @@
       "submitReport": "Submit for approval",
       "approveReport": "Approve",
       "refuseReport": "Refuse",
-      "postReport": "Post",
+      "postReport": "Post to ledger",
+      "reimburseReport": "Reimburse",
       "confirmApprove": "Approve this expense report?",
-      "confirmRefuse": "Refuse this expense report? The report stays in the system but will not be reimbursed.",
+      "confirmRefuse": "Refuse this expense report? Lines return to draft for editing.",
+      "confirmSubmit": "Submit this expense report for approval? Totals are computed from attached lines.",
       "noActions": "No actions available for this status.",
       "noDraftSheets": "Select draft expense reports to submit.",
       "noSubmittedSheets": "Select submitted reports to approve or refuse.",
-      "noApprovedSheets": "Select approved reports to post."
+      "noApprovedSheets": "Select approved reports to post.",
+      "noPostedSheets": "Select posted reports to reimburse.",
+      "approvalTimeline": "Approval timeline",
+      "timelineState": "State",
+      "timelineSubmittedBy": "Submitted by",
+      "timelineApprover": "Approver",
+      "noApprovalRequests": "No workflow approval requests for this report yet.",
+      "setAllocations": "Split allocations",
+      "projectRebill": "Project rebill invoice"
+    },
+    "capture": {
+      "title": "Mobile capture (delayed sync)",
+      "description": "Queues locally with client_request_id, then flushes via durable delayed_sync intents when online.",
+      "submit": "Queue & sync expense",
+      "flushQueue": "Flush outbox",
+      "validation": "Employee, pricelist, and description are required.",
+      "queuedOffline": "Queued locally — flush when online (idempotent client_request_id).",
+      "queuedSynced": "Captured and synced.",
+      "receiptStub": "Receipt photo stub attached",
+      "receiptNote": "Receipt note / OCR stub",
+      "receiptNotePlaceholder": "Optional note stored on the expense line"
     },
     "forms": {
       "newExpense": {
@@ -8124,7 +8147,19 @@
           "employeeId": "Employee",
           "employeePlaceholder": "Select an employee",
           "productId": "Category",
-          "productPlaceholder": "Product ID"
+          "productPlaceholder": "Product ID",
+          "hasReceipt": "Receipt attached (required to submit report)",
+          "lineKind": "Line kind",
+          "lineKindStandard": "Standard",
+          "lineKindMileage": "Mileage",
+          "lineKindPerDiem": "Per diem",
+          "projectId": "Project ID",
+          "projectIdPlaceholder": "Optional project",
+          "mileageDistance": "Mileage distance",
+          "mileageRateId": "Mileage rate ID",
+          "perDiemDays": "Per diem days",
+          "perDiemRateId": "Per diem rate ID",
+          "rateIdPlaceholder": "Rate record ID"
         }
       },
       "newExpenseSheet": {
@@ -8185,24 +8220,63 @@
         },
         "emptySheets": "No draft reports for this employee — create a report first."
       },
-      "submitReport": {
-        "title": "Submit expense report",
-        "description": "Send this report for approval. Enter the total to match your attached lines.",
-        "sections": {
-          "totals": "Totals"
-        },
-        "fields": {
-          "totalAmount": "Total amount"
-        }
-      },
       "postReport": {
         "title": "Post expense report",
-        "description": "Set the accounting date when posting this approved report.",
+        "description": "Create the journal entry (expense / employee payable) for this approved report.",
         "sections": {
-          "date": "Accounting"
+          "accounts": "Accounting"
         },
         "fields": {
-          "accountingDate": "Accounting date"
+          "accountingDate": "Accounting date",
+          "journalId": "Journal",
+          "defaultExpenseAccountId": "Expense account",
+          "payableAccountId": "Employee payable account",
+          "defaultTaxAccountId": "Tax recoverable account (optional)",
+          "cardLiabilityAccountId": "Corporate card liability (if card lines)",
+          "advanceAccountId": "Advance clearing account (if advances applied)"
+        }
+      },
+      "reimburseReport": {
+        "title": "Reimburse expense report",
+        "description": "Clear employee payable and credit liquidity for this posted report.",
+        "sections": {
+          "accounts": "Payment"
+        },
+        "fields": {
+          "paymentDate": "Payment date",
+          "journalId": "Journal",
+          "payableAccountId": "Employee payable account",
+          "liquidityAccountId": "Cash / bank account"
+        }
+      },
+      "setAllocations": {
+        "title": "Split expense allocations",
+        "description": "Allocate this draft expense across analytic accounts and/or projects. Shares must total 100%.",
+        "sections": {
+          "lines": "Allocation lines"
+        },
+        "fields": {
+          "analyticAccountId1": "Analytic account (line 1)",
+          "projectId1": "Project ID (line 1)",
+          "sharePercent1": "Share % (line 1)",
+          "billable1": "Billable (line 1)",
+          "analyticAccountId2": "Analytic account (line 2)",
+          "projectId2": "Project ID (line 2)",
+          "sharePercent2": "Share % (line 2)",
+          "billable2": "Billable (line 2)"
+        }
+      },
+      "projectRebill": {
+        "title": "Project rebill",
+        "description": "Create a customer invoice from billable project allocations on this posted report.",
+        "sections": {
+          "accounts": "Invoice accounts"
+        },
+        "fields": {
+          "invoiceDate": "Invoice date",
+          "journalId": "Journal",
+          "receivableAccountId": "Receivable account",
+          "incomeAccountId": "Income account"
         }
       }
     }

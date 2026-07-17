@@ -286,6 +286,17 @@ pub async fn execute_resource_query(
             sort_rows_by_id_desc(&mut rows);
             return Ok(rows);
         }
+        "approval-requests" => {
+            let sql = format!(
+                "SELECT id, organization_id, company_id, rule_id, model, res_id, action, params_json, status, summary, context_json, requested_by, requested_at, reviewed_by, reviewed_at, reject_reason, reviewer_comment, ai_draft_id, workflow_instance_id, create_date, write_date, metadata FROM approval_request WHERE organization_id = {organization_id}"
+            );
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
+        }
         "approval-rules" => {
             let sql = format!(
                 "SELECT id, organization_id, company_id, name, description, model, action, rule_type, threshold, approver_role_id, sequence, is_active, create_date, write_date, metadata FROM approval_rule WHERE organization_id = {organization_id}"

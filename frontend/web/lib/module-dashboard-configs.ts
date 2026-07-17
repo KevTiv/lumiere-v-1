@@ -2700,7 +2700,7 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
                 columns: 2,
                 actions: [
                   { id: "new_expense", label: "New Expense", icon: "plus", color: "orange" },
-                  { id: "new_expense_report", label: "New Report", icon: "plus", color: "blue" },
+                  { id: "new_expense_sheet", label: "New Report", icon: "plus", color: "blue" },
                 ],
               },
             },

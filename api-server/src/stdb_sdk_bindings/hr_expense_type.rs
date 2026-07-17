@@ -4,6 +4,8 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::expense_line_kind_type::ExpenseLineKind;
+use super::expense_payment_mode_type::ExpensePaymentMode;
 use super::expense_state_type::ExpenseState;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
@@ -23,10 +25,24 @@ pub struct HrExpense {
     pub tax_ids: Vec<u64>,
     pub account_id: Option<u64>,
     pub analytic_account_id: Option<u64>,
+    pub project_id: Option<u64>,
+    pub line_kind: ExpenseLineKind,
+    pub mileage_distance: Option<f64>,
+    pub mileage_rate_id: Option<u64>,
+    pub per_diem_days: Option<f64>,
+    pub per_diem_rate_id: Option<u64>,
     pub sheet_id: Option<u64>,
     pub state: ExpenseState,
     pub description: Option<String>,
     pub attachment_ids: Vec<u64>,
+    pub has_receipt: bool,
+    pub client_request_id: Option<String>,
+    pub payment_mode: ExpensePaymentMode,
+    pub merchant_key: Option<String>,
+    pub fraud_hold: bool,
+    pub fraud_reason: Option<String>,
+    pub duplicate_of_id: Option<u64>,
+    pub policy_hold: bool,
     pub created_at: __sdk::Timestamp,
 }
 
@@ -52,10 +68,24 @@ pub struct HrExpenseCols {
     pub tax_ids: __sdk::__query_builder::Col<HrExpense, Vec<u64>>,
     pub account_id: __sdk::__query_builder::Col<HrExpense, Option<u64>>,
     pub analytic_account_id: __sdk::__query_builder::Col<HrExpense, Option<u64>>,
+    pub project_id: __sdk::__query_builder::Col<HrExpense, Option<u64>>,
+    pub line_kind: __sdk::__query_builder::Col<HrExpense, ExpenseLineKind>,
+    pub mileage_distance: __sdk::__query_builder::Col<HrExpense, Option<f64>>,
+    pub mileage_rate_id: __sdk::__query_builder::Col<HrExpense, Option<u64>>,
+    pub per_diem_days: __sdk::__query_builder::Col<HrExpense, Option<f64>>,
+    pub per_diem_rate_id: __sdk::__query_builder::Col<HrExpense, Option<u64>>,
     pub sheet_id: __sdk::__query_builder::Col<HrExpense, Option<u64>>,
     pub state: __sdk::__query_builder::Col<HrExpense, ExpenseState>,
     pub description: __sdk::__query_builder::Col<HrExpense, Option<String>>,
     pub attachment_ids: __sdk::__query_builder::Col<HrExpense, Vec<u64>>,
+    pub has_receipt: __sdk::__query_builder::Col<HrExpense, bool>,
+    pub client_request_id: __sdk::__query_builder::Col<HrExpense, Option<String>>,
+    pub payment_mode: __sdk::__query_builder::Col<HrExpense, ExpensePaymentMode>,
+    pub merchant_key: __sdk::__query_builder::Col<HrExpense, Option<String>>,
+    pub fraud_hold: __sdk::__query_builder::Col<HrExpense, bool>,
+    pub fraud_reason: __sdk::__query_builder::Col<HrExpense, Option<String>>,
+    pub duplicate_of_id: __sdk::__query_builder::Col<HrExpense, Option<u64>>,
+    pub policy_hold: __sdk::__query_builder::Col<HrExpense, bool>,
     pub created_at: __sdk::__query_builder::Col<HrExpense, __sdk::Timestamp>,
 }
 
@@ -80,10 +110,24 @@ impl __sdk::__query_builder::HasCols for HrExpense {
                 table_name,
                 "analytic_account_id",
             ),
+            project_id: __sdk::__query_builder::Col::new(table_name, "project_id"),
+            line_kind: __sdk::__query_builder::Col::new(table_name, "line_kind"),
+            mileage_distance: __sdk::__query_builder::Col::new(table_name, "mileage_distance"),
+            mileage_rate_id: __sdk::__query_builder::Col::new(table_name, "mileage_rate_id"),
+            per_diem_days: __sdk::__query_builder::Col::new(table_name, "per_diem_days"),
+            per_diem_rate_id: __sdk::__query_builder::Col::new(table_name, "per_diem_rate_id"),
             sheet_id: __sdk::__query_builder::Col::new(table_name, "sheet_id"),
             state: __sdk::__query_builder::Col::new(table_name, "state"),
             description: __sdk::__query_builder::Col::new(table_name, "description"),
             attachment_ids: __sdk::__query_builder::Col::new(table_name, "attachment_ids"),
+            has_receipt: __sdk::__query_builder::Col::new(table_name, "has_receipt"),
+            client_request_id: __sdk::__query_builder::Col::new(table_name, "client_request_id"),
+            payment_mode: __sdk::__query_builder::Col::new(table_name, "payment_mode"),
+            merchant_key: __sdk::__query_builder::Col::new(table_name, "merchant_key"),
+            fraud_hold: __sdk::__query_builder::Col::new(table_name, "fraud_hold"),
+            fraud_reason: __sdk::__query_builder::Col::new(table_name, "fraud_reason"),
+            duplicate_of_id: __sdk::__query_builder::Col::new(table_name, "duplicate_of_id"),
+            policy_hold: __sdk::__query_builder::Col::new(table_name, "policy_hold"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
         }
     }

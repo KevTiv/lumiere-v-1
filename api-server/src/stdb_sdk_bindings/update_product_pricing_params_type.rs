@@ -10,6 +10,7 @@ pub struct UpdateProductPricingParams {
     pub standard_price: Option<f64>,
     pub list_price: Option<f64>,
     pub currency_id: Option<u64>,
+    pub cost_method: Option<String>,
 }
 
 impl __sdk::InModule for UpdateProductPricingParams {

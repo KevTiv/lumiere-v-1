@@ -4,14 +4,11 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::submit_expense_sheet_params_type::SubmitExpenseSheetParams;
-
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct SubmitExpenseSheetArgs {
     pub organization_id: u64,
     pub sheet_id: u64,
-    pub params: SubmitExpenseSheetParams,
 }
 
 impl From<SubmitExpenseSheetArgs> for super::Reducer {
@@ -19,7 +16,6 @@ impl From<SubmitExpenseSheetArgs> for super::Reducer {
         Self::SubmitExpenseSheet {
             organization_id: args.organization_id,
             sheet_id: args.sheet_id,
-            params: args.params,
         }
     }
 }
@@ -39,13 +35,8 @@ pub trait submit_expense_sheet {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`submit_expense_sheet:submit_expense_sheet_then`] to run a callback after the reducer completes.
-    fn submit_expense_sheet(
-        &self,
-        organization_id: u64,
-        sheet_id: u64,
-        params: SubmitExpenseSheetParams,
-    ) -> __sdk::Result<()> {
-        self.submit_expense_sheet_then(organization_id, sheet_id, params, |_, _| {})
+    fn submit_expense_sheet(&self, organization_id: u64, sheet_id: u64) -> __sdk::Result<()> {
+        self.submit_expense_sheet_then(organization_id, sheet_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `submit_expense_sheet` to run as soon as possible,
@@ -58,7 +49,6 @@ pub trait submit_expense_sheet {
         &self,
         organization_id: u64,
         sheet_id: u64,
-        params: SubmitExpenseSheetParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -71,7 +61,6 @@ impl submit_expense_sheet for super::RemoteReducers {
         &self,
         organization_id: u64,
         sheet_id: u64,
-        params: SubmitExpenseSheetParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -81,7 +70,6 @@ impl submit_expense_sheet for super::RemoteReducers {
             SubmitExpenseSheetArgs {
                 organization_id,
                 sheet_id,
-                params,
             },
             callback,
         )

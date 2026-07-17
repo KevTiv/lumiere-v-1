@@ -13,6 +13,7 @@ pub struct UpdateExpenseParams {
     pub quantity: Option<f64>,
     pub description: Option<String>,
     pub account_id: Option<u64>,
+    pub attachment_ids: Option<Vec<u64>>,
 }
 
 impl __sdk::InModule for UpdateExpenseParams {

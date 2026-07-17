@@ -20,7 +20,7 @@ use crate::purchasing::sourcing::{
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::PoState;
 
-fn seed_vendor_po(
+pub fn seed_vendor_po(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     partner_ref: &str,

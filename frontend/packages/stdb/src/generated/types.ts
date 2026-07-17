@@ -893,6 +893,15 @@ export const AddPurchaseOrderLineParams = __t.object("AddPurchaseOrderLineParams
 });
 export type AddPurchaseOrderLineParams = __Infer<typeof AddPurchaseOrderLineParams>;
 
+export const AddPurchaseRequisitionLineParams = __t.object("AddPurchaseRequisitionLineParams", {
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  productUomQty: __t.f64(),
+  name: __t.option(__t.string()),
+  sequence: __t.option(__t.u32()),
+});
+export type AddPurchaseRequisitionLineParams = __Infer<typeof AddPurchaseRequisitionLineParams>;
+
 export const AddPurchaseRfqLineParams = __t.object("AddPurchaseRfqLineParams", {
   productId: __t.u64(),
   productUom: __t.u64(),
@@ -1477,6 +1486,12 @@ export const AppendCrmConversationMessageParams = __t.object("AppendCrmConversat
   metadata: __t.option(__t.string()),
 });
 export type AppendCrmConversationMessageParams = __Infer<typeof AppendCrmConversationMessageParams>;
+
+export const ApplyExpenseAdvanceParams = __t.object("ApplyExpenseAdvanceParams", {
+  amount: __t.f64(),
+  metadata: __t.option(__t.string()),
+});
+export type ApplyExpenseAdvanceParams = __Infer<typeof ApplyExpenseAdvanceParams>;
 
 export const ApplyOmnichannelAllocationParams = __t.object("ApplyOmnichannelAllocationParams", {
   preferredRouteId: __t.option(__t.u64()),
@@ -3732,6 +3747,7 @@ export const CreateEmployeeParams = __t.object("CreateEmployeeParams", {
   workPhone: __t.option(__t.string()),
   mobilePhone: __t.option(__t.string()),
   workLocation: __t.option(__t.string()),
+  workContactPartnerId: __t.option(__t.u64()),
   dateHired: __t.option(__t.timestamp()),
   gender: __t.option(__t.string()),
   birthday: __t.option(__t.timestamp()),
@@ -3747,6 +3763,27 @@ export const CreateEmployeeParams = __t.object("CreateEmployeeParams", {
 });
 export type CreateEmployeeParams = __Infer<typeof CreateEmployeeParams>;
 
+export const CreateExpenseAdvanceParams = __t.object("CreateExpenseAdvanceParams", {
+  companyId: __t.option(__t.u64()),
+  employeeId: __t.u64(),
+  name: __t.string(),
+  amount: __t.f64(),
+  currencyId: __t.u64(),
+  clientRequestId: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateExpenseAdvanceParams = __Infer<typeof CreateExpenseAdvanceParams>;
+
+export const CreateExpenseIntegrationIntentParams = __t.object("CreateExpenseIntegrationIntentParams", {
+  companyId: __t.option(__t.u64()),
+  intentType: __t.string(),
+  idempotencyKey: __t.string(),
+  deviceId: __t.option(__t.string()),
+  payload: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateExpenseIntegrationIntentParams = __Infer<typeof CreateExpenseIntegrationIntentParams>;
+
 export const CreateExpenseParams = __t.object("CreateExpenseParams", {
   companyId: __t.option(__t.u64()),
   employeeId: __t.u64(),
@@ -3760,9 +3797,42 @@ export const CreateExpenseParams = __t.object("CreateExpenseParams", {
   taxIds: __t.array(__t.u64()),
   accountId: __t.option(__t.u64()),
   analyticAccountId: __t.option(__t.u64()),
+  projectId: __t.option(__t.u64()),
+  get lineKind() {
+    return ExpenseLineKind;
+  },
+  mileageDistance: __t.option(__t.f64()),
+  mileageRateId: __t.option(__t.u64()),
+  perDiemDays: __t.option(__t.f64()),
+  perDiemRateId: __t.option(__t.u64()),
   attachmentIds: __t.array(__t.u64()),
+  clientRequestId: __t.option(__t.string()),
+  get paymentMode() {
+    return ExpensePaymentMode;
+  },
+  merchantKey: __t.option(__t.string()),
+  policyExceptionReason: __t.option(__t.string()),
 });
 export type CreateExpenseParams = __Infer<typeof CreateExpenseParams>;
+
+export const CreateExpenseProjectRebillParams = __t.object("CreateExpenseProjectRebillParams", {
+  journalId: __t.u64(),
+  receivableAccountId: __t.u64(),
+  incomeAccountId: __t.u64(),
+  invoiceDate: __t.timestamp(),
+  partnerId: __t.option(__t.u64()),
+  clientRequestId: __t.option(__t.string()),
+});
+export type CreateExpenseProjectRebillParams = __Infer<typeof CreateExpenseProjectRebillParams>;
+
+export const CreateExpenseReimbursementParams = __t.object("CreateExpenseReimbursementParams", {
+  journalId: __t.u64(),
+  liquidityAccountId: __t.u64(),
+  payableAccountId: __t.u64(),
+  paymentDate: __t.timestamp(),
+  clientRequestId: __t.option(__t.string()),
+});
+export type CreateExpenseReimbursementParams = __Infer<typeof CreateExpenseReimbursementParams>;
 
 export const CreateExpenseSheetParams = __t.object("CreateExpenseSheetParams", {
   companyId: __t.option(__t.u64()),
@@ -4825,6 +4895,15 @@ export const CreatePurchaseOrderParams = __t.object("CreatePurchaseOrderParams",
 });
 export type CreatePurchaseOrderParams = __Infer<typeof CreatePurchaseOrderParams>;
 
+export const CreatePurchaseRequisitionLineParams = __t.object("CreatePurchaseRequisitionLineParams", {
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  productUomQty: __t.f64(),
+  name: __t.option(__t.string()),
+  sequence: __t.option(__t.u32()),
+});
+export type CreatePurchaseRequisitionLineParams = __Infer<typeof CreatePurchaseRequisitionLineParams>;
+
 export const CreatePurchaseRequisitionParams = __t.object("CreatePurchaseRequisitionParams", {
   companyId: __t.option(__t.u64()),
   origin: __t.option(__t.string()),
@@ -4836,6 +4915,9 @@ export const CreatePurchaseRequisitionParams = __t.object("CreatePurchaseRequisi
   exclusive: __t.option(__t.string()),
   multipleProduct: __t.bool(),
   lineIds: __t.array(__t.u64()),
+  get lines() {
+    return __t.array(CreatePurchaseRequisitionLineParams);
+  },
   purchaseIds: __t.array(__t.u64()),
   vendorId: __t.option(__t.u64()),
   activityIds: __t.array(__t.u64()),
@@ -6005,6 +6087,16 @@ export const CreateWarehouseParams = __t.object("CreateWarehouseParams", {
 });
 export type CreateWarehouseParams = __Infer<typeof CreateWarehouseParams>;
 
+export const CreateWarehouseSyncIntentParams = __t.object("CreateWarehouseSyncIntentParams", {
+  warehouseId: __t.u64(),
+  opType: __t.string(),
+  idempotencyKey: __t.string(),
+  deviceId: __t.option(__t.string()),
+  payload: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateWarehouseSyncIntentParams = __Infer<typeof CreateWarehouseSyncIntentParams>;
+
 export const CreateWarehouseTaskParams = __t.object("CreateWarehouseTaskParams", {
   name: __t.string(),
   taskType: __t.string(),
@@ -6669,6 +6761,68 @@ export const ExecuteDirectedPutawayParams = __t.object("ExecuteDirectedPutawayPa
 });
 export type ExecuteDirectedPutawayParams = __Infer<typeof ExecuteDirectedPutawayParams>;
 
+// The tagged union or sum type for the algebraic type `ExpenseAdvanceState`.
+export const ExpenseAdvanceState = __t.enum("ExpenseAdvanceState", {
+  Open: __t.unit(),
+  PartiallyApplied: __t.unit(),
+  Closed: __t.unit(),
+});
+export type ExpenseAdvanceState = __Infer<typeof ExpenseAdvanceState>;
+
+export const ExpenseAllocationLineParams = __t.object("ExpenseAllocationLineParams", {
+  analyticAccountId: __t.option(__t.u64()),
+  projectId: __t.option(__t.u64()),
+  sharePercent: __t.f64(),
+  billable: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type ExpenseAllocationLineParams = __Infer<typeof ExpenseAllocationLineParams>;
+
+export const ExpenseIntegrationIntent = __t.object("ExpenseIntegrationIntent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  intentType: __t.string(),
+  status: __t.string(),
+  idempotencyKey: __t.string(),
+  deviceId: __t.option(__t.string()),
+  payload: __t.string(),
+  resultExpenseId: __t.option(__t.u64()),
+  resultSheetId: __t.option(__t.u64()),
+  lastError: __t.option(__t.string()),
+  attemptCount: __t.u32(),
+  appliedAt: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ExpenseIntegrationIntent = __Infer<typeof ExpenseIntegrationIntent>;
+
+// The tagged union or sum type for the algebraic type `ExpenseLineKind`.
+export const ExpenseLineKind = __t.enum("ExpenseLineKind", {
+  Standard: __t.unit(),
+  Mileage: __t.unit(),
+  PerDiem: __t.unit(),
+});
+export type ExpenseLineKind = __Infer<typeof ExpenseLineKind>;
+
+// The tagged union or sum type for the algebraic type `ExpensePaymentMode`.
+export const ExpensePaymentMode = __t.enum("ExpensePaymentMode", {
+  OutOfPocket: __t.unit(),
+  CorporateCard: __t.unit(),
+});
+export type ExpensePaymentMode = __Infer<typeof ExpensePaymentMode>;
+
+// The tagged union or sum type for the algebraic type `ExpensePolicyExceptionState`.
+export const ExpensePolicyExceptionState = __t.enum("ExpensePolicyExceptionState", {
+  Pending: __t.unit(),
+  Approved: __t.unit(),
+  Rejected: __t.unit(),
+});
+export type ExpensePolicyExceptionState = __Infer<typeof ExpensePolicyExceptionState>;
+
 // The tagged union or sum type for the algebraic type `ExpenseSheetState`.
 export const ExpenseSheetState = __t.enum("ExpenseSheetState", {
   Draft: __t.unit(),
@@ -6695,6 +6849,18 @@ export const ExportFinancialReportParams = __t.object("ExportFinancialReportPara
   exportFormat: __t.string(),
 });
 export type ExportFinancialReportParams = __Infer<typeof ExportFinancialReportParams>;
+
+export const FailExpenseIntegrationIntentParams = __t.object("FailExpenseIntegrationIntentParams", {
+  lastError: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type FailExpenseIntegrationIntentParams = __Infer<typeof FailExpenseIntegrationIntentParams>;
+
+export const FailWarehouseSyncIntentParams = __t.object("FailWarehouseSyncIntentParams", {
+  lastError: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type FailWarehouseSyncIntentParams = __Infer<typeof FailWarehouseSyncIntentParams>;
 
 export const FieldOption = __t.object("FieldOption", {
   value: __t.string(),
@@ -7134,6 +7300,7 @@ export const HrEmployee = __t.object("HrEmployee", {
   workPhone: __t.option(__t.string()),
   mobilePhone: __t.option(__t.string()),
   workLocation: __t.option(__t.string()),
+  workContactPartnerId: __t.option(__t.u64()),
   dateHired: __t.option(__t.timestamp()),
   dateTerminated: __t.option(__t.timestamp()),
   get employmentType() {
@@ -7170,15 +7337,134 @@ export const HrExpense = __t.object("HrExpense", {
   taxIds: __t.array(__t.u64()),
   accountId: __t.option(__t.u64()),
   analyticAccountId: __t.option(__t.u64()),
+  projectId: __t.option(__t.u64()),
+  get lineKind() {
+    return ExpenseLineKind;
+  },
+  mileageDistance: __t.option(__t.f64()),
+  mileageRateId: __t.option(__t.u64()),
+  perDiemDays: __t.option(__t.f64()),
+  perDiemRateId: __t.option(__t.u64()),
   sheetId: __t.option(__t.u64()),
   get state() {
     return ExpenseState;
   },
   description: __t.option(__t.string()),
   attachmentIds: __t.array(__t.u64()),
+  hasReceipt: __t.bool(),
+  clientRequestId: __t.option(__t.string()),
+  get paymentMode() {
+    return ExpensePaymentMode;
+  },
+  merchantKey: __t.option(__t.string()),
+  fraudHold: __t.bool(),
+  fraudReason: __t.option(__t.string()),
+  duplicateOfId: __t.option(__t.u64()),
+  policyHold: __t.bool(),
   createdAt: __t.timestamp(),
 });
 export type HrExpense = __Infer<typeof HrExpense>;
+
+export const HrExpenseAdvance = __t.object("HrExpenseAdvance", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  name: __t.string(),
+  amount: __t.f64(),
+  residual: __t.f64(),
+  currencyId: __t.u64(),
+  get state() {
+    return ExpenseAdvanceState;
+  },
+  clientRequestId: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+});
+export type HrExpenseAdvance = __Infer<typeof HrExpenseAdvance>;
+
+export const HrExpenseAdvanceApplication = __t.object("HrExpenseAdvanceApplication", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  advanceId: __t.u64(),
+  sheetId: __t.u64(),
+  amount: __t.f64(),
+  createdAt: __t.timestamp(),
+});
+export type HrExpenseAdvanceApplication = __Infer<typeof HrExpenseAdvanceApplication>;
+
+export const HrExpenseAllocation = __t.object("HrExpenseAllocation", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  expenseId: __t.u64(),
+  analyticAccountId: __t.option(__t.u64()),
+  projectId: __t.option(__t.u64()),
+  sharePercent: __t.f64(),
+  amount: __t.f64(),
+  billable: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type HrExpenseAllocation = __Infer<typeof HrExpenseAllocation>;
+
+export const HrExpenseMileageRate = __t.object("HrExpenseMileageRate", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  currencyId: __t.u64(),
+  ratePerUnit: __t.f64(),
+  unit: __t.string(),
+  effectiveFrom: __t.option(__t.timestamp()),
+  effectiveTo: __t.option(__t.timestamp()),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type HrExpenseMileageRate = __Infer<typeof HrExpenseMileageRate>;
+
+export const HrExpensePerDiemRate = __t.object("HrExpensePerDiemRate", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  currencyId: __t.u64(),
+  locationCode: __t.string(),
+  amountPerDay: __t.f64(),
+  effectiveFrom: __t.option(__t.timestamp()),
+  effectiveTo: __t.option(__t.timestamp()),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type HrExpensePerDiemRate = __Infer<typeof HrExpensePerDiemRate>;
+
+export const HrExpensePolicy = __t.object("HrExpensePolicy", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  maxLineAmount: __t.option(__t.f64()),
+  maxSheetAmount: __t.option(__t.f64()),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type HrExpensePolicy = __Infer<typeof HrExpensePolicy>;
+
+export const HrExpensePolicyException = __t.object("HrExpensePolicyException", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  expenseId: __t.u64(),
+  reason: __t.string(),
+  get state() {
+    return ExpensePolicyExceptionState;
+  },
+  requestedBy: __t.identity(),
+  approvedBy: __t.option(__t.identity()),
+  createdAt: __t.timestamp(),
+  resolvedAt: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type HrExpensePolicyException = __Infer<typeof HrExpensePolicyException>;
 
 export const HrExpenseSheet = __t.object("HrExpenseSheet", {
   id: __t.u64(),
@@ -7191,10 +7477,16 @@ export const HrExpenseSheet = __t.object("HrExpenseSheet", {
   },
   totalAmount: __t.f64(),
   currencyId: __t.u64(),
+  currencyRate: __t.f64(),
+  companyCurrencyId: __t.u64(),
   accountingDate: __t.option(__t.timestamp()),
   accountMoveId: __t.option(__t.u64()),
+  reimbursementMoveId: __t.option(__t.u64()),
+  rebillMoveId: __t.option(__t.u64()),
+  submittedBy: __t.option(__t.identity()),
   approverId: __t.option(__t.identity()),
   notes: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
   createdAt: __t.timestamp(),
 });
 export type HrExpenseSheet = __Infer<typeof HrExpenseSheet>;
@@ -9384,6 +9676,18 @@ export const PosTerminal = __t.object("PosTerminal", {
 });
 export type PosTerminal = __Infer<typeof PosTerminal>;
 
+export const PostExpenseSheetParams = __t.object("PostExpenseSheetParams", {
+  journalId: __t.u64(),
+  payableAccountId: __t.u64(),
+  defaultExpenseAccountId: __t.u64(),
+  defaultTaxAccountId: __t.option(__t.u64()),
+  cardLiabilityAccountId: __t.option(__t.u64()),
+  advanceAccountId: __t.option(__t.u64()),
+  accountingDate: __t.timestamp(),
+  clientRequestId: __t.option(__t.string()),
+});
+export type PostExpenseSheetParams = __Infer<typeof PostExpenseSheetParams>;
+
 export const PostRealizedFxParams = __t.object("PostRealizedFxParams", {
   paymentId: __t.u64(),
   invoiceMoveId: __t.u64(),
@@ -10070,6 +10374,7 @@ export const PurchaseOrder = __t.object("PurchaseOrder", {
   amountTotal: __t.f64(),
   currencyRate: __t.f64(),
   matchQtyTolerance: __t.option(__t.f64()),
+  matchPriceTolerance: __t.option(__t.f64()),
   receiptStatus: __t.string(),
   notes: __t.option(__t.string()),
   messageMainAttachmentId: __t.option(__t.u64()),
@@ -10138,6 +10443,7 @@ export const PurchaseOrderLine = __t.object("PurchaseOrderLine", {
   saleOrderId: __t.option(__t.u64()),
   moveDestIds: __t.array(__t.u64()),
   moveIds: __t.array(__t.u64()),
+  matchState: __t.string(),
   createUid: __t.identity(),
   createDate: __t.timestamp(),
   writeUid: __t.identity(),
@@ -10178,6 +10484,19 @@ export const PurchaseRequisition = __t.object("PurchaseRequisition", {
   metadata: __t.option(__t.string()),
 });
 export type PurchaseRequisition = __Infer<typeof PurchaseRequisition>;
+
+export const PurchaseRequisitionLine = __t.object("PurchaseRequisitionLine", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  requisitionId: __t.u64(),
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  productUomQty: __t.f64(),
+  name: __t.option(__t.string()),
+  sequence: __t.u32(),
+});
+export type PurchaseRequisitionLine = __Infer<typeof PurchaseRequisitionLine>;
 
 export const PurchaseReturn = __t.object("PurchaseReturn", {
   id: __t.u64(),
@@ -10606,6 +10925,11 @@ export const RefreshInventoryExceptionsParams = __t.object("RefreshInventoryExce
 });
 export type RefreshInventoryExceptionsParams = __Infer<typeof RefreshInventoryExceptionsParams>;
 
+export const RefuseExpenseSheetParams = __t.object("RefuseExpenseSheetParams", {
+  reason: __t.option(__t.string()),
+});
+export type RefuseExpenseSheetParams = __Infer<typeof RefuseExpenseSheetParams>;
+
 export const RegisterDeviceParams = __t.object("RegisterDeviceParams", {
   name: __t.string(),
   deviceType: __t.string(),
@@ -10722,6 +11046,12 @@ export const ReportType = __t.enum("ReportType", {
   VatReturn: __t.unit(),
 });
 export type ReportType = __Infer<typeof ReportType>;
+
+export const RequestExpensePolicyExceptionParams = __t.object("RequestExpensePolicyExceptionParams", {
+  reason: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type RequestExpensePolicyExceptionParams = __Infer<typeof RequestExpensePolicyExceptionParams>;
 
 // The tagged union or sum type for the algebraic type `RequisitionState`.
 export const RequisitionState = __t.enum("RequisitionState", {
@@ -11476,6 +11806,20 @@ export const SetContactSegmentRulesParams = __t.object("SetContactSegmentRulesPa
   metadata: __t.option(__t.string()),
 });
 export type SetContactSegmentRulesParams = __Infer<typeof SetContactSegmentRulesParams>;
+
+export const SetExpenseAllocationsParams = __t.object("SetExpenseAllocationsParams", {
+  get lines() {
+    return __t.array(ExpenseAllocationLineParams);
+  },
+});
+export type SetExpenseAllocationsParams = __Infer<typeof SetExpenseAllocationsParams>;
+
+export const SetExpenseFraudHoldParams = __t.object("SetExpenseFraudHoldParams", {
+  fraudHold: __t.bool(),
+  fraudReason: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type SetExpenseFraudHoldParams = __Infer<typeof SetExpenseFraudHoldParams>;
 
 export const SetPurchaseApprovalDelegateParams = __t.object("SetPurchaseApprovalDelegateParams", {
   principalIdentity: __t.identity(),
@@ -12264,11 +12608,6 @@ export const StockTraceabilityReport = __t.object("StockTraceabilityReport", {
   metadata: __t.option(__t.string()),
 });
 export type StockTraceabilityReport = __Infer<typeof StockTraceabilityReport>;
-
-export const SubmitExpenseSheetParams = __t.object("SubmitExpenseSheetParams", {
-  totalAmount: __t.f64(),
-});
-export type SubmitExpenseSheetParams = __Infer<typeof SubmitExpenseSheetParams>;
 
 export const SubmitSupplierIntakeParams = __t.object("SubmitSupplierIntakeParams", {
   companyName: __t.string(),
@@ -13290,6 +13629,7 @@ export const UpdateEmployeeParams = __t.object("UpdateEmployeeParams", {
   workPhone: __t.option(__t.string()),
   mobilePhone: __t.option(__t.string()),
   workLocation: __t.option(__t.string()),
+  workContactPartnerId: __t.option(__t.u64()),
   get employmentType() {
     return __t.option(EmploymentType);
   },
@@ -13304,6 +13644,7 @@ export const UpdateExpenseParams = __t.object("UpdateExpenseParams", {
   quantity: __t.option(__t.f64()),
   description: __t.option(__t.string()),
   accountId: __t.option(__t.u64()),
+  attachmentIds: __t.option(__t.array(__t.u64())),
 });
 export type UpdateExpenseParams = __Infer<typeof UpdateExpenseParams>;
 
@@ -13640,6 +13981,7 @@ export const UpdateProductPricingParams = __t.object("UpdateProductPricingParams
   standardPrice: __t.option(__t.f64()),
   listPrice: __t.option(__t.f64()),
   currencyId: __t.option(__t.u64()),
+  costMethod: __t.option(__t.string()),
 });
 export type UpdateProductPricingParams = __Infer<typeof UpdateProductPricingParams>;
 
@@ -13746,6 +14088,7 @@ export const UpdatePurchaseOrderParams = __t.object("UpdatePurchaseOrderParams",
   partnerId: __t.option(__t.u64()),
   currencyId: __t.option(__t.u64()),
   matchQtyTolerance: __t.option(__t.f64()),
+  matchPriceTolerance: __t.option(__t.f64()),
   metadata: __t.option(__t.string()),
 });
 export type UpdatePurchaseOrderParams = __Infer<typeof UpdatePurchaseOrderParams>;
@@ -14133,6 +14476,7 @@ export const UpdateWarehouseParams = __t.object("UpdateWarehouseParams", {
   crossdock: __t.option(__t.bool()),
   sequence: __t.option(__t.i32()),
   partnerId: __t.option(__t.u64()),
+  resupplyWhIds: __t.option(__t.array(__t.u64())),
   metadata: __t.option(__t.string()),
 });
 export type UpdateWarehouseParams = __Infer<typeof UpdateWarehouseParams>;
@@ -14230,6 +14574,41 @@ export const UpsertAiSkillParams = __t.object("UpsertAiSkillParams", {
   metadata: __t.option(__t.string()),
 });
 export type UpsertAiSkillParams = __Infer<typeof UpsertAiSkillParams>;
+
+export const UpsertExpenseMileageRateParams = __t.object("UpsertExpenseMileageRateParams", {
+  companyId: __t.option(__t.u64()),
+  name: __t.string(),
+  currencyId: __t.u64(),
+  ratePerUnit: __t.f64(),
+  unit: __t.string(),
+  effectiveFrom: __t.option(__t.timestamp()),
+  effectiveTo: __t.option(__t.timestamp()),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type UpsertExpenseMileageRateParams = __Infer<typeof UpsertExpenseMileageRateParams>;
+
+export const UpsertExpensePerDiemRateParams = __t.object("UpsertExpensePerDiemRateParams", {
+  companyId: __t.option(__t.u64()),
+  name: __t.string(),
+  currencyId: __t.u64(),
+  locationCode: __t.string(),
+  amountPerDay: __t.f64(),
+  effectiveFrom: __t.option(__t.timestamp()),
+  effectiveTo: __t.option(__t.timestamp()),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type UpsertExpensePerDiemRateParams = __Infer<typeof UpsertExpensePerDiemRateParams>;
+
+export const UpsertExpensePolicyParams = __t.object("UpsertExpensePolicyParams", {
+  companyId: __t.option(__t.u64()),
+  maxLineAmount: __t.option(__t.f64()),
+  maxSheetAmount: __t.option(__t.f64()),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type UpsertExpensePolicyParams = __Infer<typeof UpsertExpensePolicyParams>;
 
 export const UpsertOrganizationSettingsParams = __t.object("UpsertOrganizationSettingsParams", {
   moduleConfig: __t.option(__t.string()),
@@ -14543,6 +14922,27 @@ export const WarehouseGeo = __t.object("WarehouseGeo", {
   writeDate: __t.timestamp(),
 });
 export type WarehouseGeo = __Infer<typeof WarehouseGeo>;
+
+export const WarehouseSyncIntent = __t.object("WarehouseSyncIntent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  warehouseId: __t.u64(),
+  opType: __t.string(),
+  status: __t.string(),
+  idempotencyKey: __t.string(),
+  deviceId: __t.option(__t.string()),
+  payload: __t.string(),
+  lastError: __t.option(__t.string()),
+  attemptCount: __t.u32(),
+  appliedAt: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type WarehouseSyncIntent = __Infer<typeof WarehouseSyncIntent>;
 
 export const WarehouseTask = __t.object("WarehouseTask", {
   id: __t.u64(),

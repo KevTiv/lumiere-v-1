@@ -39,6 +39,7 @@ pub struct PurchaseOrder {
     pub amount_total: f64,
     pub currency_rate: f64,
     pub match_qty_tolerance: Option<f64>,
+    pub match_price_tolerance: Option<f64>,
     pub receipt_status: String,
     pub notes: Option<String>,
     pub message_main_attachment_id: Option<u64>,
@@ -102,6 +103,7 @@ pub struct PurchaseOrderCols {
     pub amount_total: __sdk::__query_builder::Col<PurchaseOrder, f64>,
     pub currency_rate: __sdk::__query_builder::Col<PurchaseOrder, f64>,
     pub match_qty_tolerance: __sdk::__query_builder::Col<PurchaseOrder, Option<f64>>,
+    pub match_price_tolerance: __sdk::__query_builder::Col<PurchaseOrder, Option<f64>>,
     pub receipt_status: __sdk::__query_builder::Col<PurchaseOrder, String>,
     pub notes: __sdk::__query_builder::Col<PurchaseOrder, Option<String>>,
     pub message_main_attachment_id: __sdk::__query_builder::Col<PurchaseOrder, Option<u64>>,
@@ -167,6 +169,10 @@ impl __sdk::__query_builder::HasCols for PurchaseOrder {
             match_qty_tolerance: __sdk::__query_builder::Col::new(
                 table_name,
                 "match_qty_tolerance",
+            ),
+            match_price_tolerance: __sdk::__query_builder::Col::new(
+                table_name,
+                "match_price_tolerance",
             ),
             receipt_status: __sdk::__query_builder::Col::new(table_name, "receipt_status"),
             notes: __sdk::__query_builder::Col::new(table_name, "notes"),

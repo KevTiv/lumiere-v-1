@@ -6,17 +6,21 @@ import type { SubscriptionQueryContext } from "../queries/erp-subscriptions";
  */
 /**
  * Bounded exception keys (`purchase-orders-to-approve`,
- * `purchase-orders-partial-receipt`) use server-side `extraWhere` in `ERP_ORG_SQL`.
+ * `purchase-orders-partial-receipt`, `purchase-order-lines-over-billed`)
+ * use server-side `extraWhere` in `ERP_ORG_SQL`.
  */
 export const PURCHASING_WORKSPACE_RESOURCE_KEYS = [
   "account-payment-terms",
   "landed-costs",
+  "landed-cost-lines",
   "partner-banks",
   "purchase-order-lines",
+  "purchase-order-lines-over-billed",
   "purchase-orders",
   "purchase-orders-to-approve",
   "purchase-orders-partial-receipt",
   "purchase-requisitions",
+  "purchase-requisition-lines",
   "purchase-rfqs",
   "purchase-rfq-lines",
   "purchase-rfq-bids",

@@ -235,6 +235,53 @@ export const newPurchaseRequisitionForm = (t: TFunction): FormConfig => ({
         },
       ],
     },
+    {
+      id: "req-line",
+      title: t("purchasing.forms.newPurchaseRequisition.sections.line", {
+        defaultValue: "Requested line",
+      }),
+      fields: [
+        {
+          id: "productId",
+          name: "productId",
+          type: "select",
+          label: t("purchasing.forms.newPurchaseRequisition.fields.productId", {
+            defaultValue: "Product",
+          }),
+          placeholder: t("purchasing.forms.newPurchaseRequisition.fields.productPlaceholder", {
+            defaultValue: "Select product",
+          }),
+          width: "1/2",
+          required: true,
+          options: emptySelect,
+        },
+        {
+          id: "uomId",
+          name: "uomId",
+          type: "select",
+          label: t("purchasing.forms.newPurchaseRequisition.fields.uomId", {
+            defaultValue: "UoM",
+          }),
+          placeholder: t("purchasing.forms.newPurchaseRequisition.fields.uomPlaceholder", {
+            defaultValue: "Select UoM",
+          }),
+          width: "1/4",
+          required: true,
+          options: emptySelect,
+        },
+        {
+          id: "quantity",
+          name: "quantity",
+          type: "number",
+          label: t("purchasing.forms.newPurchaseRequisition.fields.quantity", {
+            defaultValue: "Quantity",
+          }),
+          width: "1/4",
+          required: true,
+          min: 0.0001,
+        },
+      ],
+    },
   ],
 })
 
