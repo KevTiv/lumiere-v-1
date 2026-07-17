@@ -133,6 +133,45 @@ fn pack_company_id_kinds(definition: &CountryPackDefinition) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Expense evidence rules derived from enabled country packs.
+#[derive(Clone, Debug, Default)]
+pub struct PackExpenseEvidenceRules {
+    /// When true, Standard lines require non-empty `attachment_ids` / `has_receipt`.
+    pub require_receipt: bool,
+    /// When true, Standard lines require at least one tax id for recovery evidence.
+    pub require_tax_ids: bool,
+}
+
+/// Aggregate pack metadata flags `expense_require_receipt` / `expense_require_tax_ids`.
+/// No enabled pack (or packs without these keys) → permissive defaults.
+pub(crate) fn pack_expense_evidence_rules(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+) -> PackExpenseEvidenceRules {
+    let mut rules = PackExpenseEvidenceRules::default();
+    for def in enabled_pack_definitions(ctx, organization_id, company_id) {
+        let Some(value) = pack_metadata_json(&def) else {
+            continue;
+        };
+        if value
+            .get("expense_require_receipt")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            rules.require_receipt = true;
+        }
+        if value
+            .get("expense_require_tax_ids")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            rules.require_tax_ids = true;
+        }
+    }
+    rules
+}
+
 /// Reads `address_required` (array of field names) from pack metadata.
 fn pack_address_required_fields(definition: &CountryPackDefinition) -> Vec<String> {
     let Some(value) = pack_metadata_json(definition) else {
@@ -285,7 +324,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Australia GST",
             "oceania",
             "1.0.0",
-            r#"{"fiscal_year_start_month":7,"bas_reporting":true,"company_id_kind":"ABN"}"#,
+            r#"{"fiscal_year_start_month":7,"bas_reporting":true,"company_id_kind":"ABN","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
         ),
         (
             "nz",
@@ -293,7 +332,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "New Zealand GST",
             "oceania",
             "1.0.0",
-            r#"{"fiscal_year_start_month":4,"gst_rate":0.15,"company_id_kind":"NZBN"}"#,
+            r#"{"fiscal_year_start_month":4,"gst_rate":0.15,"company_id_kind":"NZBN","expense_require_receipt":true}"#,
         ),
         (
             "za",
@@ -301,7 +340,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "South Africa VAT",
             "southern_africa",
             "1.0.0",
-            r#"{"vat_rate":0.15,"currency":"ZAR"}"#,
+            r#"{"vat_rate":0.15,"currency":"ZAR","expense_require_receipt":true}"#,
         ),
         (
             "sg",
@@ -309,22 +348,32 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Singapore GST",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"gst_rate":0.09,"iras":true,"company_id_kind":"UEN"}"#,
+            r#"{"gst_rate":0.09,"iras":true,"company_id_kind":"UEN","expense_require_receipt":true}"#,
         ),
     ];
 
     for (pack_key, country_code, name, region, version, metadata) in packs {
-        if ctx
-            .db
-            .country_pack_definition()
-            .pack_key()
-            .find(&pack_key.to_string())
-            .is_some()
-        {
+        let key = pack_key.to_string();
+        if let Some(existing) = ctx.db.country_pack_definition().pack_key().find(&key) {
+            // Upsert expense evidence flags when catalog metadata advances.
+            let needs_expense_flags = !existing
+                .metadata
+                .as_deref()
+                .unwrap_or("")
+                .contains("expense_require_receipt");
+            if needs_expense_flags {
+                ctx.db
+                    .country_pack_definition()
+                    .pack_key()
+                    .update(CountryPackDefinition {
+                        metadata: Some(metadata.to_string()),
+                        ..existing
+                    });
+            }
             continue;
         }
         ctx.db.country_pack_definition().insert(CountryPackDefinition {
-            pack_key: pack_key.to_string(),
+            pack_key: key,
             country_code: country_code.to_string(),
             name: name.to_string(),
             region: region.to_string(),

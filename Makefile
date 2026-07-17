@@ -268,7 +268,8 @@ e2e-smoke-setup:
 		API_PID=""; \
 		if ! curl -fsS "$$E2E_STDB_HOST/v1/identity" -X POST >/dev/null 2>&1; then \
 			echo "[e2e] Starting local SpacetimeDB..."; \
-			spacetime start >"$$LOG_DIR/spacetime.log" 2>&1 & \
+			nohup spacetime start --listen-addr 127.0.0.1:3000 >"$$LOG_DIR/spacetime.log" 2>&1 & \
+			disown $$! 2>/dev/null || true; \
 			SPACETIME_STARTED=1; \
 			for i in {1..60}; do \
 				if curl -fsS "$$E2E_STDB_HOST/v1/identity" -X POST >/dev/null 2>&1; then break; fi; \
@@ -653,7 +654,8 @@ e2e-smoke:
 		trap cleanup EXIT INT TERM; \
 		if ! curl -fsS "$$E2E_STDB_HOST/v1/identity" -X POST >/dev/null 2>&1; then \
 			echo "[e2e] Starting local SpacetimeDB..."; \
-			spacetime start >"$$LOG_DIR/spacetime.log" 2>&1 & \
+			nohup spacetime start --listen-addr 127.0.0.1:3000 >"$$LOG_DIR/spacetime.log" 2>&1 & \
+			disown $$! 2>/dev/null || true; \
 			SPACETIME_STARTED=1; \
 			for i in {1..60}; do \
 				if curl -fsS "$$E2E_STDB_HOST/v1/identity" -X POST >/dev/null 2>&1; then break; fi; \

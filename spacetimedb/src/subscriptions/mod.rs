@@ -11,8 +11,15 @@
 //! - `generate_subscription_invoice` – create next recurring invoice
 //! - `recognize_deferred_revenue` – move amounts from deferred → income
 
+pub mod billing_helpers;
 pub mod reducers;
+pub mod subscription_wave_c;
+pub mod subscription_wave_d;
+pub mod subscription_wave_e;
 pub mod tables;
 
 pub use reducers::*;
+pub use subscription_wave_c::*;
+pub use subscription_wave_d::*;
+pub use subscription_wave_e::*;
 pub use tables::*;

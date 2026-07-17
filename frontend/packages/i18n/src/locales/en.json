@@ -8125,7 +8125,27 @@
       "queuedSynced": "Captured and synced.",
       "receiptStub": "Receipt photo stub attached",
       "receiptNote": "Receipt note / OCR stub",
-      "receiptNotePlaceholder": "Optional note stored on the expense line"
+      "receiptNotePlaceholder": "Optional note stored on the expense line",
+      "retry": "Retry",
+      "discard": "Discard",
+      "conflictHelp": "Sync conflict — retry or discard this outbox item."
+    },
+    "ops": {
+      "title": "Expenses ops (cards & inbox)",
+      "description": "Ingest card statement lines, match to expenses, and flush OCR/email integration intents.",
+      "externalRef": "Statement external ref",
+      "merchantKey": "Merchant key",
+      "amount": "Amount",
+      "fxFee": "FX fee",
+      "currencyId": "Currency id",
+      "createStatement": "Create statement line",
+      "createdStatement": "Statement line created.",
+      "statementLineId": "Statement line id",
+      "expenseId": "Expense id",
+      "match": "Match statement → expense",
+      "matched": "Statement matched.",
+      "flushIntents": "Flush pending OCR/email intents",
+      "flushedIntents": "Pending intents applied."
     },
     "forms": {
       "newExpense": {
@@ -8233,7 +8253,9 @@
           "payableAccountId": "Employee payable account",
           "defaultTaxAccountId": "Tax recoverable account (optional)",
           "cardLiabilityAccountId": "Corporate card liability (if card lines)",
-          "advanceAccountId": "Advance clearing account (if advances applied)"
+          "advanceAccountId": "Advance clearing account (if advances applied)",
+          "fxFeeAccountId": "Card FX fee expense account",
+          "fxFeeAmount": "FX fee amount override (optional)"
         }
       },
       "reimburseReport": {

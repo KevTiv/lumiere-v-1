@@ -38,9 +38,19 @@ Executable tracker for the full backlog (Pilot → Competitive → Differentiati
 - [x] Advances + policy exceptions
 - [x] Delayed-sync outbox on `client_request_id`
 
-## Ops checklist after Wave A merge
+## Wave E — Ops validation leftovers + investigation gaps
 
-1. Generate TS/Rust SDKs + codegen (`make generate-stdb-ts-sdk`, `make generate-stdb-rust-sdk`, `make codegen`)
-2. Publish module
-3. `spacetime call <db> run_all_expenses_tests`
-4. Playwright expenses lifecycle + workforce smoke
+- [x] Pack-driven tax-evidence rules (`expense_require_receipt` / `expense_require_tax_ids` on country packs)
+- [x] Corporate card statement match (`expense_card_statement_line` + match/unmatch)
+- [x] OCR / email inbox workers (`email_inbox` intent + `apply_pending_expense_integration_intents` + api-server worker)
+- [x] Delayed-sync conflict UI (retry / discard on capture outbox)
+- [x] Cross-border card FX fee lines on post (`fx_fee_account_id` / matched statement fees)
+- [x] Domain suite `run_expenses_wave_e_test` wired into `run_all_expenses_tests`
+- [x] Playwright `expenses-wave-lifecycle.spec.ts`
+
+## Ops checklist
+
+1. [x] Generate TS/Rust SDKs + codegen (run after Wave E schema publish)
+2. [x] Publish module (`make publish-clear` → `lumiere-v1-j1uo0` local) — 2026-07-17
+3. [x] `spacetime call lumiere-v1-j1uo0 run_all_expenses_tests --server local` — green 2026-07-17
+4. [x] Playwright expenses lifecycle + workforce smoke (`expenses-wave-lifecycle.spec.ts`)

@@ -8,6 +8,11 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct GenerateSubscriptionInvoiceParams {
     pub invoice_date: __sdk::Timestamp,
+    pub billing_run_key: Option<String>,
+    pub journal_id: Option<u64>,
+    pub income_account_id: u64,
+    pub receivable_account_id: u64,
+    pub tax_account_id: Option<u64>,
 }
 
 impl __sdk::InModule for GenerateSubscriptionInvoiceParams {

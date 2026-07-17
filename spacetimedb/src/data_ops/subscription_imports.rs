@@ -1,9 +1,13 @@
-/// Subscription CSV Imports — SubscriptionPlan, Subscription
+//! Subscription CSV Imports — SubscriptionPlan, Subscription.
+//! Wave B: plans + draft headers only; never creates Posted AR invoices.
 use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
 use crate::helpers::check_permission;
+use crate::subscriptions::billing_helpers::{
+    normalize_payment_mode, normalize_plan_billing_period, normalize_rule_type,
+};
 use crate::subscriptions::tables::{
     subscription, subscription_plan, Subscription, SubscriptionPlan,
 };
@@ -52,6 +56,54 @@ pub fn import_subscription_plan_csv(
             }
         };
 
+        let billing_period_raw = {
+            let v = col(&headers, row, "billing_period");
+            if v.is_empty() {
+                "month"
+            } else {
+                v
+            }
+        };
+        let billing_period = match normalize_plan_billing_period(billing_period_raw) {
+            Ok(p) => p,
+            Err(e) => {
+                record_import_error(
+                    ctx,
+                    job.id,
+                    row_num,
+                    Some("billing_period"),
+                    Some(billing_period_raw),
+                    &e,
+                );
+                errors += 1;
+                continue;
+            }
+        };
+
+        let payment_mode_raw = {
+            let v = col(&headers, row, "payment_mode");
+            if v.is_empty() {
+                "draft_invoice"
+            } else {
+                v
+            }
+        };
+        let payment_mode = match normalize_payment_mode(payment_mode_raw) {
+            Ok(p) => p,
+            Err(e) => {
+                record_import_error(
+                    ctx,
+                    job.id,
+                    row_num,
+                    Some("payment_mode"),
+                    Some(payment_mode_raw),
+                    &e,
+                );
+                errors += 1;
+                continue;
+            }
+        };
+
         ctx.db.subscription_plan().insert(SubscriptionPlan {
             id: 0,
             organization_id,
@@ -63,14 +115,7 @@ pub fn import_subscription_plan_csv(
             currency_id,
             journal_id,
             product_id,
-            billing_period: {
-                let v = col(&headers, row, "billing_period");
-                if v.is_empty() {
-                    "month".to_string()
-                } else {
-                    v.to_string()
-                }
-            },
+            billing_period,
             billing_period_unit: {
                 let v = parse_u32(col(&headers, row, "billing_period_unit"));
                 if v == 0 {
@@ -119,14 +164,7 @@ pub fn import_subscription_plan_csv(
             recurring_rule_min_count: 1,
             recurring_rule_max_count: 12,
             close_reason_id: None,
-            payment_mode: {
-                let v = col(&headers, row, "payment_mode");
-                if v.is_empty() {
-                    "draft_invoice".to_string()
-                } else {
-                    v.to_string()
-                }
-            },
+            payment_mode,
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
             metadata: col(&headers, row, "metadata").to_string(),
@@ -197,6 +235,31 @@ pub fn import_subscription_csv(
             }
         };
 
+        let rule_raw = {
+            let v = col(&headers, row, "recurring_rule_type");
+            if v.is_empty() {
+                "monthly"
+            } else {
+                v
+            }
+        };
+        let recurring_rule_type = match normalize_rule_type(rule_raw) {
+            Ok(r) => r,
+            Err(e) => {
+                record_import_error(
+                    ctx,
+                    job.id,
+                    row_num,
+                    Some("recurring_rule_type"),
+                    Some(rule_raw),
+                    &e,
+                );
+                errors += 1;
+                continue;
+            }
+        };
+
+        // Draft headers only — never create Posted AR via CSV import.
         ctx.db.subscription().insert(Subscription {
             id: 0,
             organization_id,
@@ -235,14 +298,7 @@ pub fn import_subscription_csv(
                     v
                 }
             },
-            recurring_rule_type: {
-                let v = col(&headers, row, "recurring_rule_type");
-                if v.is_empty() {
-                    "monthly".to_string()
-                } else {
-                    v.to_string()
-                }
-            },
+            recurring_rule_type,
             recurring_interval: {
                 let v = parse_u32(col(&headers, row, "recurring_interval"));
                 if v == 0 {
@@ -260,7 +316,7 @@ pub fn import_subscription_csv(
             health: "healthy".to_string(),
             stage_id: opt_u64(col(&headers, row, "stage_id")),
             state: "draft".to_string(),
-            is_active: true,
+            is_active: false,
             is_trial: false,
             invoice_count: 0,
             vendor_id: None,

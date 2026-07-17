@@ -11,6 +11,7 @@ use crate::accounting::journal_entries::{
     AddAccountMoveLineParams,
 };
 use crate::accounting::tax_management::{account_tax, account_tax_group};
+use crate::core::country_pack::pack_expense_evidence_rules;
 use crate::core::organization::{company, company_id_from_scope};
 use crate::core::reference::{currency_rate, legacy_currency_code_for_id};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
@@ -23,6 +24,7 @@ use crate::expenses::expense_wave_d::{
     advance_applied_for_sheet, find_duplicate_expense, has_approved_policy_exception,
     has_pending_policy_exception, hr_expense_policy_exception,
 };
+use crate::expenses::expense_wave_e::sheet_matched_fx_fee_total;
 use crate::projects::projects::project_project;
 use crate::types::{
     AccountMoveState, ExpenseLineKind, ExpensePaymentMode, ExpenseSheetState, ExpenseState,
@@ -201,6 +203,10 @@ pub struct PostExpenseSheetParams {
     pub card_liability_account_id: Option<u64>,
     /// Clearing account for advances applied to this sheet (required when advances applied).
     pub advance_account_id: Option<u64>,
+    /// Expense account for cross-border card FX fees (required when matched FX fees > 0).
+    pub fx_fee_account_id: Option<u64>,
+    /// Optional override; when None, fees are summed from matched card statement lines.
+    pub fx_fee_amount: Option<f64>,
     pub accounting_date: Timestamp,
     pub client_request_id: Option<String>,
 }
@@ -1053,11 +1059,21 @@ pub fn submit_expense_sheet(
     if lines.is_empty() {
         return Err("Cannot submit an empty expense sheet".to_string());
     }
+    let pack_rules =
+        pack_expense_evidence_rules(ctx, organization_id, sheet.company_id);
     for line in &lines {
-        let receipt_required = matches!(line.line_kind, ExpenseLineKind::Standard);
+        let is_standard = matches!(line.line_kind, ExpenseLineKind::Standard);
+        // Wave A baseline: Standard lines need receipts. Pack flag can only tighten.
+        let receipt_required = is_standard || pack_rules.require_receipt;
         if receipt_required && (line.attachment_ids.is_empty() || !line.has_receipt) {
             return Err(format!(
                 "Expense {} is missing receipt attachments",
+                line.id
+            ));
+        }
+        if pack_rules.require_tax_ids && is_standard && line.tax_ids.is_empty() {
+            return Err(format!(
+                "Expense {} requires tax evidence (country pack)",
                 line.id
             ));
         }
@@ -1370,6 +1386,9 @@ pub fn post_expense_sheet(
     if let Some(adv_acct) = params.advance_account_id {
         validate_account(ctx, company_id, adv_acct, "Advance")?;
     }
+    if let Some(fx_acct) = params.fx_fee_account_id {
+        validate_account(ctx, company_id, fx_acct, "FX fee")?;
+    }
 
     let journal = ctx
         .db
@@ -1504,11 +1523,24 @@ pub fn post_expense_sheet(
         ));
     }
     let payable_credit = (out_of_pocket_company - advance_applied_company).max(0.0);
+    let matched_fx_fee = sheet_matched_fx_fee_total(ctx, sheet_id);
+    let fx_fee_company = params.fx_fee_amount.unwrap_or(matched_fx_fee).max(0.0);
+    if fx_fee_company > 0.0 && params.fx_fee_account_id.is_none() {
+        return Err(
+            "fx_fee_account_id is required when posting cross-border card FX fees".to_string(),
+        );
+    }
+    if fx_fee_company > 0.0 && card_company <= 0.0 {
+        return Err("FX fees require corporate-card lines on the sheet".to_string());
+    }
     let total_doc_with_tax = if rate > 0.0 {
         total_company / rate
     } else {
         total_doc
     };
+    // FX fee is company-currency expense + additional card liability.
+    let posted_total_company = total_company + fx_fee_company;
+    let card_credit_with_fee = card_company + fx_fee_company;
 
     let origin = format!("EXP{sheet_id}");
     let name = next_doc_number(ctx, "EXP");
@@ -1546,15 +1578,20 @@ pub fn post_expense_sheet(
         journal_id: params.journal_id,
         currency_id,
         company_currency_id,
-        amount_untaxed: untaxed_company,
+        amount_untaxed: untaxed_company + fx_fee_company,
         amount_tax: tax_company,
-        amount_total: total_company,
-        amount_residual: total_company,
-        amount_untaxed_signed: untaxed_company,
+        amount_total: posted_total_company,
+        amount_residual: posted_total_company,
+        amount_untaxed_signed: untaxed_company + fx_fee_company,
         amount_tax_signed: tax_company,
-        amount_total_signed: total_company,
-        amount_total_in_currency_signed: total_doc_with_tax,
-        amount_residual_signed: total_company,
+        amount_total_signed: posted_total_company,
+        amount_total_in_currency_signed: total_doc_with_tax
+            + if rate > 0.0 {
+                fx_fee_company / rate
+            } else {
+                fx_fee_company
+            },
+        amount_residual_signed: posted_total_company,
         to_check: false,
         posted_before: false,
         is_storno: false,
@@ -1572,6 +1609,7 @@ pub fn post_expense_sheet(
                 "expense_sheet_id": sheet_id,
                 "client_request_id": params.client_request_id,
                 "currency_rate": rate,
+                "fx_fee_company": fx_fee_company,
             })
             .to_string(),
         ),
@@ -1625,7 +1663,22 @@ pub fn post_expense_sheet(
         insert_draft_account_move_line(ctx, &move_record, payable_params)?;
         seq += 1;
     }
-    if card_company > 0.0001 {
+    if fx_fee_company > 0.0001 {
+        let fx_acct = params
+            .fx_fee_account_id
+            .ok_or("fx_fee_account_id is required")?;
+        let mut fx_params = empty_line_params(
+            fx_acct,
+            format!("Card FX fee — {}", sheet.name),
+            fx_fee_company,
+            0.0,
+            seq,
+        );
+        fx_params.partner_id = partner_id;
+        insert_draft_account_move_line(ctx, &move_record, fx_params)?;
+        seq += 1;
+    }
+    if card_credit_with_fee > 0.0001 {
         let card_acct = params
             .card_liability_account_id
             .ok_or("card_liability_account_id is required")?;
@@ -1633,7 +1686,7 @@ pub fn post_expense_sheet(
             card_acct,
             format!("Corporate card liability — {}", sheet.name),
             0.0,
-            card_company,
+            card_credit_with_fee,
             seq,
         );
         card_params.partner_id = partner_id;

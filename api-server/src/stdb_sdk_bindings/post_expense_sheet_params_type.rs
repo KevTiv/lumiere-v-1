@@ -13,6 +13,8 @@ pub struct PostExpenseSheetParams {
     pub default_tax_account_id: Option<u64>,
     pub card_liability_account_id: Option<u64>,
     pub advance_account_id: Option<u64>,
+    pub fx_fee_account_id: Option<u64>,
+    pub fx_fee_amount: Option<f64>,
     pub accounting_date: __sdk::Timestamp,
     pub client_request_id: Option<String>,
 }

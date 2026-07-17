@@ -753,6 +753,16 @@
     "name",
     "sequence"
   ],
+  "AddSubscriptionBundleItemParams": [
+    "product_id",
+    "name",
+    "quantity",
+    "price_unit",
+    "is_addon",
+    "sequence",
+    "active",
+    "metadata"
+  ],
   "AddUserToOrganizationParams": [
     "role_id",
     "company_id",
@@ -800,6 +810,10 @@
     "is_system",
     "created_at",
     "metadata"
+  ],
+  "AdvanceSubscriptionDunningParams": [
+    "past_due_days",
+    "suspend_after_days"
   ],
   "AiActionDraft": [
     "id",
@@ -1153,6 +1167,20 @@
     "write_off_account_id",
     "metadata"
   ],
+  "AmendSubscriptionParams": [
+    "amendment_type",
+    "line_id",
+    "effective_date",
+    "new_product_id",
+    "new_quantity",
+    "new_price_unit",
+    "new_discount",
+    "prorate",
+    "journal_id",
+    "income_account_id",
+    "receivable_account_id",
+    "notes"
+  ],
   "AmortizationLine": [
     "id",
     "organization_id",
@@ -1250,6 +1278,11 @@
     "amount",
     "metadata"
   ],
+  "ApplyIndexLinkedRenewalParams": [
+    "index_code",
+    "period_key",
+    "extend_term"
+  ],
   "ApplyOmnichannelAllocationParams": [
     "preferred_route_id",
     "channel",
@@ -1257,6 +1290,21 @@
   ],
   "ApplySalePromotionParams": [
     "promotion_code"
+  ],
+  "ApplySubscriptionBundleParams": [
+    "bundle_id"
+  ],
+  "ApplySubscriptionInvoicePaymentParams": [
+    "invoice_move_id",
+    "payment_journal_id",
+    "bank_account_id",
+    "receivable_account_id",
+    "amount",
+    "payment_date",
+    "cogs_account_id",
+    "inventory_account_id",
+    "ref",
+    "memo"
   ],
   "ApprovalRequest": [
     "id",
@@ -1585,6 +1633,16 @@
   "CancelIntercompanyTransactionParams": [
     "reason"
   ],
+  "CancelSubscriptionParams": [
+    "close_reason_id",
+    "notes",
+    "create_credit_note",
+    "invoice_move_id",
+    "prorate_unused",
+    "journal_id",
+    "income_account_id",
+    "receivable_account_id"
+  ],
   "CartonizationResult": [
     "id",
     "organization_id",
@@ -1636,7 +1694,8 @@
   ],
   "CloseSubscriptionParams": [
     "close_reason_id",
-    "notes"
+    "notes",
+    "no_charge"
   ],
   "CommodityPriceIndex": [
     "id",
@@ -3088,6 +3147,16 @@
     "amount",
     "currency_id",
     "client_request_id",
+    "metadata"
+  ],
+  "CreateExpenseCardStatementLineParams": [
+    "company_id",
+    "external_ref",
+    "merchant_key",
+    "amount",
+    "currency_id",
+    "transaction_date",
+    "fx_fee_amount",
     "metadata"
   ],
   "CreateExpenseIntegrationIntentParams": [
@@ -4733,6 +4802,13 @@
     "state",
     "metadata"
   ],
+  "CreateSubscriptionBundleParams": [
+    "plan_id",
+    "name",
+    "code",
+    "active",
+    "metadata"
+  ],
   "CreateSubscriptionFromSaleOrderParams": [
     "company_id",
     "sale_order_id",
@@ -4774,6 +4850,16 @@
     "message_ids",
     "metadata"
   ],
+  "CreateSubscriptionPaymentIntentParams": [
+    "intent_type",
+    "idempotency_key",
+    "invoice_move_id",
+    "payment_token_id",
+    "amount",
+    "currency_id",
+    "fallback_draft_invoice",
+    "metadata"
+  ],
   "CreateSubscriptionPlanParams": [
     "company_id",
     "name",
@@ -4803,6 +4889,25 @@
     "recurring_rule_max_unit",
     "recurring_rule_min_count",
     "recurring_rule_max_count",
+    "metadata"
+  ],
+  "CreateSubscriptionPriceTierParams": [
+    "plan_id",
+    "product_id",
+    "sequence",
+    "min_qty",
+    "max_qty",
+    "unit_price",
+    "active",
+    "metadata"
+  ],
+  "CreateSubscriptionTaxSettleIntentParams": [
+    "intent_type",
+    "idempotency_key",
+    "invoice_move_id",
+    "payment_id",
+    "pack_code",
+    "payload",
     "metadata"
   ],
   "CreateTaskParams": [
@@ -5639,6 +5744,24 @@
     "billable",
     "metadata"
   ],
+  "ExpenseCardStatementLine": [
+    "id",
+    "organization_id",
+    "company_id",
+    "external_ref",
+    "merchant_key",
+    "amount",
+    "currency_id",
+    "transaction_date",
+    "fx_fee_amount",
+    "matched_expense_id",
+    "status",
+    "metadata",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
   "ExpenseIntegrationIntent": [
     "id",
     "organization_id",
@@ -5686,6 +5809,10 @@
   "FailExpenseIntegrationIntentParams": [
     "last_error",
     "metadata"
+  ],
+  "FailSubscriptionPaymentIntentParams": [
+    "last_error",
+    "record_dunning_failure"
   ],
   "FailWarehouseSyncIntentParams": [
     "last_error",
@@ -5842,7 +5969,12 @@
     "locale"
   ],
   "GenerateSubscriptionInvoiceParams": [
-    "invoice_date"
+    "invoice_date",
+    "billing_run_key",
+    "journal_id",
+    "income_account_id",
+    "receivable_account_id",
+    "tax_account_id"
   ],
   "GeneratedOwnerReport": [
     "id",
@@ -5901,6 +6033,11 @@
     "resource",
     "action",
     "effect"
+  ],
+  "GrantSubscriptionEntitlementParams": [
+    "feature_code",
+    "product_id",
+    "metadata"
   ],
   "HelpdeskSla": [
     "id",
@@ -6295,6 +6432,15 @@
     "create_date",
     "write_uid",
     "write_date"
+  ],
+  "IngestSubscriptionUsageEventParams": [
+    "source",
+    "event_id",
+    "quantity",
+    "unit",
+    "product_id",
+    "occurred_at",
+    "metadata"
   ],
   "IntercompanyRule": [
     "id",
@@ -6891,6 +7037,10 @@
     "write_date",
     "metadata"
   ],
+  "MatchExpenseCardStatementLineParams": [
+    "expense_id",
+    "metadata"
+  ],
   "MergeContactsParams": [
     "target_contact_id"
   ],
@@ -7424,6 +7574,9 @@
     "expires_at",
     "used_at"
   ],
+  "PauseSubscriptionParams": [
+    "notes"
+  ],
   "PaymentAccount": [
     "id",
     "organization_id",
@@ -7875,6 +8028,8 @@
     "default_tax_account_id",
     "card_liability_account_id",
     "advance_account_id",
+    "fx_fee_account_id",
+    "fx_fee_amount",
     "accounting_date",
     "client_request_id"
   ],
@@ -8831,6 +8986,14 @@
     "started_at",
     "metadata"
   ],
+  "RateSubscriptionUsageEventsParams": [
+    "limit",
+    "fallback_unit_price"
+  ],
+  "RebaseDeferredSchedulesParams": [
+    "scale_factor",
+    "notes"
+  ],
   "ReceiveConsignmentStockParams": [
     "agreement_id",
     "location_id",
@@ -8936,6 +9099,11 @@
     "last_error",
     "metadata"
   ],
+  "RecordSubscriptionPaymentFailureParams": [
+    "invoice_move_id",
+    "reason",
+    "past_due_days"
+  ],
   "RecordTelemetryParams": [
     "sensor_type",
     "value",
@@ -8980,6 +9148,10 @@
     "notes",
     "date_planned",
     "metadata"
+  ],
+  "RenewSubscriptionParams": [
+    "intervals",
+    "notes"
   ],
   "ReplenishmentRule": [
     "id",
@@ -9057,6 +9229,10 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "ResumeSubscriptionParams": [
+    "notes",
+    "recurring_next_date"
   ],
   "ReturnOrder": [
     "id",
@@ -9647,6 +9823,12 @@
     "model",
     "record_id",
     "entries"
+  ],
+  "SetSubscriptionCommitmentParams": [
+    "min_amount",
+    "product_id",
+    "active",
+    "metadata"
   ],
   "SetVendorRiskFlagParams": [
     "partner_id",
@@ -10419,6 +10601,107 @@
     "updated_at",
     "metadata"
   ],
+  "SubscriptionAmendment": [
+    "id",
+    "organization_id",
+    "company_id",
+    "subscription_id",
+    "version",
+    "amendment_type",
+    "effective_date",
+    "line_id",
+    "before_json",
+    "after_json",
+    "proration_amount",
+    "proration_move_id",
+    "credit_note_move_id",
+    "notes",
+    "created_at",
+    "created_by",
+    "metadata"
+  ],
+  "SubscriptionBillingRun": [
+    "id",
+    "organization_id",
+    "company_id",
+    "subscription_id",
+    "billing_run_key",
+    "invoice_move_id",
+    "invoice_date",
+    "period_start",
+    "period_end",
+    "created_at",
+    "created_by",
+    "metadata"
+  ],
+  "SubscriptionBundle": [
+    "id",
+    "organization_id",
+    "company_id",
+    "plan_id",
+    "name",
+    "code",
+    "active",
+    "created_at",
+    "updated_at",
+    "metadata"
+  ],
+  "SubscriptionBundleItem": [
+    "id",
+    "organization_id",
+    "company_id",
+    "bundle_id",
+    "product_id",
+    "name",
+    "quantity",
+    "price_unit",
+    "is_addon",
+    "sequence",
+    "active",
+    "created_at",
+    "metadata"
+  ],
+  "SubscriptionCollection": [
+    "id",
+    "organization_id",
+    "company_id",
+    "subscription_id",
+    "stage",
+    "failed_payment_count",
+    "past_due_days",
+    "due_to_bill",
+    "past_due",
+    "amend_pending",
+    "last_failure_at",
+    "last_evaluated_at",
+    "metadata"
+  ],
+  "SubscriptionCommitment": [
+    "id",
+    "organization_id",
+    "company_id",
+    "subscription_id",
+    "min_amount",
+    "product_id",
+    "active",
+    "created_at",
+    "updated_at",
+    "metadata"
+  ],
+  "SubscriptionEntitlement": [
+    "id",
+    "organization_id",
+    "company_id",
+    "subscription_id",
+    "partner_id",
+    "product_id",
+    "feature_code",
+    "status",
+    "granted_at",
+    "revoked_at",
+    "created_by",
+    "metadata"
+  ],
   "SubscriptionLine": [
     "id",
     "organization_id",
@@ -10459,6 +10742,26 @@
     "updated_at",
     "metadata"
   ],
+  "SubscriptionPaymentIntent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "subscription_id",
+    "intent_type",
+    "status",
+    "idempotency_key",
+    "invoice_move_id",
+    "payment_token_id",
+    "amount",
+    "currency_id",
+    "fallback_draft_invoice",
+    "last_error",
+    "attempt_count",
+    "applied_at",
+    "created_at",
+    "created_by",
+    "metadata"
+  ],
   "SubscriptionPlan": [
     "id",
     "organization_id",
@@ -10494,6 +10797,89 @@
     "payment_mode",
     "created_at",
     "updated_at",
+    "metadata"
+  ],
+  "SubscriptionPriceIndex": [
+    "id",
+    "organization_id",
+    "company_id",
+    "index_code",
+    "country_code",
+    "period_key",
+    "factor",
+    "active",
+    "created_at",
+    "updated_at",
+    "metadata"
+  ],
+  "SubscriptionPriceTier": [
+    "id",
+    "organization_id",
+    "company_id",
+    "plan_id",
+    "product_id",
+    "sequence",
+    "min_qty",
+    "max_qty",
+    "unit_price",
+    "active",
+    "created_at",
+    "updated_at",
+    "metadata"
+  ],
+  "SubscriptionTaxSettleIntent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "subscription_id",
+    "intent_type",
+    "status",
+    "idempotency_key",
+    "invoice_move_id",
+    "payment_id",
+    "pack_code",
+    "payload",
+    "last_error",
+    "applied_at",
+    "created_at",
+    "created_by",
+    "metadata"
+  ],
+  "SubscriptionUsageCharge": [
+    "id",
+    "organization_id",
+    "company_id",
+    "subscription_id",
+    "usage_event_id",
+    "product_id",
+    "quantity",
+    "unit_price",
+    "amount",
+    "tier_band",
+    "status",
+    "invoice_move_id",
+    "billing_run_key",
+    "description",
+    "created_at",
+    "created_by",
+    "metadata"
+  ],
+  "SubscriptionUsageEvent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "subscription_id",
+    "source",
+    "event_id",
+    "idempotency_key",
+    "product_id",
+    "quantity",
+    "unit",
+    "occurred_at",
+    "status",
+    "rated_charge_id",
+    "created_at",
+    "created_by",
     "metadata"
   ],
   "SupplierIntakeRequest": [
@@ -10631,6 +11017,9 @@
     "create_date",
     "write_uid",
     "write_date",
+    "metadata"
+  ],
+  "UnmatchExpenseCardStatementLineParams": [
     "metadata"
   ],
   "UnreconcileAccountBankStatementLineParams": [
@@ -11706,6 +12095,30 @@
     "notify_stock",
     "metadata"
   ],
+  "UpdateSubscriptionPlanParams": [
+    "name",
+    "description",
+    "code",
+    "currency_id",
+    "journal_id",
+    "product_id",
+    "billing_period",
+    "billing_period_unit",
+    "recurring_invoice_day",
+    "trial_period",
+    "trial_duration",
+    "trial_unit",
+    "auto_close_limit",
+    "payment_mode",
+    "template_id",
+    "invoice_mail_template_id",
+    "website_url",
+    "is_published",
+    "is_default",
+    "color",
+    "image_1920_url",
+    "metadata"
+  ],
   "UpdateSupplierIntakeParams": [
     "company_name",
     "contact_name",
@@ -11985,6 +12398,14 @@
     "text",
     "embedding",
     "embedding_hash",
+    "metadata"
+  ],
+  "UpsertSubscriptionPriceIndexParams": [
+    "index_code",
+    "country_code",
+    "period_key",
+    "factor",
+    "active",
     "metadata"
   ],
   "UpsertVendorScorecardParams": [

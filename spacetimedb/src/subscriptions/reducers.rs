@@ -15,7 +15,12 @@ use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
-use crate::sales::sales_core::sale_order;
+use crate::sales::sales_core::{sale_order, sale_order_line};
+use crate::subscriptions::billing_helpers::{
+    apply_billing_run_to_subscription, apply_subscription_invoice_payment,
+    create_subscription_ar_invoice, default_billing_run_key, mrr_from_period_total,
+    normalize_payment_mode, normalize_plan_billing_period, normalize_rule_type,
+};
 use crate::subscriptions::tables::*;
 use crate::types::{AccountMoveState, PaymentState};
 
@@ -107,6 +112,8 @@ pub struct CreateSubscriptionFromSaleOrderParams {
 pub struct CloseSubscriptionParams {
     pub close_reason_id: Option<u64>,
     pub notes: Option<String>,
+    /// When true, allow closing an active subscription with zero invoices (explicit no-charge).
+    pub no_charge: bool,
 }
 
 /// Params for generating subscription invoice.
@@ -114,6 +121,32 @@ pub struct CloseSubscriptionParams {
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct GenerateSubscriptionInvoiceParams {
     pub invoice_date: Timestamp,
+    /// Idempotency key; defaults to `sub:{id}:period:{invoice_date_secs}` when empty.
+    pub billing_run_key: Option<String>,
+    /// Defaults to plan.journal_id when omitted.
+    pub journal_id: Option<u64>,
+    pub income_account_id: u64,
+    pub receivable_account_id: u64,
+    /// Optional tax payable account; required when line taxes compute > 0 and tax group has none.
+    pub tax_account_id: Option<u64>,
+}
+
+/// Params for applying a customer payment to a subscription invoice (post + clear AR).
+/// Scope: `company_id` and `subscription_id` are flat reducer params.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ApplySubscriptionInvoicePaymentParams {
+    pub invoice_move_id: u64,
+    pub payment_journal_id: u64,
+    pub bank_account_id: u64,
+    pub receivable_account_id: u64,
+    /// Defaults to invoice residual when omitted.
+    pub amount: Option<f64>,
+    pub payment_date: Option<Timestamp>,
+    /// Used when the invoice is still Draft (passed through to `post_invoice`).
+    pub cogs_account_id: u64,
+    pub inventory_account_id: u64,
+    pub ref_: Option<String>,
+    pub memo: Option<String>,
 }
 
 /// Params for creating deferred revenue schedule.
@@ -279,18 +312,8 @@ pub fn create_subscription_plan(
     if params.code.is_empty() {
         return Err("Plan code is required".to_string());
     }
-    if !matches!(
-        params.billing_period.as_str(),
-        "day" | "week" | "month" | "year"
-    ) {
-        return Err("Invalid billing period. Use: day, week, month, year".to_string());
-    }
-    if !matches!(
-        params.payment_mode.as_str(),
-        "draft_invoice" | "automated_payment"
-    ) {
-        return Err("Invalid payment mode. Use: draft_invoice, automated_payment".to_string());
-    }
+    let billing_period = normalize_plan_billing_period(&params.billing_period)?;
+    let payment_mode = normalize_payment_mode(&params.payment_mode)?;
 
     let plan = SubscriptionPlan {
         id: 0,
@@ -303,8 +326,8 @@ pub fn create_subscription_plan(
         currency_id: params.currency_id,
         journal_id: params.journal_id,
         product_id: params.product_id,
-        billing_period: params.billing_period.clone(),
-        billing_period_unit: params.billing_period_unit,
+        billing_period,
+        billing_period_unit: params.billing_period_unit.max(1),
         recurring_invoice_day: params.recurring_invoice_day,
         trial_period: params.trial_period,
         trial_duration: params.trial_duration,
@@ -324,7 +347,7 @@ pub fn create_subscription_plan(
         recurring_rule_min_count: params.recurring_rule_min_count,
         recurring_rule_max_count: params.recurring_rule_max_count,
         close_reason_id: None,
-        payment_mode: params.payment_mode.clone(),
+        payment_mode,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         metadata: params.metadata.clone().unwrap_or_default(),
@@ -407,6 +430,12 @@ pub fn create_subscription_from_sale_order(
         .id()
         .find(&params.plan_id)
         .ok_or("Subscription plan not found")?;
+    if plan.organization_id != organization_id {
+        return Err("Subscription plan does not belong to this organization".to_string());
+    }
+    if plan.company_id != order.company_id {
+        return Err("Subscription plan company does not match the sale order".to_string());
+    }
 
     // Server-authoritative fields derived from SO and plan
     let partner_id = order.partner_id;
@@ -415,10 +444,24 @@ pub fn create_subscription_from_sale_order(
     let currency_id = order.currency_id;
     let pricelist_id = order.pricelist_id;
     let resolved_company_id = order.company_id;
-    // Use plan billing period for recurrence; ignore client-passed values
-    let recurring_rule_type = plan.billing_period.clone();
-    let recurring_interval = plan.billing_period_unit;
+    let recurring_rule_type = normalize_rule_type(&plan.billing_period)?;
+    let recurring_interval = plan.billing_period_unit.max(1);
     let recurring_invoice_day = plan.recurring_invoice_day;
+    let payment_mode = normalize_payment_mode(&params.payment_mode)?;
+
+    let so_lines: Vec<_> = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&params.sale_order_id)
+        .filter(|l| l.display_type.is_none())
+        .collect();
+    if so_lines.is_empty() {
+        return Err("Sale order has no invoiceable lines for subscription".to_string());
+    }
+
+    let period_total: f64 = so_lines.iter().map(|l| l.price_subtotal).sum();
+    let mrr = mrr_from_period_total(period_total, &recurring_rule_type);
 
     let code = params.code.clone().unwrap_or_else(|| {
         format!(
@@ -442,47 +485,100 @@ pub fn create_subscription_from_sale_order(
         company_id: resolved_company_id,
         currency_id,
         pricelist_id,
-        analytic_account_id: params.analytic_account_id,
+        analytic_account_id: params.analytic_account_id.or(order.analytic_account_id),
         date_start: params.date_start,
         date: ctx.timestamp,
         recurring_next_date: params.date_start,
         recurring_invoice_day,
-        recurring_rule_type,
+        recurring_rule_type: recurring_rule_type.clone(),
         recurring_interval,
         close_reason_id: None,
         close_date: None,
         payment_token_id: None,
-        payment_mode: params.payment_mode.clone(),
+        payment_mode,
         user_id: Some(ctx.sender()),
         team_id: params.team_id,
-        health: params.health.clone(),
+        health: "healthy".to_string(),
         stage_id: params.stage_id,
-        state: params.state.clone(),
-        is_active: params.is_active,
+        // Force draft; activate_subscription is the only path to active.
+        state: "draft".to_string(),
+        is_active: false,
         is_trial: params.is_trial,
-        invoice_count: params.invoice_count,
+        invoice_count: 0,
         vendor_id: params.vendor_id,
-        recurring_total: params.recurring_total,
-        recurring_monthly: params.recurring_monthly,
-        recurring_mrr: params.recurring_mrr,
-        recurring_mrr_local: params.recurring_mrr_local,
-        percentage_mrr: params.percentage_mrr,
-        kpi_1month_mrr: params.kpi_1month_mrr,
-        kpi_3months_mrr: params.kpi_3months_mrr,
-        kpi_12months_mrr: params.kpi_12months_mrr,
-        rating_last_value: params.rating_last_value,
-        invoice_ids: params.invoice_ids.clone(),
+        recurring_total: period_total,
+        recurring_monthly: mrr,
+        recurring_mrr: mrr,
+        recurring_mrr_local: mrr,
+        percentage_mrr: 0.0,
+        kpi_1month_mrr: mrr,
+        kpi_3months_mrr: mrr,
+        kpi_12months_mrr: mrr,
+        rating_last_value: 0,
+        invoice_ids: vec![],
         sale_order_ids: vec![params.sale_order_id],
-        subscription_line_ids: params.subscription_line_ids.clone(),
-        activity_ids: params.activity_ids.clone(),
-        message_follower_ids: params.message_follower_ids.clone(),
-        message_ids: params.message_ids.clone(),
+        subscription_line_ids: vec![],
+        activity_ids: vec![],
+        message_follower_ids: vec![],
+        message_ids: vec![],
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         metadata: params.metadata.clone().unwrap_or_default(),
     };
 
     let inserted = ctx.db.subscription().insert(subscription);
+
+    let mut line_ids: Vec<u64> = Vec::with_capacity(so_lines.len());
+    for so_line in so_lines {
+        let sub_line = ctx.db.subscription_line().insert(SubscriptionLine {
+            id: 0,
+            organization_id,
+            name: so_line.name.clone(),
+            subscription_id: inserted.id,
+            product_id: so_line.product_id,
+            product_uom: so_line.product_uom,
+            product_uom_qty: so_line.product_uom_qty,
+            price_unit: so_line.price_unit,
+            price_subtotal: so_line.price_subtotal,
+            discount: so_line.discount,
+            price_tax: so_line.price_tax,
+            price_total: so_line.price_total,
+            tax_ids: so_line.tax_id.clone(),
+            company_id: resolved_company_id,
+            currency_id,
+            analytic_account_id: order.analytic_account_id,
+            analytic_tag_ids: so_line.analytic_tag_ids.clone(),
+            recurring_rule_type: recurring_rule_type.clone(),
+            recurring_interval,
+            recurring_next_date: params.date_start,
+            recurring_last_date: None,
+            line_is_recurring: true,
+            line_is_prorated: false,
+            line_is_start_date: false,
+            line_is_end_date: false,
+            line_is_trial: params.is_trial,
+            line_trial_duration: 0,
+            line_trial_unit: String::new(),
+            line_parent_id: None,
+            line_child_ids: vec![],
+            line_is_downpayment: so_line.is_downpayment,
+            line_is_discount: so_line.discount > 0.0,
+            line_is_gift: false,
+            line_is_upgrade: false,
+            line_is_downgrade: false,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            metadata: String::new(),
+        });
+        line_ids.push(sub_line.id);
+    }
+
+    let line_count = line_ids.len();
+    ctx.db.subscription().id().update(Subscription {
+        subscription_line_ids: line_ids,
+        updated_at: ctx.timestamp,
+        ..inserted.clone()
+    });
 
     write_audit_log_v2(
         ctx,
@@ -498,7 +594,9 @@ pub fn create_subscription_from_sale_order(
                     "code": inserted.code,
                     "sale_order_id": params.sale_order_id,
                     "partner_id": partner_id,
-                    "state": params.state
+                    "state": "draft",
+                    "recurring_mrr": mrr,
+                    "line_count": line_count
                 })
                 .to_string(),
             ),
@@ -507,16 +605,18 @@ pub fn create_subscription_from_sale_order(
                 "sale_order_id".to_string(),
                 "partner_id".to_string(),
                 "state".to_string(),
-                "is_active".to_string(),
+                "subscription_line_ids".to_string(),
+                "recurring_mrr".to_string(),
             ],
             metadata: None,
         },
     );
 
     log::info!(
-        "Created subscription {} from sale order {}",
+        "Created subscription {} from sale order {} with {} lines",
         inserted.id,
-        params.sale_order_id
+        params.sale_order_id,
+        line_count
     );
     Ok(())
 }
@@ -541,17 +641,31 @@ pub fn activate_subscription(
     if subscription.organization_id != organization_id {
         return Err("Subscription does not belong to this organization".to_string());
     }
+    if subscription.company_id != company_id {
+        return Err("Subscription does not belong to this company".to_string());
+    }
 
     if subscription.state != "draft" {
         return Err("Subscription must be in draft state to activate".to_string());
     }
+    if subscription.subscription_line_ids.is_empty() {
+        return Err("Subscription must have at least one line to activate".to_string());
+    }
 
-    ctx.db.subscription().id().update(Subscription {
+    let activated = Subscription {
         state: "active".to_string(),
         is_active: true,
+        health: "healthy".to_string(),
         updated_at: ctx.timestamp,
         ..subscription
-    });
+    };
+    ctx.db.subscription().id().update(activated.clone());
+    let _ = crate::subscriptions::subscription_wave_e::grant_default_entitlement(
+        ctx,
+        organization_id,
+        company_id,
+        &activated,
+    )?;
 
     write_audit_log_v2(
         ctx,
@@ -562,7 +676,7 @@ pub fn activate_subscription(
             record_id: subscription_id,
             action: "UPDATE",
             old_values: Some("{\"state\":\"draft\",\"is_active\":false}".to_string()),
-            new_values: Some("{\"state\":\"active\",\"is_active\":true}".to_string()),
+            new_values: Some("{\"state\":\"active\",\"is_active\":true,\"entitlement\":\"granted\"}".to_string()),
             changed_fields: vec!["state".to_string(), "is_active".to_string()],
             metadata: None,
         },
@@ -593,9 +707,23 @@ pub fn close_subscription(
     if subscription.organization_id != organization_id {
         return Err("Subscription does not belong to this organization".to_string());
     }
+    if subscription.company_id != company_id {
+        return Err("Subscription does not belong to this company".to_string());
+    }
 
     if subscription.state == "closed" {
         return Err("Subscription is already closed".to_string());
+    }
+
+    // Active contracts with no invoices require an explicit no-charge acknowledgment.
+    if subscription.state == "active"
+        && subscription.invoice_count == 0
+        && !params.no_charge
+    {
+        return Err(
+            "Active subscription has no invoices; set no_charge=true or generate a final invoice first"
+                .to_string(),
+        );
     }
 
     let old_state = subscription.state.clone();
@@ -626,9 +754,13 @@ pub fn close_subscription(
                 "is_active".to_string(),
                 "close_date".to_string(),
             ],
-            metadata: params
-                .notes
-                .map(|n| serde_json::json!({ "notes": n }).to_string()),
+            metadata: Some(
+                serde_json::json!({
+                    "notes": params.notes,
+                    "no_charge": params.no_charge,
+                })
+                .to_string(),
+            ),
         },
     );
 
@@ -640,7 +772,7 @@ pub fn close_subscription(
 // REDUCERS - Subscription Invoicing
 // ============================================================================
 
-/// Generate the next invoice for a subscription.
+/// Generate the next invoice for a subscription (creates draft AR `OutInvoice`).
 #[spacetimedb::reducer]
 pub fn generate_subscription_invoice(
     ctx: &ReducerContext,
@@ -650,6 +782,7 @@ pub fn generate_subscription_invoice(
     params: GenerateSubscriptionInvoiceParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
+    check_permission(ctx, organization_id, "account_move", "create")?;
 
     let subscription = ctx
         .db
@@ -661,24 +794,96 @@ pub fn generate_subscription_invoice(
     if subscription.organization_id != organization_id {
         return Err("Subscription does not belong to this organization".to_string());
     }
-
-    if subscription.state != "active" {
-        return Err("Subscription must be active to generate invoice".to_string());
+    if subscription.company_id != company_id {
+        return Err("Subscription does not belong to this company".to_string());
     }
 
-    let new_invoice_count = subscription.invoice_count + 1;
-    let new_next_date = calculate_next_date(
+    let plan = ctx
+        .db
+        .subscription_plan()
+        .id()
+        .find(&subscription.plan_id)
+        .ok_or("Subscription plan not found")?;
+    let journal_id = params.journal_id.unwrap_or(plan.journal_id);
+    if journal_id == 0 {
+        return Err("journal_id is required (plan has none)".to_string());
+    }
+    if params.income_account_id == 0 || params.receivable_account_id == 0 {
+        return Err("income_account_id and receivable_account_id are required".to_string());
+    }
+
+    let billing_run_key = params
+        .billing_run_key
+        .as_ref()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| default_billing_run_key(subscription_id, params.invoice_date));
+
+    let recurring_line_count = ctx
+        .db
+        .subscription_line()
+        .subscription_line_by_subscription()
+        .filter(&subscription_id)
+        .filter(|l| l.organization_id == organization_id && l.line_is_recurring)
+        .count();
+    let unbilled_usage = crate::subscriptions::subscription_wave_d::count_unbilled_usage_charges(
+        ctx,
+        organization_id,
+        subscription_id,
+    );
+    if recurring_line_count == 0 && unbilled_usage == 0 {
+        return Err(
+            "Subscription has no recurring lines or unbilled usage charges to invoice".to_string(),
+        );
+    }
+
+    let old_invoice_count = subscription.invoice_count;
+    let result = create_subscription_ar_invoice(
+        ctx,
+        organization_id,
+        company_id,
+        &subscription,
         params.invoice_date,
-        &subscription.recurring_rule_type,
-        subscription.recurring_interval,
+        &billing_run_key,
+        journal_id,
+        params.income_account_id,
+        params.receivable_account_id,
+        params.tax_account_id,
+        ctx.sender(),
     )?;
 
-    ctx.db.subscription().id().update(Subscription {
-        invoice_count: new_invoice_count,
-        recurring_next_date: new_next_date,
-        updated_at: ctx.timestamp,
-        ..subscription
-    });
+    let mut usage_added = 0.0f64;
+    if !result.already_existed {
+        usage_added = crate::subscriptions::subscription_wave_d::append_unbilled_usage_to_invoice(
+            ctx,
+            organization_id,
+            company_id,
+            &subscription,
+            result.move_id,
+            params.income_account_id,
+            &billing_run_key,
+            ctx.sender(),
+        )?;
+        if recurring_line_count == 0 && usage_added <= 0.0 {
+            return Err("No recurring lines and no usage/true-up amount to invoice".to_string());
+        }
+    }
+
+    apply_billing_run_to_subscription(
+        ctx,
+        subscription,
+        result.move_id,
+        result.period_end,
+        result.already_existed,
+        result.fx_rate,
+    );
+
+    let refreshed = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&subscription_id)
+        .ok_or("Subscription not found after billing run")?;
 
     write_audit_log_v2(
         ctx,
@@ -689,17 +894,31 @@ pub fn generate_subscription_invoice(
             record_id: subscription_id,
             action: "UPDATE",
             old_values: Some(
-                serde_json::json!({ "invoice_count": subscription.invoice_count }).to_string(),
+                serde_json::json!({ "invoice_count": old_invoice_count }).to_string(),
             ),
-            new_values: Some(serde_json::json!({ "invoice_count": new_invoice_count }).to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "invoice_count": refreshed.invoice_count,
+                    "invoice_move_id": result.move_id,
+                })
+                .to_string(),
+            ),
             changed_fields: vec![
                 "invoice_count".to_string(),
                 "recurring_next_date".to_string(),
+                "invoice_ids".to_string(),
             ],
             metadata: Some(
                 serde_json::json!({
                     "billing_run_recorded": true,
-                    "accounting_invoice_created": false
+                    "accounting_invoice_created": true,
+                    "billing_run_key": billing_run_key,
+                    "already_existed": result.already_existed,
+                    "amount_total": result.amount_total + usage_added,
+                    "amount_tax": result.amount_tax,
+                    "usage_amount_added": usage_added,
+                    "fx_rate": result.fx_rate,
+                    "deferred_schedule_ids": result.deferred_schedule_ids,
                 })
                 .to_string(),
             ),
@@ -707,33 +926,118 @@ pub fn generate_subscription_invoice(
     );
 
     log::info!(
-        "Recorded subscription billing run for subscription {}; accounting invoice creation is not wired here",
-        subscription_id
+        "Subscription {} billing run key={} invoice_move={} idempotent={} usage_added={}",
+        subscription_id,
+        billing_run_key,
+        result.move_id,
+        result.already_existed,
+        usage_added
     );
     Ok(())
 }
 
-fn calculate_next_date(
-    from_date: Timestamp,
-    rule_type: &str,
-    interval: u32,
-) -> Result<Timestamp, String> {
-    let duration_secs = match rule_type {
-        "daily" => interval as u64 * 24 * 60 * 60,
-        "weekly" => interval as u64 * 7 * 24 * 60 * 60,
-        "monthly" => interval as u64 * 30 * 24 * 60 * 60, // Approximate
-        "yearly" => interval as u64 * 365 * 24 * 60 * 60,
-        _ => return Err(format!("Unknown rule type: {}", rule_type)),
-    };
+/// Post (if needed) and apply a customer payment that clears a subscription AR invoice.
+#[spacetimedb::reducer]
+pub fn pay_subscription_invoice(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    subscription_id: u64,
+    params: ApplySubscriptionInvoicePaymentParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "subscription", "write")?;
+    check_permission(ctx, organization_id, "payment", "create")?;
+    check_permission(ctx, organization_id, "account_move", "write")?;
 
-    let current_secs = from_date
-        .to_duration_since_unix_epoch()
-        .unwrap_or_default()
-        .as_secs();
+    let subscription = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&subscription_id)
+        .ok_or("Subscription not found")?;
 
-    Ok(Timestamp::from_duration_since_unix_epoch(
-        std::time::Duration::from_secs(current_secs + duration_secs),
-    ))
+    if subscription.organization_id != organization_id {
+        return Err("Subscription does not belong to this organization".to_string());
+    }
+    if subscription.company_id != company_id {
+        return Err("Subscription does not belong to this company".to_string());
+    }
+    if params.payment_journal_id == 0 || params.bank_account_id == 0 {
+        return Err("payment_journal_id and bank_account_id are required".to_string());
+    }
+    if params.receivable_account_id == 0 {
+        return Err("receivable_account_id is required".to_string());
+    }
+
+    let result = apply_subscription_invoice_payment(
+        ctx,
+        organization_id,
+        company_id,
+        &subscription,
+        params.invoice_move_id,
+        params.payment_journal_id,
+        params.bank_account_id,
+        params.receivable_account_id,
+        params.amount,
+        params.payment_date,
+        params.cogs_account_id,
+        params.inventory_account_id,
+        params.ref_.clone(),
+        params.memo.clone(),
+    )?;
+
+    let refreshed = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&subscription_id)
+        .ok_or("Subscription not found after payment")?;
+    crate::subscriptions::subscription_wave_e::on_subscription_payment_cleared(
+        ctx,
+        organization_id,
+        company_id,
+        &refreshed,
+    )?;
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "subscription",
+            record_id: subscription_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "invoice_move_id": result.invoice_move_id,
+                    "payment_id": result.payment_id,
+                    "payment_move_id": result.payment_move_id,
+                    "amount": result.amount,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["payment_applied".to_string()],
+            metadata: Some(
+                serde_json::json!({
+                    "payment_applied": true,
+                    "invoice_move_id": result.invoice_move_id,
+                    "payment_id": result.payment_id,
+                    "entitlement_restored": true,
+                })
+                .to_string(),
+            ),
+        },
+    );
+
+    log::info!(
+        "Subscription {} payment {} applied to invoice {} amount={}",
+        subscription_id,
+        result.payment_id,
+        result.invoice_move_id,
+        result.amount
+    );
+    Ok(())
 }
 
 // ============================================================================

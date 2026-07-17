@@ -50,10 +50,12 @@ pub mod add_org_member_params_type;
 pub mod add_purchase_order_line_params_type;
 pub mod add_purchase_requisition_line_params_type;
 pub mod add_purchase_rfq_line_params_type;
+pub mod add_subscription_bundle_item_params_type;
 pub mod add_user_to_organization_params_type;
 pub mod add_workflow_activity_params_type;
 pub mod add_workflow_transition_params_type;
 pub mod adjustment_reason_type;
+pub mod advance_subscription_dunning_params_type;
 pub mod ai_action_draft_type;
 pub mod ai_agent_type;
 pub mod ai_agent_run_type;
@@ -75,6 +77,7 @@ pub mod ai_skill_version_type;
 pub mod ai_team_member_type;
 pub mod ai_team_member_skill_type;
 pub mod allocate_payment_params_type;
+pub mod amend_subscription_params_type;
 pub mod amortization_line_type;
 pub mod amortization_schedule_type;
 pub mod analytics_metric_type;
@@ -82,8 +85,11 @@ pub mod append_ai_agent_run_step_params_type;
 pub mod append_ai_chat_message_params_type;
 pub mod append_crm_conversation_message_params_type;
 pub mod apply_expense_advance_params_type;
+pub mod apply_index_linked_renewal_params_type;
 pub mod apply_omnichannel_allocation_params_type;
 pub mod apply_sale_promotion_params_type;
+pub mod apply_subscription_bundle_params_type;
+pub mod apply_subscription_invoice_payment_params_type;
 pub mod approval_request_type;
 pub mod approval_rule_type;
 pub mod asset_state_type;
@@ -114,6 +120,7 @@ pub mod budget_post_type;
 pub mod budget_state_type;
 pub mod calendar_event_type;
 pub mod cancel_intercompany_transaction_params_type;
+pub mod cancel_subscription_params_type;
 pub mod card_state_type;
 pub mod cartonization_result_type;
 pub mod casbin_rule_type;
@@ -231,6 +238,7 @@ pub mod create_document_template_params_type;
 pub mod create_elimination_entry_params_type;
 pub mod create_employee_params_type;
 pub mod create_expense_advance_params_type;
+pub mod create_expense_card_statement_line_params_type;
 pub mod create_expense_integration_intent_params_type;
 pub mod create_expense_params_type;
 pub mod create_expense_project_rebill_params_type;
@@ -347,8 +355,12 @@ pub mod create_stock_quant_params_type;
 pub mod create_stock_route_params_type;
 pub mod create_stock_rule_params_type;
 pub mod create_stock_traceability_report_params_type;
+pub mod create_subscription_bundle_params_type;
 pub mod create_subscription_from_sale_order_params_type;
+pub mod create_subscription_payment_intent_params_type;
 pub mod create_subscription_plan_params_type;
+pub mod create_subscription_price_tier_params_type;
+pub mod create_subscription_tax_settle_intent_params_type;
 pub mod create_task_params_type;
 pub mod create_tax_deadline_params_type;
 pub mod create_tax_jurisdiction_params_type;
@@ -410,6 +422,7 @@ pub mod execute_cross_dock_params_type;
 pub mod execute_directed_putaway_params_type;
 pub mod expense_advance_state_type;
 pub mod expense_allocation_line_params_type;
+pub mod expense_card_statement_line_type;
 pub mod expense_integration_intent_type;
 pub mod expense_line_kind_type;
 pub mod expense_payment_mode_type;
@@ -418,6 +431,7 @@ pub mod expense_sheet_state_type;
 pub mod expense_state_type;
 pub mod export_financial_report_params_type;
 pub mod fail_expense_integration_intent_params_type;
+pub mod fail_subscription_payment_intent_params_type;
 pub mod fail_warehouse_sync_intent_params_type;
 pub mod field_option_type;
 pub mod field_type_type;
@@ -438,6 +452,7 @@ pub mod generated_owner_report_type;
 pub mod google_drive_connection_type;
 pub mod grant_delegated_admin_scope_params_type;
 pub mod grant_org_permission_params_type;
+pub mod grant_subscription_entitlement_params_type;
 pub mod helpdesk_sla_type;
 pub mod helpdesk_stage_type;
 pub mod helpdesk_team_type;
@@ -467,6 +482,7 @@ pub mod import_job_type;
 pub mod import_job_error_type;
 pub mod import_job_record_type;
 pub mod import_mapping_template_type;
+pub mod ingest_subscription_usage_event_params_type;
 pub mod insight_severity_type;
 pub mod instance_state_type;
 pub mod intake_state_type;
@@ -507,6 +523,7 @@ pub mod mail_follower_type;
 pub mod mail_message_type;
 pub mod mail_message_type_type;
 pub mod mail_template_type;
+pub mod match_expense_card_statement_line_params_type;
 pub mod merge_contacts_params_type;
 pub mod message_batch_type;
 pub mod message_batch_status_type;
@@ -541,6 +558,7 @@ pub mod packaging_material_type;
 pub mod partner_credit_control_type;
 pub mod partner_type_type;
 pub mod password_reset_token_type;
+pub mod pause_subscription_params_type;
 pub mod payment_account_type;
 pub mod payment_direction_type;
 pub mod payment_fee_type;
@@ -625,6 +643,8 @@ pub mod quality_team_type;
 pub mod queue_job_type;
 pub mod queue_mail_from_template_params_type;
 pub mod queue_worker_type;
+pub mod rate_subscription_usage_events_params_type;
+pub mod rebase_deferred_schedules_params_type;
 pub mod receive_consignment_stock_params_type;
 pub mod recognize_amortization_line_params_type;
 pub mod recognize_deferred_revenue_params_type;
@@ -639,6 +659,7 @@ pub mod record_inventory_integration_result_params_type;
 pub mod record_privacy_consent_params_type;
 pub mod record_purchasing_integration_result_params_type;
 pub mod record_sales_integration_result_params_type;
+pub mod record_subscription_payment_failure_params_type;
 pub mod record_telemetry_params_type;
 pub mod record_whats_app_health_check_params_type;
 pub mod refresh_inventory_exceptions_params_type;
@@ -648,6 +669,7 @@ pub mod register_hub_params_type;
 pub mod register_queue_worker_params_type;
 pub mod reject_approval_request_params_type;
 pub mod release_blanket_to_po_params_type;
+pub mod renew_subscription_params_type;
 pub mod replenishment_rule_type;
 pub mod report_state_type;
 pub mod report_template_type;
@@ -655,6 +677,7 @@ pub mod report_type_type;
 pub mod request_expense_policy_exception_params_type;
 pub mod requisition_state_type;
 pub mod res_partner_bank_type;
+pub mod resume_subscription_params_type;
 pub mod return_order_type;
 pub mod return_order_line_type;
 pub mod revenue_recognition_rule_type;
@@ -701,6 +724,7 @@ pub mod set_expense_allocations_params_type;
 pub mod set_expense_fraud_hold_params_type;
 pub mod set_purchase_approval_delegate_params_type;
 pub mod set_record_custom_field_values_params_type;
+pub mod set_subscription_commitment_params_type;
 pub mod set_vendor_risk_flag_params_type;
 pub mod settle_sale_commissions_params_type;
 pub mod setup_fiscal_calendar_params_type;
@@ -733,8 +757,21 @@ pub mod stock_rule_type;
 pub mod stock_traceability_report_type;
 pub mod submit_supplier_intake_params_type;
 pub mod subscription_type;
+pub mod subscription_amendment_type;
+pub mod subscription_billing_run_type;
+pub mod subscription_bundle_type;
+pub mod subscription_bundle_item_type;
+pub mod subscription_collection_type;
+pub mod subscription_commitment_type;
+pub mod subscription_entitlement_type;
 pub mod subscription_line_type;
+pub mod subscription_payment_intent_type;
 pub mod subscription_plan_type;
+pub mod subscription_price_index_type;
+pub mod subscription_price_tier_type;
+pub mod subscription_tax_settle_intent_type;
+pub mod subscription_usage_charge_type;
+pub mod subscription_usage_event_type;
 pub mod supplier_intake_request_type;
 pub mod sync_direction_type;
 pub mod sync_status_type;
@@ -750,6 +787,7 @@ pub mod tax_schedule_type;
 pub mod tax_type_use_type;
 pub mod ticket_priority_type;
 pub mod trial_balance_type;
+pub mod unmatch_expense_card_statement_line_params_type;
 pub mod unreconcile_account_bank_statement_line_params_type;
 pub mod uom_type;
 pub mod uom_category_type;
@@ -855,6 +893,7 @@ pub mod update_stock_production_serial_params_type;
 pub mod update_stock_quant_quantity_params_type;
 pub mod update_stock_route_params_type;
 pub mod update_stock_rule_params_type;
+pub mod update_subscription_plan_params_type;
 pub mod update_supplier_intake_params_type;
 pub mod update_task_params_type;
 pub mod update_tax_deadline_params_type;
@@ -880,6 +919,7 @@ pub mod upsert_expense_policy_params_type;
 pub mod upsert_organization_settings_params_type;
 pub mod upsert_partner_credit_control_params_type;
 pub mod upsert_search_embedding_params_type;
+pub mod upsert_subscription_price_index_params_type;
 pub mod upsert_vendor_scorecard_params_type;
 pub mod user_credential_type;
 pub mod user_custom_field_type;
@@ -920,6 +960,7 @@ pub mod activate_consignment_agreement_reducer;
 pub mod activate_pos_config_reducer;
 pub mod activate_revenue_recognition_rule_reducer;
 pub mod activate_subscription_reducer;
+pub mod activate_subscription_plan_reducer;
 pub mod add_account_move_line_reducer;
 pub mod add_article_member_reducer;
 pub mod add_casbin_rule_reducer;
@@ -937,24 +978,32 @@ pub mod add_purchase_requisition_line_reducer;
 pub mod add_purchase_rfq_bid_reducer;
 pub mod add_purchase_rfq_line_reducer;
 pub mod add_rule_to_nomenclature_reducer;
+pub mod add_subscription_bundle_item_reducer;
 pub mod add_user_custom_field_reducer;
 pub mod add_user_to_organization_reducer;
 pub mod add_widget_to_dashboard_reducer;
 pub mod add_workflow_activity_reducer;
 pub mod add_workflow_transition_reducer;
+pub mod advance_subscription_dunning_reducer;
 pub mod allocate_payment_transaction_reducer;
+pub mod amend_subscription_reducer;
 pub mod append_ai_agent_run_step_reducer;
 pub mod append_ai_chat_message_reducer;
 pub mod append_crm_conversation_message_reducer;
 pub mod apply_expense_advance_to_sheet_reducer;
 pub mod apply_expense_integration_intent_reducer;
 pub mod apply_global_migrations_reducer;
+pub mod apply_index_linked_renewal_reducer;
 pub mod apply_landed_costs_reducer;
 pub mod apply_omnichannel_allocation_reducer;
 pub mod apply_org_migrations_reducer;
+pub mod apply_pending_expense_integration_intents_reducer;
 pub mod apply_reconciliation_rules_reducer;
 pub mod apply_sale_order_options_reducer;
 pub mod apply_sale_promotion_to_order_reducer;
+pub mod apply_subscription_bundle_reducer;
+pub mod apply_subscription_payment_intent_reducer;
+pub mod apply_subscription_tax_settle_intent_reducer;
 pub mod apply_warehouse_sync_intent_reducer;
 pub mod approve_ai_action_draft_reducer;
 pub mod approve_approval_request_reducer;
@@ -1008,6 +1057,7 @@ pub mod cancel_sale_order_reducer;
 pub mod cancel_stock_move_reducer;
 pub mod cancel_stock_package_reducer;
 pub mod cancel_stock_picking_reducer;
+pub mod cancel_subscription_reducer;
 pub mod cancel_workflow_instance_reducer;
 pub mod check_mo_availability_reducer;
 pub mod claim_hub_with_token_reducer;
@@ -1130,6 +1180,7 @@ pub mod create_employee_reducer;
 pub mod create_exchange_order_from_return_reducer;
 pub mod create_expense_reducer;
 pub mod create_expense_advance_reducer;
+pub mod create_expense_card_statement_line_reducer;
 pub mod create_expense_integration_intent_reducer;
 pub mod create_expense_project_rebill_reducer;
 pub mod create_expense_reimbursement_payment_reducer;
@@ -1244,8 +1295,12 @@ pub mod create_stock_production_serial_reducer;
 pub mod create_stock_quant_reducer;
 pub mod create_stock_route_reducer;
 pub mod create_stock_rule_reducer;
+pub mod create_subscription_bundle_reducer;
 pub mod create_subscription_from_sale_order_reducer;
+pub mod create_subscription_payment_intent_reducer;
 pub mod create_subscription_plan_reducer;
+pub mod create_subscription_price_tier_reducer;
+pub mod create_subscription_tax_settle_intent_reducer;
 pub mod create_task_reducer;
 pub mod create_tax_deadline_reducer;
 pub mod create_tax_jurisdiction_reducer;
@@ -1273,6 +1328,7 @@ pub mod create_workflow_reducer;
 pub mod create_workorder_reducer;
 pub mod deactivate_pos_config_reducer;
 pub mod deactivate_revenue_recognition_rule_reducer;
+pub mod deactivate_subscription_plan_reducer;
 pub mod delete_account_asset_reducer;
 pub mod delete_account_bank_statement_reducer;
 pub mod delete_account_bank_statement_line_reducer;
@@ -1358,6 +1414,7 @@ pub mod fail_expense_integration_intent_reducer;
 pub mod fail_iot_action_reducer;
 pub mod fail_quality_check_reducer;
 pub mod fail_scheduled_owner_report_run_reducer;
+pub mod fail_subscription_payment_intent_reducer;
 pub mod fail_warehouse_sync_intent_reducer;
 pub mod finalize_import_assistant_job_reducer;
 pub mod find_duplicate_contacts_reducer;
@@ -1371,6 +1428,7 @@ pub mod get_form_configuration_reducer;
 pub mod get_organization_form_configs_reducer;
 pub mod grant_delegated_admin_scope_reducer;
 pub mod grant_permission_reducer;
+pub mod grant_subscription_entitlement_reducer;
 pub mod hold_supplier_intake_reducer;
 pub mod import_account_csv_reducer;
 pub mod import_account_move_csv_reducer;
@@ -1432,6 +1490,7 @@ pub mod import_uom_csv_reducer;
 pub mod import_warehouse_csv_reducer;
 pub mod import_workcenter_csv_reducer;
 pub mod import_workflow_csv_reducer;
+pub mod ingest_subscription_usage_event_reducer;
 pub mod initialize_default_form_configs_reducer;
 pub mod invoice_po_line_reducer;
 pub mod link_device_to_location_reducer;
@@ -1453,6 +1512,7 @@ pub mod mark_mail_message_delivered_reducer;
 pub mod mark_reset_token_used_reducer;
 pub mod match_bank_line_reducer;
 pub mod match_elimination_entries_reducer;
+pub mod match_expense_card_statement_line_reducer;
 pub mod merge_contacts_reducer;
 pub mod migrate_all_organizations_reducer;
 pub mod move_stock_quant_reducer;
@@ -1465,6 +1525,8 @@ pub mod open_quality_alert_reducer;
 pub mod pack_moves_into_package_reducer;
 pub mod pack_stock_picking_reducer;
 pub mod pass_quality_check_reducer;
+pub mod pause_subscription_reducer;
+pub mod pay_subscription_invoice_reducer;
 pub mod post_account_bank_statement_reducer;
 pub mod post_account_move_reducer;
 pub mod post_cycle_count_adjustments_reducer;
@@ -1483,6 +1545,8 @@ pub mod process_pending_scans_reducer;
 pub mod produce_manufacturing_order_reducer;
 pub mod promote_ai_skill_version_reducer;
 pub mod queue_mail_from_template_reducer;
+pub mod rate_subscription_usage_events_reducer;
+pub mod rebase_deferred_schedules_for_subscription_reducer;
 pub mod receive_consignment_stock_reducer;
 pub mod receive_po_line_reducer;
 pub mod recognize_amortization_line_reducer;
@@ -1506,6 +1570,7 @@ pub mod record_privacy_consent_reducer;
 pub mod record_purchasing_integration_result_reducer;
 pub mod record_report_run_reducer;
 pub mod record_sales_integration_result_reducer;
+pub mod record_subscription_payment_failure_reducer;
 pub mod record_telemetry_reducer;
 pub mod record_telemetry_batch_reducer;
 pub mod record_whatsapp_health_check_reducer;
@@ -1513,6 +1578,7 @@ pub mod record_whatsapp_message_sent_reducer;
 pub mod refresh_inventory_exceptions_reducer;
 pub mod refresh_policy_snapshot_reducer;
 pub mod refresh_sale_order_promise_dates_reducer;
+pub mod refresh_subscription_exception_flags_reducer;
 pub mod refresh_tax_deadline_statuses_reducer;
 pub mod refuse_expense_sheet_reducer;
 pub mod refuse_leave_reducer;
@@ -1532,6 +1598,7 @@ pub mod remove_member_from_quality_team_reducer;
 pub mod remove_purchase_order_line_reducer;
 pub mod remove_rule_from_nomenclature_reducer;
 pub mod remove_user_from_organization_reducer;
+pub mod renew_subscription_reducer;
 pub mod reopen_inventory_close_reducer;
 pub mod reopen_ticket_reducer;
 pub mod reorder_proposal_line_items_reducer;
@@ -1544,6 +1611,7 @@ pub mod resolve_inventory_exception_reducer;
 pub mod resolve_iot_alert_reducer;
 pub mod resolve_proposal_comment_reducer;
 pub mod restore_product_category_reducer;
+pub mod resume_subscription_reducer;
 pub mod retry_intercompany_transaction_reducer;
 pub mod retry_iot_action_reducer;
 pub mod reverse_payment_transaction_reducer;
@@ -1553,6 +1621,7 @@ pub mod review_supplier_intake_reducer;
 pub mod revoke_delegated_admin_scope_reducer;
 pub mod revoke_permission_reducer;
 pub mod revoke_role_reducer;
+pub mod revoke_subscription_entitlement_reducer;
 pub mod rollback_ai_skill_release_reducer;
 pub mod rollback_import_job_reducer;
 pub mod run_accounting_fx_revaluation_test_reducer;
@@ -1574,6 +1643,7 @@ pub mod run_all_inventory_tests_reducer;
 pub mod run_all_platform_tests_reducer;
 pub mod run_all_purchasing_tests_reducer;
 pub mod run_all_sales_tests_reducer;
+pub mod run_all_subscriptions_tests_reducer;
 pub mod run_cartonization_reducer;
 pub mod run_core_operational_messaging_test_reducer;
 pub mod run_core_sod_test_reducer;
@@ -1589,6 +1659,7 @@ pub mod run_expenses_wave_a_test_reducer;
 pub mod run_expenses_wave_b_test_reducer;
 pub mod run_expenses_wave_c_test_reducer;
 pub mod run_expenses_wave_d_test_reducer;
+pub mod run_expenses_wave_e_test_reducer;
 pub mod run_fx_revaluation_reducer;
 pub mod run_fx_revaluation_batch_reducer;
 pub mod run_helpdesk_ticket_test_reducer;
@@ -1654,6 +1725,11 @@ pub mod run_sales_order_update_test_reducer;
 pub mod run_sales_pricelist_apply_test_reducer;
 pub mod run_sales_send_quotation_test_reducer;
 pub mod run_subscription_plan_test_reducer;
+pub mod run_subscriptions_wave_a_test_reducer;
+pub mod run_subscriptions_wave_b_test_reducer;
+pub mod run_subscriptions_wave_c_test_reducer;
+pub mod run_subscriptions_wave_d_test_reducer;
+pub mod run_subscriptions_wave_e_test_reducer;
 pub mod run_tenant_isolation_tests_reducer;
 pub mod run_traceability_report_reducer;
 pub mod run_workflow_definition_test_reducer;
@@ -1687,6 +1763,7 @@ pub mod set_iot_threshold_reducer;
 pub mod set_project_active_reducer;
 pub mod set_purchase_approval_delegate_reducer;
 pub mod set_record_custom_field_values_reducer;
+pub mod set_subscription_commitment_reducer;
 pub mod set_task_parent_reducer;
 pub mod set_vendor_risk_flag_reducer;
 pub mod set_whatsapp_primary_account_reducer;
@@ -1724,6 +1801,7 @@ pub mod unlock_knowledge_article_reducer;
 pub mod unlock_purchase_order_reducer;
 pub mod unlock_sale_order_reducer;
 pub mod unmatch_elimination_entry_reducer;
+pub mod unmatch_expense_card_statement_line_reducer;
 pub mod unreconciled_account_bank_statement_line_reducer;
 pub mod unreserve_stock_quant_reducer;
 pub mod unsubscribe_from_record_reducer;
@@ -1846,6 +1924,7 @@ pub mod update_stock_production_serial_reducer;
 pub mod update_stock_quant_quantity_reducer;
 pub mod update_stock_route_reducer;
 pub mod update_stock_rule_reducer;
+pub mod update_subscription_plan_reducer;
 pub mod update_supplier_intake_reducer;
 pub mod update_task_reducer;
 pub mod update_task_state_reducer;
@@ -1879,6 +1958,7 @@ pub mod upsert_organization_settings_reducer;
 pub mod upsert_partner_credit_control_reducer;
 pub mod upsert_proposal_section_reducer;
 pub mod upsert_search_embedding_reducer;
+pub mod upsert_subscription_price_index_reducer;
 pub mod upsert_vendor_scorecard_reducer;
 pub mod upsert_warehouse_geo_reducer;
 pub mod use_serial_reducer;
@@ -2005,6 +2085,7 @@ pub mod document_table;
 pub mod document_sequence_table;
 pub mod document_template_table;
 pub mod document_version_table;
+pub mod expense_card_statement_line_table;
 pub mod expense_integration_intent_table;
 pub mod expense_sheet_table;
 pub mod financial_report_table;
@@ -2191,8 +2272,21 @@ pub mod stock_route_table;
 pub mod stock_rule_table;
 pub mod stock_traceability_report_table;
 pub mod subscription_table;
+pub mod subscription_amendment_table;
+pub mod subscription_billing_run_table;
+pub mod subscription_bundle_table;
+pub mod subscription_bundle_item_table;
+pub mod subscription_collection_table;
+pub mod subscription_commitment_table;
+pub mod subscription_entitlement_table;
 pub mod subscription_line_table;
+pub mod subscription_payment_intent_table;
 pub mod subscription_plan_table;
+pub mod subscription_price_index_table;
+pub mod subscription_price_tier_table;
+pub mod subscription_tax_settle_intent_table;
+pub mod subscription_usage_charge_table;
+pub mod subscription_usage_event_table;
 pub mod supplier_intake_request_table;
 pub mod tax_deadline_table;
 pub mod tax_deadline_reminder_table;
@@ -2263,10 +2357,12 @@ pub use add_org_member_params_type::AddOrgMemberParams;
 pub use add_purchase_order_line_params_type::AddPurchaseOrderLineParams;
 pub use add_purchase_requisition_line_params_type::AddPurchaseRequisitionLineParams;
 pub use add_purchase_rfq_line_params_type::AddPurchaseRfqLineParams;
+pub use add_subscription_bundle_item_params_type::AddSubscriptionBundleItemParams;
 pub use add_user_to_organization_params_type::AddUserToOrganizationParams;
 pub use add_workflow_activity_params_type::AddWorkflowActivityParams;
 pub use add_workflow_transition_params_type::AddWorkflowTransitionParams;
 pub use adjustment_reason_type::AdjustmentReason;
+pub use advance_subscription_dunning_params_type::AdvanceSubscriptionDunningParams;
 pub use ai_action_draft_type::AiActionDraft;
 pub use ai_agent_type::AiAgent;
 pub use ai_agent_run_type::AiAgentRun;
@@ -2288,6 +2384,7 @@ pub use ai_skill_version_type::AiSkillVersion;
 pub use ai_team_member_type::AiTeamMember;
 pub use ai_team_member_skill_type::AiTeamMemberSkill;
 pub use allocate_payment_params_type::AllocatePaymentParams;
+pub use amend_subscription_params_type::AmendSubscriptionParams;
 pub use amortization_line_type::AmortizationLine;
 pub use amortization_schedule_type::AmortizationSchedule;
 pub use analytics_metric_type::AnalyticsMetric;
@@ -2295,8 +2392,11 @@ pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
 pub use append_ai_chat_message_params_type::AppendAiChatMessageParams;
 pub use append_crm_conversation_message_params_type::AppendCrmConversationMessageParams;
 pub use apply_expense_advance_params_type::ApplyExpenseAdvanceParams;
+pub use apply_index_linked_renewal_params_type::ApplyIndexLinkedRenewalParams;
 pub use apply_omnichannel_allocation_params_type::ApplyOmnichannelAllocationParams;
 pub use apply_sale_promotion_params_type::ApplySalePromotionParams;
+pub use apply_subscription_bundle_params_type::ApplySubscriptionBundleParams;
+pub use apply_subscription_invoice_payment_params_type::ApplySubscriptionInvoicePaymentParams;
 pub use approval_request_type::ApprovalRequest;
 pub use approval_rule_type::ApprovalRule;
 pub use asset_state_type::AssetState;
@@ -2327,6 +2427,7 @@ pub use budget_post_type::BudgetPost;
 pub use budget_state_type::BudgetState;
 pub use calendar_event_type::CalendarEvent;
 pub use cancel_intercompany_transaction_params_type::CancelIntercompanyTransactionParams;
+pub use cancel_subscription_params_type::CancelSubscriptionParams;
 pub use card_state_type::CardState;
 pub use cartonization_result_type::CartonizationResult;
 pub use casbin_rule_type::CasbinRule;
@@ -2444,6 +2545,7 @@ pub use create_document_template_params_type::CreateDocumentTemplateParams;
 pub use create_elimination_entry_params_type::CreateEliminationEntryParams;
 pub use create_employee_params_type::CreateEmployeeParams;
 pub use create_expense_advance_params_type::CreateExpenseAdvanceParams;
+pub use create_expense_card_statement_line_params_type::CreateExpenseCardStatementLineParams;
 pub use create_expense_integration_intent_params_type::CreateExpenseIntegrationIntentParams;
 pub use create_expense_params_type::CreateExpenseParams;
 pub use create_expense_project_rebill_params_type::CreateExpenseProjectRebillParams;
@@ -2560,8 +2662,12 @@ pub use create_stock_quant_params_type::CreateStockQuantParams;
 pub use create_stock_route_params_type::CreateStockRouteParams;
 pub use create_stock_rule_params_type::CreateStockRuleParams;
 pub use create_stock_traceability_report_params_type::CreateStockTraceabilityReportParams;
+pub use create_subscription_bundle_params_type::CreateSubscriptionBundleParams;
 pub use create_subscription_from_sale_order_params_type::CreateSubscriptionFromSaleOrderParams;
+pub use create_subscription_payment_intent_params_type::CreateSubscriptionPaymentIntentParams;
 pub use create_subscription_plan_params_type::CreateSubscriptionPlanParams;
+pub use create_subscription_price_tier_params_type::CreateSubscriptionPriceTierParams;
+pub use create_subscription_tax_settle_intent_params_type::CreateSubscriptionTaxSettleIntentParams;
 pub use create_task_params_type::CreateTaskParams;
 pub use create_tax_deadline_params_type::CreateTaxDeadlineParams;
 pub use create_tax_jurisdiction_params_type::CreateTaxJurisdictionParams;
@@ -2623,6 +2729,7 @@ pub use execute_cross_dock_params_type::ExecuteCrossDockParams;
 pub use execute_directed_putaway_params_type::ExecuteDirectedPutawayParams;
 pub use expense_advance_state_type::ExpenseAdvanceState;
 pub use expense_allocation_line_params_type::ExpenseAllocationLineParams;
+pub use expense_card_statement_line_type::ExpenseCardStatementLine;
 pub use expense_integration_intent_type::ExpenseIntegrationIntent;
 pub use expense_line_kind_type::ExpenseLineKind;
 pub use expense_payment_mode_type::ExpensePaymentMode;
@@ -2631,6 +2738,7 @@ pub use expense_sheet_state_type::ExpenseSheetState;
 pub use expense_state_type::ExpenseState;
 pub use export_financial_report_params_type::ExportFinancialReportParams;
 pub use fail_expense_integration_intent_params_type::FailExpenseIntegrationIntentParams;
+pub use fail_subscription_payment_intent_params_type::FailSubscriptionPaymentIntentParams;
 pub use fail_warehouse_sync_intent_params_type::FailWarehouseSyncIntentParams;
 pub use field_option_type::FieldOption;
 pub use field_type_type::FieldType;
@@ -2651,6 +2759,7 @@ pub use generated_owner_report_type::GeneratedOwnerReport;
 pub use google_drive_connection_type::GoogleDriveConnection;
 pub use grant_delegated_admin_scope_params_type::GrantDelegatedAdminScopeParams;
 pub use grant_org_permission_params_type::GrantOrgPermissionParams;
+pub use grant_subscription_entitlement_params_type::GrantSubscriptionEntitlementParams;
 pub use helpdesk_sla_type::HelpdeskSla;
 pub use helpdesk_stage_type::HelpdeskStage;
 pub use helpdesk_team_type::HelpdeskTeam;
@@ -2680,6 +2789,7 @@ pub use import_job_type::ImportJob;
 pub use import_job_error_type::ImportJobError;
 pub use import_job_record_type::ImportJobRecord;
 pub use import_mapping_template_type::ImportMappingTemplate;
+pub use ingest_subscription_usage_event_params_type::IngestSubscriptionUsageEventParams;
 pub use insight_severity_type::InsightSeverity;
 pub use instance_state_type::InstanceState;
 pub use intake_state_type::IntakeState;
@@ -2720,6 +2830,7 @@ pub use mail_follower_type::MailFollower;
 pub use mail_message_type::MailMessage;
 pub use mail_message_type_type::MailMessageType;
 pub use mail_template_type::MailTemplate;
+pub use match_expense_card_statement_line_params_type::MatchExpenseCardStatementLineParams;
 pub use merge_contacts_params_type::MergeContactsParams;
 pub use message_batch_type::MessageBatch;
 pub use message_batch_status_type::MessageBatchStatus;
@@ -2754,6 +2865,7 @@ pub use packaging_material_type::PackagingMaterial;
 pub use partner_credit_control_type::PartnerCreditControl;
 pub use partner_type_type::PartnerType;
 pub use password_reset_token_type::PasswordResetToken;
+pub use pause_subscription_params_type::PauseSubscriptionParams;
 pub use payment_account_type::PaymentAccount;
 pub use payment_direction_type::PaymentDirection;
 pub use payment_fee_type::PaymentFee;
@@ -2838,6 +2950,8 @@ pub use quality_team_type::QualityTeam;
 pub use queue_job_type::QueueJob;
 pub use queue_mail_from_template_params_type::QueueMailFromTemplateParams;
 pub use queue_worker_type::QueueWorker;
+pub use rate_subscription_usage_events_params_type::RateSubscriptionUsageEventsParams;
+pub use rebase_deferred_schedules_params_type::RebaseDeferredSchedulesParams;
 pub use receive_consignment_stock_params_type::ReceiveConsignmentStockParams;
 pub use recognize_amortization_line_params_type::RecognizeAmortizationLineParams;
 pub use recognize_deferred_revenue_params_type::RecognizeDeferredRevenueParams;
@@ -2852,6 +2966,7 @@ pub use record_inventory_integration_result_params_type::RecordInventoryIntegrat
 pub use record_privacy_consent_params_type::RecordPrivacyConsentParams;
 pub use record_purchasing_integration_result_params_type::RecordPurchasingIntegrationResultParams;
 pub use record_sales_integration_result_params_type::RecordSalesIntegrationResultParams;
+pub use record_subscription_payment_failure_params_type::RecordSubscriptionPaymentFailureParams;
 pub use record_telemetry_params_type::RecordTelemetryParams;
 pub use record_whats_app_health_check_params_type::RecordWhatsAppHealthCheckParams;
 pub use refresh_inventory_exceptions_params_type::RefreshInventoryExceptionsParams;
@@ -2861,6 +2976,7 @@ pub use register_hub_params_type::RegisterHubParams;
 pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
 pub use reject_approval_request_params_type::RejectApprovalRequestParams;
 pub use release_blanket_to_po_params_type::ReleaseBlanketToPoParams;
+pub use renew_subscription_params_type::RenewSubscriptionParams;
 pub use replenishment_rule_type::ReplenishmentRule;
 pub use report_state_type::ReportState;
 pub use report_template_type::ReportTemplate;
@@ -2868,6 +2984,7 @@ pub use report_type_type::ReportType;
 pub use request_expense_policy_exception_params_type::RequestExpensePolicyExceptionParams;
 pub use requisition_state_type::RequisitionState;
 pub use res_partner_bank_type::ResPartnerBank;
+pub use resume_subscription_params_type::ResumeSubscriptionParams;
 pub use return_order_type::ReturnOrder;
 pub use return_order_line_type::ReturnOrderLine;
 pub use revenue_recognition_rule_type::RevenueRecognitionRule;
@@ -2914,6 +3031,7 @@ pub use set_expense_allocations_params_type::SetExpenseAllocationsParams;
 pub use set_expense_fraud_hold_params_type::SetExpenseFraudHoldParams;
 pub use set_purchase_approval_delegate_params_type::SetPurchaseApprovalDelegateParams;
 pub use set_record_custom_field_values_params_type::SetRecordCustomFieldValuesParams;
+pub use set_subscription_commitment_params_type::SetSubscriptionCommitmentParams;
 pub use set_vendor_risk_flag_params_type::SetVendorRiskFlagParams;
 pub use settle_sale_commissions_params_type::SettleSaleCommissionsParams;
 pub use setup_fiscal_calendar_params_type::SetupFiscalCalendarParams;
@@ -2946,8 +3064,21 @@ pub use stock_rule_type::StockRule;
 pub use stock_traceability_report_type::StockTraceabilityReport;
 pub use submit_supplier_intake_params_type::SubmitSupplierIntakeParams;
 pub use subscription_type::Subscription;
+pub use subscription_amendment_type::SubscriptionAmendment;
+pub use subscription_billing_run_type::SubscriptionBillingRun;
+pub use subscription_bundle_type::SubscriptionBundle;
+pub use subscription_bundle_item_type::SubscriptionBundleItem;
+pub use subscription_collection_type::SubscriptionCollection;
+pub use subscription_commitment_type::SubscriptionCommitment;
+pub use subscription_entitlement_type::SubscriptionEntitlement;
 pub use subscription_line_type::SubscriptionLine;
+pub use subscription_payment_intent_type::SubscriptionPaymentIntent;
 pub use subscription_plan_type::SubscriptionPlan;
+pub use subscription_price_index_type::SubscriptionPriceIndex;
+pub use subscription_price_tier_type::SubscriptionPriceTier;
+pub use subscription_tax_settle_intent_type::SubscriptionTaxSettleIntent;
+pub use subscription_usage_charge_type::SubscriptionUsageCharge;
+pub use subscription_usage_event_type::SubscriptionUsageEvent;
 pub use supplier_intake_request_type::SupplierIntakeRequest;
 pub use sync_direction_type::SyncDirection;
 pub use sync_status_type::SyncStatus;
@@ -2963,6 +3094,7 @@ pub use tax_schedule_type::TaxSchedule;
 pub use tax_type_use_type::TaxTypeUse;
 pub use ticket_priority_type::TicketPriority;
 pub use trial_balance_type::TrialBalance;
+pub use unmatch_expense_card_statement_line_params_type::UnmatchExpenseCardStatementLineParams;
 pub use unreconcile_account_bank_statement_line_params_type::UnreconcileAccountBankStatementLineParams;
 pub use uom_type::Uom;
 pub use uom_category_type::UomCategory;
@@ -3068,6 +3200,7 @@ pub use update_stock_production_serial_params_type::UpdateStockProductionSerialP
 pub use update_stock_quant_quantity_params_type::UpdateStockQuantQuantityParams;
 pub use update_stock_route_params_type::UpdateStockRouteParams;
 pub use update_stock_rule_params_type::UpdateStockRuleParams;
+pub use update_subscription_plan_params_type::UpdateSubscriptionPlanParams;
 pub use update_supplier_intake_params_type::UpdateSupplierIntakeParams;
 pub use update_task_params_type::UpdateTaskParams;
 pub use update_tax_deadline_params_type::UpdateTaxDeadlineParams;
@@ -3093,6 +3226,7 @@ pub use upsert_expense_policy_params_type::UpsertExpensePolicyParams;
 pub use upsert_organization_settings_params_type::UpsertOrganizationSettingsParams;
 pub use upsert_partner_credit_control_params_type::UpsertPartnerCreditControlParams;
 pub use upsert_search_embedding_params_type::UpsertSearchEmbeddingParams;
+pub use upsert_subscription_price_index_params_type::UpsertSubscriptionPriceIndexParams;
 pub use upsert_vendor_scorecard_params_type::UpsertVendorScorecardParams;
 pub use user_credential_type::UserCredential;
 pub use user_custom_field_type::UserCustomField;
@@ -3238,6 +3372,7 @@ pub use document_table::*;
 pub use document_sequence_table::*;
 pub use document_template_table::*;
 pub use document_version_table::*;
+pub use expense_card_statement_line_table::*;
 pub use expense_integration_intent_table::*;
 pub use expense_sheet_table::*;
 pub use financial_report_table::*;
@@ -3424,8 +3559,21 @@ pub use stock_route_table::*;
 pub use stock_rule_table::*;
 pub use stock_traceability_report_table::*;
 pub use subscription_table::*;
+pub use subscription_amendment_table::*;
+pub use subscription_billing_run_table::*;
+pub use subscription_bundle_table::*;
+pub use subscription_bundle_item_table::*;
+pub use subscription_collection_table::*;
+pub use subscription_commitment_table::*;
+pub use subscription_entitlement_table::*;
 pub use subscription_line_table::*;
+pub use subscription_payment_intent_table::*;
 pub use subscription_plan_table::*;
+pub use subscription_price_index_table::*;
+pub use subscription_price_tier_table::*;
+pub use subscription_tax_settle_intent_table::*;
+pub use subscription_usage_charge_table::*;
+pub use subscription_usage_event_table::*;
 pub use supplier_intake_request_table::*;
 pub use tax_deadline_table::*;
 pub use tax_deadline_reminder_table::*;
@@ -3464,6 +3612,7 @@ pub use activate_consignment_agreement_reducer::activate_consignment_agreement;
 pub use activate_pos_config_reducer::activate_pos_config;
 pub use activate_revenue_recognition_rule_reducer::activate_revenue_recognition_rule;
 pub use activate_subscription_reducer::activate_subscription;
+pub use activate_subscription_plan_reducer::activate_subscription_plan;
 pub use add_account_move_line_reducer::add_account_move_line;
 pub use add_article_member_reducer::add_article_member;
 pub use add_casbin_rule_reducer::add_casbin_rule;
@@ -3481,24 +3630,32 @@ pub use add_purchase_requisition_line_reducer::add_purchase_requisition_line;
 pub use add_purchase_rfq_bid_reducer::add_purchase_rfq_bid;
 pub use add_purchase_rfq_line_reducer::add_purchase_rfq_line;
 pub use add_rule_to_nomenclature_reducer::add_rule_to_nomenclature;
+pub use add_subscription_bundle_item_reducer::add_subscription_bundle_item;
 pub use add_user_custom_field_reducer::add_user_custom_field;
 pub use add_user_to_organization_reducer::add_user_to_organization;
 pub use add_widget_to_dashboard_reducer::add_widget_to_dashboard;
 pub use add_workflow_activity_reducer::add_workflow_activity;
 pub use add_workflow_transition_reducer::add_workflow_transition;
+pub use advance_subscription_dunning_reducer::advance_subscription_dunning;
 pub use allocate_payment_transaction_reducer::allocate_payment_transaction;
+pub use amend_subscription_reducer::amend_subscription;
 pub use append_ai_agent_run_step_reducer::append_ai_agent_run_step;
 pub use append_ai_chat_message_reducer::append_ai_chat_message;
 pub use append_crm_conversation_message_reducer::append_crm_conversation_message;
 pub use apply_expense_advance_to_sheet_reducer::apply_expense_advance_to_sheet;
 pub use apply_expense_integration_intent_reducer::apply_expense_integration_intent;
 pub use apply_global_migrations_reducer::apply_global_migrations;
+pub use apply_index_linked_renewal_reducer::apply_index_linked_renewal;
 pub use apply_landed_costs_reducer::apply_landed_costs;
 pub use apply_omnichannel_allocation_reducer::apply_omnichannel_allocation;
 pub use apply_org_migrations_reducer::apply_org_migrations;
+pub use apply_pending_expense_integration_intents_reducer::apply_pending_expense_integration_intents;
 pub use apply_reconciliation_rules_reducer::apply_reconciliation_rules;
 pub use apply_sale_order_options_reducer::apply_sale_order_options;
 pub use apply_sale_promotion_to_order_reducer::apply_sale_promotion_to_order;
+pub use apply_subscription_bundle_reducer::apply_subscription_bundle;
+pub use apply_subscription_payment_intent_reducer::apply_subscription_payment_intent;
+pub use apply_subscription_tax_settle_intent_reducer::apply_subscription_tax_settle_intent;
 pub use apply_warehouse_sync_intent_reducer::apply_warehouse_sync_intent;
 pub use approve_ai_action_draft_reducer::approve_ai_action_draft;
 pub use approve_approval_request_reducer::approve_approval_request;
@@ -3552,6 +3709,7 @@ pub use cancel_sale_order_reducer::cancel_sale_order;
 pub use cancel_stock_move_reducer::cancel_stock_move;
 pub use cancel_stock_package_reducer::cancel_stock_package;
 pub use cancel_stock_picking_reducer::cancel_stock_picking;
+pub use cancel_subscription_reducer::cancel_subscription;
 pub use cancel_workflow_instance_reducer::cancel_workflow_instance;
 pub use check_mo_availability_reducer::check_mo_availability;
 pub use claim_hub_with_token_reducer::claim_hub_with_token;
@@ -3674,6 +3832,7 @@ pub use create_employee_reducer::create_employee;
 pub use create_exchange_order_from_return_reducer::create_exchange_order_from_return;
 pub use create_expense_reducer::create_expense;
 pub use create_expense_advance_reducer::create_expense_advance;
+pub use create_expense_card_statement_line_reducer::create_expense_card_statement_line;
 pub use create_expense_integration_intent_reducer::create_expense_integration_intent;
 pub use create_expense_project_rebill_reducer::create_expense_project_rebill;
 pub use create_expense_reimbursement_payment_reducer::create_expense_reimbursement_payment;
@@ -3788,8 +3947,12 @@ pub use create_stock_production_serial_reducer::create_stock_production_serial;
 pub use create_stock_quant_reducer::create_stock_quant;
 pub use create_stock_route_reducer::create_stock_route;
 pub use create_stock_rule_reducer::create_stock_rule;
+pub use create_subscription_bundle_reducer::create_subscription_bundle;
 pub use create_subscription_from_sale_order_reducer::create_subscription_from_sale_order;
+pub use create_subscription_payment_intent_reducer::create_subscription_payment_intent;
 pub use create_subscription_plan_reducer::create_subscription_plan;
+pub use create_subscription_price_tier_reducer::create_subscription_price_tier;
+pub use create_subscription_tax_settle_intent_reducer::create_subscription_tax_settle_intent;
 pub use create_task_reducer::create_task;
 pub use create_tax_deadline_reducer::create_tax_deadline;
 pub use create_tax_jurisdiction_reducer::create_tax_jurisdiction;
@@ -3817,6 +3980,7 @@ pub use create_workflow_reducer::create_workflow;
 pub use create_workorder_reducer::create_workorder;
 pub use deactivate_pos_config_reducer::deactivate_pos_config;
 pub use deactivate_revenue_recognition_rule_reducer::deactivate_revenue_recognition_rule;
+pub use deactivate_subscription_plan_reducer::deactivate_subscription_plan;
 pub use delete_account_asset_reducer::delete_account_asset;
 pub use delete_account_bank_statement_reducer::delete_account_bank_statement;
 pub use delete_account_bank_statement_line_reducer::delete_account_bank_statement_line;
@@ -3902,6 +4066,7 @@ pub use fail_expense_integration_intent_reducer::fail_expense_integration_intent
 pub use fail_iot_action_reducer::fail_iot_action;
 pub use fail_quality_check_reducer::fail_quality_check;
 pub use fail_scheduled_owner_report_run_reducer::fail_scheduled_owner_report_run;
+pub use fail_subscription_payment_intent_reducer::fail_subscription_payment_intent;
 pub use fail_warehouse_sync_intent_reducer::fail_warehouse_sync_intent;
 pub use finalize_import_assistant_job_reducer::finalize_import_assistant_job;
 pub use find_duplicate_contacts_reducer::find_duplicate_contacts;
@@ -3915,6 +4080,7 @@ pub use get_form_configuration_reducer::get_form_configuration;
 pub use get_organization_form_configs_reducer::get_organization_form_configs;
 pub use grant_delegated_admin_scope_reducer::grant_delegated_admin_scope;
 pub use grant_permission_reducer::grant_permission;
+pub use grant_subscription_entitlement_reducer::grant_subscription_entitlement;
 pub use hold_supplier_intake_reducer::hold_supplier_intake;
 pub use import_account_csv_reducer::import_account_csv;
 pub use import_account_move_csv_reducer::import_account_move_csv;
@@ -3976,6 +4142,7 @@ pub use import_uom_csv_reducer::import_uom_csv;
 pub use import_warehouse_csv_reducer::import_warehouse_csv;
 pub use import_workcenter_csv_reducer::import_workcenter_csv;
 pub use import_workflow_csv_reducer::import_workflow_csv;
+pub use ingest_subscription_usage_event_reducer::ingest_subscription_usage_event;
 pub use initialize_default_form_configs_reducer::initialize_default_form_configs;
 pub use invoice_po_line_reducer::invoice_po_line;
 pub use link_device_to_location_reducer::link_device_to_location;
@@ -3997,6 +4164,7 @@ pub use mark_mail_message_delivered_reducer::mark_mail_message_delivered;
 pub use mark_reset_token_used_reducer::mark_reset_token_used;
 pub use match_bank_line_reducer::match_bank_line;
 pub use match_elimination_entries_reducer::match_elimination_entries;
+pub use match_expense_card_statement_line_reducer::match_expense_card_statement_line;
 pub use merge_contacts_reducer::merge_contacts;
 pub use migrate_all_organizations_reducer::migrate_all_organizations;
 pub use move_stock_quant_reducer::move_stock_quant;
@@ -4009,6 +4177,8 @@ pub use open_quality_alert_reducer::open_quality_alert;
 pub use pack_moves_into_package_reducer::pack_moves_into_package;
 pub use pack_stock_picking_reducer::pack_stock_picking;
 pub use pass_quality_check_reducer::pass_quality_check;
+pub use pause_subscription_reducer::pause_subscription;
+pub use pay_subscription_invoice_reducer::pay_subscription_invoice;
 pub use post_account_bank_statement_reducer::post_account_bank_statement;
 pub use post_account_move_reducer::post_account_move;
 pub use post_cycle_count_adjustments_reducer::post_cycle_count_adjustments;
@@ -4027,6 +4197,8 @@ pub use process_pending_scans_reducer::process_pending_scans;
 pub use produce_manufacturing_order_reducer::produce_manufacturing_order;
 pub use promote_ai_skill_version_reducer::promote_ai_skill_version;
 pub use queue_mail_from_template_reducer::queue_mail_from_template;
+pub use rate_subscription_usage_events_reducer::rate_subscription_usage_events;
+pub use rebase_deferred_schedules_for_subscription_reducer::rebase_deferred_schedules_for_subscription;
 pub use receive_consignment_stock_reducer::receive_consignment_stock;
 pub use receive_po_line_reducer::receive_po_line;
 pub use recognize_amortization_line_reducer::recognize_amortization_line;
@@ -4050,6 +4222,7 @@ pub use record_privacy_consent_reducer::record_privacy_consent;
 pub use record_purchasing_integration_result_reducer::record_purchasing_integration_result;
 pub use record_report_run_reducer::record_report_run;
 pub use record_sales_integration_result_reducer::record_sales_integration_result;
+pub use record_subscription_payment_failure_reducer::record_subscription_payment_failure;
 pub use record_telemetry_reducer::record_telemetry;
 pub use record_telemetry_batch_reducer::record_telemetry_batch;
 pub use record_whatsapp_health_check_reducer::record_whatsapp_health_check;
@@ -4057,6 +4230,7 @@ pub use record_whatsapp_message_sent_reducer::record_whatsapp_message_sent;
 pub use refresh_inventory_exceptions_reducer::refresh_inventory_exceptions;
 pub use refresh_policy_snapshot_reducer::refresh_policy_snapshot;
 pub use refresh_sale_order_promise_dates_reducer::refresh_sale_order_promise_dates;
+pub use refresh_subscription_exception_flags_reducer::refresh_subscription_exception_flags;
 pub use refresh_tax_deadline_statuses_reducer::refresh_tax_deadline_statuses;
 pub use refuse_expense_sheet_reducer::refuse_expense_sheet;
 pub use refuse_leave_reducer::refuse_leave;
@@ -4076,6 +4250,7 @@ pub use remove_member_from_quality_team_reducer::remove_member_from_quality_team
 pub use remove_purchase_order_line_reducer::remove_purchase_order_line;
 pub use remove_rule_from_nomenclature_reducer::remove_rule_from_nomenclature;
 pub use remove_user_from_organization_reducer::remove_user_from_organization;
+pub use renew_subscription_reducer::renew_subscription;
 pub use reopen_inventory_close_reducer::reopen_inventory_close;
 pub use reopen_ticket_reducer::reopen_ticket;
 pub use reorder_proposal_line_items_reducer::reorder_proposal_line_items;
@@ -4088,6 +4263,7 @@ pub use resolve_inventory_exception_reducer::resolve_inventory_exception;
 pub use resolve_iot_alert_reducer::resolve_iot_alert;
 pub use resolve_proposal_comment_reducer::resolve_proposal_comment;
 pub use restore_product_category_reducer::restore_product_category;
+pub use resume_subscription_reducer::resume_subscription;
 pub use retry_intercompany_transaction_reducer::retry_intercompany_transaction;
 pub use retry_iot_action_reducer::retry_iot_action;
 pub use reverse_payment_transaction_reducer::reverse_payment_transaction;
@@ -4097,6 +4273,7 @@ pub use review_supplier_intake_reducer::review_supplier_intake;
 pub use revoke_delegated_admin_scope_reducer::revoke_delegated_admin_scope;
 pub use revoke_permission_reducer::revoke_permission;
 pub use revoke_role_reducer::revoke_role;
+pub use revoke_subscription_entitlement_reducer::revoke_subscription_entitlement;
 pub use rollback_ai_skill_release_reducer::rollback_ai_skill_release;
 pub use rollback_import_job_reducer::rollback_import_job;
 pub use run_accounting_fx_revaluation_test_reducer::run_accounting_fx_revaluation_test;
@@ -4118,6 +4295,7 @@ pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_platform_tests_reducer::run_all_platform_tests;
 pub use run_all_purchasing_tests_reducer::run_all_purchasing_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
+pub use run_all_subscriptions_tests_reducer::run_all_subscriptions_tests;
 pub use run_cartonization_reducer::run_cartonization;
 pub use run_core_operational_messaging_test_reducer::run_core_operational_messaging_test;
 pub use run_core_sod_test_reducer::run_core_sod_test;
@@ -4133,6 +4311,7 @@ pub use run_expenses_wave_a_test_reducer::run_expenses_wave_a_test;
 pub use run_expenses_wave_b_test_reducer::run_expenses_wave_b_test;
 pub use run_expenses_wave_c_test_reducer::run_expenses_wave_c_test;
 pub use run_expenses_wave_d_test_reducer::run_expenses_wave_d_test;
+pub use run_expenses_wave_e_test_reducer::run_expenses_wave_e_test;
 pub use run_fx_revaluation_reducer::run_fx_revaluation;
 pub use run_fx_revaluation_batch_reducer::run_fx_revaluation_batch;
 pub use run_helpdesk_ticket_test_reducer::run_helpdesk_ticket_test;
@@ -4198,6 +4377,11 @@ pub use run_sales_order_update_test_reducer::run_sales_order_update_test;
 pub use run_sales_pricelist_apply_test_reducer::run_sales_pricelist_apply_test;
 pub use run_sales_send_quotation_test_reducer::run_sales_send_quotation_test;
 pub use run_subscription_plan_test_reducer::run_subscription_plan_test;
+pub use run_subscriptions_wave_a_test_reducer::run_subscriptions_wave_a_test;
+pub use run_subscriptions_wave_b_test_reducer::run_subscriptions_wave_b_test;
+pub use run_subscriptions_wave_c_test_reducer::run_subscriptions_wave_c_test;
+pub use run_subscriptions_wave_d_test_reducer::run_subscriptions_wave_d_test;
+pub use run_subscriptions_wave_e_test_reducer::run_subscriptions_wave_e_test;
 pub use run_tenant_isolation_tests_reducer::run_tenant_isolation_tests;
 pub use run_traceability_report_reducer::run_traceability_report;
 pub use run_workflow_definition_test_reducer::run_workflow_definition_test;
@@ -4231,6 +4415,7 @@ pub use set_iot_threshold_reducer::set_iot_threshold;
 pub use set_project_active_reducer::set_project_active;
 pub use set_purchase_approval_delegate_reducer::set_purchase_approval_delegate;
 pub use set_record_custom_field_values_reducer::set_record_custom_field_values;
+pub use set_subscription_commitment_reducer::set_subscription_commitment;
 pub use set_task_parent_reducer::set_task_parent;
 pub use set_vendor_risk_flag_reducer::set_vendor_risk_flag;
 pub use set_whatsapp_primary_account_reducer::set_whatsapp_primary_account;
@@ -4268,6 +4453,7 @@ pub use unlock_knowledge_article_reducer::unlock_knowledge_article;
 pub use unlock_purchase_order_reducer::unlock_purchase_order;
 pub use unlock_sale_order_reducer::unlock_sale_order;
 pub use unmatch_elimination_entry_reducer::unmatch_elimination_entry;
+pub use unmatch_expense_card_statement_line_reducer::unmatch_expense_card_statement_line;
 pub use unreconciled_account_bank_statement_line_reducer::unreconciled_account_bank_statement_line;
 pub use unreserve_stock_quant_reducer::unreserve_stock_quant;
 pub use unsubscribe_from_record_reducer::unsubscribe_from_record;
@@ -4390,6 +4576,7 @@ pub use update_stock_production_serial_reducer::update_stock_production_serial;
 pub use update_stock_quant_quantity_reducer::update_stock_quant_quantity;
 pub use update_stock_route_reducer::update_stock_route;
 pub use update_stock_rule_reducer::update_stock_rule;
+pub use update_subscription_plan_reducer::update_subscription_plan;
 pub use update_supplier_intake_reducer::update_supplier_intake;
 pub use update_task_reducer::update_task;
 pub use update_task_state_reducer::update_task_state;
@@ -4423,6 +4610,7 @@ pub use upsert_organization_settings_reducer::upsert_organization_settings;
 pub use upsert_partner_credit_control_reducer::upsert_partner_credit_control;
 pub use upsert_proposal_section_reducer::upsert_proposal_section;
 pub use upsert_search_embedding_reducer::upsert_search_embedding;
+pub use upsert_subscription_price_index_reducer::upsert_subscription_price_index;
 pub use upsert_vendor_scorecard_reducer::upsert_vendor_scorecard;
 pub use upsert_warehouse_geo_reducer::upsert_warehouse_geo;
 pub use use_serial_reducer::use_serial;
@@ -4484,6 +4672,11 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         subscription_id: u64,
+}    ,
+    ActivateSubscriptionPlan {
+        organization_id: u64,
+        company_id: u64,
+        plan_id: u64,
 }    ,
     AddAccountMoveLine {
         organization_id: u64,
@@ -4581,6 +4774,12 @@ pub enum Reducer {
         nomenclature_id: u64,
         rule_id: u64,
 }    ,
+    AddSubscriptionBundleItem {
+        organization_id: u64,
+        company_id: u64,
+        bundle_id: u64,
+        params: AddSubscriptionBundleItemParams,
+}    ,
     AddUserCustomField {
         organization_id: u64,
         params: CreateUserCustomFieldParams,
@@ -4607,9 +4806,21 @@ pub enum Reducer {
         activity_to: u64,
         params: AddWorkflowTransitionParams,
 }    ,
+    AdvanceSubscriptionDunning {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: AdvanceSubscriptionDunningParams,
+}    ,
     AllocatePaymentTransaction {
         organization_id: u64,
         params: AllocatePaymentParams,
+}    ,
+    AmendSubscription {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: AmendSubscriptionParams,
 }    ,
     AppendAiAgentRunStep {
         organization_id: u64,
@@ -4638,6 +4849,12 @@ pub enum Reducer {
         intent_id: u64,
 }    ,
     ApplyGlobalMigrations ,
+    ApplyIndexLinkedRenewal {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: ApplyIndexLinkedRenewalParams,
+}    ,
     ApplyLandedCosts {
         organization_id: u64,
         company_id: u64,
@@ -4652,6 +4869,10 @@ pub enum Reducer {
     ApplyOrgMigrations {
         organization_id: u64,
 }    ,
+    ApplyPendingExpenseIntegrationIntents {
+        organization_id: u64,
+        limit: u32,
+}    ,
     ApplyReconciliationRules {
         organization_id: u64,
         line_id: u64,
@@ -4665,6 +4886,22 @@ pub enum Reducer {
         organization_id: u64,
         order_id: u64,
         params: ApplySalePromotionParams,
+}    ,
+    ApplySubscriptionBundle {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: ApplySubscriptionBundleParams,
+}    ,
+    ApplySubscriptionPaymentIntent {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
+}    ,
+    ApplySubscriptionTaxSettleIntent {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
 }    ,
     ApplyWarehouseSyncIntent {
         organization_id: u64,
@@ -4913,6 +5150,12 @@ pub enum Reducer {
         organization_id: u64,
         picking_id: u64,
         params: CompanyScopeParams,
+}    ,
+    CancelSubscription {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: CancelSubscriptionParams,
 }    ,
     CancelWorkflowInstance {
         organization_id: u64,
@@ -5471,6 +5714,10 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateExpenseAdvanceParams,
 }    ,
+    CreateExpenseCardStatementLine {
+        organization_id: u64,
+        params: CreateExpenseCardStatementLineParams,
+}    ,
     CreateExpenseIntegrationIntent {
         organization_id: u64,
         params: CreateExpenseIntegrationIntentParams,
@@ -6007,13 +6254,35 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateStockRuleParams,
 }    ,
+    CreateSubscriptionBundle {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateSubscriptionBundleParams,
+}    ,
     CreateSubscriptionFromSaleOrder {
         organization_id: u64,
         params: CreateSubscriptionFromSaleOrderParams,
 }    ,
+    CreateSubscriptionPaymentIntent {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: CreateSubscriptionPaymentIntentParams,
+}    ,
     CreateSubscriptionPlan {
         organization_id: u64,
         params: CreateSubscriptionPlanParams,
+}    ,
+    CreateSubscriptionPriceTier {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateSubscriptionPriceTierParams,
+}    ,
+    CreateSubscriptionTaxSettleIntent {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: CreateSubscriptionTaxSettleIntentParams,
 }    ,
     CreateTask {
         organization_id: u64,
@@ -6138,6 +6407,11 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         rule_id: u64,
+}    ,
+    DeactivateSubscriptionPlan {
+        organization_id: u64,
+        company_id: u64,
+        plan_id: u64,
 }    ,
     DeleteAccountAsset {
         organization_id: u64,
@@ -6509,6 +6783,12 @@ pub enum Reducer {
         run_id: u64,
         error_message: String,
 }    ,
+    FailSubscriptionPaymentIntent {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
+        params: FailSubscriptionPaymentIntentParams,
+}    ,
     FailWarehouseSyncIntent {
         organization_id: u64,
         company_id: u64,
@@ -6568,6 +6848,12 @@ pub enum Reducer {
     GrantPermission {
         organization_id: u64,
         params: GrantOrgPermissionParams,
+}    ,
+    GrantSubscriptionEntitlement {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: GrantSubscriptionEntitlementParams,
 }    ,
     HoldSupplierIntake {
         organization_id: u64,
@@ -6839,6 +7125,12 @@ pub enum Reducer {
         organization_id: u64,
         csv_data: String,
 }    ,
+    IngestSubscriptionUsageEvent {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: IngestSubscriptionUsageEventParams,
+}    ,
     InitializeDefaultFormConfigs {
         organization_id: u64,
 }    ,
@@ -6933,6 +7225,11 @@ pub enum Reducer {
         entry_id: u64,
         matched_entry_id: u64,
 }    ,
+    MatchExpenseCardStatementLine {
+        organization_id: u64,
+        statement_line_id: u64,
+        params: MatchExpenseCardStatementLineParams,
+}    ,
     MergeContacts {
         organization_id: u64,
         company_id: u64,
@@ -6991,6 +7288,18 @@ pub enum Reducer {
         measure: Option::<f64>,
         note: Option::<String>,
         picture: Option::<String>,
+}    ,
+    PauseSubscription {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: PauseSubscriptionParams,
+}    ,
+    PaySubscriptionInvoice {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: ApplySubscriptionInvoicePaymentParams,
 }    ,
     PostAccountBankStatement {
         organization_id: u64,
@@ -7079,6 +7388,18 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         params: QueueMailFromTemplateParams,
+}    ,
+    RateSubscriptionUsageEvents {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: RateSubscriptionUsageEventsParams,
+}    ,
+    RebaseDeferredSchedulesForSubscription {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: RebaseDeferredSchedulesParams,
 }    ,
     ReceiveConsignmentStock {
         organization_id: u64,
@@ -7196,6 +7517,12 @@ pub enum Reducer {
         intent_id: u64,
         params: RecordSalesIntegrationResultParams,
 }    ,
+    RecordSubscriptionPaymentFailure {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: RecordSubscriptionPaymentFailureParams,
+}    ,
     RecordTelemetry {
         organization_id: u64,
         device_id: u64,
@@ -7227,6 +7554,11 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         order_id: u64,
+}    ,
+    RefreshSubscriptionExceptionFlags {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
 }    ,
     RefreshTaxDeadlineStatuses {
         organization_id: u64,
@@ -7320,6 +7652,12 @@ pub enum Reducer {
         user_identity: __sdk::Identity,
         organization_id: u64,
 }    ,
+    RenewSubscription {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: RenewSubscriptionParams,
+}    ,
     ReopenInventoryClose {
         organization_id: u64,
         company_id: u64,
@@ -7374,6 +7712,12 @@ pub enum Reducer {
         organization_id: u64,
         category_id: u64,
 }    ,
+    ResumeSubscription {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: ResumeSubscriptionParams,
+}    ,
     RetryIntercompanyTransaction {
         organization_id: u64,
         company_id: u64,
@@ -7415,6 +7759,11 @@ pub enum Reducer {
         organization_id: u64,
         assignment_id: u64,
 }    ,
+    RevokeSubscriptionEntitlement {
+        organization_id: u64,
+        company_id: u64,
+        entitlement_id: u64,
+}    ,
     RollbackAiSkillRelease {
         organization_id: u64,
         skill_id: u64,
@@ -7444,6 +7793,7 @@ pub enum Reducer {
     RunAllPlatformTests ,
     RunAllPurchasingTests ,
     RunAllSalesTests ,
+    RunAllSubscriptionsTests ,
     RunCartonization {
         organization_id: u64,
         company_id: u64,
@@ -7463,6 +7813,7 @@ pub enum Reducer {
     RunExpensesWaveBTest ,
     RunExpensesWaveCTest ,
     RunExpensesWaveDTest ,
+    RunExpensesWaveETest ,
     RunFxRevaluation {
         organization_id: u64,
         company_id: u64,
@@ -7544,6 +7895,11 @@ pub enum Reducer {
     RunSalesPricelistApplyTest ,
     RunSalesSendQuotationTest ,
     RunSubscriptionPlanTest ,
+    RunSubscriptionsWaveATest ,
+    RunSubscriptionsWaveBTest ,
+    RunSubscriptionsWaveCTest ,
+    RunSubscriptionsWaveDTest ,
+    RunSubscriptionsWaveETest ,
     RunTenantIsolationTests ,
     RunTraceabilityReport {
         organization_id: u64,
@@ -7695,6 +8051,12 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         params: SetRecordCustomFieldValuesParams,
+}    ,
+    SetSubscriptionCommitment {
+        organization_id: u64,
+        company_id: u64,
+        subscription_id: u64,
+        params: SetSubscriptionCommitmentParams,
 }    ,
     SetTaskParent {
         organization_id: u64,
@@ -7868,6 +8230,11 @@ pub enum Reducer {
     UnmatchEliminationEntry {
         organization_id: u64,
         entry_id: u64,
+}    ,
+    UnmatchExpenseCardStatementLine {
+        organization_id: u64,
+        statement_line_id: u64,
+        params: UnmatchExpenseCardStatementLineParams,
 }    ,
     UnreconciledAccountBankStatementLine {
         organization_id: u64,
@@ -8523,6 +8890,12 @@ pub enum Reducer {
         rule_id: u64,
         params: UpdateStockRuleParams,
 }    ,
+    UpdateSubscriptionPlan {
+        organization_id: u64,
+        company_id: u64,
+        plan_id: u64,
+        params: UpdateSubscriptionPlanParams,
+}    ,
     UpdateSupplierIntake {
         organization_id: u64,
         intake_id: u64,
@@ -8690,6 +9063,11 @@ pub enum Reducer {
         company_id: Option::<u64>,
         params: UpsertSearchEmbeddingParams,
 }    ,
+    UpsertSubscriptionPriceIndex {
+        organization_id: u64,
+        company_id: u64,
+        params: UpsertSubscriptionPriceIndexParams,
+}    ,
     UpsertVendorScorecard {
         organization_id: u64,
         company_id: u64,
@@ -8771,6 +9149,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ActivatePosConfig { .. } => "activate_pos_config",
             Reducer::ActivateRevenueRecognitionRule { .. } => "activate_revenue_recognition_rule",
             Reducer::ActivateSubscription { .. } => "activate_subscription",
+            Reducer::ActivateSubscriptionPlan { .. } => "activate_subscription_plan",
             Reducer::AddAccountMoveLine { .. } => "add_account_move_line",
             Reducer::AddArticleMember { .. } => "add_article_member",
             Reducer::AddCasbinRule { .. } => "add_casbin_rule",
@@ -8788,24 +9167,32 @@ impl __sdk::Reducer for Reducer {
             Reducer::AddPurchaseRfqBid { .. } => "add_purchase_rfq_bid",
             Reducer::AddPurchaseRfqLine { .. } => "add_purchase_rfq_line",
             Reducer::AddRuleToNomenclature { .. } => "add_rule_to_nomenclature",
+            Reducer::AddSubscriptionBundleItem { .. } => "add_subscription_bundle_item",
             Reducer::AddUserCustomField { .. } => "add_user_custom_field",
             Reducer::AddUserToOrganization { .. } => "add_user_to_organization",
             Reducer::AddWidgetToDashboard { .. } => "add_widget_to_dashboard",
             Reducer::AddWorkflowActivity { .. } => "add_workflow_activity",
             Reducer::AddWorkflowTransition { .. } => "add_workflow_transition",
+            Reducer::AdvanceSubscriptionDunning { .. } => "advance_subscription_dunning",
             Reducer::AllocatePaymentTransaction { .. } => "allocate_payment_transaction",
+            Reducer::AmendSubscription { .. } => "amend_subscription",
             Reducer::AppendAiAgentRunStep { .. } => "append_ai_agent_run_step",
             Reducer::AppendAiChatMessage { .. } => "append_ai_chat_message",
             Reducer::AppendCrmConversationMessage { .. } => "append_crm_conversation_message",
             Reducer::ApplyExpenseAdvanceToSheet { .. } => "apply_expense_advance_to_sheet",
             Reducer::ApplyExpenseIntegrationIntent { .. } => "apply_expense_integration_intent",
             Reducer::ApplyGlobalMigrations => "apply_global_migrations",
+            Reducer::ApplyIndexLinkedRenewal { .. } => "apply_index_linked_renewal",
             Reducer::ApplyLandedCosts { .. } => "apply_landed_costs",
             Reducer::ApplyOmnichannelAllocation { .. } => "apply_omnichannel_allocation",
             Reducer::ApplyOrgMigrations { .. } => "apply_org_migrations",
+            Reducer::ApplyPendingExpenseIntegrationIntents { .. } => "apply_pending_expense_integration_intents",
             Reducer::ApplyReconciliationRules { .. } => "apply_reconciliation_rules",
             Reducer::ApplySaleOrderOptions { .. } => "apply_sale_order_options",
             Reducer::ApplySalePromotionToOrder { .. } => "apply_sale_promotion_to_order",
+            Reducer::ApplySubscriptionBundle { .. } => "apply_subscription_bundle",
+            Reducer::ApplySubscriptionPaymentIntent { .. } => "apply_subscription_payment_intent",
+            Reducer::ApplySubscriptionTaxSettleIntent { .. } => "apply_subscription_tax_settle_intent",
             Reducer::ApplyWarehouseSyncIntent { .. } => "apply_warehouse_sync_intent",
             Reducer::ApproveAiActionDraft { .. } => "approve_ai_action_draft",
             Reducer::ApproveApprovalRequest { .. } => "approve_approval_request",
@@ -8859,6 +9246,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CancelStockMove { .. } => "cancel_stock_move",
             Reducer::CancelStockPackage { .. } => "cancel_stock_package",
             Reducer::CancelStockPicking { .. } => "cancel_stock_picking",
+            Reducer::CancelSubscription { .. } => "cancel_subscription",
             Reducer::CancelWorkflowInstance { .. } => "cancel_workflow_instance",
             Reducer::CheckMoAvailability { .. } => "check_mo_availability",
             Reducer::ClaimHubWithToken { .. } => "claim_hub_with_token",
@@ -8981,6 +9369,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateExchangeOrderFromReturn { .. } => "create_exchange_order_from_return",
             Reducer::CreateExpense { .. } => "create_expense",
             Reducer::CreateExpenseAdvance { .. } => "create_expense_advance",
+            Reducer::CreateExpenseCardStatementLine { .. } => "create_expense_card_statement_line",
             Reducer::CreateExpenseIntegrationIntent { .. } => "create_expense_integration_intent",
             Reducer::CreateExpenseProjectRebill { .. } => "create_expense_project_rebill",
             Reducer::CreateExpenseReimbursementPayment { .. } => "create_expense_reimbursement_payment",
@@ -9095,8 +9484,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateStockQuant { .. } => "create_stock_quant",
             Reducer::CreateStockRoute { .. } => "create_stock_route",
             Reducer::CreateStockRule { .. } => "create_stock_rule",
+            Reducer::CreateSubscriptionBundle { .. } => "create_subscription_bundle",
             Reducer::CreateSubscriptionFromSaleOrder { .. } => "create_subscription_from_sale_order",
+            Reducer::CreateSubscriptionPaymentIntent { .. } => "create_subscription_payment_intent",
             Reducer::CreateSubscriptionPlan { .. } => "create_subscription_plan",
+            Reducer::CreateSubscriptionPriceTier { .. } => "create_subscription_price_tier",
+            Reducer::CreateSubscriptionTaxSettleIntent { .. } => "create_subscription_tax_settle_intent",
             Reducer::CreateTask { .. } => "create_task",
             Reducer::CreateTaxDeadline { .. } => "create_tax_deadline",
             Reducer::CreateTaxJurisdiction { .. } => "create_tax_jurisdiction",
@@ -9124,6 +9517,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateWorkorder { .. } => "create_workorder",
             Reducer::DeactivatePosConfig { .. } => "deactivate_pos_config",
             Reducer::DeactivateRevenueRecognitionRule { .. } => "deactivate_revenue_recognition_rule",
+            Reducer::DeactivateSubscriptionPlan { .. } => "deactivate_subscription_plan",
             Reducer::DeleteAccountAsset { .. } => "delete_account_asset",
             Reducer::DeleteAccountBankStatement { .. } => "delete_account_bank_statement",
             Reducer::DeleteAccountBankStatementLine { .. } => "delete_account_bank_statement_line",
@@ -9209,6 +9603,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::FailIotAction { .. } => "fail_iot_action",
             Reducer::FailQualityCheck { .. } => "fail_quality_check",
             Reducer::FailScheduledOwnerReportRun { .. } => "fail_scheduled_owner_report_run",
+            Reducer::FailSubscriptionPaymentIntent { .. } => "fail_subscription_payment_intent",
             Reducer::FailWarehouseSyncIntent { .. } => "fail_warehouse_sync_intent",
             Reducer::FinalizeImportAssistantJob { .. } => "finalize_import_assistant_job",
             Reducer::FindDuplicateContacts { .. } => "find_duplicate_contacts",
@@ -9222,6 +9617,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::GetOrganizationFormConfigs { .. } => "get_organization_form_configs",
             Reducer::GrantDelegatedAdminScope { .. } => "grant_delegated_admin_scope",
             Reducer::GrantPermission { .. } => "grant_permission",
+            Reducer::GrantSubscriptionEntitlement { .. } => "grant_subscription_entitlement",
             Reducer::HoldSupplierIntake { .. } => "hold_supplier_intake",
             Reducer::ImportAccountCsv { .. } => "import_account_csv",
             Reducer::ImportAccountMoveCsv { .. } => "import_account_move_csv",
@@ -9283,6 +9679,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ImportWarehouseCsv { .. } => "import_warehouse_csv",
             Reducer::ImportWorkcenterCsv { .. } => "import_workcenter_csv",
             Reducer::ImportWorkflowCsv { .. } => "import_workflow_csv",
+            Reducer::IngestSubscriptionUsageEvent { .. } => "ingest_subscription_usage_event",
             Reducer::InitializeDefaultFormConfigs { .. } => "initialize_default_form_configs",
             Reducer::InvoicePoLine { .. } => "invoice_po_line",
             Reducer::LinkDeviceToLocation { .. } => "link_device_to_location",
@@ -9304,6 +9701,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::MarkResetTokenUsed { .. } => "mark_reset_token_used",
             Reducer::MatchBankLine { .. } => "match_bank_line",
             Reducer::MatchEliminationEntries { .. } => "match_elimination_entries",
+            Reducer::MatchExpenseCardStatementLine { .. } => "match_expense_card_statement_line",
             Reducer::MergeContacts { .. } => "merge_contacts",
             Reducer::MigrateAllOrganizations => "migrate_all_organizations",
             Reducer::MoveStockQuant { .. } => "move_stock_quant",
@@ -9316,6 +9714,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::PackMovesIntoPackage { .. } => "pack_moves_into_package",
             Reducer::PackStockPicking { .. } => "pack_stock_picking",
             Reducer::PassQualityCheck { .. } => "pass_quality_check",
+            Reducer::PauseSubscription { .. } => "pause_subscription",
+            Reducer::PaySubscriptionInvoice { .. } => "pay_subscription_invoice",
             Reducer::PostAccountBankStatement { .. } => "post_account_bank_statement",
             Reducer::PostAccountMove { .. } => "post_account_move",
             Reducer::PostCycleCountAdjustments { .. } => "post_cycle_count_adjustments",
@@ -9334,6 +9734,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::ProduceManufacturingOrder { .. } => "produce_manufacturing_order",
             Reducer::PromoteAiSkillVersion { .. } => "promote_ai_skill_version",
             Reducer::QueueMailFromTemplate { .. } => "queue_mail_from_template",
+            Reducer::RateSubscriptionUsageEvents { .. } => "rate_subscription_usage_events",
+            Reducer::RebaseDeferredSchedulesForSubscription { .. } => "rebase_deferred_schedules_for_subscription",
             Reducer::ReceiveConsignmentStock { .. } => "receive_consignment_stock",
             Reducer::ReceivePoLine { .. } => "receive_po_line",
             Reducer::RecognizeAmortizationLine { .. } => "recognize_amortization_line",
@@ -9357,6 +9759,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordPurchasingIntegrationResult { .. } => "record_purchasing_integration_result",
             Reducer::RecordReportRun { .. } => "record_report_run",
             Reducer::RecordSalesIntegrationResult { .. } => "record_sales_integration_result",
+            Reducer::RecordSubscriptionPaymentFailure { .. } => "record_subscription_payment_failure",
             Reducer::RecordTelemetry { .. } => "record_telemetry",
             Reducer::RecordTelemetryBatch { .. } => "record_telemetry_batch",
             Reducer::RecordWhatsappHealthCheck { .. } => "record_whatsapp_health_check",
@@ -9364,6 +9767,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RefreshInventoryExceptions { .. } => "refresh_inventory_exceptions",
             Reducer::RefreshPolicySnapshot { .. } => "refresh_policy_snapshot",
             Reducer::RefreshSaleOrderPromiseDates { .. } => "refresh_sale_order_promise_dates",
+            Reducer::RefreshSubscriptionExceptionFlags { .. } => "refresh_subscription_exception_flags",
             Reducer::RefreshTaxDeadlineStatuses { .. } => "refresh_tax_deadline_statuses",
             Reducer::RefuseExpenseSheet { .. } => "refuse_expense_sheet",
             Reducer::RefuseLeave { .. } => "refuse_leave",
@@ -9383,6 +9787,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RemovePurchaseOrderLine { .. } => "remove_purchase_order_line",
             Reducer::RemoveRuleFromNomenclature { .. } => "remove_rule_from_nomenclature",
             Reducer::RemoveUserFromOrganization { .. } => "remove_user_from_organization",
+            Reducer::RenewSubscription { .. } => "renew_subscription",
             Reducer::ReopenInventoryClose { .. } => "reopen_inventory_close",
             Reducer::ReopenTicket { .. } => "reopen_ticket",
             Reducer::ReorderProposalLineItems { .. } => "reorder_proposal_line_items",
@@ -9395,6 +9800,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ResolveIotAlert { .. } => "resolve_iot_alert",
             Reducer::ResolveProposalComment { .. } => "resolve_proposal_comment",
             Reducer::RestoreProductCategory { .. } => "restore_product_category",
+            Reducer::ResumeSubscription { .. } => "resume_subscription",
             Reducer::RetryIntercompanyTransaction { .. } => "retry_intercompany_transaction",
             Reducer::RetryIotAction { .. } => "retry_iot_action",
             Reducer::ReversePaymentTransaction { .. } => "reverse_payment_transaction",
@@ -9404,6 +9810,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RevokeDelegatedAdminScope { .. } => "revoke_delegated_admin_scope",
             Reducer::RevokePermission { .. } => "revoke_permission",
             Reducer::RevokeRole { .. } => "revoke_role",
+            Reducer::RevokeSubscriptionEntitlement { .. } => "revoke_subscription_entitlement",
             Reducer::RollbackAiSkillRelease { .. } => "rollback_ai_skill_release",
             Reducer::RollbackImportJob { .. } => "rollback_import_job",
             Reducer::RunAccountingFxRevaluationTest => "run_accounting_fx_revaluation_test",
@@ -9425,6 +9832,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllPlatformTests => "run_all_platform_tests",
             Reducer::RunAllPurchasingTests => "run_all_purchasing_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
+            Reducer::RunAllSubscriptionsTests => "run_all_subscriptions_tests",
             Reducer::RunCartonization { .. } => "run_cartonization",
             Reducer::RunCoreOperationalMessagingTest => "run_core_operational_messaging_test",
             Reducer::RunCoreSodTest => "run_core_sod_test",
@@ -9440,6 +9848,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunExpensesWaveBTest => "run_expenses_wave_b_test",
             Reducer::RunExpensesWaveCTest => "run_expenses_wave_c_test",
             Reducer::RunExpensesWaveDTest => "run_expenses_wave_d_test",
+            Reducer::RunExpensesWaveETest => "run_expenses_wave_e_test",
             Reducer::RunFxRevaluation { .. } => "run_fx_revaluation",
             Reducer::RunFxRevaluationBatch { .. } => "run_fx_revaluation_batch",
             Reducer::RunHelpdeskTicketTest => "run_helpdesk_ticket_test",
@@ -9505,6 +9914,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunSalesPricelistApplyTest => "run_sales_pricelist_apply_test",
             Reducer::RunSalesSendQuotationTest => "run_sales_send_quotation_test",
             Reducer::RunSubscriptionPlanTest => "run_subscription_plan_test",
+            Reducer::RunSubscriptionsWaveATest => "run_subscriptions_wave_a_test",
+            Reducer::RunSubscriptionsWaveBTest => "run_subscriptions_wave_b_test",
+            Reducer::RunSubscriptionsWaveCTest => "run_subscriptions_wave_c_test",
+            Reducer::RunSubscriptionsWaveDTest => "run_subscriptions_wave_d_test",
+            Reducer::RunSubscriptionsWaveETest => "run_subscriptions_wave_e_test",
             Reducer::RunTenantIsolationTests => "run_tenant_isolation_tests",
             Reducer::RunTraceabilityReport { .. } => "run_traceability_report",
             Reducer::RunWorkflowDefinitionTest => "run_workflow_definition_test",
@@ -9538,6 +9952,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetProjectActive { .. } => "set_project_active",
             Reducer::SetPurchaseApprovalDelegate { .. } => "set_purchase_approval_delegate",
             Reducer::SetRecordCustomFieldValues { .. } => "set_record_custom_field_values",
+            Reducer::SetSubscriptionCommitment { .. } => "set_subscription_commitment",
             Reducer::SetTaskParent { .. } => "set_task_parent",
             Reducer::SetVendorRiskFlag { .. } => "set_vendor_risk_flag",
             Reducer::SetWhatsappPrimaryAccount { .. } => "set_whatsapp_primary_account",
@@ -9575,6 +9990,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UnlockPurchaseOrder { .. } => "unlock_purchase_order",
             Reducer::UnlockSaleOrder { .. } => "unlock_sale_order",
             Reducer::UnmatchEliminationEntry { .. } => "unmatch_elimination_entry",
+            Reducer::UnmatchExpenseCardStatementLine { .. } => "unmatch_expense_card_statement_line",
             Reducer::UnreconciledAccountBankStatementLine { .. } => "unreconciled_account_bank_statement_line",
             Reducer::UnreserveStockQuant { .. } => "unreserve_stock_quant",
             Reducer::UnsubscribeFromRecord { .. } => "unsubscribe_from_record",
@@ -9697,6 +10113,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateStockQuantQuantity { .. } => "update_stock_quant_quantity",
             Reducer::UpdateStockRoute { .. } => "update_stock_route",
             Reducer::UpdateStockRule { .. } => "update_stock_rule",
+            Reducer::UpdateSubscriptionPlan { .. } => "update_subscription_plan",
             Reducer::UpdateSupplierIntake { .. } => "update_supplier_intake",
             Reducer::UpdateTask { .. } => "update_task",
             Reducer::UpdateTaskState { .. } => "update_task_state",
@@ -9730,6 +10147,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpsertPartnerCreditControl { .. } => "upsert_partner_credit_control",
             Reducer::UpsertProposalSection { .. } => "upsert_proposal_section",
             Reducer::UpsertSearchEmbedding { .. } => "upsert_search_embedding",
+            Reducer::UpsertSubscriptionPriceIndex { .. } => "upsert_subscription_price_index",
             Reducer::UpsertVendorScorecard { .. } => "upsert_vendor_scorecard",
             Reducer::UpsertWarehouseGeo { .. } => "upsert_warehouse_geo",
             Reducer::UseSerial { .. } => "use_serial",
@@ -9820,6 +10238,15 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 subscription_id: subscription_id.clone(),
+}),
+            Reducer::ActivateSubscriptionPlan{
+                organization_id,
+                company_id,
+                plan_id,
+}             => __sats::bsatn::to_vec(&activate_subscription_plan_reducer::ActivateSubscriptionPlanArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                plan_id: plan_id.clone(),
 }),
             Reducer::AddAccountMoveLine{
                 organization_id,
@@ -9996,6 +10423,17 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 nomenclature_id: nomenclature_id.clone(),
                 rule_id: rule_id.clone(),
 }),
+            Reducer::AddSubscriptionBundleItem{
+                organization_id,
+                company_id,
+                bundle_id,
+                params,
+}             => __sats::bsatn::to_vec(&add_subscription_bundle_item_reducer::AddSubscriptionBundleItemArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                bundle_id: bundle_id.clone(),
+                params: params.clone(),
+}),
             Reducer::AddUserCustomField{
                 organization_id,
                 params,
@@ -10043,11 +10481,33 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 activity_to: activity_to.clone(),
                 params: params.clone(),
 }),
+            Reducer::AdvanceSubscriptionDunning{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&advance_subscription_dunning_reducer::AdvanceSubscriptionDunningArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
+                params: params.clone(),
+}),
             Reducer::AllocatePaymentTransaction{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&allocate_payment_transaction_reducer::AllocatePaymentTransactionArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::AmendSubscription{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&amend_subscription_reducer::AmendSubscriptionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
                 params: params.clone(),
 }),
             Reducer::AppendAiAgentRunStep{
@@ -10099,7 +10559,18 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
 }),
             Reducer::ApplyGlobalMigrations => __sats::bsatn::to_vec(&apply_global_migrations_reducer::ApplyGlobalMigrationsArgs {
                 }),
-Reducer::ApplyLandedCosts{
+Reducer::ApplyIndexLinkedRenewal{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&apply_index_linked_renewal_reducer::ApplyIndexLinkedRenewalArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::ApplyLandedCosts{
                 organization_id,
                 company_id,
                 landed_cost_id,
@@ -10123,6 +10594,13 @@ Reducer::ApplyLandedCosts{
                 organization_id,
 }             => __sats::bsatn::to_vec(&apply_org_migrations_reducer::ApplyOrgMigrationsArgs {
                 organization_id: organization_id.clone(),
+}),
+            Reducer::ApplyPendingExpenseIntegrationIntents{
+                organization_id,
+                limit,
+}             => __sats::bsatn::to_vec(&apply_pending_expense_integration_intents_reducer::ApplyPendingExpenseIntegrationIntentsArgs {
+                organization_id: organization_id.clone(),
+                limit: limit.clone(),
 }),
             Reducer::ApplyReconciliationRules{
                 organization_id,
@@ -10148,6 +10626,35 @@ Reducer::ApplyLandedCosts{
                 organization_id: organization_id.clone(),
                 order_id: order_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::ApplySubscriptionBundle{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&apply_subscription_bundle_reducer::ApplySubscriptionBundleArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::ApplySubscriptionPaymentIntent{
+                organization_id,
+                company_id,
+                intent_id,
+}             => __sats::bsatn::to_vec(&apply_subscription_payment_intent_reducer::ApplySubscriptionPaymentIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                intent_id: intent_id.clone(),
+}),
+            Reducer::ApplySubscriptionTaxSettleIntent{
+                organization_id,
+                company_id,
+                intent_id,
+}             => __sats::bsatn::to_vec(&apply_subscription_tax_settle_intent_reducer::ApplySubscriptionTaxSettleIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                intent_id: intent_id.clone(),
 }),
             Reducer::ApplyWarehouseSyncIntent{
                 organization_id,
@@ -10591,6 +11098,17 @@ Reducer::BillTimesheets{
 }             => __sats::bsatn::to_vec(&cancel_stock_picking_reducer::CancelStockPickingArgs {
                 organization_id: organization_id.clone(),
                 picking_id: picking_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CancelSubscription{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&cancel_subscription_reducer::CancelSubscriptionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CancelWorkflowInstance{
@@ -11585,6 +12103,13 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateExpenseCardStatementLine{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_expense_card_statement_line_reducer::CreateExpenseCardStatementLineArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateExpenseIntegrationIntent{
                 organization_id,
                 params,
@@ -12543,6 +13068,15 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateSubscriptionBundle{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_subscription_bundle_reducer::CreateSubscriptionBundleArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateSubscriptionFromSaleOrder{
                 organization_id,
                 params,
@@ -12550,11 +13084,42 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateSubscriptionPaymentIntent{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_subscription_payment_intent_reducer::CreateSubscriptionPaymentIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateSubscriptionPlan{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_subscription_plan_reducer::CreateSubscriptionPlanArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateSubscriptionPriceTier{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_subscription_price_tier_reducer::CreateSubscriptionPriceTierArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateSubscriptionTaxSettleIntent{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_subscription_tax_settle_intent_reducer::CreateSubscriptionTaxSettleIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateTask{
@@ -12777,6 +13342,15 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 rule_id: rule_id.clone(),
+}),
+            Reducer::DeactivateSubscriptionPlan{
+                organization_id,
+                company_id,
+                plan_id,
+}             => __sats::bsatn::to_vec(&deactivate_subscription_plan_reducer::DeactivateSubscriptionPlanArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                plan_id: plan_id.clone(),
 }),
             Reducer::DeleteAccountAsset{
                 organization_id,
@@ -13435,6 +14009,17 @@ Reducer::ErrorIntercompanyTransaction{
                 run_id: run_id.clone(),
                 error_message: error_message.clone(),
 }),
+            Reducer::FailSubscriptionPaymentIntent{
+                organization_id,
+                company_id,
+                intent_id,
+                params,
+}             => __sats::bsatn::to_vec(&fail_subscription_payment_intent_reducer::FailSubscriptionPaymentIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                intent_id: intent_id.clone(),
+                params: params.clone(),
+}),
             Reducer::FailWarehouseSyncIntent{
                 organization_id,
                 company_id,
@@ -13540,6 +14125,17 @@ Reducer::ErrorIntercompanyTransaction{
                 params,
 }             => __sats::bsatn::to_vec(&grant_permission_reducer::GrantPermissionArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::GrantSubscriptionEntitlement{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&grant_subscription_entitlement_reducer::GrantSubscriptionEntitlementArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
                 params: params.clone(),
 }),
             Reducer::HoldSupplierIntake{
@@ -14021,6 +14617,17 @@ Reducer::ErrorIntercompanyTransaction{
                 organization_id: organization_id.clone(),
                 csv_data: csv_data.clone(),
 }),
+            Reducer::IngestSubscriptionUsageEvent{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&ingest_subscription_usage_event_reducer::IngestSubscriptionUsageEventArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
+                params: params.clone(),
+}),
             Reducer::InitializeDefaultFormConfigs{
                 organization_id,
 }             => __sats::bsatn::to_vec(&initialize_default_form_configs_reducer::InitializeDefaultFormConfigsArgs {
@@ -14188,6 +14795,15 @@ Reducer::ErrorIntercompanyTransaction{
                 entry_id: entry_id.clone(),
                 matched_entry_id: matched_entry_id.clone(),
 }),
+            Reducer::MatchExpenseCardStatementLine{
+                organization_id,
+                statement_line_id,
+                params,
+}             => __sats::bsatn::to_vec(&match_expense_card_statement_line_reducer::MatchExpenseCardStatementLineArgs {
+                organization_id: organization_id.clone(),
+                statement_line_id: statement_line_id.clone(),
+                params: params.clone(),
+}),
             Reducer::MergeContacts{
                 organization_id,
                 company_id,
@@ -14294,6 +14910,28 @@ Reducer::MoveStockQuant{
                 measure: measure.clone(),
                 note: note.clone(),
                 picture: picture.clone(),
+}),
+            Reducer::PauseSubscription{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&pause_subscription_reducer::PauseSubscriptionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::PaySubscriptionInvoice{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&pay_subscription_invoice_reducer::PaySubscriptionInvoiceArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
+                params: params.clone(),
 }),
             Reducer::PostAccountBankStatement{
                 organization_id,
@@ -14451,6 +15089,28 @@ Reducer::MoveStockQuant{
 }             => __sats::bsatn::to_vec(&queue_mail_from_template_reducer::QueueMailFromTemplateArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RateSubscriptionUsageEvents{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&rate_subscription_usage_events_reducer::RateSubscriptionUsageEventsArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RebaseDeferredSchedulesForSubscription{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&rebase_deferred_schedules_for_subscription_reducer::RebaseDeferredSchedulesForSubscriptionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
                 params: params.clone(),
 }),
             Reducer::ReceiveConsignmentStock{
@@ -14662,6 +15322,17 @@ Reducer::MoveStockQuant{
                 intent_id: intent_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::RecordSubscriptionPaymentFailure{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_subscription_payment_failure_reducer::RecordSubscriptionPaymentFailureArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RecordTelemetry{
                 organization_id,
                 device_id,
@@ -14718,6 +15389,15 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 order_id: order_id.clone(),
+}),
+            Reducer::RefreshSubscriptionExceptionFlags{
+                organization_id,
+                company_id,
+                subscription_id,
+}             => __sats::bsatn::to_vec(&refresh_subscription_exception_flags_reducer::RefreshSubscriptionExceptionFlagsArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
 }),
             Reducer::RefreshTaxDeadlineStatuses{
                 organization_id,
@@ -14884,6 +15564,17 @@ Reducer::MoveStockQuant{
                 user_identity: user_identity.clone(),
                 organization_id: organization_id.clone(),
 }),
+            Reducer::RenewSubscription{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&renew_subscription_reducer::RenewSubscriptionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ReopenInventoryClose{
                 organization_id,
                 company_id,
@@ -14980,6 +15671,17 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 category_id: category_id.clone(),
 }),
+            Reducer::ResumeSubscription{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&resume_subscription_reducer::ResumeSubscriptionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RetryIntercompanyTransaction{
                 organization_id,
                 company_id,
@@ -15053,6 +15755,15 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 assignment_id: assignment_id.clone(),
 }),
+            Reducer::RevokeSubscriptionEntitlement{
+                organization_id,
+                company_id,
+                entitlement_id,
+}             => __sats::bsatn::to_vec(&revoke_subscription_entitlement_reducer::RevokeSubscriptionEntitlementArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                entitlement_id: entitlement_id.clone(),
+}),
             Reducer::RollbackAiSkillRelease{
                 organization_id,
                 skill_id,
@@ -15109,6 +15820,8 @@ Reducer::RunAllPurchasingTests => __sats::bsatn::to_vec(&run_all_purchasing_test
                 }),
 Reducer::RunAllSalesTests => __sats::bsatn::to_vec(&run_all_sales_tests_reducer::RunAllSalesTestsArgs {
                 }),
+Reducer::RunAllSubscriptionsTests => __sats::bsatn::to_vec(&run_all_subscriptions_tests_reducer::RunAllSubscriptionsTestsArgs {
+                }),
 Reducer::RunCartonization{
                 organization_id,
                 company_id,
@@ -15145,6 +15858,8 @@ Reducer::RunExpensesWaveBTest => __sats::bsatn::to_vec(&run_expenses_wave_b_test
 Reducer::RunExpensesWaveCTest => __sats::bsatn::to_vec(&run_expenses_wave_c_test_reducer::RunExpensesWaveCTestArgs {
                 }),
 Reducer::RunExpensesWaveDTest => __sats::bsatn::to_vec(&run_expenses_wave_d_test_reducer::RunExpensesWaveDTestArgs {
+                }),
+Reducer::RunExpensesWaveETest => __sats::bsatn::to_vec(&run_expenses_wave_e_test_reducer::RunExpensesWaveETestArgs {
                 }),
 Reducer::RunFxRevaluation{
                 organization_id,
@@ -15303,6 +16018,16 @@ Reducer::RunSalesPricelistApplyTest => __sats::bsatn::to_vec(&run_sales_pricelis
 Reducer::RunSalesSendQuotationTest => __sats::bsatn::to_vec(&run_sales_send_quotation_test_reducer::RunSalesSendQuotationTestArgs {
                 }),
 Reducer::RunSubscriptionPlanTest => __sats::bsatn::to_vec(&run_subscription_plan_test_reducer::RunSubscriptionPlanTestArgs {
+                }),
+Reducer::RunSubscriptionsWaveATest => __sats::bsatn::to_vec(&run_subscriptions_wave_a_test_reducer::RunSubscriptionsWaveATestArgs {
+                }),
+Reducer::RunSubscriptionsWaveBTest => __sats::bsatn::to_vec(&run_subscriptions_wave_b_test_reducer::RunSubscriptionsWaveBTestArgs {
+                }),
+Reducer::RunSubscriptionsWaveCTest => __sats::bsatn::to_vec(&run_subscriptions_wave_c_test_reducer::RunSubscriptionsWaveCTestArgs {
+                }),
+Reducer::RunSubscriptionsWaveDTest => __sats::bsatn::to_vec(&run_subscriptions_wave_d_test_reducer::RunSubscriptionsWaveDTestArgs {
+                }),
+Reducer::RunSubscriptionsWaveETest => __sats::bsatn::to_vec(&run_subscriptions_wave_e_test_reducer::RunSubscriptionsWaveETestArgs {
                 }),
 Reducer::RunTenantIsolationTests => __sats::bsatn::to_vec(&run_tenant_isolation_tests_reducer::RunTenantIsolationTestsArgs {
                 }),
@@ -15576,6 +16301,17 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&set_record_custom_field_values_reducer::SetRecordCustomFieldValuesArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::SetSubscriptionCommitment{
+                organization_id,
+                company_id,
+                subscription_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_subscription_commitment_reducer::SetSubscriptionCommitmentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                subscription_id: subscription_id.clone(),
                 params: params.clone(),
 }),
             Reducer::SetTaskParent{
@@ -15886,6 +16622,15 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&unmatch_elimination_entry_reducer::UnmatchEliminationEntryArgs {
                 organization_id: organization_id.clone(),
                 entry_id: entry_id.clone(),
+}),
+            Reducer::UnmatchExpenseCardStatementLine{
+                organization_id,
+                statement_line_id,
+                params,
+}             => __sats::bsatn::to_vec(&unmatch_expense_card_statement_line_reducer::UnmatchExpenseCardStatementLineArgs {
+                organization_id: organization_id.clone(),
+                statement_line_id: statement_line_id.clone(),
+                params: params.clone(),
 }),
             Reducer::UnreconciledAccountBankStatementLine{
                 organization_id,
@@ -17073,6 +17818,17 @@ Reducer::SeedOrganizationFormConfigs{
                 rule_id: rule_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateSubscriptionPlan{
+                organization_id,
+                company_id,
+                plan_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_subscription_plan_reducer::UpdateSubscriptionPlanArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                plan_id: plan_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdateSupplierIntake{
                 organization_id,
                 intake_id,
@@ -17374,6 +18130,15 @@ Reducer::SeedOrganizationFormConfigs{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpsertSubscriptionPriceIndex{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&upsert_subscription_price_index_reducer::UpsertSubscriptionPriceIndexArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpsertVendorScorecard{
                 organization_id,
                 company_id,
@@ -17609,6 +18374,7 @@ pub struct DbUpdate {
     document_sequence: __sdk::TableUpdate<DocumentSequence>,
     document_template: __sdk::TableUpdate<DocumentTemplate>,
     document_version: __sdk::TableUpdate<DocumentVersion>,
+    expense_card_statement_line: __sdk::TableUpdate<ExpenseCardStatementLine>,
     expense_integration_intent: __sdk::TableUpdate<ExpenseIntegrationIntent>,
     expense_sheet: __sdk::TableUpdate<HrExpenseSheet>,
     financial_report: __sdk::TableUpdate<FinancialReport>,
@@ -17795,8 +18561,21 @@ pub struct DbUpdate {
     stock_rule: __sdk::TableUpdate<StockRule>,
     stock_traceability_report: __sdk::TableUpdate<StockTraceabilityReport>,
     subscription: __sdk::TableUpdate<Subscription>,
+    subscription_amendment: __sdk::TableUpdate<SubscriptionAmendment>,
+    subscription_billing_run: __sdk::TableUpdate<SubscriptionBillingRun>,
+    subscription_bundle: __sdk::TableUpdate<SubscriptionBundle>,
+    subscription_bundle_item: __sdk::TableUpdate<SubscriptionBundleItem>,
+    subscription_collection: __sdk::TableUpdate<SubscriptionCollection>,
+    subscription_commitment: __sdk::TableUpdate<SubscriptionCommitment>,
+    subscription_entitlement: __sdk::TableUpdate<SubscriptionEntitlement>,
     subscription_line: __sdk::TableUpdate<SubscriptionLine>,
+    subscription_payment_intent: __sdk::TableUpdate<SubscriptionPaymentIntent>,
     subscription_plan: __sdk::TableUpdate<SubscriptionPlan>,
+    subscription_price_index: __sdk::TableUpdate<SubscriptionPriceIndex>,
+    subscription_price_tier: __sdk::TableUpdate<SubscriptionPriceTier>,
+    subscription_tax_settle_intent: __sdk::TableUpdate<SubscriptionTaxSettleIntent>,
+    subscription_usage_charge: __sdk::TableUpdate<SubscriptionUsageCharge>,
+    subscription_usage_event: __sdk::TableUpdate<SubscriptionUsageEvent>,
     supplier_intake_request: __sdk::TableUpdate<SupplierIntakeRequest>,
     tax_deadline: __sdk::TableUpdate<TaxDeadline>,
     tax_deadline_reminder: __sdk::TableUpdate<TaxDeadlineReminder>,
@@ -17950,6 +18729,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "document_sequence" => db_update.document_sequence.append(document_sequence_table::parse_table_update(table_update)?),
     "document_template" => db_update.document_template.append(document_template_table::parse_table_update(table_update)?),
     "document_version" => db_update.document_version.append(document_version_table::parse_table_update(table_update)?),
+    "expense_card_statement_line" => db_update.expense_card_statement_line.append(expense_card_statement_line_table::parse_table_update(table_update)?),
     "expense_integration_intent" => db_update.expense_integration_intent.append(expense_integration_intent_table::parse_table_update(table_update)?),
     "expense_sheet" => db_update.expense_sheet.append(expense_sheet_table::parse_table_update(table_update)?),
     "financial_report" => db_update.financial_report.append(financial_report_table::parse_table_update(table_update)?),
@@ -18136,8 +18916,21 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "stock_rule" => db_update.stock_rule.append(stock_rule_table::parse_table_update(table_update)?),
     "stock_traceability_report" => db_update.stock_traceability_report.append(stock_traceability_report_table::parse_table_update(table_update)?),
     "subscription" => db_update.subscription.append(subscription_table::parse_table_update(table_update)?),
+    "subscription_amendment" => db_update.subscription_amendment.append(subscription_amendment_table::parse_table_update(table_update)?),
+    "subscription_billing_run" => db_update.subscription_billing_run.append(subscription_billing_run_table::parse_table_update(table_update)?),
+    "subscription_bundle" => db_update.subscription_bundle.append(subscription_bundle_table::parse_table_update(table_update)?),
+    "subscription_bundle_item" => db_update.subscription_bundle_item.append(subscription_bundle_item_table::parse_table_update(table_update)?),
+    "subscription_collection" => db_update.subscription_collection.append(subscription_collection_table::parse_table_update(table_update)?),
+    "subscription_commitment" => db_update.subscription_commitment.append(subscription_commitment_table::parse_table_update(table_update)?),
+    "subscription_entitlement" => db_update.subscription_entitlement.append(subscription_entitlement_table::parse_table_update(table_update)?),
     "subscription_line" => db_update.subscription_line.append(subscription_line_table::parse_table_update(table_update)?),
+    "subscription_payment_intent" => db_update.subscription_payment_intent.append(subscription_payment_intent_table::parse_table_update(table_update)?),
     "subscription_plan" => db_update.subscription_plan.append(subscription_plan_table::parse_table_update(table_update)?),
+    "subscription_price_index" => db_update.subscription_price_index.append(subscription_price_index_table::parse_table_update(table_update)?),
+    "subscription_price_tier" => db_update.subscription_price_tier.append(subscription_price_tier_table::parse_table_update(table_update)?),
+    "subscription_tax_settle_intent" => db_update.subscription_tax_settle_intent.append(subscription_tax_settle_intent_table::parse_table_update(table_update)?),
+    "subscription_usage_charge" => db_update.subscription_usage_charge.append(subscription_usage_charge_table::parse_table_update(table_update)?),
+    "subscription_usage_event" => db_update.subscription_usage_event.append(subscription_usage_event_table::parse_table_update(table_update)?),
     "supplier_intake_request" => db_update.supplier_intake_request.append(supplier_intake_request_table::parse_table_update(table_update)?),
     "tax_deadline" => db_update.tax_deadline.append(tax_deadline_table::parse_table_update(table_update)?),
     "tax_deadline_reminder" => db_update.tax_deadline_reminder.append(tax_deadline_reminder_table::parse_table_update(table_update)?),
@@ -18303,6 +19096,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.document_sequence = cache.apply_diff_to_table::<DocumentSequence>("document_sequence", &self.document_sequence).with_updates_by_pk(|row| &row.doc_type);
         diff.document_template = cache.apply_diff_to_table::<DocumentTemplate>("document_template", &self.document_template).with_updates_by_pk(|row| &row.id);
         diff.document_version = cache.apply_diff_to_table::<DocumentVersion>("document_version", &self.document_version).with_updates_by_pk(|row| &row.id);
+        diff.expense_card_statement_line = cache.apply_diff_to_table::<ExpenseCardStatementLine>("expense_card_statement_line", &self.expense_card_statement_line).with_updates_by_pk(|row| &row.id);
         diff.expense_integration_intent = cache.apply_diff_to_table::<ExpenseIntegrationIntent>("expense_integration_intent", &self.expense_integration_intent).with_updates_by_pk(|row| &row.id);
         diff.expense_sheet = cache.apply_diff_to_table::<HrExpenseSheet>("expense_sheet", &self.expense_sheet).with_updates_by_pk(|row| &row.id);
         diff.financial_report = cache.apply_diff_to_table::<FinancialReport>("financial_report", &self.financial_report).with_updates_by_pk(|row| &row.id);
@@ -18489,8 +19283,21 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.stock_rule = cache.apply_diff_to_table::<StockRule>("stock_rule", &self.stock_rule).with_updates_by_pk(|row| &row.id);
         diff.stock_traceability_report = cache.apply_diff_to_table::<StockTraceabilityReport>("stock_traceability_report", &self.stock_traceability_report).with_updates_by_pk(|row| &row.id);
         diff.subscription = cache.apply_diff_to_table::<Subscription>("subscription", &self.subscription).with_updates_by_pk(|row| &row.id);
+        diff.subscription_amendment = cache.apply_diff_to_table::<SubscriptionAmendment>("subscription_amendment", &self.subscription_amendment).with_updates_by_pk(|row| &row.id);
+        diff.subscription_billing_run = cache.apply_diff_to_table::<SubscriptionBillingRun>("subscription_billing_run", &self.subscription_billing_run).with_updates_by_pk(|row| &row.id);
+        diff.subscription_bundle = cache.apply_diff_to_table::<SubscriptionBundle>("subscription_bundle", &self.subscription_bundle).with_updates_by_pk(|row| &row.id);
+        diff.subscription_bundle_item = cache.apply_diff_to_table::<SubscriptionBundleItem>("subscription_bundle_item", &self.subscription_bundle_item).with_updates_by_pk(|row| &row.id);
+        diff.subscription_collection = cache.apply_diff_to_table::<SubscriptionCollection>("subscription_collection", &self.subscription_collection).with_updates_by_pk(|row| &row.id);
+        diff.subscription_commitment = cache.apply_diff_to_table::<SubscriptionCommitment>("subscription_commitment", &self.subscription_commitment).with_updates_by_pk(|row| &row.id);
+        diff.subscription_entitlement = cache.apply_diff_to_table::<SubscriptionEntitlement>("subscription_entitlement", &self.subscription_entitlement).with_updates_by_pk(|row| &row.id);
         diff.subscription_line = cache.apply_diff_to_table::<SubscriptionLine>("subscription_line", &self.subscription_line).with_updates_by_pk(|row| &row.id);
+        diff.subscription_payment_intent = cache.apply_diff_to_table::<SubscriptionPaymentIntent>("subscription_payment_intent", &self.subscription_payment_intent).with_updates_by_pk(|row| &row.id);
         diff.subscription_plan = cache.apply_diff_to_table::<SubscriptionPlan>("subscription_plan", &self.subscription_plan).with_updates_by_pk(|row| &row.id);
+        diff.subscription_price_index = cache.apply_diff_to_table::<SubscriptionPriceIndex>("subscription_price_index", &self.subscription_price_index).with_updates_by_pk(|row| &row.id);
+        diff.subscription_price_tier = cache.apply_diff_to_table::<SubscriptionPriceTier>("subscription_price_tier", &self.subscription_price_tier).with_updates_by_pk(|row| &row.id);
+        diff.subscription_tax_settle_intent = cache.apply_diff_to_table::<SubscriptionTaxSettleIntent>("subscription_tax_settle_intent", &self.subscription_tax_settle_intent).with_updates_by_pk(|row| &row.id);
+        diff.subscription_usage_charge = cache.apply_diff_to_table::<SubscriptionUsageCharge>("subscription_usage_charge", &self.subscription_usage_charge).with_updates_by_pk(|row| &row.id);
+        diff.subscription_usage_event = cache.apply_diff_to_table::<SubscriptionUsageEvent>("subscription_usage_event", &self.subscription_usage_event).with_updates_by_pk(|row| &row.id);
         diff.supplier_intake_request = cache.apply_diff_to_table::<SupplierIntakeRequest>("supplier_intake_request", &self.supplier_intake_request).with_updates_by_pk(|row| &row.id);
         diff.tax_deadline = cache.apply_diff_to_table::<TaxDeadline>("tax_deadline", &self.tax_deadline).with_updates_by_pk(|row| &row.id);
         diff.tax_deadline_reminder = cache.apply_diff_to_table::<TaxDeadlineReminder>("tax_deadline_reminder", &self.tax_deadline_reminder).with_updates_by_pk(|row| &row.id);
@@ -18641,6 +19448,7 @@ for table_rows in raw.tables {
                 "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_version" => db_update.document_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "expense_card_statement_line" => db_update.expense_card_statement_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "expense_integration_intent" => db_update.expense_integration_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "expense_sheet" => db_update.expense_sheet.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "financial_report" => db_update.financial_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -18827,8 +19635,21 @@ for table_rows in raw.tables {
                 "stock_rule" => db_update.stock_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "stock_traceability_report" => db_update.stock_traceability_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "subscription" => db_update.subscription.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_amendment" => db_update.subscription_amendment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_billing_run" => db_update.subscription_billing_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_bundle" => db_update.subscription_bundle.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_bundle_item" => db_update.subscription_bundle_item.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_collection" => db_update.subscription_collection.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_commitment" => db_update.subscription_commitment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_entitlement" => db_update.subscription_entitlement.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "subscription_line" => db_update.subscription_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_payment_intent" => db_update.subscription_payment_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "subscription_plan" => db_update.subscription_plan.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_price_index" => db_update.subscription_price_index.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_price_tier" => db_update.subscription_price_tier.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_tax_settle_intent" => db_update.subscription_tax_settle_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_usage_charge" => db_update.subscription_usage_charge.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "subscription_usage_event" => db_update.subscription_usage_event.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "supplier_intake_request" => db_update.supplier_intake_request.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "tax_deadline" => db_update.tax_deadline.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "tax_deadline_reminder" => db_update.tax_deadline_reminder.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -18979,6 +19800,7 @@ for table_rows in raw.tables {
                 "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_version" => db_update.document_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "expense_card_statement_line" => db_update.expense_card_statement_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "expense_integration_intent" => db_update.expense_integration_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "expense_sheet" => db_update.expense_sheet.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "financial_report" => db_update.financial_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -19165,8 +19987,21 @@ for table_rows in raw.tables {
                 "stock_rule" => db_update.stock_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "stock_traceability_report" => db_update.stock_traceability_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "subscription" => db_update.subscription.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_amendment" => db_update.subscription_amendment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_billing_run" => db_update.subscription_billing_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_bundle" => db_update.subscription_bundle.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_bundle_item" => db_update.subscription_bundle_item.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_collection" => db_update.subscription_collection.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_commitment" => db_update.subscription_commitment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_entitlement" => db_update.subscription_entitlement.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "subscription_line" => db_update.subscription_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_payment_intent" => db_update.subscription_payment_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "subscription_plan" => db_update.subscription_plan.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_price_index" => db_update.subscription_price_index.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_price_tier" => db_update.subscription_price_tier.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_tax_settle_intent" => db_update.subscription_tax_settle_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_usage_charge" => db_update.subscription_usage_charge.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "subscription_usage_event" => db_update.subscription_usage_event.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "supplier_intake_request" => db_update.supplier_intake_request.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "tax_deadline" => db_update.tax_deadline.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "tax_deadline_reminder" => db_update.tax_deadline_reminder.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -19319,6 +20154,7 @@ pub struct AppliedDiff<'r> {
     document_sequence: __sdk::TableAppliedDiff<'r, DocumentSequence>,
     document_template: __sdk::TableAppliedDiff<'r, DocumentTemplate>,
     document_version: __sdk::TableAppliedDiff<'r, DocumentVersion>,
+    expense_card_statement_line: __sdk::TableAppliedDiff<'r, ExpenseCardStatementLine>,
     expense_integration_intent: __sdk::TableAppliedDiff<'r, ExpenseIntegrationIntent>,
     expense_sheet: __sdk::TableAppliedDiff<'r, HrExpenseSheet>,
     financial_report: __sdk::TableAppliedDiff<'r, FinancialReport>,
@@ -19505,8 +20341,21 @@ pub struct AppliedDiff<'r> {
     stock_rule: __sdk::TableAppliedDiff<'r, StockRule>,
     stock_traceability_report: __sdk::TableAppliedDiff<'r, StockTraceabilityReport>,
     subscription: __sdk::TableAppliedDiff<'r, Subscription>,
+    subscription_amendment: __sdk::TableAppliedDiff<'r, SubscriptionAmendment>,
+    subscription_billing_run: __sdk::TableAppliedDiff<'r, SubscriptionBillingRun>,
+    subscription_bundle: __sdk::TableAppliedDiff<'r, SubscriptionBundle>,
+    subscription_bundle_item: __sdk::TableAppliedDiff<'r, SubscriptionBundleItem>,
+    subscription_collection: __sdk::TableAppliedDiff<'r, SubscriptionCollection>,
+    subscription_commitment: __sdk::TableAppliedDiff<'r, SubscriptionCommitment>,
+    subscription_entitlement: __sdk::TableAppliedDiff<'r, SubscriptionEntitlement>,
     subscription_line: __sdk::TableAppliedDiff<'r, SubscriptionLine>,
+    subscription_payment_intent: __sdk::TableAppliedDiff<'r, SubscriptionPaymentIntent>,
     subscription_plan: __sdk::TableAppliedDiff<'r, SubscriptionPlan>,
+    subscription_price_index: __sdk::TableAppliedDiff<'r, SubscriptionPriceIndex>,
+    subscription_price_tier: __sdk::TableAppliedDiff<'r, SubscriptionPriceTier>,
+    subscription_tax_settle_intent: __sdk::TableAppliedDiff<'r, SubscriptionTaxSettleIntent>,
+    subscription_usage_charge: __sdk::TableAppliedDiff<'r, SubscriptionUsageCharge>,
+    subscription_usage_event: __sdk::TableAppliedDiff<'r, SubscriptionUsageEvent>,
     supplier_intake_request: __sdk::TableAppliedDiff<'r, SupplierIntakeRequest>,
     tax_deadline: __sdk::TableAppliedDiff<'r, TaxDeadline>,
     tax_deadline_reminder: __sdk::TableAppliedDiff<'r, TaxDeadlineReminder>,
@@ -19660,6 +20509,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<DocumentSequence>("document_sequence", &self.document_sequence, event);
         callbacks.invoke_table_row_callbacks::<DocumentTemplate>("document_template", &self.document_template, event);
         callbacks.invoke_table_row_callbacks::<DocumentVersion>("document_version", &self.document_version, event);
+        callbacks.invoke_table_row_callbacks::<ExpenseCardStatementLine>("expense_card_statement_line", &self.expense_card_statement_line, event);
         callbacks.invoke_table_row_callbacks::<ExpenseIntegrationIntent>("expense_integration_intent", &self.expense_integration_intent, event);
         callbacks.invoke_table_row_callbacks::<HrExpenseSheet>("expense_sheet", &self.expense_sheet, event);
         callbacks.invoke_table_row_callbacks::<FinancialReport>("financial_report", &self.financial_report, event);
@@ -19846,8 +20696,21 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<StockRule>("stock_rule", &self.stock_rule, event);
         callbacks.invoke_table_row_callbacks::<StockTraceabilityReport>("stock_traceability_report", &self.stock_traceability_report, event);
         callbacks.invoke_table_row_callbacks::<Subscription>("subscription", &self.subscription, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionAmendment>("subscription_amendment", &self.subscription_amendment, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionBillingRun>("subscription_billing_run", &self.subscription_billing_run, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionBundle>("subscription_bundle", &self.subscription_bundle, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionBundleItem>("subscription_bundle_item", &self.subscription_bundle_item, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionCollection>("subscription_collection", &self.subscription_collection, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionCommitment>("subscription_commitment", &self.subscription_commitment, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionEntitlement>("subscription_entitlement", &self.subscription_entitlement, event);
         callbacks.invoke_table_row_callbacks::<SubscriptionLine>("subscription_line", &self.subscription_line, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionPaymentIntent>("subscription_payment_intent", &self.subscription_payment_intent, event);
         callbacks.invoke_table_row_callbacks::<SubscriptionPlan>("subscription_plan", &self.subscription_plan, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionPriceIndex>("subscription_price_index", &self.subscription_price_index, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionPriceTier>("subscription_price_tier", &self.subscription_price_tier, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionTaxSettleIntent>("subscription_tax_settle_intent", &self.subscription_tax_settle_intent, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionUsageCharge>("subscription_usage_charge", &self.subscription_usage_charge, event);
+        callbacks.invoke_table_row_callbacks::<SubscriptionUsageEvent>("subscription_usage_event", &self.subscription_usage_event, event);
         callbacks.invoke_table_row_callbacks::<SupplierIntakeRequest>("supplier_intake_request", &self.supplier_intake_request, event);
         callbacks.invoke_table_row_callbacks::<TaxDeadline>("tax_deadline", &self.tax_deadline, event);
         callbacks.invoke_table_row_callbacks::<TaxDeadlineReminder>("tax_deadline_reminder", &self.tax_deadline_reminder, event);
@@ -20632,6 +21495,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         document_sequence_table::register_table(client_cache);
         document_template_table::register_table(client_cache);
         document_version_table::register_table(client_cache);
+        expense_card_statement_line_table::register_table(client_cache);
         expense_integration_intent_table::register_table(client_cache);
         expense_sheet_table::register_table(client_cache);
         financial_report_table::register_table(client_cache);
@@ -20818,8 +21682,21 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         stock_rule_table::register_table(client_cache);
         stock_traceability_report_table::register_table(client_cache);
         subscription_table::register_table(client_cache);
+        subscription_amendment_table::register_table(client_cache);
+        subscription_billing_run_table::register_table(client_cache);
+        subscription_bundle_table::register_table(client_cache);
+        subscription_bundle_item_table::register_table(client_cache);
+        subscription_collection_table::register_table(client_cache);
+        subscription_commitment_table::register_table(client_cache);
+        subscription_entitlement_table::register_table(client_cache);
         subscription_line_table::register_table(client_cache);
+        subscription_payment_intent_table::register_table(client_cache);
         subscription_plan_table::register_table(client_cache);
+        subscription_price_index_table::register_table(client_cache);
+        subscription_price_tier_table::register_table(client_cache);
+        subscription_tax_settle_intent_table::register_table(client_cache);
+        subscription_usage_charge_table::register_table(client_cache);
+        subscription_usage_event_table::register_table(client_cache);
         supplier_intake_request_table::register_table(client_cache);
         tax_deadline_table::register_table(client_cache);
         tax_deadline_reminder_table::register_table(client_cache);
@@ -20965,6 +21842,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "document_sequence",
         "document_template",
         "document_version",
+        "expense_card_statement_line",
         "expense_integration_intent",
         "expense_sheet",
         "financial_report",
@@ -21151,8 +22029,21 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "stock_rule",
         "stock_traceability_report",
         "subscription",
+        "subscription_amendment",
+        "subscription_billing_run",
+        "subscription_bundle",
+        "subscription_bundle_item",
+        "subscription_collection",
+        "subscription_commitment",
+        "subscription_entitlement",
         "subscription_line",
+        "subscription_payment_intent",
         "subscription_plan",
+        "subscription_price_index",
+        "subscription_price_tier",
+        "subscription_tax_settle_intent",
+        "subscription_usage_charge",
+        "subscription_usage_event",
         "supplier_intake_request",
         "tax_deadline",
         "tax_deadline_reminder",

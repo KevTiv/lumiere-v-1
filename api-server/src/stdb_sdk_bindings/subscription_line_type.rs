@@ -166,6 +166,7 @@ impl __sdk::__query_builder::HasCols for SubscriptionLine {
 pub struct SubscriptionLineIxCols {
     pub id: __sdk::__query_builder::IxCol<SubscriptionLine, u64>,
     pub organization_id: __sdk::__query_builder::IxCol<SubscriptionLine, u64>,
+    pub subscription_id: __sdk::__query_builder::IxCol<SubscriptionLine, u64>,
 }
 
 impl __sdk::__query_builder::HasIxCols for SubscriptionLine {
@@ -174,6 +175,7 @@ impl __sdk::__query_builder::HasIxCols for SubscriptionLine {
         SubscriptionLineIxCols {
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
+            subscription_id: __sdk::__query_builder::IxCol::new(table_name, "subscription_id"),
         }
     }
 }

@@ -20,7 +20,7 @@ pub struct BarcodeRule {
     pub sequence: i32,
     pub encoding: String,
     pub pattern: String,
-    pub r#type: String,
+    pub type: String,
     pub alias: Option::<String>,
     pub is_active: bool,
     pub created_at: __sdk::Timestamp,
@@ -45,7 +45,7 @@ pub struct BarcodeRuleCols {
     pub sequence: __sdk::__query_builder::Col<BarcodeRule, i32>,
     pub encoding: __sdk::__query_builder::Col<BarcodeRule, String>,
     pub pattern: __sdk::__query_builder::Col<BarcodeRule, String>,
-    pub r#type: __sdk::__query_builder::Col<BarcodeRule, String>,
+    pub type: __sdk::__query_builder::Col<BarcodeRule, String>,
     pub alias: __sdk::__query_builder::Col<BarcodeRule, Option::<String>>,
     pub is_active: __sdk::__query_builder::Col<BarcodeRule, bool>,
     pub created_at: __sdk::__query_builder::Col<BarcodeRule, __sdk::Timestamp>,
@@ -64,7 +64,7 @@ impl __sdk::__query_builder::HasCols for BarcodeRule {
             sequence: __sdk::__query_builder::Col::new(table_name, "sequence"),
             encoding: __sdk::__query_builder::Col::new(table_name, "encoding"),
             pattern: __sdk::__query_builder::Col::new(table_name, "pattern"),
-            r#type: __sdk::__query_builder::Col::new(table_name, "type"),
+            type: __sdk::__query_builder::Col::new(table_name, "type"),
             alias: __sdk::__query_builder::Col::new(table_name, "alias"),
             is_active: __sdk::__query_builder::Col::new(table_name, "is_active"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
@@ -81,7 +81,7 @@ impl __sdk::__query_builder::HasCols for BarcodeRule {
 pub struct BarcodeRuleIxCols {
     pub id: __sdk::__query_builder::IxCol<BarcodeRule, u64>,
     pub organization_id: __sdk::__query_builder::IxCol<BarcodeRule, u64>,
-    pub r#type: __sdk::__query_builder::IxCol<BarcodeRule, String>,
+    pub type: __sdk::__query_builder::IxCol<BarcodeRule, String>,
 }
 
 impl __sdk::__query_builder::HasIxCols for BarcodeRule {
@@ -90,7 +90,7 @@ impl __sdk::__query_builder::HasIxCols for BarcodeRule {
         BarcodeRuleIxCols {
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
-            r#type: __sdk::__query_builder::IxCol::new(table_name, "type"),
+            type: __sdk::__query_builder::IxCol::new(table_name, "type"),
 
         }
     }

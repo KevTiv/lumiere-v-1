@@ -9,10 +9,12 @@ import type { ReducerCommandContractMeta } from "./types";
 export const EXPENSES_BFF_REDUCERS = [
   "apply_expense_advance_to_sheet",
   "apply_expense_integration_intent",
+  "apply_pending_expense_integration_intents",
   "approve_expense_policy_exception",
   "approve_expense_sheet",
   "create_expense",
   "create_expense_advance",
+  "create_expense_card_statement_line",
   "create_expense_integration_intent",
   "create_expense_project_rebill",
   "create_expense_reimbursement_payment",
@@ -20,6 +22,7 @@ export const EXPENSES_BFF_REDUCERS = [
   "fail_expense_integration_intent",
   "import_expense_csv",
   "import_expense_sheet_csv",
+  "match_expense_card_statement_line",
   "post_expense_sheet",
   "refuse_expense_sheet",
   "request_expense_policy_exception",
@@ -27,6 +30,7 @@ export const EXPENSES_BFF_REDUCERS = [
   "set_expense_fraud_hold",
   "submit_expense",
   "submit_expense_sheet",
+  "unmatch_expense_card_statement_line",
   "update_expense",
   "upsert_expense_mileage_rate",
   "upsert_expense_per_diem_rate",
@@ -62,6 +66,7 @@ const EXPENSES_HINT_OVERRIDES: Partial<
 > = {
   apply_expense_advance_to_sheet: ["expense-sheets", "expenses"],
   apply_expense_integration_intent: ["expenses"],
+  apply_pending_expense_integration_intents: ["expenses"],
   approve_expense_policy_exception: ["expenses"],
   approve_expense_sheet: [
     "expense-sheets",
@@ -70,6 +75,10 @@ const EXPENSES_HINT_OVERRIDES: Partial<
   ],
   create_expense: ["expenses", "expenses-missing-receipt"],
   create_expense_advance: ["expenses"],
+  create_expense_card_statement_line: [
+    "expenses",
+    "expense-card-statement-unmatched",
+  ],
   create_expense_integration_intent: ["expenses"],
   create_expense_project_rebill: ["expense-sheets", "expenses"],
   create_expense_reimbursement_payment: ["expense-sheets", "expenses"],
@@ -77,6 +86,10 @@ const EXPENSES_HINT_OVERRIDES: Partial<
   fail_expense_integration_intent: ["expenses"],
   import_expense_csv: ["expenses", "expenses-missing-receipt"],
   import_expense_sheet_csv: ["expense-sheets"],
+  match_expense_card_statement_line: [
+    "expenses",
+    "expense-card-statement-unmatched",
+  ],
   post_expense_sheet: ["expenses", "expense-sheets"],
   refuse_expense_sheet: [
     "expense-sheets",
@@ -91,6 +104,10 @@ const EXPENSES_HINT_OVERRIDES: Partial<
     "expense-sheets",
     "expenses",
     "expense-sheets-to-approve",
+  ],
+  unmatch_expense_card_statement_line: [
+    "expenses",
+    "expense-card-statement-unmatched",
   ],
   update_expense: ["expenses", "expenses-missing-receipt"],
   upsert_expense_mileage_rate: ["expenses"],

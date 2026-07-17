@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 description = "Axum API replacing Next.js /api routes (Phase 0–1)"
 build = "build.rs"
+default-run = "api-server"
 
 [lib]
 name = "api_server"
@@ -12,6 +13,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "api-server"
 path = "src/main.rs"
+
+[[bin]]
+name = "expense-integration-worker"
+path = "src/bin/expense-integration-worker.rs"
 
 [dependencies]
 anyhow.workspace = true

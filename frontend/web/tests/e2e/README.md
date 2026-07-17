@@ -40,6 +40,8 @@ These Playwright tests exercise the current high-value ERP web flows:
 | `crm-duplicate-merge.spec.ts` | Duplicate contact detection + merge via CRM Duplicates tab (`@phase-4`) |
 | `import-rollback.spec.ts` | CRM contact import assistant + rollback import job (`@phase-4`) |
 | `manufacturing-mutations.spec.ts` | Work center, BOM, and MO create mutations (`@phase-4`) |
+| `expenses-wave-lifecycle.spec.ts` | Expenses capture/ops panels, allocations form, conflict outbox, card statement create (`@expenses` `@p0`) |
+| `phase-5-workforce-smoke.spec.ts` | HR/Projects/Expenses/Calendar shell smoke (`@phase-5`) |
 
 ## Local Setup
 

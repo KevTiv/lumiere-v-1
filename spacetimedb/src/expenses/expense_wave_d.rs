@@ -287,7 +287,7 @@ fn apply_create_expense_payload(
                 .collect::<Vec<_>>()
         })
         .unwrap_or_else(|| {
-            if intent_type == "ocr_receipt" {
+            if matches!(intent_type, "ocr_receipt" | "email_inbox") {
                 vec![1]
             } else {
                 vec![]
@@ -404,10 +404,11 @@ pub fn create_expense_integration_intent(
     let intent_type = params.intent_type.trim().to_ascii_lowercase();
     if !matches!(
         intent_type.as_str(),
-        "card_feed" | "ocr_receipt" | "fx_rate" | "delayed_sync"
+        "card_feed" | "ocr_receipt" | "email_inbox" | "fx_rate" | "delayed_sync"
     ) {
         return Err(
-            "intent_type must be card_feed|ocr_receipt|fx_rate|delayed_sync".to_string(),
+            "intent_type must be card_feed|ocr_receipt|email_inbox|fx_rate|delayed_sync"
+                .to_string(),
         );
     }
     if params.payload.trim().is_empty() {
@@ -482,7 +483,7 @@ pub fn apply_expense_integration_intent(
     let apply_result = match intent.intent_type.as_str() {
         "fx_rate" => apply_fx_rate_payload(ctx, organization_id, &intent.payload)
             .map(|sheet_id| (None, sheet_id)),
-        "card_feed" | "ocr_receipt" | "delayed_sync" => {
+        "card_feed" | "ocr_receipt" | "email_inbox" | "delayed_sync" => {
             apply_create_expense_payload(
                 ctx,
                 organization_id,

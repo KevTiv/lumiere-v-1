@@ -1107,6 +1107,132 @@
   },
   {
     "extra_where": "",
+    "mapKey": "subscription-lines",
+    "order_by": " ORDER BY subscription_id ASC, id ASC",
+    "resource_key": "subscription-lines",
+    "table": "subscription_line"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-billing-runs",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "subscription-billing-runs",
+    "table": "subscription_billing_run"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-amendments",
+    "order_by": " ORDER BY subscription_id ASC, version DESC",
+    "resource_key": "subscription-amendments",
+    "table": "subscription_amendment"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-usage-events",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "subscription-usage-events",
+    "table": "subscription_usage_event"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-usage-charges",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "subscription-usage-charges",
+    "table": "subscription_usage_charge"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-price-tiers",
+    "order_by": " ORDER BY plan_id ASC, sequence ASC",
+    "resource_key": "subscription-price-tiers",
+    "table": "subscription_price_tier"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-commitments",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "subscription-commitments",
+    "table": "subscription_commitment"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-bundles",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "subscription-bundles",
+    "table": "subscription_bundle"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-bundle-items",
+    "order_by": " ORDER BY bundle_id ASC, sequence ASC",
+    "resource_key": "subscription-bundle-items",
+    "table": "subscription_bundle_item"
+  },
+  {
+    "extra_where": " AND status = 'pending'",
+    "mapKey": "subscription-rating-backlog",
+    "order_by": " ORDER BY id ASC",
+    "resource_key": "subscription-rating-backlog",
+    "table": "subscription_usage_event"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-collections",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "subscription-collections",
+    "table": "subscription_collection"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-entitlements",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "subscription-entitlements",
+    "table": "subscription_entitlement"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-payment-intents",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "subscription-payment-intents",
+    "table": "subscription_payment_intent"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-tax-settle-intents",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "subscription-tax-settle-intents",
+    "table": "subscription_tax_settle_intent"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "subscription-price-indexes",
+    "order_by": " ORDER BY index_code ASC, period_key DESC",
+    "resource_key": "subscription-price-indexes",
+    "table": "subscription_price_index"
+  },
+  {
+    "extra_where": " AND due_to_bill = true",
+    "mapKey": "subscription-due-to-bill",
+    "order_by": " ORDER BY id ASC",
+    "resource_key": "subscription-due-to-bill",
+    "table": "subscription_collection"
+  },
+  {
+    "extra_where": " AND past_due = true",
+    "mapKey": "subscription-past-due",
+    "order_by": " ORDER BY id ASC",
+    "resource_key": "subscription-past-due",
+    "table": "subscription_collection"
+  },
+  {
+    "extra_where": " AND amend_pending = true",
+    "mapKey": "subscription-amend-pending",
+    "order_by": " ORDER BY id ASC",
+    "resource_key": "subscription-amend-pending",
+    "table": "subscription_collection"
+  },
+  {
+    "extra_where": "",
     "mapKey": "deferred-revenue-schedules",
     "order_by": " ORDER BY id DESC",
     "resource_key": "deferred-revenue-schedules",
@@ -1265,6 +1391,13 @@
     "order_by": "",
     "resource_key": "expenses-missing-receipt",
     "table": "hr_expense"
+  },
+  {
+    "extra_where": " AND status = 'unmatched'",
+    "mapKey": "expense-card-statement-unmatched",
+    "order_by": "",
+    "resource_key": "expense-card-statement-unmatched",
+    "table": "expense_card_statement_line"
   },
   {
     "extra_where": "",

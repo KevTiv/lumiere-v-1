@@ -16,6 +16,16 @@ const SUBSCRIPTIONS_TAB_IDS = [
   "dashboard",
   "subscriptions",
   "plans",
+  "lines",
+  "amendments",
+  "usage-events",
+  "usage-charges",
+  "rating-backlog",
+  "price-tiers",
+  "past-due",
+  "due-to-bill",
+  "entitlements",
+  "payment-intents",
   "deferred-schedules",
   "deferred-lines",
   "recognition-rules",
@@ -59,6 +69,12 @@ async function assertDocumentsTab(page: Page, tabId: string) {
 
 async function assertSubscriptionsTab(page: Page, tabId: string) {
   switch (tabId) {
+    case "lines":
+      await expect(activeTabEntityTable(page)).toBeVisible()
+      break
+    case "amendments":
+      await expect(activeTabEntityTable(page)).toBeVisible()
+      break
     case "deferred-schedules":
       await expect(page.getByTestId("module-create-subscriptions-deferred-schedules")).toBeVisible()
       await expect(activeTabEntityTable(page)).toBeVisible()

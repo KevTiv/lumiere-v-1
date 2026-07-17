@@ -18,7 +18,7 @@ pub struct UpdateBarcodeRuleParams {
     pub sequence: Option::<i32>,
     pub encoding: Option::<String>,
     pub pattern: Option::<String>,
-    pub r#type: Option::<String>,
+    pub type: Option::<String>,
     pub alias: Option::<String>,
     pub is_active: Option::<bool>,
     pub metadata: Option::<String>,

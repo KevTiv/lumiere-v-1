@@ -2,6 +2,32 @@
 //!
 use spacetimedb::{Identity, Timestamp};
 
+/// Idempotent billing-run ledger (Wave A).
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = subscription_billing_run,
+    public,
+    index(accessor = subscription_billing_run_by_org, btree(columns = [organization_id])),
+    index(accessor = subscription_billing_run_by_key, btree(columns = [billing_run_key])),
+    index(accessor = subscription_billing_run_by_sub, btree(columns = [subscription_id]))
+)]
+pub struct SubscriptionBillingRun {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub subscription_id: u64,
+    pub billing_run_key: String,
+    pub invoice_move_id: u64,
+    pub invoice_date: Timestamp,
+    pub period_start: Timestamp,
+    pub period_end: Timestamp,
+    pub created_at: Timestamp,
+    pub created_by: Identity,
+    pub metadata: String,
+}
+
 /// Pricing plan template (weekly/monthly/yearly) --------------- */
 #[derive(Clone)]
 #[spacetimedb::table(
@@ -117,7 +143,7 @@ pub struct Subscription {
     pub health: String, // "healthy" | "at_risk" | "churned"
     pub stage_id: Option<u64>,
 
-    pub state: String, // "draft" | "active" | "paused" | "close"
+    pub state: String, // "draft" | "active" | "paused" | "closed"
     pub is_active: bool,
     pub is_trial: bool,
 
@@ -160,7 +186,8 @@ pub struct Subscription {
 #[spacetimedb::table(
     accessor = subscription_line,
     public,
-    index(accessor = subscription_line_by_org, btree(columns = [organization_id]))
+    index(accessor = subscription_line_by_org, btree(columns = [organization_id])),
+    index(accessor = subscription_line_by_subscription, btree(columns = [subscription_id]))
 )]
 pub struct SubscriptionLine {
     #[primary_key]

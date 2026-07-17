@@ -21,12 +21,14 @@ export type ExpenseCapturePayload = {
   projectId?: string
 }
 
+export type ExpenseCaptureSyncState = "queued" | "synced" | "error" | "conflict"
+
 export interface ExpenseCaptureOutboxItem {
   clientRequestId: string
   deviceId: string
   payload: ExpenseCapturePayload
   createdAt: string
-  syncState: "queued" | "synced" | "error"
+  syncState: ExpenseCaptureSyncState
   lastError?: string
 }
 
@@ -115,10 +117,40 @@ export function markExpenseCaptureError(
   clientRequestId: string,
   lastError: string,
 ): void {
+  const conflict =
+    /already exists|idempotenc|conflict|duplicate client_request/i.test(lastError)
   const items = readExpenseCaptureOutbox(organizationId, deviceId).map((i) =>
     i.clientRequestId === clientRequestId
-      ? { ...i, syncState: "error" as const, lastError }
+      ? {
+          ...i,
+          syncState: (conflict ? "conflict" : "error") as ExpenseCaptureSyncState,
+          lastError,
+        }
       : i,
+  )
+  writeExpenseCaptureOutbox(organizationId, deviceId, items)
+}
+
+export function requeueExpenseCapture(
+  organizationId: string | number,
+  deviceId: string,
+  clientRequestId: string,
+): void {
+  const items = readExpenseCaptureOutbox(organizationId, deviceId).map((i) =>
+    i.clientRequestId === clientRequestId
+      ? { ...i, syncState: "queued" as const, lastError: undefined }
+      : i,
+  )
+  writeExpenseCaptureOutbox(organizationId, deviceId, items)
+}
+
+export function discardExpenseCapture(
+  organizationId: string | number,
+  deviceId: string,
+  clientRequestId: string,
+): void {
+  const items = readExpenseCaptureOutbox(organizationId, deviceId).filter(
+    (i) => i.clientRequestId !== clientRequestId,
   )
   writeExpenseCaptureOutbox(organizationId, deviceId, items)
 }
@@ -128,6 +160,9 @@ export function listQueuedExpenseCaptures(
   deviceId: string,
 ): ExpenseCaptureOutboxItem[] {
   return readExpenseCaptureOutbox(organizationId, deviceId).filter(
-    (i) => i.syncState === "queued" || i.syncState === "error",
+    (i) =>
+      i.syncState === "queued" ||
+      i.syncState === "error" ||
+      i.syncState === "conflict",
   )
 }

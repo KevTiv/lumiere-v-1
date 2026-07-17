@@ -88,7 +88,10 @@ export function toCreateSubscriptionFromSaleOrderParams(
     description: optionalTrimmedString(formData.description),
     recurringRuleType: String(formData.recurringRuleType ?? "monthly"),
     recurringInterval: Math.max(1, Math.floor(Number(formData.recurringInterval ?? 1))),
-    paymentMode: String(formData.paymentMode ?? "manual"),
+    paymentMode:
+      formData.paymentMode === "automatic" || formData.paymentMode === "automated_payment"
+        ? "automated_payment"
+        : "draft_invoice",
     partnerId,
     vendorId: undefined,
     partnerInvoiceId,
@@ -97,10 +100,10 @@ export function toCreateSubscriptionFromSaleOrderParams(
     pricelistId,
     analyticAccountId: undefined,
     teamId: undefined,
-    health: String(formData.health ?? "normal"),
+    health: "healthy",
     stageId: undefined,
-    state: String(formData.state ?? "draft"),
-    isActive: true,
+    state: "draft",
+    isActive: false,
     invoiceCount: 0,
     recurringTotal: 0,
     recurringMonthly: 0,
@@ -153,7 +156,15 @@ export function toCreateSubscriptionPlanParams(
   if (!name) return null
 
   const billingPeriodUnit = Math.max(1, Math.floor(Number(formData.billingPeriodUnit ?? 1)))
-  const billingPeriod = String(formData.billingPeriod ?? "monthly")
+  const rawPeriod = String(formData.billingPeriod ?? "month")
+  const billingPeriod =
+    rawPeriod === "daily" || rawPeriod === "day"
+      ? "day"
+      : rawPeriod === "weekly" || rawPeriod === "week"
+        ? "week"
+        : rawPeriod === "yearly" || rawPeriod === "year" || rawPeriod === "annual"
+          ? "year"
+          : "month"
 
   return {
     companyId,
@@ -170,7 +181,7 @@ export function toCreateSubscriptionPlanParams(
     trialDuration: Number(formData.trialDuration ?? 0),
     trialUnit: "day",
     autoCloseLimit: 0,
-    paymentMode: "manual",
+    paymentMode: "draft_invoice",
     templateId: undefined,
     invoiceMailTemplateId: undefined,
     websiteUrl: undefined,

@@ -7,8 +7,8 @@ import {
   positiveInteger,
   requireAiRouteContext,
   validateCompanyScope,
-} from "../../../_lib/route-helpers"
-import { resolveAiPrivacyPolicy } from "../../../_lib/ai-privacy-policy"
+} from "../../_lib/route-helpers"
+import { resolveAiPrivacyPolicy } from "../../_lib/ai-privacy-policy"
 
 /** Protected BFF for the promoted, read-only credit exposure control. */
 export async function POST(request: NextRequest) {

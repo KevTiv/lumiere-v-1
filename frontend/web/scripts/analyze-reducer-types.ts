@@ -808,7 +808,7 @@ const MODULE_PREFIXES: [RegExp, string][] = [
   [/^create_purchase|^update_purchase|^confirm_purchase|^cancel_purchase|^add_purchase|^create_requisition/, 'purchasing'],
   [/^create_project|^update_project|^create_task|^update_task|^log_timesheet|^create_timesheet/, 'projects'],
   [/^create_employee|^update_employee|^create_leave|^approve_leave|^create_payslip|^generate_payslip|^create_department|^create_hr/, 'hr'],
-  [/^create_subscription|^update_subscription|^activate_subscription|^cancel_subscription|^renew_subscription|^pause_subscription/, 'subscriptions'],
+  [/^create_subscription|^update_subscription|^activate_subscription|^deactivate_subscription|^cancel_subscription|^renew_subscription|^pause_subscription|^resume_subscription|^amend_subscription|^ingest_subscription|^rate_subscription|^set_subscription_commitment|^add_subscription_bundle|^apply_subscription_bundle/, 'subscriptions'],
   [/^create_helpdesk|^update_helpdesk|^assign_helpdesk|^close_helpdesk/, 'helpdesk'],
   [/^create_mrp|^update_mrp|^confirm_mrp|^plan_production|^create_bom|^update_bom|^create_workcenter/, 'manufacturing'],
   [/^create_user|^update_user|^create_role|^update_role|^create_company|^update_company|^create_country|^create_currency/, 'settings'],

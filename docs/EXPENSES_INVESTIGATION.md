@@ -310,43 +310,43 @@ Quality benchmark for integrated expense → finance controls: NetSuite expense 
 
 | Gap | Status | Notes |
 |-----|--------|-------|
-| Atomic GL/AP post on `post_expense_sheet` | **Open** | Unsuitable today — state flip only |
-| Server-computed sheet totals | **Open** | Client `total_amount` trusted |
-| Refuse state guards + line state sync | **Open** | Can refuse Posted; lines stuck Submitted |
-| Approval SoD / workflow gate | **Open** | Permission-only approve |
-| Receipt evidence on create/submit (minimal) | **Open** | UI `attachmentIds: []` |
-| Company isolation domain tests | **Open** | No expense domain suite |
-| Idempotency keys for submit/post | **Open** | Required for delayed-sync foundation |
-| Reimbursement path (employee payable + payment) | **Open** | Without this, “reimbursement” UI copy is false |
-| Fix dead “New Report” quick action | **Open** | Config/client id mismatch |
-| Domain + Playwright lifecycle after posting exists | **Open** | Smoke only today |
+| Atomic GL/AP post on `post_expense_sheet` | **Done** | Wave A — JE + `account_move_id` |
+| Server-computed sheet totals | **Done** | Wave A |
+| Refuse state guards + line state sync | **Done** | Wave A |
+| Approval SoD / workflow gate | **Done** | Wave A |
+| Receipt evidence on create/submit (minimal) | **Done** | Wave A; pack rules tighten in Wave E |
+| Company isolation domain tests | **Done** | `run_all_expenses_tests` |
+| Idempotency keys for submit/post | **Done** | Wave A/D `client_request_id` |
+| Reimbursement path (employee payable + payment) | **Done** | Wave A |
+| Fix dead “New Report” quick action | **Done** | Wave A |
+| Domain + Playwright lifecycle after posting exists | **Done** | Domain suite + `expenses-wave-lifecycle.spec.ts` |
 
 ### Competitive
 
 | Gap | Status | Notes |
 |-----|--------|-------|
-| Policy engine (limits, category, require-receipt) | **Open** | Product flags unused |
-| Mileage + per diem rate tables | **Open** | |
-| Tax recovery on post | **Open** | `tax_ids` unused |
-| Multicurrency FX snapshot / settlement | **Open** | |
-| Project analytic enforce + rebill | **Open** | Projects module adjacent |
-| Split allocations | **Open** | |
-| Bounded exception subscriptions + live KPIs | **Open** | Dashboard stats static |
-| Durable approval timeline UI | **Open** | |
-| Pack-driven tax-evidence rules | **Open** | |
-| Mobile capture UX (online-first) | **Open** | Full offline = differentiating |
+| Policy engine (limits, category, require-receipt) | **Done** | Wave B |
+| Mileage + per diem rate tables | **Done** | Wave C |
+| Tax recovery on post | **Done** | Wave B |
+| Multicurrency FX snapshot / settlement | **Done** | Wave B snapshot; settlement fees Wave E |
+| Project analytic enforce + rebill | **Done** | Wave C |
+| Split allocations | **Done** | Wave C |
+| Bounded exception subscriptions + live KPIs | **Done** | Wave B |
+| Durable approval timeline UI | **Done** | Wave B |
+| Pack-driven tax-evidence rules | **Done** | Wave E |
+| Mobile capture UX (online-first) | **Done** | Wave C/D; conflict UI Wave E |
 
 ### Differentiating
 
 | Gap | Status | Notes |
 |-----|--------|-------|
-| Corporate card feed + statement match | **Open** | Intent/worker pattern |
-| Duplicate / fraud detection | **Open** | |
-| Advances lifecycle | **Open** | |
-| Policy exceptions with immutable override records | **Open** | |
-| OCR / email inbox receipt ingestion | **Open** | External workers |
-| Cross-border card FX fee handling | **Open** | |
-| Delayed-sync outbox with conflict UI | **Open** | Builds on idempotency |
+| Corporate card feed + statement match | **Done** | Wave D intent + Wave E match table/UI |
+| Duplicate / fraud detection | **Done** | Wave D |
+| Advances lifecycle | **Done** | Wave D |
+| Policy exceptions with immutable override records | **Done** | Wave D |
+| OCR / email inbox receipt ingestion | **Done** | Wave E `email_inbox` + pending apply worker |
+| Cross-border card FX fee handling | **Done** | Wave E |
+| Delayed-sync outbox with conflict UI | **Done** | Wave E retry/discard |
 
 **Recommended first wave (pilot):** make post financially real (JE + `account_move_id` + line sync) → server totals + refuse guards → SoD approve → minimal receipt required → isolation + lifecycle tests → reimbursement payment. Then policy/mileage/FX/queues; then cards/fraud/advances/offline.
 
@@ -361,7 +361,7 @@ Quality benchmark for integrated expense → finance controls: NetSuite expense 
 | BFF keys vs reducers | 10 keys, 0 phantoms |
 | Workspace keys vs `ERP_ORG_SQL` | `expenses`, `expense-sheets` wired |
 | `cargo check` (`spacetimedb/`) | **Passed** 2026-07-17 |
-| Domain/E2E suites executed in this investigation | **No** — existence only (smoke render/CSV) |
+| Domain/E2E suites executed in this investigation | **Yes** — `run_all_expenses_tests` green 2026-07-17; Playwright `expenses-wave-lifecycle.spec.ts` |
 | Acceptance scenarios | 20 listed (≥10 required) |
 | Every gap has state + priority | Yes (§2 / §7) |
 

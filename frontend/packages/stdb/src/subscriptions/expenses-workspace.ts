@@ -13,6 +13,7 @@ export const EXPENSES_WORKSPACE_RESOURCE_KEYS = [
   "expense-sheets",
   "expense-sheets-to-approve",
   "expenses-missing-receipt",
+  "expense-card-statement-unmatched",
 ] as const;
 
 export type ExpensesWorkspaceResourceKey =

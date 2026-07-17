@@ -1,5 +1,5 @@
 //! Accounting domain test suite — invoke via `run_all_accounting_tests` reducer.
-mod helpers;
+pub mod helpers;
 pub mod fx_revaluation_test;
 pub mod ic_consolidation_test;
 pub mod journal_entries_test;

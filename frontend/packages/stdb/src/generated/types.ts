@@ -911,6 +911,18 @@ export const AddPurchaseRfqLineParams = __t.object("AddPurchaseRfqLineParams", {
 });
 export type AddPurchaseRfqLineParams = __Infer<typeof AddPurchaseRfqLineParams>;
 
+export const AddSubscriptionBundleItemParams = __t.object("AddSubscriptionBundleItemParams", {
+  productId: __t.u64(),
+  name: __t.string(),
+  quantity: __t.f64(),
+  priceUnit: __t.f64(),
+  isAddon: __t.bool(),
+  sequence: __t.u32(),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type AddSubscriptionBundleItemParams = __Infer<typeof AddSubscriptionBundleItemParams>;
+
 export const AddUserToOrganizationParams = __t.object("AddUserToOrganizationParams", {
   roleId: __t.u64(),
   companyId: __t.option(__t.u64()),
@@ -966,6 +978,12 @@ export const AdjustmentReason = __t.object("AdjustmentReason", {
   metadata: __t.option(__t.string()),
 });
 export type AdjustmentReason = __Infer<typeof AdjustmentReason>;
+
+export const AdvanceSubscriptionDunningParams = __t.object("AdvanceSubscriptionDunningParams", {
+  pastDueDays: __t.option(__t.u32()),
+  suspendAfterDays: __t.option(__t.u32()),
+});
+export type AdvanceSubscriptionDunningParams = __Infer<typeof AdvanceSubscriptionDunningParams>;
 
 export const AiActionDraft = __t.object("AiActionDraft", {
   id: __t.u64(),
@@ -1382,6 +1400,22 @@ export const AllocatePaymentParams = __t.object("AllocatePaymentParams", {
 });
 export type AllocatePaymentParams = __Infer<typeof AllocatePaymentParams>;
 
+export const AmendSubscriptionParams = __t.object("AmendSubscriptionParams", {
+  amendmentType: __t.string(),
+  lineId: __t.u64(),
+  effectiveDate: __t.option(__t.timestamp()),
+  newProductId: __t.option(__t.u64()),
+  newQuantity: __t.option(__t.f64()),
+  newPriceUnit: __t.option(__t.f64()),
+  newDiscount: __t.option(__t.f64()),
+  prorate: __t.bool(),
+  journalId: __t.option(__t.u64()),
+  incomeAccountId: __t.option(__t.u64()),
+  receivableAccountId: __t.option(__t.u64()),
+  notes: __t.option(__t.string()),
+});
+export type AmendSubscriptionParams = __Infer<typeof AmendSubscriptionParams>;
+
 export const AmortizationLine = __t.object("AmortizationLine", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -1493,6 +1527,13 @@ export const ApplyExpenseAdvanceParams = __t.object("ApplyExpenseAdvanceParams",
 });
 export type ApplyExpenseAdvanceParams = __Infer<typeof ApplyExpenseAdvanceParams>;
 
+export const ApplyIndexLinkedRenewalParams = __t.object("ApplyIndexLinkedRenewalParams", {
+  indexCode: __t.string(),
+  periodKey: __t.string(),
+  extendTerm: __t.bool(),
+});
+export type ApplyIndexLinkedRenewalParams = __Infer<typeof ApplyIndexLinkedRenewalParams>;
+
 export const ApplyOmnichannelAllocationParams = __t.object("ApplyOmnichannelAllocationParams", {
   preferredRouteId: __t.option(__t.u64()),
   channel: __t.option(__t.string()),
@@ -1504,6 +1545,25 @@ export const ApplySalePromotionParams = __t.object("ApplySalePromotionParams", {
   promotionCode: __t.string(),
 });
 export type ApplySalePromotionParams = __Infer<typeof ApplySalePromotionParams>;
+
+export const ApplySubscriptionBundleParams = __t.object("ApplySubscriptionBundleParams", {
+  bundleId: __t.u64(),
+});
+export type ApplySubscriptionBundleParams = __Infer<typeof ApplySubscriptionBundleParams>;
+
+export const ApplySubscriptionInvoicePaymentParams = __t.object("ApplySubscriptionInvoicePaymentParams", {
+  invoiceMoveId: __t.u64(),
+  paymentJournalId: __t.u64(),
+  bankAccountId: __t.u64(),
+  receivableAccountId: __t.u64(),
+  amount: __t.option(__t.f64()),
+  paymentDate: __t.option(__t.timestamp()),
+  cogsAccountId: __t.u64(),
+  inventoryAccountId: __t.u64(),
+  ref: __t.option(__t.string()),
+  memo: __t.option(__t.string()),
+});
+export type ApplySubscriptionInvoicePaymentParams = __Infer<typeof ApplySubscriptionInvoicePaymentParams>;
 
 export const ApprovalRequest = __t.object("ApprovalRequest", {
   id: __t.u64(),
@@ -1936,6 +1996,18 @@ export const CancelIntercompanyTransactionParams = __t.object("CancelIntercompan
 });
 export type CancelIntercompanyTransactionParams = __Infer<typeof CancelIntercompanyTransactionParams>;
 
+export const CancelSubscriptionParams = __t.object("CancelSubscriptionParams", {
+  closeReasonId: __t.option(__t.u64()),
+  notes: __t.option(__t.string()),
+  createCreditNote: __t.bool(),
+  invoiceMoveId: __t.option(__t.u64()),
+  prorateUnused: __t.bool(),
+  journalId: __t.option(__t.u64()),
+  incomeAccountId: __t.option(__t.u64()),
+  receivableAccountId: __t.option(__t.u64()),
+});
+export type CancelSubscriptionParams = __Infer<typeof CancelSubscriptionParams>;
+
 // The tagged union or sum type for the algebraic type `CardState`.
 export const CardState = __t.enum("CardState", {
   New: __t.unit(),
@@ -2003,6 +2075,7 @@ export type CashFlowLine = __Infer<typeof CashFlowLine>;
 export const CloseSubscriptionParams = __t.object("CloseSubscriptionParams", {
   closeReasonId: __t.option(__t.u64()),
   notes: __t.option(__t.string()),
+  noCharge: __t.bool(),
 });
 export type CloseSubscriptionParams = __Infer<typeof CloseSubscriptionParams>;
 
@@ -3773,6 +3846,18 @@ export const CreateExpenseAdvanceParams = __t.object("CreateExpenseAdvanceParams
   metadata: __t.option(__t.string()),
 });
 export type CreateExpenseAdvanceParams = __Infer<typeof CreateExpenseAdvanceParams>;
+
+export const CreateExpenseCardStatementLineParams = __t.object("CreateExpenseCardStatementLineParams", {
+  companyId: __t.option(__t.u64()),
+  externalRef: __t.string(),
+  merchantKey: __t.option(__t.string()),
+  amount: __t.f64(),
+  currencyId: __t.u64(),
+  transactionDate: __t.timestamp(),
+  fxFeeAmount: __t.f64(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateExpenseCardStatementLineParams = __Infer<typeof CreateExpenseCardStatementLineParams>;
 
 export const CreateExpenseIntegrationIntentParams = __t.object("CreateExpenseIntegrationIntentParams", {
   companyId: __t.option(__t.u64()),
@@ -5727,6 +5812,15 @@ export const CreateStockTraceabilityReportParams = __t.object("CreateStockTracea
 });
 export type CreateStockTraceabilityReportParams = __Infer<typeof CreateStockTraceabilityReportParams>;
 
+export const CreateSubscriptionBundleParams = __t.object("CreateSubscriptionBundleParams", {
+  planId: __t.u64(),
+  name: __t.string(),
+  code: __t.string(),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSubscriptionBundleParams = __Infer<typeof CreateSubscriptionBundleParams>;
+
 export const CreateSubscriptionFromSaleOrderParams = __t.object("CreateSubscriptionFromSaleOrderParams", {
   companyId: __t.option(__t.u64()),
   saleOrderId: __t.u64(),
@@ -5770,6 +5864,18 @@ export const CreateSubscriptionFromSaleOrderParams = __t.object("CreateSubscript
 });
 export type CreateSubscriptionFromSaleOrderParams = __Infer<typeof CreateSubscriptionFromSaleOrderParams>;
 
+export const CreateSubscriptionPaymentIntentParams = __t.object("CreateSubscriptionPaymentIntentParams", {
+  intentType: __t.string(),
+  idempotencyKey: __t.string(),
+  invoiceMoveId: __t.option(__t.u64()),
+  paymentTokenId: __t.option(__t.u64()),
+  amount: __t.f64(),
+  currencyId: __t.u64(),
+  fallbackDraftInvoice: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSubscriptionPaymentIntentParams = __Infer<typeof CreateSubscriptionPaymentIntentParams>;
+
 export const CreateSubscriptionPlanParams = __t.object("CreateSubscriptionPlanParams", {
   companyId: __t.option(__t.u64()),
   name: __t.string(),
@@ -5802,6 +5908,29 @@ export const CreateSubscriptionPlanParams = __t.object("CreateSubscriptionPlanPa
   metadata: __t.option(__t.string()),
 });
 export type CreateSubscriptionPlanParams = __Infer<typeof CreateSubscriptionPlanParams>;
+
+export const CreateSubscriptionPriceTierParams = __t.object("CreateSubscriptionPriceTierParams", {
+  planId: __t.u64(),
+  productId: __t.option(__t.u64()),
+  sequence: __t.u32(),
+  minQty: __t.f64(),
+  maxQty: __t.option(__t.f64()),
+  unitPrice: __t.f64(),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSubscriptionPriceTierParams = __Infer<typeof CreateSubscriptionPriceTierParams>;
+
+export const CreateSubscriptionTaxSettleIntentParams = __t.object("CreateSubscriptionTaxSettleIntentParams", {
+  intentType: __t.string(),
+  idempotencyKey: __t.string(),
+  invoiceMoveId: __t.u64(),
+  paymentId: __t.option(__t.u64()),
+  packCode: __t.string(),
+  payload: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateSubscriptionTaxSettleIntentParams = __Infer<typeof CreateSubscriptionTaxSettleIntentParams>;
 
 export const CreateTaskParams = __t.object("CreateTaskParams", {
   companyId: __t.option(__t.u64()),
@@ -6778,6 +6907,26 @@ export const ExpenseAllocationLineParams = __t.object("ExpenseAllocationLinePara
 });
 export type ExpenseAllocationLineParams = __Infer<typeof ExpenseAllocationLineParams>;
 
+export const ExpenseCardStatementLine = __t.object("ExpenseCardStatementLine", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  externalRef: __t.string(),
+  merchantKey: __t.option(__t.string()),
+  amount: __t.f64(),
+  currencyId: __t.u64(),
+  transactionDate: __t.timestamp(),
+  fxFeeAmount: __t.f64(),
+  matchedExpenseId: __t.option(__t.u64()),
+  status: __t.string(),
+  metadata: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type ExpenseCardStatementLine = __Infer<typeof ExpenseCardStatementLine>;
+
 export const ExpenseIntegrationIntent = __t.object("ExpenseIntegrationIntent", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -6855,6 +7004,12 @@ export const FailExpenseIntegrationIntentParams = __t.object("FailExpenseIntegra
   metadata: __t.option(__t.string()),
 });
 export type FailExpenseIntegrationIntentParams = __Infer<typeof FailExpenseIntegrationIntentParams>;
+
+export const FailSubscriptionPaymentIntentParams = __t.object("FailSubscriptionPaymentIntentParams", {
+  lastError: __t.string(),
+  recordDunningFailure: __t.bool(),
+});
+export type FailSubscriptionPaymentIntentParams = __Infer<typeof FailSubscriptionPaymentIntentParams>;
 
 export const FailWarehouseSyncIntentParams = __t.object("FailWarehouseSyncIntentParams", {
   lastError: __t.string(),
@@ -7092,6 +7247,11 @@ export type GenerateEuVatReportParams = __Infer<typeof GenerateEuVatReportParams
 
 export const GenerateSubscriptionInvoiceParams = __t.object("GenerateSubscriptionInvoiceParams", {
   invoiceDate: __t.timestamp(),
+  billingRunKey: __t.option(__t.string()),
+  journalId: __t.option(__t.u64()),
+  incomeAccountId: __t.u64(),
+  receivableAccountId: __t.u64(),
+  taxAccountId: __t.option(__t.u64()),
 });
 export type GenerateSubscriptionInvoiceParams = __Infer<typeof GenerateSubscriptionInvoiceParams>;
 
@@ -7172,6 +7332,13 @@ export const GrantOrgPermissionParams = __t.object("GrantOrgPermissionParams", {
   },
 });
 export type GrantOrgPermissionParams = __Infer<typeof GrantOrgPermissionParams>;
+
+export const GrantSubscriptionEntitlementParams = __t.object("GrantSubscriptionEntitlementParams", {
+  featureCode: __t.string(),
+  productId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type GrantSubscriptionEntitlementParams = __Infer<typeof GrantSubscriptionEntitlementParams>;
 
 export const HelpdeskSla = __t.object("HelpdeskSla", {
   id: __t.u64(),
@@ -7666,6 +7833,17 @@ export const ImportMappingTemplate = __t.object("ImportMappingTemplate", {
   writeDate: __t.option(__t.timestamp()),
 });
 export type ImportMappingTemplate = __Infer<typeof ImportMappingTemplate>;
+
+export const IngestSubscriptionUsageEventParams = __t.object("IngestSubscriptionUsageEventParams", {
+  source: __t.string(),
+  eventId: __t.string(),
+  quantity: __t.f64(),
+  unit: __t.string(),
+  productId: __t.option(__t.u64()),
+  occurredAt: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type IngestSubscriptionUsageEventParams = __Infer<typeof IngestSubscriptionUsageEventParams>;
 
 // The tagged union or sum type for the algebraic type `InsightSeverity`.
 export const InsightSeverity = __t.enum("InsightSeverity", {
@@ -8346,6 +8524,12 @@ export const MailTemplate = __t.object("MailTemplate", {
 });
 export type MailTemplate = __Infer<typeof MailTemplate>;
 
+export const MatchExpenseCardStatementLineParams = __t.object("MatchExpenseCardStatementLineParams", {
+  expenseId: __t.u64(),
+  metadata: __t.option(__t.string()),
+});
+export type MatchExpenseCardStatementLineParams = __Infer<typeof MatchExpenseCardStatementLineParams>;
+
 export const MergeContactsParams = __t.object("MergeContactsParams", {
   targetContactId: __t.u64(),
 });
@@ -9008,6 +9192,11 @@ export const PasswordResetToken = __t.object("PasswordResetToken", {
   usedAt: __t.option(__t.timestamp()),
 });
 export type PasswordResetToken = __Infer<typeof PasswordResetToken>;
+
+export const PauseSubscriptionParams = __t.object("PauseSubscriptionParams", {
+  notes: __t.option(__t.string()),
+});
+export type PauseSubscriptionParams = __Infer<typeof PauseSubscriptionParams>;
 
 export const PaymentAccount = __t.object("PaymentAccount", {
   id: __t.u64(),
@@ -9683,6 +9872,8 @@ export const PostExpenseSheetParams = __t.object("PostExpenseSheetParams", {
   defaultTaxAccountId: __t.option(__t.u64()),
   cardLiabilityAccountId: __t.option(__t.u64()),
   advanceAccountId: __t.option(__t.u64()),
+  fxFeeAccountId: __t.option(__t.u64()),
+  fxFeeAmount: __t.option(__t.f64()),
   accountingDate: __t.timestamp(),
   clientRequestId: __t.option(__t.string()),
 });
@@ -10772,6 +10963,18 @@ export const QueueWorker = __t.object("QueueWorker", {
 });
 export type QueueWorker = __Infer<typeof QueueWorker>;
 
+export const RateSubscriptionUsageEventsParams = __t.object("RateSubscriptionUsageEventsParams", {
+  limit: __t.u32(),
+  fallbackUnitPrice: __t.option(__t.f64()),
+});
+export type RateSubscriptionUsageEventsParams = __Infer<typeof RateSubscriptionUsageEventsParams>;
+
+export const RebaseDeferredSchedulesParams = __t.object("RebaseDeferredSchedulesParams", {
+  scaleFactor: __t.f64(),
+  notes: __t.option(__t.string()),
+});
+export type RebaseDeferredSchedulesParams = __Infer<typeof RebaseDeferredSchedulesParams>;
+
 export const ReceiveConsignmentStockParams = __t.object("ReceiveConsignmentStockParams", {
   agreementId: __t.u64(),
   locationId: __t.option(__t.u64()),
@@ -10905,6 +11108,13 @@ export const RecordSalesIntegrationResultParams = __t.object("RecordSalesIntegra
 });
 export type RecordSalesIntegrationResultParams = __Infer<typeof RecordSalesIntegrationResultParams>;
 
+export const RecordSubscriptionPaymentFailureParams = __t.object("RecordSubscriptionPaymentFailureParams", {
+  invoiceMoveId: __t.option(__t.u64()),
+  reason: __t.option(__t.string()),
+  pastDueDays: __t.option(__t.u32()),
+});
+export type RecordSubscriptionPaymentFailureParams = __Infer<typeof RecordSubscriptionPaymentFailureParams>;
+
 export const RecordTelemetryParams = __t.object("RecordTelemetryParams", {
   sensorType: __t.string(),
   value: __t.f64(),
@@ -10967,6 +11177,12 @@ export const ReleaseBlanketToPoParams = __t.object("ReleaseBlanketToPoParams", {
   metadata: __t.option(__t.string()),
 });
 export type ReleaseBlanketToPoParams = __Infer<typeof ReleaseBlanketToPoParams>;
+
+export const RenewSubscriptionParams = __t.object("RenewSubscriptionParams", {
+  intervals: __t.u32(),
+  notes: __t.option(__t.string()),
+});
+export type RenewSubscriptionParams = __Infer<typeof RenewSubscriptionParams>;
 
 export const ReplenishmentRule = __t.object("ReplenishmentRule", {
   id: __t.u64(),
@@ -11086,6 +11302,12 @@ export const ResPartnerBank = __t.object("ResPartnerBank", {
   metadata: __t.option(__t.string()),
 });
 export type ResPartnerBank = __Infer<typeof ResPartnerBank>;
+
+export const ResumeSubscriptionParams = __t.object("ResumeSubscriptionParams", {
+  notes: __t.option(__t.string()),
+  recurringNextDate: __t.option(__t.timestamp()),
+});
+export type ResumeSubscriptionParams = __Infer<typeof ResumeSubscriptionParams>;
 
 export const ReturnOrder = __t.object("ReturnOrder", {
   id: __t.u64(),
@@ -11837,6 +12059,14 @@ export const SetRecordCustomFieldValuesParams = __t.object("SetRecordCustomField
   },
 });
 export type SetRecordCustomFieldValuesParams = __Infer<typeof SetRecordCustomFieldValuesParams>;
+
+export const SetSubscriptionCommitmentParams = __t.object("SetSubscriptionCommitmentParams", {
+  minAmount: __t.f64(),
+  productId: __t.option(__t.u64()),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type SetSubscriptionCommitmentParams = __Infer<typeof SetSubscriptionCommitmentParams>;
 
 export const SetVendorRiskFlagParams = __t.object("SetVendorRiskFlagParams", {
   partnerId: __t.u64(),
@@ -12689,6 +12919,121 @@ export const Subscription = __t.object("Subscription", {
 });
 export type Subscription = __Infer<typeof Subscription>;
 
+export const SubscriptionAmendment = __t.object("SubscriptionAmendment", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  subscriptionId: __t.u64(),
+  version: __t.u32(),
+  amendmentType: __t.string(),
+  effectiveDate: __t.timestamp(),
+  lineId: __t.option(__t.u64()),
+  beforeJson: __t.string(),
+  afterJson: __t.string(),
+  prorationAmount: __t.f64(),
+  prorationMoveId: __t.option(__t.u64()),
+  creditNoteMoveId: __t.option(__t.u64()),
+  notes: __t.string(),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.string(),
+});
+export type SubscriptionAmendment = __Infer<typeof SubscriptionAmendment>;
+
+export const SubscriptionBillingRun = __t.object("SubscriptionBillingRun", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  subscriptionId: __t.u64(),
+  billingRunKey: __t.string(),
+  invoiceMoveId: __t.u64(),
+  invoiceDate: __t.timestamp(),
+  periodStart: __t.timestamp(),
+  periodEnd: __t.timestamp(),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.string(),
+});
+export type SubscriptionBillingRun = __Infer<typeof SubscriptionBillingRun>;
+
+export const SubscriptionBundle = __t.object("SubscriptionBundle", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  planId: __t.u64(),
+  name: __t.string(),
+  code: __t.string(),
+  active: __t.bool(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  metadata: __t.string(),
+});
+export type SubscriptionBundle = __Infer<typeof SubscriptionBundle>;
+
+export const SubscriptionBundleItem = __t.object("SubscriptionBundleItem", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  bundleId: __t.u64(),
+  productId: __t.u64(),
+  name: __t.string(),
+  quantity: __t.f64(),
+  priceUnit: __t.f64(),
+  isAddon: __t.bool(),
+  sequence: __t.u32(),
+  active: __t.bool(),
+  createdAt: __t.timestamp(),
+  metadata: __t.string(),
+});
+export type SubscriptionBundleItem = __Infer<typeof SubscriptionBundleItem>;
+
+export const SubscriptionCollection = __t.object("SubscriptionCollection", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  subscriptionId: __t.u64(),
+  stage: __t.string(),
+  failedPaymentCount: __t.u32(),
+  pastDueDays: __t.u32(),
+  dueToBill: __t.bool(),
+  pastDue: __t.bool(),
+  amendPending: __t.bool(),
+  lastFailureAt: __t.option(__t.timestamp()),
+  lastEvaluatedAt: __t.timestamp(),
+  metadata: __t.string(),
+});
+export type SubscriptionCollection = __Infer<typeof SubscriptionCollection>;
+
+export const SubscriptionCommitment = __t.object("SubscriptionCommitment", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  subscriptionId: __t.u64(),
+  minAmount: __t.f64(),
+  productId: __t.option(__t.u64()),
+  active: __t.bool(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  metadata: __t.string(),
+});
+export type SubscriptionCommitment = __Infer<typeof SubscriptionCommitment>;
+
+export const SubscriptionEntitlement = __t.object("SubscriptionEntitlement", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  subscriptionId: __t.u64(),
+  partnerId: __t.u64(),
+  productId: __t.option(__t.u64()),
+  featureCode: __t.string(),
+  status: __t.string(),
+  grantedAt: __t.timestamp(),
+  revokedAt: __t.option(__t.timestamp()),
+  createdBy: __t.identity(),
+  metadata: __t.string(),
+});
+export type SubscriptionEntitlement = __Infer<typeof SubscriptionEntitlement>;
+
 export const SubscriptionLine = __t.object("SubscriptionLine", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -12731,6 +13076,28 @@ export const SubscriptionLine = __t.object("SubscriptionLine", {
 });
 export type SubscriptionLine = __Infer<typeof SubscriptionLine>;
 
+export const SubscriptionPaymentIntent = __t.object("SubscriptionPaymentIntent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  subscriptionId: __t.u64(),
+  intentType: __t.string(),
+  status: __t.string(),
+  idempotencyKey: __t.string(),
+  invoiceMoveId: __t.option(__t.u64()),
+  paymentTokenId: __t.option(__t.u64()),
+  amount: __t.f64(),
+  currencyId: __t.u64(),
+  fallbackDraftInvoice: __t.bool(),
+  lastError: __t.option(__t.string()),
+  attemptCount: __t.u32(),
+  appliedAt: __t.option(__t.timestamp()),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.string(),
+});
+export type SubscriptionPaymentIntent = __Infer<typeof SubscriptionPaymentIntent>;
+
 export const SubscriptionPlan = __t.object("SubscriptionPlan", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -12769,6 +13136,99 @@ export const SubscriptionPlan = __t.object("SubscriptionPlan", {
   metadata: __t.string(),
 });
 export type SubscriptionPlan = __Infer<typeof SubscriptionPlan>;
+
+export const SubscriptionPriceIndex = __t.object("SubscriptionPriceIndex", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  indexCode: __t.string(),
+  countryCode: __t.string(),
+  periodKey: __t.string(),
+  factor: __t.f64(),
+  active: __t.bool(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  metadata: __t.string(),
+});
+export type SubscriptionPriceIndex = __Infer<typeof SubscriptionPriceIndex>;
+
+export const SubscriptionPriceTier = __t.object("SubscriptionPriceTier", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  planId: __t.u64(),
+  productId: __t.option(__t.u64()),
+  sequence: __t.u32(),
+  minQty: __t.f64(),
+  maxQty: __t.option(__t.f64()),
+  unitPrice: __t.f64(),
+  active: __t.bool(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  metadata: __t.string(),
+});
+export type SubscriptionPriceTier = __Infer<typeof SubscriptionPriceTier>;
+
+export const SubscriptionTaxSettleIntent = __t.object("SubscriptionTaxSettleIntent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  subscriptionId: __t.u64(),
+  intentType: __t.string(),
+  status: __t.string(),
+  idempotencyKey: __t.string(),
+  invoiceMoveId: __t.u64(),
+  paymentId: __t.option(__t.u64()),
+  packCode: __t.string(),
+  payload: __t.string(),
+  lastError: __t.option(__t.string()),
+  appliedAt: __t.option(__t.timestamp()),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.string(),
+});
+export type SubscriptionTaxSettleIntent = __Infer<typeof SubscriptionTaxSettleIntent>;
+
+export const SubscriptionUsageCharge = __t.object("SubscriptionUsageCharge", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  subscriptionId: __t.u64(),
+  usageEventId: __t.option(__t.u64()),
+  productId: __t.option(__t.u64()),
+  quantity: __t.f64(),
+  unitPrice: __t.f64(),
+  amount: __t.f64(),
+  tierBand: __t.string(),
+  status: __t.string(),
+  invoiceMoveId: __t.option(__t.u64()),
+  billingRunKey: __t.option(__t.string()),
+  description: __t.string(),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.string(),
+});
+export type SubscriptionUsageCharge = __Infer<typeof SubscriptionUsageCharge>;
+
+export const SubscriptionUsageEvent = __t.object("SubscriptionUsageEvent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  subscriptionId: __t.u64(),
+  source: __t.string(),
+  eventId: __t.string(),
+  idempotencyKey: __t.string(),
+  productId: __t.option(__t.u64()),
+  quantity: __t.f64(),
+  unit: __t.string(),
+  occurredAt: __t.timestamp(),
+  status: __t.string(),
+  ratedChargeId: __t.option(__t.u64()),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+  metadata: __t.string(),
+});
+export type SubscriptionUsageEvent = __Infer<typeof SubscriptionUsageEvent>;
 
 export const SupplierIntakeRequest = __t.object("SupplierIntakeRequest", {
   id: __t.u64(),
@@ -13001,6 +13461,11 @@ export const TrialBalance = __t.object("TrialBalance", {
   metadata: __t.option(__t.string()),
 });
 export type TrialBalance = __Infer<typeof TrialBalance>;
+
+export const UnmatchExpenseCardStatementLineParams = __t.object("UnmatchExpenseCardStatementLineParams", {
+  metadata: __t.option(__t.string()),
+});
+export type UnmatchExpenseCardStatementLineParams = __Infer<typeof UnmatchExpenseCardStatementLineParams>;
 
 export const UnreconcileAccountBankStatementLineParams = __t.object("UnreconcileAccountBankStatementLineParams", {
   moveIds: __t.array(__t.u64()),
@@ -14296,6 +14761,32 @@ export const UpdateStockRuleParams = __t.object("UpdateStockRuleParams", {
 });
 export type UpdateStockRuleParams = __Infer<typeof UpdateStockRuleParams>;
 
+export const UpdateSubscriptionPlanParams = __t.object("UpdateSubscriptionPlanParams", {
+  name: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+  code: __t.option(__t.string()),
+  currencyId: __t.option(__t.u64()),
+  journalId: __t.option(__t.u64()),
+  productId: __t.option(__t.u64()),
+  billingPeriod: __t.option(__t.string()),
+  billingPeriodUnit: __t.option(__t.u32()),
+  recurringInvoiceDay: __t.option(__t.u8()),
+  trialPeriod: __t.option(__t.bool()),
+  trialDuration: __t.option(__t.u32()),
+  trialUnit: __t.option(__t.string()),
+  autoCloseLimit: __t.option(__t.u32()),
+  paymentMode: __t.option(__t.string()),
+  templateId: __t.option(__t.option(__t.u64())),
+  invoiceMailTemplateId: __t.option(__t.option(__t.u64())),
+  websiteUrl: __t.option(__t.option(__t.string())),
+  isPublished: __t.option(__t.bool()),
+  isDefault: __t.option(__t.bool()),
+  color: __t.option(__t.u32()),
+  image1920Url: __t.option(__t.option(__t.string())),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateSubscriptionPlanParams = __Infer<typeof UpdateSubscriptionPlanParams>;
+
 export const UpdateSupplierIntakeParams = __t.object("UpdateSupplierIntakeParams", {
   companyName: __t.option(__t.string()),
   contactName: __t.option(__t.string()),
@@ -14636,6 +15127,16 @@ export const UpsertSearchEmbeddingParams = __t.object("UpsertSearchEmbeddingPara
   metadata: __t.option(__t.string()),
 });
 export type UpsertSearchEmbeddingParams = __Infer<typeof UpsertSearchEmbeddingParams>;
+
+export const UpsertSubscriptionPriceIndexParams = __t.object("UpsertSubscriptionPriceIndexParams", {
+  indexCode: __t.string(),
+  countryCode: __t.string(),
+  periodKey: __t.string(),
+  factor: __t.f64(),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type UpsertSubscriptionPriceIndexParams = __Infer<typeof UpsertSubscriptionPriceIndexParams>;
 
 export const UpsertVendorScorecardParams = __t.object("UpsertVendorScorecardParams", {
   partnerId: __t.u64(),

@@ -180,6 +180,24 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "helpdesk-slas",
   "subscriptions",
   "subscription-plans",
+  "subscription-lines",
+  "subscription-billing-runs",
+  "subscription-amendments",
+  "subscription-usage-events",
+  "subscription-usage-charges",
+  "subscription-price-tiers",
+  "subscription-commitments",
+  "subscription-bundles",
+  "subscription-bundle-items",
+  "subscription-rating-backlog",
+  "subscription-collections",
+  "subscription-entitlements",
+  "subscription-payment-intents",
+  "subscription-tax-settle-intents",
+  "subscription-price-indexes",
+  "subscription-due-to-bill",
+  "subscription-past-due",
+  "subscription-amend-pending",
   "deferred-revenue-schedules",
   "deferred-revenue-lines",
   "revenue-recognition-rules",
@@ -205,6 +223,7 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "expense-sheets",
   "expense-sheets-to-approve",
   "expenses-missing-receipt",
+  "expense-card-statement-unmatched",
   "iot-devices",
   "iot-hubs",
   "iot-alerts",
@@ -956,6 +975,168 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       fa,
       "",
     ),
+  "subscription-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-lines",
+      "subscription_line",
+      id,
+      fa,
+      "",
+      " ORDER BY subscription_id ASC, id ASC",
+    ),
+  "subscription-billing-runs": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-billing-runs",
+      "subscription_billing_run",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "subscription-amendments": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-amendments",
+      "subscription_amendment",
+      id,
+      fa,
+      "",
+      " ORDER BY subscription_id ASC, version DESC",
+    ),
+  "subscription-usage-events": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-usage-events",
+      "subscription_usage_event",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "subscription-usage-charges": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-usage-charges",
+      "subscription_usage_charge",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "subscription-price-tiers": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-price-tiers",
+      "subscription_price_tier",
+      id,
+      fa,
+      "",
+      " ORDER BY plan_id ASC, sequence ASC",
+    ),
+  "subscription-commitments": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-commitments",
+      "subscription_commitment",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "subscription-bundles": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-bundles",
+      "subscription_bundle",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "subscription-bundle-items": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-bundle-items",
+      "subscription_bundle_item",
+      id,
+      fa,
+      "",
+      " ORDER BY bundle_id ASC, sequence ASC",
+    ),
+  "subscription-rating-backlog": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-rating-backlog",
+      "subscription_usage_event",
+      id,
+      fa,
+      " AND status = 'pending'",
+      " ORDER BY id ASC",
+    ),
+  "subscription-collections": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-collections",
+      "subscription_collection",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "subscription-entitlements": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-entitlements",
+      "subscription_entitlement",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "subscription-payment-intents": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-payment-intents",
+      "subscription_payment_intent",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "subscription-tax-settle-intents": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-tax-settle-intents",
+      "subscription_tax_settle_intent",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "subscription-price-indexes": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-price-indexes",
+      "subscription_price_index",
+      id,
+      fa,
+      "",
+      " ORDER BY index_code ASC, period_key DESC",
+    ),
+  "subscription-due-to-bill": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-due-to-bill",
+      "subscription_collection",
+      id,
+      fa,
+      " AND due_to_bill = true",
+      " ORDER BY id ASC",
+    ),
+  "subscription-past-due": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-past-due",
+      "subscription_collection",
+      id,
+      fa,
+      " AND past_due = true",
+      " ORDER BY id ASC",
+    ),
+  "subscription-amend-pending": (id, fa) =>
+    selectOrgScopedSql(
+      "subscription-amend-pending",
+      "subscription_collection",
+      id,
+      fa,
+      " AND amend_pending = true",
+      " ORDER BY id ASC",
+    ),
   "deferred-revenue-schedules": (id, fa) =>
     selectOrgScopedSql(
       "deferred-revenue-schedules",
@@ -1065,6 +1246,14 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       id,
       fa,
       " AND has_receipt = false AND state = 'Draft'",
+    ),
+  "expense-card-statement-unmatched": (id, fa) =>
+    selectOrgScopedSql(
+      "expense-card-statement-unmatched",
+      "expense_card_statement_line",
+      id,
+      fa,
+      " AND status = 'unmatched'",
     ),
   "iot-devices": (id, fa) =>
     selectOrgScopedSql("iot-devices", "iot_device", id, fa, ""),

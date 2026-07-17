@@ -23,7 +23,7 @@ pub struct CreatePaymentParams {
     pub currency_id: u64,
     pub date: Option::<__sdk::Timestamp>,
     pub journal_id: u64,
-    pub r#ref: Option::<String>,
+    pub ref: Option::<String>,
     pub memo: Option::<String>,
 }
 

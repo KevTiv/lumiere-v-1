@@ -516,6 +516,67 @@ export function useApplyExpenseAdvanceToSheet(organizationId: bigint) {
   })
 }
 
+export function useCreateExpenseCardStatementLine(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const { urlPath, init } = expensesBffPost("create_expense_card_statement_line", [
+        organizationId,
+        stdbParamsToJson(
+          { ...params, companyId: params.companyId ?? companyId },
+          "CreateExpenseCardStatementLineParams",
+        ),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to create card statement line')
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useMatchExpenseCardStatementLine(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      statementLineId,
+      expenseId,
+    }: {
+      statementLineId: string | number | bigint
+      expenseId: string | number | bigint
+    }) => {
+      const { urlPath, init } = expensesBffPost("match_expense_card_statement_line", [
+        organizationId,
+        statementLineId,
+        stdbParamsToJson({ expenseId, metadata: null }, "MatchExpenseCardStatementLineParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to match statement line')
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useApplyPendingExpenseIntegrationIntents(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (limit = 20) => {
+      const { urlPath, init } = expensesBffPost("apply_pending_expense_integration_intents", [
+        organizationId,
+        limit,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to apply pending intents')
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
+  })
+}
+
 // ── CSV imports (organization_id, csv_data) ───────────────────────────────────
 
 async function parseCallErrorExpenses(r: Response): Promise<string> {

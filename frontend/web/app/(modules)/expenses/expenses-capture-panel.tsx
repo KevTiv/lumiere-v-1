@@ -12,12 +12,14 @@ import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { Button } from "@lumiere/ui"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
+  discardExpenseCapture,
   enqueueExpenseCapture,
   getOrCreateExpenseCaptureDeviceId,
   listQueuedExpenseCaptures,
   markExpenseCaptureError,
   markExpenseCaptureSynced,
   newExpenseClientRequestId,
+  requeueExpenseCapture,
   type ExpenseCapturePayload,
 } from "@/lib/expense-capture-outbox"
 import type {
@@ -118,7 +120,6 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
   }
 
   const syncOne = async (payload: ExpenseCapturePayload, clientRequestId: string) => {
-    // Prefer durable delayed_sync intent; fall back to direct create (idempotent).
     try {
       await createIntent.mutateAsync({
         intentType: "delayed_sync",
@@ -126,15 +127,12 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
         deviceId,
         payload: delayedSyncPayloadJson(payload, clientRequestId),
       })
-      // Apply by creating intent then direct create as apply needs intent id from query.
-      // Direct create with same client_request_id is idempotent with apply path.
       await createExpense.mutateAsync(payloadToCreateParams(payload, clientRequestId))
     } catch {
       await createExpense.mutateAsync(payloadToCreateParams(payload, clientRequestId))
     }
   }
 
-  /** Wave D delayed-sync: always enqueue first, then flush. */
   const captureDelayedSync = async () => {
     const payload = buildPayload()
     if (!payload) {
@@ -175,6 +173,7 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
     setError(null)
     try {
       for (const item of listQueuedExpenseCaptures(organizationId, deviceId)) {
+        if (item.syncState === "conflict") continue
         try {
           await syncOne(item.payload, item.clientRequestId)
           markExpenseCaptureSynced(organizationId, deviceId, item.clientRequestId)
@@ -193,8 +192,43 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
     }
   }
 
+  const retryItem = async (clientRequestId: string) => {
+    requeueExpenseCapture(organizationId, deviceId, clientRequestId)
+    setTick((n) => n + 1)
+    const item = listQueuedExpenseCaptures(organizationId, deviceId).find(
+      (i) => i.clientRequestId === clientRequestId,
+    )
+    if (!item) return
+    setBusy(true)
+    setError(null)
+    try {
+      await syncOne(item.payload, item.clientRequestId)
+      markExpenseCaptureSynced(organizationId, deviceId, item.clientRequestId)
+      setError(t("expenses.capture.queuedSynced"))
+    } catch (e) {
+      markExpenseCaptureError(
+        organizationId,
+        deviceId,
+        item.clientRequestId,
+        e instanceof Error ? e.message : String(e),
+      )
+      setError(t("expenses.capture.conflictHelp"))
+    } finally {
+      setBusy(false)
+      setTick((n) => n + 1)
+    }
+  }
+
+  const discardItem = (clientRequestId: string) => {
+    discardExpenseCapture(organizationId, deviceId, clientRequestId)
+    setTick((n) => n + 1)
+  }
+
   return (
-    <div className="rounded-lg border p-4 space-y-3 mb-4">
+    <div
+      className="rounded-lg border p-4 space-y-3 mb-4"
+      data-testid="expenses-capture-panel"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-medium">{t("expenses.capture.title")}</h2>
@@ -206,13 +240,14 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
           size="sm"
           disabled={busy || queued.length === 0}
           onClick={() => void flushQueue()}
+          data-testid="expenses-capture-flush"
         >
           {t("expenses.capture.flushQueue")} ({queued.length})
         </Button>
       </div>
 
       {error ? (
-        <p className="text-sm text-muted-foreground" role="status">
+        <p className="text-sm text-muted-foreground" role="status" data-testid="expenses-capture-status">
           {error}
         </p>
       ) : null}
@@ -224,6 +259,7 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
             className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
             value={employeeId}
             onChange={(e) => setEmployeeId(e.target.value)}
+            data-testid="expenses-capture-employee"
           >
             <option value="">{t("expenses.forms.newExpense.fields.employeePlaceholder")}</option>
             {employees.map((e) => (
@@ -239,6 +275,7 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
             className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
             value={pricelistId}
             onChange={(e) => setPricelistId(e.target.value)}
+            data-testid="expenses-capture-pricelist"
           >
             <option value="">{t("expenses.forms.newExpense.fields.pricelistPlaceholder")}</option>
             {pricelists.map((p) => (
@@ -255,6 +292,7 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("expenses.forms.newExpense.fields.namePlaceholder")}
+            data-testid="expenses-capture-name"
           />
         </label>
         <label className="text-xs space-y-1">
@@ -265,6 +303,7 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
+            data-testid="expenses-capture-amount"
           />
         </label>
         <label className="text-xs space-y-1">
@@ -307,16 +346,51 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
         </label>
       </div>
 
-      <Button type="button" disabled={busy} onClick={() => void captureDelayedSync()}>
+      <Button
+        type="button"
+        disabled={busy}
+        onClick={() => void captureDelayedSync()}
+        data-testid="expenses-capture-submit"
+      >
         {t("expenses.capture.submit")}
       </Button>
 
       {queued.length > 0 ? (
-        <ul className="text-xs text-muted-foreground space-y-1">
+        <ul className="text-xs text-muted-foreground space-y-2" data-testid="expenses-capture-queue">
           {queued.map((q) => (
-            <li key={q.clientRequestId}>
-              {q.payload.name} · {q.syncState}
-              {q.lastError ? ` — ${q.lastError}` : ""}
+            <li
+              key={q.clientRequestId}
+              className="flex flex-wrap items-center gap-2"
+              data-testid={`expenses-capture-item-${q.syncState}`}
+            >
+              <span>
+                {q.payload.name} · {q.syncState}
+                {q.lastError ? ` — ${q.lastError}` : ""}
+              </span>
+              {(q.syncState === "error" || q.syncState === "conflict") && (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void retryItem(q.clientRequestId)}
+                    data-testid="expenses-capture-retry"
+                  >
+                    {t("expenses.capture.retry")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => discardItem(q.clientRequestId)}
+                    data-testid="expenses-capture-discard"
+                  >
+                    {t("expenses.capture.discard")}
+                  </Button>
+                </>
+              )}
             </li>
           ))}
         </ul>

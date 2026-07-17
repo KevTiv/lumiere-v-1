@@ -256,6 +256,7 @@ pub fn test_card_feed_and_liability_post(ctx: &ReducerContext) -> Result<(), Str
                 "quantity": 1.0,
                 "merchant_key": "uber",
                 "payment_mode": "corporate_card",
+                "attachment_ids": [1],
             })
             .to_string(),
             metadata: None,
@@ -265,7 +266,9 @@ pub fn test_card_feed_and_liability_post(ctx: &ReducerContext) -> Result<(), Str
         .db
         .expense_integration_intent()
         .iter()
-        .find(|i| i.idempotency_key == "card-1")
+        .find(|i| {
+            i.organization_id == fixture.organization_id && i.idempotency_key == "card-1"
+        })
         .ok_or("intent")?;
     apply_expense_integration_intent(ctx, fixture.organization_id, intent.id)?;
     let line = ctx
@@ -311,6 +314,8 @@ pub fn test_card_feed_and_liability_post(ctx: &ReducerContext) -> Result<(), Str
             default_tax_account_id: None,
             card_liability_account_id: Some(accounts.card_liability_id),
             advance_account_id: None,
+            fx_fee_account_id: None,
+            fx_fee_amount: None,
             accounting_date: ctx.timestamp,
             client_request_id: Some("wd-card-post".into()),
         },
@@ -469,7 +474,9 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
         .db
         .expense_integration_intent()
         .iter()
-        .find(|i| i.idempotency_key == "delay-1")
+        .find(|i| {
+            i.organization_id == fixture.organization_id && i.idempotency_key == "delay-1"
+        })
         .ok_or("delay intent")?;
     apply_expense_integration_intent(ctx, fixture.organization_id, intent.id)?;
     let line = ctx
@@ -522,6 +529,8 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
             default_tax_account_id: None,
             card_liability_account_id: None,
             advance_account_id: Some(accounts.advance_id),
+            fx_fee_account_id: None,
+            fx_fee_amount: None,
             accounting_date: ctx.timestamp,
             client_request_id: Some("wd-adv-post".into()),
         },

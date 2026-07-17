@@ -48,6 +48,7 @@ import {
 } from "@lumiere/query-hooks/hooks/expenses"
 import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { ExpensesCapturePanel } from "./expenses-capture-panel"
+import { ExpensesOpsPanel } from "./expenses-ops-panel"
 import { useExpenseSheetApprovalTimeline } from "@lumiere/query-hooks/hooks/approvals"
 import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -275,6 +276,7 @@ function ExpensesClientLoaded({
         defaultTaxAccountId: accountFieldOptions,
         cardLiabilityAccountId: accountFieldOptions,
         advanceAccountId: accountFieldOptions,
+        fxFeeAccountId: accountFieldOptions,
       }),
     [t, journalFieldOptions, accountFieldOptions],
   )
@@ -620,6 +622,8 @@ function ExpensesClientLoaded({
       const defaultTaxAccountId = formData.defaultTaxAccountId
       const cardLiabilityAccountId = formData.cardLiabilityAccountId
       const advanceAccountId = formData.advanceAccountId
+      const fxFeeAccountId = formData.fxFeeAccountId
+      const fxFeeAmountRaw = formData.fxFeeAmount
       if (d == null || d === "" || !journalId || !payableAccountId || !defaultExpenseAccountId) return
       await postExpenseSheet.mutateAsync({
         sheetId: rowId(workflowForm.row),
@@ -639,6 +643,14 @@ function ExpensesClientLoaded({
           advanceAccountId:
             advanceAccountId != null && String(advanceAccountId).trim() !== ""
               ? BigInt(String(advanceAccountId))
+              : undefined,
+          fxFeeAccountId:
+            fxFeeAccountId != null && String(fxFeeAccountId).trim() !== ""
+              ? BigInt(String(fxFeeAccountId))
+              : undefined,
+          fxFeeAmount:
+            fxFeeAmountRaw != null && String(fxFeeAmountRaw).trim() !== ""
+              ? Number(fxFeeAmountRaw)
               : undefined,
         },
       })
@@ -718,6 +730,7 @@ function ExpensesClientLoaded({
         </p>
       ) : null}
       <ExpensesCapturePanel organizationId={organizationId} />
+      <ExpensesOpsPanel organizationId={organizationId} />
       <ModuleView
         config={config}
         data={data}

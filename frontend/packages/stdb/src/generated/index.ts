@@ -42,6 +42,7 @@ import ActivateConsignmentAgreementReducer from "./activate_consignment_agreemen
 import ActivatePosConfigReducer from "./activate_pos_config_reducer";
 import ActivateRevenueRecognitionRuleReducer from "./activate_revenue_recognition_rule_reducer";
 import ActivateSubscriptionReducer from "./activate_subscription_reducer";
+import ActivateSubscriptionPlanReducer from "./activate_subscription_plan_reducer";
 import AddAccountMoveLineReducer from "./add_account_move_line_reducer";
 import AddArticleMemberReducer from "./add_article_member_reducer";
 import AddCasbinRuleReducer from "./add_casbin_rule_reducer";
@@ -59,24 +60,32 @@ import AddPurchaseRequisitionLineReducer from "./add_purchase_requisition_line_r
 import AddPurchaseRfqBidReducer from "./add_purchase_rfq_bid_reducer";
 import AddPurchaseRfqLineReducer from "./add_purchase_rfq_line_reducer";
 import AddRuleToNomenclatureReducer from "./add_rule_to_nomenclature_reducer";
+import AddSubscriptionBundleItemReducer from "./add_subscription_bundle_item_reducer";
 import AddUserCustomFieldReducer from "./add_user_custom_field_reducer";
 import AddUserToOrganizationReducer from "./add_user_to_organization_reducer";
 import AddWidgetToDashboardReducer from "./add_widget_to_dashboard_reducer";
 import AddWorkflowActivityReducer from "./add_workflow_activity_reducer";
 import AddWorkflowTransitionReducer from "./add_workflow_transition_reducer";
+import AdvanceSubscriptionDunningReducer from "./advance_subscription_dunning_reducer";
 import AllocatePaymentTransactionReducer from "./allocate_payment_transaction_reducer";
+import AmendSubscriptionReducer from "./amend_subscription_reducer";
 import AppendAiAgentRunStepReducer from "./append_ai_agent_run_step_reducer";
 import AppendAiChatMessageReducer from "./append_ai_chat_message_reducer";
 import AppendCrmConversationMessageReducer from "./append_crm_conversation_message_reducer";
 import ApplyExpenseAdvanceToSheetReducer from "./apply_expense_advance_to_sheet_reducer";
 import ApplyExpenseIntegrationIntentReducer from "./apply_expense_integration_intent_reducer";
 import ApplyGlobalMigrationsReducer from "./apply_global_migrations_reducer";
+import ApplyIndexLinkedRenewalReducer from "./apply_index_linked_renewal_reducer";
 import ApplyLandedCostsReducer from "./apply_landed_costs_reducer";
 import ApplyOmnichannelAllocationReducer from "./apply_omnichannel_allocation_reducer";
 import ApplyOrgMigrationsReducer from "./apply_org_migrations_reducer";
+import ApplyPendingExpenseIntegrationIntentsReducer from "./apply_pending_expense_integration_intents_reducer";
 import ApplyReconciliationRulesReducer from "./apply_reconciliation_rules_reducer";
 import ApplySaleOrderOptionsReducer from "./apply_sale_order_options_reducer";
 import ApplySalePromotionToOrderReducer from "./apply_sale_promotion_to_order_reducer";
+import ApplySubscriptionBundleReducer from "./apply_subscription_bundle_reducer";
+import ApplySubscriptionPaymentIntentReducer from "./apply_subscription_payment_intent_reducer";
+import ApplySubscriptionTaxSettleIntentReducer from "./apply_subscription_tax_settle_intent_reducer";
 import ApplyWarehouseSyncIntentReducer from "./apply_warehouse_sync_intent_reducer";
 import ApproveAiActionDraftReducer from "./approve_ai_action_draft_reducer";
 import ApproveApprovalRequestReducer from "./approve_approval_request_reducer";
@@ -130,6 +139,7 @@ import CancelSaleOrderReducer from "./cancel_sale_order_reducer";
 import CancelStockMoveReducer from "./cancel_stock_move_reducer";
 import CancelStockPackageReducer from "./cancel_stock_package_reducer";
 import CancelStockPickingReducer from "./cancel_stock_picking_reducer";
+import CancelSubscriptionReducer from "./cancel_subscription_reducer";
 import CancelWorkflowInstanceReducer from "./cancel_workflow_instance_reducer";
 import CheckMoAvailabilityReducer from "./check_mo_availability_reducer";
 import ClaimHubWithTokenReducer from "./claim_hub_with_token_reducer";
@@ -252,6 +262,7 @@ import CreateEmployeeReducer from "./create_employee_reducer";
 import CreateExchangeOrderFromReturnReducer from "./create_exchange_order_from_return_reducer";
 import CreateExpenseReducer from "./create_expense_reducer";
 import CreateExpenseAdvanceReducer from "./create_expense_advance_reducer";
+import CreateExpenseCardStatementLineReducer from "./create_expense_card_statement_line_reducer";
 import CreateExpenseIntegrationIntentReducer from "./create_expense_integration_intent_reducer";
 import CreateExpenseProjectRebillReducer from "./create_expense_project_rebill_reducer";
 import CreateExpenseReimbursementPaymentReducer from "./create_expense_reimbursement_payment_reducer";
@@ -366,8 +377,12 @@ import CreateStockProductionSerialReducer from "./create_stock_production_serial
 import CreateStockQuantReducer from "./create_stock_quant_reducer";
 import CreateStockRouteReducer from "./create_stock_route_reducer";
 import CreateStockRuleReducer from "./create_stock_rule_reducer";
+import CreateSubscriptionBundleReducer from "./create_subscription_bundle_reducer";
 import CreateSubscriptionFromSaleOrderReducer from "./create_subscription_from_sale_order_reducer";
+import CreateSubscriptionPaymentIntentReducer from "./create_subscription_payment_intent_reducer";
 import CreateSubscriptionPlanReducer from "./create_subscription_plan_reducer";
+import CreateSubscriptionPriceTierReducer from "./create_subscription_price_tier_reducer";
+import CreateSubscriptionTaxSettleIntentReducer from "./create_subscription_tax_settle_intent_reducer";
 import CreateTaskReducer from "./create_task_reducer";
 import CreateTaxDeadlineReducer from "./create_tax_deadline_reducer";
 import CreateTaxJurisdictionReducer from "./create_tax_jurisdiction_reducer";
@@ -395,6 +410,7 @@ import CreateWorkflowReducer from "./create_workflow_reducer";
 import CreateWorkorderReducer from "./create_workorder_reducer";
 import DeactivatePosConfigReducer from "./deactivate_pos_config_reducer";
 import DeactivateRevenueRecognitionRuleReducer from "./deactivate_revenue_recognition_rule_reducer";
+import DeactivateSubscriptionPlanReducer from "./deactivate_subscription_plan_reducer";
 import DeleteAccountAssetReducer from "./delete_account_asset_reducer";
 import DeleteAccountBankStatementReducer from "./delete_account_bank_statement_reducer";
 import DeleteAccountBankStatementLineReducer from "./delete_account_bank_statement_line_reducer";
@@ -480,6 +496,7 @@ import FailExpenseIntegrationIntentReducer from "./fail_expense_integration_inte
 import FailIotActionReducer from "./fail_iot_action_reducer";
 import FailQualityCheckReducer from "./fail_quality_check_reducer";
 import FailScheduledOwnerReportRunReducer from "./fail_scheduled_owner_report_run_reducer";
+import FailSubscriptionPaymentIntentReducer from "./fail_subscription_payment_intent_reducer";
 import FailWarehouseSyncIntentReducer from "./fail_warehouse_sync_intent_reducer";
 import FinalizeImportAssistantJobReducer from "./finalize_import_assistant_job_reducer";
 import FindDuplicateContactsReducer from "./find_duplicate_contacts_reducer";
@@ -493,6 +510,7 @@ import GetFormConfigurationReducer from "./get_form_configuration_reducer";
 import GetOrganizationFormConfigsReducer from "./get_organization_form_configs_reducer";
 import GrantDelegatedAdminScopeReducer from "./grant_delegated_admin_scope_reducer";
 import GrantPermissionReducer from "./grant_permission_reducer";
+import GrantSubscriptionEntitlementReducer from "./grant_subscription_entitlement_reducer";
 import HoldSupplierIntakeReducer from "./hold_supplier_intake_reducer";
 import ImportAccountCsvReducer from "./import_account_csv_reducer";
 import ImportAccountMoveCsvReducer from "./import_account_move_csv_reducer";
@@ -554,6 +572,7 @@ import ImportUomCsvReducer from "./import_uom_csv_reducer";
 import ImportWarehouseCsvReducer from "./import_warehouse_csv_reducer";
 import ImportWorkcenterCsvReducer from "./import_workcenter_csv_reducer";
 import ImportWorkflowCsvReducer from "./import_workflow_csv_reducer";
+import IngestSubscriptionUsageEventReducer from "./ingest_subscription_usage_event_reducer";
 import InitializeDefaultFormConfigsReducer from "./initialize_default_form_configs_reducer";
 import InvoicePoLineReducer from "./invoice_po_line_reducer";
 import LinkDeviceToLocationReducer from "./link_device_to_location_reducer";
@@ -575,6 +594,7 @@ import MarkMailMessageDeliveredReducer from "./mark_mail_message_delivered_reduc
 import MarkResetTokenUsedReducer from "./mark_reset_token_used_reducer";
 import MatchBankLineReducer from "./match_bank_line_reducer";
 import MatchEliminationEntriesReducer from "./match_elimination_entries_reducer";
+import MatchExpenseCardStatementLineReducer from "./match_expense_card_statement_line_reducer";
 import MergeContactsReducer from "./merge_contacts_reducer";
 import MigrateAllOrganizationsReducer from "./migrate_all_organizations_reducer";
 import MoveStockQuantReducer from "./move_stock_quant_reducer";
@@ -587,6 +607,8 @@ import OpenQualityAlertReducer from "./open_quality_alert_reducer";
 import PackMovesIntoPackageReducer from "./pack_moves_into_package_reducer";
 import PackStockPickingReducer from "./pack_stock_picking_reducer";
 import PassQualityCheckReducer from "./pass_quality_check_reducer";
+import PauseSubscriptionReducer from "./pause_subscription_reducer";
+import PaySubscriptionInvoiceReducer from "./pay_subscription_invoice_reducer";
 import PostAccountBankStatementReducer from "./post_account_bank_statement_reducer";
 import PostAccountMoveReducer from "./post_account_move_reducer";
 import PostCycleCountAdjustmentsReducer from "./post_cycle_count_adjustments_reducer";
@@ -605,6 +627,8 @@ import ProcessPendingScansReducer from "./process_pending_scans_reducer";
 import ProduceManufacturingOrderReducer from "./produce_manufacturing_order_reducer";
 import PromoteAiSkillVersionReducer from "./promote_ai_skill_version_reducer";
 import QueueMailFromTemplateReducer from "./queue_mail_from_template_reducer";
+import RateSubscriptionUsageEventsReducer from "./rate_subscription_usage_events_reducer";
+import RebaseDeferredSchedulesForSubscriptionReducer from "./rebase_deferred_schedules_for_subscription_reducer";
 import ReceiveConsignmentStockReducer from "./receive_consignment_stock_reducer";
 import ReceivePoLineReducer from "./receive_po_line_reducer";
 import RecognizeAmortizationLineReducer from "./recognize_amortization_line_reducer";
@@ -628,6 +652,7 @@ import RecordPrivacyConsentReducer from "./record_privacy_consent_reducer";
 import RecordPurchasingIntegrationResultReducer from "./record_purchasing_integration_result_reducer";
 import RecordReportRunReducer from "./record_report_run_reducer";
 import RecordSalesIntegrationResultReducer from "./record_sales_integration_result_reducer";
+import RecordSubscriptionPaymentFailureReducer from "./record_subscription_payment_failure_reducer";
 import RecordTelemetryReducer from "./record_telemetry_reducer";
 import RecordTelemetryBatchReducer from "./record_telemetry_batch_reducer";
 import RecordWhatsappHealthCheckReducer from "./record_whatsapp_health_check_reducer";
@@ -635,6 +660,7 @@ import RecordWhatsappMessageSentReducer from "./record_whatsapp_message_sent_red
 import RefreshInventoryExceptionsReducer from "./refresh_inventory_exceptions_reducer";
 import RefreshPolicySnapshotReducer from "./refresh_policy_snapshot_reducer";
 import RefreshSaleOrderPromiseDatesReducer from "./refresh_sale_order_promise_dates_reducer";
+import RefreshSubscriptionExceptionFlagsReducer from "./refresh_subscription_exception_flags_reducer";
 import RefreshTaxDeadlineStatusesReducer from "./refresh_tax_deadline_statuses_reducer";
 import RefuseExpenseSheetReducer from "./refuse_expense_sheet_reducer";
 import RefuseLeaveReducer from "./refuse_leave_reducer";
@@ -654,6 +680,7 @@ import RemoveMemberFromQualityTeamReducer from "./remove_member_from_quality_tea
 import RemovePurchaseOrderLineReducer from "./remove_purchase_order_line_reducer";
 import RemoveRuleFromNomenclatureReducer from "./remove_rule_from_nomenclature_reducer";
 import RemoveUserFromOrganizationReducer from "./remove_user_from_organization_reducer";
+import RenewSubscriptionReducer from "./renew_subscription_reducer";
 import ReopenInventoryCloseReducer from "./reopen_inventory_close_reducer";
 import ReopenTicketReducer from "./reopen_ticket_reducer";
 import ReorderProposalLineItemsReducer from "./reorder_proposal_line_items_reducer";
@@ -666,6 +693,7 @@ import ResolveInventoryExceptionReducer from "./resolve_inventory_exception_redu
 import ResolveIotAlertReducer from "./resolve_iot_alert_reducer";
 import ResolveProposalCommentReducer from "./resolve_proposal_comment_reducer";
 import RestoreProductCategoryReducer from "./restore_product_category_reducer";
+import ResumeSubscriptionReducer from "./resume_subscription_reducer";
 import RetryIntercompanyTransactionReducer from "./retry_intercompany_transaction_reducer";
 import RetryIotActionReducer from "./retry_iot_action_reducer";
 import ReversePaymentTransactionReducer from "./reverse_payment_transaction_reducer";
@@ -675,6 +703,7 @@ import ReviewSupplierIntakeReducer from "./review_supplier_intake_reducer";
 import RevokeDelegatedAdminScopeReducer from "./revoke_delegated_admin_scope_reducer";
 import RevokePermissionReducer from "./revoke_permission_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
+import RevokeSubscriptionEntitlementReducer from "./revoke_subscription_entitlement_reducer";
 import RollbackAiSkillReleaseReducer from "./rollback_ai_skill_release_reducer";
 import RollbackImportJobReducer from "./rollback_import_job_reducer";
 import RunAccountingFxRevaluationTestReducer from "./run_accounting_fx_revaluation_test_reducer";
@@ -696,6 +725,7 @@ import RunAllInventoryTestsReducer from "./run_all_inventory_tests_reducer";
 import RunAllPlatformTestsReducer from "./run_all_platform_tests_reducer";
 import RunAllPurchasingTestsReducer from "./run_all_purchasing_tests_reducer";
 import RunAllSalesTestsReducer from "./run_all_sales_tests_reducer";
+import RunAllSubscriptionsTestsReducer from "./run_all_subscriptions_tests_reducer";
 import RunCartonizationReducer from "./run_cartonization_reducer";
 import RunCoreOperationalMessagingTestReducer from "./run_core_operational_messaging_test_reducer";
 import RunCoreSodTestReducer from "./run_core_sod_test_reducer";
@@ -711,6 +741,7 @@ import RunExpensesWaveATestReducer from "./run_expenses_wave_a_test_reducer";
 import RunExpensesWaveBTestReducer from "./run_expenses_wave_b_test_reducer";
 import RunExpensesWaveCTestReducer from "./run_expenses_wave_c_test_reducer";
 import RunExpensesWaveDTestReducer from "./run_expenses_wave_d_test_reducer";
+import RunExpensesWaveETestReducer from "./run_expenses_wave_e_test_reducer";
 import RunFxRevaluationReducer from "./run_fx_revaluation_reducer";
 import RunFxRevaluationBatchReducer from "./run_fx_revaluation_batch_reducer";
 import RunHelpdeskTicketTestReducer from "./run_helpdesk_ticket_test_reducer";
@@ -776,6 +807,11 @@ import RunSalesOrderUpdateTestReducer from "./run_sales_order_update_test_reduce
 import RunSalesPricelistApplyTestReducer from "./run_sales_pricelist_apply_test_reducer";
 import RunSalesSendQuotationTestReducer from "./run_sales_send_quotation_test_reducer";
 import RunSubscriptionPlanTestReducer from "./run_subscription_plan_test_reducer";
+import RunSubscriptionsWaveATestReducer from "./run_subscriptions_wave_a_test_reducer";
+import RunSubscriptionsWaveBTestReducer from "./run_subscriptions_wave_b_test_reducer";
+import RunSubscriptionsWaveCTestReducer from "./run_subscriptions_wave_c_test_reducer";
+import RunSubscriptionsWaveDTestReducer from "./run_subscriptions_wave_d_test_reducer";
+import RunSubscriptionsWaveETestReducer from "./run_subscriptions_wave_e_test_reducer";
 import RunTenantIsolationTestsReducer from "./run_tenant_isolation_tests_reducer";
 import RunTraceabilityReportReducer from "./run_traceability_report_reducer";
 import RunWorkflowDefinitionTestReducer from "./run_workflow_definition_test_reducer";
@@ -809,6 +845,7 @@ import SetIotThresholdReducer from "./set_iot_threshold_reducer";
 import SetProjectActiveReducer from "./set_project_active_reducer";
 import SetPurchaseApprovalDelegateReducer from "./set_purchase_approval_delegate_reducer";
 import SetRecordCustomFieldValuesReducer from "./set_record_custom_field_values_reducer";
+import SetSubscriptionCommitmentReducer from "./set_subscription_commitment_reducer";
 import SetTaskParentReducer from "./set_task_parent_reducer";
 import SetVendorRiskFlagReducer from "./set_vendor_risk_flag_reducer";
 import SetWhatsappPrimaryAccountReducer from "./set_whatsapp_primary_account_reducer";
@@ -846,6 +883,7 @@ import UnlockKnowledgeArticleReducer from "./unlock_knowledge_article_reducer";
 import UnlockPurchaseOrderReducer from "./unlock_purchase_order_reducer";
 import UnlockSaleOrderReducer from "./unlock_sale_order_reducer";
 import UnmatchEliminationEntryReducer from "./unmatch_elimination_entry_reducer";
+import UnmatchExpenseCardStatementLineReducer from "./unmatch_expense_card_statement_line_reducer";
 import UnreconciledAccountBankStatementLineReducer from "./unreconciled_account_bank_statement_line_reducer";
 import UnreserveStockQuantReducer from "./unreserve_stock_quant_reducer";
 import UnsubscribeFromRecordReducer from "./unsubscribe_from_record_reducer";
@@ -968,6 +1006,7 @@ import UpdateStockProductionSerialReducer from "./update_stock_production_serial
 import UpdateStockQuantQuantityReducer from "./update_stock_quant_quantity_reducer";
 import UpdateStockRouteReducer from "./update_stock_route_reducer";
 import UpdateStockRuleReducer from "./update_stock_rule_reducer";
+import UpdateSubscriptionPlanReducer from "./update_subscription_plan_reducer";
 import UpdateSupplierIntakeReducer from "./update_supplier_intake_reducer";
 import UpdateTaskReducer from "./update_task_reducer";
 import UpdateTaskStateReducer from "./update_task_state_reducer";
@@ -1001,6 +1040,7 @@ import UpsertOrganizationSettingsReducer from "./upsert_organization_settings_re
 import UpsertPartnerCreditControlReducer from "./upsert_partner_credit_control_reducer";
 import UpsertProposalSectionReducer from "./upsert_proposal_section_reducer";
 import UpsertSearchEmbeddingReducer from "./upsert_search_embedding_reducer";
+import UpsertSubscriptionPriceIndexReducer from "./upsert_subscription_price_index_reducer";
 import UpsertVendorScorecardReducer from "./upsert_vendor_scorecard_reducer";
 import UpsertWarehouseGeoReducer from "./upsert_warehouse_geo_reducer";
 import UseSerialReducer from "./use_serial_reducer";
@@ -1131,6 +1171,7 @@ import DocumentRow from "./document_table";
 import DocumentSequenceRow from "./document_sequence_table";
 import DocumentTemplateRow from "./document_template_table";
 import DocumentVersionRow from "./document_version_table";
+import ExpenseCardStatementLineRow from "./expense_card_statement_line_table";
 import ExpenseIntegrationIntentRow from "./expense_integration_intent_table";
 import ExpenseSheetRow from "./expense_sheet_table";
 import FinancialReportRow from "./financial_report_table";
@@ -1317,8 +1358,21 @@ import StockRouteRow from "./stock_route_table";
 import StockRuleRow from "./stock_rule_table";
 import StockTraceabilityReportRow from "./stock_traceability_report_table";
 import SubscriptionRow from "./subscription_table";
+import SubscriptionAmendmentRow from "./subscription_amendment_table";
+import SubscriptionBillingRunRow from "./subscription_billing_run_table";
+import SubscriptionBundleRow from "./subscription_bundle_table";
+import SubscriptionBundleItemRow from "./subscription_bundle_item_table";
+import SubscriptionCollectionRow from "./subscription_collection_table";
+import SubscriptionCommitmentRow from "./subscription_commitment_table";
+import SubscriptionEntitlementRow from "./subscription_entitlement_table";
 import SubscriptionLineRow from "./subscription_line_table";
+import SubscriptionPaymentIntentRow from "./subscription_payment_intent_table";
 import SubscriptionPlanRow from "./subscription_plan_table";
+import SubscriptionPriceIndexRow from "./subscription_price_index_table";
+import SubscriptionPriceTierRow from "./subscription_price_tier_table";
+import SubscriptionTaxSettleIntentRow from "./subscription_tax_settle_intent_table";
+import SubscriptionUsageChargeRow from "./subscription_usage_charge_table";
+import SubscriptionUsageEventRow from "./subscription_usage_event_table";
 import SupplierIntakeRequestRow from "./supplier_intake_request_table";
 import TaxDeadlineRow from "./tax_deadline_table";
 import TaxDeadlineReminderRow from "./tax_deadline_reminder_table";
@@ -3386,6 +3440,29 @@ const tablesSchema = __schema({
       { name: 'document_version_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, DocumentVersionRow),
+  expense_card_statement_line: __table({
+    name: 'expense_card_statement_line',
+    indexes: [
+      { name: 'card_stmt_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'card_stmt_by_external', algorithm: 'btree', columns: [
+        'externalRef',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'card_stmt_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'card_stmt_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'expense_card_statement_line_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ExpenseCardStatementLineRow),
   expense_integration_intent: __table({
     name: 'expense_integration_intent',
     indexes: [
@@ -6660,6 +6737,131 @@ const tablesSchema = __schema({
       { name: 'subscription_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, SubscriptionRow),
+  subscription_amendment: __table({
+    name: 'subscription_amendment',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_amendment_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subscription_amendment_by_sub', algorithm: 'btree', columns: [
+        'subscriptionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_amendment_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, SubscriptionAmendmentRow),
+  subscription_billing_run: __table({
+    name: 'subscription_billing_run',
+    indexes: [
+      { name: 'subscription_billing_run_by_key', algorithm: 'btree', columns: [
+        'billingRunKey',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_billing_run_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subscription_billing_run_by_sub', algorithm: 'btree', columns: [
+        'subscriptionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_billing_run_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, SubscriptionBillingRunRow),
+  subscription_bundle: __table({
+    name: 'subscription_bundle',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_bundle_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subscription_bundle_by_plan', algorithm: 'btree', columns: [
+        'planId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_bundle_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, SubscriptionBundleRow),
+  subscription_bundle_item: __table({
+    name: 'subscription_bundle_item',
+    indexes: [
+      { name: 'subscription_bundle_item_by_bundle', algorithm: 'btree', columns: [
+        'bundleId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_bundle_item_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_bundle_item_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, SubscriptionBundleItemRow),
+  subscription_collection: __table({
+    name: 'subscription_collection',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_collection_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subscription_collection_by_sub', algorithm: 'btree', columns: [
+        'subscriptionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_collection_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, SubscriptionCollectionRow),
+  subscription_commitment: __table({
+    name: 'subscription_commitment',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_commitment_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subscription_commitment_by_sub', algorithm: 'btree', columns: [
+        'subscriptionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_commitment_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, SubscriptionCommitmentRow),
+  subscription_entitlement: __table({
+    name: 'subscription_entitlement',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_entitlement_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subscription_entitlement_by_partner', algorithm: 'btree', columns: [
+        'partnerId',
+      ] },
+      { name: 'subscription_entitlement_by_sub', algorithm: 'btree', columns: [
+        'subscriptionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_entitlement_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, SubscriptionEntitlementRow),
   subscription_line: __table({
     name: 'subscription_line',
     indexes: [
@@ -6669,11 +6871,38 @@ const tablesSchema = __schema({
       { name: 'subscription_line_by_org', algorithm: 'btree', columns: [
         'organizationId',
       ] },
+      { name: 'subscription_line_by_subscription', algorithm: 'btree', columns: [
+        'subscriptionId',
+      ] },
     ],
     constraints: [
       { name: 'subscription_line_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, SubscriptionLineRow),
+  subscription_payment_intent: __table({
+    name: 'subscription_payment_intent',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_payment_intent_by_key', algorithm: 'btree', columns: [
+        'idempotencyKey',
+      ] },
+      { name: 'subscription_payment_intent_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subscription_payment_intent_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+      { name: 'subscription_payment_intent_by_sub', algorithm: 'btree', columns: [
+        'subscriptionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_payment_intent_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'subscription_payment_intent_idempotency_key_key', constraint: 'unique', columns: ['idempotencyKey'] },
+    ],
+  }, SubscriptionPaymentIntentRow),
   subscription_plan: __table({
     name: 'subscription_plan',
     indexes: [
@@ -6688,6 +6917,108 @@ const tablesSchema = __schema({
       { name: 'subscription_plan_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, SubscriptionPlanRow),
+  subscription_price_index: __table({
+    name: 'subscription_price_index',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_price_index_by_code', algorithm: 'btree', columns: [
+        'indexCode',
+      ] },
+      { name: 'subscription_price_index_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_price_index_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, SubscriptionPriceIndexRow),
+  subscription_price_tier: __table({
+    name: 'subscription_price_tier',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_price_tier_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subscription_price_tier_by_plan', algorithm: 'btree', columns: [
+        'planId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_price_tier_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, SubscriptionPriceTierRow),
+  subscription_tax_settle_intent: __table({
+    name: 'subscription_tax_settle_intent',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_tax_settle_by_key', algorithm: 'btree', columns: [
+        'idempotencyKey',
+      ] },
+      { name: 'subscription_tax_settle_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subscription_tax_settle_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_tax_settle_intent_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'subscription_tax_settle_intent_idempotency_key_key', constraint: 'unique', columns: ['idempotencyKey'] },
+    ],
+  }, SubscriptionTaxSettleIntentRow),
+  subscription_usage_charge: __table({
+    name: 'subscription_usage_charge',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_usage_charge_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subscription_usage_charge_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+      { name: 'subscription_usage_charge_by_sub', algorithm: 'btree', columns: [
+        'subscriptionId',
+      ] },
+      { name: 'subscription_usage_charge_by_event', algorithm: 'btree', columns: [
+        'usageEventId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_usage_charge_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, SubscriptionUsageChargeRow),
+  subscription_usage_event: __table({
+    name: 'subscription_usage_event',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subscription_usage_event_by_key', algorithm: 'btree', columns: [
+        'idempotencyKey',
+      ] },
+      { name: 'subscription_usage_event_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subscription_usage_event_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+      { name: 'subscription_usage_event_by_sub', algorithm: 'btree', columns: [
+        'subscriptionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'subscription_usage_event_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'subscription_usage_event_idempotency_key_key', constraint: 'unique', columns: ['idempotencyKey'] },
+    ],
+  }, SubscriptionUsageEventRow),
   supplier_intake_request: __table({
     name: 'supplier_intake_request',
     indexes: [
@@ -7225,6 +7556,7 @@ const reducersSchema = __reducers(
   __reducerSchema("activate_pos_config", ActivatePosConfigReducer),
   __reducerSchema("activate_revenue_recognition_rule", ActivateRevenueRecognitionRuleReducer),
   __reducerSchema("activate_subscription", ActivateSubscriptionReducer),
+  __reducerSchema("activate_subscription_plan", ActivateSubscriptionPlanReducer),
   __reducerSchema("add_account_move_line", AddAccountMoveLineReducer),
   __reducerSchema("add_article_member", AddArticleMemberReducer),
   __reducerSchema("add_casbin_rule", AddCasbinRuleReducer),
@@ -7242,24 +7574,32 @@ const reducersSchema = __reducers(
   __reducerSchema("add_purchase_rfq_bid", AddPurchaseRfqBidReducer),
   __reducerSchema("add_purchase_rfq_line", AddPurchaseRfqLineReducer),
   __reducerSchema("add_rule_to_nomenclature", AddRuleToNomenclatureReducer),
+  __reducerSchema("add_subscription_bundle_item", AddSubscriptionBundleItemReducer),
   __reducerSchema("add_user_custom_field", AddUserCustomFieldReducer),
   __reducerSchema("add_user_to_organization", AddUserToOrganizationReducer),
   __reducerSchema("add_widget_to_dashboard", AddWidgetToDashboardReducer),
   __reducerSchema("add_workflow_activity", AddWorkflowActivityReducer),
   __reducerSchema("add_workflow_transition", AddWorkflowTransitionReducer),
+  __reducerSchema("advance_subscription_dunning", AdvanceSubscriptionDunningReducer),
   __reducerSchema("allocate_payment_transaction", AllocatePaymentTransactionReducer),
+  __reducerSchema("amend_subscription", AmendSubscriptionReducer),
   __reducerSchema("append_ai_agent_run_step", AppendAiAgentRunStepReducer),
   __reducerSchema("append_ai_chat_message", AppendAiChatMessageReducer),
   __reducerSchema("append_crm_conversation_message", AppendCrmConversationMessageReducer),
   __reducerSchema("apply_expense_advance_to_sheet", ApplyExpenseAdvanceToSheetReducer),
   __reducerSchema("apply_expense_integration_intent", ApplyExpenseIntegrationIntentReducer),
   __reducerSchema("apply_global_migrations", ApplyGlobalMigrationsReducer),
+  __reducerSchema("apply_index_linked_renewal", ApplyIndexLinkedRenewalReducer),
   __reducerSchema("apply_landed_costs", ApplyLandedCostsReducer),
   __reducerSchema("apply_omnichannel_allocation", ApplyOmnichannelAllocationReducer),
   __reducerSchema("apply_org_migrations", ApplyOrgMigrationsReducer),
+  __reducerSchema("apply_pending_expense_integration_intents", ApplyPendingExpenseIntegrationIntentsReducer),
   __reducerSchema("apply_reconciliation_rules", ApplyReconciliationRulesReducer),
   __reducerSchema("apply_sale_order_options", ApplySaleOrderOptionsReducer),
   __reducerSchema("apply_sale_promotion_to_order", ApplySalePromotionToOrderReducer),
+  __reducerSchema("apply_subscription_bundle", ApplySubscriptionBundleReducer),
+  __reducerSchema("apply_subscription_payment_intent", ApplySubscriptionPaymentIntentReducer),
+  __reducerSchema("apply_subscription_tax_settle_intent", ApplySubscriptionTaxSettleIntentReducer),
   __reducerSchema("apply_warehouse_sync_intent", ApplyWarehouseSyncIntentReducer),
   __reducerSchema("approve_ai_action_draft", ApproveAiActionDraftReducer),
   __reducerSchema("approve_approval_request", ApproveApprovalRequestReducer),
@@ -7313,6 +7653,7 @@ const reducersSchema = __reducers(
   __reducerSchema("cancel_stock_move", CancelStockMoveReducer),
   __reducerSchema("cancel_stock_package", CancelStockPackageReducer),
   __reducerSchema("cancel_stock_picking", CancelStockPickingReducer),
+  __reducerSchema("cancel_subscription", CancelSubscriptionReducer),
   __reducerSchema("cancel_workflow_instance", CancelWorkflowInstanceReducer),
   __reducerSchema("check_mo_availability", CheckMoAvailabilityReducer),
   __reducerSchema("claim_hub_with_token", ClaimHubWithTokenReducer),
@@ -7435,6 +7776,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_exchange_order_from_return", CreateExchangeOrderFromReturnReducer),
   __reducerSchema("create_expense", CreateExpenseReducer),
   __reducerSchema("create_expense_advance", CreateExpenseAdvanceReducer),
+  __reducerSchema("create_expense_card_statement_line", CreateExpenseCardStatementLineReducer),
   __reducerSchema("create_expense_integration_intent", CreateExpenseIntegrationIntentReducer),
   __reducerSchema("create_expense_project_rebill", CreateExpenseProjectRebillReducer),
   __reducerSchema("create_expense_reimbursement_payment", CreateExpenseReimbursementPaymentReducer),
@@ -7549,8 +7891,12 @@ const reducersSchema = __reducers(
   __reducerSchema("create_stock_quant", CreateStockQuantReducer),
   __reducerSchema("create_stock_route", CreateStockRouteReducer),
   __reducerSchema("create_stock_rule", CreateStockRuleReducer),
+  __reducerSchema("create_subscription_bundle", CreateSubscriptionBundleReducer),
   __reducerSchema("create_subscription_from_sale_order", CreateSubscriptionFromSaleOrderReducer),
+  __reducerSchema("create_subscription_payment_intent", CreateSubscriptionPaymentIntentReducer),
   __reducerSchema("create_subscription_plan", CreateSubscriptionPlanReducer),
+  __reducerSchema("create_subscription_price_tier", CreateSubscriptionPriceTierReducer),
+  __reducerSchema("create_subscription_tax_settle_intent", CreateSubscriptionTaxSettleIntentReducer),
   __reducerSchema("create_task", CreateTaskReducer),
   __reducerSchema("create_tax_deadline", CreateTaxDeadlineReducer),
   __reducerSchema("create_tax_jurisdiction", CreateTaxJurisdictionReducer),
@@ -7578,6 +7924,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_workorder", CreateWorkorderReducer),
   __reducerSchema("deactivate_pos_config", DeactivatePosConfigReducer),
   __reducerSchema("deactivate_revenue_recognition_rule", DeactivateRevenueRecognitionRuleReducer),
+  __reducerSchema("deactivate_subscription_plan", DeactivateSubscriptionPlanReducer),
   __reducerSchema("delete_account_asset", DeleteAccountAssetReducer),
   __reducerSchema("delete_account_bank_statement", DeleteAccountBankStatementReducer),
   __reducerSchema("delete_account_bank_statement_line", DeleteAccountBankStatementLineReducer),
@@ -7663,6 +8010,7 @@ const reducersSchema = __reducers(
   __reducerSchema("fail_iot_action", FailIotActionReducer),
   __reducerSchema("fail_quality_check", FailQualityCheckReducer),
   __reducerSchema("fail_scheduled_owner_report_run", FailScheduledOwnerReportRunReducer),
+  __reducerSchema("fail_subscription_payment_intent", FailSubscriptionPaymentIntentReducer),
   __reducerSchema("fail_warehouse_sync_intent", FailWarehouseSyncIntentReducer),
   __reducerSchema("finalize_import_assistant_job", FinalizeImportAssistantJobReducer),
   __reducerSchema("find_duplicate_contacts", FindDuplicateContactsReducer),
@@ -7676,6 +8024,7 @@ const reducersSchema = __reducers(
   __reducerSchema("get_organization_form_configs", GetOrganizationFormConfigsReducer),
   __reducerSchema("grant_delegated_admin_scope", GrantDelegatedAdminScopeReducer),
   __reducerSchema("grant_permission", GrantPermissionReducer),
+  __reducerSchema("grant_subscription_entitlement", GrantSubscriptionEntitlementReducer),
   __reducerSchema("hold_supplier_intake", HoldSupplierIntakeReducer),
   __reducerSchema("import_account_csv", ImportAccountCsvReducer),
   __reducerSchema("import_account_move_csv", ImportAccountMoveCsvReducer),
@@ -7737,6 +8086,7 @@ const reducersSchema = __reducers(
   __reducerSchema("import_warehouse_csv", ImportWarehouseCsvReducer),
   __reducerSchema("import_workcenter_csv", ImportWorkcenterCsvReducer),
   __reducerSchema("import_workflow_csv", ImportWorkflowCsvReducer),
+  __reducerSchema("ingest_subscription_usage_event", IngestSubscriptionUsageEventReducer),
   __reducerSchema("initialize_default_form_configs", InitializeDefaultFormConfigsReducer),
   __reducerSchema("invoice_po_line", InvoicePoLineReducer),
   __reducerSchema("link_device_to_location", LinkDeviceToLocationReducer),
@@ -7758,6 +8108,7 @@ const reducersSchema = __reducers(
   __reducerSchema("mark_reset_token_used", MarkResetTokenUsedReducer),
   __reducerSchema("match_bank_line", MatchBankLineReducer),
   __reducerSchema("match_elimination_entries", MatchEliminationEntriesReducer),
+  __reducerSchema("match_expense_card_statement_line", MatchExpenseCardStatementLineReducer),
   __reducerSchema("merge_contacts", MergeContactsReducer),
   __reducerSchema("migrate_all_organizations", MigrateAllOrganizationsReducer),
   __reducerSchema("move_stock_quant", MoveStockQuantReducer),
@@ -7770,6 +8121,8 @@ const reducersSchema = __reducers(
   __reducerSchema("pack_moves_into_package", PackMovesIntoPackageReducer),
   __reducerSchema("pack_stock_picking", PackStockPickingReducer),
   __reducerSchema("pass_quality_check", PassQualityCheckReducer),
+  __reducerSchema("pause_subscription", PauseSubscriptionReducer),
+  __reducerSchema("pay_subscription_invoice", PaySubscriptionInvoiceReducer),
   __reducerSchema("post_account_bank_statement", PostAccountBankStatementReducer),
   __reducerSchema("post_account_move", PostAccountMoveReducer),
   __reducerSchema("post_cycle_count_adjustments", PostCycleCountAdjustmentsReducer),
@@ -7788,6 +8141,8 @@ const reducersSchema = __reducers(
   __reducerSchema("produce_manufacturing_order", ProduceManufacturingOrderReducer),
   __reducerSchema("promote_ai_skill_version", PromoteAiSkillVersionReducer),
   __reducerSchema("queue_mail_from_template", QueueMailFromTemplateReducer),
+  __reducerSchema("rate_subscription_usage_events", RateSubscriptionUsageEventsReducer),
+  __reducerSchema("rebase_deferred_schedules_for_subscription", RebaseDeferredSchedulesForSubscriptionReducer),
   __reducerSchema("receive_consignment_stock", ReceiveConsignmentStockReducer),
   __reducerSchema("receive_po_line", ReceivePoLineReducer),
   __reducerSchema("recognize_amortization_line", RecognizeAmortizationLineReducer),
@@ -7811,6 +8166,7 @@ const reducersSchema = __reducers(
   __reducerSchema("record_purchasing_integration_result", RecordPurchasingIntegrationResultReducer),
   __reducerSchema("record_report_run", RecordReportRunReducer),
   __reducerSchema("record_sales_integration_result", RecordSalesIntegrationResultReducer),
+  __reducerSchema("record_subscription_payment_failure", RecordSubscriptionPaymentFailureReducer),
   __reducerSchema("record_telemetry", RecordTelemetryReducer),
   __reducerSchema("record_telemetry_batch", RecordTelemetryBatchReducer),
   __reducerSchema("record_whatsapp_health_check", RecordWhatsappHealthCheckReducer),
@@ -7818,6 +8174,7 @@ const reducersSchema = __reducers(
   __reducerSchema("refresh_inventory_exceptions", RefreshInventoryExceptionsReducer),
   __reducerSchema("refresh_policy_snapshot", RefreshPolicySnapshotReducer),
   __reducerSchema("refresh_sale_order_promise_dates", RefreshSaleOrderPromiseDatesReducer),
+  __reducerSchema("refresh_subscription_exception_flags", RefreshSubscriptionExceptionFlagsReducer),
   __reducerSchema("refresh_tax_deadline_statuses", RefreshTaxDeadlineStatusesReducer),
   __reducerSchema("refuse_expense_sheet", RefuseExpenseSheetReducer),
   __reducerSchema("refuse_leave", RefuseLeaveReducer),
@@ -7837,6 +8194,7 @@ const reducersSchema = __reducers(
   __reducerSchema("remove_purchase_order_line", RemovePurchaseOrderLineReducer),
   __reducerSchema("remove_rule_from_nomenclature", RemoveRuleFromNomenclatureReducer),
   __reducerSchema("remove_user_from_organization", RemoveUserFromOrganizationReducer),
+  __reducerSchema("renew_subscription", RenewSubscriptionReducer),
   __reducerSchema("reopen_inventory_close", ReopenInventoryCloseReducer),
   __reducerSchema("reopen_ticket", ReopenTicketReducer),
   __reducerSchema("reorder_proposal_line_items", ReorderProposalLineItemsReducer),
@@ -7849,6 +8207,7 @@ const reducersSchema = __reducers(
   __reducerSchema("resolve_iot_alert", ResolveIotAlertReducer),
   __reducerSchema("resolve_proposal_comment", ResolveProposalCommentReducer),
   __reducerSchema("restore_product_category", RestoreProductCategoryReducer),
+  __reducerSchema("resume_subscription", ResumeSubscriptionReducer),
   __reducerSchema("retry_intercompany_transaction", RetryIntercompanyTransactionReducer),
   __reducerSchema("retry_iot_action", RetryIotActionReducer),
   __reducerSchema("reverse_payment_transaction", ReversePaymentTransactionReducer),
@@ -7858,6 +8217,7 @@ const reducersSchema = __reducers(
   __reducerSchema("revoke_delegated_admin_scope", RevokeDelegatedAdminScopeReducer),
   __reducerSchema("revoke_permission", RevokePermissionReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
+  __reducerSchema("revoke_subscription_entitlement", RevokeSubscriptionEntitlementReducer),
   __reducerSchema("rollback_ai_skill_release", RollbackAiSkillReleaseReducer),
   __reducerSchema("rollback_import_job", RollbackImportJobReducer),
   __reducerSchema("run_accounting_fx_revaluation_test", RunAccountingFxRevaluationTestReducer),
@@ -7879,6 +8239,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_all_platform_tests", RunAllPlatformTestsReducer),
   __reducerSchema("run_all_purchasing_tests", RunAllPurchasingTestsReducer),
   __reducerSchema("run_all_sales_tests", RunAllSalesTestsReducer),
+  __reducerSchema("run_all_subscriptions_tests", RunAllSubscriptionsTestsReducer),
   __reducerSchema("run_cartonization", RunCartonizationReducer),
   __reducerSchema("run_core_operational_messaging_test", RunCoreOperationalMessagingTestReducer),
   __reducerSchema("run_core_sod_test", RunCoreSodTestReducer),
@@ -7894,6 +8255,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_expenses_wave_b_test", RunExpensesWaveBTestReducer),
   __reducerSchema("run_expenses_wave_c_test", RunExpensesWaveCTestReducer),
   __reducerSchema("run_expenses_wave_d_test", RunExpensesWaveDTestReducer),
+  __reducerSchema("run_expenses_wave_e_test", RunExpensesWaveETestReducer),
   __reducerSchema("run_fx_revaluation", RunFxRevaluationReducer),
   __reducerSchema("run_fx_revaluation_batch", RunFxRevaluationBatchReducer),
   __reducerSchema("run_helpdesk_ticket_test", RunHelpdeskTicketTestReducer),
@@ -7959,6 +8321,11 @@ const reducersSchema = __reducers(
   __reducerSchema("run_sales_pricelist_apply_test", RunSalesPricelistApplyTestReducer),
   __reducerSchema("run_sales_send_quotation_test", RunSalesSendQuotationTestReducer),
   __reducerSchema("run_subscription_plan_test", RunSubscriptionPlanTestReducer),
+  __reducerSchema("run_subscriptions_wave_a_test", RunSubscriptionsWaveATestReducer),
+  __reducerSchema("run_subscriptions_wave_b_test", RunSubscriptionsWaveBTestReducer),
+  __reducerSchema("run_subscriptions_wave_c_test", RunSubscriptionsWaveCTestReducer),
+  __reducerSchema("run_subscriptions_wave_d_test", RunSubscriptionsWaveDTestReducer),
+  __reducerSchema("run_subscriptions_wave_e_test", RunSubscriptionsWaveETestReducer),
   __reducerSchema("run_tenant_isolation_tests", RunTenantIsolationTestsReducer),
   __reducerSchema("run_traceability_report", RunTraceabilityReportReducer),
   __reducerSchema("run_workflow_definition_test", RunWorkflowDefinitionTestReducer),
@@ -7992,6 +8359,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_project_active", SetProjectActiveReducer),
   __reducerSchema("set_purchase_approval_delegate", SetPurchaseApprovalDelegateReducer),
   __reducerSchema("set_record_custom_field_values", SetRecordCustomFieldValuesReducer),
+  __reducerSchema("set_subscription_commitment", SetSubscriptionCommitmentReducer),
   __reducerSchema("set_task_parent", SetTaskParentReducer),
   __reducerSchema("set_vendor_risk_flag", SetVendorRiskFlagReducer),
   __reducerSchema("set_whatsapp_primary_account", SetWhatsappPrimaryAccountReducer),
@@ -8029,6 +8397,7 @@ const reducersSchema = __reducers(
   __reducerSchema("unlock_purchase_order", UnlockPurchaseOrderReducer),
   __reducerSchema("unlock_sale_order", UnlockSaleOrderReducer),
   __reducerSchema("unmatch_elimination_entry", UnmatchEliminationEntryReducer),
+  __reducerSchema("unmatch_expense_card_statement_line", UnmatchExpenseCardStatementLineReducer),
   __reducerSchema("unreconciled_account_bank_statement_line", UnreconciledAccountBankStatementLineReducer),
   __reducerSchema("unreserve_stock_quant", UnreserveStockQuantReducer),
   __reducerSchema("unsubscribe_from_record", UnsubscribeFromRecordReducer),
@@ -8151,6 +8520,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_stock_quant_quantity", UpdateStockQuantQuantityReducer),
   __reducerSchema("update_stock_route", UpdateStockRouteReducer),
   __reducerSchema("update_stock_rule", UpdateStockRuleReducer),
+  __reducerSchema("update_subscription_plan", UpdateSubscriptionPlanReducer),
   __reducerSchema("update_supplier_intake", UpdateSupplierIntakeReducer),
   __reducerSchema("update_task", UpdateTaskReducer),
   __reducerSchema("update_task_state", UpdateTaskStateReducer),
@@ -8184,6 +8554,7 @@ const reducersSchema = __reducers(
   __reducerSchema("upsert_partner_credit_control", UpsertPartnerCreditControlReducer),
   __reducerSchema("upsert_proposal_section", UpsertProposalSectionReducer),
   __reducerSchema("upsert_search_embedding", UpsertSearchEmbeddingReducer),
+  __reducerSchema("upsert_subscription_price_index", UpsertSubscriptionPriceIndexReducer),
   __reducerSchema("upsert_vendor_scorecard", UpsertVendorScorecardReducer),
   __reducerSchema("upsert_warehouse_geo", UpsertWarehouseGeoReducer),
   __reducerSchema("use_serial", UseSerialReducer),

@@ -49,15 +49,19 @@ pub fn test_stock_quant_create(ctx: &ReducerContext) -> Result<(), String> {
         },
     )?;
 
+    // Prefer the row we just created (metadata marker). seed_minimal / prior tests may
+    // leave other quants on the same product+location in this org.
     let quant = ctx
         .db
         .stock_quant()
         .iter()
-        .find(|q| {
+        .filter(|q| {
             q.organization_id == org_id
                 && q.product_id == fixture.product_id
                 && q.location_id == location_id
+                && q.metadata.as_deref() == Some(r#"{"test":"stock_quant_create"}"#)
         })
+        .max_by_key(|q| q.id)
         .ok_or("Stock quant not found after create")?;
 
     if (quant.quantity - initial_qty).abs() > 0.001 {

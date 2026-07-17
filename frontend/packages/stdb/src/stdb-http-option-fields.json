@@ -1248,6 +1248,11 @@
     "account_id",
     "analytic_account_id"
   ],
+  "CreateExpenseCardStatementLineParams": [
+    "company_id",
+    "merchant_key",
+    "metadata"
+  ],
   "CreateExpenseSheetParams": [
     "company_id",
     "notes",
@@ -4876,6 +4881,12 @@
     "metadata"
   ],
   "FailWarehouseSyncIntentParams": [
+    "metadata"
+  ],
+  "MatchExpenseCardStatementLineParams": [
+    "metadata"
+  ],
+  "UnmatchExpenseCardStatementLineParams": [
     "metadata"
   ]
 }

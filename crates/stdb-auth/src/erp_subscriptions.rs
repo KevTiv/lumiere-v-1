@@ -22,8 +22,9 @@ pub struct SubscriptionQueryContext<'a> {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct ErpOrgRow {
+    /// Emitted as camelCase `mapKey` by `lumiere-codegen` erp_org_sql_emit.
+    #[serde(rename = "mapKey")]
     map_key: String,
     resource_key: String,
     table: String,

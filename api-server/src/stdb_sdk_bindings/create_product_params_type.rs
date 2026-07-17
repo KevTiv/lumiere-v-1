@@ -15,7 +15,7 @@ use spacetimedb_sdk::__codegen::{
 pub struct CreateProductParams {
     pub name: String,
     pub categ_id: u64,
-    pub r#type: String,
+    pub type: String,
     pub uom_id: u64,
     pub uom_po_id: u64,
     pub standard_price: f64,

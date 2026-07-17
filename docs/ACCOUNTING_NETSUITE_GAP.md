@@ -22,10 +22,11 @@ Update status cells when work lands. NetSuite is a **quality bar**, not a clone 
 | Unrealized FX | Partial → improved | Manual lines + **batch from open AR/AP** |
 | Realized FX | Present | `post_realized_fx_gain_loss` |
 | Deferred rev-rec → GL | Present | `recognize_deferred_revenue` posts balanced move |
+| Recurring subscription → AR invoice | Partial | Wave A drafts `OutInvoice` + billing_run key; tax/post/payment still open — see [SUBSCRIPTIONS_BILLING_INVESTIGATION.md](./SUBSCRIPTIONS_BILLING_INVESTIGATION.md) |
 | Accrual / prepaid amort | Present | `amortization_schedule` / `recognize_amortization_line` |
 | Write-off / bad debt | Present | `create_bad_debt_write_off` |
 | Credit control | Present | `partner_credit_control` |
-| Collections / dunning | Absent | |
+| Collections / dunning | Absent | Shared gap with subscriptions Wave E |
 | Financial statements | Present | TB + BS / P&L / CF lines + aging JSON |
 | Close checklist | Partial | UI + live signal wiring (TB step); no persisted tasks |
 | Country packs → live tax | Present | `set_company_country_pack` materializes `AccountTax` |
@@ -70,5 +71,7 @@ Update status cells when work lands. NetSuite is a **quality bar**, not a clone 
 ## Related
 
 - [MULTI_ENTITY_PLATFORM_INVENTORY.md](./MULTI_ENTITY_PLATFORM_INVENTORY.md)
+- [SUBSCRIPTIONS_BILLING_INVESTIGATION.md](./SUBSCRIPTIONS_BILLING_INVESTIGATION.md) — recurring bill → AR / rev-rec / dunning
+- [plans/subscriptions-billing-gap-fixes-plan.md](./plans/subscriptions-billing-gap-fixes-plan.md)
 - Backend: `spacetimedb/src/accounting/`
 - Adapters: `api-server/src/routes/statutory_adapters.rs`

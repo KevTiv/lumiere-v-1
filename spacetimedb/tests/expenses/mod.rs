@@ -3,6 +3,7 @@ pub mod wave_a_test;
 pub mod wave_b_test;
 pub mod wave_c_test;
 pub mod wave_d_test;
+pub mod wave_e_test;
 
 use spacetimedb::ReducerContext;
 
@@ -52,10 +53,22 @@ pub fn run_expenses_wave_d_test(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_expenses_wave_e_test(ctx: &ReducerContext) -> Result<(), String> {
+    wave_e_test::test_pack_tax_evidence_required(ctx)
+        .map_err(|e| format!("pack_tax_evidence_required: {e}"))?;
+    wave_e_test::test_card_statement_match_and_fx_fee(ctx)
+        .map_err(|e| format!("card_statement_match_and_fx_fee: {e}"))?;
+    wave_e_test::test_email_inbox_intent_batch_apply(ctx)
+        .map_err(|e| format!("email_inbox_intent_batch_apply: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_expenses_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_expenses_wave_a_test(ctx)?;
     run_expenses_wave_b_test(ctx)?;
     run_expenses_wave_c_test(ctx)?;
     run_expenses_wave_d_test(ctx)?;
+    run_expenses_wave_e_test(ctx)?;
     Ok(())
 }

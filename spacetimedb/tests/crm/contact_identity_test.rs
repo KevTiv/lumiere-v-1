@@ -225,7 +225,7 @@ pub fn test_preferred_identity_uniqueness(ctx: &ReducerContext) -> Result<(), St
             contact_id: contact_row.id,
             company_id: Some(company_id),
             kind: ContactIdentityKind::Primary,
-            raw_value: "+1 415 123 4568".to_string(),
+            raw_value: "+1 415 555 0168".to_string(),
             is_preferred: true,
             verification_state: None,
             metadata: None,
@@ -239,7 +239,7 @@ pub fn test_preferred_identity_uniqueness(ctx: &ReducerContext) -> Result<(), St
             contact_id: contact_row.id,
             company_id: Some(company_id),
             kind: ContactIdentityKind::Primary,
-            raw_value: "+1 415 123 4569".to_string(),
+            raw_value: "+1 415 555 0169".to_string(),
             is_preferred: true,
             verification_state: None,
             metadata: None,
@@ -336,7 +336,7 @@ pub fn test_verify_and_archive_contact_identity(ctx: &ReducerContext) -> Result<
             contact_id: contact_row.id,
             company_id: Some(company_id),
             kind: ContactIdentityKind::WhatsApp,
-            raw_value: "+1 415 123 4570".to_string(),
+            raw_value: "+1 415 555 0170".to_string(),
             is_preferred: false,
             verification_state: None,
             metadata: None,
@@ -627,7 +627,7 @@ pub fn test_duplicate_identity_detection(ctx: &ReducerContext) -> Result<(), Str
             contact_id: contact_a.id,
             company_id: Some(company_id),
             kind: ContactIdentityKind::Primary,
-            raw_value: "+1 415 123 4571".to_string(),
+            raw_value: "+1 415 555 0171".to_string(),
             is_preferred: true,
             verification_state: None,
             metadata: None,
@@ -641,14 +641,14 @@ pub fn test_duplicate_identity_detection(ctx: &ReducerContext) -> Result<(), Str
             contact_id: contact_b.id,
             company_id: Some(company_id),
             kind: ContactIdentityKind::Primary,
-            raw_value: "415-123-4571".to_string(),
+            raw_value: "415-555-0171".to_string(),
             is_preferred: true,
             verification_state: None,
             metadata: None,
         },
     )?;
 
-    let normalized = normalize_phone("+1 415 123 4571", None)?;
+    let normalized = normalize_phone("+1 415 555 0171", None)?;
     let found = find_identity_by_normalized(ctx, org_id, &normalized)
         .ok_or("Expected to find identity by normalized value")?;
 

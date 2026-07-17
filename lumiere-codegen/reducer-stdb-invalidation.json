@@ -1,20 +1,44 @@
 {
-  "create_ai_reducer_allowlist": ["ai-reducer-allowlist"],
-  "delete_ai_reducer_allowlist": ["ai-reducer-allowlist"],
-  "set_ai_reducer_allowlist_enabled": ["ai-reducer-allowlist"],
-  "update_ai_reducer_allowlist": ["ai-reducer-allowlist"],
-  "add_account_move_line": ["account-moves", "account-move-lines"],
-  "cancel_account_move": ["account-moves", "account-move-lines"],
-  "create_account_account": ["account-accounts"],
-  "create_account_asset": ["fixed-assets", "depreciation-lines"],
+  "create_ai_reducer_allowlist": [
+    "ai-reducer-allowlist"
+  ],
+  "delete_ai_reducer_allowlist": [
+    "ai-reducer-allowlist"
+  ],
+  "set_ai_reducer_allowlist_enabled": [
+    "ai-reducer-allowlist"
+  ],
+  "update_ai_reducer_allowlist": [
+    "ai-reducer-allowlist"
+  ],
+  "add_account_move_line": [
+    "account-moves",
+    "account-move-lines"
+  ],
+  "cancel_account_move": [
+    "account-moves",
+    "account-move-lines"
+  ],
+  "create_account_account": [
+    "account-accounts"
+  ],
+  "create_account_asset": [
+    "fixed-assets",
+    "depreciation-lines"
+  ],
   "create_account_bank_statement": [
     "bank-statements",
     "bank-statement-lines",
     "bank-match-candidates",
     "account-reconciliation-widgets"
   ],
-  "create_account_journal": ["account-journals"],
-  "create_account_move": ["account-moves", "account-move-lines"],
+  "create_account_journal": [
+    "account-journals"
+  ],
+  "create_account_move": [
+    "account-moves",
+    "account-move-lines"
+  ],
   "create_account_tax": [
     "account-taxes",
     "tax-groups",
@@ -22,14 +46,38 @@
     "tax-schedules",
     "tax-deadlines"
   ],
-  "create_amortization_schedule": ["amortization-schedules", "amortization-lines"],
-  "create_bad_debt_write_off": ["account-moves", "account-move-lines"],
-  "create_budget_line": ["budgets", "budget-lines", "budget-posts"],
-  "delete_account_move_line": ["account-moves", "account-move-lines"],
-  "deprecate_account_account": ["account-accounts"],
-  "dispose_account_asset": ["fixed-assets", "depreciation-lines"],
-  "post_account_move": ["account-moves", "account-move-lines"],
-  "post_invoice": ["account-moves", "account-move-lines"],
+  "create_amortization_schedule": [
+    "amortization-schedules",
+    "amortization-lines"
+  ],
+  "create_bad_debt_write_off": [
+    "account-moves",
+    "account-move-lines"
+  ],
+  "create_budget_line": [
+    "budgets",
+    "budget-lines",
+    "budget-posts"
+  ],
+  "delete_account_move_line": [
+    "account-moves",
+    "account-move-lines"
+  ],
+  "deprecate_account_account": [
+    "account-accounts"
+  ],
+  "dispose_account_asset": [
+    "fixed-assets",
+    "depreciation-lines"
+  ],
+  "post_account_move": [
+    "account-moves",
+    "account-move-lines"
+  ],
+  "post_invoice": [
+    "account-moves",
+    "account-move-lines"
+  ],
   "post_realized_fx_gain_loss": [
     "account-moves",
     "account-move-lines",
@@ -63,15 +111,22 @@
     "bank-match-candidates",
     "account-reconciliation-widgets"
   ],
-  "update_account_account": ["account-accounts"],
-  "update_account_asset": ["fixed-assets", "depreciation-lines"],
+  "update_account_account": [
+    "account-accounts"
+  ],
+  "update_account_asset": [
+    "fixed-assets",
+    "depreciation-lines"
+  ],
   "update_account_bank_statement": [
     "bank-statements",
     "bank-statement-lines",
     "bank-match-candidates",
     "account-reconciliation-widgets"
   ],
-  "update_account_journal": ["account-journals"],
+  "update_account_journal": [
+    "account-journals"
+  ],
   "update_account_tax": [
     "account-taxes",
     "tax-groups",
@@ -79,7 +134,167 @@
     "tax-schedules",
     "tax-deadlines"
   ],
-  "update_budget_line": ["budgets", "budget-lines", "budget-posts"],
-  "update_crossovered_budget": ["budgets", "budget-lines", "budget-posts"],
-  "upsert_partner_credit_control": ["partner-credit-controls"]
+  "update_budget_line": [
+    "budgets",
+    "budget-lines",
+    "budget-posts"
+  ],
+  "update_crossovered_budget": [
+    "budgets",
+    "budget-lines",
+    "budget-posts"
+  ],
+  "upsert_partner_credit_control": [
+    "partner-credit-controls"
+  ],
+  "create_subscription_from_sale_order": [
+    "subscriptions",
+    "subscription-lines",
+    "subscription-plans"
+  ],
+  "activate_subscription": [
+    "subscriptions"
+  ],
+  "close_subscription": [
+    "subscriptions"
+  ],
+  "generate_subscription_invoice": [
+    "subscriptions",
+    "subscription-billing-runs",
+    "deferred-revenue-schedules",
+    "deferred-revenue-lines",
+    "account-moves",
+    "account-move-lines"
+  ],
+  "pay_subscription_invoice": [
+    "subscriptions",
+    "account-moves",
+    "account-move-lines",
+    "account-payments"
+  ],
+  "amend_subscription": [
+    "subscriptions",
+    "subscription-lines",
+    "subscription-amendments",
+    "account-moves"
+  ],
+  "pause_subscription": [
+    "subscriptions",
+    "subscription-amendments"
+  ],
+  "resume_subscription": [
+    "subscriptions",
+    "subscription-amendments"
+  ],
+  "renew_subscription": [
+    "subscriptions",
+    "subscription-amendments"
+  ],
+  "cancel_subscription": [
+    "subscriptions",
+    "subscription-amendments",
+    "account-moves"
+  ],
+  "update_subscription_plan": [
+    "subscription-plans"
+  ],
+  "deactivate_subscription_plan": [
+    "subscription-plans"
+  ],
+  "activate_subscription_plan": [
+    "subscription-plans"
+  ],
+  "ingest_subscription_usage_event": [
+    "subscription-usage-events",
+    "subscription-rating-backlog"
+  ],
+  "rate_subscription_usage_events": [
+    "subscription-usage-events",
+    "subscription-usage-charges",
+    "subscription-rating-backlog"
+  ],
+  "create_subscription_price_tier": [
+    "subscription-price-tiers"
+  ],
+  "set_subscription_commitment": [
+    "subscription-commitments"
+  ],
+  "create_subscription_bundle": [
+    "subscription-bundles"
+  ],
+  "add_subscription_bundle_item": [
+    "subscription-bundle-items",
+    "subscription-bundles"
+  ],
+  "apply_subscription_bundle": [
+    "subscriptions",
+    "subscription-lines",
+    "subscription-bundles"
+  ],
+  "create_subscription_plan": [
+    "subscription-plans"
+  ],
+  "import_subscription_csv": [
+    "subscriptions"
+  ],
+  "import_subscription_plan_csv": [
+    "subscription-plans"
+  ],
+  "advance_subscription_dunning": [
+    "subscriptions",
+    "subscription-collections",
+    "subscription-entitlements",
+    "subscription-past-due"
+  ],
+  "record_subscription_payment_failure": [
+    "subscription-collections",
+    "subscription-past-due",
+    "subscriptions"
+  ],
+  "refresh_subscription_exception_flags": [
+    "subscription-collections",
+    "subscription-due-to-bill",
+    "subscription-past-due",
+    "subscription-amend-pending"
+  ],
+  "grant_subscription_entitlement": [
+    "subscription-entitlements"
+  ],
+  "revoke_subscription_entitlement": [
+    "subscription-entitlements"
+  ],
+  "create_subscription_payment_intent": [
+    "subscription-payment-intents"
+  ],
+  "apply_subscription_payment_intent": [
+    "subscription-payment-intents",
+    "subscription-collections",
+    "subscription-entitlements",
+    "subscriptions"
+  ],
+  "fail_subscription_payment_intent": [
+    "subscription-payment-intents",
+    "subscription-collections",
+    "subscriptions"
+  ],
+  "create_subscription_tax_settle_intent": [
+    "subscription-tax-settle-intents"
+  ],
+  "apply_subscription_tax_settle_intent": [
+    "subscription-tax-settle-intents",
+    "account-moves"
+  ],
+  "upsert_subscription_price_index": [
+    "subscription-price-indexes"
+  ],
+  "apply_index_linked_renewal": [
+    "subscriptions",
+    "subscription-lines",
+    "subscription-price-indexes",
+    "deferred-revenue-schedules"
+  ],
+  "rebase_deferred_schedules_for_subscription": [
+    "deferred-revenue-schedules",
+    "deferred-revenue-lines"
+  ]
 }

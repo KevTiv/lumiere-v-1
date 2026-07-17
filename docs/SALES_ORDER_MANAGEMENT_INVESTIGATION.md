@@ -362,6 +362,7 @@ Lumiere’s OMS spine plus the 2026-07-16 gap-fix wave close the prior broken lo
 ### Related docs
 
 - [CRM lifecycle investigation](./CRM_LIFECYCLE_INVESTIGATION.md) — upstream lead → opportunity → SO
+- [Subscriptions & Billing investigation](./SUBSCRIPTIONS_BILLING_INVESTIGATION.md) — confirmed SO → recurring contract (header-only today)
 - [Accounting NetSuite gap](./ACCOUNTING_NETSUITE_GAP.md) — AR/posting/credit adjacent
 - [Multi-entity platform inventory](./MULTI_ENTITY_PLATFORM_INVENTORY.md) — tenant, FX, country packs
 - [V1 roadmap](./V1_ROADMAP.md) — wedge A lead-to-cash
