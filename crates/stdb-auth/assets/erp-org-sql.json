@@ -687,6 +687,55 @@
   },
   {
     "extra_where": "",
+    "mapKey": "stock-packages",
+    "order_by": "",
+    "resource_key": "stock-packages",
+    "table": "stock_package"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "packaging-materials",
+    "order_by": "",
+    "resource_key": "packaging-materials",
+    "table": "packaging_material"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "cartonization-results",
+    "order_by": "",
+    "resource_key": "cartonization-results",
+    "table": "cartonization_result"
+  },
+  {
+    "extra_where": " AND state = 'open'",
+    "mapKey": "inventory-exceptions",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "inventory-exceptions",
+    "table": "inventory_exception"
+  },
+  {
+    "extra_where": " AND state = 'open' AND exception_type = 'short_atp'",
+    "mapKey": "inventory-exceptions-short-atp",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "inventory-exceptions-short-atp",
+    "table": "inventory_exception"
+  },
+  {
+    "extra_where": " AND state = 'open' AND exception_type = 'expired_lot'",
+    "mapKey": "inventory-exceptions-expired-lots",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "inventory-exceptions-expired-lots",
+    "table": "inventory_exception"
+  },
+  {
+    "extra_where": " AND state = 'open' AND exception_type = 'open_qc'",
+    "mapKey": "inventory-exceptions-open-qc",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "inventory-exceptions-open-qc",
+    "table": "inventory_exception"
+  },
+  {
+    "extra_where": "",
     "mapKey": "purchase-orders",
     "order_by": "",
     "resource_key": "purchase-orders",

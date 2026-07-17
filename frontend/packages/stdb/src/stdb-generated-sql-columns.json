@@ -4479,6 +4479,17 @@
     "product_type",
     "metadata"
   ],
+  "CreateStockPackageParams": [
+    "name",
+    "packaging_material_id",
+    "picking_id",
+    "location_id",
+    "location_dest_id",
+    "weight",
+    "volume",
+    "shipping_weight",
+    "metadata"
+  ],
   "CreateStockPickingParams": [
     "company_id",
     "name",
@@ -6182,6 +6193,23 @@
     "value",
     "metadata"
   ],
+  "InventoryException": [
+    "id",
+    "organization_id",
+    "company_id",
+    "exception_type",
+    "state",
+    "dedupe_key",
+    "product_id",
+    "location_id",
+    "quant_id",
+    "lot_id",
+    "quality_check_id",
+    "summary",
+    "detected_at",
+    "resolved_at",
+    "metadata"
+  ],
   "InventoryIntegrationIntent": [
     "id",
     "organization_id",
@@ -7130,6 +7158,16 @@
     "feature_flags",
     "integration_keys",
     "updated_at",
+    "metadata"
+  ],
+  "PackMovesIntoPackageParams": [
+    "move_ids",
+    "metadata"
+  ],
+  "PackStockPickingParams": [
+    "picking_id",
+    "packaging_material_id",
+    "name",
     "metadata"
   ],
   "PackagingMaterial": [
@@ -8670,6 +8708,10 @@
   "RecordWhatsAppHealthCheckParams": [
     "is_healthy"
   ],
+  "RefreshInventoryExceptionsParams": [
+    "upsert_only",
+    "metadata"
+  ],
   "RegisterDeviceParams": [
     "name",
     "device_type",
@@ -9760,6 +9802,26 @@
     "location_process_dest_id",
     "created_uid",
     "created_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "StockPackage": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "state",
+    "packaging_material_id",
+    "picking_id",
+    "location_id",
+    "location_dest_id",
+    "weight",
+    "volume",
+    "move_ids",
+    "shipping_weight",
+    "create_uid",
+    "create_date",
     "write_uid",
     "write_date",
     "metadata"

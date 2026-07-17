@@ -5437,6 +5437,19 @@ export const CreateStockMoveParams = __t.object("CreateStockMoveParams", {
 });
 export type CreateStockMoveParams = __Infer<typeof CreateStockMoveParams>;
 
+export const CreateStockPackageParams = __t.object("CreateStockPackageParams", {
+  name: __t.string(),
+  packagingMaterialId: __t.option(__t.u64()),
+  pickingId: __t.option(__t.u64()),
+  locationId: __t.option(__t.u64()),
+  locationDestId: __t.option(__t.u64()),
+  weight: __t.f64(),
+  volume: __t.f64(),
+  shippingWeight: __t.f64(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateStockPackageParams = __Infer<typeof CreateStockPackageParams>;
+
 export const CreateStockPickingParams = __t.object("CreateStockPickingParams", {
   companyId: __t.option(__t.u64()),
   name: __t.string(),
@@ -7554,6 +7567,25 @@ export const InventoryCloseLine = __t.object("InventoryCloseLine", {
 });
 export type InventoryCloseLine = __Infer<typeof InventoryCloseLine>;
 
+export const InventoryException = __t.object("InventoryException", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  exceptionType: __t.string(),
+  state: __t.string(),
+  dedupeKey: __t.string(),
+  productId: __t.option(__t.u64()),
+  locationId: __t.option(__t.u64()),
+  quantId: __t.option(__t.u64()),
+  lotId: __t.option(__t.u64()),
+  qualityCheckId: __t.option(__t.u64()),
+  summary: __t.string(),
+  detectedAt: __t.timestamp(),
+  resolvedAt: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type InventoryException = __Infer<typeof InventoryException>;
+
 export const InventoryIntegrationIntent = __t.object("InventoryIntegrationIntent", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -8618,6 +8650,20 @@ export const OrganizationSettings = __t.object("OrganizationSettings", {
   metadata: __t.option(__t.string()),
 });
 export type OrganizationSettings = __Infer<typeof OrganizationSettings>;
+
+export const PackMovesIntoPackageParams = __t.object("PackMovesIntoPackageParams", {
+  moveIds: __t.array(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type PackMovesIntoPackageParams = __Infer<typeof PackMovesIntoPackageParams>;
+
+export const PackStockPickingParams = __t.object("PackStockPickingParams", {
+  pickingId: __t.u64(),
+  packagingMaterialId: __t.option(__t.u64()),
+  name: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type PackStockPickingParams = __Infer<typeof PackStockPickingParams>;
 
 export const PackagingMaterial = __t.object("PackagingMaterial", {
   id: __t.u64(),
@@ -10554,6 +10600,12 @@ export const RecordWhatsAppHealthCheckParams = __t.object("RecordWhatsAppHealthC
 });
 export type RecordWhatsAppHealthCheckParams = __Infer<typeof RecordWhatsAppHealthCheckParams>;
 
+export const RefreshInventoryExceptionsParams = __t.object("RefreshInventoryExceptionsParams", {
+  upsertOnly: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type RefreshInventoryExceptionsParams = __Infer<typeof RefreshInventoryExceptionsParams>;
+
 export const RegisterDeviceParams = __t.object("RegisterDeviceParams", {
   name: __t.string(),
   deviceType: __t.string(),
@@ -11902,6 +11954,28 @@ export const StockMoveLine = __t.object("StockMoveLine", {
   metadata: __t.option(__t.string()),
 });
 export type StockMoveLine = __Infer<typeof StockMoveLine>;
+
+export const StockPackage = __t.object("StockPackage", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  state: __t.string(),
+  packagingMaterialId: __t.option(__t.u64()),
+  pickingId: __t.u64(),
+  locationId: __t.option(__t.u64()),
+  locationDestId: __t.option(__t.u64()),
+  weight: __t.f64(),
+  volume: __t.f64(),
+  moveIds: __t.array(__t.u64()),
+  shippingWeight: __t.f64(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type StockPackage = __Infer<typeof StockPackage>;
 
 export const StockPicking = __t.object("StockPicking", {
   id: __t.u64(),

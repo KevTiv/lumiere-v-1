@@ -128,6 +128,11 @@ function invalidateInventoryQueries(qc: ReturnType<typeof useQueryClient>, organ
   void qc.invalidateQueries({ queryKey: ['barcode-nomenclatures', orgKey] })
   void qc.invalidateQueries({ queryKey: ['serial-lot-traceability', orgKey] })
   void qc.invalidateQueries({ queryKey: ['stock-traceability-reports', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['stock-packages', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['inventory-exceptions', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['inventory-exceptions-short-atp', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['inventory-exceptions-expired-lots', orgKey] })
+  void qc.invalidateQueries({ queryKey: ['inventory-exceptions-open-qc', orgKey] })
 }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -1774,6 +1779,151 @@ export function useExecuteDirectedPutaway(organizationId: bigint, companyId: big
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to execute directed putaway')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+// ── Packing ──────────────────────────────────────────────────────────────────
+
+export function useStockPackages(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['stock-packages', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/stock-packages', 'Failed to fetch stock packages'),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+export function usePackStockPicking(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = inventoryBffPost("pack_stock_picking", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params as object, "PackStockPickingParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to pack stock picking')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useConfirmStockPackage(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (packageId) => {
+      const { urlPath, init } = inventoryBffPost("confirm_stock_package", [
+        organizationId,
+        companyId,
+        toScalarU64(packageId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to confirm stock package')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useDoneStockPackage(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (packageId) => {
+      const { urlPath, init } = inventoryBffPost("done_stock_package", [
+        organizationId,
+        companyId,
+        toScalarU64(packageId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to complete stock package')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+// ── Exception queues ─────────────────────────────────────────────────────────
+
+/** Server-bounded: open short-ATP exceptions. */
+export function useInventoryExceptionsShortAtp(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['inventory-exceptions-short-atp', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/inventory-exceptions-short-atp',
+        'Failed to fetch short ATP exceptions',
+      ),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+/** Server-bounded: open expired-lot exceptions. */
+export function useInventoryExceptionsExpiredLots(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['inventory-exceptions-expired-lots', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/inventory-exceptions-expired-lots',
+        'Failed to fetch expired lot exceptions',
+      ),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+/** Server-bounded: open QC-fail exceptions. */
+export function useInventoryExceptionsOpenQc(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['inventory-exceptions-open-qc', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/inventory-exceptions-open-qc',
+        'Failed to fetch open QC exceptions',
+      ),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+export function useRefreshInventoryExceptions(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown> | undefined>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = inventoryBffPost("refresh_inventory_exceptions", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params ?? { upsertOnly: false }, "RefreshInventoryExceptionsParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to refresh inventory exceptions')
+    },
+    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+  })
+}
+
+export function useResolveInventoryException(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (exceptionId) => {
+      const { urlPath, init } = inventoryBffPost("resolve_inventory_exception", [
+        organizationId,
+        companyId,
+        toScalarU64(exceptionId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to resolve inventory exception')
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
   })

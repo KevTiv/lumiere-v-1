@@ -49,6 +49,7 @@ export type QueryResourceKey =
   | "budget-posts"
   | "budgets"
   | "calendar-events"
+  | "cartonization-results"
   | "casbin-rule"
   | "companies"
   | "consolidation-accounts"
@@ -101,6 +102,10 @@ export type QueryResourceKey =
   | "intercompany-rules"
   | "intercompany-transactions"
   | "inventory-adjustments"
+  | "inventory-exceptions"
+  | "inventory-exceptions-expired-lots"
+  | "inventory-exceptions-open-qc"
+  | "inventory-exceptions-short-atp"
   | "inventory-valuations"
   | "iot-actions"
   | "iot-alerts"
@@ -136,6 +141,7 @@ export type QueryResourceKey =
   | "opportunity-lines"
   | "opportunity-presence"
   | "opportunity-stages"
+  | "packaging-materials"
   | "partner-banks"
   | "partner-credit-controls"
   | "partner-credit-holds"
@@ -203,6 +209,7 @@ export type QueryResourceKey =
   | "stock-inventories"
   | "stock-locations"
   | "stock-moves"
+  | "stock-packages"
   | "stock-pickings"
   | "stock-production-lots"
   | "stock-production-serials"
@@ -477,6 +484,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "calendar_event",
     aliases: ["calendar-events", "calendar_event"],
     defaultRestricted: ["name", "start", "stop", "state"],
+    mandatory: ["id", "organization_id"],
+  },
+  "cartonization-results": {
+    table: "cartonization_result",
+    aliases: ["cartonization-results", "cartonization_result"],
+    defaultRestricted: ["package_id", "packaging_material_id", "total_items", "utilization_percentage"],
     mandatory: ["id", "organization_id"],
   },
   "casbin-rule": {
@@ -791,6 +804,30 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["name", "state"],
     mandatory: ["id", "organization_id"],
   },
+  "inventory-exceptions": {
+    table: "inventory_exception",
+    aliases: ["inventory-exceptions", "inventory_exception"],
+    defaultRestricted: ["exception_type", "state", "dedupe_key", "company_id", "product_id", "location_id", "quant_id", "lot_id", "quality_check_id", "summary"],
+    mandatory: ["id", "organization_id"],
+  },
+  "inventory-exceptions-expired-lots": {
+    table: "inventory_exception",
+    aliases: ["inventory-exceptions-expired-lots", "inventory-exceptions", "inventory_exception"],
+    defaultRestricted: ["exception_type", "state", "dedupe_key", "company_id", "product_id", "location_id", "quant_id", "lot_id", "quality_check_id", "summary"],
+    mandatory: ["id", "organization_id"],
+  },
+  "inventory-exceptions-open-qc": {
+    table: "inventory_exception",
+    aliases: ["inventory-exceptions-open-qc", "inventory-exceptions", "inventory_exception"],
+    defaultRestricted: ["exception_type", "state", "dedupe_key", "company_id", "product_id", "location_id", "quant_id", "lot_id", "quality_check_id", "summary"],
+    mandatory: ["id", "organization_id"],
+  },
+  "inventory-exceptions-short-atp": {
+    table: "inventory_exception",
+    aliases: ["inventory-exceptions-short-atp", "inventory-exceptions", "inventory_exception"],
+    defaultRestricted: ["exception_type", "state", "dedupe_key", "company_id", "product_id", "location_id", "quant_id", "lot_id", "quality_check_id", "summary"],
+    mandatory: ["id", "organization_id"],
+  },
   "inventory-valuations": {
     table: "inventory_valuation",
     aliases: ["inventory-valuations", "inventory_valuation"],
@@ -999,6 +1036,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "opp_stage",
     aliases: ["opportunity-stages", "opp_stage"],
     defaultRestricted: ["name", "sequence"],
+    mandatory: ["id", "organization_id"],
+  },
+  "packaging-materials": {
+    table: "packaging_material",
+    aliases: ["packaging-materials", "packaging_material"],
+    defaultRestricted: ["name", "material_type", "is_active", "volume", "max_weight"],
     mandatory: ["id", "organization_id"],
   },
   "partner-banks": {
@@ -1403,6 +1446,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["state", "product_id", "company_id", "picking_id"],
     mandatory: ["id", "organization_id"],
   },
+  "stock-packages": {
+    table: "stock_package",
+    aliases: ["stock-packages", "stock_package"],
+    defaultRestricted: ["name", "state", "company_id", "picking_id", "packaging_material_id"],
+    mandatory: ["id", "organization_id"],
+  },
   "stock-pickings": {
     table: "stock_picking",
     aliases: ["stock-pickings", "stock_picking"],
@@ -1609,4 +1658,4 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   }
 }
 
-export const QUERY_RESOURCE_KEYS: readonly QueryResourceKey[] = ["account-account-types", "account-accounts", "account-assets", "account-groups", "account-journals", "account-move-lines", "account-moves", "account-payment-term-lines", "account-payment-terms", "account-payments", "account-periods", "account-reconciliation-widgets", "account-taxes", "activities", "adjustment-reasons", "ai-agents", "ai-document-processing-jobs", "ai-insights", "ai-reducer-allowlist", "ai-skills", "ai-team-member-skills", "ai-team-members", "amortization-lines", "amortization-schedules", "analytic-accounts", "analytic-distribution-models", "analytic-lines", "analytics-metrics", "assignment-rules", "audit-log", "audit-rules", "bank-match-candidates", "bank-statement-lines", "bank-statements", "barcode-nomenclatures", "barcode-rules", "budget-lines", "budget-posts", "budgets", "calendar-events", "casbin-rule", "companies", "consolidation-accounts", "consolidation-elimination-entries", "consolidation-journals", "contact-communication-preferences", "contact-duplicate-candidates", "contact-phone-identities", "contact-relationship-insights", "contact-relationships", "contact-role-assignments", "contact-segment-rules", "contact-segments", "contact-tag-assignments", "contact-tags", "contacts", "contracts", "crm-conversation-messages", "crm-conversations", "crm-forecast-snapshots", "dashboard-widgets", "dashboards", "data-classification-rules", "data-classifications", "deferred-revenue-lines", "deferred-revenue-schedules", "delegated-admin-scopes", "delivery-carriers", "delivery-price-rules", "departments", "depreciation-lines", "document-folders", "documents", "employees", "expense-sheets", "expenses", "financial-reports", "fiscal-years", "fixed-assets", "fleet-vehicles", "form-config-fields", "form-configs", "form-role-configs", "fx-revaluation-runs", "helpdesk-slas", "helpdesk-stages", "helpdesk-teams", "helpdesk-tickets", "hr-resources", "intercompany-rules", "intercompany-transactions", "inventory-adjustments", "inventory-valuations", "iot-actions", "iot-alerts", "iot-devices", "iot-hubs", "iot-pairing-tokens", "iot-telemetry", "iot-thresholds", "job-positions", "knowledge-articles", "knowledge-categories", "landed-cost-lines", "landed-costs", "lead-lost-reasons", "lead-score-factors", "lead-scores", "lead-sources", "leads", "leave-requests", "leave-types", "mail-followers", "mail-messages", "message-batches", "message-templates", "mrp-bom-lines", "mrp-boms", "mrp-productions", "mrp-routing-workcenters", "mrp-workcenters", "mrp-workorders", "operational-messages", "opportunities", "opportunity-lines", "opportunity-presence", "opportunity-stages", "partner-banks", "partner-credit-controls", "partner-credit-holds", "payment-accounts", "payment-fees", "payment-reconciliations", "payment-reversals", "payment-transactions", "payroll-structures", "payslips", "picking-batches", "picking-waves", "pos-configs", "pos-loyalty-cards", "pos-loyalty-programs", "pos-payment-methods", "pos-sessions", "pos-terminals", "pricelist-items", "pricelists", "privacy-consent", "product-categories", "products", "projects", "proposal-comments", "proposal-line-items", "proposal-presence", "proposal-sections", "proposal-source-docs", "proposal-versions", "proposals", "purchase-order-lines", "purchase-orders", "purchase-orders-partial-receipt", "purchase-orders-to-approve", "purchase-requisitions", "purchase-return-lines", "purchase-returns", "purchase-rfq-bids", "purchase-rfq-lines", "purchase-rfqs", "quality-alerts", "quality-checks", "quality-teams", "record-custom-field-values", "replenishment-rules", "report-templates", "return-order-lines", "return-orders", "revenue-recognition-rules", "roles", "salary-rules", "sale-commissions", "sale-commissions-pending", "sale-order-lines", "sale-orders", "sale-orders-to-approve", "saved-reports", "scheduled-reports", "segment-members", "serial-lot-traceability", "shipping-methods", "sod-conflict-rules", "stock-cycle-counts", "stock-inventories", "stock-locations", "stock-moves", "stock-pickings", "stock-production-lots", "stock-production-serials", "stock-quants", "stock-routes", "stock-rules", "stock-traceability-reports", "subscription-plans", "subscriptions", "supplier-intakes", "tasks", "tax-deadlines", "tax-groups", "tax-jurisdictions", "tax-schedules", "timesheets", "trial-balances", "uoms", "user-custom-fields", "user-organization", "user-profile", "user-role-assignment", "user-roles", "utm-campaigns", "utm-media", "utm-sources", "warehouse-3d-zones", "warehouse-tasks", "warehouses", "workflow-activities", "workflow-instances", "workflow-transitions", "workflow-workitems", "workflows"]
+export const QUERY_RESOURCE_KEYS: readonly QueryResourceKey[] = ["account-account-types", "account-accounts", "account-assets", "account-groups", "account-journals", "account-move-lines", "account-moves", "account-payment-term-lines", "account-payment-terms", "account-payments", "account-periods", "account-reconciliation-widgets", "account-taxes", "activities", "adjustment-reasons", "ai-agents", "ai-document-processing-jobs", "ai-insights", "ai-reducer-allowlist", "ai-skills", "ai-team-member-skills", "ai-team-members", "amortization-lines", "amortization-schedules", "analytic-accounts", "analytic-distribution-models", "analytic-lines", "analytics-metrics", "assignment-rules", "audit-log", "audit-rules", "bank-match-candidates", "bank-statement-lines", "bank-statements", "barcode-nomenclatures", "barcode-rules", "budget-lines", "budget-posts", "budgets", "calendar-events", "cartonization-results", "casbin-rule", "companies", "consolidation-accounts", "consolidation-elimination-entries", "consolidation-journals", "contact-communication-preferences", "contact-duplicate-candidates", "contact-phone-identities", "contact-relationship-insights", "contact-relationships", "contact-role-assignments", "contact-segment-rules", "contact-segments", "contact-tag-assignments", "contact-tags", "contacts", "contracts", "crm-conversation-messages", "crm-conversations", "crm-forecast-snapshots", "dashboard-widgets", "dashboards", "data-classification-rules", "data-classifications", "deferred-revenue-lines", "deferred-revenue-schedules", "delegated-admin-scopes", "delivery-carriers", "delivery-price-rules", "departments", "depreciation-lines", "document-folders", "documents", "employees", "expense-sheets", "expenses", "financial-reports", "fiscal-years", "fixed-assets", "fleet-vehicles", "form-config-fields", "form-configs", "form-role-configs", "fx-revaluation-runs", "helpdesk-slas", "helpdesk-stages", "helpdesk-teams", "helpdesk-tickets", "hr-resources", "intercompany-rules", "intercompany-transactions", "inventory-adjustments", "inventory-exceptions", "inventory-exceptions-expired-lots", "inventory-exceptions-open-qc", "inventory-exceptions-short-atp", "inventory-valuations", "iot-actions", "iot-alerts", "iot-devices", "iot-hubs", "iot-pairing-tokens", "iot-telemetry", "iot-thresholds", "job-positions", "knowledge-articles", "knowledge-categories", "landed-cost-lines", "landed-costs", "lead-lost-reasons", "lead-score-factors", "lead-scores", "lead-sources", "leads", "leave-requests", "leave-types", "mail-followers", "mail-messages", "message-batches", "message-templates", "mrp-bom-lines", "mrp-boms", "mrp-productions", "mrp-routing-workcenters", "mrp-workcenters", "mrp-workorders", "operational-messages", "opportunities", "opportunity-lines", "opportunity-presence", "opportunity-stages", "packaging-materials", "partner-banks", "partner-credit-controls", "partner-credit-holds", "payment-accounts", "payment-fees", "payment-reconciliations", "payment-reversals", "payment-transactions", "payroll-structures", "payslips", "picking-batches", "picking-waves", "pos-configs", "pos-loyalty-cards", "pos-loyalty-programs", "pos-payment-methods", "pos-sessions", "pos-terminals", "pricelist-items", "pricelists", "privacy-consent", "product-categories", "products", "projects", "proposal-comments", "proposal-line-items", "proposal-presence", "proposal-sections", "proposal-source-docs", "proposal-versions", "proposals", "purchase-order-lines", "purchase-orders", "purchase-orders-partial-receipt", "purchase-orders-to-approve", "purchase-requisitions", "purchase-return-lines", "purchase-returns", "purchase-rfq-bids", "purchase-rfq-lines", "purchase-rfqs", "quality-alerts", "quality-checks", "quality-teams", "record-custom-field-values", "replenishment-rules", "report-templates", "return-order-lines", "return-orders", "revenue-recognition-rules", "roles", "salary-rules", "sale-commissions", "sale-commissions-pending", "sale-order-lines", "sale-orders", "sale-orders-to-approve", "saved-reports", "scheduled-reports", "segment-members", "serial-lot-traceability", "shipping-methods", "sod-conflict-rules", "stock-cycle-counts", "stock-inventories", "stock-locations", "stock-moves", "stock-packages", "stock-pickings", "stock-production-lots", "stock-production-serials", "stock-quants", "stock-routes", "stock-rules", "stock-traceability-reports", "subscription-plans", "subscriptions", "supplier-intakes", "tasks", "tax-deadlines", "tax-groups", "tax-jurisdictions", "tax-schedules", "timesheets", "trial-balances", "uoms", "user-custom-fields", "user-organization", "user-profile", "user-role-assignment", "user-roles", "utm-campaigns", "utm-media", "utm-sources", "warehouse-3d-zones", "warehouse-tasks", "warehouses", "workflow-activities", "workflow-instances", "workflow-transitions", "workflow-workitems", "workflows"]

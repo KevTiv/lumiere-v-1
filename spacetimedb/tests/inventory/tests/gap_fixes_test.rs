@@ -1,5 +1,5 @@
 //! Inventory gap fixes — isolation, ATP, lot/serial, FEFO/expiry, replenishment, QC, waves,
-//! UoM conversion, inventory close, 3PL, cartonization, consignment, cross-dock.
+//! UoM conversion, inventory close, 3PL, cartonization, consignment, cross-dock, packing, exceptions.
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::core::organization::{company, create_company, CompanyScopeParams, CreateCompanyParams};
@@ -25,6 +25,13 @@ use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::inventory::inventory_close::{
     create_inventory_close, inventory_close, reopen_inventory_close, run_inventory_close,
     CreateInventoryCloseParams, RunInventoryCloseParams,
+};
+use crate::inventory::exceptions::{
+    inventory_exception, refresh_inventory_exceptions, resolve_inventory_exception,
+    RefreshInventoryExceptionsParams,
+};
+use crate::inventory::packing::{
+    done_stock_package, pack_stock_picking, stock_package, PackStockPickingParams,
 };
 use crate::inventory::putaway::{execute_directed_putaway, ExecuteDirectedPutawayParams};
 use crate::types::{AccountInternalGroup, JournalType};
@@ -56,8 +63,9 @@ use crate::inventory::warehouse::{
 };
 use crate::inventory::warehouse_operations::{
     cartonization_result, complete_picking_wave, create_packaging_material, create_picking_wave,
-    picking_wave, release_picking_wave, run_cartonization, update_warehouse_task_status,
-    warehouse_task, CreatePackagingMaterialParams, CreatePickingWaveParams, RunCartonizationParams,
+    packaging_material, picking_wave, release_picking_wave, run_cartonization,
+    update_warehouse_task_status, warehouse_task, CreatePackagingMaterialParams,
+    CreatePickingWaveParams, RunCartonizationParams,
 };
 use crate::purchasing::procurement_advanced::{
     consignment_agreement, create_consignment_agreement, CreateConsignmentAgreementParams,
@@ -2742,6 +2750,418 @@ pub fn test_inventory_close_posts_valuation_journal(ctx: &ReducerContext) -> Res
             "unbalanced or wrong amount: debit={debit} credit={credit} value={}",
             close.total_value
         ));
+    }
+    Ok(())
+}
+
+/// Packing workflow: pack picking → confirmed package with result_package_id → done.
+pub fn test_packing_workflow(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("product")?;
+
+    create_packaging_material(
+        ctx,
+        org_id,
+        company_id,
+        CreatePackagingMaterialParams {
+            name: "Ship Box".to_string(),
+            material_type: "box".to_string(),
+            weight: 0.2,
+            max_weight: 50.0,
+            length: 40.0,
+            width: 30.0,
+            height: 20.0,
+            volume: 100.0,
+            cost: 1.0,
+            currency_id: 1,
+            barcode: None,
+            is_active: true,
+            metadata: None,
+        },
+    )?;
+    let material_id = ctx
+        .db
+        .packaging_material()
+        .iter()
+        .find(|m| m.organization_id == org_id && m.name == "Ship Box")
+        .map(|m| m.id)
+        .ok_or("material")?;
+
+    create_stock_picking(
+        ctx,
+        org_id,
+        CreateStockPickingParams {
+            company_id: Some(company_id),
+            name: "OUT-PACK".to_string(),
+            picking_type_id: 0,
+            location_id: fixture.warehouse_id,
+            location_dest_id: fixture.partner_id,
+            move_type: "direct".to_string(),
+            priority: "1".to_string(),
+            partner_id: Some(fixture.partner_id),
+            contact_id: None,
+            scheduled_date: Some(ctx.timestamp),
+            origin: Some("pack-test".to_string()),
+            note: None,
+            user_id: None,
+            sale_id: None,
+            purchase_id: None,
+            group_id: None,
+            is_locked: false,
+            immediate_transfer: false,
+            is_printed: false,
+            is_return: false,
+            has_scrap_move: false,
+            has_tracking: false,
+            date: None,
+            date_done: None,
+            backorder_id: None,
+            backorder_ids: vec![],
+            show_operations: false,
+            show_lots_text: false,
+            show_reserved: true,
+            show_check_availability: true,
+            show_validate: true,
+            show_mark_as_todo: true,
+            show_set_qty_button: false,
+            show_clear_qty_button: false,
+            show_lots_m2o: false,
+            product_id: Some(fixture.product_id),
+            lot_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            display_lot_id: None,
+            location_id_name: None,
+            location_dest_id_name: None,
+            picking_code: Some("outgoing".to_string()),
+            product_tracking: None,
+            product_barcode: None,
+            move_line_exist: false,
+            has_packages: false,
+            has_move_lines: true,
+            has_package: false,
+            has_lot: false,
+            has_owner: false,
+            has_entire_package_src: false,
+            has_entire_package_dest: false,
+            package_level_ids: vec![],
+            batch_id: None,
+            metadata: None,
+        },
+    )?;
+    let picking_id = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "OUT-PACK")
+        .map(|p| p.id)
+        .ok_or("picking")?;
+
+    create_stock_move(
+        ctx,
+        org_id,
+        CreateStockMoveParams {
+            company_id: Some(company_id),
+            name: "Pack move".to_string(),
+            product_id: fixture.product_id,
+            product_tmpl_id: fixture.product_id,
+            product_uom: product.uom_id,
+            product_uom_qty: 3.0,
+            location_id: fixture.warehouse_id,
+            location_dest_id: fixture.partner_id,
+            date_expected: ctx.timestamp,
+            move_type: "outgoing".to_string(),
+            priority: "1".to_string(),
+            reference: None,
+            sequence: 10,
+            origin: None,
+            note: None,
+            date: None,
+            date_deadline: None,
+            picking_id: Some(picking_id),
+            picking_type_id: None,
+            partner_id: Some(fixture.partner_id),
+            product_variant_id: None,
+            group_id: None,
+            rule_id: None,
+            procure_method: "make_to_stock".to_string(),
+            price_unit: 0.0,
+            scrapped: false,
+            to_refund: false,
+            propagate_cancel: true,
+            delay_alert: false,
+            product_packaging_id: None,
+            product_packaging_qty: 0.0,
+            warehouse_id: Some(fixture.warehouse_id),
+            production_id: None,
+            raw_material_production_id: None,
+            unbuild_id: None,
+            consume_unbuild_id: None,
+            cost_share: 0.0,
+            is_subcontract: false,
+            purchase_line_id: None,
+            need_release: false,
+            release_ready: false,
+            propagation_cancel: true,
+            has_tracking: false,
+            inventory_id: None,
+            sale_line_id: None,
+            lot_id: None,
+            serial_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            package_level_id: None,
+            product_type: Some("product".to_string()),
+            metadata: None,
+        },
+    )?;
+
+    pack_stock_picking(
+        ctx,
+        org_id,
+        company_id,
+        PackStockPickingParams {
+            picking_id,
+            packaging_material_id: Some(material_id),
+            name: Some("PACK-TEST".to_string()),
+            metadata: None,
+        },
+    )?;
+
+    let pkg = ctx
+        .db
+        .stock_package()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "PACK-TEST")
+        .ok_or("package missing")?;
+    if pkg.state != "confirmed" {
+        return Err(format!("expected confirmed, got {}", pkg.state));
+    }
+    if pkg.move_ids.is_empty() {
+        return Err("package has no moves".into());
+    }
+
+    let mv = ctx
+        .db
+        .stock_move()
+        .id()
+        .find(&pkg.move_ids[0])
+        .ok_or("move")?;
+    if mv.result_package_id != Some(pkg.id) {
+        return Err("move result_package_id not stamped".into());
+    }
+
+    done_stock_package(ctx, org_id, company_id, pkg.id)?;
+    let done = ctx
+        .db
+        .stock_package()
+        .id()
+        .find(&pkg.id)
+        .ok_or("package after done")?;
+    if done.state != "done" {
+        return Err(format!("expected done, got {}", done.state));
+    }
+    Ok(())
+}
+
+/// Exception queues: short ATP, expired lot, and open QC after refresh / fail.
+pub fn test_inventory_exception_queues(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    let quant_id = create_quant(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        fixture.warehouse_id,
+        4.0,
+        None,
+    )?;
+    reserve_stock_quant(
+        ctx,
+        org_id,
+        quant_id,
+        StockQuantReserveParams {
+            company_id: Some(company_id),
+            reserve_qty: 4.0,
+        },
+    )?;
+
+    create_stock_production_lot(
+        ctx,
+        org_id,
+        CreateStockProductionLotParams {
+            company_id: Some(company_id),
+            name: format!("LOT-EXP-{company_id}"),
+            product_id: fixture.product_id,
+            product_variant_id: None,
+            ref_: None,
+            note: None,
+            expiration_date: Some(past_timestamp(ctx)),
+            use_date: None,
+            removal_date: Some(past_timestamp(ctx)),
+            alert_date: None,
+            product_qty: 1.0,
+            location_id: Some(fixture.warehouse_id),
+            package_id: None,
+            owner_id: None,
+            is_scrap: false,
+            is_locked: false,
+            metadata: None,
+        },
+    )?;
+
+    refresh_inventory_exceptions(
+        ctx,
+        org_id,
+        company_id,
+        RefreshInventoryExceptionsParams {
+            upsert_only: false,
+            metadata: None,
+        },
+    )?;
+
+    let short = ctx
+        .db
+        .inventory_exception()
+        .iter()
+        .find(|e| {
+            e.organization_id == org_id
+                && e.company_id == company_id
+                && e.exception_type == "short_atp"
+                && e.state == "open"
+                && e.quant_id == Some(quant_id)
+        })
+        .ok_or("short_atp exception missing")?;
+
+    let expired = ctx
+        .db
+        .inventory_exception()
+        .iter()
+        .find(|e| {
+            e.organization_id == org_id
+                && e.company_id == company_id
+                && e.exception_type == "expired_lot"
+                && e.state == "open"
+        })
+        .ok_or("expired_lot exception missing")?;
+
+    create_quant_for_fixture(ctx, &fixture, 5.0)?;
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "QC Exc".to_string(),
+            usage: "internal_qc".to_string(),
+            location_category: "qc".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: None,
+            complete_name: Some("QC Exc".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: None,
+        },
+    )?;
+    let qc_loc = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "QC Exc")
+        .map(|l| l.id)
+        .ok_or("qc loc")?;
+
+    create_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        CreateQualityCheckParams {
+            name: "QC-EXC".to_string(),
+            test_type: "passfail".to_string(),
+            product_id: Some(fixture.product_id),
+            product_variant_id: None,
+            picking_id: None,
+            move_line_id: None,
+            lot_id: None,
+            team_id: None,
+            user_id: None,
+            control_point_id: None,
+            qty_tested: 5.0,
+            tolerance_min: None,
+            tolerance_max: None,
+            norm_unit: None,
+            metadata: None,
+        },
+    )?;
+    let check_id = ctx
+        .db
+        .quality_check()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.name == "QC-EXC")
+        .map(|c| c.id)
+        .ok_or("qc check")?;
+
+    fail_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        check_id,
+        1.0,
+        None,
+        None,
+        Some(qc_loc),
+    )?;
+
+    let open_qc = ctx
+        .db
+        .inventory_exception()
+        .iter()
+        .find(|e| {
+            e.organization_id == org_id
+                && e.exception_type == "open_qc"
+                && e.state == "open"
+                && e.quality_check_id == Some(check_id)
+        })
+        .ok_or("open_qc exception missing")?;
+
+    resolve_inventory_exception(ctx, org_id, company_id, short.id)?;
+    let short_after = ctx
+        .db
+        .inventory_exception()
+        .id()
+        .find(&short.id)
+        .ok_or("short after")?;
+    if short_after.state != "resolved" {
+        return Err("short_atp should resolve manually".into());
+    }
+
+    if expired.state != "open" || open_qc.state != "open" {
+        return Err("expired_lot and open_qc should remain open".into());
     }
     Ok(())
 }

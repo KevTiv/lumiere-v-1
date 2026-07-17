@@ -63,6 +63,7 @@ import type {
 import { inventoryModuleConfig } from "@/lib/module-dashboard-configs"
 import { useInventoryModuleSubscription } from "@/lib/module-subscription-hooks"
 import { groupBy } from "@/lib/utils"
+import { InventoryOpsPanel } from "./inventory-ops-panel"
 import {
   useProducts,
   useProductCategories,
@@ -91,6 +92,9 @@ import {
   useBarcodeNomenclatures,
   useSerialLotTraceability,
   useStockTraceabilityReports,
+  useInventoryExceptionsShortAtp,
+  useInventoryExceptionsExpiredLots,
+  useInventoryExceptionsOpenQc,
   useCreateProduct,
   useUpdateProduct,
   useDeleteProduct,
@@ -451,6 +455,9 @@ function InventoryClientLoaded({
   const { data: barcodeNomenclatures = [] } = useBarcodeNomenclatures(orgId)
   const { data: serialLotTraceability = [] } = useSerialLotTraceability(orgId)
   const { data: stockTraceabilityReports = [] } = useStockTraceabilityReports(orgId)
+  const { data: shortAtpExceptions = [] } = useInventoryExceptionsShortAtp(orgId)
+  const { data: expiredLotExceptions = [] } = useInventoryExceptionsExpiredLots(orgId)
+  const { data: openQcExceptions = [] } = useInventoryExceptionsOpenQc(orgId)
   const { data: orgUsers = [] } = useOrgUsers()
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: contacts = [] } = useContacts(orgId)
@@ -1366,6 +1373,33 @@ function InventoryClientLoaded({
                 })
               return { ...w, data: { ...(w.data as Record<string, unknown>), rows: lowStock } }
             }
+            if (w.id === "inventory-exception-queue-cards") {
+              return {
+                ...w,
+                data: {
+                  stats: [
+                    {
+                      label: "Short ATP",
+                      value: String(shortAtpExceptions.length),
+                      icon: "AlertTriangle",
+                      testId: "inventory-queue-short-atp",
+                    },
+                    {
+                      label: "Expired lots",
+                      value: String(expiredLotExceptions.length),
+                      icon: "AlertCircle",
+                      testId: "inventory-queue-expired-lots",
+                    },
+                    {
+                      label: "Open QC fails",
+                      value: String(openQcExceptions.length),
+                      icon: "ShieldAlert",
+                      testId: "inventory-queue-open-qc",
+                    },
+                  ],
+                },
+              }
+            }
             return w
           }),
         })) ??
@@ -1378,6 +1412,9 @@ function InventoryClientLoaded({
     transfers,
     adjustments,
     stockMoves,
+    shortAtpExceptions,
+    expiredLotExceptions,
+    openQcExceptions,
     dashboardTimeRange,
     t,
     moduleConfig,
@@ -3044,6 +3081,13 @@ function InventoryClientLoaded({
       tabs: [
         ...moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+          if (tab.id === "ops") {
+            return {
+              ...tab,
+              type: "custom" as const,
+              customContent: <InventoryOpsPanel />,
+            }
+          }
           if (tab.id === "products") {
             return withTransferActions({
               ...tab,

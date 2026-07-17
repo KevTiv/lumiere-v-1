@@ -38,6 +38,8 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_cross_dock_test(ctx)?;
     run_inventory_directed_putaway_test(ctx)?;
     run_inventory_close_valuation_test(ctx)?;
+    run_inventory_packing_workflow_test(ctx)?;
+    run_inventory_exception_queues_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -188,4 +190,15 @@ pub fn run_inventory_directed_putaway_test(ctx: &ReducerContext) -> Result<(), S
 pub fn run_inventory_close_valuation_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_inventory_close_posts_valuation_journal(ctx)
         .map_err(|e| format!("inventory_close_valuation: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_packing_workflow_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_packing_workflow(ctx).map_err(|e| format!("packing_workflow: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_exception_queues_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_inventory_exception_queues(ctx)
+        .map_err(|e| format!("exception_queues: {e}"))
 }

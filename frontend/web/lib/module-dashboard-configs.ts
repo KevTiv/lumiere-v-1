@@ -1060,6 +1060,40 @@ export const inventoryDashboard: DashboardConfig = {
         },
       ],
     },
+    {
+      id: "inventory-exception-queues",
+      title: "Exception queues",
+      widgets: [
+        {
+          id: "inventory-exception-queue-cards",
+          type: "stat-cards",
+          title: "Live exceptions",
+          width: "full",
+          data: {
+            stats: [
+              {
+                label: "Short ATP",
+                value: "—",
+                icon: "AlertTriangle",
+                testId: "inventory-queue-short-atp",
+              },
+              {
+                label: "Expired lots",
+                value: "—",
+                icon: "AlertCircle",
+                testId: "inventory-queue-expired-lots",
+              },
+              {
+                label: "Open QC fails",
+                value: "—",
+                icon: "ShieldAlert",
+                testId: "inventory-queue-open-qc",
+              },
+            ],
+          },
+        },
+      ],
+    },
   ],
 }
 
@@ -1076,6 +1110,11 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       label: "Dashboard",
       type: "dashboard",
       sections: inventoryDashboard.sections,
+    },
+    {
+      id: "ops",
+      label: t("inventory.tabs.ops", { defaultValue: "Ops" }),
+      type: "custom" as const,
     },
     {
       id: "products",

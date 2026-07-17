@@ -629,6 +629,15 @@ pub fn fail_quality_check(
         },
     );
 
+    crate::inventory::exceptions::record_open_qc_exception(
+        ctx,
+        organization_id,
+        company_id,
+        check_id,
+        Some(product_id),
+        qty_failed,
+    );
+
     Ok(())
 }
 

@@ -127,6 +127,13 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "adjustment-reasons",
   "serial-lot-traceability",
   "stock-traceability-reports",
+  "stock-packages",
+  "packaging-materials",
+  "cartonization-results",
+  "inventory-exceptions",
+  "inventory-exceptions-short-atp",
+  "inventory-exceptions-expired-lots",
+  "inventory-exceptions-open-qc",
   "purchase-orders",
   "purchase-orders-to-approve",
   "purchase-orders-partial-receipt",
@@ -643,6 +650,54 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       id,
       fa,
       "",
+    ),
+  "stock-packages": (id, fa) =>
+    selectOrgScopedSql("stock-packages", "stock_package", id, fa, ""),
+  "packaging-materials": (id, fa) =>
+    selectOrgScopedSql("packaging-materials", "packaging_material", id, fa, ""),
+  "cartonization-results": (id, fa) =>
+    selectOrgScopedSql(
+      "cartonization-results",
+      "cartonization_result",
+      id,
+      fa,
+      "",
+    ),
+  "inventory-exceptions": (id, fa) =>
+    selectOrgScopedSql(
+      "inventory-exceptions",
+      "inventory_exception",
+      id,
+      fa,
+      " AND state = 'open'",
+      " ORDER BY id DESC",
+    ),
+  "inventory-exceptions-short-atp": (id, fa) =>
+    selectOrgScopedSql(
+      "inventory-exceptions-short-atp",
+      "inventory_exception",
+      id,
+      fa,
+      " AND state = 'open' AND exception_type = 'short_atp'",
+      " ORDER BY id DESC",
+    ),
+  "inventory-exceptions-expired-lots": (id, fa) =>
+    selectOrgScopedSql(
+      "inventory-exceptions-expired-lots",
+      "inventory_exception",
+      id,
+      fa,
+      " AND state = 'open' AND exception_type = 'expired_lot'",
+      " ORDER BY id DESC",
+    ),
+  "inventory-exceptions-open-qc": (id, fa) =>
+    selectOrgScopedSql(
+      "inventory-exceptions-open-qc",
+      "inventory_exception",
+      id,
+      fa,
+      " AND state = 'open' AND exception_type = 'open_qc'",
+      " ORDER BY id DESC",
     ),
   "purchase-orders": (id, fa) =>
     selectOrgScopedSql("purchase-orders", "purchase_order", id, fa, ""),

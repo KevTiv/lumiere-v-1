@@ -332,6 +332,7 @@ pub mod create_stock_inventory_line_params_type;
 pub mod create_stock_inventory_params_type;
 pub mod create_stock_location_params_type;
 pub mod create_stock_move_params_type;
+pub mod create_stock_package_params_type;
 pub mod create_stock_picking_params_type;
 pub mod create_stock_production_lot_params_type;
 pub mod create_stock_production_serial_params_type;
@@ -454,6 +455,7 @@ pub mod intercompany_transaction_type;
 pub mod inventory_adjustment_type;
 pub mod inventory_close_type;
 pub mod inventory_close_line_type;
+pub mod inventory_exception_type;
 pub mod inventory_integration_intent_type;
 pub mod inventory_valuation_type;
 pub mod invoice_status_type;
@@ -510,6 +512,8 @@ pub mod org_permission_type;
 pub mod org_schema_migration_type;
 pub mod organization_type;
 pub mod organization_settings_type;
+pub mod pack_moves_into_package_params_type;
+pub mod pack_stock_picking_params_type;
 pub mod packaging_material_type;
 pub mod partner_credit_control_type;
 pub mod partner_type_type;
@@ -612,6 +616,7 @@ pub mod record_purchasing_integration_result_params_type;
 pub mod record_sales_integration_result_params_type;
 pub mod record_telemetry_params_type;
 pub mod record_whats_app_health_check_params_type;
+pub mod refresh_inventory_exceptions_params_type;
 pub mod register_device_params_type;
 pub mod register_hub_params_type;
 pub mod register_queue_worker_params_type;
@@ -685,6 +690,7 @@ pub mod stock_landed_cost_lines_type;
 pub mod stock_location_type;
 pub mod stock_move_type;
 pub mod stock_move_line_type;
+pub mod stock_package_type;
 pub mod stock_picking_type;
 pub mod stock_picking_batch_type;
 pub mod stock_production_lot_type;
@@ -963,6 +969,7 @@ pub mod cancel_return_order_reducer;
 pub mod cancel_sale_commission_reducer;
 pub mod cancel_sale_order_reducer;
 pub mod cancel_stock_move_reducer;
+pub mod cancel_stock_package_reducer;
 pub mod cancel_stock_picking_reducer;
 pub mod cancel_workflow_instance_reducer;
 pub mod check_mo_availability_reducer;
@@ -1004,6 +1011,7 @@ pub mod confirm_purchase_return_reducer;
 pub mod confirm_return_order_reducer;
 pub mod confirm_sales_order_reducer;
 pub mod confirm_stock_move_reducer;
+pub mod confirm_stock_package_reducer;
 pub mod confirm_stock_picking_reducer;
 pub mod consume_mo_materials_reducer;
 pub mod convert_lead_to_customer_reducer;
@@ -1188,6 +1196,7 @@ pub mod create_stock_inventory_reducer;
 pub mod create_stock_inventory_line_reducer;
 pub mod create_stock_location_reducer;
 pub mod create_stock_move_reducer;
+pub mod create_stock_package_reducer;
 pub mod create_stock_picking_reducer;
 pub mod create_stock_production_lot_reducer;
 pub mod create_stock_production_serial_reducer;
@@ -1287,6 +1296,7 @@ pub mod dispatch_due_owner_reports_reducer;
 pub mod dispose_account_asset_reducer;
 pub mod done_budget_reducer;
 pub mod done_stock_move_reducer;
+pub mod done_stock_package_reducer;
 pub mod end_contact_relationship_reducer;
 pub mod end_contact_role_reducer;
 pub mod end_user_session_reducer;
@@ -1408,6 +1418,8 @@ pub mod open_crm_conversation_reducer;
 pub mod open_fiscal_year_reducer;
 pub mod open_pos_session_reducer;
 pub mod open_quality_alert_reducer;
+pub mod pack_moves_into_package_reducer;
+pub mod pack_stock_picking_reducer;
 pub mod pass_quality_check_reducer;
 pub mod post_account_bank_statement_reducer;
 pub mod post_account_move_reducer;
@@ -1454,6 +1466,7 @@ pub mod record_telemetry_reducer;
 pub mod record_telemetry_batch_reducer;
 pub mod record_whatsapp_health_check_reducer;
 pub mod record_whatsapp_message_sent_reducer;
+pub mod refresh_inventory_exceptions_reducer;
 pub mod refresh_policy_snapshot_reducer;
 pub mod refresh_tax_deadline_statuses_reducer;
 pub mod refuse_expense_sheet_reducer;
@@ -1481,6 +1494,7 @@ pub mod request_embedding_job_reducer;
 pub mod reserve_serial_reducer;
 pub mod reserve_stock_quant_reducer;
 pub mod reset_leave_to_draft_reducer;
+pub mod resolve_inventory_exception_reducer;
 pub mod resolve_iot_alert_reducer;
 pub mod resolve_proposal_comment_reducer;
 pub mod restore_product_category_reducer;
@@ -1540,10 +1554,12 @@ pub mod run_inventory_consignment_atp_test_reducer;
 pub mod run_inventory_cross_dock_test_reducer;
 pub mod run_inventory_delivery_quant_test_reducer;
 pub mod run_inventory_directed_putaway_test_reducer;
+pub mod run_inventory_exception_queues_test_reducer;
 pub mod run_inventory_expired_lot_test_reducer;
 pub mod run_inventory_fefo_test_reducer;
 pub mod run_inventory_lot_reserve_test_reducer;
 pub mod run_inventory_lot_validate_test_reducer;
+pub mod run_inventory_packing_workflow_test_reducer;
 pub mod run_inventory_product_category_test_reducer;
 pub mod run_inventory_product_update_test_reducer;
 pub mod run_inventory_qc_quarantine_test_reducer;
@@ -1961,6 +1977,7 @@ pub mod intercompany_transaction_table;
 pub mod inventory_adjustment_table;
 pub mod inventory_close_table;
 pub mod inventory_close_line_table;
+pub mod inventory_exception_table;
 pub mod inventory_integration_intent_table;
 pub mod inventory_valuation_table;
 pub mod iot_action_table;
@@ -2093,6 +2110,7 @@ pub mod stock_landed_cost_lines_table;
 pub mod stock_location_table;
 pub mod stock_move_table;
 pub mod stock_move_line_table;
+pub mod stock_package_table;
 pub mod stock_picking_table;
 pub mod stock_picking_batch_table;
 pub mod stock_production_lot_table;
@@ -2456,6 +2474,7 @@ pub use create_stock_inventory_line_params_type::CreateStockInventoryLineParams;
 pub use create_stock_inventory_params_type::CreateStockInventoryParams;
 pub use create_stock_location_params_type::CreateStockLocationParams;
 pub use create_stock_move_params_type::CreateStockMoveParams;
+pub use create_stock_package_params_type::CreateStockPackageParams;
 pub use create_stock_picking_params_type::CreateStockPickingParams;
 pub use create_stock_production_lot_params_type::CreateStockProductionLotParams;
 pub use create_stock_production_serial_params_type::CreateStockProductionSerialParams;
@@ -2578,6 +2597,7 @@ pub use intercompany_transaction_type::IntercompanyTransaction;
 pub use inventory_adjustment_type::InventoryAdjustment;
 pub use inventory_close_type::InventoryClose;
 pub use inventory_close_line_type::InventoryCloseLine;
+pub use inventory_exception_type::InventoryException;
 pub use inventory_integration_intent_type::InventoryIntegrationIntent;
 pub use inventory_valuation_type::InventoryValuation;
 pub use invoice_status_type::InvoiceStatus;
@@ -2634,6 +2654,8 @@ pub use org_permission_type::OrgPermission;
 pub use org_schema_migration_type::OrgSchemaMigration;
 pub use organization_type::Organization;
 pub use organization_settings_type::OrganizationSettings;
+pub use pack_moves_into_package_params_type::PackMovesIntoPackageParams;
+pub use pack_stock_picking_params_type::PackStockPickingParams;
 pub use packaging_material_type::PackagingMaterial;
 pub use partner_credit_control_type::PartnerCreditControl;
 pub use partner_type_type::PartnerType;
@@ -2736,6 +2758,7 @@ pub use record_purchasing_integration_result_params_type::RecordPurchasingIntegr
 pub use record_sales_integration_result_params_type::RecordSalesIntegrationResultParams;
 pub use record_telemetry_params_type::RecordTelemetryParams;
 pub use record_whats_app_health_check_params_type::RecordWhatsAppHealthCheckParams;
+pub use refresh_inventory_exceptions_params_type::RefreshInventoryExceptionsParams;
 pub use register_device_params_type::RegisterDeviceParams;
 pub use register_hub_params_type::RegisterHubParams;
 pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
@@ -2809,6 +2832,7 @@ pub use stock_landed_cost_lines_type::StockLandedCostLines;
 pub use stock_location_type::StockLocation;
 pub use stock_move_type::StockMove;
 pub use stock_move_line_type::StockMoveLine;
+pub use stock_package_type::StockPackage;
 pub use stock_picking_type::StockPicking;
 pub use stock_picking_batch_type::StockPickingBatch;
 pub use stock_production_lot_type::StockProductionLot;
@@ -3144,6 +3168,7 @@ pub use intercompany_transaction_table::*;
 pub use inventory_adjustment_table::*;
 pub use inventory_close_table::*;
 pub use inventory_close_line_table::*;
+pub use inventory_exception_table::*;
 pub use inventory_integration_intent_table::*;
 pub use inventory_valuation_table::*;
 pub use iot_action_table::*;
@@ -3276,6 +3301,7 @@ pub use stock_landed_cost_lines_table::*;
 pub use stock_location_table::*;
 pub use stock_move_table::*;
 pub use stock_move_line_table::*;
+pub use stock_package_table::*;
 pub use stock_picking_table::*;
 pub use stock_picking_batch_table::*;
 pub use stock_production_lot_table::*;
@@ -3406,6 +3432,7 @@ pub use cancel_return_order_reducer::cancel_return_order;
 pub use cancel_sale_commission_reducer::cancel_sale_commission;
 pub use cancel_sale_order_reducer::cancel_sale_order;
 pub use cancel_stock_move_reducer::cancel_stock_move;
+pub use cancel_stock_package_reducer::cancel_stock_package;
 pub use cancel_stock_picking_reducer::cancel_stock_picking;
 pub use cancel_workflow_instance_reducer::cancel_workflow_instance;
 pub use check_mo_availability_reducer::check_mo_availability;
@@ -3447,6 +3474,7 @@ pub use confirm_purchase_return_reducer::confirm_purchase_return;
 pub use confirm_return_order_reducer::confirm_return_order;
 pub use confirm_sales_order_reducer::confirm_sales_order;
 pub use confirm_stock_move_reducer::confirm_stock_move;
+pub use confirm_stock_package_reducer::confirm_stock_package;
 pub use confirm_stock_picking_reducer::confirm_stock_picking;
 pub use consume_mo_materials_reducer::consume_mo_materials;
 pub use convert_lead_to_customer_reducer::convert_lead_to_customer;
@@ -3631,6 +3659,7 @@ pub use create_stock_inventory_reducer::create_stock_inventory;
 pub use create_stock_inventory_line_reducer::create_stock_inventory_line;
 pub use create_stock_location_reducer::create_stock_location;
 pub use create_stock_move_reducer::create_stock_move;
+pub use create_stock_package_reducer::create_stock_package;
 pub use create_stock_picking_reducer::create_stock_picking;
 pub use create_stock_production_lot_reducer::create_stock_production_lot;
 pub use create_stock_production_serial_reducer::create_stock_production_serial;
@@ -3730,6 +3759,7 @@ pub use dispatch_due_owner_reports_reducer::dispatch_due_owner_reports;
 pub use dispose_account_asset_reducer::dispose_account_asset;
 pub use done_budget_reducer::done_budget;
 pub use done_stock_move_reducer::done_stock_move;
+pub use done_stock_package_reducer::done_stock_package;
 pub use end_contact_relationship_reducer::end_contact_relationship;
 pub use end_contact_role_reducer::end_contact_role;
 pub use end_user_session_reducer::end_user_session;
@@ -3851,6 +3881,8 @@ pub use open_crm_conversation_reducer::open_crm_conversation;
 pub use open_fiscal_year_reducer::open_fiscal_year;
 pub use open_pos_session_reducer::open_pos_session;
 pub use open_quality_alert_reducer::open_quality_alert;
+pub use pack_moves_into_package_reducer::pack_moves_into_package;
+pub use pack_stock_picking_reducer::pack_stock_picking;
 pub use pass_quality_check_reducer::pass_quality_check;
 pub use post_account_bank_statement_reducer::post_account_bank_statement;
 pub use post_account_move_reducer::post_account_move;
@@ -3897,6 +3929,7 @@ pub use record_telemetry_reducer::record_telemetry;
 pub use record_telemetry_batch_reducer::record_telemetry_batch;
 pub use record_whatsapp_health_check_reducer::record_whatsapp_health_check;
 pub use record_whatsapp_message_sent_reducer::record_whatsapp_message_sent;
+pub use refresh_inventory_exceptions_reducer::refresh_inventory_exceptions;
 pub use refresh_policy_snapshot_reducer::refresh_policy_snapshot;
 pub use refresh_tax_deadline_statuses_reducer::refresh_tax_deadline_statuses;
 pub use refuse_expense_sheet_reducer::refuse_expense_sheet;
@@ -3924,6 +3957,7 @@ pub use request_embedding_job_reducer::request_embedding_job;
 pub use reserve_serial_reducer::reserve_serial;
 pub use reserve_stock_quant_reducer::reserve_stock_quant;
 pub use reset_leave_to_draft_reducer::reset_leave_to_draft;
+pub use resolve_inventory_exception_reducer::resolve_inventory_exception;
 pub use resolve_iot_alert_reducer::resolve_iot_alert;
 pub use resolve_proposal_comment_reducer::resolve_proposal_comment;
 pub use restore_product_category_reducer::restore_product_category;
@@ -3983,10 +4017,12 @@ pub use run_inventory_consignment_atp_test_reducer::run_inventory_consignment_at
 pub use run_inventory_cross_dock_test_reducer::run_inventory_cross_dock_test;
 pub use run_inventory_delivery_quant_test_reducer::run_inventory_delivery_quant_test;
 pub use run_inventory_directed_putaway_test_reducer::run_inventory_directed_putaway_test;
+pub use run_inventory_exception_queues_test_reducer::run_inventory_exception_queues_test;
 pub use run_inventory_expired_lot_test_reducer::run_inventory_expired_lot_test;
 pub use run_inventory_fefo_test_reducer::run_inventory_fefo_test;
 pub use run_inventory_lot_reserve_test_reducer::run_inventory_lot_reserve_test;
 pub use run_inventory_lot_validate_test_reducer::run_inventory_lot_validate_test;
+pub use run_inventory_packing_workflow_test_reducer::run_inventory_packing_workflow_test;
 pub use run_inventory_product_category_test_reducer::run_inventory_product_category_test;
 pub use run_inventory_product_update_test_reducer::run_inventory_product_update_test;
 pub use run_inventory_qc_quarantine_test_reducer::run_inventory_qc_quarantine_test;
@@ -4701,6 +4737,11 @@ pub enum Reducer {
         move_id: u64,
         params: CompanyScopeParams,
 }    ,
+    CancelStockPackage {
+        organization_id: u64,
+        company_id: u64,
+        package_id: u64,
+}    ,
     CancelStockPicking {
         organization_id: u64,
         picking_id: u64,
@@ -4889,6 +4930,11 @@ pub enum Reducer {
         organization_id: u64,
         move_id: u64,
         params: CompanyScopeParams,
+}    ,
+    ConfirmStockPackage {
+        organization_id: u64,
+        company_id: u64,
+        package_id: u64,
 }    ,
     ConfirmStockPicking {
         organization_id: u64,
@@ -5747,6 +5793,11 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateStockMoveParams,
 }    ,
+    CreateStockPackage {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateStockPackageParams,
+}    ,
     CreateStockPicking {
         organization_id: u64,
         params: CreateStockPickingParams,
@@ -6174,6 +6225,11 @@ pub enum Reducer {
         organization_id: u64,
         move_id: u64,
         params: DoneStockMoveParams,
+}    ,
+    DoneStockPackage {
+        organization_id: u64,
+        company_id: u64,
+        package_id: u64,
 }    ,
     EndContactRelationship {
         organization_id: u64,
@@ -6716,6 +6772,17 @@ pub enum Reducer {
         company_id: u64,
         alert_id: u64,
 }    ,
+    PackMovesIntoPackage {
+        organization_id: u64,
+        company_id: u64,
+        package_id: u64,
+        params: PackMovesIntoPackageParams,
+}    ,
+    PackStockPicking {
+        organization_id: u64,
+        company_id: u64,
+        params: PackStockPickingParams,
+}    ,
     PassQualityCheck {
         organization_id: u64,
         company_id: u64,
@@ -6947,6 +7014,11 @@ pub enum Reducer {
         organization_id: u64,
         account_id: u64,
 }    ,
+    RefreshInventoryExceptions {
+        organization_id: u64,
+        company_id: u64,
+        params: RefreshInventoryExceptionsParams,
+}    ,
     RefreshPolicySnapshot {
         organization_id: u64,
 }    ,
@@ -7074,6 +7146,11 @@ pub enum Reducer {
         organization_id: u64,
         leave_id: u64,
 }    ,
+    ResolveInventoryException {
+        organization_id: u64,
+        company_id: u64,
+        exception_id: u64,
+}    ,
     ResolveIotAlert {
         organization_id: u64,
         alert_id: u64,
@@ -7198,10 +7275,12 @@ pub enum Reducer {
     RunInventoryCrossDockTest ,
     RunInventoryDeliveryQuantTest ,
     RunInventoryDirectedPutawayTest ,
+    RunInventoryExceptionQueuesTest ,
     RunInventoryExpiredLotTest ,
     RunInventoryFefoTest ,
     RunInventoryLotReserveTest ,
     RunInventoryLotValidateTest ,
+    RunInventoryPackingWorkflowTest ,
     RunInventoryProductCategoryTest ,
     RunInventoryProductUpdateTest ,
     RunInventoryQcQuarantineTest ,
@@ -8528,6 +8607,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CancelSaleCommission { .. } => "cancel_sale_commission",
             Reducer::CancelSaleOrder { .. } => "cancel_sale_order",
             Reducer::CancelStockMove { .. } => "cancel_stock_move",
+            Reducer::CancelStockPackage { .. } => "cancel_stock_package",
             Reducer::CancelStockPicking { .. } => "cancel_stock_picking",
             Reducer::CancelWorkflowInstance { .. } => "cancel_workflow_instance",
             Reducer::CheckMoAvailability { .. } => "check_mo_availability",
@@ -8569,6 +8649,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ConfirmReturnOrder { .. } => "confirm_return_order",
             Reducer::ConfirmSalesOrder { .. } => "confirm_sales_order",
             Reducer::ConfirmStockMove { .. } => "confirm_stock_move",
+            Reducer::ConfirmStockPackage { .. } => "confirm_stock_package",
             Reducer::ConfirmStockPicking { .. } => "confirm_stock_picking",
             Reducer::ConsumeMoMaterials { .. } => "consume_mo_materials",
             Reducer::ConvertLeadToCustomer { .. } => "convert_lead_to_customer",
@@ -8753,6 +8834,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateStockInventoryLine { .. } => "create_stock_inventory_line",
             Reducer::CreateStockLocation { .. } => "create_stock_location",
             Reducer::CreateStockMove { .. } => "create_stock_move",
+            Reducer::CreateStockPackage { .. } => "create_stock_package",
             Reducer::CreateStockPicking { .. } => "create_stock_picking",
             Reducer::CreateStockProductionLot { .. } => "create_stock_production_lot",
             Reducer::CreateStockProductionSerial { .. } => "create_stock_production_serial",
@@ -8852,6 +8934,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DisposeAccountAsset { .. } => "dispose_account_asset",
             Reducer::DoneBudget { .. } => "done_budget",
             Reducer::DoneStockMove { .. } => "done_stock_move",
+            Reducer::DoneStockPackage { .. } => "done_stock_package",
             Reducer::EndContactRelationship { .. } => "end_contact_relationship",
             Reducer::EndContactRole { .. } => "end_contact_role",
             Reducer::EndUserSession { .. } => "end_user_session",
@@ -8973,6 +9056,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::OpenFiscalYear { .. } => "open_fiscal_year",
             Reducer::OpenPosSession { .. } => "open_pos_session",
             Reducer::OpenQualityAlert { .. } => "open_quality_alert",
+            Reducer::PackMovesIntoPackage { .. } => "pack_moves_into_package",
+            Reducer::PackStockPicking { .. } => "pack_stock_picking",
             Reducer::PassQualityCheck { .. } => "pass_quality_check",
             Reducer::PostAccountBankStatement { .. } => "post_account_bank_statement",
             Reducer::PostAccountMove { .. } => "post_account_move",
@@ -9019,6 +9104,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordTelemetryBatch { .. } => "record_telemetry_batch",
             Reducer::RecordWhatsappHealthCheck { .. } => "record_whatsapp_health_check",
             Reducer::RecordWhatsappMessageSent { .. } => "record_whatsapp_message_sent",
+            Reducer::RefreshInventoryExceptions { .. } => "refresh_inventory_exceptions",
             Reducer::RefreshPolicySnapshot { .. } => "refresh_policy_snapshot",
             Reducer::RefreshTaxDeadlineStatuses { .. } => "refresh_tax_deadline_statuses",
             Reducer::RefuseExpenseSheet { .. } => "refuse_expense_sheet",
@@ -9046,6 +9132,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReserveSerial { .. } => "reserve_serial",
             Reducer::ReserveStockQuant { .. } => "reserve_stock_quant",
             Reducer::ResetLeaveToDraft { .. } => "reset_leave_to_draft",
+            Reducer::ResolveInventoryException { .. } => "resolve_inventory_exception",
             Reducer::ResolveIotAlert { .. } => "resolve_iot_alert",
             Reducer::ResolveProposalComment { .. } => "resolve_proposal_comment",
             Reducer::RestoreProductCategory { .. } => "restore_product_category",
@@ -9105,10 +9192,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventoryCrossDockTest => "run_inventory_cross_dock_test",
             Reducer::RunInventoryDeliveryQuantTest => "run_inventory_delivery_quant_test",
             Reducer::RunInventoryDirectedPutawayTest => "run_inventory_directed_putaway_test",
+            Reducer::RunInventoryExceptionQueuesTest => "run_inventory_exception_queues_test",
             Reducer::RunInventoryExpiredLotTest => "run_inventory_expired_lot_test",
             Reducer::RunInventoryFefoTest => "run_inventory_fefo_test",
             Reducer::RunInventoryLotReserveTest => "run_inventory_lot_reserve_test",
             Reducer::RunInventoryLotValidateTest => "run_inventory_lot_validate_test",
+            Reducer::RunInventoryPackingWorkflowTest => "run_inventory_packing_workflow_test",
             Reducer::RunInventoryProductCategoryTest => "run_inventory_product_category_test",
             Reducer::RunInventoryProductUpdateTest => "run_inventory_product_update_test",
             Reducer::RunInventoryQcQuarantineTest => "run_inventory_qc_quarantine_test",
@@ -10167,6 +10256,15 @@ Reducer::BillTimesheets{
                 move_id: move_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CancelStockPackage{
+                organization_id,
+                company_id,
+                package_id,
+}             => __sats::bsatn::to_vec(&cancel_stock_package_reducer::CancelStockPackageArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                package_id: package_id.clone(),
+}),
             Reducer::CancelStockPicking{
                 organization_id,
                 picking_id,
@@ -10503,6 +10601,15 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 move_id: move_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::ConfirmStockPackage{
+                organization_id,
+                company_id,
+                package_id,
+}             => __sats::bsatn::to_vec(&confirm_stock_package_reducer::ConfirmStockPackageArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                package_id: package_id.clone(),
 }),
             Reducer::ConfirmStockPicking{
                 organization_id,
@@ -12034,6 +12141,15 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateStockPackage{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_stock_package_reducer::CreateStockPackageArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateStockPicking{
                 organization_id,
                 params,
@@ -12791,6 +12907,15 @@ Reducer::DismissInsight{
                 organization_id: organization_id.clone(),
                 move_id: move_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::DoneStockPackage{
+                organization_id,
+                company_id,
+                package_id,
+}             => __sats::bsatn::to_vec(&done_stock_package_reducer::DoneStockPackageArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                package_id: package_id.clone(),
 }),
             Reducer::EndContactRelationship{
                 organization_id,
@@ -13755,6 +13880,26 @@ Reducer::MoveStockQuant{
                 company_id: company_id.clone(),
                 alert_id: alert_id.clone(),
 }),
+            Reducer::PackMovesIntoPackage{
+                organization_id,
+                company_id,
+                package_id,
+                params,
+}             => __sats::bsatn::to_vec(&pack_moves_into_package_reducer::PackMovesIntoPackageArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                package_id: package_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::PackStockPicking{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&pack_stock_picking_reducer::PackStockPickingArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::PassQualityCheck{
                 organization_id,
                 company_id,
@@ -14171,6 +14316,15 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 account_id: account_id.clone(),
 }),
+            Reducer::RefreshInventoryExceptions{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&refresh_inventory_exceptions_reducer::RefreshInventoryExceptionsArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RefreshPolicySnapshot{
                 organization_id,
 }             => __sats::bsatn::to_vec(&refresh_policy_snapshot_reducer::RefreshPolicySnapshotArgs {
@@ -14397,6 +14551,15 @@ Reducer::MoveStockQuant{
 }             => __sats::bsatn::to_vec(&reset_leave_to_draft_reducer::ResetLeaveToDraftArgs {
                 organization_id: organization_id.clone(),
                 leave_id: leave_id.clone(),
+}),
+            Reducer::ResolveInventoryException{
+                organization_id,
+                company_id,
+                exception_id,
+}             => __sats::bsatn::to_vec(&resolve_inventory_exception_reducer::ResolveInventoryExceptionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                exception_id: exception_id.clone(),
 }),
             Reducer::ResolveIotAlert{
                 organization_id,
@@ -14628,6 +14791,8 @@ Reducer::RunInventoryDeliveryQuantTest => __sats::bsatn::to_vec(&run_inventory_d
                 }),
 Reducer::RunInventoryDirectedPutawayTest => __sats::bsatn::to_vec(&run_inventory_directed_putaway_test_reducer::RunInventoryDirectedPutawayTestArgs {
                 }),
+Reducer::RunInventoryExceptionQueuesTest => __sats::bsatn::to_vec(&run_inventory_exception_queues_test_reducer::RunInventoryExceptionQueuesTestArgs {
+                }),
 Reducer::RunInventoryExpiredLotTest => __sats::bsatn::to_vec(&run_inventory_expired_lot_test_reducer::RunInventoryExpiredLotTestArgs {
                 }),
 Reducer::RunInventoryFefoTest => __sats::bsatn::to_vec(&run_inventory_fefo_test_reducer::RunInventoryFefoTestArgs {
@@ -14635,6 +14800,8 @@ Reducer::RunInventoryFefoTest => __sats::bsatn::to_vec(&run_inventory_fefo_test_
 Reducer::RunInventoryLotReserveTest => __sats::bsatn::to_vec(&run_inventory_lot_reserve_test_reducer::RunInventoryLotReserveTestArgs {
                 }),
 Reducer::RunInventoryLotValidateTest => __sats::bsatn::to_vec(&run_inventory_lot_validate_test_reducer::RunInventoryLotValidateTestArgs {
+                }),
+Reducer::RunInventoryPackingWorkflowTest => __sats::bsatn::to_vec(&run_inventory_packing_workflow_test_reducer::RunInventoryPackingWorkflowTestArgs {
                 }),
 Reducer::RunInventoryProductCategoryTest => __sats::bsatn::to_vec(&run_inventory_product_category_test_reducer::RunInventoryProductCategoryTestArgs {
                 }),
@@ -17014,6 +17181,7 @@ pub struct DbUpdate {
     inventory_adjustment: __sdk::TableUpdate<InventoryAdjustment>,
     inventory_close: __sdk::TableUpdate<InventoryClose>,
     inventory_close_line: __sdk::TableUpdate<InventoryCloseLine>,
+    inventory_exception: __sdk::TableUpdate<InventoryException>,
     inventory_integration_intent: __sdk::TableUpdate<InventoryIntegrationIntent>,
     inventory_valuation: __sdk::TableUpdate<InventoryValuation>,
     iot_action: __sdk::TableUpdate<IoTAction>,
@@ -17146,6 +17314,7 @@ pub struct DbUpdate {
     stock_location: __sdk::TableUpdate<StockLocation>,
     stock_move: __sdk::TableUpdate<StockMove>,
     stock_move_line: __sdk::TableUpdate<StockMoveLine>,
+    stock_package: __sdk::TableUpdate<StockPackage>,
     stock_picking: __sdk::TableUpdate<StockPicking>,
     stock_picking_batch: __sdk::TableUpdate<StockPickingBatch>,
     stock_production_lot: __sdk::TableUpdate<StockProductionLot>,
@@ -17343,6 +17512,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "inventory_adjustment" => db_update.inventory_adjustment.append(inventory_adjustment_table::parse_table_update(table_update)?),
     "inventory_close" => db_update.inventory_close.append(inventory_close_table::parse_table_update(table_update)?),
     "inventory_close_line" => db_update.inventory_close_line.append(inventory_close_line_table::parse_table_update(table_update)?),
+    "inventory_exception" => db_update.inventory_exception.append(inventory_exception_table::parse_table_update(table_update)?),
     "inventory_integration_intent" => db_update.inventory_integration_intent.append(inventory_integration_intent_table::parse_table_update(table_update)?),
     "inventory_valuation" => db_update.inventory_valuation.append(inventory_valuation_table::parse_table_update(table_update)?),
     "iot_action" => db_update.iot_action.append(iot_action_table::parse_table_update(table_update)?),
@@ -17475,6 +17645,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "stock_location" => db_update.stock_location.append(stock_location_table::parse_table_update(table_update)?),
     "stock_move" => db_update.stock_move.append(stock_move_table::parse_table_update(table_update)?),
     "stock_move_line" => db_update.stock_move_line.append(stock_move_line_table::parse_table_update(table_update)?),
+    "stock_package" => db_update.stock_package.append(stock_package_table::parse_table_update(table_update)?),
     "stock_picking" => db_update.stock_picking.append(stock_picking_table::parse_table_update(table_update)?),
     "stock_picking_batch" => db_update.stock_picking_batch.append(stock_picking_batch_table::parse_table_update(table_update)?),
     "stock_production_lot" => db_update.stock_production_lot.append(stock_production_lot_table::parse_table_update(table_update)?),
@@ -17684,6 +17855,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.inventory_adjustment = cache.apply_diff_to_table::<InventoryAdjustment>("inventory_adjustment", &self.inventory_adjustment).with_updates_by_pk(|row| &row.id);
         diff.inventory_close = cache.apply_diff_to_table::<InventoryClose>("inventory_close", &self.inventory_close).with_updates_by_pk(|row| &row.id);
         diff.inventory_close_line = cache.apply_diff_to_table::<InventoryCloseLine>("inventory_close_line", &self.inventory_close_line).with_updates_by_pk(|row| &row.id);
+        diff.inventory_exception = cache.apply_diff_to_table::<InventoryException>("inventory_exception", &self.inventory_exception).with_updates_by_pk(|row| &row.id);
         diff.inventory_integration_intent = cache.apply_diff_to_table::<InventoryIntegrationIntent>("inventory_integration_intent", &self.inventory_integration_intent).with_updates_by_pk(|row| &row.id);
         diff.inventory_valuation = cache.apply_diff_to_table::<InventoryValuation>("inventory_valuation", &self.inventory_valuation).with_updates_by_pk(|row| &row.id);
         diff.iot_action = cache.apply_diff_to_table::<IoTAction>("iot_action", &self.iot_action).with_updates_by_pk(|row| &row.id);
@@ -17816,6 +17988,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.stock_location = cache.apply_diff_to_table::<StockLocation>("stock_location", &self.stock_location).with_updates_by_pk(|row| &row.id);
         diff.stock_move = cache.apply_diff_to_table::<StockMove>("stock_move", &self.stock_move).with_updates_by_pk(|row| &row.id);
         diff.stock_move_line = cache.apply_diff_to_table::<StockMoveLine>("stock_move_line", &self.stock_move_line).with_updates_by_pk(|row| &row.id);
+        diff.stock_package = cache.apply_diff_to_table::<StockPackage>("stock_package", &self.stock_package).with_updates_by_pk(|row| &row.id);
         diff.stock_picking = cache.apply_diff_to_table::<StockPicking>("stock_picking", &self.stock_picking).with_updates_by_pk(|row| &row.id);
         diff.stock_picking_batch = cache.apply_diff_to_table::<StockPickingBatch>("stock_picking_batch", &self.stock_picking_batch).with_updates_by_pk(|row| &row.id);
         diff.stock_production_lot = cache.apply_diff_to_table::<StockProductionLot>("stock_production_lot", &self.stock_production_lot).with_updates_by_pk(|row| &row.id);
@@ -18010,6 +18183,7 @@ for table_rows in raw.tables {
                 "inventory_adjustment" => db_update.inventory_adjustment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "inventory_close" => db_update.inventory_close.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "inventory_close_line" => db_update.inventory_close_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "inventory_exception" => db_update.inventory_exception.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "inventory_integration_intent" => db_update.inventory_integration_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "inventory_valuation" => db_update.inventory_valuation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "iot_action" => db_update.iot_action.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -18142,6 +18316,7 @@ for table_rows in raw.tables {
                 "stock_location" => db_update.stock_location.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "stock_move" => db_update.stock_move.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "stock_move_line" => db_update.stock_move_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_package" => db_update.stock_package.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "stock_picking" => db_update.stock_picking.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "stock_picking_batch" => db_update.stock_picking_batch.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "stock_production_lot" => db_update.stock_production_lot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -18336,6 +18511,7 @@ for table_rows in raw.tables {
                 "inventory_adjustment" => db_update.inventory_adjustment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "inventory_close" => db_update.inventory_close.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "inventory_close_line" => db_update.inventory_close_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "inventory_exception" => db_update.inventory_exception.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "inventory_integration_intent" => db_update.inventory_integration_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "inventory_valuation" => db_update.inventory_valuation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "iot_action" => db_update.iot_action.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -18468,6 +18644,7 @@ for table_rows in raw.tables {
                 "stock_location" => db_update.stock_location.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "stock_move" => db_update.stock_move.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "stock_move_line" => db_update.stock_move_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_package" => db_update.stock_package.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "stock_picking" => db_update.stock_picking.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "stock_picking_batch" => db_update.stock_picking_batch.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "stock_production_lot" => db_update.stock_production_lot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -18664,6 +18841,7 @@ pub struct AppliedDiff<'r> {
     inventory_adjustment: __sdk::TableAppliedDiff<'r, InventoryAdjustment>,
     inventory_close: __sdk::TableAppliedDiff<'r, InventoryClose>,
     inventory_close_line: __sdk::TableAppliedDiff<'r, InventoryCloseLine>,
+    inventory_exception: __sdk::TableAppliedDiff<'r, InventoryException>,
     inventory_integration_intent: __sdk::TableAppliedDiff<'r, InventoryIntegrationIntent>,
     inventory_valuation: __sdk::TableAppliedDiff<'r, InventoryValuation>,
     iot_action: __sdk::TableAppliedDiff<'r, IoTAction>,
@@ -18796,6 +18974,7 @@ pub struct AppliedDiff<'r> {
     stock_location: __sdk::TableAppliedDiff<'r, StockLocation>,
     stock_move: __sdk::TableAppliedDiff<'r, StockMove>,
     stock_move_line: __sdk::TableAppliedDiff<'r, StockMoveLine>,
+    stock_package: __sdk::TableAppliedDiff<'r, StockPackage>,
     stock_picking: __sdk::TableAppliedDiff<'r, StockPicking>,
     stock_picking_batch: __sdk::TableAppliedDiff<'r, StockPickingBatch>,
     stock_production_lot: __sdk::TableAppliedDiff<'r, StockProductionLot>,
@@ -18993,6 +19172,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<InventoryAdjustment>("inventory_adjustment", &self.inventory_adjustment, event);
         callbacks.invoke_table_row_callbacks::<InventoryClose>("inventory_close", &self.inventory_close, event);
         callbacks.invoke_table_row_callbacks::<InventoryCloseLine>("inventory_close_line", &self.inventory_close_line, event);
+        callbacks.invoke_table_row_callbacks::<InventoryException>("inventory_exception", &self.inventory_exception, event);
         callbacks.invoke_table_row_callbacks::<InventoryIntegrationIntent>("inventory_integration_intent", &self.inventory_integration_intent, event);
         callbacks.invoke_table_row_callbacks::<InventoryValuation>("inventory_valuation", &self.inventory_valuation, event);
         callbacks.invoke_table_row_callbacks::<IoTAction>("iot_action", &self.iot_action, event);
@@ -19125,6 +19305,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<StockLocation>("stock_location", &self.stock_location, event);
         callbacks.invoke_table_row_callbacks::<StockMove>("stock_move", &self.stock_move, event);
         callbacks.invoke_table_row_callbacks::<StockMoveLine>("stock_move_line", &self.stock_move_line, event);
+        callbacks.invoke_table_row_callbacks::<StockPackage>("stock_package", &self.stock_package, event);
         callbacks.invoke_table_row_callbacks::<StockPicking>("stock_picking", &self.stock_picking, event);
         callbacks.invoke_table_row_callbacks::<StockPickingBatch>("stock_picking_batch", &self.stock_picking_batch, event);
         callbacks.invoke_table_row_callbacks::<StockProductionLot>("stock_production_lot", &self.stock_production_lot, event);
@@ -19953,6 +20134,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         inventory_adjustment_table::register_table(client_cache);
         inventory_close_table::register_table(client_cache);
         inventory_close_line_table::register_table(client_cache);
+        inventory_exception_table::register_table(client_cache);
         inventory_integration_intent_table::register_table(client_cache);
         inventory_valuation_table::register_table(client_cache);
         iot_action_table::register_table(client_cache);
@@ -20085,6 +20267,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         stock_location_table::register_table(client_cache);
         stock_move_table::register_table(client_cache);
         stock_move_line_table::register_table(client_cache);
+        stock_package_table::register_table(client_cache);
         stock_picking_table::register_table(client_cache);
         stock_picking_batch_table::register_table(client_cache);
         stock_production_lot_table::register_table(client_cache);
@@ -20274,6 +20457,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "inventory_adjustment",
         "inventory_close",
         "inventory_close_line",
+        "inventory_exception",
         "inventory_integration_intent",
         "inventory_valuation",
         "iot_action",
@@ -20406,6 +20590,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "stock_location",
         "stock_move",
         "stock_move_line",
+        "stock_package",
         "stock_picking",
         "stock_picking_batch",
         "stock_production_lot",

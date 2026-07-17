@@ -101,7 +101,7 @@ Contract: [`inventory.contract.ts`](../frontend/packages/stdb/src/contract-tests
 | `inventory-valuations` | Intentionally out of workspace | Unused/mis-shaped table; REST prefetch may still exist |
 | `warehouse-3d` | Removed | Orphan key |
 
-**Exception / ops queues:** No inventory Ops panel. No server-bounded keys (e.g. short ATP, expired lots, open waves, failed quality holds). Dashboard KPIs are client-derived from subscribed/REST data.
+**Exception / ops queues:** Inventory Ops panel + bounded keys `inventory-exceptions-short-atp` / `expired-lots` / `open-qc` (backed by `inventory_exception` rows; refresh via `refresh_inventory_exceptions`).
 
 ### 1.5 UI operations (`/inventory`)
 
@@ -124,7 +124,7 @@ Tabs from `inventoryModuleConfig` + injected tabs ([`inventory-client.tsx`](../f
 
 | Layer | What exists | Not covered |
 |-------|-------------|-------------|
-| Domain | `run_all_inventory_tests`: … + **QC**, **waves**, **UoM**, **close lock/GL**, **3PL**, **cartonization**, **consignment**, **cross-dock**, **putaway** | Costing layers, exception queues, offline sync |
+| Domain | `run_all_inventory_tests`: … + **putaway**, **packing**, **exception queues** | Costing layers, offline sync |
 | Sales (adjacent) | ATP shortfall / reserve-after-confirm / unreserve paths in sales domain tests | Multi-warehouse promise calendar |
 | Playwright | `inventory-module.spec.ts` (@dev-fixture) shell/tabs; `inventory-mutations.spec.ts` (@p0) product update + category delete; lead-to-cash / returns paths exercise picking validate | Full transfer lifecycle, waves, cycle post, phantoms |
 | Contract | `inventory.contract.ts` | Backend presence of BFF keys |
@@ -160,15 +160,15 @@ Definitions:
 | Costing methods | **Partial** | Product `cost_method` / `standard_price`; COGS helpers read quants (fifo/lifo/average/standard); stock ops default new quants to `"standard"` without layer maintenance |
 | Directed putaway / picking | **Partial** | `execute_directed_putaway` (rule / least-loaded / fixed) moves stock + done putaway task; pick orchestration via waves |
 | Wave planning | **Partial** | `release_picking_wave` assign + pick tasks; validate gated on open tasks |
-| Packing | **Partial** | Pack location IDs on warehouse; product packaging CRUD; no pack-operation workflow |
-| Cartonization | **Partial** | `create_packaging_material` + `run_cartonization` (FFD); stamps move `result_package_id` |
+| Packing | **Partial** | `stock_package` create/pack/confirm/done; `pack_stock_picking` one-shot; pack loc on done |
+| Cartonization | **Partial** | FFD creates confirmed `stock_package` rows + stamps move `result_package_id` |
 | Consignment | **Partial** | Activate/receive with `owner_id`; excluded from company ATP |
 | Quarantine | **Partial** | `fail_quality_check` → `quarantine_quantity` (uses `failure_location_id` or `wh_qc_stock_loc_id`); available=0; reserve blocked |
 | Cross-docking | **Partial** | `execute_cross_dock` creates outbound from inbound dest when `crossdock` |
 | 3PL interfaces | **Partial** | `inventory_integration_intent` create/record; ASN inbound can post stock on success (worker HTTP outside reducers) |
 | Inventory-close reconciliation | **Partial** | Snapshot + lock/reopen + optional GL valuation Entry (`account_move_id`); ongoing `inventory_valuation` table still separate |
 | PO receipt → stock | **Present** | `receive_po_line` → `validate_stock_picking_backorder` + receipt domain test |
-| Live stock subscriptions | **Present** (org-scoped) | Workspace keys wired in `ERP_ORG_SQL`; no bounded exception queues yet |
+| Live stock subscriptions | **Present** (org-scoped) | Workspace + bounded exception keys (`short-atp` / `expired-lots` / `open-qc`) in `ERP_ORG_SQL` |
 | Phantom UI contracts | **Present** (cleared) | BFF ⊆ reducers after pilot fixes |
 | Multi-entity / company isolation | **Partial** | Company fields + some guards; dedicated inventory isolation domain tests missing |
 | Drill-down reporting | **Partial** | Traceability reports + move/picking links; no competitive valuation/close drill-down |
@@ -215,7 +215,7 @@ Definitions:
 | Stale-state / double-validate | Partial | State preconditions on picking | Idempotent validate; explicit error on Done |
 | No client multi-step stock commit | Intent | SO confirm reserves server-side | Never orchestrate reserve+validate across optimistic client steps without server guards |
 | Hot-item contention proof | Partial | DB serializes reducers; ATP + company isolation domain tests added | Broader concurrent stress / latency measurement still open |
-| Live exception queues | No | Client dashboard only | Bounded subscriptions: short ATP, expired lots, open QC fails |
+| Live exception queues | Partial | `inventory_exception` + bounded keys + Ops panel | Auto-refresh on every reserve (today: refresh reducer + QC fail hook) |
 
 SpacetimeDB atomicity model: each reducer runs in one transaction that commits or rolls back as a unit ([Transactions and Atomicity](https://spacetimedb.com/docs/2.0.0-rc1/databases/transactions-atomicity); [Functions](https://spacetimedb.com/docs/functions/)). External HTTP belongs in procedures/workers, not reducers.
 
@@ -235,11 +235,11 @@ SpacetimeDB atomicity model: each reducer runs in one transaction that commits o
 10. **Quality fail → quarantine hold** — Present (`fail_quality_check` → quarantine quant, ATP blocked).
 11. **Wave release → directed pick tasks** — Present (`release_picking_wave` + task gate on validate).
 12. **Replenishment → PO/transfer demand** — Present (draft PO or internal transfer on execute).
-13. **Cartonization / pack** — Partial (`run_cartonization`); full pack ops still Open.
+13. **Cartonization / pack** — Present (MVP): cartonization + `stock_package` pack/confirm/done.
 14. **Consignment / cross-dock / 3PL** — Present (MVP): consignment owner_id ATP rules, `execute_cross_dock`, 3PL intents.
 15. **Inventory period close** — Present (snapshot + lock + optional GL valuation Entry).
 16. **Cross-company isolation** — Org filters; dedicated company-isolation domain test Present.
-17. **Live exception subscriptions** — Absent (client-derived KPIs).
+17. **Live exception subscriptions** — Present (bounded short ATP / expired lots / open QC).
 18. **Remote / intermittent warehouse ops** — No offline queue; live WS only for core 7 keys.
 
 ### Acceptance scenarios (18)
@@ -258,7 +258,7 @@ SpacetimeDB atomicity model: each reducer runs in one transaction that commits o
 12. Wave release/complete + putaway via real reducers — Present (MVP).
 13. Company B cannot reserve company A’s quants — Present (domain test).
 14. Multi-UoM: reserve/validate convert via `uom_conversion` — Present (Partial vs full UoM UX).
-15. Subscription clients see live short-ATP / expired-lot / open-QC queues without polling (target: server-bounded filters) — **fails today**.
+15. Subscription clients see live short-ATP / expired-lot / open-QC queues — Present (`inventory-exceptions-*` + Ops panel).
 16. Inventory close: snapshot + lock + optional GL valuation Entry; reopen unlocks — Present.
 17. Remote warehouse with intermittent connectivity can queue scans and reconcile without double-post (target) — **Absent**.
 18. 3PL ASN + cross-dock outbound from inbound dest — Present (MVP).
@@ -366,10 +366,10 @@ flowchart LR
 | Replenishment that creates PO/transfer | **Closed** | Draft buy PO or internal transfer on execute |
 | Directed putaway / pick task orchestration | **Closed** | Wave pick tasks + `execute_directed_putaway` |
 | Real wave release / assign | **Closed** | `release_picking_wave` confirm/assign + tasks |
-| Packing workflow | **Open** | Beyond pack location FKs / cartonization |
+| Packing workflow | **Closed** (MVP) | `stock_package` + pack/confirm/done |
 | UoM conversion on reserve/validate | **Closed** | Convert to `product.uom_id` before ATP/quant ops |
 | Inventory period close + valuation snapshot | **Closed** | Snapshot/lock + optional GL valuation Entry |
-| Exception queues (short ATP, expired lots, QC) | **Open** | Server-bounded SQL + Ops panel |
+| Exception queues (short ATP, expired lots, QC) | **Closed** (MVP) | `inventory_exception` + bounded subs + Ops |
 | Costing layer maintenance on receipt | **Open** | Align with COGS methods |
 
 ### Differentiating
@@ -389,7 +389,7 @@ flowchart LR
 
 ## Bottom line
 
-Lumiere’s inventory spine is **reservation-and-validate strong, WMS-depth still partial**: soft ATP, picking validate, lot/serial/FEFO, replenishment, QC quarantine, waves/tasks, UoM conversion, inventory close (+ optional GL valuation), 3PL ASN, cartonization (FFD), consignment ownership (ATP exclusion), cross-dock outbound, and directed putaway (rule/least-loaded/fixed) are real and tested. Remaining notable gaps: packing workflow beyond cartonization, exception Ops queues, costing layer maintenance, offline sync, and advanced multi-WH promise ATP.
+Lumiere’s inventory spine is **reservation-and-validate strong, WMS-depth still partial**: soft ATP, picking validate, lot/serial/FEFO, replenishment, QC quarantine, waves/tasks, UoM conversion, inventory close (+ optional GL valuation), 3PL ASN, cartonization + packing packages, consignment ownership, cross-dock, directed putaway, and bounded exception Ops queues are real and tested. Remaining notable gaps: costing layer maintenance, offline sync, and advanced multi-WH promise ATP.
 
 ### Related docs
 

@@ -24,13 +24,17 @@
 /// | consignment | Consignment receive + ATP ownership                             |
 /// | cross_dock  | Cross-dock outbound from inbound dest                           |
 /// | putaway     | Directed putaway (rule / least-loaded / fixed)                  |
+/// | packing     | StockPackage pack / confirm / done workflow                     |
+/// | exceptions  | Short ATP / expired lot / open QC exception queues              |
 pub mod barcode;
 pub mod consignment;
 pub mod cross_dock;
 pub mod cycle_count;
+pub mod exceptions;
 pub mod integration;
 pub mod inventory_adjustments;
 pub mod inventory_close;
+pub mod packing;
 pub mod product;
 pub mod product_category;
 pub mod putaway;

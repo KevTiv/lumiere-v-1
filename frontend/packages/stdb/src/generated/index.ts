@@ -123,6 +123,7 @@ import CancelReturnOrderReducer from "./cancel_return_order_reducer";
 import CancelSaleCommissionReducer from "./cancel_sale_commission_reducer";
 import CancelSaleOrderReducer from "./cancel_sale_order_reducer";
 import CancelStockMoveReducer from "./cancel_stock_move_reducer";
+import CancelStockPackageReducer from "./cancel_stock_package_reducer";
 import CancelStockPickingReducer from "./cancel_stock_picking_reducer";
 import CancelWorkflowInstanceReducer from "./cancel_workflow_instance_reducer";
 import CheckMoAvailabilityReducer from "./check_mo_availability_reducer";
@@ -164,6 +165,7 @@ import ConfirmPurchaseReturnReducer from "./confirm_purchase_return_reducer";
 import ConfirmReturnOrderReducer from "./confirm_return_order_reducer";
 import ConfirmSalesOrderReducer from "./confirm_sales_order_reducer";
 import ConfirmStockMoveReducer from "./confirm_stock_move_reducer";
+import ConfirmStockPackageReducer from "./confirm_stock_package_reducer";
 import ConfirmStockPickingReducer from "./confirm_stock_picking_reducer";
 import ConsumeMoMaterialsReducer from "./consume_mo_materials_reducer";
 import ConvertLeadToCustomerReducer from "./convert_lead_to_customer_reducer";
@@ -348,6 +350,7 @@ import CreateStockInventoryReducer from "./create_stock_inventory_reducer";
 import CreateStockInventoryLineReducer from "./create_stock_inventory_line_reducer";
 import CreateStockLocationReducer from "./create_stock_location_reducer";
 import CreateStockMoveReducer from "./create_stock_move_reducer";
+import CreateStockPackageReducer from "./create_stock_package_reducer";
 import CreateStockPickingReducer from "./create_stock_picking_reducer";
 import CreateStockProductionLotReducer from "./create_stock_production_lot_reducer";
 import CreateStockProductionSerialReducer from "./create_stock_production_serial_reducer";
@@ -447,6 +450,7 @@ import DispatchDueOwnerReportsReducer from "./dispatch_due_owner_reports_reducer
 import DisposeAccountAssetReducer from "./dispose_account_asset_reducer";
 import DoneBudgetReducer from "./done_budget_reducer";
 import DoneStockMoveReducer from "./done_stock_move_reducer";
+import DoneStockPackageReducer from "./done_stock_package_reducer";
 import EndContactRelationshipReducer from "./end_contact_relationship_reducer";
 import EndContactRoleReducer from "./end_contact_role_reducer";
 import EndUserSessionReducer from "./end_user_session_reducer";
@@ -568,6 +572,8 @@ import OpenCrmConversationReducer from "./open_crm_conversation_reducer";
 import OpenFiscalYearReducer from "./open_fiscal_year_reducer";
 import OpenPosSessionReducer from "./open_pos_session_reducer";
 import OpenQualityAlertReducer from "./open_quality_alert_reducer";
+import PackMovesIntoPackageReducer from "./pack_moves_into_package_reducer";
+import PackStockPickingReducer from "./pack_stock_picking_reducer";
 import PassQualityCheckReducer from "./pass_quality_check_reducer";
 import PostAccountBankStatementReducer from "./post_account_bank_statement_reducer";
 import PostAccountMoveReducer from "./post_account_move_reducer";
@@ -614,6 +620,7 @@ import RecordTelemetryReducer from "./record_telemetry_reducer";
 import RecordTelemetryBatchReducer from "./record_telemetry_batch_reducer";
 import RecordWhatsappHealthCheckReducer from "./record_whatsapp_health_check_reducer";
 import RecordWhatsappMessageSentReducer from "./record_whatsapp_message_sent_reducer";
+import RefreshInventoryExceptionsReducer from "./refresh_inventory_exceptions_reducer";
 import RefreshPolicySnapshotReducer from "./refresh_policy_snapshot_reducer";
 import RefreshTaxDeadlineStatusesReducer from "./refresh_tax_deadline_statuses_reducer";
 import RefuseExpenseSheetReducer from "./refuse_expense_sheet_reducer";
@@ -641,6 +648,7 @@ import RequestEmbeddingJobReducer from "./request_embedding_job_reducer";
 import ReserveSerialReducer from "./reserve_serial_reducer";
 import ReserveStockQuantReducer from "./reserve_stock_quant_reducer";
 import ResetLeaveToDraftReducer from "./reset_leave_to_draft_reducer";
+import ResolveInventoryExceptionReducer from "./resolve_inventory_exception_reducer";
 import ResolveIotAlertReducer from "./resolve_iot_alert_reducer";
 import ResolveProposalCommentReducer from "./resolve_proposal_comment_reducer";
 import RestoreProductCategoryReducer from "./restore_product_category_reducer";
@@ -700,10 +708,12 @@ import RunInventoryConsignmentAtpTestReducer from "./run_inventory_consignment_a
 import RunInventoryCrossDockTestReducer from "./run_inventory_cross_dock_test_reducer";
 import RunInventoryDeliveryQuantTestReducer from "./run_inventory_delivery_quant_test_reducer";
 import RunInventoryDirectedPutawayTestReducer from "./run_inventory_directed_putaway_test_reducer";
+import RunInventoryExceptionQueuesTestReducer from "./run_inventory_exception_queues_test_reducer";
 import RunInventoryExpiredLotTestReducer from "./run_inventory_expired_lot_test_reducer";
 import RunInventoryFefoTestReducer from "./run_inventory_fefo_test_reducer";
 import RunInventoryLotReserveTestReducer from "./run_inventory_lot_reserve_test_reducer";
 import RunInventoryLotValidateTestReducer from "./run_inventory_lot_validate_test_reducer";
+import RunInventoryPackingWorkflowTestReducer from "./run_inventory_packing_workflow_test_reducer";
 import RunInventoryProductCategoryTestReducer from "./run_inventory_product_category_test_reducer";
 import RunInventoryProductUpdateTestReducer from "./run_inventory_product_update_test_reducer";
 import RunInventoryQcQuarantineTestReducer from "./run_inventory_qc_quarantine_test_reducer";
@@ -1125,6 +1135,7 @@ import IntercompanyTransactionRow from "./intercompany_transaction_table";
 import InventoryAdjustmentRow from "./inventory_adjustment_table";
 import InventoryCloseRow from "./inventory_close_table";
 import InventoryCloseLineRow from "./inventory_close_line_table";
+import InventoryExceptionRow from "./inventory_exception_table";
 import InventoryIntegrationIntentRow from "./inventory_integration_intent_table";
 import InventoryValuationRow from "./inventory_valuation_table";
 import IotActionRow from "./iot_action_table";
@@ -1257,6 +1268,7 @@ import StockLandedCostLinesRow from "./stock_landed_cost_lines_table";
 import StockLocationRow from "./stock_location_table";
 import StockMoveRow from "./stock_move_table";
 import StockMoveLineRow from "./stock_move_line_table";
+import StockPackageRow from "./stock_package_table";
 import StockPickingRow from "./stock_picking_table";
 import StockPickingBatchRow from "./stock_picking_batch_table";
 import StockProductionLotRow from "./stock_production_lot_table";
@@ -3910,6 +3922,32 @@ const tablesSchema = __schema({
       { name: 'inventory_close_line_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, InventoryCloseLineRow),
+  inventory_exception: __table({
+    name: 'inventory_exception',
+    indexes: [
+      { name: 'inventory_exception_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'inventory_exception_by_dedupe', algorithm: 'btree', columns: [
+        'dedupeKey',
+      ] },
+      { name: 'inventory_exception_by_type', algorithm: 'btree', columns: [
+        'exceptionType',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'inventory_exception_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'inventory_exception_by_state', algorithm: 'btree', columns: [
+        'state',
+      ] },
+    ],
+    constraints: [
+      { name: 'inventory_exception_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, InventoryExceptionRow),
   inventory_integration_intent: __table({
     name: 'inventory_integration_intent',
     indexes: [
@@ -6207,6 +6245,29 @@ const tablesSchema = __schema({
       { name: 'stock_move_line_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, StockMoveLineRow),
+  stock_package: __table({
+    name: 'stock_package',
+    indexes: [
+      { name: 'stock_package_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'stock_package_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'stock_package_by_picking', algorithm: 'btree', columns: [
+        'pickingId',
+      ] },
+      { name: 'stock_package_by_state', algorithm: 'btree', columns: [
+        'state',
+      ] },
+    ],
+    constraints: [
+      { name: 'stock_package_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, StockPackageRow),
   stock_picking: __table({
     name: 'stock_picking',
     indexes: [
@@ -7021,6 +7082,7 @@ const reducersSchema = __reducers(
   __reducerSchema("cancel_sale_commission", CancelSaleCommissionReducer),
   __reducerSchema("cancel_sale_order", CancelSaleOrderReducer),
   __reducerSchema("cancel_stock_move", CancelStockMoveReducer),
+  __reducerSchema("cancel_stock_package", CancelStockPackageReducer),
   __reducerSchema("cancel_stock_picking", CancelStockPickingReducer),
   __reducerSchema("cancel_workflow_instance", CancelWorkflowInstanceReducer),
   __reducerSchema("check_mo_availability", CheckMoAvailabilityReducer),
@@ -7062,6 +7124,7 @@ const reducersSchema = __reducers(
   __reducerSchema("confirm_return_order", ConfirmReturnOrderReducer),
   __reducerSchema("confirm_sales_order", ConfirmSalesOrderReducer),
   __reducerSchema("confirm_stock_move", ConfirmStockMoveReducer),
+  __reducerSchema("confirm_stock_package", ConfirmStockPackageReducer),
   __reducerSchema("confirm_stock_picking", ConfirmStockPickingReducer),
   __reducerSchema("consume_mo_materials", ConsumeMoMaterialsReducer),
   __reducerSchema("convert_lead_to_customer", ConvertLeadToCustomerReducer),
@@ -7246,6 +7309,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_stock_inventory_line", CreateStockInventoryLineReducer),
   __reducerSchema("create_stock_location", CreateStockLocationReducer),
   __reducerSchema("create_stock_move", CreateStockMoveReducer),
+  __reducerSchema("create_stock_package", CreateStockPackageReducer),
   __reducerSchema("create_stock_picking", CreateStockPickingReducer),
   __reducerSchema("create_stock_production_lot", CreateStockProductionLotReducer),
   __reducerSchema("create_stock_production_serial", CreateStockProductionSerialReducer),
@@ -7345,6 +7409,7 @@ const reducersSchema = __reducers(
   __reducerSchema("dispose_account_asset", DisposeAccountAssetReducer),
   __reducerSchema("done_budget", DoneBudgetReducer),
   __reducerSchema("done_stock_move", DoneStockMoveReducer),
+  __reducerSchema("done_stock_package", DoneStockPackageReducer),
   __reducerSchema("end_contact_relationship", EndContactRelationshipReducer),
   __reducerSchema("end_contact_role", EndContactRoleReducer),
   __reducerSchema("end_user_session", EndUserSessionReducer),
@@ -7466,6 +7531,8 @@ const reducersSchema = __reducers(
   __reducerSchema("open_fiscal_year", OpenFiscalYearReducer),
   __reducerSchema("open_pos_session", OpenPosSessionReducer),
   __reducerSchema("open_quality_alert", OpenQualityAlertReducer),
+  __reducerSchema("pack_moves_into_package", PackMovesIntoPackageReducer),
+  __reducerSchema("pack_stock_picking", PackStockPickingReducer),
   __reducerSchema("pass_quality_check", PassQualityCheckReducer),
   __reducerSchema("post_account_bank_statement", PostAccountBankStatementReducer),
   __reducerSchema("post_account_move", PostAccountMoveReducer),
@@ -7512,6 +7579,7 @@ const reducersSchema = __reducers(
   __reducerSchema("record_telemetry_batch", RecordTelemetryBatchReducer),
   __reducerSchema("record_whatsapp_health_check", RecordWhatsappHealthCheckReducer),
   __reducerSchema("record_whatsapp_message_sent", RecordWhatsappMessageSentReducer),
+  __reducerSchema("refresh_inventory_exceptions", RefreshInventoryExceptionsReducer),
   __reducerSchema("refresh_policy_snapshot", RefreshPolicySnapshotReducer),
   __reducerSchema("refresh_tax_deadline_statuses", RefreshTaxDeadlineStatusesReducer),
   __reducerSchema("refuse_expense_sheet", RefuseExpenseSheetReducer),
@@ -7539,6 +7607,7 @@ const reducersSchema = __reducers(
   __reducerSchema("reserve_serial", ReserveSerialReducer),
   __reducerSchema("reserve_stock_quant", ReserveStockQuantReducer),
   __reducerSchema("reset_leave_to_draft", ResetLeaveToDraftReducer),
+  __reducerSchema("resolve_inventory_exception", ResolveInventoryExceptionReducer),
   __reducerSchema("resolve_iot_alert", ResolveIotAlertReducer),
   __reducerSchema("resolve_proposal_comment", ResolveProposalCommentReducer),
   __reducerSchema("restore_product_category", RestoreProductCategoryReducer),
@@ -7598,10 +7667,12 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_cross_dock_test", RunInventoryCrossDockTestReducer),
   __reducerSchema("run_inventory_delivery_quant_test", RunInventoryDeliveryQuantTestReducer),
   __reducerSchema("run_inventory_directed_putaway_test", RunInventoryDirectedPutawayTestReducer),
+  __reducerSchema("run_inventory_exception_queues_test", RunInventoryExceptionQueuesTestReducer),
   __reducerSchema("run_inventory_expired_lot_test", RunInventoryExpiredLotTestReducer),
   __reducerSchema("run_inventory_fefo_test", RunInventoryFefoTestReducer),
   __reducerSchema("run_inventory_lot_reserve_test", RunInventoryLotReserveTestReducer),
   __reducerSchema("run_inventory_lot_validate_test", RunInventoryLotValidateTestReducer),
+  __reducerSchema("run_inventory_packing_workflow_test", RunInventoryPackingWorkflowTestReducer),
   __reducerSchema("run_inventory_product_category_test", RunInventoryProductCategoryTestReducer),
   __reducerSchema("run_inventory_product_update_test", RunInventoryProductUpdateTestReducer),
   __reducerSchema("run_inventory_qc_quarantine_test", RunInventoryQcQuarantineTestReducer),

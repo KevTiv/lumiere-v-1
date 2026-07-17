@@ -4850,5 +4850,23 @@
     "quantity",
     "cost",
     "metadata"
+  ],
+  "CreateStockPackageParams": [
+    "packaging_material_id",
+    "picking_id",
+    "location_id",
+    "location_dest_id",
+    "metadata"
+  ],
+  "PackMovesIntoPackageParams": [
+    "metadata"
+  ],
+  "PackStockPickingParams": [
+    "packaging_material_id",
+    "name",
+    "metadata"
+  ],
+  "RefreshInventoryExceptionsParams": [
+    "metadata"
   ]
 }

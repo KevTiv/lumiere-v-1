@@ -26,6 +26,8 @@ Checklist for tranche-1 fixes from [INVENTORY_WAREHOUSE_MANAGEMENT_INVESTIGATION
 - [x] Consignment ownership: activate/receive with `owner_id`; consigned excluded from company ATP
 - [x] Cross-dock: `execute_cross_dock` outbound from inbound dest when `warehouse.crossdock`
 - [x] Directed putaway: `execute_directed_putaway` (rule / least-loaded / fixed)
+- [x] Packing workflow: `stock_package` + pack/confirm/done (+ cartonization creates real packages)
+- [x] Exception Ops queues: `inventory_exception` + bounded subscriptions + Inventory Ops panel
 
 ## Verify after publish
 

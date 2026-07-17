@@ -10,6 +10,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::core::organization::CompanyScopeParams;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
+use crate::inventory::packing::stock_package;
 use crate::inventory::product::product;
 use crate::inventory::stock::{
     assign_stock_picking, confirm_stock_picking, stock_move, stock_picking, StockMove,
@@ -866,8 +867,38 @@ pub fn run_cartonization(
         } else {
             0.0
         };
-        // Stable package key until a real package table exists.
-        let package_id = params.picking_id.saturating_mul(1000).saturating_add(idx as u64 + 1);
+        // Create a real draft→confirmed stock package for this carton.
+        let pkg = crate::inventory::packing::insert_stock_package(
+            ctx,
+            organization_id,
+            company_id,
+            crate::inventory::packing::CreateStockPackageParams {
+                name: format!("CARTON-{}-{}", params.picking_id, idx + 1),
+                packaging_material_id: Some(carton.material_id),
+                picking_id: Some(params.picking_id),
+                location_id: None,
+                location_dest_id: None,
+                weight: carton.used_weight,
+                volume: carton.used_volume,
+                shipping_weight: carton.used_weight,
+                metadata: Some(
+                    serde_json::json!({
+                        "from_cartonization": true,
+                        "carton_index": idx + 1,
+                    })
+                    .to_string(),
+                ),
+            },
+        )?;
+        let package_id = pkg.id;
+        ctx.db.stock_package().id().update(crate::inventory::packing::StockPackage {
+            move_ids: carton.move_ids.clone(),
+            state: "confirmed".to_string(),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..pkg
+        });
+
         let row = ctx.db.cartonization_result().insert(CartonizationResult {
             id: 0,
             organization_id,
@@ -886,6 +917,7 @@ pub fn run_cartonization(
                     "picking_id": params.picking_id,
                     "company_id": company_id,
                     "carton_index": idx + 1,
+                    "stock_package_id": package_id,
                 })
                 .to_string(),
             ),
@@ -896,6 +928,7 @@ pub fn run_cartonization(
             if let Some(mv) = ctx.db.stock_move().id().find(&move_id) {
                 ctx.db.stock_move().id().update(StockMove {
                     result_package_id: Some(package_id),
+                    package_id: Some(package_id),
                     write_uid: ctx.sender(),
                     write_date: ctx.timestamp,
                     ..mv
