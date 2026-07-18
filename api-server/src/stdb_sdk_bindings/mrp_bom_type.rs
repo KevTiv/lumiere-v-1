@@ -16,7 +16,7 @@ use super::bom_type_type::BomType;
 pub struct MrpBom {
     pub id: u64,
     pub organization_id: u64,
-    pub type: BomType,
+    pub r#type: BomType,
     pub product_id: u64,
     pub product_tmpl_id: u64,
     pub product_qty: f64,
@@ -56,7 +56,7 @@ impl __sdk::InModule for MrpBom {
 pub struct MrpBomCols {
     pub id: __sdk::__query_builder::Col<MrpBom, u64>,
     pub organization_id: __sdk::__query_builder::Col<MrpBom, u64>,
-    pub type: __sdk::__query_builder::Col<MrpBom, BomType>,
+    pub r#type: __sdk::__query_builder::Col<MrpBom, BomType>,
     pub product_id: __sdk::__query_builder::Col<MrpBom, u64>,
     pub product_tmpl_id: __sdk::__query_builder::Col<MrpBom, u64>,
     pub product_qty: __sdk::__query_builder::Col<MrpBom, f64>,
@@ -90,7 +90,7 @@ impl __sdk::__query_builder::HasCols for MrpBom {
         MrpBomCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
-            type: __sdk::__query_builder::Col::new(table_name, "type"),
+            r#type: __sdk::__query_builder::Col::new(table_name, "type"),
             product_id: __sdk::__query_builder::Col::new(table_name, "product_id"),
             product_tmpl_id: __sdk::__query_builder::Col::new(table_name, "product_tmpl_id"),
             product_qty: __sdk::__query_builder::Col::new(table_name, "product_qty"),

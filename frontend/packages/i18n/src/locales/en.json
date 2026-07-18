@@ -6936,6 +6936,18 @@
           "pricelistPlaceholder": "Select a pricelist",
           "partnerId": "Customer",
           "partnerIdPlaceholder": "Select a customer",
+          "billType": "Billing type",
+          "billTypes": {
+            "customer_task": "Billable by task",
+            "customer_project": "Billable by project",
+            "no": "Non-billable"
+          },
+          "pricingType": "Pricing type",
+          "pricingTypes": {
+            "task_rate": "Task rate",
+            "fixed_rate": "Fixed rate",
+            "employee_rate": "Employee rate"
+          },
           "allocatedHours": "Budget (hours)",
           "allocatedHoursPlaceholder": "0",
           "dateStart": "Start Date",
@@ -6984,6 +6996,18 @@
           "pricelistPlaceholder": "Select a pricelist",
           "partnerId": "Customer",
           "partnerIdPlaceholder": "Select a customer",
+          "billType": "Billing type",
+          "billTypes": {
+            "customer_task": "Billable by task",
+            "customer_project": "Billable by project",
+            "no": "Non-billable"
+          },
+          "pricingType": "Pricing type",
+          "pricingTypes": {
+            "task_rate": "Task rate",
+            "fixed_rate": "Fixed rate",
+            "employee_rate": "Employee rate"
+          },
           "allocatedHours": "Budget (hours)",
           "allocatedHoursPlaceholder": "0",
           "dateStart": "Start Date",
@@ -7037,12 +7061,25 @@
           "projectIdPlaceholder": "Select a project",
           "taskId": "Task",
           "taskIdPlaceholder": "Select a task",
+          "employeeId": "Employee",
+          "employeeIdPlaceholder": "Select an employee",
+          "currencyId": "Currency",
+          "currencyIdPlaceholder": "Select a currency",
           "date": "Date",
           "hours": "Hours",
           "hoursPlaceholder": "0",
+          "employeeCost": "Cost rate",
+          "employeeCostPlaceholder": "0",
+          "encodingUomId": "Unit of measure",
+          "encodingUomIdPlaceholder": "Select hours UOM",
+          "timesheetInvoiceType": "Invoice type",
+          "invoiceTypes": {
+            "billable": "Billable",
+            "non_billable": "Non-billable",
+            "timesheet_revenues": "Timesheet revenues"
+          },
           "description": "Description",
-          "descriptionPlaceholder": "What did you work on?",
-          "billable": "Billable"
+          "descriptionPlaceholder": "What did you work on?"
         }
       }
     }

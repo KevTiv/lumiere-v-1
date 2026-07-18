@@ -13,6 +13,8 @@ pub struct BillTimesheetsParams {
     pub income_account_id: u64,
     pub partner_id: u64,
     pub invoice_date: Option<__sdk::Timestamp>,
+    pub tax_ids: Vec<u64>,
+    pub fiscal_position_id: Option<u64>,
 }
 
 impl __sdk::InModule for BillTimesheetsParams {

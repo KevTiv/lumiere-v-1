@@ -19,7 +19,7 @@ pub struct AccountJournal {
     pub name: String,
     pub code: String,
     pub active: bool,
-    pub type: JournalType,
+    pub r#type: JournalType,
     pub company_id: u64,
     pub currency_id: Option::<u64>,
     pub default_account_id: Option::<u64>,
@@ -68,7 +68,7 @@ pub struct AccountJournalCols {
     pub name: __sdk::__query_builder::Col<AccountJournal, String>,
     pub code: __sdk::__query_builder::Col<AccountJournal, String>,
     pub active: __sdk::__query_builder::Col<AccountJournal, bool>,
-    pub type: __sdk::__query_builder::Col<AccountJournal, JournalType>,
+    pub r#type: __sdk::__query_builder::Col<AccountJournal, JournalType>,
     pub company_id: __sdk::__query_builder::Col<AccountJournal, u64>,
     pub currency_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
     pub default_account_id: __sdk::__query_builder::Col<AccountJournal, Option::<u64>>,
@@ -111,7 +111,7 @@ impl __sdk::__query_builder::HasCols for AccountJournal {
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             code: __sdk::__query_builder::Col::new(table_name, "code"),
             active: __sdk::__query_builder::Col::new(table_name, "active"),
-            type: __sdk::__query_builder::Col::new(table_name, "type"),
+            r#type: __sdk::__query_builder::Col::new(table_name, "type"),
             company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             currency_id: __sdk::__query_builder::Col::new(table_name, "currency_id"),
             default_account_id: __sdk::__query_builder::Col::new(table_name, "default_account_id"),
@@ -155,7 +155,7 @@ pub struct AccountJournalIxCols {
     pub company_id: __sdk::__query_builder::IxCol<AccountJournal, u64>,
     pub id: __sdk::__query_builder::IxCol<AccountJournal, u64>,
     pub organization_id: __sdk::__query_builder::IxCol<AccountJournal, u64>,
-    pub type: __sdk::__query_builder::IxCol<AccountJournal, JournalType>,
+    pub r#type: __sdk::__query_builder::IxCol<AccountJournal, JournalType>,
 }
 
 impl __sdk::__query_builder::HasIxCols for AccountJournal {
@@ -165,7 +165,7 @@ impl __sdk::__query_builder::HasIxCols for AccountJournal {
             company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
-            type: __sdk::__query_builder::IxCol::new(table_name, "type"),
+            r#type: __sdk::__query_builder::IxCol::new(table_name, "type"),
 
         }
     }

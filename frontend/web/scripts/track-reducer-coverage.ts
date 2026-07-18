@@ -741,7 +741,8 @@ function categorizeByModule(reducerName: string): string {
 
     create_project: 'projects',
     update_project: 'projects',
-    delete_project: 'projects',
+    // Soft-archive is set_project_active(active=false) — no delete_project / archive_project
+    set_project_active: 'projects',
     set_project_: 'projects',
     toggle_project_: 'projects',
     create_task: 'projects',
@@ -754,11 +755,10 @@ function categorizeByModule(reducerName: string): string {
     validate_timesheets: 'projects',
     start_timesheet_timer: 'projects',
     stop_timesheet_timer: 'projects',
-    delete_task: 'projects',
-    archive_project: 'projects',
-    unarchive_project: 'projects',
-    duplicate_project: 'projects',
-    set_project_template: 'projects',
+    create_project_rate_card: 'projects',
+    update_project_rate_card: 'projects',
+    create_project_rate_card_line: 'projects',
+    update_project_rate_card_line: 'projects',
 
     create_mrp_: 'manufacturing',
     update_mrp_: 'manufacturing',

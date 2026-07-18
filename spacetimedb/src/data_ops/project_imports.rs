@@ -67,6 +67,7 @@ pub fn import_project_csv(
             allow_material: false,
             allow_worksheets: false,
             allow_forecast: false,
+            allow_wip_je: false,
             bill_type: {
                 let v = col(&headers, row, "bill_type");
                 if v.is_empty() {
@@ -190,6 +191,8 @@ pub fn import_task_csv(
             project_id: opt_u64(col(&headers, row, "project_id")),
             user_ids: vec![],
             milestone_id: None,
+            wbs_code: col(&headers, row, "wbs_code").to_string(),
+            wbs_level: parse_u32(col(&headers, row, "wbs_level")),
             planned_hours: parse_f64(col(&headers, row, "planned_hours")),
             total_hours_spent: 0.0,
             effective_hours: 0.0,
@@ -287,6 +290,50 @@ pub fn import_timesheet_csv(
         let date = opt_timestamp(col(&headers, row, "date")).unwrap_or(ctx.timestamp);
         let unit_amount = parse_f64(col(&headers, row, "unit_amount"));
 
+        // Draft-only import policy — reject validated/billed CSV rows
+        let status_col = col(&headers, row, "validation_status");
+        if !status_col.is_empty()
+            && status_col != "draft"
+            && status_col != "0"
+        {
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("validation_status"),
+                Some(status_col),
+                "timesheet import is draft-only; validated/billed rows are rejected",
+            );
+            errors += 1;
+            continue;
+        }
+        if opt_u64(col(&headers, row, "timesheet_invoice_id")).is_some() {
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("timesheet_invoice_id"),
+                None,
+                "cannot import billed timesheets",
+            );
+            errors += 1;
+            continue;
+        }
+
+        let employee_cost = parse_f64(col(&headers, row, "employee_cost"));
+        let sell_rate_raw = parse_f64(col(&headers, row, "sell_rate"));
+        let sell_rate = if sell_rate_raw > 0.0 {
+            sell_rate_raw
+        } else {
+            employee_cost
+        };
+        let amount = if unit_amount > 0.0 {
+            unit_amount * employee_cost
+        } else {
+            parse_f64(col(&headers, row, "amount"))
+        };
+        let timesheet_revenue = unit_amount * sell_rate;
+
         ctx.db.project_timesheet().insert(ProjectTimesheet {
             id: 0,
             organization_id,
@@ -297,7 +344,7 @@ pub fn import_timesheet_csv(
             user_id: ctx.sender(),
             date,
             unit_amount,
-            amount: parse_f64(col(&headers, row, "amount")),
+            amount,
             product_id: opt_u64(col(&headers, row, "product_id")),
             product_uom_id: opt_u64(col(&headers, row, "product_uom_id")),
             account_id: opt_u64(col(&headers, row, "account_id")),
@@ -306,10 +353,15 @@ pub fn import_timesheet_csv(
             is_timer_running: false,
             timer_start: None,
             timer_pause: None,
-            employee_cost: parse_f64(col(&headers, row, "employee_cost")),
+            employee_cost,
+            sell_rate,
             timesheet_invoice_type: "non_billable".to_string(),
             timesheet_invoice_id: None,
-            timesheet_revenue: 0.0,
+            timesheet_revenue,
+            currency_rate: 0.0,
+            company_currency_id: 0,
+            amount_company: 0.0,
+            timesheet_revenue_company: 0.0,
             so_line: None,
             encoding_uom_id,
             validation_status: "draft".to_string(),

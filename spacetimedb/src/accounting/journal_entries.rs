@@ -11,6 +11,7 @@ use crate::accounting::budgeting::{
 };
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::accounting::tax_management::account_tax;
 use crate::core::organization::{company, company_id_from_scope};
 use crate::crm::contacts::contact;
 use crate::helpers::{
@@ -18,7 +19,12 @@ use crate::helpers::{
 };
 use crate::inventory::product::product;
 use crate::inventory::stock::stock_quant;
-use crate::projects::timesheets::{project_timesheet, ProjectTimesheet};
+use crate::projects::milestones::{project_milestone, ProjectMilestone};
+use crate::projects::project_accounting::refresh_project_margin_for_projects;
+use crate::projects::projects::project_project;
+use crate::projects::timesheets::{
+    ensure_timesheet_fx_snapshot, project_timesheet, ProjectTimesheet,
+};
 use crate::purchasing::purchase_orders::{
     purchase_order, purchase_order_line, validate_three_way_match_po_lines,
     DEFAULT_QTY_MATCH_TOLERANCE,
@@ -26,7 +32,7 @@ use crate::purchasing::purchase_orders::{
 use crate::sales::sales_core::{sale_order, sale_order_line, SaleOrderLine};
 use crate::types::{
     AccountMoveState, BudgetState, InvoiceStatus, LineInvoiceStatus, MoveType, PaymentState,
-    PoInvoiceStatus,
+    PoInvoiceStatus, TaxTypeUse,
 };
 use crate::workflow::approval_gate::gate_action_with_approval;
 
@@ -323,6 +329,24 @@ pub struct BillTimesheetsParams {
     pub income_account_id: u64,
     pub partner_id: u64,
     pub invoice_date: Option<Timestamp>,
+    /// Sale tax IDs for services invoice lines. When empty, the first active
+    /// company Sale tax (e.g. country-pack GST/VAT) is applied if present.
+    pub tax_ids: Vec<u64>,
+    pub fiscal_position_id: Option<u64>,
+}
+
+/// Parameters for fixed-fee / milestone AR billing (extends same OutInvoice path).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct BillProjectMilestoneParams {
+    /// Override amount; when None uses milestone.bill_amount × percent_complete/100.
+    pub amount: Option<f64>,
+    pub percent_complete: Option<f64>,
+    pub journal_id: u64,
+    pub income_account_id: u64,
+    pub partner_id: Option<u64>,
+    pub invoice_date: Option<Timestamp>,
+    pub tax_ids: Vec<u64>,
+    pub fiscal_position_id: Option<u64>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -2779,11 +2803,43 @@ pub fn reconcile_payment_with_invoice(
     Ok(())
 }
 
+/// Resolve sale tax IDs for T&M timesheet billing.
+/// Explicit `tax_ids` win; otherwise the lowest-sequence active Sale tax for the company
+/// (typically country-pack GST/VAT) is used so a non-zero tax path is available when configured.
+fn resolve_timesheet_bill_tax_ids(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    explicit: &[u64],
+) -> Vec<u64> {
+    if !explicit.is_empty() {
+        return explicit.to_vec();
+    }
+    let mut sale_taxes: Vec<_> = ctx
+        .db
+        .account_tax()
+        .tax_by_company()
+        .filter(&company_id)
+        .filter(|t| {
+            t.organization_id == organization_id
+                && t.active
+                && t.type_tax_use == TaxTypeUse::Sale
+        })
+        .collect();
+    sale_taxes.sort_by_key(|t| t.sequence);
+    sale_taxes
+        .into_iter()
+        .next()
+        .map(|t| vec![t.id])
+        .unwrap_or_default()
+}
+
 /// Create a customer invoice from validated billable timesheets.
 ///
 /// Validates each timesheet (must be validated, billable, not yet invoiced),
-/// creates an OutInvoice AccountMove with one line per timesheet, then marks
-/// each timesheet with the resulting invoice id.
+/// creates an OutInvoice AccountMove with one line per timesheet priced from
+/// `sell_rate`, applies sale tax, enforces an open accounting period, then marks
+/// each timesheet with the resulting invoice id in the same transaction.
 #[spacetimedb::reducer]
 pub fn bill_timesheets(
     ctx: &ReducerContext,
@@ -2799,6 +2855,7 @@ pub fn bill_timesheets(
     }
 
     let inv_date = params.invoice_date.unwrap_or(ctx.timestamp);
+    ensure_accounting_period_open_for_date(ctx, company_id, inv_date)?;
 
     // Fetch and validate all timesheets upfront
     let mut billable_sheets: Vec<ProjectTimesheet> = Vec::new();
@@ -2827,12 +2884,48 @@ pub fn bill_timesheets(
         if ts.timesheet_invoice_id.is_some() {
             return Err(format!("Timesheet {} is already invoiced", ts_id));
         }
+        // Snapshot FX at bill if validate did not (e.g. legacy rows)
+        let ts = ensure_timesheet_fx_snapshot(ctx, organization_id, ts)?;
         billable_sheets.push(ts);
     }
 
-    let amount_untaxed: f64 = billable_sheets.iter().map(|ts| ts.amount).sum();
     // billable_sheets is guaranteed non-empty (checked above)
     let currency_id = billable_sheets[0].currency_id;
+    if billable_sheets
+        .iter()
+        .any(|ts| ts.currency_id != currency_id)
+    {
+        return Err(
+            "Mixed currencies across timesheet batch are not supported; bill separately per currency"
+                .to_string(),
+        );
+    }
+
+    let tax_ids = resolve_timesheet_bill_tax_ids(
+        ctx,
+        organization_id,
+        company_id,
+        &params.tax_ids,
+    );
+
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+
+    let mut amount_untaxed = 0.0f64;
+    let mut amount_tax = 0.0f64;
+    let mut line_amounts: Vec<(f64, f64)> = Vec::with_capacity(billable_sheets.len());
+    for ts in &billable_sheets {
+        let line_untaxed = ts.unit_amount * ts.sell_rate;
+        let line_tax = calculate_tax(ctx, &tax_ids, line_untaxed);
+        amount_untaxed += line_untaxed;
+        amount_tax += line_tax;
+        line_amounts.push((line_untaxed, line_tax));
+    }
+    let amount_total = amount_untaxed + amount_tax;
 
     let move_row = ctx.db.account_move().insert(AccountMove {
         id: 0,
@@ -2855,7 +2948,7 @@ pub fn bill_timesheets(
         partner_id: Some(params.partner_id),
         commercial_partner_id: Some(params.partner_id),
         partner_bank_id: None,
-        fiscal_position_id: None,
+        fiscal_position_id: params.fiscal_position_id,
         invoice_user_id: Some(ctx.sender()),
         invoice_incoterm_id: None,
         incoterm_location: None,
@@ -2865,16 +2958,16 @@ pub fn bill_timesheets(
         company_id,
         journal_id: params.journal_id,
         currency_id,
-        company_currency_id: currency_id,
+        company_currency_id: company.currency_id,
         amount_untaxed,
-        amount_tax: 0.0,
-        amount_total: amount_untaxed,
-        amount_residual: amount_untaxed,
+        amount_tax,
+        amount_total,
+        amount_residual: amount_total,
         amount_untaxed_signed: amount_untaxed,
-        amount_tax_signed: 0.0,
-        amount_total_signed: amount_untaxed,
-        amount_total_in_currency_signed: amount_untaxed,
-        amount_residual_signed: amount_untaxed,
+        amount_tax_signed: amount_tax,
+        amount_total_signed: amount_total,
+        amount_total_in_currency_signed: amount_total,
+        amount_residual_signed: amount_total,
         to_check: false,
         posted_before: false,
         is_storno: false,
@@ -2892,8 +2985,10 @@ pub fn bill_timesheets(
 
     let move_id = move_row.id;
 
-    // One AccountMoveLine per timesheet entry
+    // One AccountMoveLine per timesheet entry — priced from sell_rate (not cost)
     for (seq, ts) in billable_sheets.iter().enumerate() {
+        let (line_untaxed, line_tax) = line_amounts[seq];
+        let price_total = line_untaxed + line_tax;
         ctx.db.account_move_line().insert(AccountMoveLine {
             id: 0,
             organization_id,
@@ -2904,25 +2999,25 @@ pub fn bill_timesheets(
             parent_state: AccountMoveState::Draft,
             journal_id: params.journal_id,
             company_id,
-            company_currency_id: ts.currency_id,
+            company_currency_id: company.currency_id,
             sequence: (seq + 1) as u32,
             name: ts.name.clone(),
             quantity: ts.unit_amount,
-            price_unit: ts.employee_cost,
-            price: ts.amount,
-            price_subtotal: ts.amount,
-            price_total: ts.amount,
+            price_unit: ts.sell_rate,
+            price: line_untaxed,
+            price_subtotal: line_untaxed,
+            price_total,
             discount: 0.0,
-            balance: ts.amount,
+            balance: line_untaxed,
             currency_id: ts.currency_id,
-            amount_currency: ts.amount,
-            amount_residual: ts.amount,
-            amount_residual_currency: ts.amount,
-            debit: ts.amount,
+            amount_currency: line_untaxed,
+            amount_residual: line_untaxed,
+            amount_residual_currency: line_untaxed,
+            debit: line_untaxed,
             credit: 0.0,
-            debit_currency: ts.amount,
+            debit_currency: line_untaxed,
             credit_currency: 0.0,
-            tax_base_amount: 0.0,
+            tax_base_amount: line_untaxed,
             account_id: params.income_account_id,
             account_internal_type: None,
             account_internal_group: None,
@@ -2930,7 +3025,7 @@ pub fn bill_timesheets(
             group_tax_id: None,
             tax_line_id: None,
             tax_group_id: None,
-            tax_ids: vec![],
+            tax_ids: tax_ids.clone(),
             tax_repartition_line_id: None,
             tax_audit: None,
             partner_id: Some(params.partner_id),
@@ -2964,8 +3059,10 @@ pub fn bill_timesheets(
         });
     }
 
-    // Mark each timesheet as invoiced
+    // Mark each timesheet as invoiced (atomic with move create)
+    let mut project_ids: Vec<u64> = Vec::new();
     for ts in billable_sheets {
+        project_ids.push(ts.project_id);
         ctx.db.project_timesheet().id().update(ProjectTimesheet {
             timesheet_invoice_id: Some(move_id),
             write_uid: ctx.sender(),
@@ -2988,19 +3085,309 @@ pub fn bill_timesheets(
                     "move_type": "OutInvoice",
                     "timesheet_count": params.timesheet_ids.len(),
                     "amount_untaxed": amount_untaxed,
+                    "amount_tax": amount_tax,
+                    "amount_total": amount_total,
+                    "currency_id": currency_id,
+                    "tax_ids": tax_ids,
                 })
                 .to_string(),
             ),
-            changed_fields: vec![],
+            changed_fields: vec![
+                "amount_untaxed".to_string(),
+                "amount_tax".to_string(),
+                "amount_total".to_string(),
+                "timesheet_invoice_id".to_string(),
+            ],
             metadata: None,
         },
     );
 
+    refresh_project_margin_for_projects(ctx, organization_id, company_id, project_ids);
+
     log::info!(
-        "Created invoice {} from {} timesheets (total: {})",
+        "Created invoice {} from {} timesheets (untaxed: {}, tax: {}, total: {})",
         move_id,
         params.timesheet_ids.len(),
-        amount_untaxed
+        amount_untaxed,
+        amount_tax,
+        amount_total
+    );
+    Ok(())
+}
+
+/// Create a draft OutInvoice from a project milestone (fixed-fee / % complete).
+/// Reuses period lock + tax patterns from `bill_timesheets`; does not fork AR.
+#[spacetimedb::reducer]
+pub fn bill_project_milestone(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    milestone_id: u64,
+    params: BillProjectMilestoneParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "create")?;
+    let _ = company_id_from_scope(ctx, organization_id, Some(company_id))?;
+
+    let milestone = ctx
+        .db
+        .project_milestone()
+        .id()
+        .find(&milestone_id)
+        .ok_or("Milestone not found")?;
+    if milestone.organization_id != organization_id {
+        return Err("Milestone does not belong to this organization".to_string());
+    }
+    if milestone.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+    if milestone.invoice_move_id.is_some() {
+        return Err("Milestone is already billed".to_string());
+    }
+    if !milestone.active {
+        return Err("Milestone is inactive".to_string());
+    }
+
+    let project = ctx
+        .db
+        .project_project()
+        .id()
+        .find(&milestone.project_id)
+        .ok_or("Project not found")?;
+    if project.company_id != company_id {
+        return Err("Project does not belong to this company".to_string());
+    }
+
+    let percent = params
+        .percent_complete
+        .unwrap_or(if milestone.percent_complete > 0.0 {
+            milestone.percent_complete
+        } else {
+            100.0
+        });
+    if percent <= 0.0 || percent > 100.0 {
+        return Err("percent_complete must be between 0 and 100".to_string());
+    }
+
+    let amount_untaxed = match params.amount {
+        Some(a) if a > 0.0 => a,
+        Some(_) => return Err("amount must be positive".to_string()),
+        None => {
+            if milestone.bill_amount <= 0.0 {
+                return Err(
+                    "Milestone bill_amount must be set (or pass amount in params)".to_string(),
+                );
+            }
+            milestone.bill_amount * (percent / 100.0)
+        }
+    };
+
+    let partner_id = params
+        .partner_id
+        .or(project.partner_id)
+        .ok_or("Milestone bill requires partner_id (project or params)")?;
+
+    let inv_date = params.invoice_date.unwrap_or(ctx.timestamp);
+    ensure_accounting_period_open_for_date(ctx, company_id, inv_date)?;
+
+    let tax_ids = resolve_timesheet_bill_tax_ids(
+        ctx,
+        organization_id,
+        company_id,
+        &params.tax_ids,
+    );
+    let amount_tax = calculate_tax(ctx, &tax_ids, amount_untaxed);
+    let amount_total = amount_untaxed + amount_tax;
+
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+
+    let move_row = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        organization_id,
+        name: String::new(),
+        ref_: Some(format!("MS-{}", milestone.id)),
+        move_type: MoveType::OutInvoice,
+        auto_post: false,
+        state: AccountMoveState::Draft,
+        date: inv_date,
+        invoice_date: Some(inv_date),
+        invoice_date_due: None,
+        invoice_payment_term_id: None,
+        invoice_origin: Some(format!("Milestone: {}", milestone.name)),
+        invoice_partner_display_name: None,
+        invoice_cash_rounding_id: None,
+        payment_reference: None,
+        partner_shipping_id: None,
+        sale_order_id: None,
+        partner_id: Some(partner_id),
+        commercial_partner_id: Some(partner_id),
+        partner_bank_id: None,
+        fiscal_position_id: params.fiscal_position_id,
+        invoice_user_id: Some(ctx.sender()),
+        invoice_incoterm_id: None,
+        incoterm_location: None,
+        campaign_id: None,
+        source_id: None,
+        medium_id: None,
+        company_id,
+        journal_id: params.journal_id,
+        currency_id: project.currency_id,
+        company_currency_id: company.currency_id,
+        amount_untaxed,
+        amount_tax,
+        amount_total,
+        amount_residual: amount_total,
+        amount_untaxed_signed: amount_untaxed,
+        amount_tax_signed: amount_tax,
+        amount_total_signed: amount_total,
+        amount_total_in_currency_signed: amount_total,
+        amount_residual_signed: amount_total,
+        to_check: false,
+        posted_before: false,
+        is_storno: false,
+        is_move_sent: false,
+        secure_sequence_number: None,
+        invoice_has_outstanding: false,
+        payment_state: PaymentState::NotPaid,
+        restrict_mode_hash_table: false,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some(
+            serde_json::json!({
+                "kind": "project_milestone_bill",
+                "milestone_id": milestone_id,
+                "project_id": milestone.project_id,
+                "percent_complete": percent,
+            })
+            .to_string(),
+        ),
+    });
+    let move_id = move_row.id;
+
+    let price_total = amount_untaxed + amount_tax;
+    ctx.db.account_move_line().insert(AccountMoveLine {
+        id: 0,
+        organization_id,
+        move_id,
+        move_name: None,
+        date: inv_date,
+        ref_: None,
+        parent_state: AccountMoveState::Draft,
+        journal_id: params.journal_id,
+        company_id,
+        company_currency_id: company.currency_id,
+        sequence: 1,
+        name: format!("{} ({:.0}%)", milestone.name, percent),
+        quantity: 1.0,
+        price_unit: amount_untaxed,
+        price: amount_untaxed,
+        price_subtotal: amount_untaxed,
+        price_total,
+        discount: 0.0,
+        balance: amount_untaxed,
+        currency_id: project.currency_id,
+        amount_currency: amount_untaxed,
+        amount_residual: amount_untaxed,
+        amount_residual_currency: amount_untaxed,
+        debit: amount_untaxed,
+        credit: 0.0,
+        debit_currency: amount_untaxed,
+        credit_currency: 0.0,
+        tax_base_amount: amount_untaxed,
+        account_id: params.income_account_id,
+        account_internal_type: None,
+        account_internal_group: None,
+        account_root_id: None,
+        group_tax_id: None,
+        tax_line_id: None,
+        tax_group_id: None,
+        tax_ids: tax_ids.clone(),
+        tax_repartition_line_id: None,
+        tax_audit: None,
+        partner_id: Some(partner_id),
+        commercial_partner_id: Some(partner_id),
+        reconcile_model_id: None,
+        payment_id: None,
+        statement_line_id: None,
+        currency_id_field: None,
+        blocked: false,
+        matching_number: None,
+        matching_label: None,
+        is_matching: false,
+        expected_pay_date: None,
+        expected_pay_date_currency_id: None,
+        expected_pay_date_amount: 0.0,
+        expected_pay_date_residual: 0.0,
+        display_type: None,
+        is_downpayment: false,
+        exclude_from_invoice_tab: false,
+        analytic_account_id: project.analytic_account_id,
+        analytic_tag_ids: vec![],
+        product_id: None,
+        product_uom_id: None,
+        product_category_id: None,
+        cogs_amount: 0.0,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: None,
+    });
+
+    let project_id = milestone.project_id;
+    ctx.db.project_milestone().id().update(ProjectMilestone {
+        invoice_move_id: Some(move_id),
+        billed_amount: amount_untaxed,
+        percent_complete: percent,
+        is_reached: true,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..milestone
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_move",
+            record_id: move_id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "move_type": "OutInvoice",
+                    "kind": "project_milestone_bill",
+                    "milestone_id": milestone_id,
+                    "amount_untaxed": amount_untaxed,
+                    "amount_tax": amount_tax,
+                    "percent_complete": percent,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "amount_untaxed".to_string(),
+                "amount_tax".to_string(),
+                "milestone_invoice".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    refresh_project_margin_for_projects(ctx, organization_id, company_id, [project_id]);
+
+    log::info!(
+        "Created milestone invoice {} for milestone {} (untaxed: {}, tax: {})",
+        move_id,
+        milestone_id,
+        amount_untaxed,
+        amount_tax
     );
     Ok(())
 }

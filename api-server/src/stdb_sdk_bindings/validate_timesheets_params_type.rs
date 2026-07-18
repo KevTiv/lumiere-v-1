@@ -9,6 +9,9 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct ValidateTimesheetsParams {
     pub company_id: Option<u64>,
     pub timesheet_ids: Vec<u64>,
+    pub wip_journal_id: Option<u64>,
+    pub wip_account_id: Option<u64>,
+    pub wip_labor_account_id: Option<u64>,
 }
 
 impl __sdk::InModule for ValidateTimesheetsParams {

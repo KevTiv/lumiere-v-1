@@ -111,6 +111,10 @@ pub mod expenses_tests;
 #[path = "../tests/subscriptions/mod.rs"]
 pub mod subscriptions_tests;
 
+/// Projects / PSA domain tests — call `run_all_projects_tests` reducer to execute.
+#[path = "../tests/projects/mod.rs"]
+pub mod projects_tests;
+
 /// Platform module smoke tests — helpdesk, HR, manufacturing, documents, workflow, subscriptions.
 #[path = "../tests/platform/mod.rs"]
 pub mod platform_tests;
@@ -141,6 +145,7 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
     expenses_tests::run_all_expenses_tests(ctx).map_err(|e| format!("expenses: {e}"))?;
     subscriptions_tests::run_all_subscriptions_tests(ctx)
         .map_err(|e| format!("subscriptions: {e}"))?;
+    projects_tests::run_all_projects_tests(ctx).map_err(|e| format!("projects: {e}"))?;
     platform_tests::run_all_platform_tests(ctx).map_err(|e| format!("platform: {e}"))?;
     log::info!("✅ run_all_domain_tests complete");
     Ok(())

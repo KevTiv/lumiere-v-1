@@ -87,6 +87,7 @@ pub mod append_crm_conversation_message_params_type;
 pub mod apply_expense_advance_params_type;
 pub mod apply_index_linked_renewal_params_type;
 pub mod apply_omnichannel_allocation_params_type;
+pub mod apply_project_change_order_params_type;
 pub mod apply_sale_promotion_params_type;
 pub mod apply_subscription_bundle_params_type;
 pub mod apply_subscription_invoice_payment_params_type;
@@ -110,6 +111,7 @@ pub mod barcode_nomenclature_type;
 pub mod barcode_rule_type;
 pub mod barcode_scan_type;
 pub mod batch_state_type;
+pub mod bill_project_milestone_params_type;
 pub mod bill_timesheets_params_type;
 pub mod billing_account_type;
 pub mod bom_explosion_result_type;
@@ -121,6 +123,7 @@ pub mod budget_state_type;
 pub mod calendar_event_type;
 pub mod cancel_intercompany_transaction_params_type;
 pub mod cancel_subscription_params_type;
+pub mod capacity_forecast_snapshot_type;
 pub mod card_state_type;
 pub mod cartonization_result_type;
 pub mod casbin_rule_type;
@@ -253,6 +256,8 @@ pub mod create_form_field_params_type;
 pub mod create_helpdesk_sla_params_type;
 pub mod create_helpdesk_stage_params_type;
 pub mod create_helpdesk_team_params_type;
+pub mod create_hr_employee_skill_params_type;
+pub mod create_hr_skill_params_type;
 pub mod create_incoterm_params_type;
 pub mod create_intercompany_rule_params_type;
 pub mod create_intercompany_transaction_params_type;
@@ -304,7 +309,15 @@ pub mod create_product_packaging_params_type;
 pub mod create_product_params_type;
 pub mod create_product_supplier_info_params_type;
 pub mod create_product_variant_params_type;
+pub mod create_project_change_order_params_type;
+pub mod create_project_integration_intent_params_type;
+pub mod create_project_milestone_params_type;
 pub mod create_project_params_type;
+pub mod create_project_rate_card_line_params_type;
+pub mod create_project_rate_card_params_type;
+pub mod create_project_revenue_line_params_type;
+pub mod create_project_revenue_schedule_params_type;
+pub mod create_public_holiday_params_type;
 pub mod create_purchase_blanket_order_params_type;
 pub mod create_purchase_contract_params_type;
 pub mod create_purchase_order_params_type;
@@ -323,6 +336,7 @@ pub mod create_quality_point_params_type;
 pub mod create_quality_team_params_type;
 pub mod create_replenishment_rule_params_type;
 pub mod create_report_template_params_type;
+pub mod create_resource_allocation_params_type;
 pub mod create_return_order_line_params_type;
 pub mod create_return_order_params_type;
 pub mod create_revenue_recognition_rule_params_type;
@@ -385,6 +399,7 @@ pub mod create_whats_app_business_account_params_type;
 pub mod create_workcenter_params_type;
 pub mod create_workcenter_productivity_params_type;
 pub mod create_workflow_params_type;
+pub mod create_working_calendar_params_type;
 pub mod create_workorder_params_type;
 pub mod crm_conversation_type;
 pub mod crm_conversation_message_type;
@@ -431,6 +446,7 @@ pub mod expense_sheet_state_type;
 pub mod expense_state_type;
 pub mod export_financial_report_params_type;
 pub mod fail_expense_integration_intent_params_type;
+pub mod fail_project_integration_intent_params_type;
 pub mod fail_subscription_payment_intent_params_type;
 pub mod fail_warehouse_sync_intent_params_type;
 pub mod field_option_type;
@@ -461,6 +477,7 @@ pub mod helpdesk_ticket_state_type;
 pub mod hr_contract_type;
 pub mod hr_department_type;
 pub mod hr_employee_type;
+pub mod hr_employee_skill_type;
 pub mod hr_expense_type;
 pub mod hr_expense_advance_type;
 pub mod hr_expense_advance_application_type;
@@ -478,6 +495,7 @@ pub mod hr_payroll_structure_type;
 pub mod hr_payslip_type;
 pub mod hr_resource_type;
 pub mod hr_salary_rule_type;
+pub mod hr_skill_type;
 pub mod import_job_type;
 pub mod import_job_error_type;
 pub mod import_job_record_type;
@@ -517,6 +535,7 @@ pub mod lead_score_factor_type;
 pub mod lead_source_type;
 pub mod line_invoice_status_type;
 pub mod line_state_type;
+pub mod link_subcontractor_cost_params_type;
 pub mod log_audit_event_params_type;
 pub mod log_timesheet_params_type;
 pub mod mail_follower_type;
@@ -611,9 +630,21 @@ pub mod product_pricelist_item_type;
 pub mod product_supplier_info_type;
 pub mod product_variant_type;
 pub mod profit_loss_line_type;
+pub mod project_baseline_type;
+pub mod project_change_order_type;
+pub mod project_earned_value_snapshot_type;
+pub mod project_integration_intent_type;
+pub mod project_margin_snapshot_type;
+pub mod project_milestone_type;
 pub mod project_project_type;
+pub mod project_rate_card_type;
+pub mod project_rate_card_line_type;
+pub mod project_revenue_line_type;
+pub mod project_revenue_schedule_type;
+pub mod project_subcontractor_cost_type;
 pub mod project_task_type;
 pub mod project_timesheet_type;
+pub mod project_timesheet_approval_type;
 pub mod proposal_type;
 pub mod proposal_comment_type;
 pub mod proposal_line_item_type;
@@ -622,6 +653,7 @@ pub mod proposal_section_type;
 pub mod proposal_source_doc_type;
 pub mod proposal_status_type;
 pub mod proposal_version_type;
+pub mod public_holiday_type;
 pub mod purchase_approval_delegate_type;
 pub mod purchase_blanket_order_type;
 pub mod purchase_contract_type;
@@ -648,6 +680,7 @@ pub mod rebase_deferred_schedules_params_type;
 pub mod receive_consignment_stock_params_type;
 pub mod recognize_amortization_line_params_type;
 pub mod recognize_deferred_revenue_params_type;
+pub mod recognize_project_revenue_params_type;
 pub mod reconcile_account_bank_statement_line_params_type;
 pub mod record_ai_skill_test_run_params_type;
 pub mod record_barcode_scan_params_type;
@@ -662,14 +695,20 @@ pub mod record_sales_integration_result_params_type;
 pub mod record_subscription_payment_failure_params_type;
 pub mod record_telemetry_params_type;
 pub mod record_whats_app_health_check_params_type;
+pub mod refresh_capacity_forecast_params_type;
 pub mod refresh_inventory_exceptions_params_type;
+pub mod refresh_project_earned_value_params_type;
+pub mod refresh_project_margin_params_type;
+pub mod refresh_resource_utilisation_params_type;
 pub mod refuse_expense_sheet_params_type;
 pub mod register_device_params_type;
 pub mod register_hub_params_type;
 pub mod register_queue_worker_params_type;
 pub mod reject_approval_request_params_type;
+pub mod reject_timesheets_params_type;
 pub mod release_blanket_to_po_params_type;
 pub mod renew_subscription_params_type;
+pub mod reopen_timesheets_params_type;
 pub mod replenishment_rule_type;
 pub mod report_state_type;
 pub mod report_template_type;
@@ -677,6 +716,9 @@ pub mod report_type_type;
 pub mod request_expense_policy_exception_params_type;
 pub mod requisition_state_type;
 pub mod res_partner_bank_type;
+pub mod resource_allocation_type;
+pub mod resource_capacity_snapshot_type;
+pub mod resource_utilisation_snapshot_type;
 pub mod resume_subscription_params_type;
 pub mod return_order_type;
 pub mod return_order_line_type;
@@ -708,6 +750,7 @@ pub mod scheduled_report_run_type;
 pub mod schema_migration_type;
 pub mod search_embedding_type;
 pub mod section_status_type;
+pub mod seed_pack_holidays_params_type;
 pub mod segment_member_type;
 pub mod segment_rule_clause_type;
 pub mod segment_rule_field_type;
@@ -844,6 +887,8 @@ pub mod update_expense_params_type;
 pub mod update_financial_report_params_type;
 pub mod update_fiscal_year_params_type;
 pub mod update_form_field_params_type;
+pub mod update_hr_employee_skill_params_type;
+pub mod update_hr_skill_params_type;
 pub mod update_intercompany_rule_params_type;
 pub mod update_job_position_params_type;
 pub mod update_knowledge_article_params_type;
@@ -873,14 +918,19 @@ pub mod update_product_params_type;
 pub mod update_product_pricing_params_type;
 pub mod update_product_supplier_info_params_type;
 pub mod update_product_variant_params_type;
+pub mod update_project_milestone_params_type;
 pub mod update_project_params_type;
+pub mod update_project_rate_card_line_params_type;
+pub mod update_project_rate_card_params_type;
 pub mod update_proposal_source_doc_params_type;
+pub mod update_public_holiday_params_type;
 pub mod update_purchase_order_line_params_type;
 pub mod update_purchase_order_params_type;
 pub mod update_quality_alert_reason_params_type;
 pub mod update_quality_point_params_type;
 pub mod update_quality_team_params_type;
 pub mod update_report_template_params_type;
+pub mod update_resource_allocation_params_type;
 pub mod update_role_params_type;
 pub mod update_sale_order_line_params_type;
 pub mod update_sale_order_option_params_type;
@@ -911,6 +961,7 @@ pub mod update_whats_app_credentials_params_type;
 pub mod update_whats_app_verification_params_type;
 pub mod update_widget_layout_params_type;
 pub mod update_workcenter_params_type;
+pub mod update_working_calendar_params_type;
 pub mod upsert_ai_skill_config_params_type;
 pub mod upsert_ai_skill_params_type;
 pub mod upsert_expense_mileage_rate_params_type;
@@ -949,6 +1000,7 @@ pub mod workflow_activity_type;
 pub mod workflow_instance_type;
 pub mod workflow_transition_type;
 pub mod workflow_workitem_type;
+pub mod working_calendar_type;
 pub mod workitem_state_type;
 pub mod workorder_state_type;
 pub mod zone_display_type_type;
@@ -998,6 +1050,9 @@ pub mod apply_landed_costs_reducer;
 pub mod apply_omnichannel_allocation_reducer;
 pub mod apply_org_migrations_reducer;
 pub mod apply_pending_expense_integration_intents_reducer;
+pub mod apply_pending_project_integration_intents_reducer;
+pub mod apply_project_change_order_reducer;
+pub mod apply_project_integration_intent_reducer;
 pub mod apply_reconciliation_rules_reducer;
 pub mod apply_sale_order_options_reducer;
 pub mod apply_sale_promotion_to_order_reducer;
@@ -1032,6 +1087,7 @@ pub mod assign_ticket_reducer;
 pub mod assign_user_to_picking_reducer;
 pub mod award_purchase_rfq_bid_reducer;
 pub mod backfill_external_ids_reducer;
+pub mod bill_project_milestone_reducer;
 pub mod bill_timesheets_reducer;
 pub mod block_serial_reducer;
 pub mod block_workcenter_reducer;
@@ -1196,6 +1252,8 @@ pub mod create_google_drive_connection_reducer;
 pub mod create_helpdesk_sla_reducer;
 pub mod create_helpdesk_stage_reducer;
 pub mod create_helpdesk_team_reducer;
+pub mod create_hr_employee_skill_reducer;
+pub mod create_hr_skill_reducer;
 pub mod create_incoterm_reducer;
 pub mod create_intercompany_rule_reducer;
 pub mod create_intercompany_transaction_reducer;
@@ -1251,7 +1309,15 @@ pub mod create_product_packaging_reducer;
 pub mod create_product_supplier_info_reducer;
 pub mod create_product_variant_reducer;
 pub mod create_project_reducer;
+pub mod create_project_change_order_reducer;
+pub mod create_project_integration_intent_reducer;
+pub mod create_project_milestone_reducer;
+pub mod create_project_rate_card_reducer;
+pub mod create_project_rate_card_line_reducer;
+pub mod create_project_revenue_line_reducer;
+pub mod create_project_revenue_schedule_reducer;
 pub mod create_proposal_reducer;
+pub mod create_public_holiday_reducer;
 pub mod create_purchase_blanket_order_reducer;
 pub mod create_purchase_contract_reducer;
 pub mod create_purchase_order_reducer;
@@ -1266,6 +1332,7 @@ pub mod create_quality_point_reducer;
 pub mod create_quality_team_reducer;
 pub mod create_replenishment_rule_reducer;
 pub mod create_report_template_reducer;
+pub mod create_resource_allocation_reducer;
 pub mod create_return_order_reducer;
 pub mod create_revenue_recognition_rule_reducer;
 pub mod create_role_reducer;
@@ -1325,6 +1392,7 @@ pub mod create_warehouse_task_reducer;
 pub mod create_whatsapp_business_account_reducer;
 pub mod create_workcenter_reducer;
 pub mod create_workflow_reducer;
+pub mod create_working_calendar_reducer;
 pub mod create_workorder_reducer;
 pub mod deactivate_pos_config_reducer;
 pub mod deactivate_revenue_recognition_rule_reducer;
@@ -1349,6 +1417,7 @@ pub mod delete_document_reducer;
 pub mod delete_financial_report_reducer;
 pub mod delete_fiscal_year_reducer;
 pub mod delete_form_field_reducer;
+pub mod delete_hr_employee_skill_reducer;
 pub mod delete_import_mapping_template_reducer;
 pub mod delete_integration_reducer;
 pub mod delete_intercompany_rule_reducer;
@@ -1365,6 +1434,7 @@ pub mod delete_pricelist_reducer;
 pub mod delete_pricelist_item_reducer;
 pub mod delete_product_reducer;
 pub mod delete_product_category_reducer;
+pub mod delete_project_milestone_reducer;
 pub mod delete_proposal_line_item_reducer;
 pub mod delete_proposal_section_reducer;
 pub mod delete_proposal_source_doc_reducer;
@@ -1372,6 +1442,7 @@ pub mod delete_quality_alert_reason_reducer;
 pub mod delete_quality_point_reducer;
 pub mod delete_quality_team_reducer;
 pub mod delete_record_custom_field_values_reducer;
+pub mod delete_resource_allocation_reducer;
 pub mod delete_sale_order_line_reducer;
 pub mod delete_sale_order_option_reducer;
 pub mod delete_saved_report_reducer;
@@ -1412,6 +1483,7 @@ pub mod explode_bom_reducer;
 pub mod export_financial_report_reducer;
 pub mod fail_expense_integration_intent_reducer;
 pub mod fail_iot_action_reducer;
+pub mod fail_project_integration_intent_reducer;
 pub mod fail_quality_check_reducer;
 pub mod fail_scheduled_owner_report_run_reducer;
 pub mod fail_subscription_payment_intent_reducer;
@@ -1497,6 +1569,7 @@ pub mod link_device_to_location_reducer;
 pub mod link_device_to_pos_reducer;
 pub mod link_device_to_quality_check_reducer;
 pub mod link_device_to_workcenter_reducer;
+pub mod link_subcontractor_cost_to_project_reducer;
 pub mod link_workos_user_reducer;
 pub mod lock_document_reducer;
 pub mod lock_knowledge_article_reducer;
@@ -1551,6 +1624,7 @@ pub mod receive_consignment_stock_reducer;
 pub mod receive_po_line_reducer;
 pub mod recognize_amortization_line_reducer;
 pub mod recognize_deferred_revenue_reducer;
+pub mod recognize_project_revenue_reducer;
 pub mod recompute_lead_score_reducer;
 pub mod recompute_relationship_insights_reducer;
 pub mod reconcile_account_bank_statement_line_reducer;
@@ -1575,8 +1649,13 @@ pub mod record_telemetry_reducer;
 pub mod record_telemetry_batch_reducer;
 pub mod record_whatsapp_health_check_reducer;
 pub mod record_whatsapp_message_sent_reducer;
+pub mod refresh_capacity_forecast_reducer;
 pub mod refresh_inventory_exceptions_reducer;
 pub mod refresh_policy_snapshot_reducer;
+pub mod refresh_project_earned_value_reducer;
+pub mod refresh_project_margin_reducer;
+pub mod refresh_resource_capacity_reducer;
+pub mod refresh_resource_utilisation_reducer;
 pub mod refresh_sale_order_promise_dates_reducer;
 pub mod refresh_subscription_exception_flags_reducer;
 pub mod refresh_tax_deadline_statuses_reducer;
@@ -1589,6 +1668,7 @@ pub mod register_queue_worker_reducer;
 pub mod reject_ai_action_draft_reducer;
 pub mod reject_approval_request_reducer;
 pub mod reject_supplier_intake_reducer;
+pub mod reject_timesheets_reducer;
 pub mod release_blanket_to_po_reducer;
 pub mod release_picking_wave_reducer;
 pub mod remove_article_member_reducer;
@@ -1601,6 +1681,7 @@ pub mod remove_user_from_organization_reducer;
 pub mod renew_subscription_reducer;
 pub mod reopen_inventory_close_reducer;
 pub mod reopen_ticket_reducer;
+pub mod reopen_timesheets_reducer;
 pub mod reorder_proposal_line_items_reducer;
 pub mod request_embedding_job_reducer;
 pub mod request_expense_policy_exception_reducer;
@@ -1641,6 +1722,7 @@ pub mod run_all_domain_tests_reducer;
 pub mod run_all_expenses_tests_reducer;
 pub mod run_all_inventory_tests_reducer;
 pub mod run_all_platform_tests_reducer;
+pub mod run_all_projects_tests_reducer;
 pub mod run_all_purchasing_tests_reducer;
 pub mod run_all_sales_tests_reducer;
 pub mod run_all_subscriptions_tests_reducer;
@@ -1699,6 +1781,10 @@ pub mod run_inventory_warehouse_sync_test_reducer;
 pub mod run_inventory_wave_release_test_reducer;
 pub mod run_manufacturing_workcenter_test_reducer;
 pub mod run_owner_report_schedule_reducer;
+pub mod run_projects_wave_a_test_reducer;
+pub mod run_projects_wave_c_test_reducer;
+pub mod run_projects_wave_d_test_reducer;
+pub mod run_projects_wave_e_test_reducer;
 pub mod run_purchasing_bill_balanced_test_reducer;
 pub mod run_purchasing_company_isolation_test_reducer;
 pub mod run_purchasing_incoming_picking_test_reducer;
@@ -1739,6 +1825,7 @@ pub mod schedule_sales_sla_escalation_reducer;
 pub mod schedule_tax_deadline_updates_reducer;
 pub mod seed_dev_data_reducer;
 pub mod seed_organization_form_configs_reducer;
+pub mod seed_pack_holidays_reducer;
 pub mod send_purchase_order_reducer;
 pub mod send_sale_order_quotation_reducer;
 pub mod set_ai_agent_active_reducer;
@@ -1860,6 +1947,8 @@ pub mod update_fiscal_year_reducer;
 pub mod update_form_field_reducer;
 pub mod update_google_drive_connection_reducer;
 pub mod update_google_drive_credentials_reducer;
+pub mod update_hr_employee_skill_reducer;
+pub mod update_hr_skill_reducer;
 pub mod update_hub_heartbeat_reducer;
 pub mod update_integration_status_reducer;
 pub mod update_intercompany_rule_reducer;
@@ -1900,17 +1989,22 @@ pub mod update_product_pricing_reducer;
 pub mod update_product_supplier_info_reducer;
 pub mod update_product_variant_reducer;
 pub mod update_project_reducer;
+pub mod update_project_milestone_reducer;
+pub mod update_project_rate_card_reducer;
+pub mod update_project_rate_card_line_reducer;
 pub mod update_proposal_reducer;
 pub mod update_proposal_line_item_reducer;
 pub mod update_proposal_presence_reducer;
 pub mod update_proposal_source_doc_reducer;
 pub mod update_proposal_status_reducer;
+pub mod update_public_holiday_reducer;
 pub mod update_purchase_order_reducer;
 pub mod update_purchase_order_line_reducer;
 pub mod update_quality_alert_reason_reducer;
 pub mod update_quality_point_reducer;
 pub mod update_quality_team_reducer;
 pub mod update_report_template_reducer;
+pub mod update_resource_allocation_reducer;
 pub mod update_role_reducer;
 pub mod update_sale_order_reducer;
 pub mod update_sale_order_line_reducer;
@@ -1949,6 +2043,7 @@ pub mod update_whatsapp_quality_score_reducer;
 pub mod update_whatsapp_verification_status_reducer;
 pub mod update_widget_layout_reducer;
 pub mod update_workcenter_reducer;
+pub mod update_working_calendar_reducer;
 pub mod upsert_ai_skill_reducer;
 pub mod upsert_ai_skill_config_reducer;
 pub mod upsert_expense_mileage_rate_reducer;
@@ -2036,6 +2131,7 @@ pub mod billing_account_table;
 pub mod bom_explosion_result_table;
 pub mod budget_post_table;
 pub mod calendar_event_table;
+pub mod capacity_forecast_snapshot_table;
 pub mod cartonization_result_table;
 pub mod casbin_rule_table;
 pub mod cash_flow_line_table;
@@ -2103,6 +2199,7 @@ pub mod helpdesk_ticket_table;
 pub mod hr_contract_table;
 pub mod hr_department_table;
 pub mod hr_employee_table;
+pub mod hr_employee_skill_table;
 pub mod hr_expense_table;
 pub mod hr_expense_advance_table;
 pub mod hr_expense_advance_application_table;
@@ -2118,6 +2215,7 @@ pub mod hr_payroll_structure_table;
 pub mod hr_payslip_table;
 pub mod hr_resource_table;
 pub mod hr_salary_rule_table;
+pub mod hr_skill_table;
 pub mod import_job_table;
 pub mod import_job_error_table;
 pub mod import_job_record_table;
@@ -2195,9 +2293,21 @@ pub mod product_pricelist_item_table;
 pub mod product_supplier_info_table;
 pub mod product_variant_table;
 pub mod profit_loss_line_table;
+pub mod project_baseline_table;
+pub mod project_change_order_table;
+pub mod project_earned_value_snapshot_table;
+pub mod project_integration_intent_table;
+pub mod project_margin_snapshot_table;
+pub mod project_milestone_table;
 pub mod project_project_table;
+pub mod project_rate_card_table;
+pub mod project_rate_card_line_table;
+pub mod project_revenue_line_table;
+pub mod project_revenue_schedule_table;
+pub mod project_subcontractor_cost_table;
 pub mod project_task_table;
 pub mod project_timesheet_table;
+pub mod project_timesheet_approval_table;
 pub mod proposal_table;
 pub mod proposal_comment_table;
 pub mod proposal_line_item_table;
@@ -2205,6 +2315,7 @@ pub mod proposal_presence_table;
 pub mod proposal_section_table;
 pub mod proposal_source_doc_table;
 pub mod proposal_version_table;
+pub mod public_holiday_table;
 pub mod purchase_approval_delegate_table;
 pub mod purchase_blanket_order_table;
 pub mod purchase_contract_table;
@@ -2229,6 +2340,9 @@ pub mod record_custom_field_value_table;
 pub mod replenishment_rule_table;
 pub mod report_template_table;
 pub mod res_partner_bank_table;
+pub mod resource_allocation_table;
+pub mod resource_capacity_snapshot_table;
+pub mod resource_utilisation_snapshot_table;
 pub mod return_order_table;
 pub mod return_order_line_table;
 pub mod revenue_recognition_rule_table;
@@ -2317,6 +2431,7 @@ pub mod workflow_activity_table;
 pub mod workflow_instance_table;
 pub mod workflow_transition_table;
 pub mod workflow_workitem_table;
+pub mod working_calendar_table;
 
 pub use accept_sale_order_quotation_params_type::AcceptSaleOrderQuotationParams;
 pub use account_account_type::AccountAccount;
@@ -2394,6 +2509,7 @@ pub use append_crm_conversation_message_params_type::AppendCrmConversationMessag
 pub use apply_expense_advance_params_type::ApplyExpenseAdvanceParams;
 pub use apply_index_linked_renewal_params_type::ApplyIndexLinkedRenewalParams;
 pub use apply_omnichannel_allocation_params_type::ApplyOmnichannelAllocationParams;
+pub use apply_project_change_order_params_type::ApplyProjectChangeOrderParams;
 pub use apply_sale_promotion_params_type::ApplySalePromotionParams;
 pub use apply_subscription_bundle_params_type::ApplySubscriptionBundleParams;
 pub use apply_subscription_invoice_payment_params_type::ApplySubscriptionInvoicePaymentParams;
@@ -2417,6 +2533,7 @@ pub use barcode_nomenclature_type::BarcodeNomenclature;
 pub use barcode_rule_type::BarcodeRule;
 pub use barcode_scan_type::BarcodeScan;
 pub use batch_state_type::BatchState;
+pub use bill_project_milestone_params_type::BillProjectMilestoneParams;
 pub use bill_timesheets_params_type::BillTimesheetsParams;
 pub use billing_account_type::BillingAccount;
 pub use bom_explosion_result_type::BomExplosionResult;
@@ -2428,6 +2545,7 @@ pub use budget_state_type::BudgetState;
 pub use calendar_event_type::CalendarEvent;
 pub use cancel_intercompany_transaction_params_type::CancelIntercompanyTransactionParams;
 pub use cancel_subscription_params_type::CancelSubscriptionParams;
+pub use capacity_forecast_snapshot_type::CapacityForecastSnapshot;
 pub use card_state_type::CardState;
 pub use cartonization_result_type::CartonizationResult;
 pub use casbin_rule_type::CasbinRule;
@@ -2560,6 +2678,8 @@ pub use create_form_field_params_type::CreateFormFieldParams;
 pub use create_helpdesk_sla_params_type::CreateHelpdeskSlaParams;
 pub use create_helpdesk_stage_params_type::CreateHelpdeskStageParams;
 pub use create_helpdesk_team_params_type::CreateHelpdeskTeamParams;
+pub use create_hr_employee_skill_params_type::CreateHrEmployeeSkillParams;
+pub use create_hr_skill_params_type::CreateHrSkillParams;
 pub use create_incoterm_params_type::CreateIncotermParams;
 pub use create_intercompany_rule_params_type::CreateIntercompanyRuleParams;
 pub use create_intercompany_transaction_params_type::CreateIntercompanyTransactionParams;
@@ -2611,7 +2731,15 @@ pub use create_product_packaging_params_type::CreateProductPackagingParams;
 pub use create_product_params_type::CreateProductParams;
 pub use create_product_supplier_info_params_type::CreateProductSupplierInfoParams;
 pub use create_product_variant_params_type::CreateProductVariantParams;
+pub use create_project_change_order_params_type::CreateProjectChangeOrderParams;
+pub use create_project_integration_intent_params_type::CreateProjectIntegrationIntentParams;
+pub use create_project_milestone_params_type::CreateProjectMilestoneParams;
 pub use create_project_params_type::CreateProjectParams;
+pub use create_project_rate_card_line_params_type::CreateProjectRateCardLineParams;
+pub use create_project_rate_card_params_type::CreateProjectRateCardParams;
+pub use create_project_revenue_line_params_type::CreateProjectRevenueLineParams;
+pub use create_project_revenue_schedule_params_type::CreateProjectRevenueScheduleParams;
+pub use create_public_holiday_params_type::CreatePublicHolidayParams;
 pub use create_purchase_blanket_order_params_type::CreatePurchaseBlanketOrderParams;
 pub use create_purchase_contract_params_type::CreatePurchaseContractParams;
 pub use create_purchase_order_params_type::CreatePurchaseOrderParams;
@@ -2630,6 +2758,7 @@ pub use create_quality_point_params_type::CreateQualityPointParams;
 pub use create_quality_team_params_type::CreateQualityTeamParams;
 pub use create_replenishment_rule_params_type::CreateReplenishmentRuleParams;
 pub use create_report_template_params_type::CreateReportTemplateParams;
+pub use create_resource_allocation_params_type::CreateResourceAllocationParams;
 pub use create_return_order_line_params_type::CreateReturnOrderLineParams;
 pub use create_return_order_params_type::CreateReturnOrderParams;
 pub use create_revenue_recognition_rule_params_type::CreateRevenueRecognitionRuleParams;
@@ -2692,6 +2821,7 @@ pub use create_whats_app_business_account_params_type::CreateWhatsAppBusinessAcc
 pub use create_workcenter_params_type::CreateWorkcenterParams;
 pub use create_workcenter_productivity_params_type::CreateWorkcenterProductivityParams;
 pub use create_workflow_params_type::CreateWorkflowParams;
+pub use create_working_calendar_params_type::CreateWorkingCalendarParams;
 pub use create_workorder_params_type::CreateWorkorderParams;
 pub use crm_conversation_type::CrmConversation;
 pub use crm_conversation_message_type::CrmConversationMessage;
@@ -2738,6 +2868,7 @@ pub use expense_sheet_state_type::ExpenseSheetState;
 pub use expense_state_type::ExpenseState;
 pub use export_financial_report_params_type::ExportFinancialReportParams;
 pub use fail_expense_integration_intent_params_type::FailExpenseIntegrationIntentParams;
+pub use fail_project_integration_intent_params_type::FailProjectIntegrationIntentParams;
 pub use fail_subscription_payment_intent_params_type::FailSubscriptionPaymentIntentParams;
 pub use fail_warehouse_sync_intent_params_type::FailWarehouseSyncIntentParams;
 pub use field_option_type::FieldOption;
@@ -2768,6 +2899,7 @@ pub use helpdesk_ticket_state_type::HelpdeskTicketState;
 pub use hr_contract_type::HrContract;
 pub use hr_department_type::HrDepartment;
 pub use hr_employee_type::HrEmployee;
+pub use hr_employee_skill_type::HrEmployeeSkill;
 pub use hr_expense_type::HrExpense;
 pub use hr_expense_advance_type::HrExpenseAdvance;
 pub use hr_expense_advance_application_type::HrExpenseAdvanceApplication;
@@ -2785,6 +2917,7 @@ pub use hr_payroll_structure_type::HrPayrollStructure;
 pub use hr_payslip_type::HrPayslip;
 pub use hr_resource_type::HrResource;
 pub use hr_salary_rule_type::HrSalaryRule;
+pub use hr_skill_type::HrSkill;
 pub use import_job_type::ImportJob;
 pub use import_job_error_type::ImportJobError;
 pub use import_job_record_type::ImportJobRecord;
@@ -2824,6 +2957,7 @@ pub use lead_score_factor_type::LeadScoreFactor;
 pub use lead_source_type::LeadSource;
 pub use line_invoice_status_type::LineInvoiceStatus;
 pub use line_state_type::LineState;
+pub use link_subcontractor_cost_params_type::LinkSubcontractorCostParams;
 pub use log_audit_event_params_type::LogAuditEventParams;
 pub use log_timesheet_params_type::LogTimesheetParams;
 pub use mail_follower_type::MailFollower;
@@ -2918,9 +3052,21 @@ pub use product_pricelist_item_type::ProductPricelistItem;
 pub use product_supplier_info_type::ProductSupplierInfo;
 pub use product_variant_type::ProductVariant;
 pub use profit_loss_line_type::ProfitLossLine;
+pub use project_baseline_type::ProjectBaseline;
+pub use project_change_order_type::ProjectChangeOrder;
+pub use project_earned_value_snapshot_type::ProjectEarnedValueSnapshot;
+pub use project_integration_intent_type::ProjectIntegrationIntent;
+pub use project_margin_snapshot_type::ProjectMarginSnapshot;
+pub use project_milestone_type::ProjectMilestone;
 pub use project_project_type::ProjectProject;
+pub use project_rate_card_type::ProjectRateCard;
+pub use project_rate_card_line_type::ProjectRateCardLine;
+pub use project_revenue_line_type::ProjectRevenueLine;
+pub use project_revenue_schedule_type::ProjectRevenueSchedule;
+pub use project_subcontractor_cost_type::ProjectSubcontractorCost;
 pub use project_task_type::ProjectTask;
 pub use project_timesheet_type::ProjectTimesheet;
+pub use project_timesheet_approval_type::ProjectTimesheetApproval;
 pub use proposal_type::Proposal;
 pub use proposal_comment_type::ProposalComment;
 pub use proposal_line_item_type::ProposalLineItem;
@@ -2929,6 +3075,7 @@ pub use proposal_section_type::ProposalSection;
 pub use proposal_source_doc_type::ProposalSourceDoc;
 pub use proposal_status_type::ProposalStatus;
 pub use proposal_version_type::ProposalVersion;
+pub use public_holiday_type::PublicHoliday;
 pub use purchase_approval_delegate_type::PurchaseApprovalDelegate;
 pub use purchase_blanket_order_type::PurchaseBlanketOrder;
 pub use purchase_contract_type::PurchaseContract;
@@ -2955,6 +3102,7 @@ pub use rebase_deferred_schedules_params_type::RebaseDeferredSchedulesParams;
 pub use receive_consignment_stock_params_type::ReceiveConsignmentStockParams;
 pub use recognize_amortization_line_params_type::RecognizeAmortizationLineParams;
 pub use recognize_deferred_revenue_params_type::RecognizeDeferredRevenueParams;
+pub use recognize_project_revenue_params_type::RecognizeProjectRevenueParams;
 pub use reconcile_account_bank_statement_line_params_type::ReconcileAccountBankStatementLineParams;
 pub use record_ai_skill_test_run_params_type::RecordAiSkillTestRunParams;
 pub use record_barcode_scan_params_type::RecordBarcodeScanParams;
@@ -2969,14 +3117,20 @@ pub use record_sales_integration_result_params_type::RecordSalesIntegrationResul
 pub use record_subscription_payment_failure_params_type::RecordSubscriptionPaymentFailureParams;
 pub use record_telemetry_params_type::RecordTelemetryParams;
 pub use record_whats_app_health_check_params_type::RecordWhatsAppHealthCheckParams;
+pub use refresh_capacity_forecast_params_type::RefreshCapacityForecastParams;
 pub use refresh_inventory_exceptions_params_type::RefreshInventoryExceptionsParams;
+pub use refresh_project_earned_value_params_type::RefreshProjectEarnedValueParams;
+pub use refresh_project_margin_params_type::RefreshProjectMarginParams;
+pub use refresh_resource_utilisation_params_type::RefreshResourceUtilisationParams;
 pub use refuse_expense_sheet_params_type::RefuseExpenseSheetParams;
 pub use register_device_params_type::RegisterDeviceParams;
 pub use register_hub_params_type::RegisterHubParams;
 pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
 pub use reject_approval_request_params_type::RejectApprovalRequestParams;
+pub use reject_timesheets_params_type::RejectTimesheetsParams;
 pub use release_blanket_to_po_params_type::ReleaseBlanketToPoParams;
 pub use renew_subscription_params_type::RenewSubscriptionParams;
+pub use reopen_timesheets_params_type::ReopenTimesheetsParams;
 pub use replenishment_rule_type::ReplenishmentRule;
 pub use report_state_type::ReportState;
 pub use report_template_type::ReportTemplate;
@@ -2984,6 +3138,9 @@ pub use report_type_type::ReportType;
 pub use request_expense_policy_exception_params_type::RequestExpensePolicyExceptionParams;
 pub use requisition_state_type::RequisitionState;
 pub use res_partner_bank_type::ResPartnerBank;
+pub use resource_allocation_type::ResourceAllocation;
+pub use resource_capacity_snapshot_type::ResourceCapacitySnapshot;
+pub use resource_utilisation_snapshot_type::ResourceUtilisationSnapshot;
 pub use resume_subscription_params_type::ResumeSubscriptionParams;
 pub use return_order_type::ReturnOrder;
 pub use return_order_line_type::ReturnOrderLine;
@@ -3015,6 +3172,7 @@ pub use scheduled_report_run_type::ScheduledReportRun;
 pub use schema_migration_type::SchemaMigration;
 pub use search_embedding_type::SearchEmbedding;
 pub use section_status_type::SectionStatus;
+pub use seed_pack_holidays_params_type::SeedPackHolidaysParams;
 pub use segment_member_type::SegmentMember;
 pub use segment_rule_clause_type::SegmentRuleClause;
 pub use segment_rule_field_type::SegmentRuleField;
@@ -3151,6 +3309,8 @@ pub use update_expense_params_type::UpdateExpenseParams;
 pub use update_financial_report_params_type::UpdateFinancialReportParams;
 pub use update_fiscal_year_params_type::UpdateFiscalYearParams;
 pub use update_form_field_params_type::UpdateFormFieldParams;
+pub use update_hr_employee_skill_params_type::UpdateHrEmployeeSkillParams;
+pub use update_hr_skill_params_type::UpdateHrSkillParams;
 pub use update_intercompany_rule_params_type::UpdateIntercompanyRuleParams;
 pub use update_job_position_params_type::UpdateJobPositionParams;
 pub use update_knowledge_article_params_type::UpdateKnowledgeArticleParams;
@@ -3180,14 +3340,19 @@ pub use update_product_params_type::UpdateProductParams;
 pub use update_product_pricing_params_type::UpdateProductPricingParams;
 pub use update_product_supplier_info_params_type::UpdateProductSupplierInfoParams;
 pub use update_product_variant_params_type::UpdateProductVariantParams;
+pub use update_project_milestone_params_type::UpdateProjectMilestoneParams;
 pub use update_project_params_type::UpdateProjectParams;
+pub use update_project_rate_card_line_params_type::UpdateProjectRateCardLineParams;
+pub use update_project_rate_card_params_type::UpdateProjectRateCardParams;
 pub use update_proposal_source_doc_params_type::UpdateProposalSourceDocParams;
+pub use update_public_holiday_params_type::UpdatePublicHolidayParams;
 pub use update_purchase_order_line_params_type::UpdatePurchaseOrderLineParams;
 pub use update_purchase_order_params_type::UpdatePurchaseOrderParams;
 pub use update_quality_alert_reason_params_type::UpdateQualityAlertReasonParams;
 pub use update_quality_point_params_type::UpdateQualityPointParams;
 pub use update_quality_team_params_type::UpdateQualityTeamParams;
 pub use update_report_template_params_type::UpdateReportTemplateParams;
+pub use update_resource_allocation_params_type::UpdateResourceAllocationParams;
 pub use update_role_params_type::UpdateRoleParams;
 pub use update_sale_order_line_params_type::UpdateSaleOrderLineParams;
 pub use update_sale_order_option_params_type::UpdateSaleOrderOptionParams;
@@ -3218,6 +3383,7 @@ pub use update_whats_app_credentials_params_type::UpdateWhatsAppCredentialsParam
 pub use update_whats_app_verification_params_type::UpdateWhatsAppVerificationParams;
 pub use update_widget_layout_params_type::UpdateWidgetLayoutParams;
 pub use update_workcenter_params_type::UpdateWorkcenterParams;
+pub use update_working_calendar_params_type::UpdateWorkingCalendarParams;
 pub use upsert_ai_skill_config_params_type::UpsertAiSkillConfigParams;
 pub use upsert_ai_skill_params_type::UpsertAiSkillParams;
 pub use upsert_expense_mileage_rate_params_type::UpsertExpenseMileageRateParams;
@@ -3256,6 +3422,7 @@ pub use workflow_activity_type::WorkflowActivity;
 pub use workflow_instance_type::WorkflowInstance;
 pub use workflow_transition_type::WorkflowTransition;
 pub use workflow_workitem_type::WorkflowWorkitem;
+pub use working_calendar_type::WorkingCalendar;
 pub use workitem_state_type::WorkitemState;
 pub use workorder_state_type::WorkorderState;
 pub use zone_display_type_type::ZoneDisplayType;
@@ -3323,6 +3490,7 @@ pub use billing_account_table::*;
 pub use bom_explosion_result_table::*;
 pub use budget_post_table::*;
 pub use calendar_event_table::*;
+pub use capacity_forecast_snapshot_table::*;
 pub use cartonization_result_table::*;
 pub use casbin_rule_table::*;
 pub use cash_flow_line_table::*;
@@ -3390,6 +3558,7 @@ pub use helpdesk_ticket_table::*;
 pub use hr_contract_table::*;
 pub use hr_department_table::*;
 pub use hr_employee_table::*;
+pub use hr_employee_skill_table::*;
 pub use hr_expense_table::*;
 pub use hr_expense_advance_table::*;
 pub use hr_expense_advance_application_table::*;
@@ -3405,6 +3574,7 @@ pub use hr_payroll_structure_table::*;
 pub use hr_payslip_table::*;
 pub use hr_resource_table::*;
 pub use hr_salary_rule_table::*;
+pub use hr_skill_table::*;
 pub use import_job_table::*;
 pub use import_job_error_table::*;
 pub use import_job_record_table::*;
@@ -3482,9 +3652,21 @@ pub use product_pricelist_item_table::*;
 pub use product_supplier_info_table::*;
 pub use product_variant_table::*;
 pub use profit_loss_line_table::*;
+pub use project_baseline_table::*;
+pub use project_change_order_table::*;
+pub use project_earned_value_snapshot_table::*;
+pub use project_integration_intent_table::*;
+pub use project_margin_snapshot_table::*;
+pub use project_milestone_table::*;
 pub use project_project_table::*;
+pub use project_rate_card_table::*;
+pub use project_rate_card_line_table::*;
+pub use project_revenue_line_table::*;
+pub use project_revenue_schedule_table::*;
+pub use project_subcontractor_cost_table::*;
 pub use project_task_table::*;
 pub use project_timesheet_table::*;
+pub use project_timesheet_approval_table::*;
 pub use proposal_table::*;
 pub use proposal_comment_table::*;
 pub use proposal_line_item_table::*;
@@ -3492,6 +3674,7 @@ pub use proposal_presence_table::*;
 pub use proposal_section_table::*;
 pub use proposal_source_doc_table::*;
 pub use proposal_version_table::*;
+pub use public_holiday_table::*;
 pub use purchase_approval_delegate_table::*;
 pub use purchase_blanket_order_table::*;
 pub use purchase_contract_table::*;
@@ -3516,6 +3699,9 @@ pub use record_custom_field_value_table::*;
 pub use replenishment_rule_table::*;
 pub use report_template_table::*;
 pub use res_partner_bank_table::*;
+pub use resource_allocation_table::*;
+pub use resource_capacity_snapshot_table::*;
+pub use resource_utilisation_snapshot_table::*;
 pub use return_order_table::*;
 pub use return_order_line_table::*;
 pub use revenue_recognition_rule_table::*;
@@ -3604,6 +3790,7 @@ pub use workflow_activity_table::*;
 pub use workflow_instance_table::*;
 pub use workflow_transition_table::*;
 pub use workflow_workitem_table::*;
+pub use working_calendar_table::*;
 pub use accept_sale_order_quotation_reducer::accept_sale_order_quotation;
 pub use accrue_sale_commission_reducer::accrue_sale_commission;
 pub use acknowledge_insight_reducer::acknowledge_insight;
@@ -3650,6 +3837,9 @@ pub use apply_landed_costs_reducer::apply_landed_costs;
 pub use apply_omnichannel_allocation_reducer::apply_omnichannel_allocation;
 pub use apply_org_migrations_reducer::apply_org_migrations;
 pub use apply_pending_expense_integration_intents_reducer::apply_pending_expense_integration_intents;
+pub use apply_pending_project_integration_intents_reducer::apply_pending_project_integration_intents;
+pub use apply_project_change_order_reducer::apply_project_change_order;
+pub use apply_project_integration_intent_reducer::apply_project_integration_intent;
 pub use apply_reconciliation_rules_reducer::apply_reconciliation_rules;
 pub use apply_sale_order_options_reducer::apply_sale_order_options;
 pub use apply_sale_promotion_to_order_reducer::apply_sale_promotion_to_order;
@@ -3684,6 +3874,7 @@ pub use assign_ticket_reducer::assign_ticket;
 pub use assign_user_to_picking_reducer::assign_user_to_picking;
 pub use award_purchase_rfq_bid_reducer::award_purchase_rfq_bid;
 pub use backfill_external_ids_reducer::backfill_external_ids;
+pub use bill_project_milestone_reducer::bill_project_milestone;
 pub use bill_timesheets_reducer::bill_timesheets;
 pub use block_serial_reducer::block_serial;
 pub use block_workcenter_reducer::block_workcenter;
@@ -3848,6 +4039,8 @@ pub use create_google_drive_connection_reducer::create_google_drive_connection;
 pub use create_helpdesk_sla_reducer::create_helpdesk_sla;
 pub use create_helpdesk_stage_reducer::create_helpdesk_stage;
 pub use create_helpdesk_team_reducer::create_helpdesk_team;
+pub use create_hr_employee_skill_reducer::create_hr_employee_skill;
+pub use create_hr_skill_reducer::create_hr_skill;
 pub use create_incoterm_reducer::create_incoterm;
 pub use create_intercompany_rule_reducer::create_intercompany_rule;
 pub use create_intercompany_transaction_reducer::create_intercompany_transaction;
@@ -3903,7 +4096,15 @@ pub use create_product_packaging_reducer::create_product_packaging;
 pub use create_product_supplier_info_reducer::create_product_supplier_info;
 pub use create_product_variant_reducer::create_product_variant;
 pub use create_project_reducer::create_project;
+pub use create_project_change_order_reducer::create_project_change_order;
+pub use create_project_integration_intent_reducer::create_project_integration_intent;
+pub use create_project_milestone_reducer::create_project_milestone;
+pub use create_project_rate_card_reducer::create_project_rate_card;
+pub use create_project_rate_card_line_reducer::create_project_rate_card_line;
+pub use create_project_revenue_line_reducer::create_project_revenue_line;
+pub use create_project_revenue_schedule_reducer::create_project_revenue_schedule;
 pub use create_proposal_reducer::create_proposal;
+pub use create_public_holiday_reducer::create_public_holiday;
 pub use create_purchase_blanket_order_reducer::create_purchase_blanket_order;
 pub use create_purchase_contract_reducer::create_purchase_contract;
 pub use create_purchase_order_reducer::create_purchase_order;
@@ -3918,6 +4119,7 @@ pub use create_quality_point_reducer::create_quality_point;
 pub use create_quality_team_reducer::create_quality_team;
 pub use create_replenishment_rule_reducer::create_replenishment_rule;
 pub use create_report_template_reducer::create_report_template;
+pub use create_resource_allocation_reducer::create_resource_allocation;
 pub use create_return_order_reducer::create_return_order;
 pub use create_revenue_recognition_rule_reducer::create_revenue_recognition_rule;
 pub use create_role_reducer::create_role;
@@ -3977,6 +4179,7 @@ pub use create_warehouse_task_reducer::create_warehouse_task;
 pub use create_whatsapp_business_account_reducer::create_whatsapp_business_account;
 pub use create_workcenter_reducer::create_workcenter;
 pub use create_workflow_reducer::create_workflow;
+pub use create_working_calendar_reducer::create_working_calendar;
 pub use create_workorder_reducer::create_workorder;
 pub use deactivate_pos_config_reducer::deactivate_pos_config;
 pub use deactivate_revenue_recognition_rule_reducer::deactivate_revenue_recognition_rule;
@@ -4001,6 +4204,7 @@ pub use delete_document_reducer::delete_document;
 pub use delete_financial_report_reducer::delete_financial_report;
 pub use delete_fiscal_year_reducer::delete_fiscal_year;
 pub use delete_form_field_reducer::delete_form_field;
+pub use delete_hr_employee_skill_reducer::delete_hr_employee_skill;
 pub use delete_import_mapping_template_reducer::delete_import_mapping_template;
 pub use delete_integration_reducer::delete_integration;
 pub use delete_intercompany_rule_reducer::delete_intercompany_rule;
@@ -4017,6 +4221,7 @@ pub use delete_pricelist_reducer::delete_pricelist;
 pub use delete_pricelist_item_reducer::delete_pricelist_item;
 pub use delete_product_reducer::delete_product;
 pub use delete_product_category_reducer::delete_product_category;
+pub use delete_project_milestone_reducer::delete_project_milestone;
 pub use delete_proposal_line_item_reducer::delete_proposal_line_item;
 pub use delete_proposal_section_reducer::delete_proposal_section;
 pub use delete_proposal_source_doc_reducer::delete_proposal_source_doc;
@@ -4024,6 +4229,7 @@ pub use delete_quality_alert_reason_reducer::delete_quality_alert_reason;
 pub use delete_quality_point_reducer::delete_quality_point;
 pub use delete_quality_team_reducer::delete_quality_team;
 pub use delete_record_custom_field_values_reducer::delete_record_custom_field_values;
+pub use delete_resource_allocation_reducer::delete_resource_allocation;
 pub use delete_sale_order_line_reducer::delete_sale_order_line;
 pub use delete_sale_order_option_reducer::delete_sale_order_option;
 pub use delete_saved_report_reducer::delete_saved_report;
@@ -4064,6 +4270,7 @@ pub use explode_bom_reducer::explode_bom;
 pub use export_financial_report_reducer::export_financial_report;
 pub use fail_expense_integration_intent_reducer::fail_expense_integration_intent;
 pub use fail_iot_action_reducer::fail_iot_action;
+pub use fail_project_integration_intent_reducer::fail_project_integration_intent;
 pub use fail_quality_check_reducer::fail_quality_check;
 pub use fail_scheduled_owner_report_run_reducer::fail_scheduled_owner_report_run;
 pub use fail_subscription_payment_intent_reducer::fail_subscription_payment_intent;
@@ -4149,6 +4356,7 @@ pub use link_device_to_location_reducer::link_device_to_location;
 pub use link_device_to_pos_reducer::link_device_to_pos;
 pub use link_device_to_quality_check_reducer::link_device_to_quality_check;
 pub use link_device_to_workcenter_reducer::link_device_to_workcenter;
+pub use link_subcontractor_cost_to_project_reducer::link_subcontractor_cost_to_project;
 pub use link_workos_user_reducer::link_workos_user;
 pub use lock_document_reducer::lock_document;
 pub use lock_knowledge_article_reducer::lock_knowledge_article;
@@ -4203,6 +4411,7 @@ pub use receive_consignment_stock_reducer::receive_consignment_stock;
 pub use receive_po_line_reducer::receive_po_line;
 pub use recognize_amortization_line_reducer::recognize_amortization_line;
 pub use recognize_deferred_revenue_reducer::recognize_deferred_revenue;
+pub use recognize_project_revenue_reducer::recognize_project_revenue;
 pub use recompute_lead_score_reducer::recompute_lead_score;
 pub use recompute_relationship_insights_reducer::recompute_relationship_insights;
 pub use reconcile_account_bank_statement_line_reducer::reconcile_account_bank_statement_line;
@@ -4227,8 +4436,13 @@ pub use record_telemetry_reducer::record_telemetry;
 pub use record_telemetry_batch_reducer::record_telemetry_batch;
 pub use record_whatsapp_health_check_reducer::record_whatsapp_health_check;
 pub use record_whatsapp_message_sent_reducer::record_whatsapp_message_sent;
+pub use refresh_capacity_forecast_reducer::refresh_capacity_forecast;
 pub use refresh_inventory_exceptions_reducer::refresh_inventory_exceptions;
 pub use refresh_policy_snapshot_reducer::refresh_policy_snapshot;
+pub use refresh_project_earned_value_reducer::refresh_project_earned_value;
+pub use refresh_project_margin_reducer::refresh_project_margin;
+pub use refresh_resource_capacity_reducer::refresh_resource_capacity;
+pub use refresh_resource_utilisation_reducer::refresh_resource_utilisation;
 pub use refresh_sale_order_promise_dates_reducer::refresh_sale_order_promise_dates;
 pub use refresh_subscription_exception_flags_reducer::refresh_subscription_exception_flags;
 pub use refresh_tax_deadline_statuses_reducer::refresh_tax_deadline_statuses;
@@ -4241,6 +4455,7 @@ pub use register_queue_worker_reducer::register_queue_worker;
 pub use reject_ai_action_draft_reducer::reject_ai_action_draft;
 pub use reject_approval_request_reducer::reject_approval_request;
 pub use reject_supplier_intake_reducer::reject_supplier_intake;
+pub use reject_timesheets_reducer::reject_timesheets;
 pub use release_blanket_to_po_reducer::release_blanket_to_po;
 pub use release_picking_wave_reducer::release_picking_wave;
 pub use remove_article_member_reducer::remove_article_member;
@@ -4253,6 +4468,7 @@ pub use remove_user_from_organization_reducer::remove_user_from_organization;
 pub use renew_subscription_reducer::renew_subscription;
 pub use reopen_inventory_close_reducer::reopen_inventory_close;
 pub use reopen_ticket_reducer::reopen_ticket;
+pub use reopen_timesheets_reducer::reopen_timesheets;
 pub use reorder_proposal_line_items_reducer::reorder_proposal_line_items;
 pub use request_embedding_job_reducer::request_embedding_job;
 pub use request_expense_policy_exception_reducer::request_expense_policy_exception;
@@ -4293,6 +4509,7 @@ pub use run_all_domain_tests_reducer::run_all_domain_tests;
 pub use run_all_expenses_tests_reducer::run_all_expenses_tests;
 pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_platform_tests_reducer::run_all_platform_tests;
+pub use run_all_projects_tests_reducer::run_all_projects_tests;
 pub use run_all_purchasing_tests_reducer::run_all_purchasing_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
 pub use run_all_subscriptions_tests_reducer::run_all_subscriptions_tests;
@@ -4351,6 +4568,10 @@ pub use run_inventory_warehouse_sync_test_reducer::run_inventory_warehouse_sync_
 pub use run_inventory_wave_release_test_reducer::run_inventory_wave_release_test;
 pub use run_manufacturing_workcenter_test_reducer::run_manufacturing_workcenter_test;
 pub use run_owner_report_schedule_reducer::run_owner_report_schedule;
+pub use run_projects_wave_a_test_reducer::run_projects_wave_a_test;
+pub use run_projects_wave_c_test_reducer::run_projects_wave_c_test;
+pub use run_projects_wave_d_test_reducer::run_projects_wave_d_test;
+pub use run_projects_wave_e_test_reducer::run_projects_wave_e_test;
 pub use run_purchasing_bill_balanced_test_reducer::run_purchasing_bill_balanced_test;
 pub use run_purchasing_company_isolation_test_reducer::run_purchasing_company_isolation_test;
 pub use run_purchasing_incoming_picking_test_reducer::run_purchasing_incoming_picking_test;
@@ -4391,6 +4612,7 @@ pub use schedule_sales_sla_escalation_reducer::schedule_sales_sla_escalation;
 pub use schedule_tax_deadline_updates_reducer::schedule_tax_deadline_updates;
 pub use seed_dev_data_reducer::seed_dev_data;
 pub use seed_organization_form_configs_reducer::seed_organization_form_configs;
+pub use seed_pack_holidays_reducer::seed_pack_holidays;
 pub use send_purchase_order_reducer::send_purchase_order;
 pub use send_sale_order_quotation_reducer::send_sale_order_quotation;
 pub use set_ai_agent_active_reducer::set_ai_agent_active;
@@ -4512,6 +4734,8 @@ pub use update_fiscal_year_reducer::update_fiscal_year;
 pub use update_form_field_reducer::update_form_field;
 pub use update_google_drive_connection_reducer::update_google_drive_connection;
 pub use update_google_drive_credentials_reducer::update_google_drive_credentials;
+pub use update_hr_employee_skill_reducer::update_hr_employee_skill;
+pub use update_hr_skill_reducer::update_hr_skill;
 pub use update_hub_heartbeat_reducer::update_hub_heartbeat;
 pub use update_integration_status_reducer::update_integration_status;
 pub use update_intercompany_rule_reducer::update_intercompany_rule;
@@ -4552,17 +4776,22 @@ pub use update_product_pricing_reducer::update_product_pricing;
 pub use update_product_supplier_info_reducer::update_product_supplier_info;
 pub use update_product_variant_reducer::update_product_variant;
 pub use update_project_reducer::update_project;
+pub use update_project_milestone_reducer::update_project_milestone;
+pub use update_project_rate_card_reducer::update_project_rate_card;
+pub use update_project_rate_card_line_reducer::update_project_rate_card_line;
 pub use update_proposal_reducer::update_proposal;
 pub use update_proposal_line_item_reducer::update_proposal_line_item;
 pub use update_proposal_presence_reducer::update_proposal_presence;
 pub use update_proposal_source_doc_reducer::update_proposal_source_doc;
 pub use update_proposal_status_reducer::update_proposal_status;
+pub use update_public_holiday_reducer::update_public_holiday;
 pub use update_purchase_order_reducer::update_purchase_order;
 pub use update_purchase_order_line_reducer::update_purchase_order_line;
 pub use update_quality_alert_reason_reducer::update_quality_alert_reason;
 pub use update_quality_point_reducer::update_quality_point;
 pub use update_quality_team_reducer::update_quality_team;
 pub use update_report_template_reducer::update_report_template;
+pub use update_resource_allocation_reducer::update_resource_allocation;
 pub use update_role_reducer::update_role;
 pub use update_sale_order_reducer::update_sale_order;
 pub use update_sale_order_line_reducer::update_sale_order_line;
@@ -4601,6 +4830,7 @@ pub use update_whatsapp_quality_score_reducer::update_whatsapp_quality_score;
 pub use update_whatsapp_verification_status_reducer::update_whatsapp_verification_status;
 pub use update_widget_layout_reducer::update_widget_layout;
 pub use update_workcenter_reducer::update_workcenter;
+pub use update_working_calendar_reducer::update_working_calendar;
 pub use upsert_ai_skill_reducer::upsert_ai_skill;
 pub use upsert_ai_skill_config_reducer::upsert_ai_skill_config;
 pub use upsert_expense_mileage_rate_reducer::upsert_expense_mileage_rate;
@@ -4873,6 +5103,20 @@ pub enum Reducer {
         organization_id: u64,
         limit: u32,
 }    ,
+    ApplyPendingProjectIntegrationIntents {
+        organization_id: u64,
+        limit: u32,
+}    ,
+    ApplyProjectChangeOrder {
+        organization_id: u64,
+        company_id: u64,
+        change_order_id: u64,
+        params: ApplyProjectChangeOrderParams,
+}    ,
+    ApplyProjectIntegrationIntent {
+        organization_id: u64,
+        intent_id: u64,
+}    ,
     ApplyReconciliationRules {
         organization_id: u64,
         line_id: u64,
@@ -5036,6 +5280,12 @@ pub enum Reducer {
         bid_id: u64,
 }    ,
     BackfillExternalIds ,
+    BillProjectMilestone {
+        organization_id: u64,
+        company_id: u64,
+        milestone_id: u64,
+        params: BillProjectMilestoneParams,
+}    ,
     BillTimesheets {
         organization_id: u64,
         params: BillTimesheetsParams,
@@ -5799,6 +6049,16 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateHelpdeskTeamParams,
 }    ,
+    CreateHrEmployeeSkill {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateHrEmployeeSkillParams,
+}    ,
+    CreateHrSkill {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateHrSkillParams,
+}    ,
     CreateIncoterm {
         organization_id: u64,
         params: CreateIncotermParams,
@@ -6047,6 +6307,40 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateProjectParams,
 }    ,
+    CreateProjectChangeOrder {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateProjectChangeOrderParams,
+}    ,
+    CreateProjectIntegrationIntent {
+        organization_id: u64,
+        params: CreateProjectIntegrationIntentParams,
+}    ,
+    CreateProjectMilestone {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateProjectMilestoneParams,
+}    ,
+    CreateProjectRateCard {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateProjectRateCardParams,
+}    ,
+    CreateProjectRateCardLine {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateProjectRateCardLineParams,
+}    ,
+    CreateProjectRevenueLine {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateProjectRevenueLineParams,
+}    ,
+    CreateProjectRevenueSchedule {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateProjectRevenueScheduleParams,
+}    ,
     CreateProposal {
         organization_id: u64,
         title: String,
@@ -6055,6 +6349,11 @@ pub enum Reducer {
         deadline: Option::<__sdk::Timestamp>,
         description: Option::<String>,
         document_folder_id: Option::<u64>,
+}    ,
+    CreatePublicHoliday {
+        organization_id: u64,
+        company_id: u64,
+        params: CreatePublicHolidayParams,
 }    ,
     CreatePurchaseBlanketOrder {
         organization_id: u64,
@@ -6122,6 +6421,11 @@ pub enum Reducer {
         organization_id: u64,
         company_id: Option::<u64>,
         params: CreateReportTemplateParams,
+}    ,
+    CreateResourceAllocation {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateResourceAllocationParams,
 }    ,
     CreateReturnOrder {
         organization_id: u64,
@@ -6395,6 +6699,11 @@ pub enum Reducer {
         company_id: Option::<u64>,
         params: CreateWorkflowParams,
 }    ,
+    CreateWorkingCalendar {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateWorkingCalendarParams,
+}    ,
     CreateWorkorder {
         organization_id: u64,
         params: CreateWorkorderParams,
@@ -6503,6 +6812,11 @@ pub enum Reducer {
         configuration_id: u64,
         field_id: String,
 }    ,
+    DeleteHrEmployeeSkill {
+        organization_id: u64,
+        company_id: u64,
+        employee_skill_id: u64,
+}    ,
     DeleteImportMappingTemplate {
         organization_id: u64,
         template_id: u64,
@@ -6569,6 +6883,11 @@ pub enum Reducer {
         organization_id: u64,
         category_id: u64,
 }    ,
+    DeleteProjectMilestone {
+        organization_id: u64,
+        company_id: u64,
+        milestone_id: u64,
+}    ,
     DeleteProposalLineItem {
         line_item_id: u64,
 }    ,
@@ -6596,6 +6915,11 @@ pub enum Reducer {
         company_id: u64,
         model: String,
         record_id: u64,
+}    ,
+    DeleteResourceAllocation {
+        organization_id: u64,
+        company_id: u64,
+        allocation_id: u64,
 }    ,
     DeleteSaleOrderLine {
         organization_id: u64,
@@ -6768,6 +7092,11 @@ pub enum Reducer {
         organization_id: u64,
         action_id: u64,
         error: String,
+}    ,
+    FailProjectIntegrationIntent {
+        organization_id: u64,
+        intent_id: u64,
+        params: FailProjectIntegrationIntentParams,
 }    ,
     FailQualityCheck {
         organization_id: u64,
@@ -7159,6 +7488,11 @@ pub enum Reducer {
         device_id: u64,
         workcenter_id: u64,
 }    ,
+    LinkSubcontractorCostToProject {
+        organization_id: u64,
+        company_id: u64,
+        params: LinkSubcontractorCostParams,
+}    ,
     LinkWorkosUser {
         target_identity: __sdk::Identity,
         workos_user_id: String,
@@ -7423,6 +7757,12 @@ pub enum Reducer {
         line_id: u64,
         params: RecognizeDeferredRevenueParams,
 }    ,
+    RecognizeProjectRevenue {
+        organization_id: u64,
+        company_id: u64,
+        line_id: u64,
+        params: RecognizeProjectRevenueParams,
+}    ,
     RecomputeLeadScore {
         organization_id: u64,
         lead_id: u64,
@@ -7542,6 +7882,11 @@ pub enum Reducer {
         organization_id: u64,
         account_id: u64,
 }    ,
+    RefreshCapacityForecast {
+        organization_id: u64,
+        company_id: u64,
+        params: RefreshCapacityForecastParams,
+}    ,
     RefreshInventoryExceptions {
         organization_id: u64,
         company_id: u64,
@@ -7549,6 +7894,26 @@ pub enum Reducer {
 }    ,
     RefreshPolicySnapshot {
         organization_id: u64,
+}    ,
+    RefreshProjectEarnedValue {
+        organization_id: u64,
+        company_id: u64,
+        params: RefreshProjectEarnedValueParams,
+}    ,
+    RefreshProjectMargin {
+        organization_id: u64,
+        company_id: u64,
+        params: RefreshProjectMarginParams,
+}    ,
+    RefreshResourceCapacity {
+        organization_id: u64,
+        company_id: u64,
+        employee_id: u64,
+}    ,
+    RefreshResourceUtilisation {
+        organization_id: u64,
+        company_id: u64,
+        params: RefreshResourceUtilisationParams,
 }    ,
     RefreshSaleOrderPromiseDates {
         organization_id: u64,
@@ -7610,6 +7975,10 @@ pub enum Reducer {
         intake_id: u64,
         rejection_reason: String,
 }    ,
+    RejectTimesheets {
+        organization_id: u64,
+        params: RejectTimesheetsParams,
+}    ,
     ReleaseBlanketToPo {
         organization_id: u64,
         company_id: u64,
@@ -7666,6 +8035,10 @@ pub enum Reducer {
     ReopenTicket {
         organization_id: u64,
         ticket_id: u64,
+}    ,
+    ReopenTimesheets {
+        organization_id: u64,
+        params: ReopenTimesheetsParams,
 }    ,
     ReorderProposalLineItems {
         proposal_id: u64,
@@ -7791,6 +8164,7 @@ pub enum Reducer {
     RunAllExpensesTests ,
     RunAllInventoryTests ,
     RunAllPlatformTests ,
+    RunAllProjectsTests ,
     RunAllPurchasingTests ,
     RunAllSalesTests ,
     RunAllSubscriptionsTests ,
@@ -7869,6 +8243,10 @@ pub enum Reducer {
         organization_id: u64,
         report_id: u64,
 }    ,
+    RunProjectsWaveATest ,
+    RunProjectsWaveCTest ,
+    RunProjectsWaveDTest ,
+    RunProjectsWaveETest ,
     RunPurchasingBillBalancedTest ,
     RunPurchasingCompanyIsolationTest ,
     RunPurchasingIncomingPickingTest ,
@@ -7927,6 +8305,11 @@ pub enum Reducer {
     SeedDevData ,
     SeedOrganizationFormConfigs {
         organization_id: u64,
+}    ,
+    SeedPackHolidays {
+        organization_id: u64,
+        company_id: u64,
+        params: SeedPackHolidaysParams,
 }    ,
     SendPurchaseOrder {
         organization_id: u64,
@@ -8549,6 +8932,18 @@ pub enum Reducer {
         organization_id: u64,
         credentials_reference: String,
 }    ,
+    UpdateHrEmployeeSkill {
+        organization_id: u64,
+        company_id: u64,
+        employee_skill_id: u64,
+        params: UpdateHrEmployeeSkillParams,
+}    ,
+    UpdateHrSkill {
+        organization_id: u64,
+        company_id: u64,
+        skill_id: u64,
+        params: UpdateHrSkillParams,
+}    ,
     UpdateHubHeartbeat {
         organization_id: u64,
         hub_id: u64,
@@ -8764,6 +9159,24 @@ pub enum Reducer {
         project_id: u64,
         params: UpdateProjectParams,
 }    ,
+    UpdateProjectMilestone {
+        organization_id: u64,
+        company_id: u64,
+        milestone_id: u64,
+        params: UpdateProjectMilestoneParams,
+}    ,
+    UpdateProjectRateCard {
+        organization_id: u64,
+        company_id: u64,
+        rate_card_id: u64,
+        params: UpdateProjectRateCardParams,
+}    ,
+    UpdateProjectRateCardLine {
+        organization_id: u64,
+        company_id: u64,
+        line_id: u64,
+        params: UpdateProjectRateCardLineParams,
+}    ,
     UpdateProposal {
         proposal_id: u64,
         title: String,
@@ -8791,6 +9204,12 @@ pub enum Reducer {
     UpdateProposalStatus {
         proposal_id: u64,
         status: String,
+}    ,
+    UpdatePublicHoliday {
+        organization_id: u64,
+        company_id: u64,
+        holiday_id: u64,
+        params: UpdatePublicHolidayParams,
 }    ,
     UpdatePurchaseOrder {
         organization_id: u64,
@@ -8823,6 +9242,12 @@ pub enum Reducer {
         organization_id: u64,
         template_id: u64,
         params: UpdateReportTemplateParams,
+}    ,
+    UpdateResourceAllocation {
+        organization_id: u64,
+        company_id: u64,
+        allocation_id: u64,
+        params: UpdateResourceAllocationParams,
 }    ,
     UpdateRole {
         role_id: u64,
@@ -9018,6 +9443,12 @@ pub enum Reducer {
         workcenter_id: u64,
         params: UpdateWorkcenterParams,
 }    ,
+    UpdateWorkingCalendar {
+        organization_id: u64,
+        company_id: u64,
+        calendar_id: u64,
+        params: UpdateWorkingCalendarParams,
+}    ,
     UpsertAiSkill {
         organization_id: u64,
         params: UpsertAiSkillParams,
@@ -9187,6 +9618,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApplyOmnichannelAllocation { .. } => "apply_omnichannel_allocation",
             Reducer::ApplyOrgMigrations { .. } => "apply_org_migrations",
             Reducer::ApplyPendingExpenseIntegrationIntents { .. } => "apply_pending_expense_integration_intents",
+            Reducer::ApplyPendingProjectIntegrationIntents { .. } => "apply_pending_project_integration_intents",
+            Reducer::ApplyProjectChangeOrder { .. } => "apply_project_change_order",
+            Reducer::ApplyProjectIntegrationIntent { .. } => "apply_project_integration_intent",
             Reducer::ApplyReconciliationRules { .. } => "apply_reconciliation_rules",
             Reducer::ApplySaleOrderOptions { .. } => "apply_sale_order_options",
             Reducer::ApplySalePromotionToOrder { .. } => "apply_sale_promotion_to_order",
@@ -9221,6 +9655,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AssignUserToPicking { .. } => "assign_user_to_picking",
             Reducer::AwardPurchaseRfqBid { .. } => "award_purchase_rfq_bid",
             Reducer::BackfillExternalIds => "backfill_external_ids",
+            Reducer::BillProjectMilestone { .. } => "bill_project_milestone",
             Reducer::BillTimesheets { .. } => "bill_timesheets",
             Reducer::BlockSerial { .. } => "block_serial",
             Reducer::BlockWorkcenter { .. } => "block_workcenter",
@@ -9385,6 +9820,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateHelpdeskSla { .. } => "create_helpdesk_sla",
             Reducer::CreateHelpdeskStage { .. } => "create_helpdesk_stage",
             Reducer::CreateHelpdeskTeam { .. } => "create_helpdesk_team",
+            Reducer::CreateHrEmployeeSkill { .. } => "create_hr_employee_skill",
+            Reducer::CreateHrSkill { .. } => "create_hr_skill",
             Reducer::CreateIncoterm { .. } => "create_incoterm",
             Reducer::CreateIntercompanyRule { .. } => "create_intercompany_rule",
             Reducer::CreateIntercompanyTransaction { .. } => "create_intercompany_transaction",
@@ -9440,7 +9877,15 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateProductSupplierInfo { .. } => "create_product_supplier_info",
             Reducer::CreateProductVariant { .. } => "create_product_variant",
             Reducer::CreateProject { .. } => "create_project",
+            Reducer::CreateProjectChangeOrder { .. } => "create_project_change_order",
+            Reducer::CreateProjectIntegrationIntent { .. } => "create_project_integration_intent",
+            Reducer::CreateProjectMilestone { .. } => "create_project_milestone",
+            Reducer::CreateProjectRateCard { .. } => "create_project_rate_card",
+            Reducer::CreateProjectRateCardLine { .. } => "create_project_rate_card_line",
+            Reducer::CreateProjectRevenueLine { .. } => "create_project_revenue_line",
+            Reducer::CreateProjectRevenueSchedule { .. } => "create_project_revenue_schedule",
             Reducer::CreateProposal { .. } => "create_proposal",
+            Reducer::CreatePublicHoliday { .. } => "create_public_holiday",
             Reducer::CreatePurchaseBlanketOrder { .. } => "create_purchase_blanket_order",
             Reducer::CreatePurchaseContract { .. } => "create_purchase_contract",
             Reducer::CreatePurchaseOrder { .. } => "create_purchase_order",
@@ -9455,6 +9900,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateQualityTeam { .. } => "create_quality_team",
             Reducer::CreateReplenishmentRule { .. } => "create_replenishment_rule",
             Reducer::CreateReportTemplate { .. } => "create_report_template",
+            Reducer::CreateResourceAllocation { .. } => "create_resource_allocation",
             Reducer::CreateReturnOrder { .. } => "create_return_order",
             Reducer::CreateRevenueRecognitionRule { .. } => "create_revenue_recognition_rule",
             Reducer::CreateRole { .. } => "create_role",
@@ -9514,6 +9960,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateWhatsappBusinessAccount { .. } => "create_whatsapp_business_account",
             Reducer::CreateWorkcenter { .. } => "create_workcenter",
             Reducer::CreateWorkflow { .. } => "create_workflow",
+            Reducer::CreateWorkingCalendar { .. } => "create_working_calendar",
             Reducer::CreateWorkorder { .. } => "create_workorder",
             Reducer::DeactivatePosConfig { .. } => "deactivate_pos_config",
             Reducer::DeactivateRevenueRecognitionRule { .. } => "deactivate_revenue_recognition_rule",
@@ -9538,6 +9985,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeleteFinancialReport { .. } => "delete_financial_report",
             Reducer::DeleteFiscalYear { .. } => "delete_fiscal_year",
             Reducer::DeleteFormField { .. } => "delete_form_field",
+            Reducer::DeleteHrEmployeeSkill { .. } => "delete_hr_employee_skill",
             Reducer::DeleteImportMappingTemplate { .. } => "delete_import_mapping_template",
             Reducer::DeleteIntegration { .. } => "delete_integration",
             Reducer::DeleteIntercompanyRule { .. } => "delete_intercompany_rule",
@@ -9554,6 +10002,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeletePricelistItem { .. } => "delete_pricelist_item",
             Reducer::DeleteProduct { .. } => "delete_product",
             Reducer::DeleteProductCategory { .. } => "delete_product_category",
+            Reducer::DeleteProjectMilestone { .. } => "delete_project_milestone",
             Reducer::DeleteProposalLineItem { .. } => "delete_proposal_line_item",
             Reducer::DeleteProposalSection { .. } => "delete_proposal_section",
             Reducer::DeleteProposalSourceDoc { .. } => "delete_proposal_source_doc",
@@ -9561,6 +10010,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeleteQualityPoint { .. } => "delete_quality_point",
             Reducer::DeleteQualityTeam { .. } => "delete_quality_team",
             Reducer::DeleteRecordCustomFieldValues { .. } => "delete_record_custom_field_values",
+            Reducer::DeleteResourceAllocation { .. } => "delete_resource_allocation",
             Reducer::DeleteSaleOrderLine { .. } => "delete_sale_order_line",
             Reducer::DeleteSaleOrderOption { .. } => "delete_sale_order_option",
             Reducer::DeleteSavedReport { .. } => "delete_saved_report",
@@ -9601,6 +10051,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ExportFinancialReport { .. } => "export_financial_report",
             Reducer::FailExpenseIntegrationIntent { .. } => "fail_expense_integration_intent",
             Reducer::FailIotAction { .. } => "fail_iot_action",
+            Reducer::FailProjectIntegrationIntent { .. } => "fail_project_integration_intent",
             Reducer::FailQualityCheck { .. } => "fail_quality_check",
             Reducer::FailScheduledOwnerReportRun { .. } => "fail_scheduled_owner_report_run",
             Reducer::FailSubscriptionPaymentIntent { .. } => "fail_subscription_payment_intent",
@@ -9686,6 +10137,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::LinkDeviceToPos { .. } => "link_device_to_pos",
             Reducer::LinkDeviceToQualityCheck { .. } => "link_device_to_quality_check",
             Reducer::LinkDeviceToWorkcenter { .. } => "link_device_to_workcenter",
+            Reducer::LinkSubcontractorCostToProject { .. } => "link_subcontractor_cost_to_project",
             Reducer::LinkWorkosUser { .. } => "link_workos_user",
             Reducer::LockDocument { .. } => "lock_document",
             Reducer::LockKnowledgeArticle { .. } => "lock_knowledge_article",
@@ -9740,6 +10192,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReceivePoLine { .. } => "receive_po_line",
             Reducer::RecognizeAmortizationLine { .. } => "recognize_amortization_line",
             Reducer::RecognizeDeferredRevenue { .. } => "recognize_deferred_revenue",
+            Reducer::RecognizeProjectRevenue { .. } => "recognize_project_revenue",
             Reducer::RecomputeLeadScore { .. } => "recompute_lead_score",
             Reducer::RecomputeRelationshipInsights { .. } => "recompute_relationship_insights",
             Reducer::ReconcileAccountBankStatementLine { .. } => "reconcile_account_bank_statement_line",
@@ -9764,8 +10217,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordTelemetryBatch { .. } => "record_telemetry_batch",
             Reducer::RecordWhatsappHealthCheck { .. } => "record_whatsapp_health_check",
             Reducer::RecordWhatsappMessageSent { .. } => "record_whatsapp_message_sent",
+            Reducer::RefreshCapacityForecast { .. } => "refresh_capacity_forecast",
             Reducer::RefreshInventoryExceptions { .. } => "refresh_inventory_exceptions",
             Reducer::RefreshPolicySnapshot { .. } => "refresh_policy_snapshot",
+            Reducer::RefreshProjectEarnedValue { .. } => "refresh_project_earned_value",
+            Reducer::RefreshProjectMargin { .. } => "refresh_project_margin",
+            Reducer::RefreshResourceCapacity { .. } => "refresh_resource_capacity",
+            Reducer::RefreshResourceUtilisation { .. } => "refresh_resource_utilisation",
             Reducer::RefreshSaleOrderPromiseDates { .. } => "refresh_sale_order_promise_dates",
             Reducer::RefreshSubscriptionExceptionFlags { .. } => "refresh_subscription_exception_flags",
             Reducer::RefreshTaxDeadlineStatuses { .. } => "refresh_tax_deadline_statuses",
@@ -9778,6 +10236,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RejectAiActionDraft { .. } => "reject_ai_action_draft",
             Reducer::RejectApprovalRequest { .. } => "reject_approval_request",
             Reducer::RejectSupplierIntake { .. } => "reject_supplier_intake",
+            Reducer::RejectTimesheets { .. } => "reject_timesheets",
             Reducer::ReleaseBlanketToPo { .. } => "release_blanket_to_po",
             Reducer::ReleasePickingWave { .. } => "release_picking_wave",
             Reducer::RemoveArticleMember { .. } => "remove_article_member",
@@ -9790,6 +10249,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RenewSubscription { .. } => "renew_subscription",
             Reducer::ReopenInventoryClose { .. } => "reopen_inventory_close",
             Reducer::ReopenTicket { .. } => "reopen_ticket",
+            Reducer::ReopenTimesheets { .. } => "reopen_timesheets",
             Reducer::ReorderProposalLineItems { .. } => "reorder_proposal_line_items",
             Reducer::RequestEmbeddingJob { .. } => "request_embedding_job",
             Reducer::RequestExpensePolicyException { .. } => "request_expense_policy_exception",
@@ -9830,6 +10290,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllExpensesTests => "run_all_expenses_tests",
             Reducer::RunAllInventoryTests => "run_all_inventory_tests",
             Reducer::RunAllPlatformTests => "run_all_platform_tests",
+            Reducer::RunAllProjectsTests => "run_all_projects_tests",
             Reducer::RunAllPurchasingTests => "run_all_purchasing_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
             Reducer::RunAllSubscriptionsTests => "run_all_subscriptions_tests",
@@ -9888,6 +10349,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventoryWaveReleaseTest => "run_inventory_wave_release_test",
             Reducer::RunManufacturingWorkcenterTest => "run_manufacturing_workcenter_test",
             Reducer::RunOwnerReportSchedule { .. } => "run_owner_report_schedule",
+            Reducer::RunProjectsWaveATest => "run_projects_wave_a_test",
+            Reducer::RunProjectsWaveCTest => "run_projects_wave_c_test",
+            Reducer::RunProjectsWaveDTest => "run_projects_wave_d_test",
+            Reducer::RunProjectsWaveETest => "run_projects_wave_e_test",
             Reducer::RunPurchasingBillBalancedTest => "run_purchasing_bill_balanced_test",
             Reducer::RunPurchasingCompanyIsolationTest => "run_purchasing_company_isolation_test",
             Reducer::RunPurchasingIncomingPickingTest => "run_purchasing_incoming_picking_test",
@@ -9928,6 +10393,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ScheduleTaxDeadlineUpdates { .. } => "schedule_tax_deadline_updates",
             Reducer::SeedDevData => "seed_dev_data",
             Reducer::SeedOrganizationFormConfigs { .. } => "seed_organization_form_configs",
+            Reducer::SeedPackHolidays { .. } => "seed_pack_holidays",
             Reducer::SendPurchaseOrder { .. } => "send_purchase_order",
             Reducer::SendSaleOrderQuotation { .. } => "send_sale_order_quotation",
             Reducer::SetAiAgentActive { .. } => "set_ai_agent_active",
@@ -10049,6 +10515,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateFormField { .. } => "update_form_field",
             Reducer::UpdateGoogleDriveConnection { .. } => "update_google_drive_connection",
             Reducer::UpdateGoogleDriveCredentials { .. } => "update_google_drive_credentials",
+            Reducer::UpdateHrEmployeeSkill { .. } => "update_hr_employee_skill",
+            Reducer::UpdateHrSkill { .. } => "update_hr_skill",
             Reducer::UpdateHubHeartbeat { .. } => "update_hub_heartbeat",
             Reducer::UpdateIntegrationStatus { .. } => "update_integration_status",
             Reducer::UpdateIntercompanyRule { .. } => "update_intercompany_rule",
@@ -10089,17 +10557,22 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateProductSupplierInfo { .. } => "update_product_supplier_info",
             Reducer::UpdateProductVariant { .. } => "update_product_variant",
             Reducer::UpdateProject { .. } => "update_project",
+            Reducer::UpdateProjectMilestone { .. } => "update_project_milestone",
+            Reducer::UpdateProjectRateCard { .. } => "update_project_rate_card",
+            Reducer::UpdateProjectRateCardLine { .. } => "update_project_rate_card_line",
             Reducer::UpdateProposal { .. } => "update_proposal",
             Reducer::UpdateProposalLineItem { .. } => "update_proposal_line_item",
             Reducer::UpdateProposalPresence { .. } => "update_proposal_presence",
             Reducer::UpdateProposalSourceDoc { .. } => "update_proposal_source_doc",
             Reducer::UpdateProposalStatus { .. } => "update_proposal_status",
+            Reducer::UpdatePublicHoliday { .. } => "update_public_holiday",
             Reducer::UpdatePurchaseOrder { .. } => "update_purchase_order",
             Reducer::UpdatePurchaseOrderLine { .. } => "update_purchase_order_line",
             Reducer::UpdateQualityAlertReason { .. } => "update_quality_alert_reason",
             Reducer::UpdateQualityPoint { .. } => "update_quality_point",
             Reducer::UpdateQualityTeam { .. } => "update_quality_team",
             Reducer::UpdateReportTemplate { .. } => "update_report_template",
+            Reducer::UpdateResourceAllocation { .. } => "update_resource_allocation",
             Reducer::UpdateRole { .. } => "update_role",
             Reducer::UpdateSaleOrder { .. } => "update_sale_order",
             Reducer::UpdateSaleOrderLine { .. } => "update_sale_order_line",
@@ -10138,6 +10611,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateWhatsappVerificationStatus { .. } => "update_whatsapp_verification_status",
             Reducer::UpdateWidgetLayout { .. } => "update_widget_layout",
             Reducer::UpdateWorkcenter { .. } => "update_workcenter",
+            Reducer::UpdateWorkingCalendar { .. } => "update_working_calendar",
             Reducer::UpsertAiSkill { .. } => "upsert_ai_skill",
             Reducer::UpsertAiSkillConfig { .. } => "upsert_ai_skill_config",
             Reducer::UpsertExpenseMileageRate { .. } => "upsert_expense_mileage_rate",
@@ -10602,6 +11076,31 @@ Reducer::ApplyIndexLinkedRenewal{
                 organization_id: organization_id.clone(),
                 limit: limit.clone(),
 }),
+            Reducer::ApplyPendingProjectIntegrationIntents{
+                organization_id,
+                limit,
+}             => __sats::bsatn::to_vec(&apply_pending_project_integration_intents_reducer::ApplyPendingProjectIntegrationIntentsArgs {
+                organization_id: organization_id.clone(),
+                limit: limit.clone(),
+}),
+            Reducer::ApplyProjectChangeOrder{
+                organization_id,
+                company_id,
+                change_order_id,
+                params,
+}             => __sats::bsatn::to_vec(&apply_project_change_order_reducer::ApplyProjectChangeOrderArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                change_order_id: change_order_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::ApplyProjectIntegrationIntent{
+                organization_id,
+                intent_id,
+}             => __sats::bsatn::to_vec(&apply_project_integration_intent_reducer::ApplyProjectIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                intent_id: intent_id.clone(),
+}),
             Reducer::ApplyReconciliationRules{
                 organization_id,
                 line_id,
@@ -10895,7 +11394,18 @@ Reducer::ApplyIndexLinkedRenewal{
 }),
             Reducer::BackfillExternalIds => __sats::bsatn::to_vec(&backfill_external_ids_reducer::BackfillExternalIdsArgs {
                 }),
-Reducer::BillTimesheets{
+Reducer::BillProjectMilestone{
+                organization_id,
+                company_id,
+                milestone_id,
+                params,
+}             => __sats::bsatn::to_vec(&bill_project_milestone_reducer::BillProjectMilestoneArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                milestone_id: milestone_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::BillTimesheets{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&bill_timesheets_reducer::BillTimesheetsArgs {
@@ -12257,6 +12767,24 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateHrEmployeeSkill{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_hr_employee_skill_reducer::CreateHrEmployeeSkillArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateHrSkill{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_hr_skill_reducer::CreateHrSkillArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateIncoterm{
                 organization_id,
                 params,
@@ -12698,6 +13226,67 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateProjectChangeOrder{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_project_change_order_reducer::CreateProjectChangeOrderArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateProjectIntegrationIntent{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_project_integration_intent_reducer::CreateProjectIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateProjectMilestone{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_project_milestone_reducer::CreateProjectMilestoneArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateProjectRateCard{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_project_rate_card_reducer::CreateProjectRateCardArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateProjectRateCardLine{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_project_rate_card_line_reducer::CreateProjectRateCardLineArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateProjectRevenueLine{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_project_revenue_line_reducer::CreateProjectRevenueLineArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateProjectRevenueSchedule{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_project_revenue_schedule_reducer::CreateProjectRevenueScheduleArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateProposal{
                 organization_id,
                 title,
@@ -12714,6 +13303,15 @@ Reducer::BillTimesheets{
                 deadline: deadline.clone(),
                 description: description.clone(),
                 document_folder_id: document_folder_id.clone(),
+}),
+            Reducer::CreatePublicHoliday{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_public_holiday_reducer::CreatePublicHolidayArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
 }),
             Reducer::CreatePurchaseBlanketOrder{
                 organization_id,
@@ -12831,6 +13429,15 @@ Reducer::BillTimesheets{
                 company_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_report_template_reducer::CreateReportTemplateArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateResourceAllocation{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_resource_allocation_reducer::CreateResourceAllocationArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 params: params.clone(),
@@ -13320,6 +13927,15 @@ Reducer::BillTimesheets{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateWorkingCalendar{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_working_calendar_reducer::CreateWorkingCalendarArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateWorkorder{
                 organization_id,
                 params,
@@ -13512,6 +14128,15 @@ Reducer::BillTimesheets{
                 configuration_id: configuration_id.clone(),
                 field_id: field_id.clone(),
 }),
+            Reducer::DeleteHrEmployeeSkill{
+                organization_id,
+                company_id,
+                employee_skill_id,
+}             => __sats::bsatn::to_vec(&delete_hr_employee_skill_reducer::DeleteHrEmployeeSkillArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                employee_skill_id: employee_skill_id.clone(),
+}),
             Reducer::DeleteImportMappingTemplate{
                 organization_id,
                 template_id,
@@ -13628,6 +14253,15 @@ Reducer::BillTimesheets{
                 organization_id: organization_id.clone(),
                 category_id: category_id.clone(),
 }),
+            Reducer::DeleteProjectMilestone{
+                organization_id,
+                company_id,
+                milestone_id,
+}             => __sats::bsatn::to_vec(&delete_project_milestone_reducer::DeleteProjectMilestoneArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                milestone_id: milestone_id.clone(),
+}),
             Reducer::DeleteProposalLineItem{
                 line_item_id,
 }             => __sats::bsatn::to_vec(&delete_proposal_line_item_reducer::DeleteProposalLineItemArgs {
@@ -13676,6 +14310,15 @@ Reducer::BillTimesheets{
                 company_id: company_id.clone(),
                 model: model.clone(),
                 record_id: record_id.clone(),
+}),
+            Reducer::DeleteResourceAllocation{
+                organization_id,
+                company_id,
+                allocation_id,
+}             => __sats::bsatn::to_vec(&delete_resource_allocation_reducer::DeleteResourceAllocationArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                allocation_id: allocation_id.clone(),
 }),
             Reducer::DeleteSaleOrderLine{
                 organization_id,
@@ -13982,6 +14625,15 @@ Reducer::ErrorIntercompanyTransaction{
                 organization_id: organization_id.clone(),
                 action_id: action_id.clone(),
                 error: error.clone(),
+}),
+            Reducer::FailProjectIntegrationIntent{
+                organization_id,
+                intent_id,
+                params,
+}             => __sats::bsatn::to_vec(&fail_project_integration_intent_reducer::FailProjectIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                intent_id: intent_id.clone(),
+                params: params.clone(),
 }),
             Reducer::FailQualityCheck{
                 organization_id,
@@ -14678,6 +15330,15 @@ Reducer::ErrorIntercompanyTransaction{
                 device_id: device_id.clone(),
                 workcenter_id: workcenter_id.clone(),
 }),
+            Reducer::LinkSubcontractorCostToProject{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&link_subcontractor_cost_to_project_reducer::LinkSubcontractorCostToProjectArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::LinkWorkosUser{
                 target_identity,
                 workos_user_id,
@@ -15153,6 +15814,17 @@ Reducer::MoveStockQuant{
                 line_id: line_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::RecognizeProjectRevenue{
+                organization_id,
+                company_id,
+                line_id,
+                params,
+}             => __sats::bsatn::to_vec(&recognize_project_revenue_reducer::RecognizeProjectRevenueArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                line_id: line_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RecomputeLeadScore{
                 organization_id,
                 lead_id,
@@ -15367,6 +16039,15 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 account_id: account_id.clone(),
 }),
+            Reducer::RefreshCapacityForecast{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&refresh_capacity_forecast_reducer::RefreshCapacityForecastArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RefreshInventoryExceptions{
                 organization_id,
                 company_id,
@@ -15380,6 +16061,42 @@ Reducer::MoveStockQuant{
                 organization_id,
 }             => __sats::bsatn::to_vec(&refresh_policy_snapshot_reducer::RefreshPolicySnapshotArgs {
                 organization_id: organization_id.clone(),
+}),
+            Reducer::RefreshProjectEarnedValue{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&refresh_project_earned_value_reducer::RefreshProjectEarnedValueArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RefreshProjectMargin{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&refresh_project_margin_reducer::RefreshProjectMarginArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RefreshResourceCapacity{
+                organization_id,
+                company_id,
+                employee_id,
+}             => __sats::bsatn::to_vec(&refresh_resource_capacity_reducer::RefreshResourceCapacityArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                employee_id: employee_id.clone(),
+}),
+            Reducer::RefreshResourceUtilisation{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&refresh_resource_utilisation_reducer::RefreshResourceUtilisationArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RefreshSaleOrderPromiseDates{
                 organization_id,
@@ -15489,6 +16206,13 @@ Reducer::MoveStockQuant{
                 intake_id: intake_id.clone(),
                 rejection_reason: rejection_reason.clone(),
 }),
+            Reducer::RejectTimesheets{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&reject_timesheets_reducer::RejectTimesheetsArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ReleaseBlanketToPo{
                 organization_id,
                 company_id,
@@ -15590,6 +16314,13 @@ Reducer::MoveStockQuant{
 }             => __sats::bsatn::to_vec(&reopen_ticket_reducer::ReopenTicketArgs {
                 organization_id: organization_id.clone(),
                 ticket_id: ticket_id.clone(),
+}),
+            Reducer::ReopenTimesheets{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&reopen_timesheets_reducer::ReopenTimesheetsArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
 }),
             Reducer::ReorderProposalLineItems{
                 proposal_id,
@@ -15816,6 +16547,8 @@ Reducer::RunAllInventoryTests => __sats::bsatn::to_vec(&run_all_inventory_tests_
                 }),
 Reducer::RunAllPlatformTests => __sats::bsatn::to_vec(&run_all_platform_tests_reducer::RunAllPlatformTestsArgs {
                 }),
+Reducer::RunAllProjectsTests => __sats::bsatn::to_vec(&run_all_projects_tests_reducer::RunAllProjectsTestsArgs {
+                }),
 Reducer::RunAllPurchasingTests => __sats::bsatn::to_vec(&run_all_purchasing_tests_reducer::RunAllPurchasingTestsArgs {
                 }),
 Reducer::RunAllSalesTests => __sats::bsatn::to_vec(&run_all_sales_tests_reducer::RunAllSalesTestsArgs {
@@ -15967,7 +16700,15 @@ Reducer::RunOwnerReportSchedule{
                 organization_id: organization_id.clone(),
                 report_id: report_id.clone(),
 }),
-            Reducer::RunPurchasingBillBalancedTest => __sats::bsatn::to_vec(&run_purchasing_bill_balanced_test_reducer::RunPurchasingBillBalancedTestArgs {
+            Reducer::RunProjectsWaveATest => __sats::bsatn::to_vec(&run_projects_wave_a_test_reducer::RunProjectsWaveATestArgs {
+                }),
+Reducer::RunProjectsWaveCTest => __sats::bsatn::to_vec(&run_projects_wave_c_test_reducer::RunProjectsWaveCTestArgs {
+                }),
+Reducer::RunProjectsWaveDTest => __sats::bsatn::to_vec(&run_projects_wave_d_test_reducer::RunProjectsWaveDTestArgs {
+                }),
+Reducer::RunProjectsWaveETest => __sats::bsatn::to_vec(&run_projects_wave_e_test_reducer::RunProjectsWaveETestArgs {
+                }),
+Reducer::RunPurchasingBillBalancedTest => __sats::bsatn::to_vec(&run_purchasing_bill_balanced_test_reducer::RunPurchasingBillBalancedTestArgs {
                 }),
 Reducer::RunPurchasingCompanyIsolationTest => __sats::bsatn::to_vec(&run_purchasing_company_isolation_test_reducer::RunPurchasingCompanyIsolationTestArgs {
                 }),
@@ -16078,6 +16819,15 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id,
 }             => __sats::bsatn::to_vec(&seed_organization_form_configs_reducer::SeedOrganizationFormConfigsArgs {
                 organization_id: organization_id.clone(),
+}),
+            Reducer::SeedPackHolidays{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&seed_pack_holidays_reducer::SeedPackHolidaysArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
 }),
             Reducer::SendPurchaseOrder{
                 organization_id,
@@ -17200,6 +17950,28 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 credentials_reference: credentials_reference.clone(),
 }),
+            Reducer::UpdateHrEmployeeSkill{
+                organization_id,
+                company_id,
+                employee_skill_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_hr_employee_skill_reducer::UpdateHrEmployeeSkillArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                employee_skill_id: employee_skill_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateHrSkill{
+                organization_id,
+                company_id,
+                skill_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_hr_skill_reducer::UpdateHrSkillArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                skill_id: skill_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdateHubHeartbeat{
                 organization_id,
                 hub_id,
@@ -17590,6 +18362,39 @@ Reducer::SeedOrganizationFormConfigs{
                 project_id: project_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateProjectMilestone{
+                organization_id,
+                company_id,
+                milestone_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_project_milestone_reducer::UpdateProjectMilestoneArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                milestone_id: milestone_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateProjectRateCard{
+                organization_id,
+                company_id,
+                rate_card_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_project_rate_card_reducer::UpdateProjectRateCardArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                rate_card_id: rate_card_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateProjectRateCardLine{
+                organization_id,
+                company_id,
+                line_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_project_rate_card_line_reducer::UpdateProjectRateCardLineArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                line_id: line_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdateProposal{
                 proposal_id,
                 title,
@@ -17640,6 +18445,17 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&update_proposal_status_reducer::UpdateProposalStatusArgs {
                 proposal_id: proposal_id.clone(),
                 status: status.clone(),
+}),
+            Reducer::UpdatePublicHoliday{
+                organization_id,
+                company_id,
+                holiday_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_public_holiday_reducer::UpdatePublicHolidayArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                holiday_id: holiday_id.clone(),
+                params: params.clone(),
 }),
             Reducer::UpdatePurchaseOrder{
                 organization_id,
@@ -17697,6 +18513,17 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&update_report_template_reducer::UpdateReportTemplateArgs {
                 organization_id: organization_id.clone(),
                 template_id: template_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateResourceAllocation{
+                organization_id,
+                company_id,
+                allocation_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_resource_allocation_reducer::UpdateResourceAllocationArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                allocation_id: allocation_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateRole{
@@ -18049,6 +18876,17 @@ Reducer::SeedOrganizationFormConfigs{
                 workcenter_id: workcenter_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateWorkingCalendar{
+                organization_id,
+                company_id,
+                calendar_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_working_calendar_reducer::UpdateWorkingCalendarArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                calendar_id: calendar_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpsertAiSkill{
                 organization_id,
                 params,
@@ -18325,6 +19163,7 @@ pub struct DbUpdate {
     bom_explosion_result: __sdk::TableUpdate<BomExplosionResult>,
     budget_post: __sdk::TableUpdate<BudgetPost>,
     calendar_event: __sdk::TableUpdate<CalendarEvent>,
+    capacity_forecast_snapshot: __sdk::TableUpdate<CapacityForecastSnapshot>,
     cartonization_result: __sdk::TableUpdate<CartonizationResult>,
     casbin_rule: __sdk::TableUpdate<CasbinRule>,
     cash_flow_line: __sdk::TableUpdate<CashFlowLine>,
@@ -18392,6 +19231,7 @@ pub struct DbUpdate {
     hr_contract: __sdk::TableUpdate<HrContract>,
     hr_department: __sdk::TableUpdate<HrDepartment>,
     hr_employee: __sdk::TableUpdate<HrEmployee>,
+    hr_employee_skill: __sdk::TableUpdate<HrEmployeeSkill>,
     hr_expense: __sdk::TableUpdate<HrExpense>,
     hr_expense_advance: __sdk::TableUpdate<HrExpenseAdvance>,
     hr_expense_advance_application: __sdk::TableUpdate<HrExpenseAdvanceApplication>,
@@ -18407,6 +19247,7 @@ pub struct DbUpdate {
     hr_payslip: __sdk::TableUpdate<HrPayslip>,
     hr_resource: __sdk::TableUpdate<HrResource>,
     hr_salary_rule: __sdk::TableUpdate<HrSalaryRule>,
+    hr_skill: __sdk::TableUpdate<HrSkill>,
     import_job: __sdk::TableUpdate<ImportJob>,
     import_job_error: __sdk::TableUpdate<ImportJobError>,
     import_job_record: __sdk::TableUpdate<ImportJobRecord>,
@@ -18484,9 +19325,21 @@ pub struct DbUpdate {
     product_supplier_info: __sdk::TableUpdate<ProductSupplierInfo>,
     product_variant: __sdk::TableUpdate<ProductVariant>,
     profit_loss_line: __sdk::TableUpdate<ProfitLossLine>,
+    project_baseline: __sdk::TableUpdate<ProjectBaseline>,
+    project_change_order: __sdk::TableUpdate<ProjectChangeOrder>,
+    project_earned_value_snapshot: __sdk::TableUpdate<ProjectEarnedValueSnapshot>,
+    project_integration_intent: __sdk::TableUpdate<ProjectIntegrationIntent>,
+    project_margin_snapshot: __sdk::TableUpdate<ProjectMarginSnapshot>,
+    project_milestone: __sdk::TableUpdate<ProjectMilestone>,
     project_project: __sdk::TableUpdate<ProjectProject>,
+    project_rate_card: __sdk::TableUpdate<ProjectRateCard>,
+    project_rate_card_line: __sdk::TableUpdate<ProjectRateCardLine>,
+    project_revenue_line: __sdk::TableUpdate<ProjectRevenueLine>,
+    project_revenue_schedule: __sdk::TableUpdate<ProjectRevenueSchedule>,
+    project_subcontractor_cost: __sdk::TableUpdate<ProjectSubcontractorCost>,
     project_task: __sdk::TableUpdate<ProjectTask>,
     project_timesheet: __sdk::TableUpdate<ProjectTimesheet>,
+    project_timesheet_approval: __sdk::TableUpdate<ProjectTimesheetApproval>,
     proposal: __sdk::TableUpdate<Proposal>,
     proposal_comment: __sdk::TableUpdate<ProposalComment>,
     proposal_line_item: __sdk::TableUpdate<ProposalLineItem>,
@@ -18494,6 +19347,7 @@ pub struct DbUpdate {
     proposal_section: __sdk::TableUpdate<ProposalSection>,
     proposal_source_doc: __sdk::TableUpdate<ProposalSourceDoc>,
     proposal_version: __sdk::TableUpdate<ProposalVersion>,
+    public_holiday: __sdk::TableUpdate<PublicHoliday>,
     purchase_approval_delegate: __sdk::TableUpdate<PurchaseApprovalDelegate>,
     purchase_blanket_order: __sdk::TableUpdate<PurchaseBlanketOrder>,
     purchase_contract: __sdk::TableUpdate<PurchaseContract>,
@@ -18518,6 +19372,9 @@ pub struct DbUpdate {
     replenishment_rule: __sdk::TableUpdate<ReplenishmentRule>,
     report_template: __sdk::TableUpdate<ReportTemplate>,
     res_partner_bank: __sdk::TableUpdate<ResPartnerBank>,
+    resource_allocation: __sdk::TableUpdate<ResourceAllocation>,
+    resource_capacity_snapshot: __sdk::TableUpdate<ResourceCapacitySnapshot>,
+    resource_utilisation_snapshot: __sdk::TableUpdate<ResourceUtilisationSnapshot>,
     return_order: __sdk::TableUpdate<ReturnOrder>,
     return_order_line: __sdk::TableUpdate<ReturnOrderLine>,
     revenue_recognition_rule: __sdk::TableUpdate<RevenueRecognitionRule>,
@@ -18606,6 +19463,7 @@ pub struct DbUpdate {
     workflow_instance: __sdk::TableUpdate<WorkflowInstance>,
     workflow_transition: __sdk::TableUpdate<WorkflowTransition>,
     workflow_workitem: __sdk::TableUpdate<WorkflowWorkitem>,
+    working_calendar: __sdk::TableUpdate<WorkingCalendar>,
 }
 
 
@@ -18680,6 +19538,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "bom_explosion_result" => db_update.bom_explosion_result.append(bom_explosion_result_table::parse_table_update(table_update)?),
     "budget_post" => db_update.budget_post.append(budget_post_table::parse_table_update(table_update)?),
     "calendar_event" => db_update.calendar_event.append(calendar_event_table::parse_table_update(table_update)?),
+    "capacity_forecast_snapshot" => db_update.capacity_forecast_snapshot.append(capacity_forecast_snapshot_table::parse_table_update(table_update)?),
     "cartonization_result" => db_update.cartonization_result.append(cartonization_result_table::parse_table_update(table_update)?),
     "casbin_rule" => db_update.casbin_rule.append(casbin_rule_table::parse_table_update(table_update)?),
     "cash_flow_line" => db_update.cash_flow_line.append(cash_flow_line_table::parse_table_update(table_update)?),
@@ -18747,6 +19606,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "hr_contract" => db_update.hr_contract.append(hr_contract_table::parse_table_update(table_update)?),
     "hr_department" => db_update.hr_department.append(hr_department_table::parse_table_update(table_update)?),
     "hr_employee" => db_update.hr_employee.append(hr_employee_table::parse_table_update(table_update)?),
+    "hr_employee_skill" => db_update.hr_employee_skill.append(hr_employee_skill_table::parse_table_update(table_update)?),
     "hr_expense" => db_update.hr_expense.append(hr_expense_table::parse_table_update(table_update)?),
     "hr_expense_advance" => db_update.hr_expense_advance.append(hr_expense_advance_table::parse_table_update(table_update)?),
     "hr_expense_advance_application" => db_update.hr_expense_advance_application.append(hr_expense_advance_application_table::parse_table_update(table_update)?),
@@ -18762,6 +19622,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "hr_payslip" => db_update.hr_payslip.append(hr_payslip_table::parse_table_update(table_update)?),
     "hr_resource" => db_update.hr_resource.append(hr_resource_table::parse_table_update(table_update)?),
     "hr_salary_rule" => db_update.hr_salary_rule.append(hr_salary_rule_table::parse_table_update(table_update)?),
+    "hr_skill" => db_update.hr_skill.append(hr_skill_table::parse_table_update(table_update)?),
     "import_job" => db_update.import_job.append(import_job_table::parse_table_update(table_update)?),
     "import_job_error" => db_update.import_job_error.append(import_job_error_table::parse_table_update(table_update)?),
     "import_job_record" => db_update.import_job_record.append(import_job_record_table::parse_table_update(table_update)?),
@@ -18839,9 +19700,21 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "product_supplier_info" => db_update.product_supplier_info.append(product_supplier_info_table::parse_table_update(table_update)?),
     "product_variant" => db_update.product_variant.append(product_variant_table::parse_table_update(table_update)?),
     "profit_loss_line" => db_update.profit_loss_line.append(profit_loss_line_table::parse_table_update(table_update)?),
+    "project_baseline" => db_update.project_baseline.append(project_baseline_table::parse_table_update(table_update)?),
+    "project_change_order" => db_update.project_change_order.append(project_change_order_table::parse_table_update(table_update)?),
+    "project_earned_value_snapshot" => db_update.project_earned_value_snapshot.append(project_earned_value_snapshot_table::parse_table_update(table_update)?),
+    "project_integration_intent" => db_update.project_integration_intent.append(project_integration_intent_table::parse_table_update(table_update)?),
+    "project_margin_snapshot" => db_update.project_margin_snapshot.append(project_margin_snapshot_table::parse_table_update(table_update)?),
+    "project_milestone" => db_update.project_milestone.append(project_milestone_table::parse_table_update(table_update)?),
     "project_project" => db_update.project_project.append(project_project_table::parse_table_update(table_update)?),
+    "project_rate_card" => db_update.project_rate_card.append(project_rate_card_table::parse_table_update(table_update)?),
+    "project_rate_card_line" => db_update.project_rate_card_line.append(project_rate_card_line_table::parse_table_update(table_update)?),
+    "project_revenue_line" => db_update.project_revenue_line.append(project_revenue_line_table::parse_table_update(table_update)?),
+    "project_revenue_schedule" => db_update.project_revenue_schedule.append(project_revenue_schedule_table::parse_table_update(table_update)?),
+    "project_subcontractor_cost" => db_update.project_subcontractor_cost.append(project_subcontractor_cost_table::parse_table_update(table_update)?),
     "project_task" => db_update.project_task.append(project_task_table::parse_table_update(table_update)?),
     "project_timesheet" => db_update.project_timesheet.append(project_timesheet_table::parse_table_update(table_update)?),
+    "project_timesheet_approval" => db_update.project_timesheet_approval.append(project_timesheet_approval_table::parse_table_update(table_update)?),
     "proposal" => db_update.proposal.append(proposal_table::parse_table_update(table_update)?),
     "proposal_comment" => db_update.proposal_comment.append(proposal_comment_table::parse_table_update(table_update)?),
     "proposal_line_item" => db_update.proposal_line_item.append(proposal_line_item_table::parse_table_update(table_update)?),
@@ -18849,6 +19722,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "proposal_section" => db_update.proposal_section.append(proposal_section_table::parse_table_update(table_update)?),
     "proposal_source_doc" => db_update.proposal_source_doc.append(proposal_source_doc_table::parse_table_update(table_update)?),
     "proposal_version" => db_update.proposal_version.append(proposal_version_table::parse_table_update(table_update)?),
+    "public_holiday" => db_update.public_holiday.append(public_holiday_table::parse_table_update(table_update)?),
     "purchase_approval_delegate" => db_update.purchase_approval_delegate.append(purchase_approval_delegate_table::parse_table_update(table_update)?),
     "purchase_blanket_order" => db_update.purchase_blanket_order.append(purchase_blanket_order_table::parse_table_update(table_update)?),
     "purchase_contract" => db_update.purchase_contract.append(purchase_contract_table::parse_table_update(table_update)?),
@@ -18873,6 +19747,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "replenishment_rule" => db_update.replenishment_rule.append(replenishment_rule_table::parse_table_update(table_update)?),
     "report_template" => db_update.report_template.append(report_template_table::parse_table_update(table_update)?),
     "res_partner_bank" => db_update.res_partner_bank.append(res_partner_bank_table::parse_table_update(table_update)?),
+    "resource_allocation" => db_update.resource_allocation.append(resource_allocation_table::parse_table_update(table_update)?),
+    "resource_capacity_snapshot" => db_update.resource_capacity_snapshot.append(resource_capacity_snapshot_table::parse_table_update(table_update)?),
+    "resource_utilisation_snapshot" => db_update.resource_utilisation_snapshot.append(resource_utilisation_snapshot_table::parse_table_update(table_update)?),
     "return_order" => db_update.return_order.append(return_order_table::parse_table_update(table_update)?),
     "return_order_line" => db_update.return_order_line.append(return_order_line_table::parse_table_update(table_update)?),
     "revenue_recognition_rule" => db_update.revenue_recognition_rule.append(revenue_recognition_rule_table::parse_table_update(table_update)?),
@@ -18961,6 +19838,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "workflow_instance" => db_update.workflow_instance.append(workflow_instance_table::parse_table_update(table_update)?),
     "workflow_transition" => db_update.workflow_transition.append(workflow_transition_table::parse_table_update(table_update)?),
     "workflow_workitem" => db_update.workflow_workitem.append(workflow_workitem_table::parse_table_update(table_update)?),
+    "working_calendar" => db_update.working_calendar.append(working_calendar_table::parse_table_update(table_update)?),
 
                 unknown => {
                     return Err(__sdk::InternalError::unknown_name(
@@ -19047,6 +19925,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.bom_explosion_result = cache.apply_diff_to_table::<BomExplosionResult>("bom_explosion_result", &self.bom_explosion_result).with_updates_by_pk(|row| &row.id);
         diff.budget_post = cache.apply_diff_to_table::<BudgetPost>("budget_post", &self.budget_post).with_updates_by_pk(|row| &row.id);
         diff.calendar_event = cache.apply_diff_to_table::<CalendarEvent>("calendar_event", &self.calendar_event).with_updates_by_pk(|row| &row.id);
+        diff.capacity_forecast_snapshot = cache.apply_diff_to_table::<CapacityForecastSnapshot>("capacity_forecast_snapshot", &self.capacity_forecast_snapshot).with_updates_by_pk(|row| &row.id);
         diff.cartonization_result = cache.apply_diff_to_table::<CartonizationResult>("cartonization_result", &self.cartonization_result).with_updates_by_pk(|row| &row.id);
         diff.casbin_rule = cache.apply_diff_to_table::<CasbinRule>("casbin_rule", &self.casbin_rule).with_updates_by_pk(|row| &row.id);
         diff.cash_flow_line = cache.apply_diff_to_table::<CashFlowLine>("cash_flow_line", &self.cash_flow_line).with_updates_by_pk(|row| &row.id);
@@ -19114,6 +19993,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.hr_contract = cache.apply_diff_to_table::<HrContract>("hr_contract", &self.hr_contract).with_updates_by_pk(|row| &row.id);
         diff.hr_department = cache.apply_diff_to_table::<HrDepartment>("hr_department", &self.hr_department).with_updates_by_pk(|row| &row.id);
         diff.hr_employee = cache.apply_diff_to_table::<HrEmployee>("hr_employee", &self.hr_employee).with_updates_by_pk(|row| &row.id);
+        diff.hr_employee_skill = cache.apply_diff_to_table::<HrEmployeeSkill>("hr_employee_skill", &self.hr_employee_skill).with_updates_by_pk(|row| &row.id);
         diff.hr_expense = cache.apply_diff_to_table::<HrExpense>("hr_expense", &self.hr_expense).with_updates_by_pk(|row| &row.id);
         diff.hr_expense_advance = cache.apply_diff_to_table::<HrExpenseAdvance>("hr_expense_advance", &self.hr_expense_advance).with_updates_by_pk(|row| &row.id);
         diff.hr_expense_advance_application = cache.apply_diff_to_table::<HrExpenseAdvanceApplication>("hr_expense_advance_application", &self.hr_expense_advance_application).with_updates_by_pk(|row| &row.id);
@@ -19129,6 +20009,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.hr_payslip = cache.apply_diff_to_table::<HrPayslip>("hr_payslip", &self.hr_payslip).with_updates_by_pk(|row| &row.id);
         diff.hr_resource = cache.apply_diff_to_table::<HrResource>("hr_resource", &self.hr_resource).with_updates_by_pk(|row| &row.id);
         diff.hr_salary_rule = cache.apply_diff_to_table::<HrSalaryRule>("hr_salary_rule", &self.hr_salary_rule).with_updates_by_pk(|row| &row.id);
+        diff.hr_skill = cache.apply_diff_to_table::<HrSkill>("hr_skill", &self.hr_skill).with_updates_by_pk(|row| &row.id);
         diff.import_job = cache.apply_diff_to_table::<ImportJob>("import_job", &self.import_job).with_updates_by_pk(|row| &row.id);
         diff.import_job_error = cache.apply_diff_to_table::<ImportJobError>("import_job_error", &self.import_job_error).with_updates_by_pk(|row| &row.id);
         diff.import_job_record = cache.apply_diff_to_table::<ImportJobRecord>("import_job_record", &self.import_job_record).with_updates_by_pk(|row| &row.id);
@@ -19206,9 +20087,21 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.product_supplier_info = cache.apply_diff_to_table::<ProductSupplierInfo>("product_supplier_info", &self.product_supplier_info).with_updates_by_pk(|row| &row.id);
         diff.product_variant = cache.apply_diff_to_table::<ProductVariant>("product_variant", &self.product_variant).with_updates_by_pk(|row| &row.id);
         diff.profit_loss_line = cache.apply_diff_to_table::<ProfitLossLine>("profit_loss_line", &self.profit_loss_line).with_updates_by_pk(|row| &row.id);
+        diff.project_baseline = cache.apply_diff_to_table::<ProjectBaseline>("project_baseline", &self.project_baseline).with_updates_by_pk(|row| &row.id);
+        diff.project_change_order = cache.apply_diff_to_table::<ProjectChangeOrder>("project_change_order", &self.project_change_order).with_updates_by_pk(|row| &row.id);
+        diff.project_earned_value_snapshot = cache.apply_diff_to_table::<ProjectEarnedValueSnapshot>("project_earned_value_snapshot", &self.project_earned_value_snapshot).with_updates_by_pk(|row| &row.id);
+        diff.project_integration_intent = cache.apply_diff_to_table::<ProjectIntegrationIntent>("project_integration_intent", &self.project_integration_intent).with_updates_by_pk(|row| &row.id);
+        diff.project_margin_snapshot = cache.apply_diff_to_table::<ProjectMarginSnapshot>("project_margin_snapshot", &self.project_margin_snapshot).with_updates_by_pk(|row| &row.id);
+        diff.project_milestone = cache.apply_diff_to_table::<ProjectMilestone>("project_milestone", &self.project_milestone).with_updates_by_pk(|row| &row.id);
         diff.project_project = cache.apply_diff_to_table::<ProjectProject>("project_project", &self.project_project).with_updates_by_pk(|row| &row.id);
+        diff.project_rate_card = cache.apply_diff_to_table::<ProjectRateCard>("project_rate_card", &self.project_rate_card).with_updates_by_pk(|row| &row.id);
+        diff.project_rate_card_line = cache.apply_diff_to_table::<ProjectRateCardLine>("project_rate_card_line", &self.project_rate_card_line).with_updates_by_pk(|row| &row.id);
+        diff.project_revenue_line = cache.apply_diff_to_table::<ProjectRevenueLine>("project_revenue_line", &self.project_revenue_line).with_updates_by_pk(|row| &row.id);
+        diff.project_revenue_schedule = cache.apply_diff_to_table::<ProjectRevenueSchedule>("project_revenue_schedule", &self.project_revenue_schedule).with_updates_by_pk(|row| &row.id);
+        diff.project_subcontractor_cost = cache.apply_diff_to_table::<ProjectSubcontractorCost>("project_subcontractor_cost", &self.project_subcontractor_cost).with_updates_by_pk(|row| &row.id);
         diff.project_task = cache.apply_diff_to_table::<ProjectTask>("project_task", &self.project_task).with_updates_by_pk(|row| &row.id);
         diff.project_timesheet = cache.apply_diff_to_table::<ProjectTimesheet>("project_timesheet", &self.project_timesheet).with_updates_by_pk(|row| &row.id);
+        diff.project_timesheet_approval = cache.apply_diff_to_table::<ProjectTimesheetApproval>("project_timesheet_approval", &self.project_timesheet_approval).with_updates_by_pk(|row| &row.id);
         diff.proposal = cache.apply_diff_to_table::<Proposal>("proposal", &self.proposal).with_updates_by_pk(|row| &row.id);
         diff.proposal_comment = cache.apply_diff_to_table::<ProposalComment>("proposal_comment", &self.proposal_comment).with_updates_by_pk(|row| &row.id);
         diff.proposal_line_item = cache.apply_diff_to_table::<ProposalLineItem>("proposal_line_item", &self.proposal_line_item).with_updates_by_pk(|row| &row.id);
@@ -19216,6 +20109,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.proposal_section = cache.apply_diff_to_table::<ProposalSection>("proposal_section", &self.proposal_section).with_updates_by_pk(|row| &row.id);
         diff.proposal_source_doc = cache.apply_diff_to_table::<ProposalSourceDoc>("proposal_source_doc", &self.proposal_source_doc).with_updates_by_pk(|row| &row.id);
         diff.proposal_version = cache.apply_diff_to_table::<ProposalVersion>("proposal_version", &self.proposal_version).with_updates_by_pk(|row| &row.id);
+        diff.public_holiday = cache.apply_diff_to_table::<PublicHoliday>("public_holiday", &self.public_holiday).with_updates_by_pk(|row| &row.id);
         diff.purchase_approval_delegate = cache.apply_diff_to_table::<PurchaseApprovalDelegate>("purchase_approval_delegate", &self.purchase_approval_delegate).with_updates_by_pk(|row| &row.id);
         diff.purchase_blanket_order = cache.apply_diff_to_table::<PurchaseBlanketOrder>("purchase_blanket_order", &self.purchase_blanket_order).with_updates_by_pk(|row| &row.id);
         diff.purchase_contract = cache.apply_diff_to_table::<PurchaseContract>("purchase_contract", &self.purchase_contract).with_updates_by_pk(|row| &row.id);
@@ -19240,6 +20134,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.replenishment_rule = cache.apply_diff_to_table::<ReplenishmentRule>("replenishment_rule", &self.replenishment_rule).with_updates_by_pk(|row| &row.id);
         diff.report_template = cache.apply_diff_to_table::<ReportTemplate>("report_template", &self.report_template).with_updates_by_pk(|row| &row.id);
         diff.res_partner_bank = cache.apply_diff_to_table::<ResPartnerBank>("res_partner_bank", &self.res_partner_bank).with_updates_by_pk(|row| &row.id);
+        diff.resource_allocation = cache.apply_diff_to_table::<ResourceAllocation>("resource_allocation", &self.resource_allocation).with_updates_by_pk(|row| &row.id);
+        diff.resource_capacity_snapshot = cache.apply_diff_to_table::<ResourceCapacitySnapshot>("resource_capacity_snapshot", &self.resource_capacity_snapshot).with_updates_by_pk(|row| &row.id);
+        diff.resource_utilisation_snapshot = cache.apply_diff_to_table::<ResourceUtilisationSnapshot>("resource_utilisation_snapshot", &self.resource_utilisation_snapshot).with_updates_by_pk(|row| &row.id);
         diff.return_order = cache.apply_diff_to_table::<ReturnOrder>("return_order", &self.return_order).with_updates_by_pk(|row| &row.id);
         diff.return_order_line = cache.apply_diff_to_table::<ReturnOrderLine>("return_order_line", &self.return_order_line).with_updates_by_pk(|row| &row.id);
         diff.revenue_recognition_rule = cache.apply_diff_to_table::<RevenueRecognitionRule>("revenue_recognition_rule", &self.revenue_recognition_rule).with_updates_by_pk(|row| &row.id);
@@ -19328,6 +20225,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.workflow_instance = cache.apply_diff_to_table::<WorkflowInstance>("workflow_instance", &self.workflow_instance).with_updates_by_pk(|row| &row.id);
         diff.workflow_transition = cache.apply_diff_to_table::<WorkflowTransition>("workflow_transition", &self.workflow_transition).with_updates_by_pk(|row| &row.id);
         diff.workflow_workitem = cache.apply_diff_to_table::<WorkflowWorkitem>("workflow_workitem", &self.workflow_workitem).with_updates_by_pk(|row| &row.id);
+        diff.working_calendar = cache.apply_diff_to_table::<WorkingCalendar>("working_calendar", &self.working_calendar).with_updates_by_pk(|row| &row.id);
 
                     diff
                 }
@@ -19399,6 +20297,7 @@ for table_rows in raw.tables {
                 "bom_explosion_result" => db_update.bom_explosion_result.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "budget_post" => db_update.budget_post.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "calendar_event" => db_update.calendar_event.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "capacity_forecast_snapshot" => db_update.capacity_forecast_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "cartonization_result" => db_update.cartonization_result.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "casbin_rule" => db_update.casbin_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "cash_flow_line" => db_update.cash_flow_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -19466,6 +20365,7 @@ for table_rows in raw.tables {
                 "hr_contract" => db_update.hr_contract.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_department" => db_update.hr_department.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_employee" => db_update.hr_employee.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_employee_skill" => db_update.hr_employee_skill.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_expense" => db_update.hr_expense.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_expense_advance" => db_update.hr_expense_advance.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_expense_advance_application" => db_update.hr_expense_advance_application.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -19481,6 +20381,7 @@ for table_rows in raw.tables {
                 "hr_payslip" => db_update.hr_payslip.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_resource" => db_update.hr_resource.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_salary_rule" => db_update.hr_salary_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_skill" => db_update.hr_skill.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "import_job" => db_update.import_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "import_job_error" => db_update.import_job_error.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "import_job_record" => db_update.import_job_record.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -19558,9 +20459,21 @@ for table_rows in raw.tables {
                 "product_supplier_info" => db_update.product_supplier_info.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "product_variant" => db_update.product_variant.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "profit_loss_line" => db_update.profit_loss_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_baseline" => db_update.project_baseline.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_change_order" => db_update.project_change_order.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_earned_value_snapshot" => db_update.project_earned_value_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_integration_intent" => db_update.project_integration_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_margin_snapshot" => db_update.project_margin_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_milestone" => db_update.project_milestone.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "project_project" => db_update.project_project.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_rate_card" => db_update.project_rate_card.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_rate_card_line" => db_update.project_rate_card_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_revenue_line" => db_update.project_revenue_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_revenue_schedule" => db_update.project_revenue_schedule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_subcontractor_cost" => db_update.project_subcontractor_cost.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "project_task" => db_update.project_task.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "project_timesheet" => db_update.project_timesheet.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "project_timesheet_approval" => db_update.project_timesheet_approval.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal" => db_update.proposal.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_comment" => db_update.proposal_comment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_line_item" => db_update.proposal_line_item.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -19568,6 +20481,7 @@ for table_rows in raw.tables {
                 "proposal_section" => db_update.proposal_section.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_source_doc" => db_update.proposal_source_doc.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_version" => db_update.proposal_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "public_holiday" => db_update.public_holiday.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_approval_delegate" => db_update.purchase_approval_delegate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_blanket_order" => db_update.purchase_blanket_order.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_contract" => db_update.purchase_contract.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -19592,6 +20506,9 @@ for table_rows in raw.tables {
                 "replenishment_rule" => db_update.replenishment_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "report_template" => db_update.report_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "res_partner_bank" => db_update.res_partner_bank.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "resource_allocation" => db_update.resource_allocation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "resource_capacity_snapshot" => db_update.resource_capacity_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "resource_utilisation_snapshot" => db_update.resource_utilisation_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "return_order" => db_update.return_order.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "return_order_line" => db_update.return_order_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "revenue_recognition_rule" => db_update.revenue_recognition_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -19680,6 +20597,7 @@ for table_rows in raw.tables {
                 "workflow_instance" => db_update.workflow_instance.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "workflow_transition" => db_update.workflow_transition.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "workflow_workitem" => db_update.workflow_workitem.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "working_calendar" => db_update.working_calendar.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 unknown => { return Err(__sdk::InternalError::unknown_name("table", unknown, "QueryRows").into()); }
 }}        Ok(db_update)
 }
@@ -19751,6 +20669,7 @@ for table_rows in raw.tables {
                 "bom_explosion_result" => db_update.bom_explosion_result.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "budget_post" => db_update.budget_post.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "calendar_event" => db_update.calendar_event.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "capacity_forecast_snapshot" => db_update.capacity_forecast_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "cartonization_result" => db_update.cartonization_result.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "casbin_rule" => db_update.casbin_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "cash_flow_line" => db_update.cash_flow_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -19818,6 +20737,7 @@ for table_rows in raw.tables {
                 "hr_contract" => db_update.hr_contract.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_department" => db_update.hr_department.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_employee" => db_update.hr_employee.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_employee_skill" => db_update.hr_employee_skill.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_expense" => db_update.hr_expense.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_expense_advance" => db_update.hr_expense_advance.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_expense_advance_application" => db_update.hr_expense_advance_application.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -19833,6 +20753,7 @@ for table_rows in raw.tables {
                 "hr_payslip" => db_update.hr_payslip.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_resource" => db_update.hr_resource.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_salary_rule" => db_update.hr_salary_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_skill" => db_update.hr_skill.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "import_job" => db_update.import_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "import_job_error" => db_update.import_job_error.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "import_job_record" => db_update.import_job_record.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -19910,9 +20831,21 @@ for table_rows in raw.tables {
                 "product_supplier_info" => db_update.product_supplier_info.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "product_variant" => db_update.product_variant.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "profit_loss_line" => db_update.profit_loss_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_baseline" => db_update.project_baseline.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_change_order" => db_update.project_change_order.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_earned_value_snapshot" => db_update.project_earned_value_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_integration_intent" => db_update.project_integration_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_margin_snapshot" => db_update.project_margin_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_milestone" => db_update.project_milestone.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "project_project" => db_update.project_project.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_rate_card" => db_update.project_rate_card.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_rate_card_line" => db_update.project_rate_card_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_revenue_line" => db_update.project_revenue_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_revenue_schedule" => db_update.project_revenue_schedule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_subcontractor_cost" => db_update.project_subcontractor_cost.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "project_task" => db_update.project_task.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "project_timesheet" => db_update.project_timesheet.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "project_timesheet_approval" => db_update.project_timesheet_approval.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal" => db_update.proposal.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_comment" => db_update.proposal_comment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_line_item" => db_update.proposal_line_item.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -19920,6 +20853,7 @@ for table_rows in raw.tables {
                 "proposal_section" => db_update.proposal_section.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_source_doc" => db_update.proposal_source_doc.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_version" => db_update.proposal_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "public_holiday" => db_update.public_holiday.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_approval_delegate" => db_update.purchase_approval_delegate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_blanket_order" => db_update.purchase_blanket_order.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_contract" => db_update.purchase_contract.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -19944,6 +20878,9 @@ for table_rows in raw.tables {
                 "replenishment_rule" => db_update.replenishment_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "report_template" => db_update.report_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "res_partner_bank" => db_update.res_partner_bank.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "resource_allocation" => db_update.resource_allocation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "resource_capacity_snapshot" => db_update.resource_capacity_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "resource_utilisation_snapshot" => db_update.resource_utilisation_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "return_order" => db_update.return_order.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "return_order_line" => db_update.return_order_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "revenue_recognition_rule" => db_update.revenue_recognition_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -20032,6 +20969,7 @@ for table_rows in raw.tables {
                 "workflow_instance" => db_update.workflow_instance.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "workflow_transition" => db_update.workflow_transition.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "workflow_workitem" => db_update.workflow_workitem.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "working_calendar" => db_update.working_calendar.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 unknown => { return Err(__sdk::InternalError::unknown_name("table", unknown, "QueryRows").into()); }
 }}        Ok(db_update)
 }
@@ -20105,6 +21043,7 @@ pub struct AppliedDiff<'r> {
     bom_explosion_result: __sdk::TableAppliedDiff<'r, BomExplosionResult>,
     budget_post: __sdk::TableAppliedDiff<'r, BudgetPost>,
     calendar_event: __sdk::TableAppliedDiff<'r, CalendarEvent>,
+    capacity_forecast_snapshot: __sdk::TableAppliedDiff<'r, CapacityForecastSnapshot>,
     cartonization_result: __sdk::TableAppliedDiff<'r, CartonizationResult>,
     casbin_rule: __sdk::TableAppliedDiff<'r, CasbinRule>,
     cash_flow_line: __sdk::TableAppliedDiff<'r, CashFlowLine>,
@@ -20172,6 +21111,7 @@ pub struct AppliedDiff<'r> {
     hr_contract: __sdk::TableAppliedDiff<'r, HrContract>,
     hr_department: __sdk::TableAppliedDiff<'r, HrDepartment>,
     hr_employee: __sdk::TableAppliedDiff<'r, HrEmployee>,
+    hr_employee_skill: __sdk::TableAppliedDiff<'r, HrEmployeeSkill>,
     hr_expense: __sdk::TableAppliedDiff<'r, HrExpense>,
     hr_expense_advance: __sdk::TableAppliedDiff<'r, HrExpenseAdvance>,
     hr_expense_advance_application: __sdk::TableAppliedDiff<'r, HrExpenseAdvanceApplication>,
@@ -20187,6 +21127,7 @@ pub struct AppliedDiff<'r> {
     hr_payslip: __sdk::TableAppliedDiff<'r, HrPayslip>,
     hr_resource: __sdk::TableAppliedDiff<'r, HrResource>,
     hr_salary_rule: __sdk::TableAppliedDiff<'r, HrSalaryRule>,
+    hr_skill: __sdk::TableAppliedDiff<'r, HrSkill>,
     import_job: __sdk::TableAppliedDiff<'r, ImportJob>,
     import_job_error: __sdk::TableAppliedDiff<'r, ImportJobError>,
     import_job_record: __sdk::TableAppliedDiff<'r, ImportJobRecord>,
@@ -20264,9 +21205,21 @@ pub struct AppliedDiff<'r> {
     product_supplier_info: __sdk::TableAppliedDiff<'r, ProductSupplierInfo>,
     product_variant: __sdk::TableAppliedDiff<'r, ProductVariant>,
     profit_loss_line: __sdk::TableAppliedDiff<'r, ProfitLossLine>,
+    project_baseline: __sdk::TableAppliedDiff<'r, ProjectBaseline>,
+    project_change_order: __sdk::TableAppliedDiff<'r, ProjectChangeOrder>,
+    project_earned_value_snapshot: __sdk::TableAppliedDiff<'r, ProjectEarnedValueSnapshot>,
+    project_integration_intent: __sdk::TableAppliedDiff<'r, ProjectIntegrationIntent>,
+    project_margin_snapshot: __sdk::TableAppliedDiff<'r, ProjectMarginSnapshot>,
+    project_milestone: __sdk::TableAppliedDiff<'r, ProjectMilestone>,
     project_project: __sdk::TableAppliedDiff<'r, ProjectProject>,
+    project_rate_card: __sdk::TableAppliedDiff<'r, ProjectRateCard>,
+    project_rate_card_line: __sdk::TableAppliedDiff<'r, ProjectRateCardLine>,
+    project_revenue_line: __sdk::TableAppliedDiff<'r, ProjectRevenueLine>,
+    project_revenue_schedule: __sdk::TableAppliedDiff<'r, ProjectRevenueSchedule>,
+    project_subcontractor_cost: __sdk::TableAppliedDiff<'r, ProjectSubcontractorCost>,
     project_task: __sdk::TableAppliedDiff<'r, ProjectTask>,
     project_timesheet: __sdk::TableAppliedDiff<'r, ProjectTimesheet>,
+    project_timesheet_approval: __sdk::TableAppliedDiff<'r, ProjectTimesheetApproval>,
     proposal: __sdk::TableAppliedDiff<'r, Proposal>,
     proposal_comment: __sdk::TableAppliedDiff<'r, ProposalComment>,
     proposal_line_item: __sdk::TableAppliedDiff<'r, ProposalLineItem>,
@@ -20274,6 +21227,7 @@ pub struct AppliedDiff<'r> {
     proposal_section: __sdk::TableAppliedDiff<'r, ProposalSection>,
     proposal_source_doc: __sdk::TableAppliedDiff<'r, ProposalSourceDoc>,
     proposal_version: __sdk::TableAppliedDiff<'r, ProposalVersion>,
+    public_holiday: __sdk::TableAppliedDiff<'r, PublicHoliday>,
     purchase_approval_delegate: __sdk::TableAppliedDiff<'r, PurchaseApprovalDelegate>,
     purchase_blanket_order: __sdk::TableAppliedDiff<'r, PurchaseBlanketOrder>,
     purchase_contract: __sdk::TableAppliedDiff<'r, PurchaseContract>,
@@ -20298,6 +21252,9 @@ pub struct AppliedDiff<'r> {
     replenishment_rule: __sdk::TableAppliedDiff<'r, ReplenishmentRule>,
     report_template: __sdk::TableAppliedDiff<'r, ReportTemplate>,
     res_partner_bank: __sdk::TableAppliedDiff<'r, ResPartnerBank>,
+    resource_allocation: __sdk::TableAppliedDiff<'r, ResourceAllocation>,
+    resource_capacity_snapshot: __sdk::TableAppliedDiff<'r, ResourceCapacitySnapshot>,
+    resource_utilisation_snapshot: __sdk::TableAppliedDiff<'r, ResourceUtilisationSnapshot>,
     return_order: __sdk::TableAppliedDiff<'r, ReturnOrder>,
     return_order_line: __sdk::TableAppliedDiff<'r, ReturnOrderLine>,
     revenue_recognition_rule: __sdk::TableAppliedDiff<'r, RevenueRecognitionRule>,
@@ -20386,6 +21343,7 @@ pub struct AppliedDiff<'r> {
     workflow_instance: __sdk::TableAppliedDiff<'r, WorkflowInstance>,
     workflow_transition: __sdk::TableAppliedDiff<'r, WorkflowTransition>,
     workflow_workitem: __sdk::TableAppliedDiff<'r, WorkflowWorkitem>,
+    working_calendar: __sdk::TableAppliedDiff<'r, WorkingCalendar>,
     __unused: std::marker::PhantomData<&'r ()>,
 }
 
@@ -20460,6 +21418,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<BomExplosionResult>("bom_explosion_result", &self.bom_explosion_result, event);
         callbacks.invoke_table_row_callbacks::<BudgetPost>("budget_post", &self.budget_post, event);
         callbacks.invoke_table_row_callbacks::<CalendarEvent>("calendar_event", &self.calendar_event, event);
+        callbacks.invoke_table_row_callbacks::<CapacityForecastSnapshot>("capacity_forecast_snapshot", &self.capacity_forecast_snapshot, event);
         callbacks.invoke_table_row_callbacks::<CartonizationResult>("cartonization_result", &self.cartonization_result, event);
         callbacks.invoke_table_row_callbacks::<CasbinRule>("casbin_rule", &self.casbin_rule, event);
         callbacks.invoke_table_row_callbacks::<CashFlowLine>("cash_flow_line", &self.cash_flow_line, event);
@@ -20527,6 +21486,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<HrContract>("hr_contract", &self.hr_contract, event);
         callbacks.invoke_table_row_callbacks::<HrDepartment>("hr_department", &self.hr_department, event);
         callbacks.invoke_table_row_callbacks::<HrEmployee>("hr_employee", &self.hr_employee, event);
+        callbacks.invoke_table_row_callbacks::<HrEmployeeSkill>("hr_employee_skill", &self.hr_employee_skill, event);
         callbacks.invoke_table_row_callbacks::<HrExpense>("hr_expense", &self.hr_expense, event);
         callbacks.invoke_table_row_callbacks::<HrExpenseAdvance>("hr_expense_advance", &self.hr_expense_advance, event);
         callbacks.invoke_table_row_callbacks::<HrExpenseAdvanceApplication>("hr_expense_advance_application", &self.hr_expense_advance_application, event);
@@ -20542,6 +21502,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<HrPayslip>("hr_payslip", &self.hr_payslip, event);
         callbacks.invoke_table_row_callbacks::<HrResource>("hr_resource", &self.hr_resource, event);
         callbacks.invoke_table_row_callbacks::<HrSalaryRule>("hr_salary_rule", &self.hr_salary_rule, event);
+        callbacks.invoke_table_row_callbacks::<HrSkill>("hr_skill", &self.hr_skill, event);
         callbacks.invoke_table_row_callbacks::<ImportJob>("import_job", &self.import_job, event);
         callbacks.invoke_table_row_callbacks::<ImportJobError>("import_job_error", &self.import_job_error, event);
         callbacks.invoke_table_row_callbacks::<ImportJobRecord>("import_job_record", &self.import_job_record, event);
@@ -20619,9 +21580,21 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<ProductSupplierInfo>("product_supplier_info", &self.product_supplier_info, event);
         callbacks.invoke_table_row_callbacks::<ProductVariant>("product_variant", &self.product_variant, event);
         callbacks.invoke_table_row_callbacks::<ProfitLossLine>("profit_loss_line", &self.profit_loss_line, event);
+        callbacks.invoke_table_row_callbacks::<ProjectBaseline>("project_baseline", &self.project_baseline, event);
+        callbacks.invoke_table_row_callbacks::<ProjectChangeOrder>("project_change_order", &self.project_change_order, event);
+        callbacks.invoke_table_row_callbacks::<ProjectEarnedValueSnapshot>("project_earned_value_snapshot", &self.project_earned_value_snapshot, event);
+        callbacks.invoke_table_row_callbacks::<ProjectIntegrationIntent>("project_integration_intent", &self.project_integration_intent, event);
+        callbacks.invoke_table_row_callbacks::<ProjectMarginSnapshot>("project_margin_snapshot", &self.project_margin_snapshot, event);
+        callbacks.invoke_table_row_callbacks::<ProjectMilestone>("project_milestone", &self.project_milestone, event);
         callbacks.invoke_table_row_callbacks::<ProjectProject>("project_project", &self.project_project, event);
+        callbacks.invoke_table_row_callbacks::<ProjectRateCard>("project_rate_card", &self.project_rate_card, event);
+        callbacks.invoke_table_row_callbacks::<ProjectRateCardLine>("project_rate_card_line", &self.project_rate_card_line, event);
+        callbacks.invoke_table_row_callbacks::<ProjectRevenueLine>("project_revenue_line", &self.project_revenue_line, event);
+        callbacks.invoke_table_row_callbacks::<ProjectRevenueSchedule>("project_revenue_schedule", &self.project_revenue_schedule, event);
+        callbacks.invoke_table_row_callbacks::<ProjectSubcontractorCost>("project_subcontractor_cost", &self.project_subcontractor_cost, event);
         callbacks.invoke_table_row_callbacks::<ProjectTask>("project_task", &self.project_task, event);
         callbacks.invoke_table_row_callbacks::<ProjectTimesheet>("project_timesheet", &self.project_timesheet, event);
+        callbacks.invoke_table_row_callbacks::<ProjectTimesheetApproval>("project_timesheet_approval", &self.project_timesheet_approval, event);
         callbacks.invoke_table_row_callbacks::<Proposal>("proposal", &self.proposal, event);
         callbacks.invoke_table_row_callbacks::<ProposalComment>("proposal_comment", &self.proposal_comment, event);
         callbacks.invoke_table_row_callbacks::<ProposalLineItem>("proposal_line_item", &self.proposal_line_item, event);
@@ -20629,6 +21602,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<ProposalSection>("proposal_section", &self.proposal_section, event);
         callbacks.invoke_table_row_callbacks::<ProposalSourceDoc>("proposal_source_doc", &self.proposal_source_doc, event);
         callbacks.invoke_table_row_callbacks::<ProposalVersion>("proposal_version", &self.proposal_version, event);
+        callbacks.invoke_table_row_callbacks::<PublicHoliday>("public_holiday", &self.public_holiday, event);
         callbacks.invoke_table_row_callbacks::<PurchaseApprovalDelegate>("purchase_approval_delegate", &self.purchase_approval_delegate, event);
         callbacks.invoke_table_row_callbacks::<PurchaseBlanketOrder>("purchase_blanket_order", &self.purchase_blanket_order, event);
         callbacks.invoke_table_row_callbacks::<PurchaseContract>("purchase_contract", &self.purchase_contract, event);
@@ -20653,6 +21627,9 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<ReplenishmentRule>("replenishment_rule", &self.replenishment_rule, event);
         callbacks.invoke_table_row_callbacks::<ReportTemplate>("report_template", &self.report_template, event);
         callbacks.invoke_table_row_callbacks::<ResPartnerBank>("res_partner_bank", &self.res_partner_bank, event);
+        callbacks.invoke_table_row_callbacks::<ResourceAllocation>("resource_allocation", &self.resource_allocation, event);
+        callbacks.invoke_table_row_callbacks::<ResourceCapacitySnapshot>("resource_capacity_snapshot", &self.resource_capacity_snapshot, event);
+        callbacks.invoke_table_row_callbacks::<ResourceUtilisationSnapshot>("resource_utilisation_snapshot", &self.resource_utilisation_snapshot, event);
         callbacks.invoke_table_row_callbacks::<ReturnOrder>("return_order", &self.return_order, event);
         callbacks.invoke_table_row_callbacks::<ReturnOrderLine>("return_order_line", &self.return_order_line, event);
         callbacks.invoke_table_row_callbacks::<RevenueRecognitionRule>("revenue_recognition_rule", &self.revenue_recognition_rule, event);
@@ -20741,6 +21718,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<WorkflowInstance>("workflow_instance", &self.workflow_instance, event);
         callbacks.invoke_table_row_callbacks::<WorkflowTransition>("workflow_transition", &self.workflow_transition, event);
         callbacks.invoke_table_row_callbacks::<WorkflowWorkitem>("workflow_workitem", &self.workflow_workitem, event);
+        callbacks.invoke_table_row_callbacks::<WorkingCalendar>("working_calendar", &self.working_calendar, event);
 }
 }
 
@@ -21446,6 +22424,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         bom_explosion_result_table::register_table(client_cache);
         budget_post_table::register_table(client_cache);
         calendar_event_table::register_table(client_cache);
+        capacity_forecast_snapshot_table::register_table(client_cache);
         cartonization_result_table::register_table(client_cache);
         casbin_rule_table::register_table(client_cache);
         cash_flow_line_table::register_table(client_cache);
@@ -21513,6 +22492,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         hr_contract_table::register_table(client_cache);
         hr_department_table::register_table(client_cache);
         hr_employee_table::register_table(client_cache);
+        hr_employee_skill_table::register_table(client_cache);
         hr_expense_table::register_table(client_cache);
         hr_expense_advance_table::register_table(client_cache);
         hr_expense_advance_application_table::register_table(client_cache);
@@ -21528,6 +22508,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         hr_payslip_table::register_table(client_cache);
         hr_resource_table::register_table(client_cache);
         hr_salary_rule_table::register_table(client_cache);
+        hr_skill_table::register_table(client_cache);
         import_job_table::register_table(client_cache);
         import_job_error_table::register_table(client_cache);
         import_job_record_table::register_table(client_cache);
@@ -21605,9 +22586,21 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         product_supplier_info_table::register_table(client_cache);
         product_variant_table::register_table(client_cache);
         profit_loss_line_table::register_table(client_cache);
+        project_baseline_table::register_table(client_cache);
+        project_change_order_table::register_table(client_cache);
+        project_earned_value_snapshot_table::register_table(client_cache);
+        project_integration_intent_table::register_table(client_cache);
+        project_margin_snapshot_table::register_table(client_cache);
+        project_milestone_table::register_table(client_cache);
         project_project_table::register_table(client_cache);
+        project_rate_card_table::register_table(client_cache);
+        project_rate_card_line_table::register_table(client_cache);
+        project_revenue_line_table::register_table(client_cache);
+        project_revenue_schedule_table::register_table(client_cache);
+        project_subcontractor_cost_table::register_table(client_cache);
         project_task_table::register_table(client_cache);
         project_timesheet_table::register_table(client_cache);
+        project_timesheet_approval_table::register_table(client_cache);
         proposal_table::register_table(client_cache);
         proposal_comment_table::register_table(client_cache);
         proposal_line_item_table::register_table(client_cache);
@@ -21615,6 +22608,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         proposal_section_table::register_table(client_cache);
         proposal_source_doc_table::register_table(client_cache);
         proposal_version_table::register_table(client_cache);
+        public_holiday_table::register_table(client_cache);
         purchase_approval_delegate_table::register_table(client_cache);
         purchase_blanket_order_table::register_table(client_cache);
         purchase_contract_table::register_table(client_cache);
@@ -21639,6 +22633,9 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         replenishment_rule_table::register_table(client_cache);
         report_template_table::register_table(client_cache);
         res_partner_bank_table::register_table(client_cache);
+        resource_allocation_table::register_table(client_cache);
+        resource_capacity_snapshot_table::register_table(client_cache);
+        resource_utilisation_snapshot_table::register_table(client_cache);
         return_order_table::register_table(client_cache);
         return_order_line_table::register_table(client_cache);
         revenue_recognition_rule_table::register_table(client_cache);
@@ -21727,6 +22724,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         workflow_instance_table::register_table(client_cache);
         workflow_transition_table::register_table(client_cache);
         workflow_workitem_table::register_table(client_cache);
+        working_calendar_table::register_table(client_cache);
 }
 const ALL_TABLE_NAMES: &'static [&'static str] = &[
                 "account_account",
@@ -21793,6 +22791,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "bom_explosion_result",
         "budget_post",
         "calendar_event",
+        "capacity_forecast_snapshot",
         "cartonization_result",
         "casbin_rule",
         "cash_flow_line",
@@ -21860,6 +22859,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "hr_contract",
         "hr_department",
         "hr_employee",
+        "hr_employee_skill",
         "hr_expense",
         "hr_expense_advance",
         "hr_expense_advance_application",
@@ -21875,6 +22875,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "hr_payslip",
         "hr_resource",
         "hr_salary_rule",
+        "hr_skill",
         "import_job",
         "import_job_error",
         "import_job_record",
@@ -21952,9 +22953,21 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "product_supplier_info",
         "product_variant",
         "profit_loss_line",
+        "project_baseline",
+        "project_change_order",
+        "project_earned_value_snapshot",
+        "project_integration_intent",
+        "project_margin_snapshot",
+        "project_milestone",
         "project_project",
+        "project_rate_card",
+        "project_rate_card_line",
+        "project_revenue_line",
+        "project_revenue_schedule",
+        "project_subcontractor_cost",
         "project_task",
         "project_timesheet",
+        "project_timesheet_approval",
         "proposal",
         "proposal_comment",
         "proposal_line_item",
@@ -21962,6 +22975,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "proposal_section",
         "proposal_source_doc",
         "proposal_version",
+        "public_holiday",
         "purchase_approval_delegate",
         "purchase_blanket_order",
         "purchase_contract",
@@ -21986,6 +23000,9 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "replenishment_rule",
         "report_template",
         "res_partner_bank",
+        "resource_allocation",
+        "resource_capacity_snapshot",
+        "resource_utilisation_snapshot",
         "return_order",
         "return_order_line",
         "revenue_recognition_rule",
@@ -22074,5 +23091,6 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "workflow_instance",
         "workflow_transition",
         "workflow_workitem",
+        "working_calendar",
 ];
 }

@@ -2,7 +2,12 @@
  * Maps Projects module form payloads to SpacetimeDB reducer param types.
  */
 
-import type { CreateProjectParams, CreateTaskParams } from '@lumiere/stdb/types'
+import type {
+  CreateProjectParams,
+  CreateTaskParams,
+  LogTimesheetParams,
+  StartTimesheetTimerParams,
+} from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
@@ -10,6 +15,13 @@ import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
 
 const TASK_STATE_IN_PROGRESS: CreateTaskParams['state'] = { tag: 'InProgress' }
+
+/** Valid BillType string values (server `BillType::from_str`). */
+const BILL_TYPES = new Set(['customer_project', 'customer_task', 'no'])
+/** Valid PricingType string values (server `PricingType::from_str`). */
+const PRICING_TYPES = new Set(['task_rate', 'fixed_rate', 'employee_rate'])
+/** Valid TimesheetInvoiceType string values. */
+const TIMESHEET_INVOICE_TYPES = new Set(['billable', 'non_billable', 'timesheet_revenues'])
 
 function optionalTrimmedString(v: unknown): string | undefined {
   if (v == null) return undefined
@@ -47,6 +59,32 @@ function optionalPartnerId(raw: unknown): bigint | undefined {
   if (raw === '' || raw == null) return undefined
   const id = parseU64FromForm(raw)
   return id ?? undefined
+}
+
+function parseBillType(raw: unknown): string {
+  const v = String(raw ?? '').trim()
+  return BILL_TYPES.has(v) ? v : 'customer_task'
+}
+
+function parsePricingType(raw: unknown): string {
+  const v = String(raw ?? '').trim()
+  return PRICING_TYPES.has(v) ? v : 'task_rate'
+}
+
+function parseTimesheetInvoiceType(raw: unknown): string | undefined {
+  if (raw === '' || raw == null) return undefined
+  const v = String(raw).trim()
+  return TIMESHEET_INVOICE_TYPES.has(v) ? v : undefined
+}
+
+function resolveCurrencyIdFromProject(
+  projectId: bigint,
+  projects: ReadonlyArray<Record<string, unknown>> | undefined,
+): bigint | null {
+  if (!projects?.length) return null
+  const project = projects.find((p) => String(p.id) === String(projectId))
+  if (project == null) return null
+  return parseU64FromForm(project.currencyId)
 }
 
 function resolveCurrencyIdFromPricelist(
@@ -116,8 +154,9 @@ export function toCreateProjectParams(
     allowMaterial: false,
     allowWorksheets: false,
     allowForecast: true,
-    billType: 'non_billable',
-    pricingType: 'task_rate',
+    allowWipJe: formData.allowWipJe === true || formData.allow_wip_je === true,
+    billType: parseBillType(formData.billType),
+    pricingType: parsePricingType(formData.pricingType),
     ratingStatus: 'on_track',
     ratingStatusPeriod: 'monthly',
     privacyVisibility: 'followers',
@@ -164,6 +203,7 @@ export function toCreateTaskParams(
 
   const dateDeadline = optionalTimestampFromFormDate(formData.dateDeadline)
 
+  // Cast: wbsCode/wbsLevel land after `make generate-stdb-ts-sdk` refreshes bindings.
   return {
     companyId: companyId !== undefined ? companyId : undefined,
     projectId,
@@ -179,7 +219,9 @@ export function toCreateTaskParams(
     dateEnd: undefined,
     color: undefined,
     userIds: [],
-    milestoneId: undefined,
+    milestoneId: parseU64FromForm(formData.milestoneId) ?? undefined,
+    wbsCode: String(formData.wbsCode ?? '').trim(),
+    wbsLevel: 0,
     plannedHours: planned,
     totalHoursSpent: 0,
     effectiveHours: 0,
@@ -209,7 +251,7 @@ export function toCreateTaskParams(
     messageFollowerIds: [],
     messageIds: [],
     metadata: undefined,
-  }
+  } as CreateTaskParams
 }
 
 export function projectsParamsToJson(
@@ -236,6 +278,8 @@ export function toUpdateProjectParams(
     dateEnd,
     partnerId: optionalPartnerId(formData.partnerId) ?? null,
     active: Boolean(formData.active),
+    billType: parseBillType(formData.billType),
+    pricingType: parsePricingType(formData.pricingType),
     metadata: JSON.stringify({
       allocatedHours: formData.allocatedHours ?? null,
       pricelistId: formData.pricelistId ?? null,
@@ -261,19 +305,100 @@ export function toUpdateTaskParams(
     plannedHours: parseF64(formData.plannedHours, 0),
     dateDeadline,
     kanbanState: String(formData.kanbanState ?? 'normal'),
+    wbsCode: String(formData.wbsCode ?? '').trim() || undefined,
+    milestoneId: parseU64FromForm(formData.milestoneId),
   }
 }
 
 // ── Timesheet params helpers ─────────────────────────────────────────────────
 
-export function toLogTimesheetParams(
+function resolveTimesheetSharedFields(
   formData: Record<string, unknown>,
-  companyId?: bigint,
-): Record<string, unknown> | null {
+  companyId: bigint | undefined,
+  projects: ReadonlyArray<Record<string, unknown>> | undefined,
+): {
+  companyId: bigint | undefined
+  projectId: bigint
+  taskId: bigint | undefined
+  employeeId: bigint
+  name: string
+  currencyId: bigint
+  /** Omit / undefined → server resolves from rate card */
+  employeeCost: number | undefined
+  /** Omit / undefined → server defaults sell_rate = cost / rate card */
+  sellRate: number | undefined
+  timesheetInvoiceType: string | undefined
+  encodingUomId: bigint
+  productId: bigint | undefined
+  productUomId: bigint | undefined
+  accountId: bigint | undefined
+  soLine: bigint | undefined
+  departmentId: bigint | undefined
+  managerId: undefined
+  metadata: string | undefined
+} | null {
   const projectId = parseU64FromForm(formData.projectId)
   if (projectId === null) return null
 
+  const employeeId = parseU64FromForm(formData.employeeId)
+  if (employeeId === null) return null
+
+  const encodingUomId = parseU64FromForm(formData.encodingUomId)
+  if (encodingUomId === null) return null
+
+  const currencyId =
+    parseU64FromForm(formData.currencyId) ??
+    resolveCurrencyIdFromProject(projectId, projects)
+  if (currencyId === null) return null
+
   const taskId = parseU64FromForm(formData.taskId)
+  const sellRateRaw = formData.sellRate
+  const sellRate =
+    sellRateRaw === undefined || sellRateRaw === null || sellRateRaw === ''
+      ? undefined
+      : parseF64(sellRateRaw, NaN)
+  const resolvedSellRate =
+    sellRate !== undefined && !Number.isNaN(sellRate) ? sellRate : undefined
+
+  const costRaw = formData.employeeCost
+  const costParsed =
+    costRaw === undefined || costRaw === null || costRaw === ''
+      ? undefined
+      : parseF64(costRaw, NaN)
+  const resolvedCost =
+    costParsed !== undefined && !Number.isNaN(costParsed) && costParsed > 0
+      ? costParsed
+      : undefined
+
+  return {
+    companyId: companyId !== undefined ? companyId : undefined,
+    projectId,
+    taskId: taskId ?? undefined,
+    employeeId,
+    name: optionalTrimmedString(formData.name) ?? '',
+    currencyId,
+    employeeCost: resolvedCost,
+    sellRate: resolvedSellRate,
+    timesheetInvoiceType: parseTimesheetInvoiceType(formData.timesheetInvoiceType),
+    encodingUomId,
+    productId: parseU64FromForm(formData.productId) ?? undefined,
+    productUomId: parseU64FromForm(formData.productUomId) ?? undefined,
+    accountId: parseU64FromForm(formData.accountId) ?? undefined,
+    soLine: parseU64FromForm(formData.soLine) ?? undefined,
+    departmentId: parseU64FromForm(formData.departmentId) ?? undefined,
+    managerId: undefined,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toLogTimesheetParams(
+  formData: Record<string, unknown>,
+  companyId?: bigint,
+  projects?: ReadonlyArray<Record<string, unknown>>,
+): LogTimesheetParams | null {
+  const shared = resolveTimesheetSharedFields(formData, companyId, projects)
+  if (!shared) return null
+
   const date = optionalTimestampFromFormDate(formData.date)
   if (!date) return null
 
@@ -281,16 +406,18 @@ export function toLogTimesheetParams(
   if (hours <= 0) return null
 
   return {
-    companyId: companyId !== undefined ? companyId : undefined,
-    projectId,
-    taskId: taskId ?? undefined,
+    ...shared,
     date,
-    name: optionalTrimmedString(formData.name) ?? '',
     unitAmount: hours,
-    billable: Boolean(formData.billable ?? true),
-    validated: false,
-    billed: false,
-    encoding: 'utf-8',
-    manuallyModified: true,
   }
+}
+
+export function toStartTimesheetTimerParams(
+  formData: Record<string, unknown>,
+  companyId?: bigint,
+  projects?: ReadonlyArray<Record<string, unknown>>,
+): StartTimesheetTimerParams | null {
+  const shared = resolveTimesheetSharedFields(formData, companyId, projects)
+  if (!shared) return null
+  return shared
 }

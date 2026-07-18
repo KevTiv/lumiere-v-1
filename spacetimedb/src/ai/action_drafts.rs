@@ -893,6 +893,8 @@ fn build_create_task_params(company_id: u64, value: &Value) -> Result<CreateTask
         color: None,
         user_ids: Vec::new(),
         milestone_id: obj.get("milestone_id").and_then(json_u64),
+        wbs_code: json_string(obj, "wbs_code").unwrap_or_default(),
+        wbs_level: obj.get("wbs_level").and_then(json_u64).unwrap_or(0) as u32,
         planned_hours: json_f64(obj, "planned_hours").unwrap_or(0.0),
         total_hours_spent: json_f64(obj, "total_hours_spent").unwrap_or(0.0),
         effective_hours: json_f64(obj, "effective_hours").unwrap_or(0.0),

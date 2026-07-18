@@ -101,6 +101,28 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "projects",
   "tasks",
   "timesheets",
+  "timesheets-to-validate",
+  "timesheets-unbilled",
+  "project-rate-cards",
+  "project-rate-card-lines",
+  "working-calendars",
+  "public-holidays",
+  "resource-allocations",
+  "resource-capacity-by-employee",
+  "project-margin-by-project",
+  "resource-utilisation-by-employee",
+  "project-milestones",
+  "capacity-forecast-by-employee",
+  "project-baselines",
+  "project-change-orders",
+  "project-earned-value-by-project",
+  "project-subcontractor-costs",
+  "project-revenue-schedules",
+  "project-revenue-lines",
+  "project-integration-intents",
+  "hr-resources",
+  "hr-skills",
+  "hr-employee-skills",
   "products",
   "product-categories",
   "uoms",
@@ -585,6 +607,143 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
   tasks: (id, fa) => selectOrgScopedSql("tasks", "project_task", id, fa, ""),
   timesheets: (id, fa) =>
     selectOrgScopedSql("timesheets", "project_timesheet", id, fa, ""),
+  "timesheets-to-validate": (id, fa) =>
+    selectOrgScopedSql(
+      "timesheets-to-validate",
+      "project_timesheet",
+      id,
+      fa,
+      " AND validation_status = 'draft' AND timesheet_invoice_id IS NULL",
+    ),
+  "timesheets-unbilled": (id, fa) =>
+    selectOrgScopedSql(
+      "timesheets-unbilled",
+      "project_timesheet",
+      id,
+      fa,
+      " AND validation_status = 'validated' AND timesheet_invoice_type = 'billable' AND timesheet_invoice_id IS NULL",
+    ),
+  "project-rate-cards": (id, fa) =>
+    selectOrgScopedSql("project-rate-cards", "project_rate_card", id, fa, ""),
+  "project-rate-card-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "project-rate-card-lines",
+      "project_rate_card_line",
+      id,
+      fa,
+      "",
+    ),
+  "working-calendars": (id, fa) =>
+    selectOrgScopedSql("working-calendars", "working_calendar", id, fa, ""),
+  "public-holidays": (id, fa) =>
+    selectOrgScopedSql("public-holidays", "public_holiday", id, fa, ""),
+  "resource-allocations": (id, fa) =>
+    selectOrgScopedSql(
+      "resource-allocations",
+      "resource_allocation",
+      id,
+      fa,
+      "",
+    ),
+  /** Materialised capacity: available − leave − allocations − actual hours. */
+  "resource-capacity-by-employee": (id, fa) =>
+    selectOrgScopedSql(
+      "resource-capacity-by-employee",
+      "resource_capacity_snapshot",
+      id,
+      fa,
+      "",
+    ),
+  /** Materialised project margin: billed/unbilled revenue, labor, expenses. */
+  "project-margin-by-project": (id, fa) =>
+    selectOrgScopedSql(
+      "project-margin-by-project",
+      "project_margin_snapshot",
+      id,
+      fa,
+      "",
+    ),
+  /** Materialised utilisation: available vs billable/non-billable hours. */
+  "resource-utilisation-by-employee": (id, fa) =>
+    selectOrgScopedSql(
+      "resource-utilisation-by-employee",
+      "resource_utilisation_snapshot",
+      id,
+      fa,
+      "",
+    ),
+  "project-milestones": (id, fa) =>
+    selectOrgScopedSql("project-milestones", "project_milestone", id, fa, ""),
+  "capacity-forecast-by-employee": (id, fa) =>
+    selectOrgScopedSql(
+      "capacity-forecast-by-employee",
+      "capacity_forecast_snapshot",
+      id,
+      fa,
+      "",
+    ),
+  "project-baselines": (id, fa) =>
+    selectOrgScopedSql("project-baselines", "project_baseline", id, fa, ""),
+  "project-change-orders": (id, fa) =>
+    selectOrgScopedSql(
+      "project-change-orders",
+      "project_change_order",
+      id,
+      fa,
+      "",
+    ),
+  "project-earned-value-by-project": (id, fa) =>
+    selectOrgScopedSql(
+      "project-earned-value-by-project",
+      "project_earned_value_snapshot",
+      id,
+      fa,
+      "",
+    ),
+  "project-subcontractor-costs": (id, fa) =>
+    selectOrgScopedSql(
+      "project-subcontractor-costs",
+      "project_subcontractor_cost",
+      id,
+      fa,
+      "",
+    ),
+  "project-revenue-schedules": (id, fa) =>
+    selectOrgScopedSql(
+      "project-revenue-schedules",
+      "project_revenue_schedule",
+      id,
+      fa,
+      "",
+    ),
+  "project-revenue-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "project-revenue-lines",
+      "project_revenue_line",
+      id,
+      fa,
+      "",
+    ),
+  "project-integration-intents": (id, fa) =>
+    selectOrgScopedSql(
+      "project-integration-intents",
+      "project_integration_intent",
+      id,
+      fa,
+      "",
+    ),
+  "hr-resources": (id, fa) =>
+    selectOrgScopedSql("hr-resources", "hr_resource", id, fa, ""),
+  "hr-skills": (id, fa) =>
+    selectOrgScopedSql("hr-skills", "hr_skill", id, fa, ""),
+  "hr-employee-skills": (id, fa) =>
+    selectOrgScopedSql(
+      "hr-employee-skills",
+      "hr_employee_skill",
+      id,
+      fa,
+      "",
+    ),
   products: (id, fa) => selectOrgScopedSql("products", "product", id, fa, ""),
   "product-categories": (id, fa) =>
     selectOrgScopedSql(

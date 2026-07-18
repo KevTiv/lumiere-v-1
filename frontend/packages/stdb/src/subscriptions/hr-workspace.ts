@@ -14,6 +14,9 @@ export const HR_WORKSPACE_RESOURCE_KEYS = [
   "payroll-structures",
   "payslips",
   "salary-rules",
+  "hr-resources",
+  "hr-skills",
+  "hr-employee-skills",
 ] as const;
 
 export type HrWorkspaceResourceKey = (typeof HR_WORKSPACE_RESOURCE_KEYS)[number];

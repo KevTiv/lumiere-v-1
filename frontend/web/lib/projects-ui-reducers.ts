@@ -8,6 +8,8 @@ export const PROJECTS_UI_REDUCERS = [
   "import_task_csv",
   "import_timesheet_csv",
   "log_timesheet",
+  "reject_timesheets",
+  "reopen_timesheets",
   "set_project_active",
   "set_task_parent",
   "start_timesheet_timer",

@@ -1689,6 +1689,7 @@ export function toCreateCrossoveredBudgetLineParams(
   const plannedAmount = Number(formData.plannedAmount ?? formData.planned_amount ?? 0)
   return {
     analyticAccountId: optionalBigIntU64(formData.analyticAccountId ?? formData.analytic_account_id),
+    projectId: optionalBigIntU64(formData.projectId ?? formData.project_id),
     dateFrom: timestampFromFormDate(formData.dateFrom ?? formData.date_from ?? new Date()),
     dateTo: timestampFromFormDate(formData.dateTo ?? formData.date_to ?? new Date()),
     paidDate: optionalTimestampFromFormDate(formData.paidDate ?? formData.paid_date),

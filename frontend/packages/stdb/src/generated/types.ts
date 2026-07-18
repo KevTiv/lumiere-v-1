@@ -1541,6 +1541,11 @@ export const ApplyOmnichannelAllocationParams = __t.object("ApplyOmnichannelAllo
 });
 export type ApplyOmnichannelAllocationParams = __Infer<typeof ApplyOmnichannelAllocationParams>;
 
+export const ApplyProjectChangeOrderParams = __t.object("ApplyProjectChangeOrderParams", {
+  metadata: __t.option(__t.string()),
+});
+export type ApplyProjectChangeOrderParams = __Infer<typeof ApplyProjectChangeOrderParams>;
+
 export const ApplySalePromotionParams = __t.object("ApplySalePromotionParams", {
   promotionCode: __t.string(),
 });
@@ -1854,6 +1859,18 @@ export const BatchState = __t.enum("BatchState", {
 });
 export type BatchState = __Infer<typeof BatchState>;
 
+export const BillProjectMilestoneParams = __t.object("BillProjectMilestoneParams", {
+  amount: __t.option(__t.f64()),
+  percentComplete: __t.option(__t.f64()),
+  journalId: __t.u64(),
+  incomeAccountId: __t.u64(),
+  partnerId: __t.option(__t.u64()),
+  invoiceDate: __t.option(__t.timestamp()),
+  taxIds: __t.array(__t.u64()),
+  fiscalPositionId: __t.option(__t.u64()),
+});
+export type BillProjectMilestoneParams = __Infer<typeof BillProjectMilestoneParams>;
+
 export const BillTimesheetsParams = __t.object("BillTimesheetsParams", {
   companyId: __t.option(__t.u64()),
   timesheetIds: __t.array(__t.u64()),
@@ -1861,6 +1878,8 @@ export const BillTimesheetsParams = __t.object("BillTimesheetsParams", {
   incomeAccountId: __t.u64(),
   partnerId: __t.u64(),
   invoiceDate: __t.option(__t.timestamp()),
+  taxIds: __t.array(__t.u64()),
+  fiscalPositionId: __t.option(__t.u64()),
 });
 export type BillTimesheetsParams = __Infer<typeof BillTimesheetsParams>;
 
@@ -2007,6 +2026,23 @@ export const CancelSubscriptionParams = __t.object("CancelSubscriptionParams", {
   receivableAccountId: __t.option(__t.u64()),
 });
 export type CancelSubscriptionParams = __Infer<typeof CancelSubscriptionParams>;
+
+export const CapacityForecastSnapshot = __t.object("CapacityForecastSnapshot", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.option(__t.u64()),
+  periodStart: __t.timestamp(),
+  periodEnd: __t.timestamp(),
+  availableHours: __t.f64(),
+  allocatedHours: __t.f64(),
+  pipelineHours: __t.f64(),
+  forecastRemainingHours: __t.f64(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type CapacityForecastSnapshot = __Infer<typeof CapacityForecastSnapshot>;
 
 // The tagged union or sum type for the algebraic type `CardState`.
 export const CardState = __t.enum("CardState", {
@@ -3525,6 +3561,7 @@ export type CreateCrmForecastSnapshotParams = __Infer<typeof CreateCrmForecastSn
 
 export const CreateCrossoveredBudgetLineParams = __t.object("CreateCrossoveredBudgetLineParams", {
   analyticAccountId: __t.option(__t.u64()),
+  projectId: __t.option(__t.u64()),
   dateFrom: __t.timestamp(),
   dateTo: __t.timestamp(),
   paidDate: __t.option(__t.timestamp()),
@@ -4057,6 +4094,26 @@ export const CreateHelpdeskTeamParams = __t.object("CreateHelpdeskTeamParams", {
   isActive: __t.bool(),
 });
 export type CreateHelpdeskTeamParams = __Infer<typeof CreateHelpdeskTeamParams>;
+
+export const CreateHrEmployeeSkillParams = __t.object("CreateHrEmployeeSkillParams", {
+  employeeId: __t.u64(),
+  skillId: __t.u64(),
+  level: __t.u32(),
+  notes: __t.option(__t.string()),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateHrEmployeeSkillParams = __Infer<typeof CreateHrEmployeeSkillParams>;
+
+export const CreateHrSkillParams = __t.object("CreateHrSkillParams", {
+  name: __t.string(),
+  code: __t.option(__t.string()),
+  category: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateHrSkillParams = __Infer<typeof CreateHrSkillParams>;
 
 export const CreateIncotermParams = __t.object("CreateIncotermParams", {
   code: __t.string(),
@@ -4885,6 +4942,42 @@ export const CreateProductVariantParams = __t.object("CreateProductVariantParams
 });
 export type CreateProductVariantParams = __Infer<typeof CreateProductVariantParams>;
 
+export const CreateProjectChangeOrderParams = __t.object("CreateProjectChangeOrderParams", {
+  projectId: __t.u64(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  scopeDelta: __t.option(__t.string()),
+  budgetDelta: __t.f64(),
+  plannedHoursDelta: __t.f64(),
+  rateDeltaPercent: __t.f64(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateProjectChangeOrderParams = __Infer<typeof CreateProjectChangeOrderParams>;
+
+export const CreateProjectIntegrationIntentParams = __t.object("CreateProjectIntegrationIntentParams", {
+  companyId: __t.option(__t.u64()),
+  projectId: __t.option(__t.u64()),
+  intentType: __t.string(),
+  idempotencyKey: __t.string(),
+  payload: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateProjectIntegrationIntentParams = __Infer<typeof CreateProjectIntegrationIntentParams>;
+
+export const CreateProjectMilestoneParams = __t.object("CreateProjectMilestoneParams", {
+  projectId: __t.u64(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  deadline: __t.option(__t.timestamp()),
+  sequence: __t.u32(),
+  isReached: __t.bool(),
+  billAmount: __t.f64(),
+  percentComplete: __t.f64(),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateProjectMilestoneParams = __Infer<typeof CreateProjectMilestoneParams>;
+
 export const CreateProjectParams = __t.object("CreateProjectParams", {
   companyId: __t.option(__t.u64()),
   name: __t.string(),
@@ -4907,6 +5000,7 @@ export const CreateProjectParams = __t.object("CreateProjectParams", {
   allowMaterial: __t.bool(),
   allowWorksheets: __t.bool(),
   allowForecast: __t.bool(),
+  allowWipJe: __t.bool(),
   billType: __t.string(),
   pricingType: __t.string(),
   ratingStatus: __t.string(),
@@ -4937,6 +5031,66 @@ export const CreateProjectParams = __t.object("CreateProjectParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateProjectParams = __Infer<typeof CreateProjectParams>;
+
+export const CreateProjectRateCardLineParams = __t.object("CreateProjectRateCardLineParams", {
+  rateCardId: __t.u64(),
+  scope: __t.string(),
+  employeeId: __t.option(__t.u64()),
+  taskId: __t.option(__t.u64()),
+  currencyId: __t.u64(),
+  costRate: __t.f64(),
+  sellRate: __t.f64(),
+  active: __t.bool(),
+  effectiveFrom: __t.option(__t.timestamp()),
+  effectiveTo: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateProjectRateCardLineParams = __Infer<typeof CreateProjectRateCardLineParams>;
+
+export const CreateProjectRateCardParams = __t.object("CreateProjectRateCardParams", {
+  name: __t.string(),
+  currencyId: __t.u64(),
+  projectId: __t.option(__t.u64()),
+  active: __t.bool(),
+  effectiveFrom: __t.option(__t.timestamp()),
+  effectiveTo: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateProjectRateCardParams = __Infer<typeof CreateProjectRateCardParams>;
+
+export const CreateProjectRevenueLineParams = __t.object("CreateProjectRevenueLineParams", {
+  scheduleId: __t.u64(),
+  recognitionDate: __t.timestamp(),
+  amount: __t.f64(),
+  percent: __t.f64(),
+  milestoneId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateProjectRevenueLineParams = __Infer<typeof CreateProjectRevenueLineParams>;
+
+export const CreateProjectRevenueScheduleParams = __t.object("CreateProjectRevenueScheduleParams", {
+  projectId: __t.u64(),
+  milestoneId: __t.option(__t.u64()),
+  name: __t.string(),
+  recognitionMethod: __t.string(),
+  totalAmount: __t.f64(),
+  currencyId: __t.u64(),
+  journalId: __t.u64(),
+  deferredAccountId: __t.u64(),
+  incomeAccountId: __t.u64(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateProjectRevenueScheduleParams = __Infer<typeof CreateProjectRevenueScheduleParams>;
+
+export const CreatePublicHolidayParams = __t.object("CreatePublicHolidayParams", {
+  calendarId: __t.option(__t.u64()),
+  packKey: __t.string(),
+  name: __t.string(),
+  holidayDate: __t.timestamp(),
+  isRecurring: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreatePublicHolidayParams = __Infer<typeof CreatePublicHolidayParams>;
 
 export const CreatePurchaseBlanketOrderParams = __t.object("CreatePurchaseBlanketOrderParams", {
   name: __t.string(),
@@ -5177,6 +5331,23 @@ export const CreateReportTemplateParams = __t.object("CreateReportTemplateParams
   metadata: __t.option(__t.string()),
 });
 export type CreateReportTemplateParams = __Infer<typeof CreateReportTemplateParams>;
+
+export const CreateResourceAllocationParams = __t.object("CreateResourceAllocationParams", {
+  employeeId: __t.option(__t.u64()),
+  resourceId: __t.option(__t.u64()),
+  projectId: __t.u64(),
+  taskId: __t.option(__t.u64()),
+  dateFrom: __t.timestamp(),
+  dateTo: __t.timestamp(),
+  allocatedHours: __t.f64(),
+  allocationPercent: __t.f64(),
+  name: __t.option(__t.string()),
+  notes: __t.option(__t.string()),
+  enforceCapacity: __t.bool(),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateResourceAllocationParams = __Infer<typeof CreateResourceAllocationParams>;
 
 export const CreateReturnOrderLineParams = __t.object("CreateReturnOrderLineParams", {
   saleOrderLineId: __t.option(__t.u64()),
@@ -5950,6 +6121,8 @@ export const CreateTaskParams = __t.object("CreateTaskParams", {
   color: __t.option(__t.u8()),
   userIds: __t.array(__t.identity()),
   milestoneId: __t.option(__t.u64()),
+  wbsCode: __t.string(),
+  wbsLevel: __t.u32(),
   plannedHours: __t.f64(),
   totalHoursSpent: __t.f64(),
   effectiveHours: __t.f64(),
@@ -6329,6 +6502,22 @@ export const CreateWorkflowParams = __t.object("CreateWorkflowParams", {
 });
 export type CreateWorkflowParams = __Infer<typeof CreateWorkflowParams>;
 
+export const CreateWorkingCalendarParams = __t.object("CreateWorkingCalendarParams", {
+  name: __t.string(),
+  packKey: __t.string(),
+  hoursPerDay: __t.f64(),
+  workMonday: __t.bool(),
+  workTuesday: __t.bool(),
+  workWednesday: __t.bool(),
+  workThursday: __t.bool(),
+  workFriday: __t.bool(),
+  workSaturday: __t.bool(),
+  workSunday: __t.bool(),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateWorkingCalendarParams = __Infer<typeof CreateWorkingCalendarParams>;
+
 export const CreateWorkorderParams = __t.object("CreateWorkorderParams", {
   workcenterId: __t.u64(),
   productionId: __t.u64(),
@@ -6434,6 +6623,7 @@ export const CrossoveredBudgetLines = __t.object("CrossoveredBudgetLines", {
   organizationId: __t.u64(),
   generalBudgetId: __t.u64(),
   analyticAccountId: __t.option(__t.u64()),
+  projectId: __t.option(__t.u64()),
   dateFrom: __t.timestamp(),
   dateTo: __t.timestamp(),
   paidDate: __t.option(__t.timestamp()),
@@ -7005,6 +7195,12 @@ export const FailExpenseIntegrationIntentParams = __t.object("FailExpenseIntegra
 });
 export type FailExpenseIntegrationIntentParams = __Infer<typeof FailExpenseIntegrationIntentParams>;
 
+export const FailProjectIntegrationIntentParams = __t.object("FailProjectIntegrationIntentParams", {
+  lastError: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type FailProjectIntegrationIntentParams = __Infer<typeof FailProjectIntegrationIntentParams>;
+
 export const FailSubscriptionPaymentIntentParams = __t.object("FailSubscriptionPaymentIntentParams", {
   lastError: __t.string(),
   recordDunningFailure: __t.bool(),
@@ -7489,6 +7685,23 @@ export const HrEmployee = __t.object("HrEmployee", {
 });
 export type HrEmployee = __Infer<typeof HrEmployee>;
 
+export const HrEmployeeSkill = __t.object("HrEmployeeSkill", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  skillId: __t.u64(),
+  level: __t.u32(),
+  notes: __t.option(__t.string()),
+  active: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type HrEmployeeSkill = __Infer<typeof HrEmployeeSkill>;
+
 export const HrExpense = __t.object("HrExpense", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -7781,6 +7994,23 @@ export const HrSalaryRule = __t.object("HrSalaryRule", {
   isActive: __t.bool(),
 });
 export type HrSalaryRule = __Infer<typeof HrSalaryRule>;
+
+export const HrSkill = __t.object("HrSkill", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  code: __t.option(__t.string()),
+  category: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+  active: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type HrSkill = __Infer<typeof HrSkill>;
 
 export const ImportJob = __t.object("ImportJob", {
   id: __t.u64(),
@@ -8430,6 +8660,21 @@ export const LineState = __t.enum("LineState", {
 });
 export type LineState = __Infer<typeof LineState>;
 
+export const LinkSubcontractorCostParams = __t.object("LinkSubcontractorCostParams", {
+  projectId: __t.u64(),
+  purchaseOrderId: __t.option(__t.u64()),
+  purchaseOrderLineId: __t.option(__t.u64()),
+  vendorBillMoveId: __t.option(__t.u64()),
+  vendorBillLineId: __t.option(__t.u64()),
+  partnerId: __t.option(__t.u64()),
+  amount: __t.f64(),
+  currencyId: __t.u64(),
+  name: __t.option(__t.string()),
+  active: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type LinkSubcontractorCostParams = __Infer<typeof LinkSubcontractorCostParams>;
+
 export const LogAuditEventParams = __t.object("LogAuditEventParams", {
   companyId: __t.option(__t.u64()),
   tableName: __t.string(),
@@ -8454,7 +8699,8 @@ export const LogTimesheetParams = __t.object("LogTimesheetParams", {
   date: __t.timestamp(),
   unitAmount: __t.f64(),
   currencyId: __t.u64(),
-  employeeCost: __t.f64(),
+  employeeCost: __t.option(__t.f64()),
+  sellRate: __t.option(__t.f64()),
   timesheetInvoiceType: __t.option(__t.string()),
   productId: __t.option(__t.u64()),
   productUomId: __t.option(__t.u64()),
@@ -10195,6 +10441,129 @@ export const ProfitLossLine = __t.object("ProfitLossLine", {
 });
 export type ProfitLossLine = __Infer<typeof ProfitLossLine>;
 
+export const ProjectBaseline = __t.object("ProjectBaseline", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  projectId: __t.u64(),
+  originalBudget: __t.f64(),
+  originalPlannedHours: __t.f64(),
+  originalCapturedAt: __t.timestamp(),
+  currentBudget: __t.f64(),
+  currentPlannedHours: __t.f64(),
+  currentChangeOrderId: __t.option(__t.u64()),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProjectBaseline = __Infer<typeof ProjectBaseline>;
+
+export const ProjectChangeOrder = __t.object("ProjectChangeOrder", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  projectId: __t.u64(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  scopeDelta: __t.option(__t.string()),
+  budgetDelta: __t.f64(),
+  plannedHoursDelta: __t.f64(),
+  rateDeltaPercent: __t.f64(),
+  baselineBudget: __t.f64(),
+  baselinePlannedHours: __t.f64(),
+  revisedBudget: __t.f64(),
+  revisedPlannedHours: __t.f64(),
+  state: __t.string(),
+  appliedAt: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProjectChangeOrder = __Infer<typeof ProjectChangeOrder>;
+
+export const ProjectEarnedValueSnapshot = __t.object("ProjectEarnedValueSnapshot", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  projectId: __t.u64(),
+  plannedValue: __t.f64(),
+  earnedValue: __t.f64(),
+  actualCost: __t.f64(),
+  schedulePerformanceIndex: __t.f64(),
+  costPerformanceIndex: __t.f64(),
+  percentComplete: __t.f64(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProjectEarnedValueSnapshot = __Infer<typeof ProjectEarnedValueSnapshot>;
+
+export const ProjectIntegrationIntent = __t.object("ProjectIntegrationIntent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  projectId: __t.option(__t.u64()),
+  intentType: __t.string(),
+  status: __t.string(),
+  idempotencyKey: __t.string(),
+  payload: __t.string(),
+  resultRef: __t.option(__t.string()),
+  lastError: __t.option(__t.string()),
+  attemptCount: __t.u32(),
+  appliedAt: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProjectIntegrationIntent = __Infer<typeof ProjectIntegrationIntent>;
+
+export const ProjectMarginSnapshot = __t.object("ProjectMarginSnapshot", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  projectId: __t.u64(),
+  billedRevenue: __t.f64(),
+  unbilledRevenue: __t.f64(),
+  laborCost: __t.f64(),
+  expenseCost: __t.f64(),
+  subcontractorCost: __t.f64(),
+  marginAmount: __t.f64(),
+  marginPercent: __t.f64(),
+  budgetPlanned: __t.f64(),
+  budgetActual: __t.f64(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProjectMarginSnapshot = __Infer<typeof ProjectMarginSnapshot>;
+
+export const ProjectMilestone = __t.object("ProjectMilestone", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  projectId: __t.u64(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  deadline: __t.option(__t.timestamp()),
+  sequence: __t.u32(),
+  isReached: __t.bool(),
+  billAmount: __t.f64(),
+  percentComplete: __t.f64(),
+  invoiceMoveId: __t.option(__t.u64()),
+  billedAmount: __t.f64(),
+  active: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProjectMilestone = __Infer<typeof ProjectMilestone>;
+
 export const ProjectProject = __t.object("ProjectProject", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -10220,6 +10589,7 @@ export const ProjectProject = __t.object("ProjectProject", {
   allowMaterial: __t.bool(),
   allowWorksheets: __t.bool(),
   allowForecast: __t.bool(),
+  allowWipJe: __t.bool(),
   billType: __t.string(),
   pricingType: __t.string(),
   ratingStatus: __t.string(),
@@ -10255,6 +10625,113 @@ export const ProjectProject = __t.object("ProjectProject", {
 });
 export type ProjectProject = __Infer<typeof ProjectProject>;
 
+export const ProjectRateCard = __t.object("ProjectRateCard", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  currencyId: __t.u64(),
+  projectId: __t.option(__t.u64()),
+  active: __t.bool(),
+  effectiveFrom: __t.option(__t.timestamp()),
+  effectiveTo: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProjectRateCard = __Infer<typeof ProjectRateCard>;
+
+export const ProjectRateCardLine = __t.object("ProjectRateCardLine", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  rateCardId: __t.u64(),
+  scope: __t.string(),
+  employeeId: __t.option(__t.u64()),
+  taskId: __t.option(__t.u64()),
+  currencyId: __t.u64(),
+  costRate: __t.f64(),
+  sellRate: __t.f64(),
+  active: __t.bool(),
+  effectiveFrom: __t.option(__t.timestamp()),
+  effectiveTo: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProjectRateCardLine = __Infer<typeof ProjectRateCardLine>;
+
+export const ProjectRevenueLine = __t.object("ProjectRevenueLine", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  scheduleId: __t.u64(),
+  projectId: __t.u64(),
+  milestoneId: __t.option(__t.u64()),
+  recognitionDate: __t.timestamp(),
+  amount: __t.f64(),
+  percent: __t.f64(),
+  recognized: __t.bool(),
+  moveId: __t.option(__t.u64()),
+  moveLineId: __t.option(__t.u64()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProjectRevenueLine = __Infer<typeof ProjectRevenueLine>;
+
+export const ProjectRevenueSchedule = __t.object("ProjectRevenueSchedule", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  projectId: __t.u64(),
+  milestoneId: __t.option(__t.u64()),
+  name: __t.string(),
+  recognitionMethod: __t.string(),
+  totalAmount: __t.f64(),
+  recognizedAmount: __t.f64(),
+  deferredAmount: __t.f64(),
+  currencyId: __t.u64(),
+  journalId: __t.u64(),
+  deferredAccountId: __t.u64(),
+  incomeAccountId: __t.u64(),
+  state: __t.string(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProjectRevenueSchedule = __Infer<typeof ProjectRevenueSchedule>;
+
+export const ProjectSubcontractorCost = __t.object("ProjectSubcontractorCost", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  projectId: __t.u64(),
+  purchaseOrderId: __t.option(__t.u64()),
+  purchaseOrderLineId: __t.option(__t.u64()),
+  vendorBillMoveId: __t.option(__t.u64()),
+  vendorBillLineId: __t.option(__t.u64()),
+  partnerId: __t.option(__t.u64()),
+  amount: __t.f64(),
+  currencyId: __t.u64(),
+  name: __t.option(__t.string()),
+  active: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProjectSubcontractorCost = __Infer<typeof ProjectSubcontractorCost>;
+
 export const ProjectTask = __t.object("ProjectTask", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -10276,6 +10753,8 @@ export const ProjectTask = __t.object("ProjectTask", {
   projectId: __t.option(__t.u64()),
   userIds: __t.array(__t.identity()),
   milestoneId: __t.option(__t.u64()),
+  wbsCode: __t.string(),
+  wbsLevel: __t.u32(),
   plannedHours: __t.f64(),
   totalHoursSpent: __t.f64(),
   effectiveHours: __t.f64(),
@@ -10332,9 +10811,14 @@ export const ProjectTimesheet = __t.object("ProjectTimesheet", {
   timerStart: __t.option(__t.timestamp()),
   timerPause: __t.option(__t.timestamp()),
   employeeCost: __t.f64(),
+  sellRate: __t.f64(),
   timesheetInvoiceType: __t.string(),
   timesheetInvoiceId: __t.option(__t.u64()),
   timesheetRevenue: __t.f64(),
+  currencyRate: __t.f64(),
+  companyCurrencyId: __t.u64(),
+  amountCompany: __t.f64(),
+  timesheetRevenueCompany: __t.f64(),
   soLine: __t.option(__t.u64()),
   encodingUomId: __t.u64(),
   validationStatus: __t.string(),
@@ -10349,6 +10833,22 @@ export const ProjectTimesheet = __t.object("ProjectTimesheet", {
   metadata: __t.option(__t.string()),
 });
 export type ProjectTimesheet = __Infer<typeof ProjectTimesheet>;
+
+export const ProjectTimesheetApproval = __t.object("ProjectTimesheetApproval", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  timesheetId: __t.u64(),
+  actor: __t.identity(),
+  decision: __t.string(),
+  reason: __t.option(__t.string()),
+  hours: __t.f64(),
+  sellRate: __t.f64(),
+  costRate: __t.f64(),
+  currencyId: __t.u64(),
+  decidedAt: __t.timestamp(),
+});
+export type ProjectTimesheetApproval = __Infer<typeof ProjectTimesheetApproval>;
 
 export const Proposal = __t.object("Proposal", {
   id: __t.u64(),
@@ -10478,6 +10978,23 @@ export const ProposalVersion = __t.object("ProposalVersion", {
   createDate: __t.timestamp(),
 });
 export type ProposalVersion = __Infer<typeof ProposalVersion>;
+
+export const PublicHoliday = __t.object("PublicHoliday", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  calendarId: __t.option(__t.u64()),
+  packKey: __t.string(),
+  name: __t.string(),
+  holidayDate: __t.timestamp(),
+  isRecurring: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type PublicHoliday = __Infer<typeof PublicHoliday>;
 
 export const PurchaseApprovalDelegate = __t.object("PurchaseApprovalDelegate", {
   id: __t.u64(),
@@ -10996,6 +11513,12 @@ export const RecognizeDeferredRevenueParams = __t.object("RecognizeDeferredReven
 });
 export type RecognizeDeferredRevenueParams = __Infer<typeof RecognizeDeferredRevenueParams>;
 
+export const RecognizeProjectRevenueParams = __t.object("RecognizeProjectRevenueParams", {
+  reference: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type RecognizeProjectRevenueParams = __Infer<typeof RecognizeProjectRevenueParams>;
+
 export const ReconcileAccountBankStatementLineParams = __t.object("ReconcileAccountBankStatementLineParams", {
   moveIds: __t.array(__t.u64()),
   amountResidual: __t.f64(),
@@ -11129,11 +11652,37 @@ export const RecordWhatsAppHealthCheckParams = __t.object("RecordWhatsAppHealthC
 });
 export type RecordWhatsAppHealthCheckParams = __Infer<typeof RecordWhatsAppHealthCheckParams>;
 
+export const RefreshCapacityForecastParams = __t.object("RefreshCapacityForecastParams", {
+  employeeId: __t.option(__t.u64()),
+  periodStart: __t.option(__t.timestamp()),
+  periodEnd: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type RefreshCapacityForecastParams = __Infer<typeof RefreshCapacityForecastParams>;
+
 export const RefreshInventoryExceptionsParams = __t.object("RefreshInventoryExceptionsParams", {
   upsertOnly: __t.bool(),
   metadata: __t.option(__t.string()),
 });
 export type RefreshInventoryExceptionsParams = __Infer<typeof RefreshInventoryExceptionsParams>;
+
+export const RefreshProjectEarnedValueParams = __t.object("RefreshProjectEarnedValueParams", {
+  projectIds: __t.array(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type RefreshProjectEarnedValueParams = __Infer<typeof RefreshProjectEarnedValueParams>;
+
+export const RefreshProjectMarginParams = __t.object("RefreshProjectMarginParams", {
+  projectIds: __t.array(__t.u64()),
+});
+export type RefreshProjectMarginParams = __Infer<typeof RefreshProjectMarginParams>;
+
+export const RefreshResourceUtilisationParams = __t.object("RefreshResourceUtilisationParams", {
+  employeeId: __t.option(__t.u64()),
+  periodStart: __t.option(__t.timestamp()),
+  periodEnd: __t.option(__t.timestamp()),
+});
+export type RefreshResourceUtilisationParams = __Infer<typeof RefreshResourceUtilisationParams>;
 
 export const RefuseExpenseSheetParams = __t.object("RefuseExpenseSheetParams", {
   reason: __t.option(__t.string()),
@@ -11171,6 +11720,13 @@ export const RejectApprovalRequestParams = __t.object("RejectApprovalRequestPara
 });
 export type RejectApprovalRequestParams = __Infer<typeof RejectApprovalRequestParams>;
 
+export const RejectTimesheetsParams = __t.object("RejectTimesheetsParams", {
+  companyId: __t.option(__t.u64()),
+  timesheetIds: __t.array(__t.u64()),
+  reason: __t.string(),
+});
+export type RejectTimesheetsParams = __Infer<typeof RejectTimesheetsParams>;
+
 export const ReleaseBlanketToPoParams = __t.object("ReleaseBlanketToPoParams", {
   notes: __t.option(__t.string()),
   datePlanned: __t.option(__t.timestamp()),
@@ -11183,6 +11739,13 @@ export const RenewSubscriptionParams = __t.object("RenewSubscriptionParams", {
   notes: __t.option(__t.string()),
 });
 export type RenewSubscriptionParams = __Infer<typeof RenewSubscriptionParams>;
+
+export const ReopenTimesheetsParams = __t.object("ReopenTimesheetsParams", {
+  companyId: __t.option(__t.u64()),
+  timesheetIds: __t.array(__t.u64()),
+  reason: __t.option(__t.string()),
+});
+export type ReopenTimesheetsParams = __Infer<typeof ReopenTimesheetsParams>;
 
 export const ReplenishmentRule = __t.object("ReplenishmentRule", {
   id: __t.u64(),
@@ -11302,6 +11865,68 @@ export const ResPartnerBank = __t.object("ResPartnerBank", {
   metadata: __t.option(__t.string()),
 });
 export type ResPartnerBank = __Infer<typeof ResPartnerBank>;
+
+export const ResourceAllocation = __t.object("ResourceAllocation", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.option(__t.u64()),
+  resourceId: __t.option(__t.u64()),
+  projectId: __t.u64(),
+  taskId: __t.option(__t.u64()),
+  dateFrom: __t.timestamp(),
+  dateTo: __t.timestamp(),
+  allocatedHours: __t.f64(),
+  allocationPercent: __t.f64(),
+  name: __t.option(__t.string()),
+  notes: __t.option(__t.string()),
+  enforceCapacity: __t.bool(),
+  active: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ResourceAllocation = __Infer<typeof ResourceAllocation>;
+
+export const ResourceCapacitySnapshot = __t.object("ResourceCapacitySnapshot", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.option(__t.u64()),
+  resourceId: __t.option(__t.u64()),
+  periodStart: __t.timestamp(),
+  periodEnd: __t.timestamp(),
+  availableHours: __t.f64(),
+  leaveHours: __t.f64(),
+  allocatedHours: __t.f64(),
+  actualHours: __t.f64(),
+  remainingHours: __t.f64(),
+  calendarId: __t.option(__t.u64()),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ResourceCapacitySnapshot = __Infer<typeof ResourceCapacitySnapshot>;
+
+export const ResourceUtilisationSnapshot = __t.object("ResourceUtilisationSnapshot", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  periodStart: __t.timestamp(),
+  periodEnd: __t.timestamp(),
+  availableHours: __t.f64(),
+  billableHours: __t.f64(),
+  nonBillableHours: __t.f64(),
+  utilisationPercent: __t.f64(),
+  billableUtilisationPercent: __t.f64(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ResourceUtilisationSnapshot = __Infer<typeof ResourceUtilisationSnapshot>;
 
 export const ResumeSubscriptionParams = __t.object("ResumeSubscriptionParams", {
   notes: __t.option(__t.string()),
@@ -11903,6 +12528,12 @@ export const SectionStatus = __t.enum("SectionStatus", {
 });
 export type SectionStatus = __Infer<typeof SectionStatus>;
 
+export const SeedPackHolidaysParams = __t.object("SeedPackHolidaysParams", {
+  packKeys: __t.array(__t.string()),
+  calendarId: __t.option(__t.u64()),
+});
+export type SeedPackHolidaysParams = __Infer<typeof SeedPackHolidaysParams>;
+
 export const SegmentMember = __t.object("SegmentMember", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -12166,7 +12797,8 @@ export const StartTimesheetTimerParams = __t.object("StartTimesheetTimerParams",
   employeeId: __t.u64(),
   name: __t.string(),
   currencyId: __t.u64(),
-  employeeCost: __t.f64(),
+  employeeCost: __t.option(__t.f64()),
+  sellRate: __t.option(__t.f64()),
   timesheetInvoiceType: __t.option(__t.string()),
   productId: __t.option(__t.u64()),
   productUomId: __t.option(__t.u64()),
@@ -14026,6 +14658,7 @@ export type UpdateCrmConversationParams = __Infer<typeof UpdateCrmConversationPa
 export const UpdateCrossoveredBudgetLineParams = __t.object("UpdateCrossoveredBudgetLineParams", {
   plannedAmount: __t.option(__t.f64()),
   analyticAccountId: __t.option(__t.option(__t.u64())),
+  projectId: __t.option(__t.option(__t.u64())),
   dateFrom: __t.option(__t.timestamp()),
   dateTo: __t.option(__t.timestamp()),
   metadata: __t.option(__t.option(__t.string())),
@@ -14164,6 +14797,24 @@ export const UpdateFormFieldParams = __t.object("UpdateFormFieldParams", {
   },
 });
 export type UpdateFormFieldParams = __Infer<typeof UpdateFormFieldParams>;
+
+export const UpdateHrEmployeeSkillParams = __t.object("UpdateHrEmployeeSkillParams", {
+  level: __t.option(__t.u32()),
+  notes: __t.option(__t.option(__t.string())),
+  active: __t.option(__t.bool()),
+  metadata: __t.option(__t.option(__t.string())),
+});
+export type UpdateHrEmployeeSkillParams = __Infer<typeof UpdateHrEmployeeSkillParams>;
+
+export const UpdateHrSkillParams = __t.object("UpdateHrSkillParams", {
+  name: __t.option(__t.string()),
+  code: __t.option(__t.option(__t.string())),
+  category: __t.option(__t.option(__t.string())),
+  description: __t.option(__t.option(__t.string())),
+  active: __t.option(__t.bool()),
+  metadata: __t.option(__t.option(__t.string())),
+});
+export type UpdateHrSkillParams = __Infer<typeof UpdateHrSkillParams>;
 
 export const UpdateIntercompanyRuleParams = __t.object("UpdateIntercompanyRuleParams", {
   name: __t.option(__t.string()),
@@ -14470,6 +15121,19 @@ export const UpdateProductVariantParams = __t.object("UpdateProductVariantParams
 });
 export type UpdateProductVariantParams = __Infer<typeof UpdateProductVariantParams>;
 
+export const UpdateProjectMilestoneParams = __t.object("UpdateProjectMilestoneParams", {
+  name: __t.option(__t.string()),
+  description: __t.option(__t.option(__t.string())),
+  deadline: __t.option(__t.option(__t.timestamp())),
+  sequence: __t.option(__t.u32()),
+  isReached: __t.option(__t.bool()),
+  billAmount: __t.option(__t.f64()),
+  percentComplete: __t.option(__t.f64()),
+  active: __t.option(__t.bool()),
+  metadata: __t.option(__t.option(__t.string())),
+});
+export type UpdateProjectMilestoneParams = __Infer<typeof UpdateProjectMilestoneParams>;
+
 export const UpdateProjectParams = __t.object("UpdateProjectParams", {
   companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
@@ -14492,6 +15156,7 @@ export const UpdateProjectParams = __t.object("UpdateProjectParams", {
   allowMaterial: __t.option(__t.bool()),
   allowWorksheets: __t.option(__t.bool()),
   allowForecast: __t.option(__t.bool()),
+  allowWipJe: __t.option(__t.bool()),
   billType: __t.option(__t.string()),
   pricingType: __t.option(__t.string()),
   ratingStatus: __t.option(__t.string()),
@@ -14518,6 +15183,31 @@ export const UpdateProjectParams = __t.object("UpdateProjectParams", {
 });
 export type UpdateProjectParams = __Infer<typeof UpdateProjectParams>;
 
+export const UpdateProjectRateCardLineParams = __t.object("UpdateProjectRateCardLineParams", {
+  scope: __t.option(__t.string()),
+  employeeId: __t.option(__t.option(__t.u64())),
+  taskId: __t.option(__t.option(__t.u64())),
+  currencyId: __t.option(__t.u64()),
+  costRate: __t.option(__t.f64()),
+  sellRate: __t.option(__t.f64()),
+  active: __t.option(__t.bool()),
+  effectiveFrom: __t.option(__t.option(__t.timestamp())),
+  effectiveTo: __t.option(__t.option(__t.timestamp())),
+  metadata: __t.option(__t.option(__t.string())),
+});
+export type UpdateProjectRateCardLineParams = __Infer<typeof UpdateProjectRateCardLineParams>;
+
+export const UpdateProjectRateCardParams = __t.object("UpdateProjectRateCardParams", {
+  name: __t.option(__t.string()),
+  currencyId: __t.option(__t.u64()),
+  projectId: __t.option(__t.option(__t.u64())),
+  active: __t.option(__t.bool()),
+  effectiveFrom: __t.option(__t.option(__t.timestamp())),
+  effectiveTo: __t.option(__t.option(__t.timestamp())),
+  metadata: __t.option(__t.option(__t.string())),
+});
+export type UpdateProjectRateCardParams = __Infer<typeof UpdateProjectRateCardParams>;
+
 export const UpdateProposalSourceDocParams = __t.object("UpdateProposalSourceDocParams", {
   name: __t.option(__t.string()),
   content: __t.option(__t.string()),
@@ -14525,6 +15215,16 @@ export const UpdateProposalSourceDocParams = __t.object("UpdateProposalSourceDoc
   wordCount: __t.option(__t.u32()),
 });
 export type UpdateProposalSourceDocParams = __Infer<typeof UpdateProposalSourceDocParams>;
+
+export const UpdatePublicHolidayParams = __t.object("UpdatePublicHolidayParams", {
+  calendarId: __t.option(__t.option(__t.u64())),
+  packKey: __t.option(__t.string()),
+  name: __t.option(__t.string()),
+  holidayDate: __t.option(__t.timestamp()),
+  isRecurring: __t.option(__t.bool()),
+  metadata: __t.option(__t.option(__t.string())),
+});
+export type UpdatePublicHolidayParams = __Infer<typeof UpdatePublicHolidayParams>;
 
 export const UpdatePurchaseOrderLineParams = __t.object("UpdatePurchaseOrderLineParams", {
   productId: __t.option(__t.u64()),
@@ -14594,6 +15294,23 @@ export const UpdateReportTemplateParams = __t.object("UpdateReportTemplateParams
   paperFormat: __t.option(__t.string()),
 });
 export type UpdateReportTemplateParams = __Infer<typeof UpdateReportTemplateParams>;
+
+export const UpdateResourceAllocationParams = __t.object("UpdateResourceAllocationParams", {
+  employeeId: __t.option(__t.option(__t.u64())),
+  resourceId: __t.option(__t.option(__t.u64())),
+  projectId: __t.option(__t.u64()),
+  taskId: __t.option(__t.option(__t.u64())),
+  dateFrom: __t.option(__t.timestamp()),
+  dateTo: __t.option(__t.timestamp()),
+  allocatedHours: __t.option(__t.f64()),
+  allocationPercent: __t.option(__t.f64()),
+  name: __t.option(__t.option(__t.string())),
+  notes: __t.option(__t.option(__t.string())),
+  enforceCapacity: __t.option(__t.bool()),
+  active: __t.option(__t.bool()),
+  metadata: __t.option(__t.option(__t.string())),
+});
+export type UpdateResourceAllocationParams = __Infer<typeof UpdateResourceAllocationParams>;
 
 export const UpdateRoleParams = __t.object("UpdateRoleParams", {
   name: __t.option(__t.string()),
@@ -14833,6 +15550,8 @@ export const UpdateTaskParams = __t.object("UpdateTaskParams", {
   projectId: __t.option(__t.option(__t.u64())),
   userIds: __t.option(__t.array(__t.identity())),
   milestoneId: __t.option(__t.option(__t.u64())),
+  wbsCode: __t.option(__t.string()),
+  wbsLevel: __t.option(__t.u32()),
   plannedHours: __t.option(__t.f64()),
   totalHoursSpent: __t.option(__t.f64()),
   effectiveHours: __t.option(__t.f64()),
@@ -15034,6 +15753,22 @@ export const UpdateWorkcenterParams = __t.object("UpdateWorkcenterParams", {
   metadata: __t.option(__t.string()),
 });
 export type UpdateWorkcenterParams = __Infer<typeof UpdateWorkcenterParams>;
+
+export const UpdateWorkingCalendarParams = __t.object("UpdateWorkingCalendarParams", {
+  name: __t.option(__t.string()),
+  packKey: __t.option(__t.string()),
+  hoursPerDay: __t.option(__t.f64()),
+  workMonday: __t.option(__t.bool()),
+  workTuesday: __t.option(__t.bool()),
+  workWednesday: __t.option(__t.bool()),
+  workThursday: __t.option(__t.bool()),
+  workFriday: __t.option(__t.bool()),
+  workSaturday: __t.option(__t.bool()),
+  workSunday: __t.option(__t.bool()),
+  active: __t.option(__t.bool()),
+  metadata: __t.option(__t.option(__t.string())),
+});
+export type UpdateWorkingCalendarParams = __Infer<typeof UpdateWorkingCalendarParams>;
 
 export const UpsertAiSkillConfigParams = __t.object("UpsertAiSkillConfigParams", {
   companyId: __t.option(__t.u64()),
@@ -15282,6 +16017,9 @@ export type UtmSource = __Infer<typeof UtmSource>;
 export const ValidateTimesheetsParams = __t.object("ValidateTimesheetsParams", {
   companyId: __t.option(__t.u64()),
   timesheetIds: __t.array(__t.u64()),
+  wipJournalId: __t.option(__t.u64()),
+  wipAccountId: __t.option(__t.u64()),
+  wipLaborAccountId: __t.option(__t.u64()),
 });
 export type ValidateTimesheetsParams = __Infer<typeof ValidateTimesheetsParams>;
 
@@ -15638,6 +16376,29 @@ export const WorkflowWorkitem = __t.object("WorkflowWorkitem", {
   metadata: __t.option(__t.string()),
 });
 export type WorkflowWorkitem = __Infer<typeof WorkflowWorkitem>;
+
+export const WorkingCalendar = __t.object("WorkingCalendar", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  packKey: __t.string(),
+  hoursPerDay: __t.f64(),
+  workMonday: __t.bool(),
+  workTuesday: __t.bool(),
+  workWednesday: __t.bool(),
+  workThursday: __t.bool(),
+  workFriday: __t.bool(),
+  workSaturday: __t.bool(),
+  workSunday: __t.bool(),
+  active: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type WorkingCalendar = __Infer<typeof WorkingCalendar>;
 
 // The tagged union or sum type for the algebraic type `WorkitemState`.
 export const WorkitemState = __t.enum("WorkitemState", {

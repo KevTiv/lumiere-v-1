@@ -25,6 +25,8 @@ pub struct UpdateTaskParams {
     pub project_id: Option<Option<u64>>,
     pub user_ids: Option<Vec<__sdk::Identity>>,
     pub milestone_id: Option<Option<u64>>,
+    pub wbs_code: Option<String>,
+    pub wbs_level: Option<u32>,
     pub planned_hours: Option<f64>,
     pub total_hours_spent: Option<f64>,
     pub effective_hours: Option<f64>,

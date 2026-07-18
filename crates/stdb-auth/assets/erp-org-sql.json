@@ -504,6 +504,160 @@
     "table": "project_timesheet"
   },
   {
+    "extra_where": " AND validation_status = 'draft' AND timesheet_invoice_id IS NULL",
+    "mapKey": "timesheets-to-validate",
+    "order_by": "",
+    "resource_key": "timesheets-to-validate",
+    "table": "project_timesheet"
+  },
+  {
+    "extra_where": " AND validation_status = 'validated' AND timesheet_invoice_type = 'billable' AND timesheet_invoice_id IS NULL",
+    "mapKey": "timesheets-unbilled",
+    "order_by": "",
+    "resource_key": "timesheets-unbilled",
+    "table": "project_timesheet"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "project-rate-cards",
+    "order_by": "",
+    "resource_key": "project-rate-cards",
+    "table": "project_rate_card"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "project-rate-card-lines",
+    "order_by": "",
+    "resource_key": "project-rate-card-lines",
+    "table": "project_rate_card_line"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "working-calendars",
+    "order_by": "",
+    "resource_key": "working-calendars",
+    "table": "working_calendar"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "public-holidays",
+    "order_by": "",
+    "resource_key": "public-holidays",
+    "table": "public_holiday"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "resource-allocations",
+    "order_by": "",
+    "resource_key": "resource-allocations",
+    "table": "resource_allocation"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "available",
+    "order_by": "",
+    "resource_key": "resource-capacity-by-employee",
+    "table": "resource_capacity_snapshot"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "billed",
+    "order_by": "",
+    "resource_key": "project-margin-by-project",
+    "table": "project_margin_snapshot"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "available",
+    "order_by": "",
+    "resource_key": "resource-utilisation-by-employee",
+    "table": "resource_utilisation_snapshot"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "project-milestones",
+    "order_by": "",
+    "resource_key": "project-milestones",
+    "table": "project_milestone"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "capacity-forecast-by-employee",
+    "order_by": "",
+    "resource_key": "capacity-forecast-by-employee",
+    "table": "capacity_forecast_snapshot"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "project-baselines",
+    "order_by": "",
+    "resource_key": "project-baselines",
+    "table": "project_baseline"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "project-change-orders",
+    "order_by": "",
+    "resource_key": "project-change-orders",
+    "table": "project_change_order"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "project-earned-value-by-project",
+    "order_by": "",
+    "resource_key": "project-earned-value-by-project",
+    "table": "project_earned_value_snapshot"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "project-subcontractor-costs",
+    "order_by": "",
+    "resource_key": "project-subcontractor-costs",
+    "table": "project_subcontractor_cost"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "project-revenue-schedules",
+    "order_by": "",
+    "resource_key": "project-revenue-schedules",
+    "table": "project_revenue_schedule"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "project-revenue-lines",
+    "order_by": "",
+    "resource_key": "project-revenue-lines",
+    "table": "project_revenue_line"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "project-integration-intents",
+    "order_by": "",
+    "resource_key": "project-integration-intents",
+    "table": "project_integration_intent"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "hr-resources",
+    "order_by": "",
+    "resource_key": "hr-resources",
+    "table": "hr_resource"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "hr-skills",
+    "order_by": "",
+    "resource_key": "hr-skills",
+    "table": "hr_skill"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "hr-employee-skills",
+    "order_by": "",
+    "resource_key": "hr-employee-skills",
+    "table": "hr_employee_skill"
+  },
+  {
     "extra_where": "",
     "mapKey": "products",
     "order_by": "",

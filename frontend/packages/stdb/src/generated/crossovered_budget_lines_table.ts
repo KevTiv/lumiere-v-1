@@ -15,6 +15,7 @@ export default __t.row({
   organizationId: __t.u64().name("organization_id"),
   generalBudgetId: __t.u64().name("general_budget_id"),
   analyticAccountId: __t.option(__t.u64()).name("analytic_account_id"),
+  projectId: __t.option(__t.u64()).name("project_id"),
   dateFrom: __t.timestamp().name("date_from"),
   dateTo: __t.timestamp().name("date_to"),
   paidDate: __t.option(__t.timestamp()).name("paid_date"),

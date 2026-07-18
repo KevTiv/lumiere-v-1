@@ -35,6 +35,8 @@ export default __t.row({
   projectId: __t.option(__t.u64()).name("project_id"),
   userIds: __t.array(__t.identity()).name("user_ids"),
   milestoneId: __t.option(__t.u64()).name("milestone_id"),
+  wbsCode: __t.string().name("wbs_code"),
+  wbsLevel: __t.u32().name("wbs_level"),
   plannedHours: __t.f64().name("planned_hours"),
   totalHoursSpent: __t.f64().name("total_hours_spent"),
   effectiveHours: __t.f64().name("effective_hours"),

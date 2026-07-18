@@ -28,6 +28,7 @@ pub struct CreateProjectParams {
     pub allow_material: bool,
     pub allow_worksheets: bool,
     pub allow_forecast: bool,
+    pub allow_wip_je: bool,
     pub bill_type: String,
     pub pricing_type: String,
     pub rating_status: String,

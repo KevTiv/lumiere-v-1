@@ -49,6 +49,8 @@ pub struct ProjectProject {
     pub allow_material: bool,
     pub allow_worksheets: bool,
     pub allow_forecast: bool,
+    /// When true, validate may post optional WIP JE (caller supplies accounts).
+    pub allow_wip_je: bool,
     pub bill_type: String,
     pub pricing_type: String,
     pub rating_status: String,
@@ -108,6 +110,8 @@ pub struct CreateProjectParams {
     pub allow_material: bool,
     pub allow_worksheets: bool,
     pub allow_forecast: bool,
+    /// When true, validate may post optional WIP JE (caller supplies accounts).
+    pub allow_wip_je: bool,
     pub bill_type: String,
     pub pricing_type: String,
     pub rating_status: String,
@@ -161,6 +165,7 @@ pub struct UpdateProjectParams {
     pub allow_material: Option<bool>,
     pub allow_worksheets: Option<bool>,
     pub allow_forecast: Option<bool>,
+    pub allow_wip_je: Option<bool>,
     pub bill_type: Option<String>,
     pub pricing_type: Option<String>,
     pub rating_status: Option<String>,
@@ -306,6 +311,10 @@ fn project_audit_json(project: &ProjectProject) -> Value {
     values.insert(
         "allow_forecast".to_string(),
         Value::from(project.allow_forecast),
+    );
+    values.insert(
+        "allow_wip_je".to_string(),
+        Value::from(project.allow_wip_je),
     );
     values.insert(
         "bill_type".to_string(),
@@ -466,6 +475,7 @@ pub fn create_project(
         allow_material: params.allow_material,
         allow_worksheets: params.allow_worksheets,
         allow_forecast: params.allow_forecast,
+        allow_wip_je: params.allow_wip_je,
         bill_type: params.bill_type.clone(),
         pricing_type: params.pricing_type.clone(),
         rating_status: params.rating_status.clone(),
@@ -531,6 +541,7 @@ pub fn create_project(
                 "allow_material".to_string(),
                 "allow_worksheets".to_string(),
                 "allow_forecast".to_string(),
+                "allow_wip_je".to_string(),
                 "bill_type".to_string(),
                 "pricing_type".to_string(),
                 "rating_status".to_string(),
@@ -697,6 +708,10 @@ pub fn update_project(
     if let Some(allow_forecast) = params.allow_forecast {
         project.allow_forecast = allow_forecast;
         changed_fields.push("allow_forecast".to_string());
+    }
+    if let Some(allow_wip_je) = params.allow_wip_je {
+        project.allow_wip_je = allow_wip_je;
+        changed_fields.push("allow_wip_je".to_string());
     }
 
     if let Some(bill_type) = params.bill_type {

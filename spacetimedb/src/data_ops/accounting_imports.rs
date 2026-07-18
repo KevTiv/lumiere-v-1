@@ -544,6 +544,7 @@ pub fn import_budget_line_csv(
                 organization_id,
                 general_budget_id,
                 analytic_account_id: opt_u64(col(&headers, row, "analytic_account_id")),
+                project_id: opt_u64(col(&headers, row, "project_id")),
                 date_from,
                 date_to,
                 paid_date: None,

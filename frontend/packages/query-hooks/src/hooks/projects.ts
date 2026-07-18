@@ -20,6 +20,18 @@ function toScalarU64(v: bigint | number | string): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
 }
 
+function invalidateTimesheetQueues(
+  qc: ReturnType<typeof useQueryClient>,
+  organizationId: bigint,
+) {
+  const k = rqBigIntKey(organizationId)
+  void qc.invalidateQueries({ queryKey: ['timesheets', k] })
+  void qc.invalidateQueries({ queryKey: ['timesheets-to-validate', k] })
+  void qc.invalidateQueries({ queryKey: ['timesheets-unbilled', k] })
+  void qc.invalidateQueries({ queryKey: ['project-margin-by-project', k] })
+  void qc.invalidateQueries({ queryKey: ['resource-utilisation-by-employee', k] })
+}
+
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export function useProjects(
@@ -55,6 +67,240 @@ export function useTimesheets(
     queryFn: () => fetchQueryList('/api/query/timesheets', 'Failed to fetch timesheets'),
     staleTime: 30_000,
     initialData,
+  })
+}
+
+/** Server-bounded: draft timesheets not yet invoiced. */
+export function useTimesheetsToValidate(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['timesheets-to-validate', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/timesheets-to-validate',
+        'Failed to fetch timesheets awaiting validation',
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+/** Server-bounded: validated billable timesheets with no invoice link. */
+export function useTimesheetsUnbilled(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['timesheets-unbilled', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/timesheets-unbilled',
+        'Failed to fetch unbilled timesheets',
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProjectRateCards(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['project-rate-cards', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/project-rate-cards', 'Failed to fetch project rate cards'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProjectRateCardLines(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['project-rate-card-lines', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/project-rate-card-lines',
+        'Failed to fetch project rate card lines',
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useResourceAllocations(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['resource-allocations', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/resource-allocations', 'Failed to fetch resource allocations'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+/** Materialised remaining capacity (available − leave − allocations − actual). */
+export function useResourceCapacityByEmployee(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['resource-capacity-by-employee', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/resource-capacity-by-employee',
+        'Failed to fetch resource capacity',
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+/** Materialised project margin (billed/unbilled revenue, labor, expenses). */
+export function useProjectMarginByProject(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['project-margin-by-project', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/project-margin-by-project',
+        'Failed to fetch project margin',
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+/** Materialised utilisation (available vs billable/non-billable). */
+export function useResourceUtilisationByEmployee(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['resource-utilisation-by-employee', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/resource-utilisation-by-employee',
+        'Failed to fetch resource utilisation',
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProjectMilestones(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['project-milestones', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/project-milestones', 'Failed to fetch project milestones'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useHrResources(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['hr-resources', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/hr-resources', 'Failed to fetch HR resources'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useHrSkills(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['hr-skills', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/hr-skills', 'Failed to fetch HR skills'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useHrEmployeeSkills(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['hr-employee-skills', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/hr-employee-skills', 'Failed to fetch employee skills'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useCreateResourceAllocation(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      if (companyId == null) throw new Error('companyId is required for allocations')
+      const { urlPath, init } = projectsBffPost('create_resource_allocation', [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) {
+        const body = await r.text().catch(() => '')
+        throw new Error(body || 'Failed to create resource allocation')
+      }
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['resource-allocations', k] })
+      void qc.invalidateQueries({ queryKey: ['resource-capacity-by-employee', k] })
+    },
+  })
+}
+
+export function useCreateProjectMilestone(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      if (companyId == null) throw new Error('companyId is required for milestones')
+      const { urlPath, init } = projectsBffPost('create_project_milestone', [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to create project milestone')
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({
+        queryKey: ['project-milestones', rqBigIntKey(organizationId)],
+      }),
+  })
+}
+
+export function useCreateProjectRateCard(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      if (companyId == null) throw new Error('companyId is required for rate cards')
+      const { urlPath, init } = projectsBffPost("create_project_rate_card", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to create project rate card')
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({
+        queryKey: ['project-rate-cards', rqBigIntKey(organizationId)],
+      }),
+  })
+}
+
+export function useCreateProjectRateCardLine(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      if (companyId == null) throw new Error('companyId is required for rate card lines')
+      const { urlPath, init } = projectsBffPost("create_project_rate_card_line", [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to create project rate card line')
+    },
+    onSuccess: () =>
+      void qc.invalidateQueries({
+        queryKey: ['project-rate-card-lines', rqBigIntKey(organizationId)],
+      }),
   })
 }
 
@@ -104,7 +350,7 @@ export function useCreateTimesheet(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create timesheet')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
   })
 }
 
@@ -185,7 +431,7 @@ export function useStartTimesheetTimer(organizationId: bigint, companyId?: bigin
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start timesheet timer')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
   })
 }
 
@@ -198,7 +444,7 @@ export function useStopTimesheetTimer(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to stop timesheet timer')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
   })
 }
 
@@ -277,23 +523,95 @@ export function useAssignTaskUsers(organizationId: bigint) {
 export type ValidateTimesheetsInput = {
   companyId: bigint | number | string | null
   timesheetIds: (string | number | bigint)[]
+  /** Optional WIP JE — only applied when project.allow_wip_je. */
+  wipJournalId?: bigint | number | string | null
+  wipAccountId?: bigint | number | string | null
+  wipLaborAccountId?: bigint | number | string | null
 }
 
 export function useValidateTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ValidateTimesheetsInput>({
-    mutationFn: async ({ timesheetIds, companyId }) => {
+    mutationFn: async ({
+      timesheetIds,
+      companyId,
+      wipJournalId,
+      wipAccountId,
+      wipLaborAccountId,
+    }) => {
       const { urlPath, init } = projectsBffPost("validate_timesheets", [
         organizationId,
         stdbParamsToJson({
           companyId: companyId != null ? toScalarU64(companyId) : null,
           timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
+          wipJournalId:
+            wipJournalId != null && wipJournalId !== ""
+              ? toScalarU64(wipJournalId)
+              : null,
+          wipAccountId:
+            wipAccountId != null && wipAccountId !== ""
+              ? toScalarU64(wipAccountId)
+              : null,
+          wipLaborAccountId:
+            wipLaborAccountId != null && wipLaborAccountId !== ""
+              ? toScalarU64(wipLaborAccountId)
+              : null,
         }),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to validate timesheets')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] }),
+    onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
+  })
+}
+
+export type RejectTimesheetsInput = {
+  companyId: bigint | number | string | null
+  timesheetIds: (string | number | bigint)[]
+  reason: string
+}
+
+export function useRejectTimesheets(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, RejectTimesheetsInput>({
+    mutationFn: async ({ timesheetIds, companyId, reason }) => {
+      const { urlPath, init } = projectsBffPost("reject_timesheets", [
+        organizationId,
+        stdbParamsToJson({
+          companyId: companyId != null ? toScalarU64(companyId) : null,
+          timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
+          reason,
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to reject timesheets')
+    },
+    onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
+  })
+}
+
+export type ReopenTimesheetsInput = {
+  companyId: bigint | number | string | null
+  timesheetIds: (string | number | bigint)[]
+  reason?: string | null
+}
+
+export function useReopenTimesheets(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ReopenTimesheetsInput>({
+    mutationFn: async ({ timesheetIds, companyId, reason }) => {
+      const { urlPath, init } = projectsBffPost("reopen_timesheets", [
+        organizationId,
+        stdbParamsToJson({
+          companyId: companyId != null ? toScalarU64(companyId) : null,
+          timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
+          reason: reason ?? null,
+        }),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to reopen timesheets')
+    },
+    onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
   })
 }
 
@@ -305,6 +623,9 @@ export type BillTimesheetsInput = {
   partnerId: bigint | number | string
   /** Pass `null` to let the server default the invoice date. */
   invoiceDate: Date | string | number | null
+  /** Optional sale tax IDs; empty lets the server pick company Sale tax (pack GST/VAT). */
+  taxIds?: (string | number | bigint)[]
+  fiscalPositionId?: bigint | number | string | null
 }
 
 export function useBillTimesheets(organizationId: bigint) {
@@ -317,6 +638,8 @@ export function useBillTimesheets(organizationId: bigint) {
       incomeAccountId,
       partnerId,
       invoiceDate,
+      taxIds,
+      fiscalPositionId,
     }) => {
       const { urlPath, init } = projectsBffPost("bill_timesheets", [
           organizationId,
@@ -332,6 +655,11 @@ export function useBillTimesheets(organizationId: bigint) {
                     invoiceDate instanceof Date ? invoiceDate : new Date(invoiceDate),
                   )
                 : null,
+            taxIds: (taxIds ?? []).map((id) => toScalarU64(id)),
+            fiscalPositionId:
+              fiscalPositionId != null && String(fiscalPositionId).trim() !== ""
+                ? toScalarU64(fiscalPositionId)
+                : null,
           }),
         ])
 
@@ -339,8 +667,9 @@ export function useBillTimesheets(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to bill timesheets')
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(organizationId)] })
-      qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] })
+      invalidateTimesheetQueues(qc, organizationId)
+      void qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] })
+      void qc.invalidateQueries({ queryKey: ['account-moves', rqBigIntKey(organizationId)] })
     },
   })
 }
@@ -393,8 +722,7 @@ export function useImportTimesheetCsv(organizationId: bigint, companyId: bigint)
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
     },
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['timesheets', rqBigIntKey(companyId)] }),
+    onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
   })
 }
 
@@ -408,6 +736,173 @@ export function useProjectsCsvImportMutations(organizationId: bigint, companyId:
 }
 
 export type ProjectsCsvImportMutations = ReturnType<typeof useProjectsCsvImportMutations>
+
+// ── Wave E reads / mutations ─────────────────────────────────────────────────
+
+export function useCapacityForecastByEmployee(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['capacity-forecast-by-employee', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/capacity-forecast-by-employee',
+        'Failed to fetch capacity forecast',
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProjectChangeOrders(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['project-change-orders', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/project-change-orders', 'Failed to fetch change orders'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProjectEarnedValueByProject(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['project-earned-value-by-project', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/project-earned-value-by-project',
+        'Failed to fetch earned value',
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProjectIntegrationIntents(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['project-integration-intents', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/project-integration-intents',
+        'Failed to fetch project integration intents',
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useCreateProjectChangeOrder(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      if (companyId == null) throw new Error('companyId is required for change orders')
+      const { urlPath, init } = projectsBffPost('create_project_change_order', [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error((await r.text().catch(() => '')) || 'Failed to create change order')
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['project-change-orders', k] })
+    },
+  })
+}
+
+export function useLinkSubcontractorCost(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      if (companyId == null) throw new Error('companyId is required for subcontractor link')
+      const { urlPath, init } = projectsBffPost('link_subcontractor_cost_to_project', [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) {
+        throw new Error((await r.text().catch(() => '')) || 'Failed to link subcontractor cost')
+      }
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['project-subcontractor-costs', k] })
+      void qc.invalidateQueries({ queryKey: ['project-margin-by-project', k] })
+      void qc.invalidateQueries({ queryKey: ['project-earned-value-by-project', k] })
+    },
+  })
+}
+
+export function useCreateProjectIntegrationIntent(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      const { urlPath, init } = projectsBffPost('create_project_integration_intent', [
+        organizationId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) {
+        throw new Error((await r.text().catch(() => '')) || 'Failed to create integration intent')
+      }
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ['project-integration-intents', rqBigIntKey(organizationId)],
+      })
+    },
+  })
+}
+
+export function useRefreshCapacityForecast(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      if (companyId == null) throw new Error('companyId is required for forecast refresh')
+      const { urlPath, init } = projectsBffPost('refresh_capacity_forecast', [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error((await r.text().catch(() => '')) || 'Failed to refresh forecast')
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ['capacity-forecast-by-employee', rqBigIntKey(organizationId)],
+      })
+    },
+  })
+}
+
+export function useRefreshProjectEarnedValue(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Record<string, unknown>>({
+    mutationFn: async (params) => {
+      if (companyId == null) throw new Error('companyId is required for EVM refresh')
+      const { urlPath, init } = projectsBffPost('refresh_project_earned_value', [
+        organizationId,
+        companyId,
+        stdbParamsToJson(params),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error((await r.text().catch(() => '')) || 'Failed to refresh EVM')
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ['project-earned-value-by-project', rqBigIntKey(organizationId)],
+      })
+    },
+  })
+}
 
 // Re-export cross-domain dependency so callers import from one place
 export { useEmployees } from "./hr"

@@ -14,7 +14,7 @@ use spacetimedb_sdk::__codegen::{
 #[sats(crate = __lib)]
 pub struct CreatePayrollStructureParams {
     pub name: String,
-    pub type: String,
+    pub r#type: String,
     pub is_active: bool,
 }
 

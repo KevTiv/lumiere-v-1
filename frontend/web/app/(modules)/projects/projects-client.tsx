@@ -10,6 +10,14 @@ import {
   editProjectForm,
   editTaskForm,
   logTimesheetForm,
+  newProjectRateCardForm,
+  newProjectRateCardLineForm,
+  newResourceAllocationForm,
+  newProjectMilestoneForm,
+  projectExpenseRebillForm,
+  newProjectChangeOrderForm,
+  linkSubcontractorCostForm,
+  newProjectIntegrationIntentForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
   projectsCsvImportForm,
@@ -23,6 +31,7 @@ import {
   toUpdateProjectParams,
   toUpdateTaskParams,
   toLogTimesheetParams,
+  toStartTimesheetTimerParams,
 } from "@/lib/projects-create-params"
 import { projectsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useProjectsModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -30,9 +39,24 @@ import {
   useProjects,
   useTasks,
   useTimesheets,
+  useTimesheetsToValidate,
+  useTimesheetsUnbilled,
+  useProjectRateCards,
   useCreateProject,
   useCreateTask,
   useCreateTimesheet,
+  useCreateProjectRateCard,
+  useCreateProjectRateCardLine,
+  useCreateResourceAllocation,
+  useCreateProjectMilestone,
+  useResourceAllocations,
+  useResourceCapacityByEmployee,
+  useProjectMarginByProject,
+  useResourceUtilisationByEmployee,
+  useProjectMilestones,
+  useHrResources,
+  useHrSkills,
+  useHrEmployeeSkills,
   useUpdateProject,
   useUpdateTask,
   useUpdateTaskState,
@@ -46,7 +70,22 @@ import {
   useBillTimesheets,
   useEmployees,
   useProjectsCsvImportMutations,
+  useCapacityForecastByEmployee,
+  useProjectChangeOrders,
+  useProjectEarnedValueByProject,
+  useProjectIntegrationIntents,
+  useCreateProjectChangeOrder,
+  useLinkSubcontractorCost,
+  useCreateProjectIntegrationIntent,
+  useRefreshCapacityForecast,
+  useRefreshProjectEarnedValue,
 } from "@lumiere/query-hooks/hooks/projects"
+import {
+  useCreateExpenseProjectRebill,
+  useExpenseSheets,
+} from "@lumiere/query-hooks/hooks/expenses"
+import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import { useUoms } from "@lumiere/query-hooks/hooks/inventory"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
@@ -61,8 +100,24 @@ import {
   userRowsToSelectOptions,
   accountJournalRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
+  employeeRowsToSelectOptions,
+  uomRowsToSelectOptions,
+  currencyOptionsFromRows,
 } from "@/lib/form-lookup"
-import { ProjectGanttPanel, ResourceAllocationPanel } from "./projects-panels"
+import {
+  ProjectGanttPanel,
+  ResourceAllocationPanel,
+  ResourceUtilisationPanel,
+} from "./projects-panels"
+import { AdvancedPsaPanel } from "./advanced-psa-panel"
+import { TimesheetCapturePanel } from "./timesheet-capture-panel"
+import {
+  enqueueTimesheetCapture,
+  getOrCreateTimesheetCaptureDeviceId,
+  markTimesheetCaptureError,
+  markTimesheetCaptureSynced,
+  newTimesheetClientRequestId,
+} from "@/lib/timesheet-capture-outbox"
 
 export { PROJECTS_UI_REDUCERS } from "@/lib/projects-ui-reducers"
 
@@ -91,6 +146,13 @@ type LifecycleModalState =
   | { type: "taskParent"; rows: Record<string, unknown>[]; form: FormConfig }
   | { type: "assignUsers"; rows: Record<string, unknown>[]; form: FormConfig }
   | { type: "billTimesheets"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "expenseRebill"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "rateCardLine"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "resourceAllocation"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "projectMilestone"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "changeOrder"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "subcontractorCost"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "integrationIntent"; rows: Record<string, unknown>[]; form: FormConfig }
 
 type ProjectToolbarAction = {
   id: string
@@ -240,7 +302,24 @@ function ProjectsClientLoaded({
   const { data: projects = [] } = useProjects(orgId, initialProjects)
   const { data: tasks = [] } = useTasks(orgId, initialTasks)
   const { data: timesheets = [] } = useTimesheets(orgId, initialTimesheets)
+  const { data: timesheetsToValidate = [] } = useTimesheetsToValidate(orgId)
+  const { data: timesheetsUnbilled = [] } = useTimesheetsUnbilled(orgId)
+  const { data: rateCards = [] } = useProjectRateCards(orgId)
+  const { data: allocations = [] } = useResourceAllocations(orgId)
+  const { data: capacity = [] } = useResourceCapacityByEmployee(orgId)
+  const { data: projectMargins = [] } = useProjectMarginByProject(orgId)
+  const { data: utilisation = [] } = useResourceUtilisationByEmployee(orgId)
+  const { data: milestones = [] } = useProjectMilestones(orgId)
+  const { data: capacityForecast = [] } = useCapacityForecastByEmployee(orgId)
+  const { data: changeOrders = [] } = useProjectChangeOrders(orgId)
+  const { data: earnedValue = [] } = useProjectEarnedValueByProject(orgId)
+  const { data: projectIntents = [] } = useProjectIntegrationIntents(orgId)
+  const { data: hrResources = [] } = useHrResources(orgId)
+  const { data: hrSkills = [] } = useHrSkills(orgId)
+  const { data: hrEmployeeSkills = [] } = useHrEmployeeSkills(orgId)
+  const { data: expenseSheets = [] } = useExpenseSheets(orgId)
   const { data: employees = [] } = useEmployees(orgId)
+  const { data: uoms = [] } = useUoms(orgId)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: contacts = [] } = useContacts(orgId, initialContacts)
   const { data: users = [] } = useUsers(orgId)
@@ -249,6 +328,15 @@ function ProjectsClientLoaded({
 
   const createProject = useCreateProject(orgId, operatingCompanyId)
   const createTask = useCreateTask(orgId, operatingCompanyId)
+  const createRateCard = useCreateProjectRateCard(orgId, operatingCompanyId)
+  const createRateCardLine = useCreateProjectRateCardLine(orgId, operatingCompanyId)
+  const createAllocation = useCreateResourceAllocation(orgId, operatingCompanyId)
+  const createMilestone = useCreateProjectMilestone(orgId, operatingCompanyId)
+  const createChangeOrder = useCreateProjectChangeOrder(orgId, operatingCompanyId)
+  const linkSubcontractor = useLinkSubcontractorCost(orgId, operatingCompanyId)
+  const createProjectIntent = useCreateProjectIntegrationIntent(orgId)
+  const refreshForecast = useRefreshCapacityForecast(orgId, operatingCompanyId)
+  const refreshEvm = useRefreshProjectEarnedValue(orgId, operatingCompanyId)
   const updateProject = useUpdateProject(orgId, operatingCompanyId)
   const updateTask = useUpdateTask(orgId, operatingCompanyId)
   const updateTaskState = useUpdateTaskState(orgId)
@@ -261,6 +349,7 @@ function ProjectsClientLoaded({
   const assignTaskUsers = useAssignTaskUsers(orgId)
   const validateTimesheets = useValidateTimesheets(orgId)
   const billTimesheets = useBillTimesheets(orgId)
+  const projectRebill = useCreateExpenseProjectRebill(orgId)
   const csvImports = useProjectsCsvImportMutations(orgId, operatingCompanyId)
 
   const moduleConfig = useMemo(() => projectsModuleConfig(t), [t])
@@ -296,6 +385,26 @@ function ProjectsClientLoaded({
     if (fromApi.length > 0) return [optional, ...fromApi]
     return [{ value: "", label: t("common.lookup.noPartners"), disabled: true }]
   }, [contacts, t])
+
+  const employeeFieldOptions = useMemo(() => {
+    const fromApi = employeeRowsToSelectOptions(employees as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noEmployees"), disabled: true }]
+  }, [employees, t])
+
+  const currencyFieldOptions = useMemo(
+    () =>
+      currencyOptionsFromRows(
+        [projects as Record<string, unknown>[], pricelists as Record<string, unknown>[]],
+      ),
+    [projects, pricelists],
+  )
+
+  const uomFieldOptions = useMemo(() => {
+    const fromApi = uomRowsToSelectOptions(uoms as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noUoms"), disabled: true }]
+  }, [uoms, t])
 
   const journalFieldOptions = useMemo(() => {
     const fromApi = accountJournalRowsToSelectOptions(accountJournals as Record<string, unknown>[])
@@ -353,6 +462,65 @@ function ProjectsClientLoaded({
     [projects, tasks, t],
   )
 
+  const allocationFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newResourceAllocationForm(t), {
+        employeeId: employeeFieldOptions,
+        resourceId:
+          (hrResources as Record<string, unknown>[]).length > 0
+            ? (hrResources as Record<string, unknown>[]).map((r) => ({
+                value: String(r.id),
+                label: String(r.name ?? r.id),
+              }))
+            : [{ value: "", label: "No HR resources", disabled: true }],
+        projectId: projectFieldOptions,
+        taskId: taskFieldOptions,
+      }),
+    [employeeFieldOptions, hrResources, projectFieldOptions, taskFieldOptions, t],
+  )
+
+  const milestoneFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newProjectMilestoneForm(t), {
+        projectId: projectFieldOptions,
+      }),
+    [projectFieldOptions, t],
+  )
+
+  const changeOrderFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newProjectChangeOrderForm(t), {
+        projectId: projectFieldOptions,
+      }),
+    [projectFieldOptions, t],
+  )
+
+  const subcontractorFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(linkSubcontractorCostForm(t), {
+        projectId: projectFieldOptions,
+      }),
+    [projectFieldOptions, t],
+  )
+
+  const integrationIntentFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newProjectIntegrationIntentForm(t), {
+        projectId: projectFieldOptions,
+      }),
+    [projectFieldOptions, t],
+  )
+
+  const milestoneFieldOptions = useMemo(() => {
+    const optional = { value: "", label: "—" }
+    const fromApi = (milestones as Record<string, unknown>[]).map((m) => ({
+      value: String(m.id),
+      label: String(m.name ?? m.id),
+    }))
+    if (fromApi.length > 0) return [optional, ...fromApi]
+    return [optional]
+  }, [milestones])
+
   const resourceTab = useMemo(
     () => ({
       id: "resource-allocation",
@@ -361,11 +529,112 @@ function ProjectsClientLoaded({
       customContent: (
         <ResourceAllocationPanel
           employees={employees as Record<string, unknown>[]}
-          timesheets={timesheets as Record<string, unknown>[]}
+          hrResources={hrResources as Record<string, unknown>[]}
+          allocations={allocations as Record<string, unknown>[]}
+          capacity={capacity as Record<string, unknown>[]}
+          employeeSkills={hrEmployeeSkills as Record<string, unknown>[]}
+          skills={hrSkills as Record<string, unknown>[]}
+          onBookAllocation={() =>
+            setLifecycleModal({
+              type: "resourceAllocation",
+              rows: [],
+              form: allocationFormConfig,
+            })
+          }
         />
       ),
     }),
-    [employees, timesheets, t],
+    [
+      employees,
+      hrResources,
+      allocations,
+      capacity,
+      hrEmployeeSkills,
+      hrSkills,
+      allocationFormConfig,
+      t,
+    ],
+  )
+
+  const utilisationTab = useMemo(
+    () => ({
+      id: "utilisation",
+      label: "Utilisation",
+      type: "custom" as const,
+      customContent: (
+        <ResourceUtilisationPanel
+          employees={employees as Record<string, unknown>[]}
+          utilisation={utilisation as Record<string, unknown>[]}
+        />
+      ),
+    }),
+    [employees, utilisation],
+  )
+
+  const advancedTab = useMemo(
+    () => ({
+      id: "advanced-psa",
+      label: "Advanced PSA",
+      type: "custom" as const,
+      customContent: (
+        <div className="space-y-6">
+          <AdvancedPsaPanel
+            forecast={capacityForecast as Record<string, unknown>[]}
+            changeOrders={changeOrders as Record<string, unknown>[]}
+            earnedValue={earnedValue as Record<string, unknown>[]}
+            intents={projectIntents as Record<string, unknown>[]}
+            onNewChangeOrder={() =>
+              setLifecycleModal({
+                type: "changeOrder",
+                rows: [],
+                form: changeOrderFormConfig,
+              })
+            }
+            onLinkSubcontractor={() =>
+              setLifecycleModal({
+                type: "subcontractorCost",
+                rows: [],
+                form: subcontractorFormConfig,
+              })
+            }
+            onNewIntent={() =>
+              setLifecycleModal({
+                type: "integrationIntent",
+                rows: [],
+                form: integrationIntentFormConfig,
+              })
+            }
+            onRefreshForecast={() =>
+              void refreshForecast.mutateAsync({
+                employeeId: null,
+                periodStart: null,
+                periodEnd: null,
+                metadata: null,
+              })
+            }
+            onRefreshEvm={() =>
+              void refreshEvm.mutateAsync({
+                projectIds: [],
+                metadata: null,
+              })
+            }
+          />
+          <TimesheetCapturePanel organizationId={organizationId} />
+        </div>
+      ),
+    }),
+    [
+      capacityForecast,
+      changeOrders,
+      earnedValue,
+      projectIntents,
+      changeOrderFormConfig,
+      subcontractorFormConfig,
+      integrationIntentFormConfig,
+      refreshForecast,
+      refreshEvm,
+      organizationId,
+    ],
   )
 
   const taskStageFieldOptions = useMemo(() => {
@@ -397,8 +666,9 @@ function ProjectsClientLoaded({
       mergeSelectOptionsForFields(newTaskForm(t), {
         projectId: projectFieldOptions,
         stageId: taskStageFieldOptions,
+        milestoneId: milestoneFieldOptions,
       }),
-    [t, projectFieldOptions, taskStageFieldOptions],
+    [t, projectFieldOptions, taskStageFieldOptions, milestoneFieldOptions],
   )
 
   const timesheetFormConfig = useMemo(
@@ -406,8 +676,65 @@ function ProjectsClientLoaded({
       mergeSelectOptionsForFields(logTimesheetForm(t), {
         projectId: projectFieldOptions,
         taskId: taskFieldOptions,
+        employeeId: employeeFieldOptions,
+        currencyId: currencyFieldOptions,
+        encodingUomId: uomFieldOptions,
       }),
-    [t, projectFieldOptions, taskFieldOptions],
+    [t, projectFieldOptions, taskFieldOptions, employeeFieldOptions, currencyFieldOptions, uomFieldOptions],
+  )
+
+  const rateCardFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newProjectRateCardForm(t), {
+        currencyId: currencyFieldOptions,
+        projectId: [{ value: "", label: "—" }, ...projectFieldOptions],
+      }),
+    [t, currencyFieldOptions, projectFieldOptions],
+  )
+
+  const rateCardSelectOptions = useMemo(() => {
+    const opts = (rateCards as Record<string, unknown>[]).map((r) => ({
+      value: String(r.id ?? ""),
+      label: String(r.name ?? r.id ?? ""),
+    }))
+    if (opts.length > 0) return opts
+    return [{ value: "", label: "No rate cards", disabled: true }]
+  }, [rateCards])
+
+  const rateCardLineFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newProjectRateCardLineForm(t), {
+        rateCardId: rateCardSelectOptions,
+        currencyId: currencyFieldOptions,
+        employeeId: employeeFieldOptions,
+        taskId: taskFieldOptions,
+      }),
+    [t, rateCardSelectOptions, currencyFieldOptions, employeeFieldOptions, taskFieldOptions],
+  )
+
+  const postedSheetOptions = useMemo(() => {
+    const opts = (expenseSheets as Record<string, unknown>[])
+      .filter((s) => {
+        const st = String(s.state ?? "")
+        return (st === "Posted" || st === "Done") && s.rebillMoveId == null
+      })
+      .map((s) => ({
+        value: String(s.id ?? ""),
+        label: String(s.name ?? s.id ?? ""),
+      }))
+    if (opts.length > 0) return opts
+    return [{ value: "", label: "No posted sheets to rebill", disabled: true }]
+  }, [expenseSheets])
+
+  const expenseRebillFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(projectExpenseRebillForm(t), {
+        sheetId: postedSheetOptions,
+        journalId: journalFieldOptions,
+        receivableAccountId: incomeAccountFieldOptions,
+        incomeAccountId: incomeAccountFieldOptions,
+      }),
+    [t, postedSheetOptions, journalFieldOptions, incomeAccountFieldOptions],
   )
 
   // Helper to build edit form with initial values
@@ -432,6 +759,7 @@ function ProjectsClientLoaded({
     const base = mergeSelectOptionsForFields(editTaskForm(t), {
       projectId: projectFieldOptions,
       stageId: taskStageFieldOptions,
+      milestoneId: milestoneFieldOptions,
     })
     return {
       ...base,
@@ -443,7 +771,7 @@ function ProjectsClientLoaded({
         }),
       })) as typeof base.sections,
     }
-  }, [t, projectFieldOptions, taskStageFieldOptions])
+  }, [t, projectFieldOptions, taskStageFieldOptions, milestoneFieldOptions])
 
   // Handle row click for edit
   const handleRowClick = useCallback((tabId: string, row: Record<string, unknown>) => {
@@ -475,22 +803,17 @@ function ProjectsClientLoaded({
     [],
   )
 
-  // Live KPI overrides
+  // Live KPI overrides from queue subscriptions + hours
   const liveSections = useMemo(() => {
     const activeProjects = projects.filter(
-      (p) => String(p.lastUpdateStatus) === "InProgress",
+      (p) => p.active !== false && String(p.lastUpdateStatus) !== "Cancelled",
     ).length
     const totalHoursSpent = timesheets.reduce((s, ts) => s + Number(ts.unitAmount ?? 0), 0)
-    const overdueTasks = tasks.filter(
-      (task) =>
-        task.dateDeadline != null &&
-        Number(task.dateDeadline) < Date.now() * 1000 &&
-        String(task.kanbanState) !== "Done" &&
-        String(task.kanbanState) !== "Cancelled",
-    ).length
-    const openTasks = tasks.filter(
-      (task) => String(task.kanbanState) !== "Done" && String(task.kanbanState) !== "Cancelled",
-    ).length
+    const toValidateCount = timesheetsToValidate.length
+    const unbilledHours = timesheetsUnbilled.reduce(
+      (s, ts) => s + Number(ts.unitAmount ?? 0),
+      0,
+    )
 
     const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
     if (!dashboardTab?.sections) return []
@@ -504,8 +827,8 @@ function ProjectsClientLoaded({
             data: {
               stats: [
                 { label: t("projects.dashboard.activeProjects"), value: String(activeProjects), icon: "FolderKanban" },
-                { label: t("projects.dashboard.openTasks"), value: String(openTasks), icon: "CheckSquare" },
-                { label: t("projects.dashboard.overdueTasks"), value: String(overdueTasks), icon: "AlertCircle" },
+                { label: "To validate", value: String(toValidateCount), icon: "CheckSquare", testId: "proj-queue-to-validate" },
+                { label: "Unbilled hours", value: `${Math.round(unbilledHours * 10) / 10}h`, icon: "AlertCircle", testId: "proj-queue-unbilled" },
                 { label: t("projects.dashboard.hoursLogged"), value: `${Math.round(totalHoursSpent)}h`, icon: "Clock" },
               ],
             },
@@ -541,6 +864,33 @@ function ProjectsClientLoaded({
           })
           return { ...w, data: { metrics } }
         }
+        if (w.id === "proj-budget-health") {
+          const projectName = new Map(
+            projects.map((p) => [String(p.id), String(p.name ?? p.id)]),
+          )
+          const values = (projectMargins as Record<string, unknown>[])
+            .slice(0, 8)
+            .map((m) => ({
+              project: projectName.get(String(m.projectId ?? "")) ?? String(m.projectId ?? "—"),
+              Budget: Math.round(Number(m.budgetPlanned ?? 0)),
+              Spent: Math.round(Number(m.budgetActual ?? 0)),
+              Margin: Math.round(Number(m.marginPercent ?? 0)),
+              href: `/projects?tab=timesheets&projectId=${m.projectId ?? ""}`,
+            }))
+          return {
+            ...w,
+            title: "Budget vs actual / margin",
+            data: {
+              categoryKey: "project",
+              series: [
+                { name: "Budget", color: "#94a3b8" },
+                { name: "Spent", color: "#6366f1" },
+              ],
+              values,
+              testId: "proj-margin-panel",
+            },
+          }
+        }
         if (w.id === "proj-milestones-table") {
           const nowMs = Date.now()
           const fourteenDaysMs = nowMs + 14 * 86400000
@@ -569,7 +919,19 @@ function ProjectsClientLoaded({
         return w
       }),
     }))
-  }, [projects, tasks, timesheets, t, moduleConfig, projectFormConfig, taskFormConfig, timesheetFormConfig])
+  }, [
+    projects,
+    tasks,
+    timesheets,
+    timesheetsToValidate,
+    timesheetsUnbilled,
+    projectMargins,
+    t,
+    moduleConfig,
+    projectFormConfig,
+    taskFormConfig,
+    timesheetFormConfig,
+  ])
 
   const csvFormConfig = useMemo(() => {
     if (!csvKind) return null
@@ -616,6 +978,38 @@ function ProjectsClientLoaded({
                     void runForSelectedIds(rows, (id) =>
                       setProjectActive.mutateAsync({ projectId: id, active: false }),
                     ),
+                },
+                {
+                  id: "expense-rebill",
+                  label: "Expense rebill",
+                  onClick: () => {
+                    setLifecycleError(null)
+                    setLifecycleModal({
+                      type: "expenseRebill",
+                      rows: [],
+                      form: expenseRebillFormConfig,
+                    })
+                  },
+                },
+              ]),
+            }
+          }
+          if (tab.id === "rate-cards" && tab.entityConfig) {
+            return {
+              ...tab,
+              createForm: rateCardFormConfig,
+              entityConfig: addCsvToolbar(tab.entityConfig, [
+                {
+                  id: "add-rate-line",
+                  label: "Add rate line",
+                  onClick: () => {
+                    setLifecycleError(null)
+                    setLifecycleModal({
+                      type: "rateCardLine",
+                      rows: [],
+                      form: rateCardLineFormConfig,
+                    })
+                  },
                 },
               ]),
             }
@@ -702,16 +1096,23 @@ function ProjectsClientLoaded({
         }),
           ganttTab,
           resourceTab,
+          utilisationTab,
+          advancedTab,
         ],
       }) as ModuleConfig,
     [
       moduleConfig,
       ganttTab,
       resourceTab,
+      utilisationTab,
+      advancedTab,
       liveSections,
       projectFormConfig,
       taskFormConfig,
       timesheetFormConfig,
+      rateCardFormConfig,
+      rateCardLineFormConfig,
+      expenseRebillFormConfig,
       t,
       runForSelectedIds,
       toggleFavorite,
@@ -730,9 +1131,10 @@ function ProjectsClientLoaded({
       projects: projects as unknown as Record<string, unknown>[],
       tasks: tasks as unknown as Record<string, unknown>[],
       timesheets: timesheets as unknown as Record<string, unknown>[],
+      "rate-cards": rateCards as unknown as Record<string, unknown>[],
       resources: employees as unknown as Record<string, unknown>[],
     }),
-    [projects, tasks, timesheets, employees],
+    [projects, tasks, timesheets, rateCards, employees],
   )
 
   const handleFormSubmit = async (
@@ -753,17 +1155,82 @@ function ProjectsClientLoaded({
       const p = toUpdateTaskParams(formData)
       if (p) await updateTask.mutateAsync({ taskId: modal.entityId, params: projectsParamsToJson(p) })
     } else if (action === "logTimesheet") {
-      const p = toLogTimesheetParams(formData, operatingCompanyId)
-      if (p) await createTimesheet.mutateAsync(projectsParamsToJson(p))
+      const p = toLogTimesheetParams(
+        formData,
+        operatingCompanyId,
+        projects as Record<string, unknown>[],
+      )
+      if (p) {
+        const deviceId = getOrCreateTimesheetCaptureDeviceId()
+        const clientRequestId = newTimesheetClientRequestId()
+        const payload = {
+          projectId: String(formData.projectId ?? ""),
+          taskId: String(formData.taskId ?? ""),
+          employeeId: String(formData.employeeId ?? ""),
+          date: String(formData.date ?? new Date().toISOString().slice(0, 10)),
+          unitAmount: Number(formData.unitAmount ?? 0),
+          name: formData.name != null ? String(formData.name) : undefined,
+          description:
+            formData.description != null ? String(formData.description) : undefined,
+          timesheetInvoiceType:
+            formData.timesheetInvoiceType != null
+              ? String(formData.timesheetInvoiceType)
+              : undefined,
+          currencyId:
+            formData.currencyId != null ? String(formData.currencyId) : undefined,
+        }
+        try {
+          await createTimesheet.mutateAsync(projectsParamsToJson(p))
+          markTimesheetCaptureSynced(organizationId, deviceId, clientRequestId)
+        } catch (err) {
+          enqueueTimesheetCapture(organizationId, {
+            clientRequestId,
+            deviceId,
+            payload,
+          })
+          markTimesheetCaptureError(
+            organizationId,
+            deviceId,
+            clientRequestId,
+            err instanceof Error ? err.message : String(err),
+          )
+          throw err
+        }
+      }
     } else if (action === "startTimer") {
-      const p = toLogTimesheetParams(formData, operatingCompanyId)
+      const p = toStartTimesheetTimerParams(
+        formData,
+        operatingCompanyId,
+        projects as Record<string, unknown>[],
+      )
       if (p) await startTimer.mutateAsync(projectsParamsToJson(p))
+    } else if (action === "createRateCard") {
+      const projectRaw = formData.projectId
+      await createRateCard.mutateAsync({
+        name: String(formData.name ?? ""),
+        currencyId: BigInt(String(formData.currencyId)),
+        projectId:
+          projectRaw != null && String(projectRaw).trim() !== ""
+            ? BigInt(String(projectRaw))
+            : null,
+        active: formData.active !== false && formData.active !== "false",
+        effectiveFrom: null,
+        effectiveTo: null,
+        metadata: null,
+      })
     }
   }
 
   const isFormMutationPending =
     createProject.isPending ||
     createTask.isPending ||
+    createRateCard.isPending ||
+    createRateCardLine.isPending ||
+    createAllocation.isPending ||
+    createMilestone.isPending ||
+    createChangeOrder.isPending ||
+    linkSubcontractor.isPending ||
+    createProjectIntent.isPending ||
     updateProject.isPending ||
     updateTask.isPending ||
     updateTaskState.isPending ||
@@ -776,6 +1243,7 @@ function ProjectsClientLoaded({
     assignTaskUsers.isPending ||
     validateTimesheets.isPending ||
     billTimesheets.isPending ||
+    projectRebill.isPending ||
     csvImports.importProject.isPending ||
     csvImports.importTask.isPending ||
     csvImports.importTimesheet.isPending
@@ -872,6 +1340,171 @@ function ProjectsClientLoaded({
                       ? (formData.invoiceDate as string | number | Date)
                       : null,
                 })
+              } else if (lifecycleModal.type === "expenseRebill") {
+                // Surface expenses reducer create_expense_project_rebill (do not reimplement).
+                const sheetId = formData.sheetId
+                const journalId = formData.journalId
+                const receivableAccountId = formData.receivableAccountId
+                const incomeAccountId = formData.incomeAccountId
+                const d = formData.invoiceDate
+                if (
+                  sheetId == null ||
+                  sheetId === "" ||
+                  !journalId ||
+                  !receivableAccountId ||
+                  !incomeAccountId ||
+                  d == null ||
+                  d === ""
+                ) {
+                  throw new Error("Sheet, journal, accounts, and invoice date are required")
+                }
+                await projectRebill.mutateAsync({
+                  sheetId: String(sheetId),
+                  params: {
+                    invoiceDate: stbTimestampFromDate(new Date(String(d))),
+                    journalId: BigInt(String(journalId)),
+                    receivableAccountId: BigInt(String(receivableAccountId)),
+                    incomeAccountId: BigInt(String(incomeAccountId)),
+                  },
+                })
+              } else if (lifecycleModal.type === "rateCardLine") {
+                const empRaw = formData.employeeId
+                const taskRaw = formData.taskId
+                await createRateCardLine.mutateAsync({
+                  rateCardId: BigInt(String(formData.rateCardId)),
+                  scope: String(formData.scope ?? "employee"),
+                  employeeId:
+                    empRaw != null && String(empRaw).trim() !== ""
+                      ? BigInt(String(empRaw))
+                      : null,
+                  taskId:
+                    taskRaw != null && String(taskRaw).trim() !== ""
+                      ? BigInt(String(taskRaw))
+                      : null,
+                  currencyId: BigInt(String(formData.currencyId)),
+                  costRate: Number(formData.costRate ?? 0),
+                  sellRate: Number(formData.sellRate ?? 0),
+                  active: formData.active !== false && formData.active !== "false",
+                  effectiveFrom: null,
+                  effectiveTo: null,
+                  metadata: null,
+                })
+              } else if (lifecycleModal.type === "resourceAllocation") {
+                const empRaw = formData.employeeId
+                const resRaw = formData.resourceId
+                const taskRaw = formData.taskId
+                const from = formData.dateFrom
+                const to = formData.dateTo
+                if (!formData.projectId || from == null || from === "" || to == null || to === "") {
+                  throw new Error("Project, date from, and date to are required")
+                }
+                const skillHint =
+                  formData.skillHint != null && String(formData.skillHint).trim() !== ""
+                    ? String(formData.skillHint)
+                    : null
+                await createAllocation.mutateAsync({
+                  employeeId:
+                    empRaw != null && String(empRaw).trim() !== ""
+                      ? BigInt(String(empRaw))
+                      : null,
+                  resourceId:
+                    resRaw != null && String(resRaw).trim() !== ""
+                      ? BigInt(String(resRaw))
+                      : null,
+                  projectId: BigInt(String(formData.projectId)),
+                  taskId:
+                    taskRaw != null && String(taskRaw).trim() !== ""
+                      ? BigInt(String(taskRaw))
+                      : null,
+                  dateFrom: stbTimestampFromDate(new Date(String(from))),
+                  dateTo: stbTimestampFromDate(new Date(String(to))),
+                  allocatedHours: Number(formData.allocatedHours ?? 0),
+                  allocationPercent: Number(formData.allocationPercent ?? 0),
+                  name: null,
+                  notes:
+                    formData.notes != null && String(formData.notes).trim() !== ""
+                      ? String(formData.notes)
+                      : null,
+                  enforceCapacity:
+                    formData.enforceCapacity !== false && formData.enforceCapacity !== "false",
+                  active: true,
+                  metadata: skillHint ? JSON.stringify({ skillHint }) : null,
+                })
+              } else if (lifecycleModal.type === "projectMilestone") {
+                const d = formData.deadline
+                await createMilestone.mutateAsync({
+                  projectId: BigInt(String(formData.projectId)),
+                  name: String(formData.name ?? "").trim(),
+                  description:
+                    formData.description != null && String(formData.description).trim() !== ""
+                      ? String(formData.description)
+                      : null,
+                  deadline:
+                    d != null && String(d).trim() !== ""
+                      ? stbTimestampFromDate(new Date(String(d)))
+                      : null,
+                  sequence: Number(formData.sequence ?? 10),
+                  isReached: false,
+                  billAmount: Number(formData.billAmount ?? 0),
+                  percentComplete: Number(formData.percentComplete ?? 0),
+                  active: true,
+                  metadata: null,
+                })
+              } else if (lifecycleModal.type === "changeOrder") {
+                await createChangeOrder.mutateAsync({
+                  projectId: BigInt(String(formData.projectId)),
+                  name: String(formData.name ?? "").trim(),
+                  description:
+                    formData.description != null && String(formData.description).trim() !== ""
+                      ? String(formData.description)
+                      : null,
+                  scopeDelta:
+                    formData.scopeDelta != null && String(formData.scopeDelta).trim() !== ""
+                      ? String(formData.scopeDelta)
+                      : null,
+                  budgetDelta: Number(formData.budgetDelta ?? 0),
+                  plannedHoursDelta: Number(formData.plannedHoursDelta ?? 0),
+                  rateDeltaPercent: Number(formData.rateDeltaPercent ?? 0),
+                  metadata: null,
+                })
+              } else if (lifecycleModal.type === "subcontractorCost") {
+                const poRaw = formData.purchaseOrderId
+                const poLineRaw = formData.purchaseOrderLineId
+                await linkSubcontractor.mutateAsync({
+                  projectId: BigInt(String(formData.projectId)),
+                  purchaseOrderId:
+                    poRaw != null && String(poRaw).trim() !== ""
+                      ? BigInt(String(poRaw))
+                      : null,
+                  purchaseOrderLineId:
+                    poLineRaw != null && String(poLineRaw).trim() !== ""
+                      ? BigInt(String(poLineRaw))
+                      : null,
+                  vendorBillMoveId: null,
+                  vendorBillLineId: null,
+                  partnerId: null,
+                  amount: Number(formData.amount ?? 0),
+                  currencyId: BigInt(String(formData.currencyId ?? 1)),
+                  name:
+                    formData.name != null && String(formData.name).trim() !== ""
+                      ? String(formData.name)
+                      : null,
+                  active: true,
+                  metadata: null,
+                })
+              } else if (lifecycleModal.type === "integrationIntent") {
+                const projRaw = formData.projectId
+                await createProjectIntent.mutateAsync({
+                  companyId: operatingCompanyId,
+                  projectId:
+                    projRaw != null && String(projRaw).trim() !== ""
+                      ? BigInt(String(projRaw))
+                      : null,
+                  intentType: String(formData.intentType ?? "payroll_export"),
+                  idempotencyKey: String(formData.idempotencyKey ?? "").trim(),
+                  payload: String(formData.payload ?? "{}"),
+                  metadata: null,
+                })
               }
               setLifecycleModal({ type: null })
             } catch (e) {
@@ -935,6 +1568,10 @@ function getProjectFieldValue(project: Record<string, unknown>, fieldName: strin
       return String(project.pricelistId ?? '')
     case 'partnerId':
       return String(project.partnerId ?? '')
+    case 'billType':
+      return String(project.billType ?? 'customer_task')
+    case 'pricingType':
+      return String(project.pricingType ?? 'task_rate')
     case 'allocatedHours':
       return project.allocatedHours ?? ''
     case 'dateStart':

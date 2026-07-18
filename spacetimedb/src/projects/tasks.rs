@@ -9,6 +9,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::projects::milestones::validate_milestone_fk;
 use crate::projects::projects::{project_project, ProjectProject};
 use crate::types::TaskState;
 
@@ -46,6 +47,10 @@ pub struct ProjectTask {
     pub project_id: Option<u64>,
     pub user_ids: Vec<Identity>,
     pub milestone_id: Option<u64>,
+    /// WBS code within the project (e.g. `1.2.3`). Empty when unset.
+    pub wbs_code: String,
+    /// Hierarchy depth: 0 = root, parent.wbs_level + 1 for children.
+    pub wbs_level: u32,
     pub planned_hours: f64,
     pub total_hours_spent: f64,
     pub effective_hours: f64,
@@ -100,6 +105,8 @@ pub struct CreateTaskParams {
     pub color: Option<u8>,
     pub user_ids: Vec<Identity>,
     pub milestone_id: Option<u64>,
+    pub wbs_code: String,
+    pub wbs_level: u32,
     pub planned_hours: f64,
     pub total_hours_spent: f64,
     pub effective_hours: f64,
@@ -149,6 +156,8 @@ pub struct UpdateTaskParams {
     pub project_id: Option<Option<u64>>,
     pub user_ids: Option<Vec<Identity>>,
     pub milestone_id: Option<Option<u64>>,
+    pub wbs_code: Option<String>,
+    pub wbs_level: Option<u32>,
     pub planned_hours: Option<f64>,
     pub total_hours_spent: Option<f64>,
     pub effective_hours: Option<f64>,
@@ -384,6 +393,8 @@ pub fn create_task(
         }
     }
 
+    let mut wbs_level = params.wbs_level;
+    let mut wbs_code = params.wbs_code.clone();
     if let Some(pid) = params.parent_id {
         let parent = ctx
             .db
@@ -406,7 +417,31 @@ pub fn create_task(
                 return Err("Parent task must belong to the same project".to_string());
             }
         }
+
+        // Derive WBS level from parent hierarchy; reject inconsistent caller level.
+        let derived_level = parent.wbs_level.saturating_add(1);
+        if params.wbs_level > 0 && params.wbs_level != derived_level {
+            return Err(format!(
+                "wbs_level must be {} for this parent (got {})",
+                derived_level, params.wbs_level
+            ));
+        }
+        wbs_level = derived_level;
+        if wbs_code.trim().is_empty() && !parent.wbs_code.is_empty() {
+            let sibling_n = parent.child_ids.len() as u32 + 1;
+            wbs_code = format!("{}.{}", parent.wbs_code, sibling_n);
+        }
+    } else if wbs_level == 0 && wbs_code.trim().is_empty() {
+        // Root task: leave code empty unless caller provided one; level stays 0.
     }
+
+    validate_milestone_fk(
+        ctx,
+        organization_id,
+        company_id,
+        params.project_id,
+        params.milestone_id,
+    )?;
 
     let task = ctx.db.project_task().insert(ProjectTask {
         id: 0,
@@ -431,6 +466,8 @@ pub fn create_task(
         project_id: params.project_id,
         user_ids: params.user_ids.clone(),
         milestone_id: params.milestone_id,
+        wbs_code,
+        wbs_level,
         planned_hours: params.planned_hours,
         total_hours_spent: params.total_hours_spent,
         effective_hours: params.effective_hours,
@@ -872,8 +909,38 @@ pub fn update_task(
     }
 
     if let Some(milestone_id) = params.milestone_id {
+        validate_milestone_fk(
+            ctx,
+            organization_id,
+            company_id,
+            task.project_id,
+            milestone_id,
+        )?;
         task.milestone_id = milestone_id;
         changed_fields.push("milestone_id".to_string());
+    }
+
+    if let Some(wbs_code) = params.wbs_code {
+        task.wbs_code = wbs_code;
+        changed_fields.push("wbs_code".to_string());
+    }
+
+    if let Some(wbs_level) = params.wbs_level {
+        if let Some(pid) = task.parent_id {
+            if let Some(parent) = ctx.db.project_task().id().find(&pid) {
+                let expected = parent.wbs_level.saturating_add(1);
+                if wbs_level != expected {
+                    return Err(format!(
+                        "wbs_level must be {} for current parent (got {})",
+                        expected, wbs_level
+                    ));
+                }
+            }
+        } else if wbs_level != 0 {
+            return Err("root tasks must have wbs_level 0".to_string());
+        }
+        task.wbs_level = wbs_level;
+        changed_fields.push("wbs_level".to_string());
     }
 
     if let Some(planned_hours) = params.planned_hours {
@@ -1188,8 +1255,20 @@ pub fn set_task_parent(
         });
     }
 
+    let wbs_level = match parent_id {
+        Some(pid) => ctx
+            .db
+            .project_task()
+            .id()
+            .find(&pid)
+            .map(|p| p.wbs_level.saturating_add(1))
+            .unwrap_or(0),
+        None => 0,
+    };
+
     ctx.db.project_task().id().update(ProjectTask {
         parent_id,
+        wbs_level,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..task
@@ -1207,9 +1286,10 @@ pub fn set_task_parent(
             new_values: Some({
                 let mut new_values = Map::new();
                 new_values.insert("parent_id".to_string(), serde_json::json!(parent_id));
+                new_values.insert("wbs_level".to_string(), Value::from(wbs_level));
                 Value::Object(new_values).to_string()
             }),
-            changed_fields: vec!["parent_id".to_string()],
+            changed_fields: vec!["parent_id".to_string(), "wbs_level".to_string()],
             metadata: None,
         },
     );

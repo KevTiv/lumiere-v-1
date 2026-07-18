@@ -131,9 +131,55 @@ export const timesheetsTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Rate cards ────────────────────────────────────────────────────────────────
+export const rateCardsTableConfig = (_t: TFunction): EntityViewConfig => ({
+  id: "rate-cards-table",
+  title: "Rate cards",
+  description: "Project / employee / task cost and sell rates",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: "Search rate cards…",
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: "Name", width: "min-w-48" },
+      { key: "projectId", label: "Project", width: "min-w-32" },
+      { key: "currencyId", label: "Currency", width: "min-w-24" },
+      { key: "active", label: "Active", type: "badge" },
+    ],
+    emptyMessage: "No rate cards yet",
+  },
+})
+
+export const rateCardLinesTableConfig = (_t: TFunction): EntityViewConfig => ({
+  id: "rate-card-lines-table",
+  title: "Rate card lines",
+  description: "Scoped rate lines",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: "Search lines…",
+    searchKeys: ["scope"],
+    columns: [
+      { key: "rateCardId", label: "Card", width: "min-w-24" },
+      { key: "scope", label: "Scope", width: "min-w-24" },
+      { key: "employeeId", label: "Employee", width: "min-w-24" },
+      { key: "taskId", label: "Task", width: "min-w-24" },
+      { key: "costRate", label: "Cost", type: "number", align: "right" },
+      { key: "sellRate", label: "Sell", type: "number", align: "right" },
+      { key: "active", label: "Active", type: "badge" },
+    ],
+    emptyMessage: "No rate card lines yet",
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const projectsEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "projects-table": projectsTableConfig(t),
   "tasks-table": tasksTableConfig(t),
   "timesheets-table": timesheetsTableConfig(t),
+  "rate-cards-table": rateCardsTableConfig(t),
+  "rate-card-lines-table": rateCardLinesTableConfig(t),
 })

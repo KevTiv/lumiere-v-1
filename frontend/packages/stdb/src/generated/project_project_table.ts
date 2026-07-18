@@ -35,6 +35,7 @@ export default __t.row({
   allowMaterial: __t.bool().name("allow_material"),
   allowWorksheets: __t.bool().name("allow_worksheets"),
   allowForecast: __t.bool().name("allow_forecast"),
+  allowWipJe: __t.bool().name("allow_wip_je"),
   billType: __t.string().name("bill_type"),
   pricingType: __t.string().name("pricing_type"),
   ratingStatus: __t.string().name("rating_status"),

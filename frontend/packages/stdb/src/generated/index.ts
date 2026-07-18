@@ -80,6 +80,9 @@ import ApplyLandedCostsReducer from "./apply_landed_costs_reducer";
 import ApplyOmnichannelAllocationReducer from "./apply_omnichannel_allocation_reducer";
 import ApplyOrgMigrationsReducer from "./apply_org_migrations_reducer";
 import ApplyPendingExpenseIntegrationIntentsReducer from "./apply_pending_expense_integration_intents_reducer";
+import ApplyPendingProjectIntegrationIntentsReducer from "./apply_pending_project_integration_intents_reducer";
+import ApplyProjectChangeOrderReducer from "./apply_project_change_order_reducer";
+import ApplyProjectIntegrationIntentReducer from "./apply_project_integration_intent_reducer";
 import ApplyReconciliationRulesReducer from "./apply_reconciliation_rules_reducer";
 import ApplySaleOrderOptionsReducer from "./apply_sale_order_options_reducer";
 import ApplySalePromotionToOrderReducer from "./apply_sale_promotion_to_order_reducer";
@@ -114,6 +117,7 @@ import AssignTicketReducer from "./assign_ticket_reducer";
 import AssignUserToPickingReducer from "./assign_user_to_picking_reducer";
 import AwardPurchaseRfqBidReducer from "./award_purchase_rfq_bid_reducer";
 import BackfillExternalIdsReducer from "./backfill_external_ids_reducer";
+import BillProjectMilestoneReducer from "./bill_project_milestone_reducer";
 import BillTimesheetsReducer from "./bill_timesheets_reducer";
 import BlockSerialReducer from "./block_serial_reducer";
 import BlockWorkcenterReducer from "./block_workcenter_reducer";
@@ -278,6 +282,8 @@ import CreateGoogleDriveConnectionReducer from "./create_google_drive_connection
 import CreateHelpdeskSlaReducer from "./create_helpdesk_sla_reducer";
 import CreateHelpdeskStageReducer from "./create_helpdesk_stage_reducer";
 import CreateHelpdeskTeamReducer from "./create_helpdesk_team_reducer";
+import CreateHrEmployeeSkillReducer from "./create_hr_employee_skill_reducer";
+import CreateHrSkillReducer from "./create_hr_skill_reducer";
 import CreateIncotermReducer from "./create_incoterm_reducer";
 import CreateIntercompanyRuleReducer from "./create_intercompany_rule_reducer";
 import CreateIntercompanyTransactionReducer from "./create_intercompany_transaction_reducer";
@@ -333,7 +339,15 @@ import CreateProductPackagingReducer from "./create_product_packaging_reducer";
 import CreateProductSupplierInfoReducer from "./create_product_supplier_info_reducer";
 import CreateProductVariantReducer from "./create_product_variant_reducer";
 import CreateProjectReducer from "./create_project_reducer";
+import CreateProjectChangeOrderReducer from "./create_project_change_order_reducer";
+import CreateProjectIntegrationIntentReducer from "./create_project_integration_intent_reducer";
+import CreateProjectMilestoneReducer from "./create_project_milestone_reducer";
+import CreateProjectRateCardReducer from "./create_project_rate_card_reducer";
+import CreateProjectRateCardLineReducer from "./create_project_rate_card_line_reducer";
+import CreateProjectRevenueLineReducer from "./create_project_revenue_line_reducer";
+import CreateProjectRevenueScheduleReducer from "./create_project_revenue_schedule_reducer";
 import CreateProposalReducer from "./create_proposal_reducer";
+import CreatePublicHolidayReducer from "./create_public_holiday_reducer";
 import CreatePurchaseBlanketOrderReducer from "./create_purchase_blanket_order_reducer";
 import CreatePurchaseContractReducer from "./create_purchase_contract_reducer";
 import CreatePurchaseOrderReducer from "./create_purchase_order_reducer";
@@ -348,6 +362,7 @@ import CreateQualityPointReducer from "./create_quality_point_reducer";
 import CreateQualityTeamReducer from "./create_quality_team_reducer";
 import CreateReplenishmentRuleReducer from "./create_replenishment_rule_reducer";
 import CreateReportTemplateReducer from "./create_report_template_reducer";
+import CreateResourceAllocationReducer from "./create_resource_allocation_reducer";
 import CreateReturnOrderReducer from "./create_return_order_reducer";
 import CreateRevenueRecognitionRuleReducer from "./create_revenue_recognition_rule_reducer";
 import CreateRoleReducer from "./create_role_reducer";
@@ -407,6 +422,7 @@ import CreateWarehouseTaskReducer from "./create_warehouse_task_reducer";
 import CreateWhatsappBusinessAccountReducer from "./create_whatsapp_business_account_reducer";
 import CreateWorkcenterReducer from "./create_workcenter_reducer";
 import CreateWorkflowReducer from "./create_workflow_reducer";
+import CreateWorkingCalendarReducer from "./create_working_calendar_reducer";
 import CreateWorkorderReducer from "./create_workorder_reducer";
 import DeactivatePosConfigReducer from "./deactivate_pos_config_reducer";
 import DeactivateRevenueRecognitionRuleReducer from "./deactivate_revenue_recognition_rule_reducer";
@@ -431,6 +447,7 @@ import DeleteDocumentReducer from "./delete_document_reducer";
 import DeleteFinancialReportReducer from "./delete_financial_report_reducer";
 import DeleteFiscalYearReducer from "./delete_fiscal_year_reducer";
 import DeleteFormFieldReducer from "./delete_form_field_reducer";
+import DeleteHrEmployeeSkillReducer from "./delete_hr_employee_skill_reducer";
 import DeleteImportMappingTemplateReducer from "./delete_import_mapping_template_reducer";
 import DeleteIntegrationReducer from "./delete_integration_reducer";
 import DeleteIntercompanyRuleReducer from "./delete_intercompany_rule_reducer";
@@ -447,6 +464,7 @@ import DeletePricelistReducer from "./delete_pricelist_reducer";
 import DeletePricelistItemReducer from "./delete_pricelist_item_reducer";
 import DeleteProductReducer from "./delete_product_reducer";
 import DeleteProductCategoryReducer from "./delete_product_category_reducer";
+import DeleteProjectMilestoneReducer from "./delete_project_milestone_reducer";
 import DeleteProposalLineItemReducer from "./delete_proposal_line_item_reducer";
 import DeleteProposalSectionReducer from "./delete_proposal_section_reducer";
 import DeleteProposalSourceDocReducer from "./delete_proposal_source_doc_reducer";
@@ -454,6 +472,7 @@ import DeleteQualityAlertReasonReducer from "./delete_quality_alert_reason_reduc
 import DeleteQualityPointReducer from "./delete_quality_point_reducer";
 import DeleteQualityTeamReducer from "./delete_quality_team_reducer";
 import DeleteRecordCustomFieldValuesReducer from "./delete_record_custom_field_values_reducer";
+import DeleteResourceAllocationReducer from "./delete_resource_allocation_reducer";
 import DeleteSaleOrderLineReducer from "./delete_sale_order_line_reducer";
 import DeleteSaleOrderOptionReducer from "./delete_sale_order_option_reducer";
 import DeleteSavedReportReducer from "./delete_saved_report_reducer";
@@ -494,6 +513,7 @@ import ExplodeBomReducer from "./explode_bom_reducer";
 import ExportFinancialReportReducer from "./export_financial_report_reducer";
 import FailExpenseIntegrationIntentReducer from "./fail_expense_integration_intent_reducer";
 import FailIotActionReducer from "./fail_iot_action_reducer";
+import FailProjectIntegrationIntentReducer from "./fail_project_integration_intent_reducer";
 import FailQualityCheckReducer from "./fail_quality_check_reducer";
 import FailScheduledOwnerReportRunReducer from "./fail_scheduled_owner_report_run_reducer";
 import FailSubscriptionPaymentIntentReducer from "./fail_subscription_payment_intent_reducer";
@@ -579,6 +599,7 @@ import LinkDeviceToLocationReducer from "./link_device_to_location_reducer";
 import LinkDeviceToPosReducer from "./link_device_to_pos_reducer";
 import LinkDeviceToQualityCheckReducer from "./link_device_to_quality_check_reducer";
 import LinkDeviceToWorkcenterReducer from "./link_device_to_workcenter_reducer";
+import LinkSubcontractorCostToProjectReducer from "./link_subcontractor_cost_to_project_reducer";
 import LinkWorkosUserReducer from "./link_workos_user_reducer";
 import LockDocumentReducer from "./lock_document_reducer";
 import LockKnowledgeArticleReducer from "./lock_knowledge_article_reducer";
@@ -633,6 +654,7 @@ import ReceiveConsignmentStockReducer from "./receive_consignment_stock_reducer"
 import ReceivePoLineReducer from "./receive_po_line_reducer";
 import RecognizeAmortizationLineReducer from "./recognize_amortization_line_reducer";
 import RecognizeDeferredRevenueReducer from "./recognize_deferred_revenue_reducer";
+import RecognizeProjectRevenueReducer from "./recognize_project_revenue_reducer";
 import RecomputeLeadScoreReducer from "./recompute_lead_score_reducer";
 import RecomputeRelationshipInsightsReducer from "./recompute_relationship_insights_reducer";
 import ReconcileAccountBankStatementLineReducer from "./reconcile_account_bank_statement_line_reducer";
@@ -657,8 +679,13 @@ import RecordTelemetryReducer from "./record_telemetry_reducer";
 import RecordTelemetryBatchReducer from "./record_telemetry_batch_reducer";
 import RecordWhatsappHealthCheckReducer from "./record_whatsapp_health_check_reducer";
 import RecordWhatsappMessageSentReducer from "./record_whatsapp_message_sent_reducer";
+import RefreshCapacityForecastReducer from "./refresh_capacity_forecast_reducer";
 import RefreshInventoryExceptionsReducer from "./refresh_inventory_exceptions_reducer";
 import RefreshPolicySnapshotReducer from "./refresh_policy_snapshot_reducer";
+import RefreshProjectEarnedValueReducer from "./refresh_project_earned_value_reducer";
+import RefreshProjectMarginReducer from "./refresh_project_margin_reducer";
+import RefreshResourceCapacityReducer from "./refresh_resource_capacity_reducer";
+import RefreshResourceUtilisationReducer from "./refresh_resource_utilisation_reducer";
 import RefreshSaleOrderPromiseDatesReducer from "./refresh_sale_order_promise_dates_reducer";
 import RefreshSubscriptionExceptionFlagsReducer from "./refresh_subscription_exception_flags_reducer";
 import RefreshTaxDeadlineStatusesReducer from "./refresh_tax_deadline_statuses_reducer";
@@ -671,6 +698,7 @@ import RegisterQueueWorkerReducer from "./register_queue_worker_reducer";
 import RejectAiActionDraftReducer from "./reject_ai_action_draft_reducer";
 import RejectApprovalRequestReducer from "./reject_approval_request_reducer";
 import RejectSupplierIntakeReducer from "./reject_supplier_intake_reducer";
+import RejectTimesheetsReducer from "./reject_timesheets_reducer";
 import ReleaseBlanketToPoReducer from "./release_blanket_to_po_reducer";
 import ReleasePickingWaveReducer from "./release_picking_wave_reducer";
 import RemoveArticleMemberReducer from "./remove_article_member_reducer";
@@ -683,6 +711,7 @@ import RemoveUserFromOrganizationReducer from "./remove_user_from_organization_r
 import RenewSubscriptionReducer from "./renew_subscription_reducer";
 import ReopenInventoryCloseReducer from "./reopen_inventory_close_reducer";
 import ReopenTicketReducer from "./reopen_ticket_reducer";
+import ReopenTimesheetsReducer from "./reopen_timesheets_reducer";
 import ReorderProposalLineItemsReducer from "./reorder_proposal_line_items_reducer";
 import RequestEmbeddingJobReducer from "./request_embedding_job_reducer";
 import RequestExpensePolicyExceptionReducer from "./request_expense_policy_exception_reducer";
@@ -723,6 +752,7 @@ import RunAllDomainTestsReducer from "./run_all_domain_tests_reducer";
 import RunAllExpensesTestsReducer from "./run_all_expenses_tests_reducer";
 import RunAllInventoryTestsReducer from "./run_all_inventory_tests_reducer";
 import RunAllPlatformTestsReducer from "./run_all_platform_tests_reducer";
+import RunAllProjectsTestsReducer from "./run_all_projects_tests_reducer";
 import RunAllPurchasingTestsReducer from "./run_all_purchasing_tests_reducer";
 import RunAllSalesTestsReducer from "./run_all_sales_tests_reducer";
 import RunAllSubscriptionsTestsReducer from "./run_all_subscriptions_tests_reducer";
@@ -781,6 +811,10 @@ import RunInventoryWarehouseSyncTestReducer from "./run_inventory_warehouse_sync
 import RunInventoryWaveReleaseTestReducer from "./run_inventory_wave_release_test_reducer";
 import RunManufacturingWorkcenterTestReducer from "./run_manufacturing_workcenter_test_reducer";
 import RunOwnerReportScheduleReducer from "./run_owner_report_schedule_reducer";
+import RunProjectsWaveATestReducer from "./run_projects_wave_a_test_reducer";
+import RunProjectsWaveCTestReducer from "./run_projects_wave_c_test_reducer";
+import RunProjectsWaveDTestReducer from "./run_projects_wave_d_test_reducer";
+import RunProjectsWaveETestReducer from "./run_projects_wave_e_test_reducer";
 import RunPurchasingBillBalancedTestReducer from "./run_purchasing_bill_balanced_test_reducer";
 import RunPurchasingCompanyIsolationTestReducer from "./run_purchasing_company_isolation_test_reducer";
 import RunPurchasingIncomingPickingTestReducer from "./run_purchasing_incoming_picking_test_reducer";
@@ -821,6 +855,7 @@ import ScheduleSalesSlaEscalationReducer from "./schedule_sales_sla_escalation_r
 import ScheduleTaxDeadlineUpdatesReducer from "./schedule_tax_deadline_updates_reducer";
 import SeedDevDataReducer from "./seed_dev_data_reducer";
 import SeedOrganizationFormConfigsReducer from "./seed_organization_form_configs_reducer";
+import SeedPackHolidaysReducer from "./seed_pack_holidays_reducer";
 import SendPurchaseOrderReducer from "./send_purchase_order_reducer";
 import SendSaleOrderQuotationReducer from "./send_sale_order_quotation_reducer";
 import SetAiAgentActiveReducer from "./set_ai_agent_active_reducer";
@@ -942,6 +977,8 @@ import UpdateFiscalYearReducer from "./update_fiscal_year_reducer";
 import UpdateFormFieldReducer from "./update_form_field_reducer";
 import UpdateGoogleDriveConnectionReducer from "./update_google_drive_connection_reducer";
 import UpdateGoogleDriveCredentialsReducer from "./update_google_drive_credentials_reducer";
+import UpdateHrEmployeeSkillReducer from "./update_hr_employee_skill_reducer";
+import UpdateHrSkillReducer from "./update_hr_skill_reducer";
 import UpdateHubHeartbeatReducer from "./update_hub_heartbeat_reducer";
 import UpdateIntegrationStatusReducer from "./update_integration_status_reducer";
 import UpdateIntercompanyRuleReducer from "./update_intercompany_rule_reducer";
@@ -982,17 +1019,22 @@ import UpdateProductPricingReducer from "./update_product_pricing_reducer";
 import UpdateProductSupplierInfoReducer from "./update_product_supplier_info_reducer";
 import UpdateProductVariantReducer from "./update_product_variant_reducer";
 import UpdateProjectReducer from "./update_project_reducer";
+import UpdateProjectMilestoneReducer from "./update_project_milestone_reducer";
+import UpdateProjectRateCardReducer from "./update_project_rate_card_reducer";
+import UpdateProjectRateCardLineReducer from "./update_project_rate_card_line_reducer";
 import UpdateProposalReducer from "./update_proposal_reducer";
 import UpdateProposalLineItemReducer from "./update_proposal_line_item_reducer";
 import UpdateProposalPresenceReducer from "./update_proposal_presence_reducer";
 import UpdateProposalSourceDocReducer from "./update_proposal_source_doc_reducer";
 import UpdateProposalStatusReducer from "./update_proposal_status_reducer";
+import UpdatePublicHolidayReducer from "./update_public_holiday_reducer";
 import UpdatePurchaseOrderReducer from "./update_purchase_order_reducer";
 import UpdatePurchaseOrderLineReducer from "./update_purchase_order_line_reducer";
 import UpdateQualityAlertReasonReducer from "./update_quality_alert_reason_reducer";
 import UpdateQualityPointReducer from "./update_quality_point_reducer";
 import UpdateQualityTeamReducer from "./update_quality_team_reducer";
 import UpdateReportTemplateReducer from "./update_report_template_reducer";
+import UpdateResourceAllocationReducer from "./update_resource_allocation_reducer";
 import UpdateRoleReducer from "./update_role_reducer";
 import UpdateSaleOrderReducer from "./update_sale_order_reducer";
 import UpdateSaleOrderLineReducer from "./update_sale_order_line_reducer";
@@ -1031,6 +1073,7 @@ import UpdateWhatsappQualityScoreReducer from "./update_whatsapp_quality_score_r
 import UpdateWhatsappVerificationStatusReducer from "./update_whatsapp_verification_status_reducer";
 import UpdateWidgetLayoutReducer from "./update_widget_layout_reducer";
 import UpdateWorkcenterReducer from "./update_workcenter_reducer";
+import UpdateWorkingCalendarReducer from "./update_working_calendar_reducer";
 import UpsertAiSkillReducer from "./upsert_ai_skill_reducer";
 import UpsertAiSkillConfigReducer from "./upsert_ai_skill_config_reducer";
 import UpsertExpenseMileageRateReducer from "./upsert_expense_mileage_rate_reducer";
@@ -1122,6 +1165,7 @@ import BillingAccountRow from "./billing_account_table";
 import BomExplosionResultRow from "./bom_explosion_result_table";
 import BudgetPostRow from "./budget_post_table";
 import CalendarEventRow from "./calendar_event_table";
+import CapacityForecastSnapshotRow from "./capacity_forecast_snapshot_table";
 import CartonizationResultRow from "./cartonization_result_table";
 import CasbinRuleRow from "./casbin_rule_table";
 import CashFlowLineRow from "./cash_flow_line_table";
@@ -1189,6 +1233,7 @@ import HelpdeskTicketRow from "./helpdesk_ticket_table";
 import HrContractRow from "./hr_contract_table";
 import HrDepartmentRow from "./hr_department_table";
 import HrEmployeeRow from "./hr_employee_table";
+import HrEmployeeSkillRow from "./hr_employee_skill_table";
 import HrExpenseRow from "./hr_expense_table";
 import HrExpenseAdvanceRow from "./hr_expense_advance_table";
 import HrExpenseAdvanceApplicationRow from "./hr_expense_advance_application_table";
@@ -1204,6 +1249,7 @@ import HrPayrollStructureRow from "./hr_payroll_structure_table";
 import HrPayslipRow from "./hr_payslip_table";
 import HrResourceRow from "./hr_resource_table";
 import HrSalaryRuleRow from "./hr_salary_rule_table";
+import HrSkillRow from "./hr_skill_table";
 import ImportJobRow from "./import_job_table";
 import ImportJobErrorRow from "./import_job_error_table";
 import ImportJobRecordRow from "./import_job_record_table";
@@ -1281,9 +1327,21 @@ import ProductPricelistItemRow from "./product_pricelist_item_table";
 import ProductSupplierInfoRow from "./product_supplier_info_table";
 import ProductVariantRow from "./product_variant_table";
 import ProfitLossLineRow from "./profit_loss_line_table";
+import ProjectBaselineRow from "./project_baseline_table";
+import ProjectChangeOrderRow from "./project_change_order_table";
+import ProjectEarnedValueSnapshotRow from "./project_earned_value_snapshot_table";
+import ProjectIntegrationIntentRow from "./project_integration_intent_table";
+import ProjectMarginSnapshotRow from "./project_margin_snapshot_table";
+import ProjectMilestoneRow from "./project_milestone_table";
 import ProjectProjectRow from "./project_project_table";
+import ProjectRateCardRow from "./project_rate_card_table";
+import ProjectRateCardLineRow from "./project_rate_card_line_table";
+import ProjectRevenueLineRow from "./project_revenue_line_table";
+import ProjectRevenueScheduleRow from "./project_revenue_schedule_table";
+import ProjectSubcontractorCostRow from "./project_subcontractor_cost_table";
 import ProjectTaskRow from "./project_task_table";
 import ProjectTimesheetRow from "./project_timesheet_table";
+import ProjectTimesheetApprovalRow from "./project_timesheet_approval_table";
 import ProposalRow from "./proposal_table";
 import ProposalCommentRow from "./proposal_comment_table";
 import ProposalLineItemRow from "./proposal_line_item_table";
@@ -1291,6 +1349,7 @@ import ProposalPresenceRow from "./proposal_presence_table";
 import ProposalSectionRow from "./proposal_section_table";
 import ProposalSourceDocRow from "./proposal_source_doc_table";
 import ProposalVersionRow from "./proposal_version_table";
+import PublicHolidayRow from "./public_holiday_table";
 import PurchaseApprovalDelegateRow from "./purchase_approval_delegate_table";
 import PurchaseBlanketOrderRow from "./purchase_blanket_order_table";
 import PurchaseContractRow from "./purchase_contract_table";
@@ -1315,6 +1374,9 @@ import RecordCustomFieldValueRow from "./record_custom_field_value_table";
 import ReplenishmentRuleRow from "./replenishment_rule_table";
 import ReportTemplateRow from "./report_template_table";
 import ResPartnerBankRow from "./res_partner_bank_table";
+import ResourceAllocationRow from "./resource_allocation_table";
+import ResourceCapacitySnapshotRow from "./resource_capacity_snapshot_table";
+import ResourceUtilisationSnapshotRow from "./resource_utilisation_snapshot_table";
 import ReturnOrderRow from "./return_order_table";
 import ReturnOrderLineRow from "./return_order_line_table";
 import RevenueRecognitionRuleRow from "./revenue_recognition_rule_table";
@@ -1403,6 +1465,7 @@ import WorkflowActivityRow from "./workflow_activity_table";
 import WorkflowInstanceRow from "./workflow_instance_table";
 import WorkflowTransitionRow from "./workflow_transition_table";
 import WorkflowWorkitemRow from "./workflow_workitem_table";
+import WorkingCalendarRow from "./working_calendar_table";
 
 /** Type-only namespace exports for generated type groups. */
 
@@ -2647,6 +2710,26 @@ const tablesSchema = __schema({
       { name: 'calendar_event_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CalendarEventRow),
+  capacity_forecast_snapshot: __table({
+    name: 'capacity_forecast_snapshot',
+    indexes: [
+      { name: 'forecast_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'forecast_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'forecast_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'capacity_forecast_snapshot_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CapacityForecastSnapshotRow),
   cartonization_result: __table({
     name: 'cartonization_result',
     indexes: [
@@ -3189,6 +3272,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'budget_line_by_org', algorithm: 'btree', columns: [
         'organizationId',
+      ] },
+      { name: 'budget_line_by_project', algorithm: 'btree', columns: [
+        'projectId',
       ] },
     ],
     constraints: [
@@ -3768,6 +3854,29 @@ const tablesSchema = __schema({
       { name: 'hr_employee_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrEmployeeRow),
+  hr_employee_skill: __table({
+    name: 'hr_employee_skill',
+    indexes: [
+      { name: 'emp_skill_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'emp_skill_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'emp_skill_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'emp_skill_by_skill', algorithm: 'btree', columns: [
+        'skillId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_employee_skill_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrEmployeeSkillRow),
   hr_expense: __table({
     name: 'hr_expense',
     indexes: [
@@ -4026,6 +4135,23 @@ const tablesSchema = __schema({
       { name: 'hr_salary_rule_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrSalaryRuleRow),
+  hr_skill: __table({
+    name: 'hr_skill',
+    indexes: [
+      { name: 'skill_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'skill_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_skill_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrSkillRow),
   import_job: __table({
     name: 'import_job',
     indexes: [
@@ -5373,6 +5499,129 @@ const tablesSchema = __schema({
       { name: 'profit_loss_line_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ProfitLossLineRow),
+  project_baseline: __table({
+    name: 'project_baseline',
+    indexes: [
+      { name: 'baseline_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'baseline_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'baseline_by_project', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_baseline_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectBaselineRow),
+  project_change_order: __table({
+    name: 'project_change_order',
+    indexes: [
+      { name: 'change_order_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'change_order_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'change_order_by_project', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_change_order_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectChangeOrderRow),
+  project_earned_value_snapshot: __table({
+    name: 'project_earned_value_snapshot',
+    indexes: [
+      { name: 'evm_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'evm_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'evm_by_project', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_earned_value_snapshot_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectEarnedValueSnapshotRow),
+  project_integration_intent: __table({
+    name: 'project_integration_intent',
+    indexes: [
+      { name: 'proj_intent_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'proj_intent_by_key', algorithm: 'btree', columns: [
+        'idempotencyKey',
+      ] },
+      { name: 'proj_intent_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'proj_intent_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_integration_intent_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectIntegrationIntentRow),
+  project_margin_snapshot: __table({
+    name: 'project_margin_snapshot',
+    indexes: [
+      { name: 'margin_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'margin_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'margin_by_project', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_margin_snapshot_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectMarginSnapshotRow),
+  project_milestone: __table({
+    name: 'project_milestone',
+    indexes: [
+      { name: 'milestone_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'milestone_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'milestone_by_project', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_milestone_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectMilestoneRow),
   project_project: __table({
     name: 'project_project',
     indexes: [
@@ -5393,6 +5642,115 @@ const tablesSchema = __schema({
       { name: 'project_project_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ProjectProjectRow),
+  project_rate_card: __table({
+    name: 'project_rate_card',
+    indexes: [
+      { name: 'rate_card_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'rate_card_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'rate_card_by_project', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_rate_card_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectRateCardRow),
+  project_rate_card_line: __table({
+    name: 'project_rate_card_line',
+    indexes: [
+      { name: 'rate_card_line_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'rate_card_line_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'rate_card_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'rate_card_line_by_card', algorithm: 'btree', columns: [
+        'rateCardId',
+      ] },
+      { name: 'rate_card_line_by_task', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_rate_card_line_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectRateCardLineRow),
+  project_revenue_line: __table({
+    name: 'project_revenue_line',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'proj_rev_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'proj_rev_line_by_project', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+      { name: 'proj_rev_line_by_schedule', algorithm: 'btree', columns: [
+        'scheduleId',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_revenue_line_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectRevenueLineRow),
+  project_revenue_schedule: __table({
+    name: 'project_revenue_schedule',
+    indexes: [
+      { name: 'proj_rev_sched_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'proj_rev_sched_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'proj_rev_sched_by_project', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_revenue_schedule_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectRevenueScheduleRow),
+  project_subcontractor_cost: __table({
+    name: 'project_subcontractor_cost',
+    indexes: [
+      { name: 'subcon_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'subcon_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'subcon_by_project', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+      { name: 'subcon_by_po_line', algorithm: 'btree', columns: [
+        'purchaseOrderLineId',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_subcontractor_cost_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectSubcontractorCostRow),
   project_task: __table({
     name: 'project_task',
     indexes: [
@@ -5439,6 +5797,26 @@ const tablesSchema = __schema({
       { name: 'project_timesheet_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ProjectTimesheetRow),
+  project_timesheet_approval: __table({
+    name: 'project_timesheet_approval',
+    indexes: [
+      { name: 'timesheet_approval_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'timesheet_approval_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'timesheet_approval_by_timesheet', algorithm: 'btree', columns: [
+        'timesheetId',
+      ] },
+    ],
+    constraints: [
+      { name: 'project_timesheet_approval_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ProjectTimesheetApprovalRow),
   proposal: __table({
     name: 'proposal',
     indexes: [
@@ -5558,6 +5936,26 @@ const tablesSchema = __schema({
       { name: 'proposal_version_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ProposalVersionRow),
+  public_holiday: __table({
+    name: 'public_holiday',
+    indexes: [
+      { name: 'holiday_by_calendar', algorithm: 'btree', columns: [
+        'calendarId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'holiday_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'holiday_by_pack', algorithm: 'btree', columns: [
+        'packKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'public_holiday_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PublicHolidayRow),
   purchase_approval_delegate: __table({
     name: 'purchase_approval_delegate',
     indexes: [
@@ -5968,6 +6366,75 @@ const tablesSchema = __schema({
       { name: 'res_partner_bank_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ResPartnerBankRow),
+  resource_allocation: __table({
+    name: 'resource_allocation',
+    indexes: [
+      { name: 'allocation_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'allocation_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'allocation_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'allocation_by_project', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+      { name: 'allocation_by_resource', algorithm: 'btree', columns: [
+        'resourceId',
+      ] },
+    ],
+    constraints: [
+      { name: 'resource_allocation_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ResourceAllocationRow),
+  resource_capacity_snapshot: __table({
+    name: 'resource_capacity_snapshot',
+    indexes: [
+      { name: 'capacity_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'capacity_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'capacity_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'capacity_by_resource', algorithm: 'btree', columns: [
+        'resourceId',
+      ] },
+    ],
+    constraints: [
+      { name: 'resource_capacity_snapshot_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ResourceCapacitySnapshotRow),
+  resource_utilisation_snapshot: __table({
+    name: 'resource_utilisation_snapshot',
+    indexes: [
+      { name: 'utilisation_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'utilisation_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'utilisation_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'resource_utilisation_snapshot_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ResourceUtilisationSnapshotRow),
   return_order: __table({
     name: 'return_order',
     indexes: [
@@ -7544,6 +8011,26 @@ const tablesSchema = __schema({
       { name: 'workflow_workitem_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, WorkflowWorkitemRow),
+  working_calendar: __table({
+    name: 'working_calendar',
+    indexes: [
+      { name: 'calendar_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'calendar_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'calendar_by_pack', algorithm: 'btree', columns: [
+        'packKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'working_calendar_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkingCalendarRow),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
@@ -7594,6 +8081,9 @@ const reducersSchema = __reducers(
   __reducerSchema("apply_omnichannel_allocation", ApplyOmnichannelAllocationReducer),
   __reducerSchema("apply_org_migrations", ApplyOrgMigrationsReducer),
   __reducerSchema("apply_pending_expense_integration_intents", ApplyPendingExpenseIntegrationIntentsReducer),
+  __reducerSchema("apply_pending_project_integration_intents", ApplyPendingProjectIntegrationIntentsReducer),
+  __reducerSchema("apply_project_change_order", ApplyProjectChangeOrderReducer),
+  __reducerSchema("apply_project_integration_intent", ApplyProjectIntegrationIntentReducer),
   __reducerSchema("apply_reconciliation_rules", ApplyReconciliationRulesReducer),
   __reducerSchema("apply_sale_order_options", ApplySaleOrderOptionsReducer),
   __reducerSchema("apply_sale_promotion_to_order", ApplySalePromotionToOrderReducer),
@@ -7628,6 +8118,7 @@ const reducersSchema = __reducers(
   __reducerSchema("assign_user_to_picking", AssignUserToPickingReducer),
   __reducerSchema("award_purchase_rfq_bid", AwardPurchaseRfqBidReducer),
   __reducerSchema("backfill_external_ids", BackfillExternalIdsReducer),
+  __reducerSchema("bill_project_milestone", BillProjectMilestoneReducer),
   __reducerSchema("bill_timesheets", BillTimesheetsReducer),
   __reducerSchema("block_serial", BlockSerialReducer),
   __reducerSchema("block_workcenter", BlockWorkcenterReducer),
@@ -7792,6 +8283,8 @@ const reducersSchema = __reducers(
   __reducerSchema("create_helpdesk_sla", CreateHelpdeskSlaReducer),
   __reducerSchema("create_helpdesk_stage", CreateHelpdeskStageReducer),
   __reducerSchema("create_helpdesk_team", CreateHelpdeskTeamReducer),
+  __reducerSchema("create_hr_employee_skill", CreateHrEmployeeSkillReducer),
+  __reducerSchema("create_hr_skill", CreateHrSkillReducer),
   __reducerSchema("create_incoterm", CreateIncotermReducer),
   __reducerSchema("create_intercompany_rule", CreateIntercompanyRuleReducer),
   __reducerSchema("create_intercompany_transaction", CreateIntercompanyTransactionReducer),
@@ -7847,7 +8340,15 @@ const reducersSchema = __reducers(
   __reducerSchema("create_product_supplier_info", CreateProductSupplierInfoReducer),
   __reducerSchema("create_product_variant", CreateProductVariantReducer),
   __reducerSchema("create_project", CreateProjectReducer),
+  __reducerSchema("create_project_change_order", CreateProjectChangeOrderReducer),
+  __reducerSchema("create_project_integration_intent", CreateProjectIntegrationIntentReducer),
+  __reducerSchema("create_project_milestone", CreateProjectMilestoneReducer),
+  __reducerSchema("create_project_rate_card", CreateProjectRateCardReducer),
+  __reducerSchema("create_project_rate_card_line", CreateProjectRateCardLineReducer),
+  __reducerSchema("create_project_revenue_line", CreateProjectRevenueLineReducer),
+  __reducerSchema("create_project_revenue_schedule", CreateProjectRevenueScheduleReducer),
   __reducerSchema("create_proposal", CreateProposalReducer),
+  __reducerSchema("create_public_holiday", CreatePublicHolidayReducer),
   __reducerSchema("create_purchase_blanket_order", CreatePurchaseBlanketOrderReducer),
   __reducerSchema("create_purchase_contract", CreatePurchaseContractReducer),
   __reducerSchema("create_purchase_order", CreatePurchaseOrderReducer),
@@ -7862,6 +8363,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_quality_team", CreateQualityTeamReducer),
   __reducerSchema("create_replenishment_rule", CreateReplenishmentRuleReducer),
   __reducerSchema("create_report_template", CreateReportTemplateReducer),
+  __reducerSchema("create_resource_allocation", CreateResourceAllocationReducer),
   __reducerSchema("create_return_order", CreateReturnOrderReducer),
   __reducerSchema("create_revenue_recognition_rule", CreateRevenueRecognitionRuleReducer),
   __reducerSchema("create_role", CreateRoleReducer),
@@ -7921,6 +8423,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_whatsapp_business_account", CreateWhatsappBusinessAccountReducer),
   __reducerSchema("create_workcenter", CreateWorkcenterReducer),
   __reducerSchema("create_workflow", CreateWorkflowReducer),
+  __reducerSchema("create_working_calendar", CreateWorkingCalendarReducer),
   __reducerSchema("create_workorder", CreateWorkorderReducer),
   __reducerSchema("deactivate_pos_config", DeactivatePosConfigReducer),
   __reducerSchema("deactivate_revenue_recognition_rule", DeactivateRevenueRecognitionRuleReducer),
@@ -7945,6 +8448,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_financial_report", DeleteFinancialReportReducer),
   __reducerSchema("delete_fiscal_year", DeleteFiscalYearReducer),
   __reducerSchema("delete_form_field", DeleteFormFieldReducer),
+  __reducerSchema("delete_hr_employee_skill", DeleteHrEmployeeSkillReducer),
   __reducerSchema("delete_import_mapping_template", DeleteImportMappingTemplateReducer),
   __reducerSchema("delete_integration", DeleteIntegrationReducer),
   __reducerSchema("delete_intercompany_rule", DeleteIntercompanyRuleReducer),
@@ -7961,6 +8465,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_pricelist_item", DeletePricelistItemReducer),
   __reducerSchema("delete_product", DeleteProductReducer),
   __reducerSchema("delete_product_category", DeleteProductCategoryReducer),
+  __reducerSchema("delete_project_milestone", DeleteProjectMilestoneReducer),
   __reducerSchema("delete_proposal_line_item", DeleteProposalLineItemReducer),
   __reducerSchema("delete_proposal_section", DeleteProposalSectionReducer),
   __reducerSchema("delete_proposal_source_doc", DeleteProposalSourceDocReducer),
@@ -7968,6 +8473,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_quality_point", DeleteQualityPointReducer),
   __reducerSchema("delete_quality_team", DeleteQualityTeamReducer),
   __reducerSchema("delete_record_custom_field_values", DeleteRecordCustomFieldValuesReducer),
+  __reducerSchema("delete_resource_allocation", DeleteResourceAllocationReducer),
   __reducerSchema("delete_sale_order_line", DeleteSaleOrderLineReducer),
   __reducerSchema("delete_sale_order_option", DeleteSaleOrderOptionReducer),
   __reducerSchema("delete_saved_report", DeleteSavedReportReducer),
@@ -8008,6 +8514,7 @@ const reducersSchema = __reducers(
   __reducerSchema("export_financial_report", ExportFinancialReportReducer),
   __reducerSchema("fail_expense_integration_intent", FailExpenseIntegrationIntentReducer),
   __reducerSchema("fail_iot_action", FailIotActionReducer),
+  __reducerSchema("fail_project_integration_intent", FailProjectIntegrationIntentReducer),
   __reducerSchema("fail_quality_check", FailQualityCheckReducer),
   __reducerSchema("fail_scheduled_owner_report_run", FailScheduledOwnerReportRunReducer),
   __reducerSchema("fail_subscription_payment_intent", FailSubscriptionPaymentIntentReducer),
@@ -8093,6 +8600,7 @@ const reducersSchema = __reducers(
   __reducerSchema("link_device_to_pos", LinkDeviceToPosReducer),
   __reducerSchema("link_device_to_quality_check", LinkDeviceToQualityCheckReducer),
   __reducerSchema("link_device_to_workcenter", LinkDeviceToWorkcenterReducer),
+  __reducerSchema("link_subcontractor_cost_to_project", LinkSubcontractorCostToProjectReducer),
   __reducerSchema("link_workos_user", LinkWorkosUserReducer),
   __reducerSchema("lock_document", LockDocumentReducer),
   __reducerSchema("lock_knowledge_article", LockKnowledgeArticleReducer),
@@ -8147,6 +8655,7 @@ const reducersSchema = __reducers(
   __reducerSchema("receive_po_line", ReceivePoLineReducer),
   __reducerSchema("recognize_amortization_line", RecognizeAmortizationLineReducer),
   __reducerSchema("recognize_deferred_revenue", RecognizeDeferredRevenueReducer),
+  __reducerSchema("recognize_project_revenue", RecognizeProjectRevenueReducer),
   __reducerSchema("recompute_lead_score", RecomputeLeadScoreReducer),
   __reducerSchema("recompute_relationship_insights", RecomputeRelationshipInsightsReducer),
   __reducerSchema("reconcile_account_bank_statement_line", ReconcileAccountBankStatementLineReducer),
@@ -8171,8 +8680,13 @@ const reducersSchema = __reducers(
   __reducerSchema("record_telemetry_batch", RecordTelemetryBatchReducer),
   __reducerSchema("record_whatsapp_health_check", RecordWhatsappHealthCheckReducer),
   __reducerSchema("record_whatsapp_message_sent", RecordWhatsappMessageSentReducer),
+  __reducerSchema("refresh_capacity_forecast", RefreshCapacityForecastReducer),
   __reducerSchema("refresh_inventory_exceptions", RefreshInventoryExceptionsReducer),
   __reducerSchema("refresh_policy_snapshot", RefreshPolicySnapshotReducer),
+  __reducerSchema("refresh_project_earned_value", RefreshProjectEarnedValueReducer),
+  __reducerSchema("refresh_project_margin", RefreshProjectMarginReducer),
+  __reducerSchema("refresh_resource_capacity", RefreshResourceCapacityReducer),
+  __reducerSchema("refresh_resource_utilisation", RefreshResourceUtilisationReducer),
   __reducerSchema("refresh_sale_order_promise_dates", RefreshSaleOrderPromiseDatesReducer),
   __reducerSchema("refresh_subscription_exception_flags", RefreshSubscriptionExceptionFlagsReducer),
   __reducerSchema("refresh_tax_deadline_statuses", RefreshTaxDeadlineStatusesReducer),
@@ -8185,6 +8699,7 @@ const reducersSchema = __reducers(
   __reducerSchema("reject_ai_action_draft", RejectAiActionDraftReducer),
   __reducerSchema("reject_approval_request", RejectApprovalRequestReducer),
   __reducerSchema("reject_supplier_intake", RejectSupplierIntakeReducer),
+  __reducerSchema("reject_timesheets", RejectTimesheetsReducer),
   __reducerSchema("release_blanket_to_po", ReleaseBlanketToPoReducer),
   __reducerSchema("release_picking_wave", ReleasePickingWaveReducer),
   __reducerSchema("remove_article_member", RemoveArticleMemberReducer),
@@ -8197,6 +8712,7 @@ const reducersSchema = __reducers(
   __reducerSchema("renew_subscription", RenewSubscriptionReducer),
   __reducerSchema("reopen_inventory_close", ReopenInventoryCloseReducer),
   __reducerSchema("reopen_ticket", ReopenTicketReducer),
+  __reducerSchema("reopen_timesheets", ReopenTimesheetsReducer),
   __reducerSchema("reorder_proposal_line_items", ReorderProposalLineItemsReducer),
   __reducerSchema("request_embedding_job", RequestEmbeddingJobReducer),
   __reducerSchema("request_expense_policy_exception", RequestExpensePolicyExceptionReducer),
@@ -8237,6 +8753,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_all_expenses_tests", RunAllExpensesTestsReducer),
   __reducerSchema("run_all_inventory_tests", RunAllInventoryTestsReducer),
   __reducerSchema("run_all_platform_tests", RunAllPlatformTestsReducer),
+  __reducerSchema("run_all_projects_tests", RunAllProjectsTestsReducer),
   __reducerSchema("run_all_purchasing_tests", RunAllPurchasingTestsReducer),
   __reducerSchema("run_all_sales_tests", RunAllSalesTestsReducer),
   __reducerSchema("run_all_subscriptions_tests", RunAllSubscriptionsTestsReducer),
@@ -8295,6 +8812,10 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_wave_release_test", RunInventoryWaveReleaseTestReducer),
   __reducerSchema("run_manufacturing_workcenter_test", RunManufacturingWorkcenterTestReducer),
   __reducerSchema("run_owner_report_schedule", RunOwnerReportScheduleReducer),
+  __reducerSchema("run_projects_wave_a_test", RunProjectsWaveATestReducer),
+  __reducerSchema("run_projects_wave_c_test", RunProjectsWaveCTestReducer),
+  __reducerSchema("run_projects_wave_d_test", RunProjectsWaveDTestReducer),
+  __reducerSchema("run_projects_wave_e_test", RunProjectsWaveETestReducer),
   __reducerSchema("run_purchasing_bill_balanced_test", RunPurchasingBillBalancedTestReducer),
   __reducerSchema("run_purchasing_company_isolation_test", RunPurchasingCompanyIsolationTestReducer),
   __reducerSchema("run_purchasing_incoming_picking_test", RunPurchasingIncomingPickingTestReducer),
@@ -8335,6 +8856,7 @@ const reducersSchema = __reducers(
   __reducerSchema("schedule_tax_deadline_updates", ScheduleTaxDeadlineUpdatesReducer),
   __reducerSchema("seed_dev_data", SeedDevDataReducer),
   __reducerSchema("seed_organization_form_configs", SeedOrganizationFormConfigsReducer),
+  __reducerSchema("seed_pack_holidays", SeedPackHolidaysReducer),
   __reducerSchema("send_purchase_order", SendPurchaseOrderReducer),
   __reducerSchema("send_sale_order_quotation", SendSaleOrderQuotationReducer),
   __reducerSchema("set_ai_agent_active", SetAiAgentActiveReducer),
@@ -8456,6 +8978,8 @@ const reducersSchema = __reducers(
   __reducerSchema("update_form_field", UpdateFormFieldReducer),
   __reducerSchema("update_google_drive_connection", UpdateGoogleDriveConnectionReducer),
   __reducerSchema("update_google_drive_credentials", UpdateGoogleDriveCredentialsReducer),
+  __reducerSchema("update_hr_employee_skill", UpdateHrEmployeeSkillReducer),
+  __reducerSchema("update_hr_skill", UpdateHrSkillReducer),
   __reducerSchema("update_hub_heartbeat", UpdateHubHeartbeatReducer),
   __reducerSchema("update_integration_status", UpdateIntegrationStatusReducer),
   __reducerSchema("update_intercompany_rule", UpdateIntercompanyRuleReducer),
@@ -8496,17 +9020,22 @@ const reducersSchema = __reducers(
   __reducerSchema("update_product_supplier_info", UpdateProductSupplierInfoReducer),
   __reducerSchema("update_product_variant", UpdateProductVariantReducer),
   __reducerSchema("update_project", UpdateProjectReducer),
+  __reducerSchema("update_project_milestone", UpdateProjectMilestoneReducer),
+  __reducerSchema("update_project_rate_card", UpdateProjectRateCardReducer),
+  __reducerSchema("update_project_rate_card_line", UpdateProjectRateCardLineReducer),
   __reducerSchema("update_proposal", UpdateProposalReducer),
   __reducerSchema("update_proposal_line_item", UpdateProposalLineItemReducer),
   __reducerSchema("update_proposal_presence", UpdateProposalPresenceReducer),
   __reducerSchema("update_proposal_source_doc", UpdateProposalSourceDocReducer),
   __reducerSchema("update_proposal_status", UpdateProposalStatusReducer),
+  __reducerSchema("update_public_holiday", UpdatePublicHolidayReducer),
   __reducerSchema("update_purchase_order", UpdatePurchaseOrderReducer),
   __reducerSchema("update_purchase_order_line", UpdatePurchaseOrderLineReducer),
   __reducerSchema("update_quality_alert_reason", UpdateQualityAlertReasonReducer),
   __reducerSchema("update_quality_point", UpdateQualityPointReducer),
   __reducerSchema("update_quality_team", UpdateQualityTeamReducer),
   __reducerSchema("update_report_template", UpdateReportTemplateReducer),
+  __reducerSchema("update_resource_allocation", UpdateResourceAllocationReducer),
   __reducerSchema("update_role", UpdateRoleReducer),
   __reducerSchema("update_sale_order", UpdateSaleOrderReducer),
   __reducerSchema("update_sale_order_line", UpdateSaleOrderLineReducer),
@@ -8545,6 +9074,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_whatsapp_verification_status", UpdateWhatsappVerificationStatusReducer),
   __reducerSchema("update_widget_layout", UpdateWidgetLayoutReducer),
   __reducerSchema("update_workcenter", UpdateWorkcenterReducer),
+  __reducerSchema("update_working_calendar", UpdateWorkingCalendarReducer),
   __reducerSchema("upsert_ai_skill", UpsertAiSkillReducer),
   __reducerSchema("upsert_ai_skill_config", UpsertAiSkillConfigReducer),
   __reducerSchema("upsert_expense_mileage_rate", UpsertExpenseMileageRateReducer),

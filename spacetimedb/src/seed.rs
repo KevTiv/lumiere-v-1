@@ -198,6 +198,9 @@ use crate::subscriptions::tables::{
 };
 
 // ── Timesheets ─────────────────────────────────────────────────────────────────
+use crate::projects::rate_cards::{
+    project_rate_card, project_rate_card_line, ProjectRateCard, ProjectRateCardLine,
+};
 use crate::projects::timesheets::{project_timesheet, ProjectTimesheet};
 
 // ── Documents ──────────────────────────────────────────────────────────────────
@@ -4957,6 +4960,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             organization_id: org_id,
             general_budget_id: budget_2026.id,
             analytic_account_id: Some(analytic_account_sales.id),
+            project_id: None,
             date_from: ctx.timestamp,
             date_to: ctx.timestamp,
             paid_date: None,
@@ -4983,6 +4987,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             organization_id: org_id,
             general_budget_id: budget_2026.id,
             analytic_account_id: Some(analytic_account_marketing.id),
+            project_id: None,
             date_from: ctx.timestamp,
             date_to: ctx.timestamp,
             paid_date: None,
@@ -5328,6 +5333,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         allow_material: false,
         allow_worksheets: false,
         allow_forecast: false,
+        allow_wip_je: false,
         bill_type: "customer_project".to_string(),
         pricing_type: "fixed_rate".to_string(),
         rating_status: "no".to_string(),
@@ -5397,6 +5403,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             project_id: Some(proj_crm.id),
             user_ids: vec![seeder],
             milestone_id: None,
+            wbs_code: format!("{seq}"),
+            wbs_level: 0,
             planned_hours: 8.0,
             total_hours_spent: 0.0,
             effective_hours: 0.0,
@@ -5459,6 +5467,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         allow_material: false,
         allow_worksheets: false,
         allow_forecast: false,
+        allow_wip_je: false,
         bill_type: "no".to_string(),
         pricing_type: "fixed_rate".to_string(),
         rating_status: "no".to_string(),
@@ -5517,6 +5526,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             project_id: Some(proj_infra.id),
             user_ids: vec![seeder],
             milestone_id: None,
+            wbs_code: format!("{seq}"),
+            wbs_level: 0,
             planned_hours: 16.0,
             total_hours_spent: 0.0,
             effective_hours: 0.0,
@@ -6373,7 +6384,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         user_id: seeder,
         date: ctx.timestamp,
         unit_amount: 4.0,
-        amount: 400.0, // 4 hours × $100
+        amount: 400.0, // 4 hours × $100 cost
         product_id: None,
         product_uom_id: Some(uom_hours.id),
         account_id: None,
@@ -6383,9 +6394,14 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         timer_start: None,
         timer_pause: None,
         employee_cost: 100.0,
+        sell_rate: 100.0,
         timesheet_invoice_type: "billable".to_string(),
         timesheet_invoice_id: None,
-        timesheet_revenue: 400.0,
+        timesheet_revenue: 400.0, // 4 hours × $100 sell
+        currency_rate: 1.0,
+        company_currency_id: 1,
+        amount_company: 400.0,
+        timesheet_revenue_company: 400.0,
         so_line: None,
         encoding_uom_id: uom_hours.id,
         validation_status: "validated".to_string(),
@@ -6410,7 +6426,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         user_id: seeder,
         date: ctx.timestamp,
         unit_amount: 6.0,
-        amount: 600.0, // 6 hours × $100
+        amount: 600.0, // 6 hours × $100 cost
         product_id: None,
         product_uom_id: Some(uom_hours.id),
         account_id: None,
@@ -6420,9 +6436,14 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         timer_start: None,
         timer_pause: None,
         employee_cost: 100.0,
+        sell_rate: 100.0,
         timesheet_invoice_type: "billable".to_string(),
         timesheet_invoice_id: None,
         timesheet_revenue: 600.0,
+        currency_rate: 1.0,
+        company_currency_id: 1,
+        amount_company: 600.0,
+        timesheet_revenue_company: 600.0,
         so_line: None,
         encoding_uom_id: uom_hours.id,
         validation_status: "validated".to_string(),
@@ -6447,7 +6468,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         user_id: seeder,
         date: ctx.timestamp,
         unit_amount: 2.0,
-        amount: 150.0, // 2 hours × $75 (contractor rate)
+        amount: 150.0, // 2 hours × $75 cost
         product_id: None,
         product_uom_id: Some(uom_hours.id),
         account_id: None,
@@ -6457,9 +6478,14 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         timer_start: None,
         timer_pause: None,
         employee_cost: 75.0,
+        sell_rate: 75.0,
         timesheet_invoice_type: "billable".to_string(),
         timesheet_invoice_id: None,
         timesheet_revenue: 150.0,
+        currency_rate: 0.0,
+        company_currency_id: 0,
+        amount_company: 0.0,
+        timesheet_revenue_company: 0.0,
         so_line: None,
         encoding_uom_id: uom_hours.id,
         validation_status: "draft".to_string(),
@@ -6467,6 +6493,44 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         validated_at: None,
         department_id: Some(dept_eng.id),
         manager_id: None,
+        create_uid: seeder,
+        create_date: ctx.timestamp,
+        write_uid: seeder,
+        write_date: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    // ── 11.2 Sample rate card (PSA Wave B) ────────────────────────────────────
+    let rate_card = ctx.db.project_rate_card().insert(ProjectRateCard {
+        id: 0,
+        organization_id: org_id,
+        company_id,
+        name: "CRM Delivery rates".to_string(),
+        currency_id: 1,
+        project_id: Some(proj_crm.id),
+        active: true,
+        effective_from: None,
+        effective_to: None,
+        create_uid: seeder,
+        create_date: ctx.timestamp,
+        write_uid: seeder,
+        write_date: ctx.timestamp,
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+    ctx.db.project_rate_card_line().insert(ProjectRateCardLine {
+        id: 0,
+        organization_id: org_id,
+        company_id,
+        rate_card_id: rate_card.id,
+        scope: "employee".to_string(),
+        employee_id: Some(emp_jordan.id),
+        task_id: None,
+        currency_id: 1,
+        cost_rate: 100.0,
+        sell_rate: 175.0,
+        active: true,
+        effective_from: None,
+        effective_to: None,
         create_uid: seeder,
         create_date: ctx.timestamp,
         write_uid: seeder,

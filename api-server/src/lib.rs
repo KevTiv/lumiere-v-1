@@ -7,6 +7,7 @@ pub mod error;
 pub mod metrics;
 mod middleware;
 pub mod expense_integration_worker;
+pub mod project_integration_worker;
 pub mod owner_report_worker;
 pub mod query_exec;
 pub mod realtime;
@@ -33,4 +34,9 @@ pub async fn run_owner_report_worker() -> anyhow::Result<()> {
 /// Run the standalone expense OCR/email/card intent worker service.
 pub async fn run_expense_integration_worker() -> anyhow::Result<()> {
     expense_integration_worker::serve().await
+}
+
+/// Run the standalone project payroll/calendar/e-invoice intent worker service.
+pub async fn run_project_integration_worker() -> anyhow::Result<()> {
+    project_integration_worker::serve().await
 }

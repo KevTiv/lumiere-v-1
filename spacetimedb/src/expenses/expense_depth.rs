@@ -9,6 +9,7 @@ use crate::accounting::journal_entries::{
 use crate::core::organization::company_id_from_scope;
 use crate::expenses::expenses::{expense_sheet, hr_expense, HrExpense, HrExpenseSheet};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::projects::project_accounting::refresh_project_margin_for_projects;
 use crate::projects::projects::project_project;
 use crate::types::{AccountMoveState, ExpenseSheetState, ExpenseState, MoveType, PaymentState};
 
@@ -704,6 +705,11 @@ pub fn create_expense_project_rebill(
         ),
     });
 
+    let rebill_project_ids: Vec<u64> = income_lines
+        .iter()
+        .filter_map(|(_, _, _, pid)| *pid)
+        .collect();
+
     let mut seq = 1u32;
     for (label, amt, analytic_id, _project_id) in income_lines {
         let mut lp = empty_line_params(params.income_account_id, label, 0.0, amt, seq);
@@ -786,5 +792,8 @@ pub fn create_expense_project_rebill(
             metadata: None,
         },
     );
+
+    refresh_project_margin_for_projects(ctx, organization_id, company_id, rebill_project_ids);
+
     Ok(())
 }

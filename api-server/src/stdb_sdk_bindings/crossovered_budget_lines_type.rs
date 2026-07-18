@@ -11,6 +11,7 @@ pub struct CrossoveredBudgetLines {
     pub organization_id: u64,
     pub general_budget_id: u64,
     pub analytic_account_id: Option<u64>,
+    pub project_id: Option<u64>,
     pub date_from: __sdk::Timestamp,
     pub date_to: __sdk::Timestamp,
     pub paid_date: Option<__sdk::Timestamp>,
@@ -41,6 +42,7 @@ pub struct CrossoveredBudgetLinesCols {
     pub organization_id: __sdk::__query_builder::Col<CrossoveredBudgetLines, u64>,
     pub general_budget_id: __sdk::__query_builder::Col<CrossoveredBudgetLines, u64>,
     pub analytic_account_id: __sdk::__query_builder::Col<CrossoveredBudgetLines, Option<u64>>,
+    pub project_id: __sdk::__query_builder::Col<CrossoveredBudgetLines, Option<u64>>,
     pub date_from: __sdk::__query_builder::Col<CrossoveredBudgetLines, __sdk::Timestamp>,
     pub date_to: __sdk::__query_builder::Col<CrossoveredBudgetLines, __sdk::Timestamp>,
     pub paid_date: __sdk::__query_builder::Col<CrossoveredBudgetLines, Option<__sdk::Timestamp>>,
@@ -70,6 +72,7 @@ impl __sdk::__query_builder::HasCols for CrossoveredBudgetLines {
                 table_name,
                 "analytic_account_id",
             ),
+            project_id: __sdk::__query_builder::Col::new(table_name, "project_id"),
             date_from: __sdk::__query_builder::Col::new(table_name, "date_from"),
             date_to: __sdk::__query_builder::Col::new(table_name, "date_to"),
             paid_date: __sdk::__query_builder::Col::new(table_name, "paid_date"),
@@ -101,6 +104,7 @@ pub struct CrossoveredBudgetLinesIxCols {
     pub general_budget_id: __sdk::__query_builder::IxCol<CrossoveredBudgetLines, u64>,
     pub id: __sdk::__query_builder::IxCol<CrossoveredBudgetLines, u64>,
     pub organization_id: __sdk::__query_builder::IxCol<CrossoveredBudgetLines, u64>,
+    pub project_id: __sdk::__query_builder::IxCol<CrossoveredBudgetLines, Option<u64>>,
 }
 
 impl __sdk::__query_builder::HasIxCols for CrossoveredBudgetLines {
@@ -114,6 +118,7 @@ impl __sdk::__query_builder::HasIxCols for CrossoveredBudgetLines {
             general_budget_id: __sdk::__query_builder::IxCol::new(table_name, "general_budget_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
+            project_id: __sdk::__query_builder::IxCol::new(table_name, "project_id"),
         }
     }
 }

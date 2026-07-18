@@ -4,6 +4,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::projects::capacity::on_leave_approved;
 use crate::types::HrLeaveState;
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -249,11 +250,14 @@ pub fn approve_leave(
         return Err("Leave is already approved".to_string());
     }
     let company_id = leave.company_id;
+    let employee_id = leave.employee_id;
     ctx.db.hr_leave().id().update(HrLeave {
         state: HrLeaveState::Validated,
         first_approver_id: Some(ctx.sender()),
         ..leave
     });
+    // Same txn: reduce remaining capacity projection for this employee.
+    on_leave_approved(ctx, organization_id, company_id, employee_id);
     write_audit_log_v2(
         ctx,
         organization_id,

@@ -1288,6 +1288,9 @@
     "channel",
     "metadata"
   ],
+  "ApplyProjectChangeOrderParams": [
+    "metadata"
+  ],
   "ApplySalePromotionParams": [
     "promotion_code"
   ],
@@ -1529,13 +1532,25 @@
     "context_id",
     "metadata"
   ],
+  "BillProjectMilestoneParams": [
+    "amount",
+    "percent_complete",
+    "journal_id",
+    "income_account_id",
+    "partner_id",
+    "invoice_date",
+    "tax_ids",
+    "fiscal_position_id"
+  ],
   "BillTimesheetsParams": [
     "company_id",
     "timesheet_ids",
     "journal_id",
     "income_account_id",
     "partner_id",
-    "invoice_date"
+    "invoice_date",
+    "tax_ids",
+    "fiscal_position_id"
   ],
   "BillingAccount": [
     "id",
@@ -1642,6 +1657,21 @@
     "journal_id",
     "income_account_id",
     "receivable_account_id"
+  ],
+  "CapacityForecastSnapshot": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "period_start",
+    "period_end",
+    "available_hours",
+    "allocated_hours",
+    "pipeline_hours",
+    "forecast_remaining_hours",
+    "write_uid",
+    "write_date",
+    "metadata"
   ],
   "CartonizationResult": [
     "id",
@@ -2875,6 +2905,7 @@
   ],
   "CreateCrossoveredBudgetLineParams": [
     "analytic_account_id",
+    "project_id",
     "date_from",
     "date_to",
     "paid_date",
@@ -3311,6 +3342,22 @@
     "name",
     "description",
     "is_active"
+  ],
+  "CreateHrEmployeeSkillParams": [
+    "employee_id",
+    "skill_id",
+    "level",
+    "notes",
+    "active",
+    "metadata"
+  ],
+  "CreateHrSkillParams": [
+    "name",
+    "code",
+    "category",
+    "description",
+    "active",
+    "metadata"
   ],
   "CreateIncotermParams": [
     "code",
@@ -3987,6 +4034,36 @@
     "default_code",
     "barcode"
   ],
+  "CreateProjectChangeOrderParams": [
+    "project_id",
+    "name",
+    "description",
+    "scope_delta",
+    "budget_delta",
+    "planned_hours_delta",
+    "rate_delta_percent",
+    "metadata"
+  ],
+  "CreateProjectIntegrationIntentParams": [
+    "company_id",
+    "project_id",
+    "intent_type",
+    "idempotency_key",
+    "payload",
+    "metadata"
+  ],
+  "CreateProjectMilestoneParams": [
+    "project_id",
+    "name",
+    "description",
+    "deadline",
+    "sequence",
+    "is_reached",
+    "bill_amount",
+    "percent_complete",
+    "active",
+    "metadata"
+  ],
   "CreateProjectParams": [
     "company_id",
     "name",
@@ -4009,6 +4086,7 @@
     "allow_material",
     "allow_worksheets",
     "allow_forecast",
+    "allow_wip_je",
     "bill_type",
     "pricing_type",
     "rating_status",
@@ -4036,6 +4114,56 @@
     "activity_summary",
     "message_follower_ids",
     "message_ids",
+    "metadata"
+  ],
+  "CreateProjectRateCardLineParams": [
+    "rate_card_id",
+    "scope",
+    "employee_id",
+    "task_id",
+    "currency_id",
+    "cost_rate",
+    "sell_rate",
+    "active",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "CreateProjectRateCardParams": [
+    "name",
+    "currency_id",
+    "project_id",
+    "active",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "CreateProjectRevenueLineParams": [
+    "schedule_id",
+    "recognition_date",
+    "amount",
+    "percent",
+    "milestone_id",
+    "metadata"
+  ],
+  "CreateProjectRevenueScheduleParams": [
+    "project_id",
+    "milestone_id",
+    "name",
+    "recognition_method",
+    "total_amount",
+    "currency_id",
+    "journal_id",
+    "deferred_account_id",
+    "income_account_id",
+    "metadata"
+  ],
+  "CreatePublicHolidayParams": [
+    "calendar_id",
+    "pack_key",
+    "name",
+    "holiday_date",
+    "is_recurring",
     "metadata"
   ],
   "CreatePurchaseBlanketOrderParams": [
@@ -4234,6 +4362,21 @@
     "paper_format",
     "print_report_name",
     "attachment",
+    "metadata"
+  ],
+  "CreateResourceAllocationParams": [
+    "employee_id",
+    "resource_id",
+    "project_id",
+    "task_id",
+    "date_from",
+    "date_to",
+    "allocated_hours",
+    "allocation_percent",
+    "name",
+    "notes",
+    "enforce_capacity",
+    "active",
     "metadata"
   ],
   "CreateReturnOrderLineParams": [
@@ -4926,6 +5069,8 @@
     "color",
     "user_ids",
     "milestone_id",
+    "wbs_code",
+    "wbs_level",
     "planned_hours",
     "total_hours_spent",
     "effective_hours",
@@ -5243,6 +5388,20 @@
     "description",
     "metadata"
   ],
+  "CreateWorkingCalendarParams": [
+    "name",
+    "pack_key",
+    "hours_per_day",
+    "work_monday",
+    "work_tuesday",
+    "work_wednesday",
+    "work_thursday",
+    "work_friday",
+    "work_saturday",
+    "work_sunday",
+    "active",
+    "metadata"
+  ],
   "CreateWorkorderParams": [
     "workcenter_id",
     "production_id",
@@ -5332,6 +5491,7 @@
     "organization_id",
     "general_budget_id",
     "analytic_account_id",
+    "project_id",
     "date_from",
     "date_to",
     "paid_date",
@@ -5810,6 +5970,10 @@
     "last_error",
     "metadata"
   ],
+  "FailProjectIntegrationIntentParams": [
+    "last_error",
+    "metadata"
+  ],
   "FailSubscriptionPaymentIntentParams": [
     "last_error",
     "record_dunning_failure"
@@ -6154,6 +6318,21 @@
     "deleted_at",
     "metadata"
   ],
+  "HrEmployeeSkill": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "skill_id",
+    "level",
+    "notes",
+    "active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
   "HrExpense": [
     "id",
     "organization_id",
@@ -6388,6 +6567,21 @@
     "amount_percentage",
     "sequence",
     "is_active"
+  ],
+  "HrSkill": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "code",
+    "category",
+    "description",
+    "active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
   ],
   "ImportJob": [
     "id",
@@ -6964,6 +7158,19 @@
     "is_active",
     "metadata"
   ],
+  "LinkSubcontractorCostParams": [
+    "project_id",
+    "purchase_order_id",
+    "purchase_order_line_id",
+    "vendor_bill_move_id",
+    "vendor_bill_line_id",
+    "partner_id",
+    "amount",
+    "currency_id",
+    "name",
+    "active",
+    "metadata"
+  ],
   "LogAuditEventParams": [
     "company_id",
     "table_name",
@@ -6987,6 +7194,7 @@
     "unit_amount",
     "currency_id",
     "employee_cost",
+    "sell_rate",
     "timesheet_invoice_type",
     "product_id",
     "product_uom_id",
@@ -8307,6 +8515,117 @@
     "write_date",
     "metadata"
   ],
+  "ProjectBaseline": [
+    "id",
+    "organization_id",
+    "company_id",
+    "project_id",
+    "original_budget",
+    "original_planned_hours",
+    "original_captured_at",
+    "current_budget",
+    "current_planned_hours",
+    "current_change_order_id",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ProjectChangeOrder": [
+    "id",
+    "organization_id",
+    "company_id",
+    "project_id",
+    "name",
+    "description",
+    "scope_delta",
+    "budget_delta",
+    "planned_hours_delta",
+    "rate_delta_percent",
+    "baseline_budget",
+    "baseline_planned_hours",
+    "revised_budget",
+    "revised_planned_hours",
+    "state",
+    "applied_at",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ProjectEarnedValueSnapshot": [
+    "id",
+    "organization_id",
+    "company_id",
+    "project_id",
+    "planned_value",
+    "earned_value",
+    "actual_cost",
+    "schedule_performance_index",
+    "cost_performance_index",
+    "percent_complete",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ProjectIntegrationIntent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "project_id",
+    "intent_type",
+    "status",
+    "idempotency_key",
+    "payload",
+    "result_ref",
+    "last_error",
+    "attempt_count",
+    "applied_at",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ProjectMarginSnapshot": [
+    "id",
+    "organization_id",
+    "company_id",
+    "project_id",
+    "billed_revenue",
+    "unbilled_revenue",
+    "labor_cost",
+    "expense_cost",
+    "subcontractor_cost",
+    "margin_amount",
+    "margin_percent",
+    "budget_planned",
+    "budget_actual",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ProjectMilestone": [
+    "id",
+    "organization_id",
+    "company_id",
+    "project_id",
+    "name",
+    "description",
+    "deadline",
+    "sequence",
+    "is_reached",
+    "bill_amount",
+    "percent_complete",
+    "invoice_move_id",
+    "billed_amount",
+    "active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
   "ProjectProject": [
     "id",
     "organization_id",
@@ -8332,6 +8651,7 @@
     "allow_material",
     "allow_worksheets",
     "allow_forecast",
+    "allow_wip_je",
     "bill_type",
     "pricing_type",
     "rating_status",
@@ -8365,6 +8685,103 @@
     "write_date",
     "metadata"
   ],
+  "ProjectRateCard": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "currency_id",
+    "project_id",
+    "active",
+    "effective_from",
+    "effective_to",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ProjectRateCardLine": [
+    "id",
+    "organization_id",
+    "company_id",
+    "rate_card_id",
+    "scope",
+    "employee_id",
+    "task_id",
+    "currency_id",
+    "cost_rate",
+    "sell_rate",
+    "active",
+    "effective_from",
+    "effective_to",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ProjectRevenueLine": [
+    "id",
+    "organization_id",
+    "company_id",
+    "schedule_id",
+    "project_id",
+    "milestone_id",
+    "recognition_date",
+    "amount",
+    "percent",
+    "recognized",
+    "move_id",
+    "move_line_id",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ProjectRevenueSchedule": [
+    "id",
+    "organization_id",
+    "company_id",
+    "project_id",
+    "milestone_id",
+    "name",
+    "recognition_method",
+    "total_amount",
+    "recognized_amount",
+    "deferred_amount",
+    "currency_id",
+    "journal_id",
+    "deferred_account_id",
+    "income_account_id",
+    "state",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ProjectSubcontractorCost": [
+    "id",
+    "organization_id",
+    "company_id",
+    "project_id",
+    "purchase_order_id",
+    "purchase_order_line_id",
+    "vendor_bill_move_id",
+    "vendor_bill_line_id",
+    "partner_id",
+    "amount",
+    "currency_id",
+    "name",
+    "active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
   "ProjectTask": [
     "id",
     "organization_id",
@@ -8384,6 +8801,8 @@
     "project_id",
     "user_ids",
     "milestone_id",
+    "wbs_code",
+    "wbs_level",
     "planned_hours",
     "total_hours_spent",
     "effective_hours",
@@ -8438,9 +8857,14 @@
     "timer_start",
     "timer_pause",
     "employee_cost",
+    "sell_rate",
     "timesheet_invoice_type",
     "timesheet_invoice_id",
     "timesheet_revenue",
+    "currency_rate",
+    "company_currency_id",
+    "amount_company",
+    "timesheet_revenue_company",
     "so_line",
     "encoding_uom_id",
     "validation_status",
@@ -8453,6 +8877,20 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "ProjectTimesheetApproval": [
+    "id",
+    "organization_id",
+    "company_id",
+    "timesheet_id",
+    "actor",
+    "decision",
+    "reason",
+    "hours",
+    "sell_rate",
+    "cost_rate",
+    "currency_id",
+    "decided_at"
   ],
   "Proposal": [
     "id",
@@ -8553,6 +8991,21 @@
     "sections_json",
     "author_id",
     "create_date"
+  ],
+  "PublicHoliday": [
+    "id",
+    "organization_id",
+    "company_id",
+    "calendar_id",
+    "pack_key",
+    "name",
+    "holiday_date",
+    "is_recurring",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
   ],
   "PurchaseApprovalDelegate": [
     "id",
@@ -9009,6 +9462,10 @@
     "reference",
     "metadata"
   ],
+  "RecognizeProjectRevenueParams": [
+    "reference",
+    "metadata"
+  ],
   "ReconcileAccountBankStatementLineParams": [
     "move_ids",
     "amount_residual"
@@ -9114,9 +9571,27 @@
   "RecordWhatsAppHealthCheckParams": [
     "is_healthy"
   ],
+  "RefreshCapacityForecastParams": [
+    "employee_id",
+    "period_start",
+    "period_end",
+    "metadata"
+  ],
   "RefreshInventoryExceptionsParams": [
     "upsert_only",
     "metadata"
+  ],
+  "RefreshProjectEarnedValueParams": [
+    "project_ids",
+    "metadata"
+  ],
+  "RefreshProjectMarginParams": [
+    "project_ids"
+  ],
+  "RefreshResourceUtilisationParams": [
+    "employee_id",
+    "period_start",
+    "period_end"
   ],
   "RefuseExpenseSheetParams": [
     "reason"
@@ -9144,6 +9619,11 @@
     "reason",
     "comment"
   ],
+  "RejectTimesheetsParams": [
+    "company_id",
+    "timesheet_ids",
+    "reason"
+  ],
   "ReleaseBlanketToPoParams": [
     "notes",
     "date_planned",
@@ -9152,6 +9632,11 @@
   "RenewSubscriptionParams": [
     "intervals",
     "notes"
+  ],
+  "ReopenTimesheetsParams": [
+    "company_id",
+    "timesheet_ids",
+    "reason"
   ],
   "ReplenishmentRule": [
     "id",
@@ -9226,6 +9711,62 @@
     "lock_trust_fields",
     "create_uid",
     "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ResourceAllocation": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "resource_id",
+    "project_id",
+    "task_id",
+    "date_from",
+    "date_to",
+    "allocated_hours",
+    "allocation_percent",
+    "name",
+    "notes",
+    "enforce_capacity",
+    "active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ResourceCapacitySnapshot": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "resource_id",
+    "period_start",
+    "period_end",
+    "available_hours",
+    "leave_hours",
+    "allocated_hours",
+    "actual_hours",
+    "remaining_hours",
+    "calendar_id",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ResourceUtilisationSnapshot": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "period_start",
+    "period_end",
+    "available_hours",
+    "billable_hours",
+    "non_billable_hours",
+    "utilisation_percent",
+    "billable_utilisation_percent",
     "write_uid",
     "write_date",
     "metadata"
@@ -9735,6 +10276,10 @@
     "write_date",
     "metadata"
   ],
+  "SeedPackHolidaysParams": [
+    "pack_keys",
+    "calendar_id"
+  ],
   "SegmentMember": [
     "id",
     "organization_id",
@@ -9903,6 +10448,7 @@
     "name",
     "currency_id",
     "employee_cost",
+    "sell_rate",
     "timesheet_invoice_type",
     "product_id",
     "product_uom_id",
@@ -11486,6 +12032,7 @@
   "UpdateCrossoveredBudgetLineParams": [
     "planned_amount",
     "analytic_account_id",
+    "project_id",
     "date_from",
     "date_to",
     "metadata"
@@ -11596,6 +12143,20 @@
     "is_enabled",
     "show_in_list",
     "width"
+  ],
+  "UpdateHrEmployeeSkillParams": [
+    "level",
+    "notes",
+    "active",
+    "metadata"
+  ],
+  "UpdateHrSkillParams": [
+    "name",
+    "code",
+    "category",
+    "description",
+    "active",
+    "metadata"
   ],
   "UpdateIntercompanyRuleParams": [
     "name",
@@ -11844,6 +12405,17 @@
     "barcode",
     "is_active"
   ],
+  "UpdateProjectMilestoneParams": [
+    "name",
+    "description",
+    "deadline",
+    "sequence",
+    "is_reached",
+    "bill_amount",
+    "percent_complete",
+    "active",
+    "metadata"
+  ],
   "UpdateProjectParams": [
     "company_id",
     "name",
@@ -11866,6 +12438,7 @@
     "allow_material",
     "allow_worksheets",
     "allow_forecast",
+    "allow_wip_je",
     "bill_type",
     "pricing_type",
     "rating_status",
@@ -11890,11 +12463,40 @@
     "message_ids",
     "metadata"
   ],
+  "UpdateProjectRateCardLineParams": [
+    "scope",
+    "employee_id",
+    "task_id",
+    "currency_id",
+    "cost_rate",
+    "sell_rate",
+    "active",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "UpdateProjectRateCardParams": [
+    "name",
+    "currency_id",
+    "project_id",
+    "active",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
   "UpdateProposalSourceDocParams": [
     "name",
     "content",
     "doc_type",
     "word_count"
+  ],
+  "UpdatePublicHolidayParams": [
+    "calendar_id",
+    "pack_key",
+    "name",
+    "holiday_date",
+    "is_recurring",
+    "metadata"
   ],
   "UpdatePurchaseOrderLineParams": [
     "product_id",
@@ -11952,6 +12554,21 @@
     "orientation",
     "template_content",
     "paper_format"
+  ],
+  "UpdateResourceAllocationParams": [
+    "employee_id",
+    "resource_id",
+    "project_id",
+    "task_id",
+    "date_from",
+    "date_to",
+    "allocated_hours",
+    "allocation_percent",
+    "name",
+    "notes",
+    "enforce_capacity",
+    "active",
+    "metadata"
   ],
   "UpdateRoleParams": [
     "name",
@@ -12161,6 +12778,8 @@
     "project_id",
     "user_ids",
     "milestone_id",
+    "wbs_code",
+    "wbs_level",
     "planned_hours",
     "total_hours_spent",
     "effective_hours",
@@ -12321,6 +12940,20 @@
     "default_time_efficiency",
     "default_oee_target",
     "sequence",
+    "metadata"
+  ],
+  "UpdateWorkingCalendarParams": [
+    "name",
+    "pack_key",
+    "hours_per_day",
+    "work_monday",
+    "work_tuesday",
+    "work_wednesday",
+    "work_thursday",
+    "work_friday",
+    "work_saturday",
+    "work_sunday",
+    "active",
     "metadata"
   ],
   "UpsertAiSkillConfigParams": [
@@ -12529,7 +13162,10 @@
   ],
   "ValidateTimesheetsParams": [
     "company_id",
-    "timesheet_ids"
+    "timesheet_ids",
+    "wip_journal_id",
+    "wip_account_id",
+    "wip_labor_account_id"
   ],
   "VendorRiskFlag": [
     "id",
@@ -12843,6 +13479,27 @@
     "act_id",
     "wkf_evaled_condition",
     "state",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "WorkingCalendar": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "pack_key",
+    "hours_per_day",
+    "work_monday",
+    "work_tuesday",
+    "work_wednesday",
+    "work_thursday",
+    "work_friday",
+    "work_saturday",
+    "work_sunday",
+    "active",
     "create_uid",
     "create_date",
     "write_uid",

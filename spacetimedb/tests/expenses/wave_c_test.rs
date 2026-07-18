@@ -340,6 +340,7 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
             allow_material: false,
             allow_worksheets: false,
             allow_forecast: false,
+            allow_wip_je: false,
             bill_type: "customer_project".into(),
             pricing_type: "fixed_rate".into(),
             rating_status: "off".into(),

@@ -28,6 +28,7 @@ pub struct UpdateProjectParams {
     pub allow_material: Option<bool>,
     pub allow_worksheets: Option<bool>,
     pub allow_forecast: Option<bool>,
+    pub allow_wip_je: Option<bool>,
     pub bill_type: Option<String>,
     pub pricing_type: Option<String>,
     pub rating_status: Option<String>,

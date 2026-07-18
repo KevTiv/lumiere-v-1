@@ -19,7 +19,7 @@ pub struct CreateAccountMoveParams {
     pub move_type: MoveType,
     pub date: __sdk::Timestamp,
     pub name: String,
-    pub ref: Option::<String>,
+    pub r#ref: Option::<String>,
     pub auto_post: bool,
     pub to_check: bool,
     pub is_storno: bool,

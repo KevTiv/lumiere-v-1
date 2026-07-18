@@ -24,6 +24,8 @@ pub struct CreateTaskParams {
     pub color: Option<u8>,
     pub user_ids: Vec<__sdk::Identity>,
     pub milestone_id: Option<u64>,
+    pub wbs_code: String,
+    pub wbs_level: u32,
     pub planned_hours: f64,
     pub total_hours_spent: f64,
     pub effective_hours: f64,

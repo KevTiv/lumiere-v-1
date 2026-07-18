@@ -15,7 +15,7 @@ use super::account_internal_group_type::AccountInternalGroup;
 #[sats(crate = __lib)]
 pub struct CreateAccountAccountTypeParams {
     pub name: String,
-    pub type: String,
+    pub r#type: String,
     pub internal_group: AccountInternalGroup,
     pub include_initial_balance: bool,
     pub company_id: Option::<u64>,

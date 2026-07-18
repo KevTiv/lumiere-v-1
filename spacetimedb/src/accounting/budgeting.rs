@@ -13,6 +13,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::projects::projects::project_project;
 use crate::types::BudgetState;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -55,6 +56,7 @@ pub struct CrossoveredBudget {
     index(accessor = budget_line_by_org, btree(columns = [organization_id])),
     index(accessor = budget_line_by_budget, btree(columns = [general_budget_id])),
     index(accessor = budget_line_by_analytic, btree(columns = [analytic_account_id])),
+    index(accessor = budget_line_by_project, btree(columns = [project_id])),
     index(accessor = budget_line_by_date, btree(columns = [date_from, date_to]))
 )]
 #[derive(Clone)]
@@ -65,6 +67,8 @@ pub struct CrossoveredBudgetLines {
     pub organization_id: u64,
     pub general_budget_id: u64,
     pub analytic_account_id: Option<u64>,
+    /// Optional PSA project link for budget vs actual.
+    pub project_id: Option<u64>,
     pub date_from: Timestamp,
     pub date_to: Timestamp,
     pub paid_date: Option<Timestamp>,
@@ -139,6 +143,7 @@ pub struct UpdateCrossoveredBudgetParams {
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateCrossoveredBudgetLineParams {
     pub analytic_account_id: Option<u64>,
+    pub project_id: Option<u64>,
     pub date_from: Timestamp,
     pub date_to: Timestamp,
     pub paid_date: Option<Timestamp>,
@@ -156,6 +161,7 @@ pub struct CreateCrossoveredBudgetLineParams {
 pub struct UpdateCrossoveredBudgetLineParams {
     pub planned_amount: Option<f64>,
     pub analytic_account_id: Option<Option<u64>>,
+    pub project_id: Option<Option<u64>>,
     pub date_from: Option<Timestamp>,
     pub date_to: Option<Timestamp>,
     pub metadata: Option<Option<String>>,
@@ -400,6 +406,18 @@ pub fn create_budget_line(
 
     let budget_company_id = budget.company_id;
 
+    if let Some(pid) = params.project_id {
+        let project = ctx
+            .db
+            .project_project()
+            .id()
+            .find(&pid)
+            .ok_or("Project not found")?;
+        if project.organization_id != organization_id || project.company_id != budget_company_id {
+            return Err("Project does not belong to this company".to_string());
+        }
+    }
+
     let line = ctx
         .db
         .crossovered_budget_lines()
@@ -408,6 +426,7 @@ pub fn create_budget_line(
             organization_id,
             general_budget_id: budget_id,
             analytic_account_id: params.analytic_account_id,
+            project_id: params.project_id,
             date_from: params.date_from,
             date_to: params.date_to,
             paid_date: params.paid_date,
@@ -500,6 +519,22 @@ pub fn update_budget_line(
     if let Some(aid) = params.analytic_account_id {
         line.analytic_account_id = aid;
         changed_fields.push("analytic_account_id".to_string());
+    }
+
+    if let Some(pid) = params.project_id {
+        if let Some(project_id) = pid {
+            let project = ctx
+                .db
+                .project_project()
+                .id()
+                .find(&project_id)
+                .ok_or("Project not found")?;
+            if project.organization_id != organization_id || project.company_id != line.company_id {
+                return Err("Project does not belong to this company".to_string());
+            }
+        }
+        line.project_id = pid;
+        changed_fields.push("project_id".to_string());
     }
 
     if let Some(df) = params.date_from {

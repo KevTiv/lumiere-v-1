@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct CreateCrossoveredBudgetLineParams {
     pub analytic_account_id: Option<u64>,
+    pub project_id: Option<u64>,
     pub date_from: __sdk::Timestamp,
     pub date_to: __sdk::Timestamp,
     pub paid_date: Option<__sdk::Timestamp>,
