@@ -33,7 +33,9 @@ import {
   useExpenseSheets,
   useExpenseSheetsToApprove,
   useExpensesMissingReceipt,
+  useExpenseCardStatementUnmatched,
   useCreateExpense,
+  useCreateExpenseReceipt,
   useCreateExpenseSheet,
   useUpdateExpense,
   useSubmitExpense,
@@ -45,10 +47,14 @@ import {
   useCreateExpenseProjectRebill,
   useSetExpenseAllocations,
   useExpensesCsvImportMutations,
+  useExpenseMileageRates,
+  useExpensePerDiemRates,
 } from "@lumiere/query-hooks/hooks/expenses"
 import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { ExpensesCapturePanel } from "./expenses-capture-panel"
+import { ExpensesInboxPanel } from "./expenses-inbox-panel"
 import { ExpensesOpsPanel } from "./expenses-ops-panel"
+import { ExpensesAdminPanel } from "./expenses-admin-panel"
 import { useExpenseSheetApprovalTimeline } from "@lumiere/query-hooks/hooks/approvals"
 import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -56,6 +62,8 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
 import {
+  newExpenseReceiptClientRequestId,
+  parseAttachmentIds,
   toCreateExpenseParams,
   toCreateExpenseSheetParams,
 } from "@/lib/expenses-create-params"
@@ -65,6 +73,7 @@ import {
   expenseSheetRowsToDraftSelectOptions,
   accountJournalRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
+  expenseRateRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
   mapExpenseRow,
@@ -133,6 +142,7 @@ function ExpensesClientLoaded({
   const [confirmDialog, setConfirmDialog] = useState<
     { kind: "approve" | "refuse" | "submit"; row: Record<string, unknown> } | null
   >(null)
+  const [refuseReason, setRefuseReason] = useState("")
   const [csvKind, setCsvKind] = useState<ExpensesCsvImportKind | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
   const [toolbarError, setToolbarError] = useState<string | null>(null)
@@ -142,6 +152,7 @@ function ExpensesClientLoaded({
   const { data: sheetsRaw = [] } = useExpenseSheets(orgId, initialSheets)
   const { data: sheetsToApprove = [] } = useExpenseSheetsToApprove(orgId)
   const { data: missingReceipts = [] } = useExpensesMissingReceipt(orgId)
+  const { data: unmatchedCards = [] } = useExpenseCardStatementUnmatched(orgId)
   const timelineQuery = useExpenseSheetApprovalTimeline(
     organizationId,
     timelineSheet ? rowId(timelineSheet) : undefined,
@@ -151,6 +162,8 @@ function ExpensesClientLoaded({
   const { data: employees = [] } = useEmployees(orgId, initialEmployees)
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
+  const { data: mileageRates = [] } = useExpenseMileageRates(orgId)
+  const { data: perDiemRates = [] } = useExpensePerDiemRates(orgId)
 
   const expenses = useMemo(
     () => expensesRaw.map((e) => mapExpenseRow(e as Record<string, unknown>)),
@@ -162,8 +175,42 @@ function ExpensesClientLoaded({
   )
 
   const createExpense = useCreateExpense(orgId, operatingCompanyId)
+  const createExpenseReceipt = useCreateExpenseReceipt(orgId, operatingCompanyId)
   const createExpenseSheet = useCreateExpenseSheet(orgId, operatingCompanyId)
   const updateExpense = useUpdateExpense(orgId, operatingCompanyId)
+
+  const resolveAttachmentIds = useCallback(
+    async (formData: Record<string, unknown>, employeeIdRaw: unknown): Promise<bigint[]> => {
+      const existing = parseAttachmentIds(formData)
+      if (existing.length > 0) return existing
+      const hasReceipt = formData.hasReceipt !== false && formData.hasReceipt !== "false"
+      if (!hasReceipt) return []
+      const employeeId = optionalBigIntU64(employeeIdRaw)
+      if (employeeId === undefined) {
+        throw new Error("Employee is required to register a receipt")
+      }
+      const clientRequestId = newExpenseReceiptClientRequestId()
+      const storageKey =
+        formData.storageKey != null && String(formData.storageKey).trim() !== ""
+          ? String(formData.storageKey).trim()
+          : `local:${clientRequestId}`
+      const receiptId = await createExpenseReceipt.mutateAsync({
+        employeeId,
+        storageKey,
+        clientRequestId,
+        fileName:
+          formData.fileName != null && String(formData.fileName).trim() !== ""
+            ? String(formData.fileName)
+            : undefined,
+        mimeType:
+          formData.mimeType != null && String(formData.mimeType).trim() !== ""
+            ? String(formData.mimeType)
+            : undefined,
+      })
+      return [receiptId]
+    },
+    [createExpenseReceipt],
+  )
   const submitExpense = useSubmitExpense(orgId)
   const submitExpenseSheet = useSubmitExpenseSheet(orgId)
   const approveExpenseSheet = useApproveExpenseSheet(orgId)
@@ -193,7 +240,9 @@ function ExpensesClientLoaded({
       ...ec,
       view: {
         ...ec.view,
-        rowSelectionToggleOnClick: false,
+        // Keep click-to-select so toolbar actions with requiresSelection work.
+        // Row click still opens the detail sheet via onRowClick; e2e dismisses that dialog.
+        rowSelectionToggleOnClick: true,
         actions,
       },
     }
@@ -237,13 +286,27 @@ function ExpensesClientLoaded({
     return [{ value: "", label: t("common.lookup.noEmployees"), disabled: true }]
   }, [employees, t])
 
+  const mileageRateFieldOptions = useMemo(() => {
+    const fromApi = expenseRateRowsToSelectOptions(mileageRates)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("expenses.forms.newExpense.fields.noMileageRates"), disabled: true }]
+  }, [mileageRates, t])
+
+  const perDiemRateFieldOptions = useMemo(() => {
+    const fromApi = expenseRateRowsToSelectOptions(perDiemRates)
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("expenses.forms.newExpense.fields.noPerDiemRates"), disabled: true }]
+  }, [perDiemRates, t])
+
   const expenseFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newExpenseForm(t), {
         pricelistId: pricelistFieldOptions,
         employeeId: employeeFieldOptions,
+        mileageRateId: mileageRateFieldOptions,
+        perDiemRateId: perDiemRateFieldOptions,
       }),
-    [t, pricelistFieldOptions, employeeFieldOptions],
+    [t, pricelistFieldOptions, employeeFieldOptions, mileageRateFieldOptions, perDiemRateFieldOptions],
   )
 
   const expenseSheetFormConfig = useMemo(
@@ -255,7 +318,14 @@ function ExpensesClientLoaded({
     [t, pricelistFieldOptions, employeeFieldOptions],
   )
 
-  const editExpenseFormConfig = useMemo(() => editExpenseForm(t), [t])
+  const editExpenseFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(editExpenseForm(t), {
+        mileageRateId: mileageRateFieldOptions,
+        perDiemRateId: perDiemRateFieldOptions,
+      }),
+    [t, mileageRateFieldOptions, perDiemRateFieldOptions],
+  )
   const addToReportFormBase = useMemo(() => addExpenseToReportForm(t), [t])
   const journalFieldOptions = useMemo(() => {
     const fromApi = accountJournalRowsToSelectOptions(accountJournals)
@@ -303,6 +373,7 @@ function ExpensesClientLoaded({
   const liveSections = useMemo(() => {
     const pendingApproval = sheetsToApprove.length
     const missingReceiptCount = missingReceipts.length
+    const unmatchedCardCount = unmatchedCards.length
     const totalAmount = sheets.reduce((sum, s) => sum + Number(s.totalAmount ?? 0), 0)
     const approved = sheets.filter((s) => {
       const st = String(s.state)
@@ -323,6 +394,11 @@ function ExpensesClientLoaded({
                 { label: t("expenses.dashboard.totalExpenses"), value: String(expenses.length), icon: "Receipt" },
                 { label: t("expenses.dashboard.pendingApproval"), value: String(pendingApproval), icon: "Clock" },
                 { label: t("expenses.dashboard.missingReceipts"), value: String(missingReceiptCount), icon: "FileWarning" },
+                {
+                  label: t("expenses.dashboard.unmatchedCards", { defaultValue: "Unmatched cards" }),
+                  value: String(unmatchedCardCount),
+                  icon: "CreditCard",
+                },
                 { label: t("expenses.dashboard.approved"), value: String(approved), icon: "CheckCircle" },
                 { label: t("expenses.dashboard.totalAmount"), value: `$${totalAmount.toLocaleString()}`, icon: "DollarSign" },
               ],
@@ -350,6 +426,7 @@ function ExpensesClientLoaded({
     sheets,
     sheetsToApprove.length,
     missingReceipts.length,
+    unmatchedCards.length,
     moduleConfig,
     t,
     expenseFormConfig,
@@ -362,6 +439,12 @@ function ExpensesClientLoaded({
         ...moduleConfig,
         tabs: moduleConfig.tabs.map((tab) => {
           if (tab.id === "dashboard") return { ...tab, sections: liveSections }
+          if (tab.id === "inbox") {
+            return {
+              ...tab,
+              customContent: <ExpensesInboxPanel organizationId={organizationId} />,
+            }
+          }
           if (tab.id === "expenses" && tab.entityConfig) {
             return {
               ...tab,
@@ -426,9 +509,12 @@ function ExpensesClientLoaded({
                       setToolbarError(t("expenses.workflow.noSubmittedSheets"))
                       return
                     }
-                    void runSheetAction(submitted, "report", (row) =>
-                      refuseExpenseSheet.mutateAsync({ sheetId: rowId(row), params: {} }),
-                    )
+                    if (submitted.length === 1) {
+                      setRefuseReason("")
+                      setConfirmDialog({ kind: "refuse", row: submitted[0]! })
+                      return
+                    }
+                    setToolbarError("Select one submitted report to refuse (reason required).")
                   },
                 },
                 {
@@ -471,7 +557,17 @@ function ExpensesClientLoaded({
           return tab
         }),
       }) as ModuleConfig,
-    [liveSections, moduleConfig, expenseFormConfig, expenseSheetFormConfig, t, submitExpenseSheet, approveExpenseSheet, refuseExpenseSheet],
+    [
+      liveSections,
+      moduleConfig,
+      expenseFormConfig,
+      expenseSheetFormConfig,
+      t,
+      submitExpenseSheet,
+      approveExpenseSheet,
+      refuseExpenseSheet,
+      organizationId,
+    ],
   )
 
   const data = useMemo(
@@ -493,10 +589,15 @@ function ExpensesClientLoaded({
       if (plRaw === "" || plRaw == null || empRaw === "" || empRaw == null) return
       const pl = pricelists.find((p) => String(p.id) === String(plRaw))
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
-      const params = toCreateExpenseParams(formData, {
-        currencyId: pl.currencyId,
-        pricelistId: plRaw,
-      })
+      const attachmentIds = await resolveAttachmentIds(formData, empRaw)
+      const params = toCreateExpenseParams(
+        formData,
+        {
+          currencyId: pl.currencyId,
+          pricelistId: plRaw,
+        },
+        attachmentIds,
+      )
       if (params === null) return
       await createExpense.mutateAsync(params)
     } else if (action === "createExpenseSheet" || action === "createSheet") {
@@ -516,6 +617,7 @@ function ExpensesClientLoaded({
 
   const isFormMutationPending =
     createExpense.isPending ||
+    createExpenseReceipt.isPending ||
     createExpenseSheet.isPending ||
     updateExpense.isPending ||
     submitExpense.isPending ||
@@ -546,10 +648,36 @@ function ExpensesClientLoaded({
     if (!workflowForm) return null
     if (workflowForm.kind === "editExpense") {
       const row = workflowForm.row
+      const paymentTag =
+        typeof row.paymentMode === "object" && row.paymentMode != null && "tag" in (row.paymentMode as object)
+          ? String((row.paymentMode as { tag: string }).tag)
+          : String(row.paymentMode ?? row.payment_mode ?? "OutOfPocket")
+      const taxRaw = row.taxIds ?? row.tax_ids
+      const taxIds = Array.isArray(taxRaw) ? taxRaw.map(String).join(", ") : String(taxRaw ?? "")
+      const hasReceipt = Boolean(row.hasReceipt ?? row.has_receipt)
       return mergeFieldDefaultValues(editExpenseFormConfig, {
         name: String(row.name ?? ""),
         unitAmount: numField(row, "unitAmount", "unit_amount"),
         quantity: numField(row, "quantity") || 1,
+        mileageDistance: numField(row, "mileageDistance", "mileage_distance") || "",
+        mileageRateId:
+          row.mileageRateId != null || row.mileage_rate_id != null
+            ? String(row.mileageRateId ?? row.mileage_rate_id)
+            : "",
+        perDiemDays: numField(row, "perDiemDays", "per_diem_days") || "",
+        perDiemRateId:
+          row.perDiemRateId != null || row.per_diem_rate_id != null
+            ? String(row.perDiemRateId ?? row.per_diem_rate_id)
+            : "",
+        productId: row.productId != null || row.product_id != null
+          ? String(row.productId ?? row.product_id)
+          : "",
+        taxIds,
+        paymentMode: paymentTag === "CorporateCard" ? "CorporateCard" : "OutOfPocket",
+        merchantKey: row.merchantKey != null || row.merchant_key != null
+          ? String(row.merchantKey ?? row.merchant_key)
+          : "",
+        hasReceipt,
         description: row.description != null ? String(row.description) : "",
       })
     }
@@ -594,17 +722,59 @@ function ExpensesClientLoaded({
       const id = rowId(workflowForm.row)
       if (!id) return
       const hasReceipt = formData.hasReceipt !== false && formData.hasReceipt !== "false"
+      const existingIds = parseAttachmentIds({
+        attachmentIds: workflowForm.row.attachmentIds ?? workflowForm.row.attachment_ids,
+      })
+      let attachmentIds: bigint[] = []
+      if (hasReceipt) {
+        attachmentIds =
+          existingIds.length > 0
+            ? existingIds
+            : await resolveAttachmentIds(formData, workflowForm.row.employeeId ?? workflowForm.row.employee_id)
+      }
+      const paymentTag = String(formData.paymentMode ?? "OutOfPocket")
+      const lineKindTag = String(
+        (workflowForm.row.lineKind as { tag?: string } | undefined)?.tag ??
+          workflowForm.row.lineKind ??
+          "Standard",
+      )
+      const mileageDistance =
+        formData.mileageDistance != null && String(formData.mileageDistance).trim() !== ""
+          ? Number(formData.mileageDistance)
+          : undefined
+      const perDiemDays =
+        formData.perDiemDays != null && String(formData.perDiemDays).trim() !== ""
+          ? Number(formData.perDiemDays)
+          : undefined
       await updateExpense.mutateAsync({
         expenseId: id,
         params: {
           name: String(formData.name ?? ""),
-          unitAmount: Number(formData.unitAmount ?? 0),
-          quantity: Number(formData.quantity ?? 1),
+          ...(lineKindTag === "Mileage" || lineKindTag === "PerDiem"
+            ? {}
+            : {
+                unitAmount: Number(formData.unitAmount ?? 0),
+                quantity: Number(formData.quantity ?? 1),
+              }),
           description:
             formData.description != null && String(formData.description).trim() !== ""
               ? String(formData.description)
               : undefined,
-          attachmentIds: hasReceipt ? [1n] : [],
+          productId: optionalBigIntU64(formData.productId),
+          taxIds: parseAttachmentIds({ attachmentIds: formData.taxIds }),
+          paymentMode:
+            paymentTag === "CorporateCard"
+              ? ({ tag: "CorporateCard" } as const)
+              : ({ tag: "OutOfPocket" } as const),
+          merchantKey:
+            formData.merchantKey != null && String(formData.merchantKey).trim() !== ""
+              ? String(formData.merchantKey)
+              : undefined,
+          attachmentIds,
+          mileageDistance: Number.isFinite(mileageDistance) ? mileageDistance : undefined,
+          mileageRateId: optionalBigIntU64(formData.mileageRateId),
+          perDiemDays: Number.isFinite(perDiemDays) ? perDiemDays : undefined,
+          perDiemRateId: optionalBigIntU64(formData.perDiemRateId),
         },
       })
     } else if (workflowForm.kind === "addToReport") {
@@ -660,6 +830,11 @@ function ExpensesClientLoaded({
       const payableAccountId = formData.payableAccountId
       const liquidityAccountId = formData.liquidityAccountId
       if (d == null || d === "" || !journalId || !payableAccountId || !liquidityAccountId) return
+      const amountRaw = formData.amount
+      const amount =
+        amountRaw != null && String(amountRaw).trim() !== ""
+          ? Number(amountRaw)
+          : undefined
       await reimburseExpenseSheet.mutateAsync({
         sheetId: rowId(workflowForm.row),
         params: {
@@ -667,29 +842,29 @@ function ExpensesClientLoaded({
           journalId: BigInt(String(journalId)),
           payableAccountId: BigInt(String(payableAccountId)),
           liquidityAccountId: BigInt(String(liquidityAccountId)),
+          ...(amount != null && Number.isFinite(amount) ? { amount } : {}),
         },
       })
     } else if (workflowForm.kind === "setAllocations") {
       const lines = []
-      const share1 = Number(formData.sharePercent1 ?? 0)
-      if (share1 > 0) {
+      for (const n of [1, 2, 3, 4] as const) {
+        const share = Number(formData[`sharePercent${n}`] ?? 0)
+        if (!(share > 0)) continue
         lines.push({
-          analyticAccountId: optionalBigIntU64(formData.analyticAccountId1),
-          projectId: optionalBigIntU64(formData.projectId1),
-          sharePercent: share1,
-          billable: formData.billable1 !== false && formData.billable1 !== "false",
+          analyticAccountId: optionalBigIntU64(formData[`analyticAccountId${n}`]),
+          projectId: optionalBigIntU64(formData[`projectId${n}`]),
+          sharePercent: share,
+          billable:
+            n === 1
+              ? formData.billable1 !== false && formData.billable1 !== "false"
+              : formData[`billable${n}`] === true || formData[`billable${n}`] === "true",
           metadata: undefined as string | undefined,
         })
       }
-      const share2 = Number(formData.sharePercent2 ?? 0)
-      if (share2 > 0) {
-        lines.push({
-          analyticAccountId: optionalBigIntU64(formData.analyticAccountId2),
-          projectId: optionalBigIntU64(formData.projectId2),
-          sharePercent: share2,
-          billable: formData.billable2 === true || formData.billable2 === "true",
-          metadata: undefined as string | undefined,
-        })
+      const shareTotal = lines.reduce((s, l) => s + l.sharePercent, 0)
+      if (Math.abs(shareTotal - 100) > 0.01) {
+        setToolbarError(t("expenses.ops.shareTotalInvalid"))
+        return
       }
       await setExpenseAllocations.mutateAsync({
         expenseId: rowId(workflowForm.row),
@@ -731,6 +906,7 @@ function ExpensesClientLoaded({
       ) : null}
       <ExpensesCapturePanel organizationId={organizationId} />
       <ExpensesOpsPanel organizationId={organizationId} />
+      <ExpensesAdminPanel organizationId={organizationId} />
       <ModuleView
         config={config}
         data={data}
@@ -865,6 +1041,7 @@ function ExpensesClientLoaded({
                   onClick={() => {
                     const row = rowAction.row
                     setRowAction(null)
+                    setRefuseReason("")
                     setConfirmDialog({ kind: "refuse", row })
                   }}
                 >
@@ -884,6 +1061,39 @@ function ExpensesClientLoaded({
               >
                 {t("expenses.workflow.approvalTimeline")}
               </Button>
+            )}
+            {rowAction?.tabId === "expense-sheets" && (
+              <div className="rounded-md border p-3 text-sm space-y-2" data-testid="expenses-sheet-move-links">
+                <div className="font-medium">
+                  {t("expenses.workflow.accountingMoves", { defaultValue: "Accounting moves" })}
+                </div>
+                {(
+                  [
+                    ["accountMoveId", "account_move_id", "Post JE"],
+                    ["reimbursementMoveId", "reimbursement_move_id", "Reimbursement"],
+                    ["rebillMoveId", "rebill_move_id", "Rebill"],
+                  ] as const
+                ).map(([camel, snake, label]) => {
+                  const moveId = rowAction.row[camel] ?? rowAction.row[snake]
+                  const idStr = moveId != null && moveId !== "" ? String(moveId) : ""
+                  return (
+                    <div key={camel} className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-muted-foreground">{label}</span>
+                      {idStr ? (
+                        <a
+                          className="font-mono text-xs underline underline-offset-2"
+                          href={`/accounting?tab=journal-entries&highlight=${encodeURIComponent(idStr)}`}
+                          data-testid={`expenses-move-link-${camel}`}
+                        >
+                          #{idStr}
+                        </a>
+                      ) : (
+                        <span className="font-mono text-xs text-muted-foreground">—</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             )}
             {rowAction?.tabId === "expense-sheets" && rowState(rowAction.row) === "Approved" && (
               <Button
@@ -1006,7 +1216,15 @@ function ExpensesClientLoaded({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={confirmDialog !== null} onOpenChange={(open) => !open && setConfirmDialog(null)}>
+      <Dialog
+        open={confirmDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmDialog(null)
+            setRefuseReason("")
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -1017,6 +1235,20 @@ function ExpensesClientLoaded({
                   : t("expenses.workflow.confirmRefuse")}
             </DialogTitle>
           </DialogHeader>
+          {confirmDialog?.kind === "refuse" && (
+            <div className="space-y-2 py-2">
+              <label className="text-sm font-medium" htmlFor="refuse-reason">
+                {t("expenses.workflow.refuseReason")}
+              </label>
+              <textarea
+                id="refuse-reason"
+                className="w-full min-h-[80px] rounded-md border bg-background px-3 py-2 text-sm"
+                value={refuseReason}
+                onChange={(e) => setRefuseReason(e.target.value)}
+                placeholder={t("expenses.workflow.refuseReasonPlaceholder")}
+              />
+            </div>
+          )}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setConfirmDialog(null)}>
               {t("common.cancel")}
@@ -1052,9 +1284,14 @@ function ExpensesClientLoaded({
                 variant="destructive"
                 onClick={() => {
                   const row = confirmDialog.row
+                  const reason = refuseReason.trim()
                   setConfirmDialog(null)
+                  setRefuseReason("")
                   void refuseExpenseSheet
-                    .mutateAsync({ sheetId: rowId(row), params: {} })
+                    .mutateAsync({
+                      sheetId: rowId(row),
+                      params: { reason: reason || undefined },
+                    })
                     .catch((e) => setToolbarError(e instanceof Error ? e.message : String(e)))
                 }}
               >

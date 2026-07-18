@@ -1006,6 +1006,7 @@ function categorizeByModule(reducerName: string): string {
     apply_expense_advance_to_sheet: 'expenses',
     request_expense_policy_exception: 'expenses',
     approve_expense_policy_exception: 'expenses',
+    reject_expense_policy_exception: 'expenses',
     set_expense_fraud_hold: 'expenses',
     set_expense_allocations: 'expenses',
     upsert_expense_mileage_rate: 'expenses',

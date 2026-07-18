@@ -251,6 +251,12 @@ fn create_line_with_receipt(
     name: &str,
     amount: f64,
 ) -> Result<u64, String> {
+    let receipt_id = super::test_receipt_id(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        employee_id,
+    )?;
     create_expense(
         ctx,
         fixture.organization_id,
@@ -273,7 +279,7 @@ fn create_line_with_receipt(
             mileage_rate_id: None,
             per_diem_days: None,
             per_diem_rate_id: None,
-            attachment_ids: vec![1],
+            attachment_ids: vec![receipt_id],
             client_request_id: None,
             payment_mode: ExpensePaymentMode::OutOfPocket,
             merchant_key: None,
@@ -408,6 +414,7 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
             liquidity_account_id: accounts.liquidity_id,
             payable_account_id: accounts.payable_id,
             payment_date: ctx.timestamp,
+            amount: None,
             client_request_id: Some("reim-1".into()),
         },
     )?;

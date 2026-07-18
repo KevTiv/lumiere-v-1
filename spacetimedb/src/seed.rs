@@ -4840,11 +4840,22 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         });
 
     // ── 5.11 Fiscal Periods ───────────────────────────────────────────────────
+    // Real ranges (not zero-width seed instants) so period-lock gates accept "today".
+    let day = std::time::Duration::from_secs(86400);
+    let fy_from = ctx.timestamp - day * 180;
+    let fy_to = ctx.timestamp + day * 180;
+    let closed_a_from = fy_from;
+    let closed_a_to = ctx.timestamp - day * 90;
+    let closed_b_from = closed_a_to + day;
+    let closed_b_to = ctx.timestamp - day * 30;
+    let open_from = closed_b_to + day;
+    let open_to = fy_to;
+
     let fiscal_year_2026 = ctx.db.account_fiscal_year().insert(AccountFiscalYear {
         id: 0,
         name: "Fiscal Year 2026".to_string(),
-        date_from: ctx.timestamp,
-        date_to: ctx.timestamp,
+        date_from: fy_from,
+        date_to: fy_to,
         company_id: company_id,
         state: FiscalYearState::Running,
         type_: "standard".to_string(),
@@ -4864,8 +4875,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         id: 0,
         name: "January 2026".to_string(),
         code: "JAN-2026".to_string(),
-        date_from: ctx.timestamp,
-        date_to: ctx.timestamp,
+        date_from: closed_a_from,
+        date_to: closed_a_to,
         company_id: company_id,
         fiscal_year_id: fiscal_year_2026.id,
         state: PeriodState::Closed,
@@ -4882,8 +4893,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         id: 0,
         name: "February 2026".to_string(),
         code: "FEB-2026".to_string(),
-        date_from: ctx.timestamp,
-        date_to: ctx.timestamp,
+        date_from: closed_b_from,
+        date_to: closed_b_to,
         company_id: company_id,
         fiscal_year_id: fiscal_year_2026.id,
         state: PeriodState::Closed,
@@ -4900,8 +4911,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         id: 0,
         name: "March 2026".to_string(),
         code: "MAR-2026".to_string(),
-        date_from: ctx.timestamp,
-        date_to: ctx.timestamp,
+        date_from: open_from,
+        date_to: open_to,
         company_id: company_id,
         fiscal_year_id: fiscal_year_2026.id,
         state: PeriodState::Open,

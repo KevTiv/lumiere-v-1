@@ -245,6 +245,7 @@ pub mod create_expense_card_statement_line_params_type;
 pub mod create_expense_integration_intent_params_type;
 pub mod create_expense_params_type;
 pub mod create_expense_project_rebill_params_type;
+pub mod create_expense_receipt_params_type;
 pub mod create_expense_reimbursement_params_type;
 pub mod create_expense_sheet_params_type;
 pub mod create_financial_report_params_type;
@@ -486,6 +487,7 @@ pub mod hr_expense_mileage_rate_type;
 pub mod hr_expense_per_diem_rate_type;
 pub mod hr_expense_policy_type;
 pub mod hr_expense_policy_exception_type;
+pub mod hr_expense_receipt_type;
 pub mod hr_expense_sheet_type;
 pub mod hr_job_position_type;
 pub mod hr_leave_type;
@@ -1239,6 +1241,7 @@ pub mod create_expense_advance_reducer;
 pub mod create_expense_card_statement_line_reducer;
 pub mod create_expense_integration_intent_reducer;
 pub mod create_expense_project_rebill_reducer;
+pub mod create_expense_receipt_reducer;
 pub mod create_expense_reimbursement_payment_reducer;
 pub mod create_expense_sheet_reducer;
 pub mod create_financial_report_reducer;
@@ -1742,6 +1745,7 @@ pub mod run_expenses_wave_b_test_reducer;
 pub mod run_expenses_wave_c_test_reducer;
 pub mod run_expenses_wave_d_test_reducer;
 pub mod run_expenses_wave_e_test_reducer;
+pub mod run_expenses_wave_f_test_reducer;
 pub mod run_fx_revaluation_reducer;
 pub mod run_fx_revaluation_batch_reducer;
 pub mod run_helpdesk_ticket_test_reducer;
@@ -2208,6 +2212,7 @@ pub mod hr_expense_mileage_rate_table;
 pub mod hr_expense_per_diem_rate_table;
 pub mod hr_expense_policy_table;
 pub mod hr_expense_policy_exception_table;
+pub mod hr_expense_receipt_table;
 pub mod hr_job_position_table;
 pub mod hr_leave_table;
 pub mod hr_leave_type_table;
@@ -2667,6 +2672,7 @@ pub use create_expense_card_statement_line_params_type::CreateExpenseCardStateme
 pub use create_expense_integration_intent_params_type::CreateExpenseIntegrationIntentParams;
 pub use create_expense_params_type::CreateExpenseParams;
 pub use create_expense_project_rebill_params_type::CreateExpenseProjectRebillParams;
+pub use create_expense_receipt_params_type::CreateExpenseReceiptParams;
 pub use create_expense_reimbursement_params_type::CreateExpenseReimbursementParams;
 pub use create_expense_sheet_params_type::CreateExpenseSheetParams;
 pub use create_financial_report_params_type::CreateFinancialReportParams;
@@ -2908,6 +2914,7 @@ pub use hr_expense_mileage_rate_type::HrExpenseMileageRate;
 pub use hr_expense_per_diem_rate_type::HrExpensePerDiemRate;
 pub use hr_expense_policy_type::HrExpensePolicy;
 pub use hr_expense_policy_exception_type::HrExpensePolicyException;
+pub use hr_expense_receipt_type::HrExpenseReceipt;
 pub use hr_expense_sheet_type::HrExpenseSheet;
 pub use hr_job_position_type::HrJobPosition;
 pub use hr_leave_type::HrLeave;
@@ -3567,6 +3574,7 @@ pub use hr_expense_mileage_rate_table::*;
 pub use hr_expense_per_diem_rate_table::*;
 pub use hr_expense_policy_table::*;
 pub use hr_expense_policy_exception_table::*;
+pub use hr_expense_receipt_table::*;
 pub use hr_job_position_table::*;
 pub use hr_leave_table::*;
 pub use hr_leave_type_table::*;
@@ -4026,6 +4034,7 @@ pub use create_expense_advance_reducer::create_expense_advance;
 pub use create_expense_card_statement_line_reducer::create_expense_card_statement_line;
 pub use create_expense_integration_intent_reducer::create_expense_integration_intent;
 pub use create_expense_project_rebill_reducer::create_expense_project_rebill;
+pub use create_expense_receipt_reducer::create_expense_receipt;
 pub use create_expense_reimbursement_payment_reducer::create_expense_reimbursement_payment;
 pub use create_expense_sheet_reducer::create_expense_sheet;
 pub use create_financial_report_reducer::create_financial_report;
@@ -4529,6 +4538,7 @@ pub use run_expenses_wave_b_test_reducer::run_expenses_wave_b_test;
 pub use run_expenses_wave_c_test_reducer::run_expenses_wave_c_test;
 pub use run_expenses_wave_d_test_reducer::run_expenses_wave_d_test;
 pub use run_expenses_wave_e_test_reducer::run_expenses_wave_e_test;
+pub use run_expenses_wave_f_test_reducer::run_expenses_wave_f_test;
 pub use run_fx_revaluation_reducer::run_fx_revaluation;
 pub use run_fx_revaluation_batch_reducer::run_fx_revaluation_batch;
 pub use run_helpdesk_ticket_test_reducer::run_helpdesk_ticket_test;
@@ -5976,6 +5986,10 @@ pub enum Reducer {
         organization_id: u64,
         sheet_id: u64,
         params: CreateExpenseProjectRebillParams,
+}    ,
+    CreateExpenseReceipt {
+        organization_id: u64,
+        params: CreateExpenseReceiptParams,
 }    ,
     CreateExpenseReimbursementPayment {
         organization_id: u64,
@@ -8188,6 +8202,7 @@ pub enum Reducer {
     RunExpensesWaveCTest ,
     RunExpensesWaveDTest ,
     RunExpensesWaveETest ,
+    RunExpensesWaveFTest ,
     RunFxRevaluation {
         organization_id: u64,
         company_id: u64,
@@ -9807,6 +9822,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateExpenseCardStatementLine { .. } => "create_expense_card_statement_line",
             Reducer::CreateExpenseIntegrationIntent { .. } => "create_expense_integration_intent",
             Reducer::CreateExpenseProjectRebill { .. } => "create_expense_project_rebill",
+            Reducer::CreateExpenseReceipt { .. } => "create_expense_receipt",
             Reducer::CreateExpenseReimbursementPayment { .. } => "create_expense_reimbursement_payment",
             Reducer::CreateExpenseSheet { .. } => "create_expense_sheet",
             Reducer::CreateFinancialReport { .. } => "create_financial_report",
@@ -10310,6 +10326,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunExpensesWaveCTest => "run_expenses_wave_c_test",
             Reducer::RunExpensesWaveDTest => "run_expenses_wave_d_test",
             Reducer::RunExpensesWaveETest => "run_expenses_wave_e_test",
+            Reducer::RunExpensesWaveFTest => "run_expenses_wave_f_test",
             Reducer::RunFxRevaluation { .. } => "run_fx_revaluation",
             Reducer::RunFxRevaluationBatch { .. } => "run_fx_revaluation_batch",
             Reducer::RunHelpdeskTicketTest => "run_helpdesk_ticket_test",
@@ -12634,6 +12651,13 @@ Reducer::BillProjectMilestone{
 }             => __sats::bsatn::to_vec(&create_expense_project_rebill_reducer::CreateExpenseProjectRebillArgs {
                 organization_id: organization_id.clone(),
                 sheet_id: sheet_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateExpenseReceipt{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_expense_receipt_reducer::CreateExpenseReceiptArgs {
+                organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateExpenseReimbursementPayment{
@@ -16594,6 +16618,8 @@ Reducer::RunExpensesWaveDTest => __sats::bsatn::to_vec(&run_expenses_wave_d_test
                 }),
 Reducer::RunExpensesWaveETest => __sats::bsatn::to_vec(&run_expenses_wave_e_test_reducer::RunExpensesWaveETestArgs {
                 }),
+Reducer::RunExpensesWaveFTest => __sats::bsatn::to_vec(&run_expenses_wave_f_test_reducer::RunExpensesWaveFTestArgs {
+                }),
 Reducer::RunFxRevaluation{
                 organization_id,
                 company_id,
@@ -19240,6 +19266,7 @@ pub struct DbUpdate {
     hr_expense_per_diem_rate: __sdk::TableUpdate<HrExpensePerDiemRate>,
     hr_expense_policy: __sdk::TableUpdate<HrExpensePolicy>,
     hr_expense_policy_exception: __sdk::TableUpdate<HrExpensePolicyException>,
+    hr_expense_receipt: __sdk::TableUpdate<HrExpenseReceipt>,
     hr_job_position: __sdk::TableUpdate<HrJobPosition>,
     hr_leave: __sdk::TableUpdate<HrLeave>,
     hr_leave_type: __sdk::TableUpdate<HrLeaveType>,
@@ -19615,6 +19642,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "hr_expense_per_diem_rate" => db_update.hr_expense_per_diem_rate.append(hr_expense_per_diem_rate_table::parse_table_update(table_update)?),
     "hr_expense_policy" => db_update.hr_expense_policy.append(hr_expense_policy_table::parse_table_update(table_update)?),
     "hr_expense_policy_exception" => db_update.hr_expense_policy_exception.append(hr_expense_policy_exception_table::parse_table_update(table_update)?),
+    "hr_expense_receipt" => db_update.hr_expense_receipt.append(hr_expense_receipt_table::parse_table_update(table_update)?),
     "hr_job_position" => db_update.hr_job_position.append(hr_job_position_table::parse_table_update(table_update)?),
     "hr_leave" => db_update.hr_leave.append(hr_leave_table::parse_table_update(table_update)?),
     "hr_leave_type" => db_update.hr_leave_type.append(hr_leave_type_table::parse_table_update(table_update)?),
@@ -20002,6 +20030,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.hr_expense_per_diem_rate = cache.apply_diff_to_table::<HrExpensePerDiemRate>("hr_expense_per_diem_rate", &self.hr_expense_per_diem_rate).with_updates_by_pk(|row| &row.id);
         diff.hr_expense_policy = cache.apply_diff_to_table::<HrExpensePolicy>("hr_expense_policy", &self.hr_expense_policy).with_updates_by_pk(|row| &row.id);
         diff.hr_expense_policy_exception = cache.apply_diff_to_table::<HrExpensePolicyException>("hr_expense_policy_exception", &self.hr_expense_policy_exception).with_updates_by_pk(|row| &row.id);
+        diff.hr_expense_receipt = cache.apply_diff_to_table::<HrExpenseReceipt>("hr_expense_receipt", &self.hr_expense_receipt).with_updates_by_pk(|row| &row.id);
         diff.hr_job_position = cache.apply_diff_to_table::<HrJobPosition>("hr_job_position", &self.hr_job_position).with_updates_by_pk(|row| &row.id);
         diff.hr_leave = cache.apply_diff_to_table::<HrLeave>("hr_leave", &self.hr_leave).with_updates_by_pk(|row| &row.id);
         diff.hr_leave_type = cache.apply_diff_to_table::<HrLeaveType>("hr_leave_type", &self.hr_leave_type).with_updates_by_pk(|row| &row.id);
@@ -20374,6 +20403,7 @@ for table_rows in raw.tables {
                 "hr_expense_per_diem_rate" => db_update.hr_expense_per_diem_rate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_expense_policy" => db_update.hr_expense_policy.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_expense_policy_exception" => db_update.hr_expense_policy_exception.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_expense_receipt" => db_update.hr_expense_receipt.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_job_position" => db_update.hr_job_position.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_leave" => db_update.hr_leave.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_leave_type" => db_update.hr_leave_type.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -20746,6 +20776,7 @@ for table_rows in raw.tables {
                 "hr_expense_per_diem_rate" => db_update.hr_expense_per_diem_rate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_expense_policy" => db_update.hr_expense_policy.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_expense_policy_exception" => db_update.hr_expense_policy_exception.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_expense_receipt" => db_update.hr_expense_receipt.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_job_position" => db_update.hr_job_position.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_leave" => db_update.hr_leave.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_leave_type" => db_update.hr_leave_type.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -21120,6 +21151,7 @@ pub struct AppliedDiff<'r> {
     hr_expense_per_diem_rate: __sdk::TableAppliedDiff<'r, HrExpensePerDiemRate>,
     hr_expense_policy: __sdk::TableAppliedDiff<'r, HrExpensePolicy>,
     hr_expense_policy_exception: __sdk::TableAppliedDiff<'r, HrExpensePolicyException>,
+    hr_expense_receipt: __sdk::TableAppliedDiff<'r, HrExpenseReceipt>,
     hr_job_position: __sdk::TableAppliedDiff<'r, HrJobPosition>,
     hr_leave: __sdk::TableAppliedDiff<'r, HrLeave>,
     hr_leave_type: __sdk::TableAppliedDiff<'r, HrLeaveType>,
@@ -21495,6 +21527,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<HrExpensePerDiemRate>("hr_expense_per_diem_rate", &self.hr_expense_per_diem_rate, event);
         callbacks.invoke_table_row_callbacks::<HrExpensePolicy>("hr_expense_policy", &self.hr_expense_policy, event);
         callbacks.invoke_table_row_callbacks::<HrExpensePolicyException>("hr_expense_policy_exception", &self.hr_expense_policy_exception, event);
+        callbacks.invoke_table_row_callbacks::<HrExpenseReceipt>("hr_expense_receipt", &self.hr_expense_receipt, event);
         callbacks.invoke_table_row_callbacks::<HrJobPosition>("hr_job_position", &self.hr_job_position, event);
         callbacks.invoke_table_row_callbacks::<HrLeave>("hr_leave", &self.hr_leave, event);
         callbacks.invoke_table_row_callbacks::<HrLeaveType>("hr_leave_type", &self.hr_leave_type, event);
@@ -22501,6 +22534,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         hr_expense_per_diem_rate_table::register_table(client_cache);
         hr_expense_policy_table::register_table(client_cache);
         hr_expense_policy_exception_table::register_table(client_cache);
+        hr_expense_receipt_table::register_table(client_cache);
         hr_job_position_table::register_table(client_cache);
         hr_leave_table::register_table(client_cache);
         hr_leave_type_table::register_table(client_cache);
@@ -22868,6 +22902,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "hr_expense_per_diem_rate",
         "hr_expense_policy",
         "hr_expense_policy_exception",
+        "hr_expense_receipt",
         "hr_job_position",
         "hr_leave",
         "hr_leave_type",

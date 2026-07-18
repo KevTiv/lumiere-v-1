@@ -269,6 +269,7 @@ import CreateExpenseAdvanceReducer from "./create_expense_advance_reducer";
 import CreateExpenseCardStatementLineReducer from "./create_expense_card_statement_line_reducer";
 import CreateExpenseIntegrationIntentReducer from "./create_expense_integration_intent_reducer";
 import CreateExpenseProjectRebillReducer from "./create_expense_project_rebill_reducer";
+import CreateExpenseReceiptReducer from "./create_expense_receipt_reducer";
 import CreateExpenseReimbursementPaymentReducer from "./create_expense_reimbursement_payment_reducer";
 import CreateExpenseSheetReducer from "./create_expense_sheet_reducer";
 import CreateFinancialReportReducer from "./create_financial_report_reducer";
@@ -697,6 +698,7 @@ import RegisterPaymentOnInvoiceReducer from "./register_payment_on_invoice_reduc
 import RegisterQueueWorkerReducer from "./register_queue_worker_reducer";
 import RejectAiActionDraftReducer from "./reject_ai_action_draft_reducer";
 import RejectApprovalRequestReducer from "./reject_approval_request_reducer";
+import RejectExpensePolicyExceptionReducer from "./reject_expense_policy_exception_reducer";
 import RejectSupplierIntakeReducer from "./reject_supplier_intake_reducer";
 import RejectTimesheetsReducer from "./reject_timesheets_reducer";
 import ReleaseBlanketToPoReducer from "./release_blanket_to_po_reducer";
@@ -772,6 +774,7 @@ import RunExpensesWaveBTestReducer from "./run_expenses_wave_b_test_reducer";
 import RunExpensesWaveCTestReducer from "./run_expenses_wave_c_test_reducer";
 import RunExpensesWaveDTestReducer from "./run_expenses_wave_d_test_reducer";
 import RunExpensesWaveETestReducer from "./run_expenses_wave_e_test_reducer";
+import RunExpensesWaveFTestReducer from "./run_expenses_wave_f_test_reducer";
 import RunFxRevaluationReducer from "./run_fx_revaluation_reducer";
 import RunFxRevaluationBatchReducer from "./run_fx_revaluation_batch_reducer";
 import RunHelpdeskTicketTestReducer from "./run_helpdesk_ticket_test_reducer";
@@ -856,6 +859,7 @@ import ScheduleTaxDeadlineUpdatesReducer from "./schedule_tax_deadline_updates_r
 import SeedDevDataReducer from "./seed_dev_data_reducer";
 import SeedOrganizationFormConfigsReducer from "./seed_organization_form_configs_reducer";
 import SeedPackHolidaysReducer from "./seed_pack_holidays_reducer";
+import SeedStatutoryExpenseMileageRatesReducer from "./seed_statutory_expense_mileage_rates_reducer";
 import SendPurchaseOrderReducer from "./send_purchase_order_reducer";
 import SendSaleOrderQuotationReducer from "./send_sale_order_quotation_reducer";
 import SetAiAgentActiveReducer from "./set_ai_agent_active_reducer";
@@ -1242,6 +1246,7 @@ import HrExpenseMileageRateRow from "./hr_expense_mileage_rate_table";
 import HrExpensePerDiemRateRow from "./hr_expense_per_diem_rate_table";
 import HrExpensePolicyRow from "./hr_expense_policy_table";
 import HrExpensePolicyExceptionRow from "./hr_expense_policy_exception_table";
+import HrExpenseReceiptRow from "./hr_expense_receipt_table";
 import HrJobPositionRow from "./hr_job_position_table";
 import HrLeaveRow from "./hr_leave_table";
 import HrLeaveTypeRow from "./hr_leave_type_table";
@@ -4019,6 +4024,26 @@ const tablesSchema = __schema({
       { name: 'hr_expense_policy_exception_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrExpensePolicyExceptionRow),
+  hr_expense_receipt: __table({
+    name: 'hr_expense_receipt',
+    indexes: [
+      { name: 'expense_receipt_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'expense_receipt_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'expense_receipt_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_expense_receipt_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrExpenseReceiptRow),
   hr_job_position: __table({
     name: 'hr_job_position',
     indexes: [
@@ -8270,6 +8295,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_expense_card_statement_line", CreateExpenseCardStatementLineReducer),
   __reducerSchema("create_expense_integration_intent", CreateExpenseIntegrationIntentReducer),
   __reducerSchema("create_expense_project_rebill", CreateExpenseProjectRebillReducer),
+  __reducerSchema("create_expense_receipt", CreateExpenseReceiptReducer),
   __reducerSchema("create_expense_reimbursement_payment", CreateExpenseReimbursementPaymentReducer),
   __reducerSchema("create_expense_sheet", CreateExpenseSheetReducer),
   __reducerSchema("create_financial_report", CreateFinancialReportReducer),
@@ -8698,6 +8724,7 @@ const reducersSchema = __reducers(
   __reducerSchema("register_queue_worker", RegisterQueueWorkerReducer),
   __reducerSchema("reject_ai_action_draft", RejectAiActionDraftReducer),
   __reducerSchema("reject_approval_request", RejectApprovalRequestReducer),
+  __reducerSchema("reject_expense_policy_exception", RejectExpensePolicyExceptionReducer),
   __reducerSchema("reject_supplier_intake", RejectSupplierIntakeReducer),
   __reducerSchema("reject_timesheets", RejectTimesheetsReducer),
   __reducerSchema("release_blanket_to_po", ReleaseBlanketToPoReducer),
@@ -8773,6 +8800,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_expenses_wave_c_test", RunExpensesWaveCTestReducer),
   __reducerSchema("run_expenses_wave_d_test", RunExpensesWaveDTestReducer),
   __reducerSchema("run_expenses_wave_e_test", RunExpensesWaveETestReducer),
+  __reducerSchema("run_expenses_wave_f_test", RunExpensesWaveFTestReducer),
   __reducerSchema("run_fx_revaluation", RunFxRevaluationReducer),
   __reducerSchema("run_fx_revaluation_batch", RunFxRevaluationBatchReducer),
   __reducerSchema("run_helpdesk_ticket_test", RunHelpdeskTicketTestReducer),
@@ -8857,6 +8885,7 @@ const reducersSchema = __reducers(
   __reducerSchema("seed_dev_data", SeedDevDataReducer),
   __reducerSchema("seed_organization_form_configs", SeedOrganizationFormConfigsReducer),
   __reducerSchema("seed_pack_holidays", SeedPackHolidaysReducer),
+  __reducerSchema("seed_statutory_expense_mileage_rates", SeedStatutoryExpenseMileageRatesReducer),
   __reducerSchema("send_purchase_order", SendPurchaseOrderReducer),
   __reducerSchema("send_sale_order_quotation", SendSaleOrderQuotationReducer),
   __reducerSchema("set_ai_agent_active", SetAiAgentActiveReducer),

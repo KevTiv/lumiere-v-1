@@ -11,4 +11,4 @@ pub use expense_wave_d::{
     HrExpensePolicyException,
 };
 pub use expense_wave_e::ExpenseCardStatementLine;
-pub use expenses::{HrExpense, HrExpenseSheet};
+pub use expenses::{HrExpense, HrExpenseReceipt, HrExpenseSheet};

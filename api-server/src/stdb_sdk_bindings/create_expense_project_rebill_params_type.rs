@@ -12,6 +12,7 @@ pub struct CreateExpenseProjectRebillParams {
     pub income_account_id: u64,
     pub invoice_date: __sdk::Timestamp,
     pub partner_id: Option<u64>,
+    pub fiscal_position_id: Option<u64>,
     pub client_request_id: Option<String>,
 }
 

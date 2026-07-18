@@ -150,6 +150,16 @@ function isSatsOption(v: unknown): boolean {
   return keys.length === 1 && (keys[0] === "some" || keys[0] === "none")
 }
 
+/** Already-encoded SATS sum JSON (`{ outOfPocket: [] }`, `{ role: [1] }`) — do not snake_case the variant key. */
+function isSatsSumJson(v: unknown): v is Record<string, unknown[]> {
+  if (v === null || typeof v !== "object" || Array.isArray(v)) return false
+  const keys = Object.keys(v as object)
+  if (keys.length !== 1) return false
+  const key = keys[0]!
+  if (key === "some" || key === "none") return false
+  return Array.isArray((v as Record<string, unknown>)[key])
+}
+
 function bigintToJson(v: bigint): number {
   if (v < 0n) {
     throw new Error("stdbParamsToJson: negative bigint is not valid as u64 in JSON")
@@ -217,6 +227,11 @@ function encodeValue(
 
   if (Array.isArray(value)) {
     return value.map((item) => encodeValue(item, optionFields))
+  }
+
+  if (isSatsSumJson(value)) {
+    const key = Object.keys(value)[0]!
+    return { [key]: encodeValue(value[key], optionFields) }
   }
 
   if (typeof value === "object") {
@@ -444,6 +459,27 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_ai_action_draft: "CreateAiActionDraftParams",
   update_ai_action_draft_params: "UpdateAiActionDraftParamsParams",
   post_account_move: undefined,
+  create_expense: "CreateExpenseParams",
+  create_expense_sheet: "CreateExpenseSheetParams",
+  create_expense_receipt: "CreateExpenseReceiptParams",
+  update_expense: "UpdateExpenseParams",
+  post_expense_sheet: "PostExpenseSheetParams",
+  create_expense_reimbursement_payment: "CreateExpenseReimbursementParams",
+  refuse_expense_sheet: "RefuseExpenseSheetParams",
+  create_expense_project_rebill: "CreateExpenseProjectRebillParams",
+  create_expense_integration_intent: "CreateExpenseIntegrationIntentParams",
+  create_expense_advance: "CreateExpenseAdvanceParams",
+  apply_expense_advance_to_sheet: "ApplyExpenseAdvanceParams",
+  create_expense_card_statement_line: "CreateExpenseCardStatementLineParams",
+  match_expense_card_statement_line: "MatchExpenseCardStatementLineParams",
+  unmatch_expense_card_statement_line: "UnmatchExpenseCardStatementLineParams",
+  set_expense_fraud_hold: "SetExpenseFraudHoldParams",
+  request_expense_policy_exception: "RequestExpensePolicyExceptionParams",
+  reject_expense_policy_exception: "RejectExpensePolicyExceptionParams",
+  upsert_expense_mileage_rate: "UpsertExpenseMileageRateParams",
+  upsert_expense_per_diem_rate: "UpsertExpensePerDiemRateParams",
+  upsert_expense_policy: "UpsertExpensePolicyParams",
+  fail_expense_integration_intent: "FailExpenseIntegrationIntentParams",
 }
 
 /** Flat `Option<T>` arg indices for reducers without a trailing params struct. */

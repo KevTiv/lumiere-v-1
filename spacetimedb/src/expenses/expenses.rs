@@ -6,6 +6,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove,
     AddAccountMoveLineParams,
@@ -21,8 +22,8 @@ use crate::expenses::expense_depth::{
     allocations_for_expense, hr_expense_mileage_rate, hr_expense_per_diem_rate,
 };
 use crate::expenses::expense_wave_d::{
-    advance_applied_for_sheet, find_duplicate_expense, has_approved_policy_exception,
-    has_pending_policy_exception, hr_expense_policy_exception,
+    advance_applied_for_sheet, find_duplicate_by_receipt_content_hash, find_duplicate_expense,
+    has_approved_policy_exception, has_pending_policy_exception, hr_expense_policy_exception,
 };
 use crate::expenses::expense_wave_e::sheet_matched_fx_fee_total;
 use crate::projects::projects::project_project;
@@ -136,6 +137,30 @@ pub struct HrExpensePolicy {
     pub metadata: Option<String>,
 }
 
+/// Registered receipt / evidence row. Blob bytes live outside reducers; this stores metadata + opaque storage key.
+#[spacetimedb::table(
+    accessor = hr_expense_receipt,
+    public,
+    index(accessor = expense_receipt_by_org, btree(columns = [organization_id])),
+    index(accessor = expense_receipt_by_company, btree(columns = [company_id])),
+    index(accessor = expense_receipt_by_employee, btree(columns = [employee_id]))
+)]
+pub struct HrExpenseReceipt {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub employee_id: u64,
+    pub file_name: Option<String>,
+    pub mime_type: Option<String>,
+    /// Opaque client/worker key (no blob in reducer).
+    pub storage_key: String,
+    pub content_hash: Option<String>,
+    pub client_request_id: Option<String>,
+    pub created_at: Timestamp,
+}
+
 // ── Input Params ─────────────────────────────────────────────────────────────
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -174,7 +199,26 @@ pub struct UpdateExpenseParams {
     pub quantity: Option<f64>,
     pub description: Option<String>,
     pub account_id: Option<u64>,
+    pub product_id: Option<u64>,
+    pub tax_ids: Option<Vec<u64>>,
+    pub payment_mode: Option<ExpensePaymentMode>,
+    pub merchant_key: Option<String>,
     pub attachment_ids: Option<Vec<u64>>,
+    pub mileage_distance: Option<f64>,
+    pub mileage_rate_id: Option<u64>,
+    pub per_diem_days: Option<f64>,
+    pub per_diem_rate_id: Option<u64>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateExpenseReceiptParams {
+    pub company_id: Option<u64>,
+    pub employee_id: u64,
+    pub file_name: Option<String>,
+    pub mime_type: Option<String>,
+    pub storage_key: String,
+    pub content_hash: Option<String>,
+    pub client_request_id: Option<String>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -217,6 +261,8 @@ pub struct CreateExpenseReimbursementParams {
     pub liquidity_account_id: u64,
     pub payable_account_id: u64,
     pub payment_date: Timestamp,
+    /// When set, reimburse this amount (`0 < amount ≤ residual`). When `None`, pay full residual.
+    pub amount: Option<f64>,
     pub client_request_id: Option<String>,
 }
 
@@ -230,6 +276,79 @@ pub struct UpsertExpensePolicyParams {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Every attachment id must reference a real `hr_expense_receipt` for the same org/company/employee.
+/// Rejects `0`. Historically stubbed `1` is only accepted when that receipt row actually exists.
+pub(crate) fn validate_expense_attachment_ids(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    employee_id: u64,
+    attachment_ids: &[u64],
+) -> Result<(), String> {
+    for &id in attachment_ids {
+        if id == 0 {
+            return Err("Invalid attachment id 0".to_string());
+        }
+        let receipt = ctx
+            .db
+            .hr_expense_receipt()
+            .id()
+            .find(&id)
+            .ok_or_else(|| format!("Receipt attachment {id} not found"))?;
+        if receipt.organization_id != organization_id || receipt.company_id != company_id {
+            return Err(format!("Receipt {id} does not belong to this company"));
+        }
+        if receipt.employee_id != employee_id {
+            return Err(format!("Receipt {id} does not belong to this employee"));
+        }
+    }
+    Ok(())
+}
+
+/// Insert a receipt row (used by create reducer and intent apply). Returns the new id.
+pub(crate) fn insert_expense_receipt(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: &CreateExpenseReceiptParams,
+) -> Result<u64, String> {
+    if params.storage_key.trim().is_empty() {
+        return Err("storage_key cannot be empty".to_string());
+    }
+    if let Some(ref req) = params.client_request_id {
+        if !req.is_empty() {
+            if let Some(existing) = ctx.db.hr_expense_receipt().iter().find(|r| {
+                r.organization_id == organization_id
+                    && r.client_request_id.as_deref() == Some(req.as_str())
+            }) {
+                return Ok(existing.id);
+            }
+        }
+    }
+    let emp = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&params.employee_id)
+        .ok_or("Employee not found")?;
+    if emp.organization_id != organization_id || emp.company_id != company_id {
+        return Err("Employee does not belong to this company".to_string());
+    }
+    let row = ctx.db.hr_expense_receipt().insert(HrExpenseReceipt {
+        id: 0,
+        organization_id,
+        company_id,
+        employee_id: params.employee_id,
+        file_name: params.file_name.clone(),
+        mime_type: params.mime_type.clone(),
+        storage_key: params.storage_key.clone(),
+        content_hash: params.content_hash.clone(),
+        client_request_id: params.client_request_id.clone(),
+        created_at: ctx.timestamp,
+    });
+    Ok(row.id)
+}
 
 fn sheet_lines(ctx: &ReducerContext, sheet_id: u64) -> Vec<HrExpense> {
     ctx.db
@@ -266,6 +385,35 @@ fn merge_metadata(existing: Option<&str>, patch: serde_json::Value) -> Option<St
         }
     }
     Some(serde_json::Value::Object(map).to_string())
+}
+
+/// Exact JSON string-field match for idempotency keys (never substring / `.contains`).
+pub(crate) fn metadata_str_eq(metadata: Option<&str>, key: &str, expected: &str) -> bool {
+    let Some(raw) = metadata else {
+        return false;
+    };
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return false;
+    };
+    v.get(key).and_then(|x| x.as_str()) == Some(expected)
+}
+
+/// Debit=credit assert for expense-posted Entry moves (epsilon matches journal post).
+fn assert_move_lines_balanced(ctx: &ReducerContext, move_id: u64) -> Result<(), String> {
+    let lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .collect();
+    let total_debit: f64 = lines.iter().map(|l| l.debit).sum();
+    let total_credit: f64 = lines.iter().map(|l| l.credit).sum();
+    if (total_debit - total_credit).abs() > 0.01 {
+        return Err(format!(
+            "Expense move is not balanced: debit={total_debit} credit={total_credit}"
+        ));
+    }
+    Ok(())
 }
 
 fn active_policy_for_company(
@@ -426,6 +574,37 @@ struct TaxRecoveryLine {
     amount_company: f64,
     account_id: u64,
     label: String,
+}
+
+/// Rate is usable when active window covers `at`:
+/// `effective_from <= at` (or open) and `effective_to` is None or `>= at`.
+fn rate_effective_on(at: Timestamp, from: Option<Timestamp>, to: Option<Timestamp>) -> bool {
+    if let Some(f) = from {
+        if at.to_micros_since_unix_epoch() < f.to_micros_since_unix_epoch() {
+            return false;
+        }
+    }
+    if let Some(t) = to {
+        if at.to_micros_since_unix_epoch() > t.to_micros_since_unix_epoch() {
+            return false;
+        }
+    }
+    true
+}
+
+fn ensure_rate_effective_on(
+    at: Timestamp,
+    from: Option<Timestamp>,
+    to: Option<Timestamp>,
+    label: &str,
+) -> Result<(), String> {
+    if rate_effective_on(at, from, to) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{label} is not effective on the expense date (check effective_from/effective_to)"
+        ))
+    }
 }
 
 fn tax_recoverable_account(
@@ -672,6 +851,12 @@ pub fn create_expense(
             if !rate.active {
                 return Err("Mileage rate is inactive".to_string());
             }
+            ensure_rate_effective_on(
+                params.date,
+                rate.effective_from,
+                rate.effective_to,
+                "Mileage rate",
+            )?;
             if rate.currency_id != params.currency_id {
                 return Err("Mileage rate currency must match expense currency".to_string());
             }
@@ -708,6 +893,12 @@ pub fn create_expense(
             if !rate.active {
                 return Err("Per diem rate is inactive".to_string());
             }
+            ensure_rate_effective_on(
+                params.date,
+                rate.effective_from,
+                rate.effective_to,
+                "Per diem rate",
+            )?;
             if rate.currency_id != params.currency_id {
                 return Err("Per diem rate currency must match expense currency".to_string());
             }
@@ -731,7 +922,7 @@ pub fn create_expense(
         .as_ref()
         .map(|s| !s.trim().is_empty())
         .unwrap_or(false);
-    let needs_exception = enforce_expense_product_policy(
+    let cap_exception = enforce_expense_product_policy(
         ctx,
         organization_id,
         company_id,
@@ -739,21 +930,55 @@ pub fn create_expense(
         total_amount,
         allow_exception,
     )?;
-    if needs_exception && !allow_exception {
+    if cap_exception && !allow_exception {
         return Err("Expense exceeds policy caps".to_string());
     }
-    let has_receipt = !params.attachment_ids.is_empty();
-    let merchant_key = params.merchant_key.clone();
-    let duplicate_of_id = find_duplicate_expense(
+    // AU pack: entertainment / FBT category products get a soft policy hold.
+    let pack_rules = pack_expense_evidence_rules(ctx, organization_id, company_id);
+    let fbt_hold = if pack_rules.fbt_entertainment {
+        params.product_id.and_then(|pid| ctx.db.product().id().find(&pid)).is_some_and(
+            |prod| {
+                let fbt_meta = prod.metadata.as_deref().is_some_and(|m| {
+                    m.contains("\"expense_fbt_category\":true")
+                        || m.contains("\"expense_fbt_category\": true")
+                });
+                let p = prod.expense_policy.to_ascii_lowercase();
+                fbt_meta || p.contains("fbt") || p.contains("entertainment")
+            },
+        )
+    } else {
+        false
+    };
+    let needs_exception = cap_exception || fbt_hold;
+    validate_expense_attachment_ids(
         ctx,
         organization_id,
         company_id,
         params.employee_id,
-        total_amount,
-        params.date,
-        merchant_key.as_deref(),
+        &params.attachment_ids,
+    )?;
+    let has_receipt = !params.attachment_ids.is_empty();
+    let merchant_key = params.merchant_key.clone();
+    // Prefer receipt content_hash when present; fall back to amount/day/merchant.
+    let duplicate_of_id = find_duplicate_by_receipt_content_hash(
+        ctx,
+        organization_id,
+        company_id,
+        &params.attachment_ids,
         None,
-    );
+    )
+    .or_else(|| {
+        find_duplicate_expense(
+            ctx,
+            organization_id,
+            company_id,
+            params.employee_id,
+            total_amount,
+            params.date,
+            merchant_key.as_deref(),
+            None,
+        )
+    });
     let fraud_hold = duplicate_of_id.is_some();
     let fraud_reason = duplicate_of_id.map(|id| format!("Possible duplicate of expense {id}"));
     let expense = ctx.db.hr_expense().insert(HrExpense {
@@ -792,10 +1017,13 @@ pub fn create_expense(
         created_at: ctx.timestamp,
     });
     if needs_exception {
-        let reason = params
-            .policy_exception_reason
-            .clone()
-            .unwrap_or_else(|| "Over policy cap".into());
+        let reason = params.policy_exception_reason.clone().unwrap_or_else(|| {
+            if fbt_hold {
+                "AU FBT / entertainment category hold".into()
+            } else {
+                "Over policy cap".into()
+            }
+        });
         ctx.db
             .hr_expense_policy_exception()
             .insert(crate::expenses::expense_wave_d::HrExpensePolicyException {
@@ -853,22 +1081,167 @@ pub fn update_expense(
     if expense.state != ExpenseState::Draft {
         return Err("Only draft expenses can be edited".to_string());
     }
-    let new_unit = params.unit_amount.unwrap_or(expense.unit_amount);
-    let new_qty = params.quantity.unwrap_or(expense.quantity);
-    if new_unit < 0.0 {
-        return Err("Unit amount cannot be negative".to_string());
-    }
-    if new_qty <= 0.0 {
-        return Err("Quantity must be positive".to_string());
-    }
-    let total_amount = new_unit * new_qty;
+
+    let (
+        new_unit,
+        new_qty,
+        total_amount,
+        mileage_distance,
+        mileage_rate_id,
+        per_diem_days,
+        per_diem_rate_id,
+    ) = match expense.line_kind {
+        ExpenseLineKind::Standard => {
+            let new_unit = params.unit_amount.unwrap_or(expense.unit_amount);
+            let new_qty = params.quantity.unwrap_or(expense.quantity);
+            if new_unit < 0.0 {
+                return Err("Unit amount cannot be negative".to_string());
+            }
+            if new_qty <= 0.0 {
+                return Err("Quantity must be positive".to_string());
+            }
+            (
+                new_unit,
+                new_qty,
+                new_unit * new_qty,
+                None,
+                None,
+                None,
+                None,
+            )
+        }
+        ExpenseLineKind::Mileage => {
+            // Kind-safe: totals always come from rate × distance.
+            let distance = params
+                .mileage_distance
+                .or(expense.mileage_distance)
+                .filter(|d| *d > 0.0)
+                .ok_or("Mileage distance must be positive")?;
+            let rate_id = params
+                .mileage_rate_id
+                .or(expense.mileage_rate_id)
+                .ok_or("mileage_rate_id is required for mileage expenses")?;
+            let rate = ctx
+                .db
+                .hr_expense_mileage_rate()
+                .id()
+                .find(&rate_id)
+                .ok_or("Mileage rate not found")?;
+            if rate.organization_id != organization_id || rate.company_id != company_id {
+                return Err("Mileage rate does not belong to this company".to_string());
+            }
+            if !rate.active {
+                return Err("Mileage rate is inactive".to_string());
+            }
+            ensure_rate_effective_on(
+                expense.date,
+                rate.effective_from,
+                rate.effective_to,
+                "Mileage rate",
+            )?;
+            if rate.currency_id != expense.currency_id {
+                return Err("Mileage rate currency must match expense currency".to_string());
+            }
+            let unit_amount = rate.rate_per_unit;
+            // Reject unit/qty-only edits that would diverge from rate × distance.
+            if params.mileage_distance.is_none() && params.mileage_rate_id.is_none() {
+                if let Some(u) = params.unit_amount {
+                    if (u - unit_amount).abs() > 0.0001 {
+                        return Err(
+                            "Mileage expenses must be updated via mileage_distance/mileage_rate_id, not unit/qty"
+                                .to_string(),
+                        );
+                    }
+                }
+                if let Some(q) = params.quantity {
+                    if (q - distance).abs() > 0.0001 {
+                        return Err(
+                            "Mileage expenses must be updated via mileage_distance/mileage_rate_id, not unit/qty"
+                                .to_string(),
+                        );
+                    }
+                }
+            }
+            (
+                unit_amount,
+                distance,
+                distance * unit_amount,
+                Some(distance),
+                Some(rate_id),
+                None,
+                None,
+            )
+        }
+        ExpenseLineKind::PerDiem => {
+            let days = params
+                .per_diem_days
+                .or(expense.per_diem_days)
+                .filter(|d| *d > 0.0)
+                .ok_or("Per diem days must be positive")?;
+            let rate_id = params
+                .per_diem_rate_id
+                .or(expense.per_diem_rate_id)
+                .ok_or("per_diem_rate_id is required for per diem expenses")?;
+            let rate = ctx
+                .db
+                .hr_expense_per_diem_rate()
+                .id()
+                .find(&rate_id)
+                .ok_or("Per diem rate not found")?;
+            if rate.organization_id != organization_id || rate.company_id != company_id {
+                return Err("Per diem rate does not belong to this company".to_string());
+            }
+            if !rate.active {
+                return Err("Per diem rate is inactive".to_string());
+            }
+            ensure_rate_effective_on(
+                expense.date,
+                rate.effective_from,
+                rate.effective_to,
+                "Per diem rate",
+            )?;
+            if rate.currency_id != expense.currency_id {
+                return Err("Per diem rate currency must match expense currency".to_string());
+            }
+            let unit_amount = rate.amount_per_day;
+            if params.per_diem_days.is_none() && params.per_diem_rate_id.is_none() {
+                if let Some(u) = params.unit_amount {
+                    if (u - unit_amount).abs() > 0.0001 {
+                        return Err(
+                            "Per diem expenses must be updated via per_diem_days/per_diem_rate_id, not unit/qty"
+                                .to_string(),
+                        );
+                    }
+                }
+                if let Some(q) = params.quantity {
+                    if (q - days).abs() > 0.0001 {
+                        return Err(
+                            "Per diem expenses must be updated via per_diem_days/per_diem_rate_id, not unit/qty"
+                                .to_string(),
+                        );
+                    }
+                }
+            }
+            (
+                unit_amount,
+                days,
+                days * unit_amount,
+                None,
+                None,
+                Some(days),
+                Some(rate_id),
+            )
+        }
+    };
+
+    let product_id = params.product_id.or(expense.product_id);
     let allow_exception = has_approved_policy_exception(ctx, expense_id)
         || has_pending_policy_exception(ctx, expense_id);
     enforce_expense_product_policy(
         ctx,
         organization_id,
         company_id,
-        expense.product_id,
+        product_id,
         total_amount,
         allow_exception,
     )?;
@@ -876,19 +1249,54 @@ pub fn update_expense(
         .attachment_ids
         .clone()
         .unwrap_or_else(|| expense.attachment_ids.clone());
+    validate_expense_attachment_ids(
+        ctx,
+        organization_id,
+        company_id,
+        expense.employee_id,
+        &attachment_ids,
+    )?;
     let has_receipt = !attachment_ids.is_empty();
     let mut changed = vec!["total_amount".to_string()];
     if params.attachment_ids.is_some() {
         changed.push("attachment_ids".to_string());
         changed.push("has_receipt".to_string());
     }
+    if params.product_id.is_some() {
+        changed.push("product_id".to_string());
+    }
+    if params.tax_ids.is_some() {
+        changed.push("tax_ids".to_string());
+    }
+    if params.payment_mode.is_some() {
+        changed.push("payment_mode".to_string());
+    }
+    if params.merchant_key.is_some() {
+        changed.push("merchant_key".to_string());
+    }
+    if params.mileage_distance.is_some() || params.mileage_rate_id.is_some() {
+        changed.push("mileage_distance".to_string());
+        changed.push("mileage_rate_id".to_string());
+    }
+    if params.per_diem_days.is_some() || params.per_diem_rate_id.is_some() {
+        changed.push("per_diem_days".to_string());
+        changed.push("per_diem_rate_id".to_string());
+    }
     ctx.db.hr_expense().id().update(HrExpense {
         name: params.name.unwrap_or(expense.name),
         unit_amount: new_unit,
         quantity: new_qty,
         total_amount,
+        mileage_distance,
+        mileage_rate_id,
+        per_diem_days,
+        per_diem_rate_id,
         description: params.description.or(expense.description),
         account_id: params.account_id.or(expense.account_id),
+        product_id,
+        tax_ids: params.tax_ids.unwrap_or(expense.tax_ids),
+        payment_mode: params.payment_mode.unwrap_or(expense.payment_mode),
+        merchant_key: params.merchant_key.or(expense.merchant_key),
         attachment_ids,
         has_receipt,
         ..expense
@@ -904,6 +1312,43 @@ pub fn update_expense(
             old_values: None,
             new_values: None,
             changed_fields: changed,
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+#[reducer]
+pub fn create_expense_receipt(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateExpenseReceiptParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "hr_expense", "create")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let receipt_id = insert_expense_receipt(ctx, organization_id, company_id, &params)?;
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_expense_receipt",
+            record_id: receipt_id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "employee_id": params.employee_id,
+                    "storage_key": params.storage_key,
+                    "client_request_id": params.client_request_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "employee_id".to_string(),
+                "storage_key".to_string(),
+                "client_request_id".to_string(),
+            ],
             metadata: None,
         },
     );
@@ -930,6 +1375,13 @@ pub fn submit_expense(
     if expense.state != ExpenseState::Draft {
         return Err("Only draft expenses can be submitted".to_string());
     }
+    validate_expense_attachment_ids(
+        ctx,
+        organization_id,
+        expense.company_id,
+        expense.employee_id,
+        &expense.attachment_ids,
+    )?;
     let sheet = ctx
         .db
         .expense_sheet()
@@ -1071,6 +1523,13 @@ pub fn submit_expense_sheet(
                 line.id
             ));
         }
+        validate_expense_attachment_ids(
+            ctx,
+            organization_id,
+            sheet.company_id,
+            line.employee_id,
+            &line.attachment_ids,
+        )?;
         if pack_rules.require_tax_ids && is_standard && line.tax_ids.is_empty() {
             return Err(format!(
                 "Expense {} requires tax evidence (country pack)",
@@ -1345,12 +1804,7 @@ pub fn post_expense_sheet(
 
     if let Some(existing_move) = sheet.account_move_id {
         if let Some(req) = params.client_request_id.as_ref() {
-            if sheet
-                .metadata
-                .as_deref()
-                .map(|m| m.contains(req.as_str()))
-                .unwrap_or(false)
-            {
+            if metadata_str_eq(sheet.metadata.as_deref(), "client_request_id", req) {
                 return Ok(());
             }
         }
@@ -1364,6 +1818,7 @@ pub fn post_expense_sheet(
     }
 
     let company_id = sheet.company_id;
+    ensure_accounting_period_open_for_date(ctx, company_id, params.accounting_date)?;
     if params.payable_account_id == params.default_expense_account_id {
         return Err("Expense and payable accounts must differ".to_string());
     }
@@ -1477,6 +1932,7 @@ pub fn post_expense_sheet(
                 line.quantity,
                 line.unit_amount * rate,
             ));
+            prepared_tax_lines.extend(tax_lines);
         } else {
             let mut allocated = 0.0;
             for (i, alloc) in allocs.iter().enumerate() {
@@ -1498,8 +1954,24 @@ pub fn post_expense_sheet(
                     line.unit_amount * rate,
                 ));
             }
+            // Split tax recovery by the same share_percent rule (100% invariant).
+            for tax_line in tax_lines {
+                let mut tax_allocated = 0.0;
+                for (i, alloc) in allocs.iter().enumerate() {
+                    let mut share_tax = tax_line.amount_company * (alloc.share_percent / 100.0);
+                    if i + 1 == allocs.len() {
+                        share_tax = (tax_line.amount_company - tax_allocated).max(0.0);
+                    }
+                    tax_allocated += share_tax;
+                    prepared_tax_lines.push(TaxRecoveryLine {
+                        tax_id: tax_line.tax_id,
+                        amount_company: share_tax,
+                        account_id: tax_line.account_id,
+                        label: format!("{} ({:.0}%)", tax_line.label, alloc.share_percent),
+                    });
+                }
+            }
         }
-        prepared_tax_lines.extend(tax_lines);
     }
 
     let total_company = untaxed_company + tax_company;
@@ -1708,6 +2180,8 @@ pub fn post_expense_sheet(
         insert_draft_account_move_line(ctx, &move_record, adv_params)?;
     }
 
+    assert_move_lines_balanced(ctx, move_record.id)?;
+
     // Mark move posted in-txn (Entry path — amounts already set).
     for ml in ctx.db.account_move_line().iter().filter(|l| l.move_id == move_record.id) {
         ctx.db.account_move_line().id().update(crate::accounting::journal_entries::AccountMoveLine {
@@ -1802,21 +2276,18 @@ pub fn create_expense_reimbursement_payment(
     let move_id = sheet
         .account_move_id
         .ok_or("Posted sheet is missing account_move_id")?;
-    if sheet.reimbursement_move_id.is_some() {
-        if let Some(req) = params.client_request_id.as_ref() {
-            if sheet
-                .metadata
-                .as_deref()
-                .map(|m| m.contains(req.as_str()))
-                .unwrap_or(false)
-            {
-                return Ok(());
-            }
+    if let Some(req) = params.client_request_id.as_ref() {
+        if metadata_str_eq(
+            sheet.metadata.as_deref(),
+            "reimbursement_client_request_id",
+            req,
+        ) {
+            return Ok(());
         }
-        return Err("Expense sheet already reimbursed".to_string());
     }
 
     let company_id = sheet.company_id;
+    ensure_accounting_period_open_for_date(ctx, company_id, params.payment_date)?;
     if params.payable_account_id == params.liquidity_account_id {
         return Err("Payable and liquidity accounts must differ".to_string());
     }
@@ -1841,15 +2312,33 @@ pub fn create_expense_reimbursement_payment(
     if source_move.company_id != company_id {
         return Err("Source move does not belong to this company".to_string());
     }
-    // Reimburse the posted company-currency residual (includes tax recovery).
-    let amount = if source_move.amount_residual > 0.0 {
+    // Residual in company currency (includes tax recovery). Full pay when amount is None.
+    let residual = if source_move.amount_residual > 0.0 {
         source_move.amount_residual
-    } else {
+    } else if sheet.reimbursement_move_id.is_none() {
         source_move.amount_total
+    } else {
+        0.0
     };
-    if amount <= 0.0 {
-        return Err("Reimbursement amount must be positive".to_string());
+    if residual <= 0.0 {
+        return Err("Expense sheet already fully reimbursed".to_string());
     }
+    let amount = match params.amount {
+        Some(a) => {
+            if a <= 0.0 {
+                return Err("Reimbursement amount must be positive".to_string());
+            }
+            if a > residual + 0.0001 {
+                return Err(format!(
+                    "Reimbursement amount {a} exceeds residual {residual}"
+                ));
+            }
+            a
+        }
+        None => residual,
+    };
+    let remaining = (residual - amount).max(0.0);
+    let clears_residual = remaining <= 0.0001;
     let partner_id = source_move
         .partner_id
         .or_else(|| employee_remittance_partner(ctx, sheet.employee_id));
@@ -1957,10 +2446,14 @@ pub fn create_expense_reimbursement_payment(
     });
 
     ctx.db.account_move().id().update(AccountMove {
-        amount_residual: 0.0,
-        amount_residual_signed: 0.0,
-        invoice_has_outstanding: false,
-        payment_state: PaymentState::Paid,
+        amount_residual: remaining,
+        amount_residual_signed: remaining,
+        invoice_has_outstanding: !clears_residual,
+        payment_state: if clears_residual {
+            PaymentState::Paid
+        } else {
+            PaymentState::Partial
+        },
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
         ..source_move
@@ -1971,16 +2464,25 @@ pub fn create_expense_reimbursement_payment(
         serde_json::json!({
             "reimbursement_client_request_id": params.client_request_id,
             "reimbursement_move_id": reimb_move.id,
+            "reimbursement_amount": amount,
+            "reimbursement_residual": remaining,
         }),
     );
 
+    let new_state = if clears_residual {
+        ExpenseSheetState::Done
+    } else {
+        ExpenseSheetState::Posted
+    };
     ctx.db.expense_sheet().id().update(HrExpenseSheet {
         reimbursement_move_id: Some(reimb_move.id),
-        state: ExpenseSheetState::Done,
+        state: new_state.clone(),
         metadata,
         ..sheet
     });
-    sync_line_states(ctx, sheet_id, ExpenseState::Done);
+    if clears_residual {
+        sync_line_states(ctx, sheet_id, ExpenseState::Done);
+    }
 
     write_audit_log_v2(
         ctx,
@@ -1993,8 +2495,10 @@ pub fn create_expense_reimbursement_payment(
             old_values: Some(serde_json::json!({ "state": "Posted" }).to_string()),
             new_values: Some(
                 serde_json::json!({
-                    "state": "Done",
+                    "state": format!("{:?}", new_state),
                     "reimbursement_move_id": reimb_move.id,
+                    "reimbursement_amount": amount,
+                    "reimbursement_residual": remaining,
                 })
                 .to_string(),
             ),

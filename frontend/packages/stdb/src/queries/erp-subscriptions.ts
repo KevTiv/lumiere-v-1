@@ -245,7 +245,12 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "expense-sheets",
   "expense-sheets-to-approve",
   "expenses-missing-receipt",
+  "expense-receipts",
   "expense-card-statement-unmatched",
+  "expense-advances",
+  "expense-policy-exceptions",
+  "expense-mileage-rates",
+  "expense-per-diem-rates",
   "iot-devices",
   "iot-hubs",
   "iot-alerts",
@@ -1406,6 +1411,8 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       fa,
       " AND has_receipt = false AND state = 'Draft'",
     ),
+  "expense-receipts": (id, fa) =>
+    selectOrgScopedSql("expense-receipts", "hr_expense_receipt", id, fa, ""),
   "expense-card-statement-unmatched": (id, fa) =>
     selectOrgScopedSql(
       "expense-card-statement-unmatched",
@@ -1413,6 +1420,32 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       id,
       fa,
       " AND status = 'unmatched'",
+    ),
+  "expense-advances": (id, fa) =>
+    selectOrgScopedSql("expense-advances", "hr_expense_advance", id, fa, ""),
+  "expense-policy-exceptions": (id, fa) =>
+    selectOrgScopedSql(
+      "expense-policy-exceptions",
+      "hr_expense_policy_exception",
+      id,
+      fa,
+      " AND state = 'Pending'",
+    ),
+  "expense-mileage-rates": (id, fa) =>
+    selectOrgScopedSql(
+      "expense-mileage-rates",
+      "hr_expense_mileage_rate",
+      id,
+      fa,
+      " AND active = true",
+    ),
+  "expense-per-diem-rates": (id, fa) =>
+    selectOrgScopedSql(
+      "expense-per-diem-rates",
+      "hr_expense_per_diem_rate",
+      id,
+      fa,
+      " AND active = true",
     ),
   "iot-devices": (id, fa) =>
     selectOrgScopedSql("iot-devices", "iot_device", id, fa, ""),

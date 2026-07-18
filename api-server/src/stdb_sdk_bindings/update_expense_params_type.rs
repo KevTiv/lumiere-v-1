@@ -4,6 +4,8 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::expense_payment_mode_type::ExpensePaymentMode;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct UpdateExpenseParams {
@@ -13,7 +15,15 @@ pub struct UpdateExpenseParams {
     pub quantity: Option<f64>,
     pub description: Option<String>,
     pub account_id: Option<u64>,
+    pub product_id: Option<u64>,
+    pub tax_ids: Option<Vec<u64>>,
+    pub payment_mode: Option<ExpensePaymentMode>,
+    pub merchant_key: Option<String>,
     pub attachment_ids: Option<Vec<u64>>,
+    pub mileage_distance: Option<f64>,
+    pub mileage_rate_id: Option<u64>,
+    pub per_diem_days: Option<f64>,
+    pub per_diem_rate_id: Option<u64>,
 }
 
 impl __sdk::InModule for UpdateExpenseParams {

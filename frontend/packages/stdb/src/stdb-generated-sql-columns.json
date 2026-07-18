@@ -3177,6 +3177,10 @@
     "name",
     "amount",
     "currency_id",
+    "journal_id",
+    "cash_account_id",
+    "advance_account_id",
+    "accounting_date",
     "client_request_id",
     "metadata"
   ],
@@ -3229,6 +3233,16 @@
     "income_account_id",
     "invoice_date",
     "partner_id",
+    "fiscal_position_id",
+    "client_request_id"
+  ],
+  "CreateExpenseReceiptParams": [
+    "company_id",
+    "employee_id",
+    "file_name",
+    "mime_type",
+    "storage_key",
+    "content_hash",
     "client_request_id"
   ],
   "CreateExpenseReimbursementParams": [
@@ -3236,6 +3250,7 @@
     "liquidity_account_id",
     "payable_account_id",
     "payment_date",
+    "amount",
     "client_request_id"
   ],
   "CreateExpenseSheetParams": [
@@ -6378,6 +6393,7 @@
     "residual",
     "currency_id",
     "state",
+    "account_move_id",
     "client_request_id",
     "metadata",
     "created_at"
@@ -6450,6 +6466,18 @@
     "created_at",
     "resolved_at",
     "metadata"
+  ],
+  "HrExpenseReceipt": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "file_name",
+    "mime_type",
+    "storage_key",
+    "content_hash",
+    "client_request_id",
+    "created_at"
   ],
   "HrExpenseSheet": [
     "id",
@@ -9619,6 +9647,10 @@
     "reason",
     "comment"
   ],
+  "RejectExpensePolicyExceptionParams": [
+    "reason",
+    "metadata"
+  ],
   "RejectTimesheetsParams": [
     "company_id",
     "timesheet_ids",
@@ -10279,6 +10311,10 @@
   "SeedPackHolidaysParams": [
     "pack_keys",
     "calendar_id"
+  ],
+  "SeedStatutoryExpenseMileageRatesParams": [
+    "company_id",
+    "currency_id"
   ],
   "SegmentMember": [
     "id",
@@ -12100,7 +12136,15 @@
     "quantity",
     "description",
     "account_id",
-    "attachment_ids"
+    "product_id",
+    "tax_ids",
+    "payment_mode",
+    "merchant_key",
+    "attachment_ids",
+    "mileage_distance",
+    "mileage_rate_id",
+    "per_diem_days",
+    "per_diem_rate_id"
   ],
   "UpdateFinancialReportParams": [
     "name",

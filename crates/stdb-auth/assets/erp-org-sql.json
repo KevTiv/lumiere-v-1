@@ -1547,11 +1547,46 @@
     "table": "hr_expense"
   },
   {
+    "extra_where": "",
+    "mapKey": "expense-receipts",
+    "order_by": "",
+    "resource_key": "expense-receipts",
+    "table": "hr_expense_receipt"
+  },
+  {
     "extra_where": " AND status = 'unmatched'",
     "mapKey": "expense-card-statement-unmatched",
     "order_by": "",
     "resource_key": "expense-card-statement-unmatched",
     "table": "expense_card_statement_line"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "expense-advances",
+    "order_by": "",
+    "resource_key": "expense-advances",
+    "table": "hr_expense_advance"
+  },
+  {
+    "extra_where": " AND state = 'Pending'",
+    "mapKey": "expense-policy-exceptions",
+    "order_by": "",
+    "resource_key": "expense-policy-exceptions",
+    "table": "hr_expense_policy_exception"
+  },
+  {
+    "extra_where": " AND active = true",
+    "mapKey": "expense-mileage-rates",
+    "order_by": "",
+    "resource_key": "expense-mileage-rates",
+    "table": "hr_expense_mileage_rate"
+  },
+  {
+    "extra_where": " AND active = true",
+    "mapKey": "expense-per-diem-rates",
+    "order_by": "",
+    "resource_key": "expense-per-diem-rates",
+    "table": "hr_expense_per_diem_rate"
   },
   {
     "extra_where": "",

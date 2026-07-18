@@ -2830,6 +2830,11 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
       createLabel: "New Report",
       createAction: "createSheet",
     },
+    {
+      id: "inbox",
+      label: t("expenses.tabs.inbox", { defaultValue: "Inbox" }),
+      type: "custom" as const,
+    },
   ],
 })
 

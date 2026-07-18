@@ -3879,6 +3879,10 @@ export const CreateExpenseAdvanceParams = __t.object("CreateExpenseAdvanceParams
   name: __t.string(),
   amount: __t.f64(),
   currencyId: __t.u64(),
+  journalId: __t.u64(),
+  cashAccountId: __t.u64(),
+  advanceAccountId: __t.u64(),
+  accountingDate: __t.timestamp(),
   clientRequestId: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
 });
@@ -3943,15 +3947,28 @@ export const CreateExpenseProjectRebillParams = __t.object("CreateExpenseProject
   incomeAccountId: __t.u64(),
   invoiceDate: __t.timestamp(),
   partnerId: __t.option(__t.u64()),
+  fiscalPositionId: __t.option(__t.u64()),
   clientRequestId: __t.option(__t.string()),
 });
 export type CreateExpenseProjectRebillParams = __Infer<typeof CreateExpenseProjectRebillParams>;
+
+export const CreateExpenseReceiptParams = __t.object("CreateExpenseReceiptParams", {
+  companyId: __t.option(__t.u64()),
+  employeeId: __t.u64(),
+  fileName: __t.option(__t.string()),
+  mimeType: __t.option(__t.string()),
+  storageKey: __t.string(),
+  contentHash: __t.option(__t.string()),
+  clientRequestId: __t.option(__t.string()),
+});
+export type CreateExpenseReceiptParams = __Infer<typeof CreateExpenseReceiptParams>;
 
 export const CreateExpenseReimbursementParams = __t.object("CreateExpenseReimbursementParams", {
   journalId: __t.u64(),
   liquidityAccountId: __t.u64(),
   payableAccountId: __t.u64(),
   paymentDate: __t.timestamp(),
+  amount: __t.option(__t.f64()),
   clientRequestId: __t.option(__t.string()),
 });
 export type CreateExpenseReimbursementParams = __Infer<typeof CreateExpenseReimbursementParams>;
@@ -7757,6 +7774,7 @@ export const HrExpenseAdvance = __t.object("HrExpenseAdvance", {
   get state() {
     return ExpenseAdvanceState;
   },
+  accountMoveId: __t.option(__t.u64()),
   clientRequestId: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
   createdAt: __t.timestamp(),
@@ -7845,6 +7863,20 @@ export const HrExpensePolicyException = __t.object("HrExpensePolicyException", {
   metadata: __t.option(__t.string()),
 });
 export type HrExpensePolicyException = __Infer<typeof HrExpensePolicyException>;
+
+export const HrExpenseReceipt = __t.object("HrExpenseReceipt", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  fileName: __t.option(__t.string()),
+  mimeType: __t.option(__t.string()),
+  storageKey: __t.string(),
+  contentHash: __t.option(__t.string()),
+  clientRequestId: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+});
+export type HrExpenseReceipt = __Infer<typeof HrExpenseReceipt>;
 
 export const HrExpenseSheet = __t.object("HrExpenseSheet", {
   id: __t.u64(),
@@ -11720,6 +11752,12 @@ export const RejectApprovalRequestParams = __t.object("RejectApprovalRequestPara
 });
 export type RejectApprovalRequestParams = __Infer<typeof RejectApprovalRequestParams>;
 
+export const RejectExpensePolicyExceptionParams = __t.object("RejectExpensePolicyExceptionParams", {
+  reason: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type RejectExpensePolicyExceptionParams = __Infer<typeof RejectExpensePolicyExceptionParams>;
+
 export const RejectTimesheetsParams = __t.object("RejectTimesheetsParams", {
   companyId: __t.option(__t.u64()),
   timesheetIds: __t.array(__t.u64()),
@@ -12533,6 +12571,12 @@ export const SeedPackHolidaysParams = __t.object("SeedPackHolidaysParams", {
   calendarId: __t.option(__t.u64()),
 });
 export type SeedPackHolidaysParams = __Infer<typeof SeedPackHolidaysParams>;
+
+export const SeedStatutoryExpenseMileageRatesParams = __t.object("SeedStatutoryExpenseMileageRatesParams", {
+  companyId: __t.option(__t.u64()),
+  currencyId: __t.u64(),
+});
+export type SeedStatutoryExpenseMileageRatesParams = __Infer<typeof SeedStatutoryExpenseMileageRatesParams>;
 
 export const SegmentMember = __t.object("SegmentMember", {
   id: __t.u64(),
@@ -14742,7 +14786,17 @@ export const UpdateExpenseParams = __t.object("UpdateExpenseParams", {
   quantity: __t.option(__t.f64()),
   description: __t.option(__t.string()),
   accountId: __t.option(__t.u64()),
+  productId: __t.option(__t.u64()),
+  taxIds: __t.option(__t.array(__t.u64())),
+  get paymentMode() {
+    return __t.option(ExpensePaymentMode);
+  },
+  merchantKey: __t.option(__t.string()),
   attachmentIds: __t.option(__t.array(__t.u64())),
+  mileageDistance: __t.option(__t.f64()),
+  mileageRateId: __t.option(__t.u64()),
+  perDiemDays: __t.option(__t.f64()),
+  perDiemRateId: __t.option(__t.u64()),
 });
 export type UpdateExpenseParams = __Infer<typeof UpdateExpenseParams>;
 

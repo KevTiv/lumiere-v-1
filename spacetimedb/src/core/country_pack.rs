@@ -140,9 +140,12 @@ pub struct PackExpenseEvidenceRules {
     pub require_receipt: bool,
     /// When true, Standard lines require at least one tax id for recovery evidence.
     pub require_tax_ids: bool,
+    /// When true (AU), entertainment/FBT product metadata triggers a policy hold.
+    pub fbt_entertainment: bool,
 }
 
-/// Aggregate pack metadata flags `expense_require_receipt` / `expense_require_tax_ids`.
+/// Aggregate pack metadata flags `expense_require_receipt` / `expense_require_tax_ids`
+/// / `expense_fbt_entertainment`.
 /// No enabled pack (or packs without these keys) → permissive defaults.
 pub(crate) fn pack_expense_evidence_rules(
     ctx: &ReducerContext,
@@ -167,6 +170,13 @@ pub(crate) fn pack_expense_evidence_rules(
             .unwrap_or(false)
         {
             rules.require_tax_ids = true;
+        }
+        if value
+            .get("expense_fbt_entertainment")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            rules.fbt_entertainment = true;
         }
     }
     rules
@@ -324,7 +334,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Australia GST",
             "oceania",
             "1.0.0",
-            r#"{"fiscal_year_start_month":7,"bas_reporting":true,"company_id_kind":"ABN","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
+            r#"{"fiscal_year_start_month":7,"bas_reporting":true,"company_id_kind":"ABN","expense_require_receipt":true,"expense_require_tax_ids":true,"expense_fbt_entertainment":true}"#,
         ),
         (
             "nz",
@@ -355,12 +365,10 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
     for (pack_key, country_code, name, region, version, metadata) in packs {
         let key = pack_key.to_string();
         if let Some(existing) = ctx.db.country_pack_definition().pack_key().find(&key) {
-            // Upsert expense evidence flags when catalog metadata advances.
-            let needs_expense_flags = !existing
-                .metadata
-                .as_deref()
-                .unwrap_or("")
-                .contains("expense_require_receipt");
+            // Upsert expense evidence / FBT flags when catalog metadata advances.
+            let meta = existing.metadata.as_deref().unwrap_or("");
+            let needs_expense_flags = !meta.contains("expense_require_receipt")
+                || (pack_key == "au" && !meta.contains("expense_fbt_entertainment"));
             if needs_expense_flags {
                 ctx.db
                     .country_pack_definition()
@@ -409,7 +417,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Brazil taxes",
             "southern_cone",
             "1.0.0",
-            r#"{"nfe_adapter":true,"currency":"BRL","inflation_mode":"optional","company_id_kind":"CNPJ"}"#,
+            r#"{"nfe_adapter":true,"currency":"BRL","inflation_mode":"optional","company_id_kind":"CNPJ","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
         ),
         (
             "ar",
@@ -417,7 +425,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Argentina IVA",
             "southern_cone",
             "1.0.0",
-            r#"{"currency":"ARS","inflation_mode":"optional"}"#,
+            r#"{"currency":"ARS","inflation_mode":"optional","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
         ),
         (
             "cl",
@@ -425,7 +433,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Chile IVA",
             "southern_cone",
             "1.0.0",
-            r#"{"currency":"CLP"}"#,
+            r#"{"currency":"CLP","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
         ),
         (
             "my",
@@ -433,7 +441,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Malaysia SST",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"currency":"MYR","e_invoice":"peppol"}"#,
+            r#"{"currency":"MYR","e_invoice":"peppol","expense_require_receipt":true}"#,
         ),
         (
             "id",
@@ -441,7 +449,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Indonesia PPN",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"currency":"IDR","e_invoice":"coretax"}"#,
+            r#"{"currency":"IDR","e_invoice":"coretax","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
         ),
         (
             "th",
@@ -449,7 +457,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Thailand VAT",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"currency":"THB"}"#,
+            r#"{"currency":"THB","expense_require_receipt":true}"#,
         ),
         (
             "ph",
@@ -457,22 +465,31 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Philippines VAT",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"currency":"PHP"}"#,
+            r#"{"currency":"PHP","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
         ),
     ];
 
     for (pack_key, country_code, name, region, version, metadata) in extra_packs {
-        if ctx
-            .db
-            .country_pack_definition()
-            .pack_key()
-            .find(&pack_key.to_string())
-            .is_some()
-        {
+        let key = pack_key.to_string();
+        if let Some(existing) = ctx.db.country_pack_definition().pack_key().find(&key) {
+            let needs_expense_flags = !existing
+                .metadata
+                .as_deref()
+                .unwrap_or("")
+                .contains("expense_require_receipt");
+            if needs_expense_flags {
+                ctx.db
+                    .country_pack_definition()
+                    .pack_key()
+                    .update(CountryPackDefinition {
+                        metadata: Some(metadata.to_string()),
+                        ..existing
+                    });
+            }
             continue;
         }
         ctx.db.country_pack_definition().insert(CountryPackDefinition {
-            pack_key: pack_key.to_string(),
+            pack_key: key,
             country_code: country_code.to_string(),
             name: name.to_string(),
             region: region.to_string(),

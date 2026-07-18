@@ -1246,7 +1246,15 @@
     "product_id",
     "description",
     "account_id",
-    "analytic_account_id"
+    "analytic_account_id",
+    "project_id",
+    "mileage_distance",
+    "mileage_rate_id",
+    "per_diem_days",
+    "per_diem_rate_id",
+    "client_request_id",
+    "merchant_key",
+    "policy_exception_reason"
   ],
   "CreateExpenseCardStatementLineParams": [
     "company_id",
@@ -4034,7 +4042,15 @@
     "unit_amount",
     "quantity",
     "description",
-    "account_id"
+    "account_id",
+    "product_id",
+    "tax_ids",
+    "merchant_key",
+    "attachment_ids",
+    "mileage_distance",
+    "mileage_rate_id",
+    "per_diem_days",
+    "per_diem_rate_id"
   ],
   "UpdateFinancialReportParams": [
     "name",
@@ -4887,6 +4903,77 @@
     "metadata"
   ],
   "UnmatchExpenseCardStatementLineParams": [
+    "metadata"
+  ],
+  "ApplyExpenseAdvanceParams": [
+    "metadata"
+  ],
+  "CreateExpenseAdvanceParams": [
+    "company_id",
+    "client_request_id",
+    "metadata"
+  ],
+  "CreateExpenseIntegrationIntentParams": [
+    "company_id",
+    "device_id",
+    "metadata"
+  ],
+  "CreateExpenseProjectRebillParams": [
+    "partner_id",
+    "fiscal_position_id",
+    "client_request_id"
+  ],
+  "CreateExpenseReceiptParams": [
+    "company_id",
+    "file_name",
+    "mime_type",
+    "content_hash",
+    "client_request_id"
+  ],
+  "CreateExpenseReimbursementParams": [
+    "amount",
+    "client_request_id"
+  ],
+  "FailExpenseIntegrationIntentParams": [
+    "metadata"
+  ],
+  "PostExpenseSheetParams": [
+    "default_tax_account_id",
+    "card_liability_account_id",
+    "advance_account_id",
+    "fx_fee_account_id",
+    "fx_fee_amount",
+    "client_request_id"
+  ],
+  "RefuseExpenseSheetParams": [
+    "reason"
+  ],
+  "RejectExpensePolicyExceptionParams": [
+    "metadata"
+  ],
+  "RequestExpensePolicyExceptionParams": [
+    "metadata"
+  ],
+  "SetExpenseFraudHoldParams": [
+    "fraud_reason",
+    "metadata"
+  ],
+  "UpsertExpenseMileageRateParams": [
+    "company_id",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "UpsertExpensePerDiemRateParams": [
+    "company_id",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "UpsertExpensePolicyParams": [
+    "company_id",
+    "max_line_amount",
+    "max_sheet_amount",
     "metadata"
   ]
 }

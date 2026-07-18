@@ -9,25 +9,16 @@ import {
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
 } from "spacetimedb";
-import {
-  ExpenseAdvanceState,
-} from "./types";
-
 
 export default __t.row({
   id: __t.u64().primaryKey(),
   organizationId: __t.u64().name("organization_id"),
   companyId: __t.u64().name("company_id"),
   employeeId: __t.u64().name("employee_id"),
-  name: __t.string(),
-  amount: __t.f64(),
-  residual: __t.f64(),
-  currencyId: __t.u64().name("currency_id"),
-  get state() {
-    return ExpenseAdvanceState;
-  },
-  accountMoveId: __t.option(__t.u64()).name("account_move_id"),
+  fileName: __t.option(__t.string()).name("file_name"),
+  mimeType: __t.option(__t.string()).name("mime_type"),
+  storageKey: __t.string().name("storage_key"),
+  contentHash: __t.option(__t.string()).name("content_hash"),
   clientRequestId: __t.option(__t.string()).name("client_request_id"),
-  metadata: __t.option(__t.string()),
   createdAt: __t.timestamp().name("created_at"),
 });

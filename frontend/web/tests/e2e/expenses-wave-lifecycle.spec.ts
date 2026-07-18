@@ -1,15 +1,28 @@
 /**
- * Expenses Waves A–E UI coverage for this session.
- * Tags: @expenses @p0 (shell/lifecycle UI) — full SoD approve uses a second identity in domain tests.
+ * Expenses Waves A–F UI coverage for this session.
+ * Tags: @expenses @p0 (shell/lifecycle UI).
+ *
+ * Fixture note: e2e auth is a single storage state — same-identity SoD blocks approve.
+ * Gate-enabled SoD approve is proven in domain `run_expenses_wave_f_test`.
+ * Post → reimburse uses the seeded Approved sheet ("Q1 Business Trips") when present.
  */
 import { expect, test, type Page } from "@playwright/test"
 
 import {
   callReducerBff,
+  callReducerBffResult,
+  chooseSelectOptionByLabel,
   expectNoAppError,
+  fetchAccountIdByCode,
+  fetchAccountSelectLabelByInternalType,
   fetchSessionOrganizationId,
+  fillField,
   gotoModule,
+  isoDate,
+  scalarQueryId,
+  selectEntityRowById,
   smokeName,
+  submitForm,
 } from "./helpers"
 
 const some = <T>(value: T) => ({ some: value })
@@ -80,6 +93,25 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     const employeeId = Number(((await employees.json()) as { data?: Array<{ id?: number }> }).data?.[0]?.id)
     expect(employeeId).toBeGreaterThan(0)
     const name = smokeName("alloc")
+    const receiptKey = `e2e-rcpt-${Date.now()}`
+    await callReducerBff(page, "create_expense_receipt", [
+      organizationId,
+      {
+        company_id: none,
+        employee_id: employeeId,
+        file_name: some("e2e.pdf"),
+        mime_type: some("application/pdf"),
+        storage_key: `e2e:${receiptKey}`,
+        content_hash: none,
+        client_request_id: some(receiptKey),
+      },
+    ])
+    const receipts = await page.request.get("/api/query/expense-receipts")
+    const receiptId = Number(
+      ((await receipts.json()) as { data?: Array<{ id?: number; clientRequestId?: string; client_request_id?: string }> })
+        .data?.find((r) => (r.clientRequestId ?? r.client_request_id) === receiptKey)?.id,
+    )
+    expect(receiptId).toBeGreaterThan(0)
     await callReducerBff(page, "create_expense", [
       organizationId,
       {
@@ -101,7 +133,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
         mileage_rate_id: none,
         per_diem_days: none,
         per_diem_rate_id: none,
-        attachment_ids: [1],
+        attachment_ids: [receiptId],
         client_request_id: some(`e2e-alloc-${Date.now()}`),
         payment_mode: { outOfPocket: [] },
         merchant_key: none,
@@ -175,6 +207,261 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await page.getByTestId("expenses-ops-create-statement").click()
     await expect(page.getByTestId("expenses-ops-status")).toBeVisible({ timeout: 30_000 })
     await expect(page.getByTestId("expenses-ops-status")).not.toContainText(/error|failed|invalid/i)
+    await expectNoAppError(page)
+  })
+
+  test("submit → SoD block → post → reimburse lifecycle @expenses @p0", async ({ page }) => {
+    test.setTimeout(180_000)
+    await gotoModule(page, "/expenses", "expenses")
+    const organizationId = await fetchSessionOrganizationId(page)
+
+    const employees = await page.request.get("/api/query/employees")
+    const employeeId = Number(((await employees.json()) as { data?: Array<{ id?: number }> }).data?.[0]?.id)
+    expect(employeeId).toBeGreaterThan(0)
+
+    const sheetName = smokeName("lifecycle-sheet")
+    const expenseName = smokeName("lifecycle-line")
+    const receiptKey = `e2e-lc-${Date.now()}`
+
+    await callReducerBff(page, "create_expense_receipt", [
+      organizationId,
+      {
+        company_id: none,
+        employee_id: employeeId,
+        file_name: some("lifecycle.pdf"),
+        mime_type: some("application/pdf"),
+        storage_key: `e2e:${receiptKey}`,
+        content_hash: none,
+        client_request_id: some(receiptKey),
+      },
+    ])
+    const receipts = await page.request.get("/api/query/expense-receipts")
+    const receiptId = Number(
+      ((await receipts.json()) as { data?: Array<{ id?: number; clientRequestId?: string; client_request_id?: string }> })
+        .data?.find((r) => (r.clientRequestId ?? r.client_request_id) === receiptKey)?.id,
+    )
+    expect(receiptId).toBeGreaterThan(0)
+
+    await callReducerBff(page, "create_expense_sheet", [
+      organizationId,
+      {
+        company_id: none,
+        employee_id: employeeId,
+        name: sheetName,
+        currency_id: 1,
+        notes: none,
+        accounting_date: none,
+      },
+    ])
+    const sheetsRes = await page.request.get("/api/query/expense-sheets")
+    const sheetId = Number(
+      ((await sheetsRes.json()) as { data?: Array<{ id?: number; name?: string }> }).data?.find(
+        (s) => s.name === sheetName,
+      )?.id,
+    )
+    expect(sheetId).toBeGreaterThan(0)
+
+    await callReducerBff(page, "create_expense", [
+      organizationId,
+      {
+        company_id: none,
+        employee_id: employeeId,
+        name: expenseName,
+        date: { __timestamp_micros_since_unix_epoch__: Date.now() * 1000 },
+        // Unique amount avoids seed/demo duplicate fraud holds (same employee+day+amount).
+        unit_amount: 48.17 + (Date.now() % 1000) / 1000,
+        quantity: 1,
+        currency_id: 1,
+        product_id: none,
+        description: none,
+        tax_ids: [],
+        account_id: none,
+        analytic_account_id: none,
+        project_id: none,
+        line_kind: { standard: [] },
+        mileage_distance: none,
+        mileage_rate_id: none,
+        per_diem_days: none,
+        per_diem_rate_id: none,
+        attachment_ids: [receiptId],
+        client_request_id: some(`e2e-lc-exp-${Date.now()}`),
+        payment_mode: { outOfPocket: [] },
+        merchant_key: some(`e2e-merchant-${Date.now()}`),
+        policy_exception_reason: none,
+      },
+    ])
+    const expensesRes = await page.request.get("/api/query/expenses")
+    const expenseId = Number(
+      ((await expensesRes.json()) as { data?: Array<{ id?: number; name?: string }> }).data?.find(
+        (e) => e.name === expenseName,
+      )?.id,
+    )
+    expect(expenseId).toBeGreaterThan(0)
+
+    await callReducerBff(page, "submit_expense", [organizationId, expenseId, sheetId])
+    await callReducerBff(page, "submit_expense_sheet", [organizationId, sheetId])
+
+    await expect
+      .poll(async () => {
+        const res = await page.request.get("/api/query/expense-sheets")
+        if (!res.ok()) return ""
+        const json = (await res.json()) as {
+          data?: Array<{ id?: number; state?: string | { tag?: string } }>
+        }
+        const row = (json.data ?? []).find((s) => Number(s.id) === sheetId)
+        const state = row?.state
+        return typeof state === "string" ? state : String(state?.tag ?? "")
+      }, { timeout: 45_000 })
+      .toMatch(/Submitted/i)
+
+    // Single-user fixture: public approve must SoD-fail (second identity covered in domain Wave F).
+    const approveResult = await callReducerBffResult(page, "approve_expense_sheet", [
+      organizationId,
+      sheetId,
+    ])
+    expect(approveResult.ok).toBe(false)
+    expect(approveResult.error ?? "").toMatch(/sod|cannot approve|submitter/i)
+
+    // Post + reimburse via seeded "Q1 Business Trips" (Approved on fresh seed; Posted if prior run).
+    const sheetState = (state: unknown) => {
+      if (state == null) return ""
+      if (typeof state === "string") return state
+      if (typeof state === "object" && !Array.isArray(state)) {
+        const obj = state as Record<string, unknown>
+        if (typeof obj.tag === "string") return obj.tag
+        const keys = Object.keys(obj)
+        if (keys.length === 1) {
+          const key = keys[0]!
+          const payload = obj[key]
+          if (Array.isArray(payload) && payload.length === 0) {
+            return key.charAt(0).toUpperCase() + key.slice(1)
+          }
+        }
+      }
+      return ""
+    }
+    const seedSheets = await page.request.get("/api/query/expense-sheets")
+    const seedJson = (await seedSheets.json()) as {
+      data?: Array<{
+        id?: number
+        name?: string
+        state?: string | { tag?: string }
+        accountMoveId?: number | string | null
+        account_move_id?: number | string | null
+      }>
+    }
+    const seedSheet = (seedJson.data ?? []).find((s) => s.name === "Q1 Business Trips")
+    expect(seedSheet?.id, "seeded sheet Q1 Business Trips required for post/reimburse").toBeTruthy()
+    const postSheetId = Number(seedSheet!.id)
+    let seedState = sheetState(seedSheet!.state)
+    let accountMoveId = scalarQueryId(seedSheet!.accountMoveId ?? seedSheet!.account_move_id) ?? 0
+
+    const journals = await page.request.get("/api/query/account-journals")
+    const journalData =
+      ((await journals.json()) as { data?: Array<{ code?: string; name?: string }> }).data ?? []
+    const journalRow =
+      journalData.find((j) => String(j.code ?? "").toUpperCase() === "MISC") ?? journalData[0]
+    expect(journalRow).toBeTruthy()
+    const journalLabel =
+      journalRow!.code && journalRow!.name
+        ? `${journalRow!.code} — ${journalRow!.name}`
+        : String(journalRow!.name ?? journalRow!.code)
+
+    const expenseLabel = await fetchAccountSelectLabelByInternalType(page, "expense")
+    const payableLabel = await fetchAccountSelectLabelByInternalType(page, "payable")
+
+    if (/Approved/i.test(seedState)) {
+      await gotoModule(page, "/expenses", "expenses")
+      await openExpensesTab(page, "expense-sheets")
+      await selectEntityRowById(page, postSheetId)
+      await page.getByTestId("entity-action-post-sheets").click()
+      await expect(page.getByTestId("form-modal-post-expense-report")).toBeVisible({ timeout: 15_000 })
+
+      await fillField(page, "accountingDate", isoDate(0))
+      await chooseSelectOptionByLabel(page, "journalId", journalLabel)
+      await chooseSelectOptionByLabel(page, "defaultExpenseAccountId", expenseLabel)
+      await chooseSelectOptionByLabel(page, "payableAccountId", payableLabel)
+
+      const [postRes] = await Promise.all([
+        page.waitForResponse(
+          (res) => res.url().includes("/api/call/post_expense_sheet") && res.ok(),
+          { timeout: 45_000 },
+        ),
+        submitForm(page, "post-expense-report"),
+      ])
+      expect(postRes.ok()).toBe(true)
+
+      await expect
+        .poll(async () => {
+          const res = await page.request.get("/api/query/expense-sheets")
+          if (!res.ok()) return ""
+          const json = (await res.json()) as {
+            data?: Array<{
+              id?: number
+              state?: string | { tag?: string }
+              accountMoveId?: number | string | null
+              account_move_id?: number | string | null
+            }>
+          }
+          const row = (json.data ?? []).find((s) => Number(s.id) === postSheetId)
+          seedState = sheetState(row?.state)
+          accountMoveId = scalarQueryId(row?.accountMoveId ?? row?.account_move_id) ?? 0
+          return seedState
+        }, { timeout: 60_000 })
+        .toMatch(/Posted/i)
+    } else {
+      expect(seedState, "Q1 sheet must be Approved or Posted").toMatch(/Posted|Done/i)
+      expect(accountMoveId).toBeGreaterThan(0)
+    }
+    expect(accountMoveId).toBeGreaterThan(0)
+
+    await gotoModule(page, "/expenses", "expenses")
+    await openExpensesTab(page, "expense-sheets")
+    await selectEntityRowById(page, postSheetId)
+    await page.getByTestId("entity-action-reimburse-sheets").click()
+    await expect(page.getByTestId("form-modal-reimburse-expense-report")).toBeVisible({
+      timeout: 15_000,
+    })
+
+    const liquidityLabel =
+      (await fetchAccountSelectLabelByInternalType(page, "liquidity").catch(() => null)) ??
+      (await (async () => {
+        const bankId = await fetchAccountIdByCode(page, "1200")
+        const res = await page.request.get("/api/query/account-accounts")
+        const json = (await res.json()) as { data?: Array<{ id?: number; code?: string; name?: string }> }
+        const row = (json.data ?? []).find((a) => Number(a.id) === bankId)
+        const code = String(row?.code ?? "1200")
+        const name = String(row?.name ?? "Bank")
+        return `${code} — ${name}`
+      })())
+
+    await fillField(page, "paymentDate", isoDate(0))
+    await chooseSelectOptionByLabel(page, "journalId", journalLabel)
+    await chooseSelectOptionByLabel(page, "payableAccountId", payableLabel)
+    await chooseSelectOptionByLabel(page, "liquidityAccountId", liquidityLabel)
+
+    const [reimRes] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/call/create_expense_reimbursement_payment") && res.ok(),
+        { timeout: 45_000 },
+      ),
+      submitForm(page, "reimburse-expense-report"),
+    ])
+    expect(reimRes.ok()).toBe(true)
+
+    await expect
+      .poll(async () => {
+        const res = await page.request.get("/api/query/expense-sheets")
+        if (!res.ok()) return ""
+        const json = (await res.json()) as {
+          data?: Array<{ id?: number; state?: string | { tag?: string } }>
+        }
+        const row = (json.data ?? []).find((s) => Number(s.id) === postSheetId)
+        const state = typeof row?.state === "string" ? row.state : String(row?.state?.tag ?? "")
+        return state
+      }, { timeout: 60_000 })
+      .toMatch(/Done/i)
+
     await expectNoAppError(page)
   })
 })

@@ -6,15 +6,16 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub struct CreateExpenseReimbursementParams {
-    pub journal_id: u64,
-    pub liquidity_account_id: u64,
-    pub payable_account_id: u64,
-    pub payment_date: __sdk::Timestamp,
-    pub amount: Option<f64>,
+pub struct CreateExpenseReceiptParams {
+    pub company_id: Option<u64>,
+    pub employee_id: u64,
+    pub file_name: Option<String>,
+    pub mime_type: Option<String>,
+    pub storage_key: String,
+    pub content_hash: Option<String>,
     pub client_request_id: Option<String>,
 }
 
-impl __sdk::InModule for CreateExpenseReimbursementParams {
+impl __sdk::InModule for CreateExpenseReceiptParams {
     type Module = super::RemoteModule;
 }

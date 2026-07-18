@@ -8138,6 +8138,8 @@
       "reimburseReport": "Reimburse",
       "confirmApprove": "Approve this expense report?",
       "confirmRefuse": "Refuse this expense report? Lines return to draft for editing.",
+      "refuseReason": "Refuse reason",
+      "refuseReasonPlaceholder": "Why is this report being refused?",
       "confirmSubmit": "Submit this expense report for approval? Totals are computed from attached lines.",
       "noActions": "No actions available for this status.",
       "noDraftSheets": "Select draft expense reports to submit.",
@@ -8150,7 +8152,8 @@
       "timelineApprover": "Approver",
       "noApprovalRequests": "No workflow approval requests for this report yet.",
       "setAllocations": "Split allocations",
-      "projectRebill": "Project rebill invoice"
+      "projectRebill": "Project rebill invoice",
+      "accountingMoves": "Accounting moves"
     },
     "capture": {
       "title": "Mobile capture (delayed sync)",
@@ -8160,12 +8163,26 @@
       "validation": "Employee, pricelist, and description are required.",
       "queuedOffline": "Queued locally — flush when online (idempotent client_request_id).",
       "queuedSynced": "Captured and synced.",
-      "receiptStub": "Receipt photo stub attached",
+      "receiptStub": "Register receipt evidence on capture",
       "receiptNote": "Receipt note / OCR stub",
       "receiptNotePlaceholder": "Optional note stored on the expense line",
       "retry": "Retry",
       "discard": "Discard",
       "conflictHelp": "Sync conflict — retry or discard this outbox item."
+    },
+    "tabs": {
+      "inbox": "Inbox"
+    },
+    "inbox": {
+      "title": "Exception inbox",
+      "description": "Server-bounded queues for approval, receipt evidence, and card match.",
+      "toApprove": "To approve",
+      "missingReceipt": "Missing receipt",
+      "unmatchedCard": "Unmatched cards",
+      "empty": "No items in this queue.",
+      "approved": "Report approved.",
+      "refused": "Report refused.",
+      "openInExpenses": "Attach a receipt from the Expenses tab, then re-submit."
     },
     "ops": {
       "title": "Expenses ops (cards & inbox)",
@@ -8181,8 +8198,59 @@
       "expenseId": "Expense id",
       "match": "Match statement → expense",
       "matched": "Statement matched.",
+      "unmatch": "Unmatch statement line",
+      "unmatched": "Statement unmatched.",
       "flushIntents": "Flush pending OCR/email intents",
-      "flushedIntents": "Pending intents applied."
+      "flushedIntents": "Pending intents applied.",
+      "ratesTitle": "Travel rates",
+      "ratesDescription": "Upsert mileage and per diem rates used on capture and create.",
+      "upsertMileage": "Upsert mileage rate",
+      "upsertPerDiem": "Upsert per diem rate",
+      "seedStatutoryMileage": "Seed AU/NZ statutory mileage",
+      "statutoryMileageSeeded": "Statutory mileage rates seeded for enabled packs.",
+      "mileageSaved": "Mileage rate saved.",
+      "perDiemSaved": "Per diem rate saved.",
+      "shareTotalInvalid": "Allocation shares must total 100%."
+    },
+    "admin": {
+      "title": "Advances, exceptions & fraud",
+      "description": "Issue cash advances, review policy exceptions, and set or clear fraud holds.",
+      "advancesTitle": "Expense advances",
+      "advancesDescription": "Create a posted cash/prepaid entry, then apply residual to a draft/submitted sheet.",
+      "employeeId": "Employee id",
+      "advanceName": "Advance name",
+      "amount": "Amount",
+      "currencyId": "Currency id",
+      "journalId": "Journal id",
+      "cashAccountId": "Cash/bank account id",
+      "advanceAccountId": "Advance (prepaid) account id",
+      "createAdvance": "Create advance (posts JE)",
+      "advanceCreated": "Advance issued with GL entry.",
+      "residual": "Residual",
+      "noAdvances": "No open advances with residual.",
+      "advanceId": "Advance id",
+      "sheetId": "Sheet id",
+      "applyAdvance": "Apply advance to sheet",
+      "advanceApplied": "Advance applied to sheet.",
+      "exceptionsTitle": "Policy exceptions",
+      "exceptionsDescription": "Request an exception on a draft line, then approve or reject pending items (SoD).",
+      "expenseId": "Expense id",
+      "exceptionReason": "Exception reason",
+      "requestException": "Request exception",
+      "exceptionRequested": "Policy exception requested.",
+      "noExceptions": "No pending policy exceptions.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "rejectReason": "Reject reason (required)",
+      "exceptionApproved": "Exception approved.",
+      "exceptionRejected": "Exception rejected.",
+      "fraudTitle": "Fraud hold",
+      "fraudDescription": "Set or clear fraud hold on draft/submitted expense lines.",
+      "fraudReason": "Fraud reason",
+      "setFraudHold": "Set fraud hold",
+      "clearFraudHold": "Clear fraud hold",
+      "fraudSet": "Fraud hold set.",
+      "fraudCleared": "Fraud hold cleared."
     },
     "forms": {
       "newExpense": {
@@ -8205,6 +8273,15 @@
           "employeePlaceholder": "Select an employee",
           "productId": "Category",
           "productPlaceholder": "Product ID",
+          "taxIds": "Tax IDs",
+          "taxIdsPlaceholder": "Comma-separated tax record IDs",
+          "paymentMode": "Payment mode",
+          "paymentModeOutOfPocket": "Out of pocket",
+          "paymentModeCorporateCard": "Corporate card",
+          "merchantKey": "Merchant",
+          "merchantKeyPlaceholder": "e.g. starbucks",
+          "storageKey": "Receipt storage key",
+          "storageKeyPlaceholder": "Opaque key (auto-generated if empty when receipt checked)",
           "hasReceipt": "Receipt attached (required to submit report)",
           "lineKind": "Line kind",
           "lineKindStandard": "Standard",
@@ -8213,10 +8290,12 @@
           "projectId": "Project ID",
           "projectIdPlaceholder": "Optional project",
           "mileageDistance": "Mileage distance",
-          "mileageRateId": "Mileage rate ID",
+          "mileageRateId": "Mileage rate",
           "perDiemDays": "Per diem days",
-          "perDiemRateId": "Per diem rate ID",
-          "rateIdPlaceholder": "Rate record ID"
+          "perDiemRateId": "Per diem rate",
+          "rateIdPlaceholder": "Select a rate",
+          "noMileageRates": "No mileage rates — upsert or seed statutory rates in Ops",
+          "noPerDiemRates": "No per-diem rates — upsert in Ops"
         }
       },
       "newExpenseSheet": {
@@ -8262,6 +8341,11 @@
           "name": "Description",
           "unitAmount": "Unit amount",
           "quantity": "Quantity",
+          "productId": "Category",
+          "taxIds": "Tax IDs",
+          "paymentMode": "Payment mode",
+          "merchantKey": "Merchant",
+          "hasReceipt": "Receipt attached",
           "description": "Notes"
         }
       },
@@ -8305,12 +8389,14 @@
           "paymentDate": "Payment date",
           "journalId": "Journal",
           "payableAccountId": "Employee payable account",
-          "liquidityAccountId": "Cash / bank account"
+          "liquidityAccountId": "Cash / bank account",
+          "amount": "Amount (optional partial)",
+          "amountHint": "Leave empty to pay the full residual. Partial leaves the report Posted."
         }
       },
       "setAllocations": {
         "title": "Split expense allocations",
-        "description": "Allocate this draft expense across analytic accounts and/or projects. Shares must total 100%.",
+        "description": "Allocate this draft expense across analytic accounts and/or projects. Shares must total 100% (up to 4 lines).",
         "sections": {
           "lines": "Allocation lines"
         },
@@ -8322,7 +8408,49 @@
           "analyticAccountId2": "Analytic account (line 2)",
           "projectId2": "Project ID (line 2)",
           "sharePercent2": "Share % (line 2)",
-          "billable2": "Billable (line 2)"
+          "billable2": "Billable (line 2)",
+          "analyticAccountId3": "Analytic account (line 3)",
+          "projectId3": "Project ID (line 3)",
+          "sharePercent3": "Share % (line 3)",
+          "billable3": "Billable (line 3)",
+          "analyticAccountId4": "Analytic account (line 4)",
+          "projectId4": "Project ID (line 4)",
+          "sharePercent4": "Share % (line 4)",
+          "billable4": "Billable (line 4)"
+        }
+      },
+      "upsertMileageRate": {
+        "title": "Mileage rate",
+        "description": "Create or update a company mileage rate (effective dates enforced on expense create).",
+        "sections": {
+          "rate": "Rate details"
+        },
+        "fields": {
+          "rateId": "Existing rate ID (optional)",
+          "name": "Name",
+          "currencyId": "Currency ID",
+          "ratePerUnit": "Rate per unit",
+          "unit": "Unit",
+          "effectiveFrom": "Effective from",
+          "effectiveTo": "Effective to",
+          "active": "Active"
+        }
+      },
+      "upsertPerDiemRate": {
+        "title": "Per diem rate",
+        "description": "Create or update a company per diem rate by location.",
+        "sections": {
+          "rate": "Rate details"
+        },
+        "fields": {
+          "rateId": "Existing rate ID (optional)",
+          "name": "Name",
+          "locationCode": "Location code",
+          "currencyId": "Currency ID",
+          "amountPerDay": "Amount per day",
+          "effectiveFrom": "Effective from",
+          "effectiveTo": "Effective to",
+          "active": "Active"
         }
       },
       "projectRebill": {

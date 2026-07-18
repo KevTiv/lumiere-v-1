@@ -48,17 +48,49 @@ function parsePaymentMode(v: unknown): ExpensePaymentMode {
   return { tag: "OutOfPocket" } as ExpensePaymentMode
 }
 
+function parseU64IdList(raw: unknown): bigint[] {
+  if (raw == null) return []
+  if (Array.isArray(raw)) {
+    return raw
+      .map((x) => optionalBigIntU64(x))
+      .filter((x): x is bigint => x !== undefined)
+  }
+  return String(raw)
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => optionalBigIntU64(s))
+    .filter((x): x is bigint => x !== undefined)
+}
+
+/** Parse attachment ids from form; never invent stub id `1`. */
+export function parseAttachmentIds(formData: Record<string, unknown>): bigint[] {
+  if (formData.attachmentIds != null) {
+    return parseU64IdList(formData.attachmentIds)
+  }
+  if (formData.attachment_ids != null) {
+    return parseU64IdList(formData.attachment_ids)
+  }
+  return []
+}
+
+export function newExpenseReceiptClientRequestId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `rcpt-${crypto.randomUUID()}`
+  }
+  return `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 export function toCreateExpenseParams(
   formData: Record<string, unknown>,
   currencyId: unknown,
+  attachmentIds: bigint[] = [],
 ): Partial<CreateExpenseParams> | null {
   const employeeId = optionalBigIntU64(formData.employeeId)
   const parsedCurrencyId = optionalBigIntU64(currencyIdFromLookup(currencyId))
   const date = requiredTimestamp(formData.date)
   if (employeeId === undefined || parsedCurrencyId === undefined || date === null) return null
 
-  // Wave A: stub receipt id when "hasReceipt" is checked (default true).
-  const hasReceipt = formData.hasReceipt !== false && formData.hasReceipt !== "false"
   const lineKind = parseLineKind(formData.lineKind)
   const mileageDistance =
     formData.mileageDistance != null && String(formData.mileageDistance).trim() !== ""
@@ -77,8 +109,8 @@ export function toCreateExpenseParams(
     quantity: Number(formData.quantity ?? 1),
     currencyId: parsedCurrencyId,
     description: optionalString(formData.description),
-    productId: undefined,
-    taxIds: [],
+    productId: optionalBigIntU64(formData.productId),
+    taxIds: parseU64IdList(formData.taxIds),
     accountId: undefined,
     analyticAccountId: optionalBigIntU64(formData.analyticAccountId),
     projectId: optionalBigIntU64(formData.projectId),
@@ -87,7 +119,7 @@ export function toCreateExpenseParams(
     mileageRateId: optionalBigIntU64(formData.mileageRateId),
     perDiemDays: Number.isFinite(perDiemDays) ? perDiemDays : undefined,
     perDiemRateId: optionalBigIntU64(formData.perDiemRateId),
-    attachmentIds: hasReceipt ? [1n] : [],
+    attachmentIds,
     clientRequestId: optionalString(formData.clientRequestId),
     paymentMode: parsePaymentMode(formData.paymentMode),
     merchantKey: optionalString(formData.merchantKey),

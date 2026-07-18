@@ -1,19 +1,29 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   useApplyPendingExpenseIntegrationIntents,
   useCreateExpenseCardStatementLine,
   useMatchExpenseCardStatementLine,
+  useSeedStatutoryExpenseMileageRates,
+  useUnmatchExpenseCardStatementLine,
+  useUpsertExpenseMileageRate,
+  useUpsertExpensePerDiemRate,
 } from "@lumiere/query-hooks/hooks/expenses"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { Button } from "@lumiere/ui"
+import {
+  Button,
+  FormModal,
+  upsertExpenseMileageRateForm,
+  upsertExpensePerDiemRateForm,
+} from "@lumiere/ui"
+import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 /**
  * Wave E ops: card statement match + OCR/email inbox intent flush.
- * Prompt-driven MVP (no dedicated QueryResourceKey lists yet).
+ * Wave G: mileage / per diem rate admin (upsert_expense_mileage_rate, upsert_expense_per_diem_rate).
  */
 export function ExpensesOpsPanel({ organizationId }: { organizationId: number }) {
   const { t } = useTranslation()
@@ -21,9 +31,14 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
   const companyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const createStmt = useCreateExpenseCardStatementLine(orgId, companyId)
   const matchStmt = useMatchExpenseCardStatementLine(orgId)
+  const unmatchStmt = useUnmatchExpenseCardStatementLine(orgId)
   const applyPending = useApplyPendingExpenseIntegrationIntents(orgId)
+  const upsertMileage = useUpsertExpenseMileageRate(orgId, companyId)
+  const upsertPerDiem = useUpsertExpensePerDiemRate(orgId, companyId)
+  const seedStatutoryMileage = useSeedStatutoryExpenseMileageRates(orgId, companyId)
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [rateForm, setRateForm] = useState<"mileage" | "perDiem" | null>(null)
 
   const [externalRef, setExternalRef] = useState("")
   const [merchantKey, setMerchantKey] = useState("")
@@ -32,6 +47,9 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
   const [currencyId, setCurrencyId] = useState("1")
   const [statementLineId, setStatementLineId] = useState("")
   const [expenseId, setExpenseId] = useState("")
+
+  const mileageForm = useMemo(() => upsertExpenseMileageRateForm(t), [t])
+  const perDiemForm = useMemo(() => upsertExpensePerDiemRateForm(t), [t])
 
   const run = async (fn: () => Promise<void>, okMsg: string) => {
     setBusy(true)
@@ -44,6 +62,12 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
     } finally {
       setBusy(false)
     }
+  }
+
+  const optionalDate = (v: unknown) => {
+    if (v == null || String(v).trim() === "") return undefined
+    const d = new Date(String(v))
+    return Number.isNaN(d.getTime()) ? undefined : stbTimestampFromDate(d)
   }
 
   return (
@@ -146,6 +170,64 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
         >
           {t("expenses.ops.match")}
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busy || !statementLineId}
+          data-testid="expenses-ops-unmatch"
+          onClick={() =>
+            void run(async () => {
+              await unmatchStmt.mutateAsync({ statementLineId })
+            }, t("expenses.ops.unmatched"))
+          }
+        >
+          {t("expenses.ops.unmatch")}
+        </Button>
+      </div>
+
+      <div className="space-y-2 border-t pt-3" data-testid="expenses-ops-rates">
+        <div>
+          <h3 className="text-sm font-medium">{t("expenses.ops.ratesTitle")}</h3>
+          <p className="text-xs text-muted-foreground">{t("expenses.ops.ratesDescription")}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            data-testid="expenses-ops-upsert-mileage"
+            onClick={() => setRateForm("mileage")}
+          >
+            {t("expenses.ops.upsertMileage")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            data-testid="expenses-ops-upsert-per-diem"
+            onClick={() => setRateForm("perDiem")}
+          >
+            {t("expenses.ops.upsertPerDiem")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busy || seedStatutoryMileage.isPending}
+            data-testid="expenses-ops-seed-statutory-mileage"
+            onClick={() =>
+              void run(async () => {
+                const seedCurrencyId = optionalBigIntU64(currencyId) ?? 1n
+                await seedStatutoryMileage.mutateAsync({ currencyId: seedCurrencyId })
+              }, t("expenses.ops.statutoryMileageSeeded"))
+            }
+          >
+            {t("expenses.ops.seedStatutoryMileage")}
+          </Button>
+        </div>
       </div>
 
       <Button
@@ -162,6 +244,48 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
       >
         {t("expenses.ops.flushIntents")}
       </Button>
+
+      <FormModal
+        open={rateForm !== null}
+        onOpenChange={(open) => {
+          if (!open) setRateForm(null)
+        }}
+        config={rateForm === "perDiem" ? perDiemForm : mileageForm}
+        isPending={upsertMileage.isPending || upsertPerDiem.isPending}
+        onSubmit={async (formData) => {
+          const rateId = optionalBigIntU64(formData.rateId)
+          if (rateForm === "mileage") {
+            await upsertMileage.mutateAsync({
+              rateId: rateId ?? null,
+              params: {
+                name: String(formData.name ?? ""),
+                currencyId: optionalBigIntU64(formData.currencyId) ?? 1n,
+                ratePerUnit: Number(formData.ratePerUnit ?? 0),
+                unit: String(formData.unit ?? "km"),
+                effectiveFrom: optionalDate(formData.effectiveFrom),
+                effectiveTo: optionalDate(formData.effectiveTo),
+                active: formData.active !== false && formData.active !== "false",
+              },
+            })
+            setStatus(t("expenses.ops.mileageSaved"))
+          } else if (rateForm === "perDiem") {
+            await upsertPerDiem.mutateAsync({
+              rateId: rateId ?? null,
+              params: {
+                name: String(formData.name ?? ""),
+                currencyId: optionalBigIntU64(formData.currencyId) ?? 1n,
+                locationCode: String(formData.locationCode ?? ""),
+                amountPerDay: Number(formData.amountPerDay ?? 0),
+                effectiveFrom: optionalDate(formData.effectiveFrom),
+                effectiveTo: optionalDate(formData.effectiveTo),
+                active: formData.active !== false && formData.active !== "false",
+              },
+            })
+            setStatus(t("expenses.ops.perDiemSaved"))
+          }
+          setRateForm(null)
+        }}
+      />
     </div>
   )
 }

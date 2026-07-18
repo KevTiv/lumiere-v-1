@@ -1,28 +1,30 @@
 //! Wave D — integration intents, card liability, fraud, advances, delayed sync.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::accounting::chart_of_accounts::{
     account_account, account_account_type, account_journal, create_account_account,
     create_account_account_type, create_account_journal, CreateAccountAccountParams,
     CreateAccountAccountTypeParams, CreateAccountJournalParams,
 };
-use crate::accounting::journal_entries::account_move_line;
+use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::expenses::expense_wave_d::{
-    apply_expense_advance_to_sheet, apply_expense_integration_intent,
-    create_expense_advance, create_expense_integration_intent, expense_integration_intent,
-    hr_expense_advance, set_expense_fraud_hold, ApplyExpenseAdvanceParams,
-    CreateExpenseAdvanceParams, CreateExpenseIntegrationIntentParams, SetExpenseFraudHoldParams,
+    apply_expense_advance_to_sheet, apply_expense_integration_intent, create_expense_advance,
+    create_expense_integration_intent, expense_integration_intent, hr_expense_advance,
+    hr_expense_policy_exception, reject_expense_policy_exception, request_expense_policy_exception,
+    set_expense_fraud_hold, ApplyExpenseAdvanceParams, CreateExpenseAdvanceParams,
+    CreateExpenseIntegrationIntentParams, RejectExpensePolicyExceptionParams,
+    RequestExpensePolicyExceptionParams, SetExpenseFraudHoldParams,
 };
 use crate::expenses::expenses::{
     approve_expense_sheet_impl, create_expense, create_expense_sheet, expense_sheet, hr_expense,
-    post_expense_sheet, submit_expense, submit_expense_sheet, CreateExpenseParams,
-    CreateExpenseSheetParams, PostExpenseSheetParams,
+    post_expense_sheet, submit_expense, submit_expense_sheet, update_expense, CreateExpenseParams,
+    CreateExpenseSheetParams, PostExpenseSheetParams, UpdateExpenseParams,
 };
 use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{
-    AccountInternalGroup, EmploymentType, ExpenseLineKind, ExpensePaymentMode, ExpenseSheetState,
-    JournalType,
+    AccountInternalGroup, AccountMoveState, EmploymentType, ExpenseLineKind, ExpensePaymentMode,
+    ExpensePolicyExceptionState, ExpenseSheetState, JournalType,
 };
 
 struct ExpenseAccounts {
@@ -31,6 +33,7 @@ struct ExpenseAccounts {
     payable_id: u64,
     card_liability_id: u64,
     advance_id: u64,
+    cash_id: u64,
 }
 
 fn seed_accounts(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<ExpenseAccounts, String> {
@@ -82,6 +85,27 @@ fn seed_accounts(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<ExpenseAc
         .find(|t| t.organization_id == org_id && t.name == liability_type_name)
         .map(|t| t.id)
         .ok_or("liability type")?;
+
+    let asset_type_name = format!("WD Asset Type {company_id}");
+    create_account_account_type(
+        ctx,
+        org_id,
+        CreateAccountAccountTypeParams {
+            company_id: Some(company_id),
+            name: asset_type_name.clone(),
+            type_: "asset".into(),
+            include_initial_balance: false,
+            internal_group: AccountInternalGroup::Asset,
+            metadata: None,
+        },
+    )?;
+    let asset_type_id = ctx
+        .db
+        .account_account_type()
+        .iter()
+        .find(|t| t.organization_id == org_id && t.name == asset_type_name)
+        .map(|t| t.id)
+        .ok_or("asset type")?;
 
     let mk_account = |code: String,
                       name: String,
@@ -137,6 +161,12 @@ fn seed_accounts(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<ExpenseAc
         liability_type_id,
         AccountInternalGroup::Liability,
     )?;
+    let cash_id = mk_account(
+        format!("1WDC{company_id}"),
+        "WD Cash".into(),
+        asset_type_id,
+        AccountInternalGroup::Asset,
+    )?;
 
     let journal_code = format!("WD{company_id}");
     create_account_journal(
@@ -190,6 +220,7 @@ fn seed_accounts(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<ExpenseAc
         payable_id,
         card_liability_id,
         advance_id,
+        cash_id,
     })
 }
 
@@ -256,7 +287,6 @@ pub fn test_card_feed_and_liability_post(ctx: &ReducerContext) -> Result<(), Str
                 "quantity": 1.0,
                 "merchant_key": "uber",
                 "payment_mode": "corporate_card",
-                "attachment_ids": [1],
             })
             .to_string(),
             metadata: None,
@@ -280,6 +310,35 @@ pub fn test_card_feed_and_liability_post(ctx: &ReducerContext) -> Result<(), Str
     if line.payment_mode != ExpensePaymentMode::CorporateCard {
         return Err("expected CorporateCard payment mode".into());
     }
+    // Card feeds may omit merchant receipt images; attach a registered receipt for submit evidence.
+    let receipt_id = super::test_receipt_id(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        employee_id,
+    )?;
+    update_expense(
+        ctx,
+        fixture.organization_id,
+        line.id,
+        UpdateExpenseParams {
+            company_id: None,
+            name: None,
+            unit_amount: None,
+            quantity: None,
+            description: None,
+            account_id: None,
+            product_id: None,
+            tax_ids: None,
+            payment_mode: None,
+            merchant_key: None,
+            attachment_ids: Some(vec![receipt_id]),
+            mileage_distance: None,
+            mileage_rate_id: None,
+            per_diem_days: None,
+            per_diem_rate_id: None,
+        },
+    )?;
 
     create_expense_sheet(
         ctx,
@@ -341,7 +400,13 @@ pub fn test_duplicate_fraud_hold_blocks_submit(ctx: &ReducerContext) -> Result<(
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let employee_id = seed_employee(ctx, &fixture)?;
-    let mk = |name: &str, req: Option<&str>| {
+    let mk = |name: &str, req: Option<&str>| -> Result<(), String> {
+        let receipt_id = super::test_receipt_id(
+            ctx,
+            fixture.organization_id,
+            fixture.company_id,
+            employee_id,
+        )?;
         create_expense(
             ctx,
             fixture.organization_id,
@@ -364,7 +429,7 @@ pub fn test_duplicate_fraud_hold_blocks_submit(ctx: &ReducerContext) -> Result<(
                 mileage_rate_id: None,
                 per_diem_days: None,
                 per_diem_rate_id: None,
-                attachment_ids: vec![1],
+                attachment_ids: vec![receipt_id],
                 client_request_id: req.map(|s| s.into()),
                 payment_mode: ExpensePaymentMode::OutOfPocket,
                 merchant_key: Some("starbucks".into()),
@@ -399,7 +464,9 @@ pub fn test_duplicate_fraud_hold_blocks_submit(ctx: &ReducerContext) -> Result<(
         .db
         .expense_sheet()
         .iter()
-        .find(|s| s.name == "WD Fraud Sheet")
+        .find(|s| {
+            s.organization_id == fixture.organization_id && s.name == "WD Fraud Sheet"
+        })
         .map(|s| s.id)
         .ok_or("sheet")?;
     submit_expense(ctx, fixture.organization_id, dup.id, sheet_id)?;
@@ -429,6 +496,9 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
     let accounts = seed_accounts(ctx, &fixture)?;
     let employee_id = seed_employee(ctx, &fixture)?;
 
+    let adv_req = format!("adv-1-{}", fixture.company_id);
+    let delay_key = format!("delay-1-{}", fixture.company_id);
+    let post_req = format!("wd-adv-post-{}", fixture.company_id);
     create_expense_advance(
         ctx,
         fixture.organization_id,
@@ -438,7 +508,11 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
             name: "Trip advance".into(),
             amount: 100.0,
             currency_id: 1,
-            client_request_id: Some("adv-1".into()),
+            journal_id: accounts.journal_id,
+            cash_account_id: accounts.cash_id,
+            advance_account_id: accounts.advance_id,
+            accounting_date: ctx.timestamp,
+            client_request_id: Some(adv_req.clone()),
             metadata: None,
         },
     )?;
@@ -446,16 +520,54 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
         .db
         .hr_expense_advance()
         .iter()
-        .find(|a| a.client_request_id.as_deref() == Some("adv-1"))
+        .find(|a| {
+            a.organization_id == fixture.organization_id
+                && a.client_request_id.as_deref() == Some(adv_req.as_str())
+        })
         .ok_or("advance")?;
+    let issue_move_id = advance.account_move_id.ok_or("advance missing account_move_id")?;
+    let issue_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&issue_move_id)
+        .ok_or("issuance move missing")?;
+    if issue_move.state != AccountMoveState::Posted {
+        return Err("advance issuance move must be Posted".into());
+    }
+    let issue_adv_debit: f64 = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|l| l.move_id == issue_move_id && l.account_id == accounts.advance_id)
+        .map(|l| l.debit)
+        .sum();
+    let issue_cash_credit: f64 = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|l| l.move_id == issue_move_id && l.account_id == accounts.cash_id)
+        .map(|l| l.credit)
+        .sum();
+    if (issue_adv_debit - 100.0).abs() > 0.01 || (issue_cash_credit - 100.0).abs() > 0.01 {
+        return Err(format!(
+            "expected issuance Dr advance 100 / Cr cash 100, got debit={issue_adv_debit} credit={issue_cash_credit}"
+        ));
+    }
 
+    let delay_receipt_id = super::test_receipt_id(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        employee_id,
+    )?;
     create_expense_integration_intent(
         ctx,
         fixture.organization_id,
         CreateExpenseIntegrationIntentParams {
             company_id: Some(fixture.company_id),
             intent_type: "delayed_sync".into(),
-            idempotency_key: "delay-1".into(),
+            idempotency_key: delay_key.clone(),
             device_id: Some("phone".into()),
             payload: serde_json::json!({
                 "employee_id": employee_id,
@@ -463,8 +575,8 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
                 "name": "Offline meal",
                 "unit_amount": 80.0,
                 "quantity": 1.0,
-                "client_request_id": "delay-1",
-                "attachment_ids": [1],
+                "client_request_id": delay_key.clone(),
+                "attachment_ids": [delay_receipt_id],
             })
             .to_string(),
             metadata: None,
@@ -475,7 +587,7 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
         .expense_integration_intent()
         .iter()
         .find(|i| {
-            i.organization_id == fixture.organization_id && i.idempotency_key == "delay-1"
+            i.organization_id == fixture.organization_id && i.idempotency_key == delay_key
         })
         .ok_or("delay intent")?;
     apply_expense_integration_intent(ctx, fixture.organization_id, intent.id)?;
@@ -483,16 +595,20 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
         .db
         .hr_expense()
         .iter()
-        .find(|e| e.client_request_id.as_deref() == Some("delay-1"))
+        .find(|e| {
+            e.organization_id == fixture.organization_id
+                && e.client_request_id.as_deref() == Some(delay_key.as_str())
+        })
         .ok_or("delayed expense")?;
 
+    let sheet_name = format!("WD Adv Sheet {}", fixture.company_id);
     create_expense_sheet(
         ctx,
         fixture.organization_id,
         CreateExpenseSheetParams {
             company_id: Some(fixture.company_id),
             employee_id,
-            name: "WD Adv Sheet".into(),
+            name: sheet_name.clone(),
             currency_id: 1,
             notes: None,
             accounting_date: None,
@@ -502,7 +618,7 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
         .db
         .expense_sheet()
         .iter()
-        .find(|s| s.name == "WD Adv Sheet")
+        .find(|s| s.organization_id == fixture.organization_id && s.name == sheet_name)
         .map(|s| s.id)
         .ok_or("sheet")?;
     submit_expense(ctx, fixture.organization_id, line.id, sheet_id)?;
@@ -532,14 +648,23 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
             fx_fee_account_id: None,
             fx_fee_amount: None,
             accounting_date: ctx.timestamp,
-            client_request_id: Some("wd-adv-post".into()),
+            client_request_id: Some(post_req),
         },
     )?;
+    let sheet = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
+        .ok_or("sheet after post")?;
+    let post_move_id = sheet.account_move_id.ok_or("sheet missing account_move_id")?;
     let payable_credit: f64 = ctx
         .db
         .account_move_line()
         .iter()
-        .filter(|l| l.account_id == accounts.payable_id && l.credit > 0.0)
+        .filter(|l| {
+            l.move_id == post_move_id && l.account_id == accounts.payable_id && l.credit > 0.0
+        })
         .map(|l| l.credit)
         .sum();
     // 80 out of pocket - 30 advance = 50 payable
@@ -550,11 +675,149 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
         .db
         .account_move_line()
         .iter()
-        .filter(|l| l.account_id == accounts.advance_id && l.credit > 0.0)
+        .filter(|l| {
+            l.move_id == post_move_id && l.account_id == accounts.advance_id && l.credit > 0.0
+        })
         .map(|l| l.credit)
         .sum();
     if (adv_credit - 30.0).abs() > 0.01 {
         return Err(format!("expected advance credit 30, got {adv_credit}"));
+    }
+    Ok(())
+}
+
+/// Reject path: Pending → Rejected with reason; SoD; policy_hold remains.
+pub fn test_reject_policy_exception(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let employee_id = seed_employee(ctx, &fixture)?;
+    let receipt_id = super::test_receipt_id(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        employee_id,
+    )?;
+    create_expense(
+        ctx,
+        fixture.organization_id,
+        CreateExpenseParams {
+            company_id: Some(fixture.company_id),
+            employee_id,
+            name: "WD Exception Line".into(),
+            date: ctx.timestamp,
+            unit_amount: 40.0,
+            quantity: 1.0,
+            currency_id: 1,
+            product_id: None,
+            description: None,
+            tax_ids: vec![],
+            account_id: None,
+            analytic_account_id: None,
+            project_id: None,
+            line_kind: ExpenseLineKind::Standard,
+            mileage_distance: None,
+            mileage_rate_id: None,
+            per_diem_days: None,
+            per_diem_rate_id: None,
+            attachment_ids: vec![receipt_id],
+            client_request_id: Some(format!("wd-exc-1-{}", fixture.company_id)),
+            payment_mode: ExpensePaymentMode::OutOfPocket,
+            merchant_key: None,
+            policy_exception_reason: None,
+        },
+    )?;
+    let exc_req = format!("wd-exc-1-{}", fixture.company_id);
+    let expense_id = ctx
+        .db
+        .hr_expense()
+        .iter()
+        .find(|e| {
+            e.organization_id == fixture.organization_id
+                && e.client_request_id.as_deref() == Some(exc_req.as_str())
+        })
+        .map(|e| e.id)
+        .ok_or("expense")?;
+
+    request_expense_policy_exception(
+        ctx,
+        fixture.organization_id,
+        expense_id,
+        RequestExpensePolicyExceptionParams {
+            reason: "Over cap for client dinner".into(),
+            metadata: None,
+        },
+    )?;
+    let exception = ctx
+        .db
+        .hr_expense_policy_exception()
+        .iter()
+        .find(|e| e.expense_id == expense_id && e.state == ExpensePolicyExceptionState::Pending)
+        .ok_or("pending exception")?;
+
+    // SoD: requester cannot reject.
+    let sod = reject_expense_policy_exception(
+        ctx,
+        fixture.organization_id,
+        exception.id,
+        RejectExpensePolicyExceptionParams {
+            reason: "self reject".into(),
+            metadata: None,
+        },
+    );
+    if sod.is_ok() {
+        return Err("requester must not reject own exception".into());
+    }
+    let empty = reject_expense_policy_exception(
+        ctx,
+        fixture.organization_id,
+        exception.id,
+        RejectExpensePolicyExceptionParams {
+            reason: "  ".into(),
+            metadata: None,
+        },
+    );
+    if empty.is_ok() {
+        return Err("empty reject reason must fail".into());
+    }
+
+    // Harness sender is the requester — patch requested_by so SoD allows reject.
+    ctx.db
+        .hr_expense_policy_exception()
+        .id()
+        .update(crate::expenses::expense_wave_d::HrExpensePolicyException {
+            requested_by: Identity::__dummy(),
+            ..exception.clone()
+        });
+    reject_expense_policy_exception(
+        ctx,
+        fixture.organization_id,
+        exception.id,
+        RejectExpensePolicyExceptionParams {
+            reason: "Policy not waived".into(),
+            metadata: None,
+        },
+    )?;
+    let rejected = ctx
+        .db
+        .hr_expense_policy_exception()
+        .id()
+        .find(&exception.id)
+        .ok_or("exception after reject")?;
+    if rejected.state != ExpensePolicyExceptionState::Rejected {
+        return Err(format!("expected Rejected, got {:?}", rejected.state));
+    }
+    let meta = rejected.metadata.as_deref().unwrap_or("");
+    if !meta.contains("Policy not waived") {
+        return Err(format!("reject reason missing from metadata: {meta}"));
+    }
+    let expense = ctx
+        .db
+        .hr_expense()
+        .id()
+        .find(&expense_id)
+        .ok_or("expense after reject")?;
+    if !expense.policy_hold {
+        return Err("policy_hold must remain after reject".into());
     }
     Ok(())
 }

@@ -1,12 +1,17 @@
 //! Wave C — mileage/per diem, allocations, project rebill, idempotent create.
-use spacetimedb::{ReducerContext, Table};
+//! Also Wave G travel/alloc integrity: rate effective dates, kind-safe update, tax split.
+use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::{
     account_account, account_account_type, account_journal, create_account_account,
     create_account_account_type, create_account_journal, CreateAccountAccountParams,
     CreateAccountAccountTypeParams, CreateAccountJournalParams,
 };
-use crate::accounting::journal_entries::account_move;
+use crate::accounting::journal_entries::{account_move, account_move_line};
+use crate::accounting::tax_management::{
+    account_tax, account_tax_group, create_account_tax, create_account_tax_group,
+    CreateAccountTaxGroupParams, CreateAccountTaxParams,
+};
 use crate::expenses::expense_depth::{
     create_expense_project_rebill, hr_expense_allocation, hr_expense_mileage_rate,
     hr_expense_per_diem_rate, set_expense_allocations, upsert_expense_mileage_rate,
@@ -15,15 +20,15 @@ use crate::expenses::expense_depth::{
 };
 use crate::expenses::expenses::{
     approve_expense_sheet_impl, create_expense, create_expense_sheet, expense_sheet, hr_expense,
-    post_expense_sheet, submit_expense, submit_expense_sheet, CreateExpenseParams,
-    CreateExpenseSheetParams, PostExpenseSheetParams,
+    post_expense_sheet, submit_expense, submit_expense_sheet, update_expense, CreateExpenseParams,
+    CreateExpenseSheetParams, PostExpenseSheetParams, UpdateExpenseParams,
 };
 use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
 use crate::projects::projects::{create_project, project_project, CreateProjectParams};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{
-    AccountInternalGroup, AccountMoveState, EmploymentType, ExpenseLineKind, ExpensePaymentMode, ExpenseSheetState,
-    JournalType, MoveType,
+    AccountInternalGroup, AccountMoveState, EmploymentType, ExpenseLineKind, ExpensePaymentMode,
+    ExpenseSheetState, JournalType, MoveType, TaxAmountType, TaxTypeUse,
 };
 
 struct ExpenseAccounts {
@@ -424,7 +429,7 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
             mileage_rate_id: None,
             per_diem_days: None,
             per_diem_rate_id: None,
-            attachment_ids: vec![1],
+            attachment_ids: vec![super::test_receipt_id(ctx, fixture.organization_id, fixture.company_id, employee_id)?],
             client_request_id: None,
             payment_mode: ExpensePaymentMode::OutOfPocket,
             merchant_key: None,
@@ -504,6 +509,7 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
             income_account_id: accounts.income_id,
             invoice_date: ctx.timestamp,
             partner_id: None,
+            fiscal_position_id: None,
             client_request_id: Some("wc-rebill".into()),
         },
     )?;
@@ -597,6 +603,455 @@ pub fn test_per_diem_rate(ctx: &ReducerContext) -> Result<(), String> {
         .ok_or("per diem line")?;
     if (line.total_amount - 225.0).abs() > 0.001 {
         return Err(format!("expected 225, got {}", line.total_amount));
+    }
+    Ok(())
+}
+
+fn days_offset(ctx: &ReducerContext, days: i64) -> Timestamp {
+    Timestamp::from_micros_since_unix_epoch(
+        ctx.timestamp.to_micros_since_unix_epoch() + days * 86_400_000_000,
+    )
+}
+
+/// Rate effective window must cover expense.date on create.
+pub fn test_mileage_rate_effective_dates(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let employee_id = seed_employee(ctx, &fixture, "EffDate Emp")?;
+    upsert_expense_mileage_rate(
+        ctx,
+        fixture.organization_id,
+        None,
+        UpsertExpenseMileageRateParams {
+            company_id: Some(fixture.company_id),
+            name: "Windowed km".into(),
+            currency_id: 1,
+            rate_per_unit: 1.0,
+            unit: "km".into(),
+            effective_from: Some(days_offset(ctx, -10)),
+            effective_to: Some(days_offset(ctx, -1)),
+            active: true,
+            metadata: None,
+        },
+    )?;
+    let rate_id = ctx
+        .db
+        .hr_expense_mileage_rate()
+        .iter()
+        .find(|r| r.organization_id == fixture.organization_id && r.name == "Windowed km")
+        .map(|r| r.id)
+        .ok_or("windowed rate")?;
+
+    let rejected = create_expense(
+        ctx,
+        fixture.organization_id,
+        CreateExpenseParams {
+            company_id: Some(fixture.company_id),
+            employee_id,
+            name: "Out of window drive".into(),
+            date: ctx.timestamp,
+            unit_amount: 0.0,
+            quantity: 1.0,
+            currency_id: 1,
+            product_id: None,
+            description: None,
+            tax_ids: vec![],
+            account_id: None,
+            analytic_account_id: None,
+            project_id: None,
+            line_kind: ExpenseLineKind::Mileage,
+            mileage_distance: Some(10.0),
+            mileage_rate_id: Some(rate_id),
+            per_diem_days: None,
+            per_diem_rate_id: None,
+            attachment_ids: vec![],
+            client_request_id: None,
+            payment_mode: ExpensePaymentMode::OutOfPocket,
+            merchant_key: None,
+            policy_exception_reason: None,
+        },
+    );
+    if rejected.is_ok() {
+        return Err("expected create to reject out-of-window mileage rate".into());
+    }
+
+    upsert_expense_mileage_rate(
+        ctx,
+        fixture.organization_id,
+        None,
+        UpsertExpenseMileageRateParams {
+            company_id: Some(fixture.company_id),
+            name: "Current km".into(),
+            currency_id: 1,
+            rate_per_unit: 0.5,
+            unit: "km".into(),
+            effective_from: Some(days_offset(ctx, -1)),
+            effective_to: Some(days_offset(ctx, 30)),
+            active: true,
+            metadata: None,
+        },
+    )?;
+    let ok_rate = ctx
+        .db
+        .hr_expense_mileage_rate()
+        .iter()
+        .find(|r| r.organization_id == fixture.organization_id && r.name == "Current km")
+        .map(|r| r.id)
+        .ok_or("current rate")?;
+    create_expense(
+        ctx,
+        fixture.organization_id,
+        CreateExpenseParams {
+            company_id: Some(fixture.company_id),
+            employee_id,
+            name: "In window drive".into(),
+            date: ctx.timestamp,
+            unit_amount: 0.0,
+            quantity: 1.0,
+            currency_id: 1,
+            product_id: None,
+            description: None,
+            tax_ids: vec![],
+            account_id: None,
+            analytic_account_id: None,
+            project_id: None,
+            line_kind: ExpenseLineKind::Mileage,
+            mileage_distance: Some(40.0),
+            mileage_rate_id: Some(ok_rate),
+            per_diem_days: None,
+            per_diem_rate_id: None,
+            attachment_ids: vec![],
+            client_request_id: None,
+            payment_mode: ExpensePaymentMode::OutOfPocket,
+            merchant_key: None,
+            policy_exception_reason: None,
+        },
+    )?;
+    let line = ctx
+        .db
+        .hr_expense()
+        .iter()
+        .find(|e| e.organization_id == fixture.organization_id && e.name == "In window drive")
+        .ok_or("in-window line")?;
+    if (line.total_amount - 20.0).abs() > 0.001 {
+        return Err(format!("expected 20.0, got {}", line.total_amount));
+    }
+
+    // Kind-safe update: distance change recalculates; unit/qty-only reject.
+    update_expense(
+        ctx,
+        fixture.organization_id,
+        line.id,
+        UpdateExpenseParams {
+            company_id: Some(fixture.company_id),
+            name: None,
+            unit_amount: None,
+            quantity: None,
+            description: None,
+            account_id: None,
+            product_id: None,
+            tax_ids: None,
+            payment_mode: None,
+            merchant_key: None,
+            attachment_ids: None,
+            mileage_distance: Some(80.0),
+            mileage_rate_id: None,
+            per_diem_days: None,
+            per_diem_rate_id: None,
+        },
+    )?;
+    let updated = ctx
+        .db
+        .hr_expense()
+        .id()
+        .find(&line.id)
+        .ok_or("updated line")?;
+    if (updated.total_amount - 40.0).abs() > 0.001 {
+        return Err(format!("expected 40 after distance update, got {}", updated.total_amount));
+    }
+    let bad = update_expense(
+        ctx,
+        fixture.organization_id,
+        line.id,
+        UpdateExpenseParams {
+            company_id: Some(fixture.company_id),
+            name: None,
+            unit_amount: Some(99.0),
+            quantity: None,
+            description: None,
+            account_id: None,
+            product_id: None,
+            tax_ids: None,
+            payment_mode: None,
+            merchant_key: None,
+            attachment_ids: None,
+            mileage_distance: None,
+            mileage_rate_id: None,
+            per_diem_days: None,
+            per_diem_rate_id: None,
+        },
+    );
+    if bad.is_ok() {
+        return Err("expected unit-only mileage update to fail".into());
+    }
+    Ok(())
+}
+
+/// Tax recovery lines on post follow allocation share_percent.
+pub fn test_allocation_tax_split_on_post(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let accounts = seed_accounts(ctx, &fixture)?;
+    let employee_id = seed_employee(ctx, &fixture, "TaxAlloc Emp")?;
+
+    let tax_type_name = format!("WC Tax Type {}", fixture.company_id);
+    create_account_account_type(
+        ctx,
+        fixture.organization_id,
+        CreateAccountAccountTypeParams {
+            company_id: Some(fixture.company_id),
+            name: tax_type_name.clone(),
+            type_: "asset".into(),
+            include_initial_balance: false,
+            internal_group: AccountInternalGroup::Asset,
+            metadata: None,
+        },
+    )?;
+    let tax_type_id = ctx
+        .db
+        .account_account_type()
+        .iter()
+        .find(|t| t.organization_id == fixture.organization_id && t.name == tax_type_name)
+        .map(|t| t.id)
+        .ok_or("tax type")?;
+    let tax_code = format!("1WCT{}", fixture.company_id);
+    create_account_account(
+        ctx,
+        fixture.organization_id,
+        CreateAccountAccountParams {
+            company_id: Some(fixture.company_id),
+            code: tax_code.clone(),
+            name: "WC Tax Recoverable".into(),
+            user_type_id: tax_type_id,
+            currency_id: None,
+            internal_type: None,
+            internal_group: Some(AccountInternalGroup::Asset),
+            group_id: None,
+            reconcile: false,
+            tax_ids: vec![],
+            note: None,
+            opening_debit: 0.0,
+            opening_credit: 0.0,
+            allowed_journal_ids: vec![],
+            non_trade: false,
+            is_off_balance: false,
+            metadata: None,
+        },
+    )?;
+    let tax_acct = ctx
+        .db
+        .account_account()
+        .iter()
+        .find(|a| a.organization_id == fixture.organization_id && a.code == tax_code)
+        .map(|a| a.id)
+        .ok_or("tax account")?;
+
+    create_account_tax_group(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        CreateAccountTaxGroupParams {
+            name: format!("WC VAT Group {}", fixture.company_id),
+            sequence: 10,
+            preceding_subtotal: None,
+            tax_payable_account_id: None,
+            tax_receivable_account_id: Some(tax_acct),
+            advance_tax_payment_account_id: None,
+            metadata: None,
+        },
+    )?;
+    let group_id = ctx
+        .db
+        .account_tax_group()
+        .iter()
+        .find(|g| {
+            g.organization_id == fixture.organization_id
+                && g.company_id == fixture.company_id
+                && g.name.contains("WC VAT Group")
+        })
+        .map(|g| g.id)
+        .ok_or("tax group")?;
+    create_account_tax(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        CreateAccountTaxParams {
+            name: format!("WC VAT 10 {}", fixture.company_id),
+            description: None,
+            type_tax_use: TaxTypeUse::Purchase,
+            amount_type: TaxAmountType::Percent,
+            amount: 10.0,
+            active: true,
+            price_include: false,
+            include_base_amount: false,
+            is_base_affected: false,
+            sequence: 10,
+            tax_group_id: Some(group_id),
+            country_id: None,
+            country_code: None,
+            tags: vec![],
+            has_negative_factor: false,
+            invoice_repartition_line_ids: vec![],
+            refund_repartition_line_ids: vec![],
+            metadata: None,
+        },
+    )?;
+    let tax_def_id = ctx
+        .db
+        .account_tax()
+        .iter()
+        .find(|t| {
+            t.organization_id == fixture.organization_id
+                && t.company_id == fixture.company_id
+                && t.name.contains("WC VAT 10")
+        })
+        .map(|t| t.id)
+        .ok_or("tax")?;
+
+    create_expense_sheet(
+        ctx,
+        fixture.organization_id,
+        CreateExpenseSheetParams {
+            company_id: Some(fixture.company_id),
+            employee_id,
+            name: "TaxAlloc Sheet".into(),
+            currency_id: 1,
+            notes: None,
+            accounting_date: None,
+        },
+    )?;
+    let sheet_id = ctx
+        .db
+        .expense_sheet()
+        .iter()
+        .find(|s| s.organization_id == fixture.organization_id && s.name == "TaxAlloc Sheet")
+        .map(|s| s.id)
+        .ok_or("sheet")?;
+
+    create_expense(
+        ctx,
+        fixture.organization_id,
+        CreateExpenseParams {
+            company_id: Some(fixture.company_id),
+            employee_id,
+            name: "Split meal".into(),
+            date: ctx.timestamp,
+            unit_amount: 100.0,
+            quantity: 1.0,
+            currency_id: 1,
+            product_id: None,
+            description: None,
+            tax_ids: vec![tax_def_id],
+            account_id: Some(accounts.expense_id),
+            analytic_account_id: None,
+            project_id: None,
+            line_kind: ExpenseLineKind::Standard,
+            mileage_distance: None,
+            mileage_rate_id: None,
+            per_diem_days: None,
+            per_diem_rate_id: None,
+            attachment_ids: vec![super::test_receipt_id(
+                ctx,
+                fixture.organization_id,
+                fixture.company_id,
+                employee_id,
+            )?],
+            client_request_id: None,
+            payment_mode: ExpensePaymentMode::OutOfPocket,
+            merchant_key: None,
+            policy_exception_reason: None,
+        },
+    )?;
+    let line_id = ctx
+        .db
+        .hr_expense()
+        .iter()
+        .find(|e| e.organization_id == fixture.organization_id && e.name == "Split meal")
+        .map(|e| e.id)
+        .ok_or("line")?;
+
+    set_expense_allocations(
+        ctx,
+        fixture.organization_id,
+        line_id,
+        SetExpenseAllocationsParams {
+            lines: vec![
+                ExpenseAllocationLineParams {
+                    analytic_account_id: Some(1),
+                    project_id: None,
+                    share_percent: 60.0,
+                    billable: false,
+                    metadata: None,
+                },
+                ExpenseAllocationLineParams {
+                    analytic_account_id: Some(2),
+                    project_id: None,
+                    share_percent: 40.0,
+                    billable: false,
+                    metadata: None,
+                },
+            ],
+        },
+    )?;
+
+    submit_expense(ctx, fixture.organization_id, line_id, sheet_id)?;
+    submit_expense_sheet(ctx, fixture.organization_id, sheet_id)?;
+    approve_expense_sheet_impl(ctx, fixture.organization_id, sheet_id, true)?;
+    post_expense_sheet(
+        ctx,
+        fixture.organization_id,
+        sheet_id,
+        PostExpenseSheetParams {
+            journal_id: accounts.journal_id,
+            payable_account_id: accounts.payable_id,
+            default_expense_account_id: accounts.expense_id,
+            default_tax_account_id: Some(tax_acct),
+            card_liability_account_id: None,
+            advance_account_id: None,
+            fx_fee_account_id: None,
+            fx_fee_amount: None,
+            accounting_date: ctx.timestamp,
+            client_request_id: Some("wc-tax-alloc".into()),
+        },
+    )?;
+
+    let move_id = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
+        .and_then(|s| s.account_move_id)
+        .ok_or("posted move")?;
+    let tax_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|l| l.move_id == move_id && l.tax_line_id == Some(tax_def_id))
+        .collect();
+    if tax_lines.len() != 2 {
+        return Err(format!(
+            "expected 2 allocation-split tax lines, got {}",
+            tax_lines.len()
+        ));
+    }
+    let tax_sum: f64 = tax_lines.iter().map(|l| l.debit).sum();
+    if (tax_sum - 10.0).abs() > 0.01 {
+        return Err(format!("expected tax sum 10, got {tax_sum}"));
+    }
+    let mut shares: Vec<f64> = tax_lines.iter().map(|l| l.debit).collect();
+    shares.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    if (shares[0] - 4.0).abs() > 0.01 || (shares[1] - 6.0).abs() > 0.01 {
+        return Err(format!("expected tax shares 4/6, got {shares:?}"));
     }
     Ok(())
 }

@@ -315,6 +315,28 @@ export function employeeRowsToSelectOptions(
   }))
 }
 
+/** Mileage / per-diem rate pickers — name + amount/unit when present. */
+export function expenseRateRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => {
+    const id = row.id
+    const name = String(row.name ?? "")
+    const rate =
+      row.ratePerUnit ?? row.rate_per_unit ?? row.amountPerDay ?? row.amount_per_day
+    const unit = row.unit ?? row.locationCode ?? row.location_code
+    const detail =
+      rate != null
+        ? unit != null
+          ? `${rate}/${unit}`
+          : String(rate)
+        : ""
+    const label =
+      name && detail ? `${name} (${detail})` : name || detail || (id != null ? String(id) : "?")
+    return { value: String(id), label }
+  })
+}
+
 export function departmentRowsToSelectOptions(
   rows: Record<string, unknown>[],
 ): Array<{ value: string; label: string }> {

@@ -17,12 +17,13 @@ use crate::expenses::expense_wave_d::{
 use crate::expenses::expense_wave_e::{
     apply_pending_expense_integration_intents, create_expense_card_statement_line,
     expense_card_statement_line, match_expense_card_statement_line,
-    CreateExpenseCardStatementLineParams, MatchExpenseCardStatementLineParams,
+    unmatch_expense_card_statement_line, CreateExpenseCardStatementLineParams,
+    MatchExpenseCardStatementLineParams, UnmatchExpenseCardStatementLineParams,
 };
 use crate::expenses::expenses::{
     approve_expense_sheet_impl, create_expense, create_expense_sheet, expense_sheet, hr_expense,
-    post_expense_sheet, submit_expense, submit_expense_sheet, CreateExpenseParams,
-    CreateExpenseSheetParams, PostExpenseSheetParams,
+    hr_expense_receipt, post_expense_sheet, submit_expense, submit_expense_sheet,
+    CreateExpenseParams, CreateExpenseSheetParams, PostExpenseSheetParams,
 };
 use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
@@ -288,26 +289,31 @@ pub fn test_pack_tax_evidence_required(ctx: &ReducerContext) -> Result<(), Strin
             mileage_rate_id: None,
             per_diem_days: None,
             per_diem_rate_id: None,
-            attachment_ids: vec![1],
-            client_request_id: Some("we-pack-1".into()),
+            attachment_ids: vec![super::test_receipt_id(ctx, fixture.organization_id, fixture.company_id, employee_id)?],
+            client_request_id: Some(format!("we-pack-1-{}", fixture.company_id)),
             payment_mode: ExpensePaymentMode::OutOfPocket,
             merchant_key: None,
             policy_exception_reason: None,
         },
     )?;
+    let pack_req = format!("we-pack-1-{}", fixture.company_id);
     let line = ctx
         .db
         .hr_expense()
         .iter()
-        .find(|e| e.client_request_id.as_deref() == Some("we-pack-1"))
+        .find(|e| {
+            e.organization_id == fixture.organization_id
+                && e.client_request_id.as_deref() == Some(pack_req.as_str())
+        })
         .ok_or("line")?;
+    let sheet_name = format!("WE Pack Sheet {}", fixture.company_id);
     create_expense_sheet(
         ctx,
         fixture.organization_id,
         CreateExpenseSheetParams {
             company_id: Some(fixture.company_id),
             employee_id,
-            name: "WE Pack Sheet".into(),
+            name: sheet_name.clone(),
             currency_id: 1,
             notes: None,
             accounting_date: None,
@@ -317,7 +323,7 @@ pub fn test_pack_tax_evidence_required(ctx: &ReducerContext) -> Result<(), Strin
         .db
         .expense_sheet()
         .iter()
-        .find(|s| s.name == "WE Pack Sheet")
+        .find(|s| s.organization_id == fixture.organization_id && s.name == sheet_name)
         .map(|s| s.id)
         .ok_or("sheet")?;
     submit_expense(ctx, fixture.organization_id, line.id, sheet_id)?;
@@ -360,26 +366,31 @@ pub fn test_card_statement_match_and_fx_fee(ctx: &ReducerContext) -> Result<(), 
             mileage_rate_id: None,
             per_diem_days: None,
             per_diem_rate_id: None,
-            attachment_ids: vec![1],
-            client_request_id: Some("we-card-1".into()),
+            attachment_ids: vec![super::test_receipt_id(ctx, fixture.organization_id, fixture.company_id, employee_id)?],
+            client_request_id: Some(format!("we-card-1-{}", fixture.company_id)),
             payment_mode: ExpensePaymentMode::CorporateCard,
             merchant_key: Some("hilton".into()),
             policy_exception_reason: None,
         },
     )?;
+    let card_req = format!("we-card-1-{}", fixture.company_id);
     let line = ctx
         .db
         .hr_expense()
         .iter()
-        .find(|e| e.client_request_id.as_deref() == Some("we-card-1"))
+        .find(|e| {
+            e.organization_id == fixture.organization_id
+                && e.client_request_id.as_deref() == Some(card_req.as_str())
+        })
         .ok_or("card expense")?;
 
+    let stmt_ref = format!("STMT-WE-1-{}", fixture.company_id);
     create_expense_card_statement_line(
         ctx,
         fixture.organization_id,
         CreateExpenseCardStatementLineParams {
             company_id: Some(fixture.company_id),
-            external_ref: "STMT-WE-1".into(),
+            external_ref: stmt_ref.clone(),
             merchant_key: Some("hilton".into()),
             amount: 100.0,
             currency_id: 1,
@@ -392,7 +403,9 @@ pub fn test_card_statement_match_and_fx_fee(ctx: &ReducerContext) -> Result<(), 
         .db
         .expense_card_statement_line()
         .iter()
-        .find(|s| s.external_ref == "STMT-WE-1")
+        .find(|s| {
+            s.organization_id == fixture.organization_id && s.external_ref == stmt_ref
+        })
         .ok_or("statement")?;
     match_expense_card_statement_line(
         ctx,
@@ -404,13 +417,14 @@ pub fn test_card_statement_match_and_fx_fee(ctx: &ReducerContext) -> Result<(), 
         },
     )?;
 
+    let sheet_name = format!("WE FX Sheet {}", fixture.company_id);
     create_expense_sheet(
         ctx,
         fixture.organization_id,
         CreateExpenseSheetParams {
             company_id: Some(fixture.company_id),
             employee_id,
-            name: "WE FX Sheet".into(),
+            name: sheet_name.clone(),
             currency_id: 1,
             notes: None,
             accounting_date: None,
@@ -420,7 +434,7 @@ pub fn test_card_statement_match_and_fx_fee(ctx: &ReducerContext) -> Result<(), 
         .db
         .expense_sheet()
         .iter()
-        .find(|s| s.name == "WE FX Sheet")
+        .find(|s| s.organization_id == fixture.organization_id && s.name == sheet_name)
         .map(|s| s.id)
         .ok_or("sheet")?;
     submit_expense(ctx, fixture.organization_id, line.id, sheet_id)?;
@@ -440,14 +454,21 @@ pub fn test_card_statement_match_and_fx_fee(ctx: &ReducerContext) -> Result<(), 
             fx_fee_account_id: Some(accounts.fx_fee_id),
             fx_fee_amount: None,
             accounting_date: ctx.timestamp,
-            client_request_id: Some("we-fx-post".into()),
+            client_request_id: Some(format!("we-fx-post-{}", fixture.company_id)),
         },
     )?;
+    let post_move_id = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
+        .and_then(|s| s.account_move_id)
+        .ok_or("sheet missing account_move_id")?;
     let fx_debit: f64 = ctx
         .db
         .account_move_line()
         .iter()
-        .filter(|l| l.account_id == accounts.fx_fee_id && l.debit > 0.0)
+        .filter(|l| l.move_id == post_move_id && l.account_id == accounts.fx_fee_id && l.debit > 0.0)
         .map(|l| l.debit)
         .sum();
     if (fx_debit - 3.5).abs() > 0.01 {
@@ -457,7 +478,11 @@ pub fn test_card_statement_match_and_fx_fee(ctx: &ReducerContext) -> Result<(), 
         .db
         .account_move_line()
         .iter()
-        .filter(|l| l.account_id == accounts.card_liability_id && l.credit > 0.0)
+        .filter(|l| {
+            l.move_id == post_move_id
+                && l.account_id == accounts.card_liability_id
+                && l.credit > 0.0
+        })
         .map(|l| l.credit)
         .sum();
     if (card_credit - 103.5).abs() > 0.01 {
@@ -489,7 +514,9 @@ pub fn test_email_inbox_intent_batch_apply(ctx: &ReducerContext) -> Result<(), S
                 "name": "Email receipt lunch",
                 "unit_amount": 18.0,
                 "quantity": 1.0,
-                "attachment_ids": [9],
+                "storage_key": "s3://inbox/email-we-1.pdf",
+                "content_hash": "sha256:email-we-1",
+                "file_name": "lunch.pdf",
             })
             .to_string(),
             metadata: None,
@@ -516,6 +543,22 @@ pub fn test_email_inbox_intent_batch_apply(ctx: &ReducerContext) -> Result<(), S
     if line.attachment_ids.is_empty() {
         return Err("email inbox should attach receipt ids".into());
     }
+    let receipt_id = line.attachment_ids[0];
+    if receipt_id == 1 {
+        return Err("email inbox must not use stub attachment id 1".into());
+    }
+    let receipt = ctx
+        .db
+        .hr_expense_receipt()
+        .id()
+        .find(&receipt_id)
+        .ok_or("email receipt row missing")?;
+    if receipt.storage_key != "s3://inbox/email-we-1.pdf" {
+        return Err(format!(
+            "expected storage_key from payload, got {}",
+            receipt.storage_key
+        ));
+    }
     // Direct apply path still works for OCR.
     create_expense_integration_intent(
         ctx,
@@ -531,6 +574,8 @@ pub fn test_email_inbox_intent_batch_apply(ctx: &ReducerContext) -> Result<(), S
                 "name": "OCR taxi",
                 "unit_amount": 12.0,
                 "quantity": 1.0,
+                "storage_key": "s3://ocr/ocr-we-1.jpg",
+                "content_hash": "sha256:ocr-we-1",
             })
             .to_string(),
             metadata: None,
@@ -545,5 +590,187 @@ pub fn test_email_inbox_intent_batch_apply(ctx: &ReducerContext) -> Result<(), S
         })
         .ok_or("ocr intent")?;
     apply_expense_integration_intent(ctx, fixture.organization_id, ocr.id)?;
+    // Missing storage_key must fail for OCR/email.
+    create_expense_integration_intent(
+        ctx,
+        fixture.organization_id,
+        CreateExpenseIntegrationIntentParams {
+            company_id: Some(fixture.company_id),
+            intent_type: "ocr_receipt".into(),
+            idempotency_key: "ocr-missing-key".into(),
+            device_id: None,
+            payload: serde_json::json!({
+                "employee_id": employee_id,
+                "currency_id": 1,
+                "name": "OCR no key",
+                "unit_amount": 5.0,
+                "quantity": 1.0,
+            })
+            .to_string(),
+            metadata: None,
+        },
+    )?;
+    let bad = ctx
+        .db
+        .expense_integration_intent()
+        .iter()
+        .find(|i| {
+            i.organization_id == fixture.organization_id && i.idempotency_key == "ocr-missing-key"
+        })
+        .ok_or("ocr missing key intent")?;
+    if apply_expense_integration_intent(ctx, fixture.organization_id, bad.id).is_ok() {
+        return Err("ocr without storage_key must not apply".into());
+    }
+    Ok(())
+}
+
+/// Match then unmatch restores statement line to unmatched inbox.
+pub fn test_card_statement_unmatch(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let employee_id = seed_employee(ctx, &fixture)?;
+
+    create_expense(
+        ctx,
+        fixture.organization_id,
+        CreateExpenseParams {
+            company_id: Some(fixture.company_id),
+            employee_id,
+            name: "Card match target".into(),
+            date: ctx.timestamp,
+            unit_amount: 55.0,
+            quantity: 1.0,
+            currency_id: 1,
+            product_id: None,
+            description: None,
+            tax_ids: vec![],
+            account_id: None,
+            analytic_account_id: None,
+            project_id: None,
+            line_kind: ExpenseLineKind::Standard,
+            mileage_distance: None,
+            mileage_rate_id: None,
+            per_diem_days: None,
+            per_diem_rate_id: None,
+            attachment_ids: vec![super::test_receipt_id(
+                ctx,
+                fixture.organization_id,
+                fixture.company_id,
+                employee_id,
+            )?],
+            client_request_id: Some(format!("we-unmatch-exp-{}", fixture.company_id)),
+            payment_mode: ExpensePaymentMode::CorporateCard,
+            merchant_key: Some("shell".into()),
+            policy_exception_reason: None,
+        },
+    )?;
+    let unmatch_req = format!("we-unmatch-exp-{}", fixture.company_id);
+    let line = ctx
+        .db
+        .hr_expense()
+        .iter()
+        .find(|e| {
+            e.organization_id == fixture.organization_id
+                && e.client_request_id.as_deref() == Some(unmatch_req.as_str())
+        })
+        .ok_or("expense")?;
+
+    let stmt_ref = format!("STMT-UNMATCH-1-{}", fixture.company_id);
+    create_expense_card_statement_line(
+        ctx,
+        fixture.organization_id,
+        CreateExpenseCardStatementLineParams {
+            company_id: Some(fixture.company_id),
+            external_ref: stmt_ref.clone(),
+            merchant_key: Some("shell".into()),
+            amount: 55.0,
+            currency_id: 1,
+            transaction_date: ctx.timestamp,
+            fx_fee_amount: 0.0,
+            metadata: None,
+        },
+    )?;
+    let stmt = ctx
+        .db
+        .expense_card_statement_line()
+        .iter()
+        .find(|s| {
+            s.organization_id == fixture.organization_id && s.external_ref == stmt_ref
+        })
+        .ok_or("statement")?;
+    match_expense_card_statement_line(
+        ctx,
+        fixture.organization_id,
+        stmt.id,
+        MatchExpenseCardStatementLineParams {
+            expense_id: line.id,
+            metadata: None,
+        },
+    )?;
+    let matched = ctx
+        .db
+        .expense_card_statement_line()
+        .id()
+        .find(&stmt.id)
+        .ok_or("matched stmt")?;
+    if matched.status != "matched" || matched.matched_expense_id != Some(line.id) {
+        return Err("expected matched status".into());
+    }
+    unmatch_expense_card_statement_line(
+        ctx,
+        fixture.organization_id,
+        stmt.id,
+        UnmatchExpenseCardStatementLineParams { metadata: None },
+    )?;
+    let unmatched = ctx
+        .db
+        .expense_card_statement_line()
+        .id()
+        .find(&stmt.id)
+        .ok_or("unmatched stmt")?;
+    if unmatched.status != "unmatched" || unmatched.matched_expense_id.is_some() {
+        return Err(format!(
+            "expected unmatched restore, got status={} matched={:?}",
+            unmatched.status, unmatched.matched_expense_id
+        ));
+    }
+    Ok(())
+}
+
+/// BR (and LATAM/SEA) packs expose expense evidence flags beyond AU/NZ/ZA/SG.
+pub fn test_br_pack_expense_evidence_flags(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let br = ctx
+        .db
+        .country_pack_definition()
+        .pack_key()
+        .find(&"br".to_string())
+        .ok_or("br country pack missing — run migrations")?;
+    let meta = br.metadata.as_deref().unwrap_or("");
+    if !meta.contains("expense_require_receipt") {
+        return Err("br pack missing expense_require_receipt".into());
+    }
+    set_company_country_pack(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        SetCompanyCountryPackParams {
+            pack_key: "br".into(),
+            enabled: true,
+            configuration: None,
+        },
+    )?;
+    let rules = crate::core::country_pack::pack_expense_evidence_rules(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+    );
+    if !rules.require_receipt {
+        return Err("br pack should require receipt when enabled".into());
+    }
+    if !rules.require_tax_ids {
+        return Err("br pack should require tax ids when enabled".into());
+    }
     Ok(())
 }

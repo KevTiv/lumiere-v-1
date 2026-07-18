@@ -2,16 +2,26 @@
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove,
     AddAccountMoveLineParams,
 };
+use crate::accounting::tax_management::{account_tax, account_tax_group};
+use crate::core::country_pack::company_enabled_pack_keys;
 use crate::core::organization::company_id_from_scope;
-use crate::expenses::expenses::{expense_sheet, hr_expense, HrExpense, HrExpenseSheet};
-use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::expenses::expenses::{
+    expense_sheet, hr_expense, metadata_str_eq, HrExpense, HrExpenseSheet,
+};
+use crate::helpers::{
+    calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
+};
 use crate::projects::project_accounting::refresh_project_margin_for_projects;
 use crate::projects::projects::project_project;
-use crate::types::{AccountMoveState, ExpenseSheetState, ExpenseState, MoveType, PaymentState};
+use crate::sales::oms_extensions::remap_taxes_for_fiscal_position;
+use crate::types::{
+    AccountMoveState, ExpenseSheetState, ExpenseState, MoveType, PaymentState, TaxTypeUse,
+};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -121,6 +131,12 @@ pub struct ExpenseAllocationLineParams {
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
+pub struct SeedStatutoryExpenseMileageRatesParams {
+    pub company_id: Option<u64>,
+    pub currency_id: u64,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
 pub struct SetExpenseAllocationsParams {
     pub lines: Vec<ExpenseAllocationLineParams>,
 }
@@ -133,10 +149,63 @@ pub struct CreateExpenseProjectRebillParams {
     pub invoice_date: Timestamp,
     /// Override project partner when set.
     pub partner_id: Option<u64>,
+    /// Optional fiscal position for tax remap (partner FP when known).
+    pub fiscal_position_id: Option<u64>,
     pub client_request_id: Option<String>,
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Resolve sale tax ids for project rebill — prefer expense-line taxes (remapped via
+/// optional fiscal position), else company default sale tax (mirrors `bill_timesheets`).
+fn resolve_rebill_tax_ids(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    line_tax_ids: &[u64],
+    fiscal_position_id: Option<u64>,
+) -> Result<Vec<u64>, String> {
+    let mut tax_ids = if line_tax_ids.is_empty() {
+        let mut sale_taxes: Vec<_> = ctx
+            .db
+            .account_tax()
+            .tax_by_company()
+            .filter(&company_id)
+            .filter(|t| {
+                t.organization_id == organization_id
+                    && t.active
+                    && t.type_tax_use == TaxTypeUse::Sale
+            })
+            .collect();
+        sale_taxes.sort_by_key(|t| t.sequence);
+        sale_taxes
+            .into_iter()
+            .next()
+            .map(|t| vec![t.id])
+            .unwrap_or_default()
+    } else {
+        line_tax_ids.to_vec()
+    };
+    tax_ids = remap_taxes_for_fiscal_position(ctx, organization_id, fiscal_position_id, &tax_ids)?;
+    Ok(tax_ids)
+}
+
+fn resolve_tax_payable_account(ctx: &ReducerContext, tax_ids: &[u64]) -> Option<u64> {
+    for &tax_id in tax_ids {
+        let Some(tax) = ctx.db.account_tax().id().find(&tax_id) else {
+            continue;
+        };
+        let Some(group_id) = tax.tax_group_id else {
+            continue;
+        };
+        if let Some(group) = ctx.db.account_tax_group().id().find(&group_id) {
+            if let Some(payable) = group.tax_payable_account_id.filter(|id| *id > 0) {
+                return Some(payable);
+            }
+        }
+    }
+    None
+}
 
 fn empty_line_params(
     account_id: u64,
@@ -215,6 +284,127 @@ pub(crate) fn clear_allocations_for_expense(ctx: &ReducerContext, expense_id: u6
     for id in ids {
         ctx.db.hr_expense_allocation().id().delete(&id);
     }
+}
+
+// ── Statutory mileage helpers (AU/NZ packs) ───────────────────────────────────
+
+/// Illustrative statutory cents-per-km tables for country packs.
+/// Confirm against ATO / IRD before production close — rates change by income year.
+pub fn statutory_mileage_rate_specs(pack_key: &str) -> Vec<(&'static str, f64, &'static str)> {
+    match pack_key {
+        "au" => vec![("ATO cents per kilometre (seed)", 0.88, "km")],
+        "nz" => vec![("IRD mileage rate (seed)", 0.95, "km")],
+        _ => vec![],
+    }
+}
+
+/// Insert missing statutory mileage rates for one pack (idempotent by name + company).
+pub(crate) fn seed_statutory_mileage_rates_for_pack(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    pack_key: &str,
+    currency_id: u64,
+) -> Result<u32, String> {
+    let mut inserted = 0u32;
+    for (name, rate_per_unit, unit) in statutory_mileage_rate_specs(pack_key) {
+        let exists = ctx.db.hr_expense_mileage_rate().iter().any(|r| {
+            r.organization_id == organization_id
+                && r.company_id == company_id
+                && r.name == name
+        });
+        if exists {
+            continue;
+        }
+        let meta = serde_json::json!({
+            "statutory": true,
+            "pack_key": pack_key,
+            "source": "seed",
+        })
+        .to_string();
+        ctx.db.hr_expense_mileage_rate().insert(HrExpenseMileageRate {
+            id: 0,
+            organization_id,
+            company_id,
+            name: name.to_string(),
+            currency_id,
+            rate_per_unit,
+            unit: unit.to_string(),
+            effective_from: None,
+            effective_to: None,
+            active: true,
+            metadata: Some(meta),
+        });
+        inserted = inserted.saturating_add(1);
+    }
+    Ok(inserted)
+}
+
+/// Seed AU/NZ (and any pack with specs) statutory mileage rates for enabled company packs.
+#[reducer]
+pub fn seed_statutory_expense_mileage_rates(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: SeedStatutoryExpenseMileageRatesParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "hr_expense", "update")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    if params.currency_id == 0 {
+        return Err("currency_id is required".to_string());
+    }
+    let pack_keys = company_enabled_pack_keys(ctx, organization_id, company_id);
+    let mut total = 0u32;
+    let mut seeded_packs: Vec<String> = Vec::new();
+    for key in &pack_keys {
+        let n = seed_statutory_mileage_rates_for_pack(
+            ctx,
+            organization_id,
+            company_id,
+            key,
+            params.currency_id,
+        )?;
+        if n > 0 {
+            seeded_packs.push(key.clone());
+            total = total.saturating_add(n);
+        }
+    }
+    // If no packs enabled, still allow explicit AU/NZ seed for pilot companies.
+    if pack_keys.is_empty() {
+        for key in ["au", "nz"] {
+            let n = seed_statutory_mileage_rates_for_pack(
+                ctx,
+                organization_id,
+                company_id,
+                key,
+                params.currency_id,
+            )?;
+            if n > 0 {
+                seeded_packs.push(key.to_string());
+                total = total.saturating_add(n);
+            }
+        }
+    }
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_expense_mileage_rate",
+            record_id: 0,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "inserted": total,
+                    "packs": seeded_packs,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["statutory_mileage_seeds".into()],
+            metadata: None,
+        },
+    );
+    Ok(())
 }
 
 // ── Reducers: Rates ───────────────────────────────────────────────────────────
@@ -528,12 +718,7 @@ pub fn create_expense_project_rebill(
     }
     if let Some(existing) = sheet.rebill_move_id {
         if let Some(req) = params.client_request_id.as_ref() {
-            if sheet
-                .metadata
-                .as_deref()
-                .map(|m| m.contains(req.as_str()))
-                .unwrap_or(false)
-            {
+            if metadata_str_eq(sheet.metadata.as_deref(), "rebill_client_request_id", req) {
                 return Ok(());
             }
         }
@@ -543,6 +728,7 @@ pub fn create_expense_project_rebill(
     }
 
     let company_id = sheet.company_id;
+    ensure_accounting_period_open_for_date(ctx, company_id, params.invoice_date)?;
     if params.receivable_account_id == params.income_account_id {
         return Err("Receivable and income accounts must differ".to_string());
     }
@@ -573,6 +759,7 @@ pub fn create_expense_project_rebill(
     let mut rebill_total = 0.0;
     let mut partner_id = params.partner_id;
     let mut income_lines: Vec<(String, f64, Option<u64>, Option<u64>)> = Vec::new();
+    let mut collected_tax_ids: Vec<u64> = Vec::new();
 
     for line in &lines {
         let allocs = allocations_for_expense(ctx, line.id);
@@ -589,6 +776,11 @@ pub fn create_expense_project_rebill(
                 }
                 let amt = line.total_amount * rate;
                 rebill_total += amt;
+                for tid in &line.tax_ids {
+                    if !collected_tax_ids.contains(tid) {
+                        collected_tax_ids.push(*tid);
+                    }
+                }
                 income_lines.push((
                     format!("{} — {}", sheet.name, line.name),
                     amt,
@@ -614,6 +806,11 @@ pub fn create_expense_project_rebill(
                 }
                 let amt = alloc.amount * rate;
                 rebill_total += amt;
+                for tid in &line.tax_ids {
+                    if !collected_tax_ids.contains(tid) {
+                        collected_tax_ids.push(*tid);
+                    }
+                }
                 income_lines.push((
                     format!("{} — {} ({:.0}%)", sheet.name, line.name, alloc.share_percent),
                     amt,
@@ -633,6 +830,16 @@ pub fn create_expense_project_rebill(
     let partner_id = partner_id.ok_or(
         "Project rebill requires a customer partner (project.partner_id or params.partner_id)",
     )?;
+
+    let tax_ids = resolve_rebill_tax_ids(
+        ctx,
+        organization_id,
+        company_id,
+        &collected_tax_ids,
+        params.fiscal_position_id,
+    )?;
+    let amount_tax = calculate_tax(ctx, &tax_ids, rebill_total);
+    let amount_total = rebill_total + amount_tax;
 
     let origin = format!("EXP{sheet_id}-REBILL");
     let name = next_doc_number(ctx, "INV");
@@ -663,7 +870,7 @@ pub fn create_expense_project_rebill(
         partner_id: Some(partner_id),
         commercial_partner_id: Some(partner_id),
         partner_bank_id: None,
-        fiscal_position_id: None,
+        fiscal_position_id: params.fiscal_position_id,
         invoice_user_id: Some(ctx.sender()),
         invoice_incoterm_id: None,
         incoterm_location: None,
@@ -675,14 +882,14 @@ pub fn create_expense_project_rebill(
         currency_id: sheet.currency_id,
         company_currency_id,
         amount_untaxed: rebill_total,
-        amount_tax: 0.0,
-        amount_total: rebill_total,
-        amount_residual: rebill_total,
+        amount_tax,
+        amount_total,
+        amount_residual: amount_total,
         amount_untaxed_signed: rebill_total,
-        amount_tax_signed: 0.0,
-        amount_total_signed: rebill_total,
-        amount_total_in_currency_signed: rebill_total / rate.max(0.0001),
-        amount_residual_signed: rebill_total,
+        amount_tax_signed: amount_tax,
+        amount_total_signed: amount_total,
+        amount_total_in_currency_signed: amount_total / rate.max(0.0001),
+        amount_residual_signed: amount_total,
         to_check: false,
         posted_before: false,
         is_storno: false,
@@ -700,6 +907,8 @@ pub fn create_expense_project_rebill(
                 "expense_sheet_id": sheet_id,
                 "kind": "expense_project_rebill",
                 "client_request_id": params.client_request_id,
+                "tax_ids": tax_ids,
+                "amount_tax": amount_tax,
             })
             .to_string(),
         ),
@@ -715,13 +924,29 @@ pub fn create_expense_project_rebill(
         let mut lp = empty_line_params(params.income_account_id, label, 0.0, amt, seq);
         lp.analytic_account_id = analytic_id;
         lp.partner_id = Some(partner_id);
+        lp.tax_ids = tax_ids.clone();
         insert_draft_account_move_line(ctx, &move_record, lp)?;
+        seq += 1;
+    }
+    if amount_tax > 0.0001 {
+        let tax_account = resolve_tax_payable_account(ctx, &tax_ids)
+            .unwrap_or(params.income_account_id);
+        let mut tax_lp = empty_line_params(
+            tax_account,
+            format!("Tax on rebill — {}", sheet.name),
+            0.0,
+            amount_tax,
+            seq,
+        );
+        tax_lp.partner_id = Some(partner_id);
+        tax_lp.tax_ids = tax_ids.clone();
+        insert_draft_account_move_line(ctx, &move_record, tax_lp)?;
         seq += 1;
     }
     let mut ar = empty_line_params(
         params.receivable_account_id,
         format!("Customer receivable — {}", sheet.name),
-        rebill_total,
+        amount_total,
         0.0,
         seq,
     );
@@ -785,6 +1010,8 @@ pub fn create_expense_project_rebill(
                 serde_json::json!({
                     "rebill_move_id": move_record.id,
                     "rebill_total": rebill_total,
+                    "amount_tax": amount_tax,
+                    "amount_total": amount_total,
                 })
                 .to_string(),
             ),

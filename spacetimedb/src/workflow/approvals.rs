@@ -8,6 +8,7 @@ use crate::ai::action_drafts::{
 };
 use crate::accounting::journal_entries::post_account_move_impl;
 use crate::accounting::payments::post_payment_impl;
+use crate::expenses::expenses::approve_expense_sheet_impl;
 use crate::purchasing::purchase_orders::{
     confirm_purchase_order_impl, purchase_order, send_purchase_order_impl, PurchaseOrder,
 };
@@ -133,6 +134,9 @@ fn execute_approved_action(
         }
         "post_account_move" => post_account_move_impl(ctx, organization_id, request.res_id, true),
         "post_payment" => post_payment_impl(ctx, organization_id, request.res_id, true),
+        "approve_expense_sheet" => {
+            approve_expense_sheet_impl(ctx, organization_id, request.res_id, true)
+        }
         "approve_ai_action_draft" => {
             let draft_id = request
                 .ai_draft_id

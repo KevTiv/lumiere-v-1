@@ -46,13 +46,50 @@ pub fn import_expense_csv(
             continue;
         }
 
-        let state = match col(&headers, row, "state") {
-            "submitted" => ExpenseState::Submitted,
-            "approved" => ExpenseState::Approved,
-            "posted" => ExpenseState::Posted,
-            "done" => ExpenseState::Done,
-            "refused" => ExpenseState::Refused,
-            _ => ExpenseState::Draft,
+        // Draft-only by default — never allow Posted/Done without JE via CSV.
+        // Break-glass: set allow_non_draft=true to import Submitted/Approved/Refused only.
+        let allow_flag = col(&headers, row, "allow_non_draft");
+        let allow_non_draft = allow_flag.eq_ignore_ascii_case("1")
+            || allow_flag.eq_ignore_ascii_case("true")
+            || allow_flag.eq_ignore_ascii_case("yes");
+        let state_raw = col(&headers, row, "state");
+        let state = if !allow_non_draft {
+            match state_raw {
+                "" | "draft" => ExpenseState::Draft,
+                "submitted" | "approved" | "posted" | "done" | "refused" => {
+                    record_import_error(
+                        ctx,
+                        job.id,
+                        row_num,
+                        Some("state"),
+                        Some(state_raw),
+                        "CSV import allows Draft expense lines only (set allow_non_draft=true for break-glass)",
+                    );
+                    errors += 1;
+                    continue;
+                }
+                _ => ExpenseState::Draft,
+            }
+        } else {
+            match state_raw {
+                "" | "draft" => ExpenseState::Draft,
+                "submitted" => ExpenseState::Submitted,
+                "approved" => ExpenseState::Approved,
+                "refused" => ExpenseState::Refused,
+                "posted" | "done" => {
+                    record_import_error(
+                        ctx,
+                        job.id,
+                        row_num,
+                        Some("state"),
+                        Some(state_raw),
+                        "CSV cannot import Posted/Done expense lines (no account_move_id on line)",
+                    );
+                    errors += 1;
+                    continue;
+                }
+                _ => ExpenseState::Draft,
+            }
         };
         let attachment_ids = vec_u64(col(&headers, row, "attachment_ids"));
         let has_receipt = !attachment_ids.is_empty();

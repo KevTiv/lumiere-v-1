@@ -19,6 +19,8 @@ export type ExpenseCapturePayload = {
   perDiemDays?: number
   perDiemRateId?: string
   projectId?: string
+  paymentMode?: "OutOfPocket" | "CorporateCard"
+  merchantKey?: string
 }
 
 export type ExpenseCaptureSyncState = "queued" | "synced" | "error" | "conflict"

@@ -1,17 +1,24 @@
 //! Wave D — integration intents, advances, policy exceptions, fraud helpers.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company_id_from_scope;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, insert_draft_account_move_line, AccountMove,
+    AddAccountMoveLineParams,
+};
+use crate::core::organization::{company, company_id_from_scope};
+use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::types::{
-    ExpenseAdvanceState, ExpenseLineKind, ExpensePaymentMode, ExpensePolicyExceptionState,
-    ExpenseState,
+    AccountMoveState, ExpenseAdvanceState, ExpenseLineKind, ExpensePaymentMode,
+    ExpensePolicyExceptionState, ExpenseState, MoveType, PaymentState,
 };
 use serde_json::Value;
 
 use super::expenses::{
-    create_expense, expense_sheet, hr_expense, CreateExpenseParams, HrExpense,
+    create_expense, expense_sheet, hr_expense, hr_expense_receipt, insert_expense_receipt,
+    CreateExpenseParams, CreateExpenseReceiptParams, HrExpense,
 };
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -70,6 +77,8 @@ pub struct HrExpenseAdvance {
     pub residual: f64,
     pub currency_id: u64,
     pub state: ExpenseAdvanceState,
+    /// Posted cash/prepaid Entry created at issuance (Dr advance, Cr cash).
+    pub account_move_id: Option<u64>,
     pub client_request_id: Option<String>,
     pub metadata: Option<String>,
     pub created_at: Timestamp,
@@ -142,6 +151,13 @@ pub struct CreateExpenseAdvanceParams {
     pub name: String,
     pub amount: f64,
     pub currency_id: u64,
+    /// Journal for the issuance Entry (cash/bank book).
+    pub journal_id: u64,
+    /// Cash or bank account credited on issuance.
+    pub cash_account_id: u64,
+    /// Prepaid / advance asset account debited on issuance (cleared on sheet post).
+    pub advance_account_id: u64,
+    pub accounting_date: Timestamp,
     pub client_request_id: Option<String>,
     pub metadata: Option<String>,
 }
@@ -154,6 +170,12 @@ pub struct ApplyExpenseAdvanceParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct RequestExpensePolicyExceptionParams {
+    pub reason: String,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RejectExpensePolicyExceptionParams {
     pub reason: String,
     pub metadata: Option<String>,
 }
@@ -242,6 +264,53 @@ pub(crate) fn find_duplicate_expense(
     })
 }
 
+/// If any attachment shares a non-empty `content_hash` with a receipt already linked to
+/// another expense in the same company, treat that expense as a duplicate.
+pub(crate) fn find_duplicate_by_receipt_content_hash(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    attachment_ids: &[u64],
+    exclude_expense_id: Option<u64>,
+) -> Option<u64> {
+    let hashes: Vec<String> = attachment_ids
+        .iter()
+        .filter_map(|id| {
+            ctx.db.hr_expense_receipt().id().find(id).and_then(|r| {
+                if r.organization_id != organization_id || r.company_id != company_id {
+                    return None;
+                }
+                r.content_hash
+                    .as_ref()
+                    .map(|h| h.trim().to_string())
+                    .filter(|h| !h.is_empty())
+            })
+        })
+        .collect();
+    if hashes.is_empty() {
+        return None;
+    }
+    for other in ctx.db.hr_expense().iter() {
+        if other.organization_id != organization_id || other.company_id != company_id {
+            continue;
+        }
+        if exclude_expense_id == Some(other.id) {
+            continue;
+        }
+        for aid in &other.attachment_ids {
+            if let Some(r) = ctx.db.hr_expense_receipt().id().find(aid) {
+                if let Some(ref h) = r.content_hash {
+                    let h = h.trim();
+                    if !h.is_empty() && hashes.iter().any(|x| x == h) {
+                        return Some(other.id);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 fn payload_u64(v: &Value, key: &str) -> Option<u64> {
     v.get(key).and_then(|x| x.as_u64())
 }
@@ -254,6 +323,11 @@ fn payload_str(v: &Value, key: &str) -> Option<String> {
     v.get(key).and_then(|x| x.as_str()).map(|s| s.to_string())
 }
 
+/// Apply card/OCR/email/delayed_sync payload → optional receipt + `create_expense`.
+///
+/// OCR/email contract: payload MUST include non-empty `storage_key`. Apply inserts
+/// `hr_expense_receipt` then creates the expense with that id (never stub `1`).
+/// See `api-server/src/expense_integration_worker.rs` module docs.
 fn apply_create_expense_payload(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -278,7 +352,7 @@ fn apply_create_expense_payload(
         _ if intent_type == "card_feed" => ExpensePaymentMode::CorporateCard,
         _ => ExpensePaymentMode::OutOfPocket,
     };
-    let attachment_ids = v
+    let mut attachment_ids = v
         .get("attachment_ids")
         .and_then(|a| a.as_array())
         .map(|arr| {
@@ -286,16 +360,39 @@ fn apply_create_expense_payload(
                 .filter_map(|x| x.as_u64())
                 .collect::<Vec<_>>()
         })
-        .unwrap_or_else(|| {
-            if matches!(intent_type, "ocr_receipt" | "email_inbox") {
-                vec![1]
-            } else {
-                vec![]
-            }
-        });
+        .unwrap_or_default();
     let client_request_id = payload_str(&v, "client_request_id")
         .or_else(|| Some(idempotency_key.to_string()));
     let client_request_id_lookup = client_request_id.clone();
+
+    // OCR / email intents must register a real receipt row — never stub id 1.
+    // Workers must supply a non-empty storage_key (object-store / blob key).
+    if matches!(intent_type, "ocr_receipt" | "email_inbox") {
+        if attachment_ids.is_empty() {
+            let storage_key = payload_str(&v, "storage_key")
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| {
+                    format!("{intent_type} payload requires non-empty storage_key")
+                })?;
+            let receipt_key = format!("{intent_type}:{idempotency_key}");
+            let receipt_id = insert_expense_receipt(
+                ctx,
+                organization_id,
+                company_id,
+                &CreateExpenseReceiptParams {
+                    company_id: Some(company_id),
+                    employee_id,
+                    file_name: payload_str(&v, "file_name"),
+                    mime_type: payload_str(&v, "mime_type"),
+                    storage_key,
+                    content_hash: payload_str(&v, "content_hash"),
+                    client_request_id: Some(receipt_key),
+                },
+            )?;
+            attachment_ids = vec![receipt_id];
+        }
+    }
 
     create_expense(
         ctx,
@@ -597,6 +694,69 @@ pub fn fail_expense_integration_intent(
 
 // ── Reducers: Advances ────────────────────────────────────────────────────────
 
+fn validate_advance_account(
+    ctx: &ReducerContext,
+    company_id: u64,
+    account_id: u64,
+    label: &str,
+) -> Result<(), String> {
+    let account = ctx
+        .db
+        .account_account()
+        .id()
+        .find(&account_id)
+        .ok_or_else(|| format!("{label} account not found"))?;
+    if account.company_id != company_id {
+        return Err(format!("{label} account does not belong to this company"));
+    }
+    Ok(())
+}
+
+fn advance_line_params(
+    account_id: u64,
+    name: String,
+    debit: f64,
+    credit: f64,
+    sequence: u32,
+) -> AddAccountMoveLineParams {
+    AddAccountMoveLineParams {
+        account_id,
+        name,
+        debit,
+        credit,
+        sequence,
+        quantity: if debit > 0.0 || credit > 0.0 { 1.0 } else { 0.0 },
+        price_unit: debit.max(credit),
+        discount: 0.0,
+        tax_ids: vec![],
+        partner_id: None,
+        product_id: None,
+        product_uom_id: None,
+        product_category_id: None,
+        analytic_account_id: None,
+        analytic_tag_ids: vec![],
+        display_type: None,
+        is_downpayment: false,
+        exclude_from_invoice_tab: false,
+        blocked: false,
+        group_tax_id: None,
+        tax_line_id: None,
+        tax_group_id: None,
+        tax_repartition_line_id: None,
+        tax_audit: None,
+        reconcile_model_id: None,
+        payment_id: None,
+        statement_line_id: None,
+        matching_number: None,
+        matching_label: None,
+        expected_pay_date: None,
+        expected_pay_date_currency_id: None,
+        expected_pay_date_amount: 0.0,
+        expected_pay_date_residual: 0.0,
+        metadata: None,
+    }
+}
+
 #[reducer]
 pub fn create_expense_advance(
     ctx: &ReducerContext,
@@ -610,6 +770,9 @@ pub fn create_expense_advance(
     }
     if params.amount <= 0.0 {
         return Err("Advance amount must be positive".to_string());
+    }
+    if params.cash_account_id == params.advance_account_id {
+        return Err("Cash and advance accounts must differ".to_string());
     }
     if let Some(ref req) = params.client_request_id {
         if !req.is_empty()
@@ -630,6 +793,158 @@ pub fn create_expense_advance(
     if emp.organization_id != organization_id || emp.company_id != company_id {
         return Err("Employee does not belong to this company".to_string());
     }
+
+    ensure_accounting_period_open_for_date(ctx, company_id, params.accounting_date)?;
+    validate_advance_account(ctx, company_id, params.cash_account_id, "Cash")?;
+    validate_advance_account(ctx, company_id, params.advance_account_id, "Advance")?;
+    let journal = ctx
+        .db
+        .account_journal()
+        .id()
+        .find(&params.journal_id)
+        .ok_or("Journal not found")?;
+    if journal.company_id != company_id {
+        return Err("Journal does not belong to this company".to_string());
+    }
+    let company_row = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+    let company_currency_id = company_row.currency_id;
+    let amount = params.amount;
+    let currency_id = params.currency_id;
+    let origin = format!("ADV-{}", params.employee_id);
+    let move_name = next_doc_number(ctx, "ADV");
+
+    let move_record = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        organization_id,
+        name: move_name.clone(),
+        ref_: Some(params.name.clone()),
+        move_type: MoveType::Entry,
+        auto_post: false,
+        state: AccountMoveState::Draft,
+        date: params.accounting_date,
+        invoice_date: Some(params.accounting_date),
+        invoice_date_due: None,
+        invoice_payment_term_id: None,
+        invoice_origin: Some(origin.clone()),
+        invoice_partner_display_name: None,
+        invoice_cash_rounding_id: None,
+        payment_reference: Some(origin.clone()),
+        partner_shipping_id: None,
+        sale_order_id: None,
+        partner_id: emp.work_contact_partner_id,
+        commercial_partner_id: emp.work_contact_partner_id,
+        partner_bank_id: None,
+        fiscal_position_id: None,
+        invoice_user_id: Some(ctx.sender()),
+        invoice_incoterm_id: None,
+        incoterm_location: None,
+        campaign_id: None,
+        source_id: None,
+        medium_id: None,
+        company_id,
+        journal_id: params.journal_id,
+        currency_id,
+        company_currency_id,
+        amount_untaxed: amount,
+        amount_tax: 0.0,
+        amount_total: amount,
+        amount_residual: amount,
+        amount_untaxed_signed: amount,
+        amount_tax_signed: 0.0,
+        amount_total_signed: amount,
+        amount_total_in_currency_signed: amount,
+        amount_residual_signed: amount,
+        to_check: false,
+        posted_before: false,
+        is_storno: false,
+        is_move_sent: false,
+        secure_sequence_number: None,
+        invoice_has_outstanding: false,
+        payment_state: PaymentState::NotPaid,
+        restrict_mode_hash_table: false,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some(
+            serde_json::json!({
+                "expense_advance": true,
+                "employee_id": params.employee_id,
+                "client_request_id": params.client_request_id,
+            })
+            .to_string(),
+        ),
+    });
+
+    insert_draft_account_move_line(
+        ctx,
+        &move_record,
+        advance_line_params(
+            params.advance_account_id,
+            format!("Expense advance — {}", params.name),
+            amount,
+            0.0,
+            1,
+        ),
+    )?;
+    insert_draft_account_move_line(
+        ctx,
+        &move_record,
+        advance_line_params(
+            params.cash_account_id,
+            format!("Cash for advance — {}", params.name),
+            0.0,
+            amount,
+            2,
+        ),
+    )?;
+
+    let total_debit: f64 = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|l| l.move_id == move_record.id)
+        .map(|l| l.debit)
+        .sum();
+    let total_credit: f64 = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|l| l.move_id == move_record.id)
+        .map(|l| l.credit)
+        .sum();
+    if (total_debit - total_credit).abs() > 0.01 {
+        return Err(format!(
+            "Advance issuance move is not balanced: debit={total_debit} credit={total_credit}"
+        ));
+    }
+
+    for ml in ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|l| l.move_id == move_record.id)
+    {
+        ctx.db.account_move_line().id().update(
+            crate::accounting::journal_entries::AccountMoveLine {
+                parent_state: AccountMoveState::Posted,
+                ..ml
+            },
+        );
+    }
+    ctx.db.account_move().id().update(AccountMove {
+        state: AccountMoveState::Posted,
+        posted_before: true,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..move_record
+    });
+
     let row = ctx.db.hr_expense_advance().insert(HrExpenseAdvance {
         id: 0,
         organization_id,
@@ -640,6 +955,7 @@ pub fn create_expense_advance(
         residual: params.amount,
         currency_id: params.currency_id,
         state: ExpenseAdvanceState::Open,
+        account_move_id: Some(move_record.id),
         client_request_id: params.client_request_id,
         metadata: params.metadata,
         created_at: ctx.timestamp,
@@ -653,8 +969,23 @@ pub fn create_expense_advance(
             record_id: row.id,
             action: "CREATE",
             old_values: None,
-            new_values: None,
-            changed_fields: vec![],
+            new_values: Some(
+                serde_json::json!({
+                    "amount": amount,
+                    "account_move_id": move_record.id,
+                    "journal_id": params.journal_id,
+                    "cash_account_id": params.cash_account_id,
+                    "advance_account_id": params.advance_account_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "amount".into(),
+                "account_move_id".into(),
+                "journal_id".into(),
+                "cash_account_id".into(),
+                "advance_account_id".into(),
+            ],
             metadata: None,
         },
     );
@@ -870,6 +1201,89 @@ pub fn approve_expense_policy_exception(
             old_values: Some(r#"{"state":"Pending"}"#.into()),
             new_values: Some(r#"{"state":"Approved"}"#.into()),
             changed_fields: vec!["state".into()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+#[reducer]
+pub fn reject_expense_policy_exception(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    exception_id: u64,
+    params: RejectExpensePolicyExceptionParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "hr_expense_sheet", "approve")?;
+    if params.reason.trim().is_empty() {
+        return Err("Rejection reason is required".to_string());
+    }
+    let exception = ctx
+        .db
+        .hr_expense_policy_exception()
+        .id()
+        .find(&exception_id)
+        .ok_or("Policy exception not found")?;
+    if exception.organization_id != organization_id {
+        return Err("Exception belongs to a different organization".to_string());
+    }
+    if exception.state != ExpensePolicyExceptionState::Pending {
+        return Err("Only pending exceptions can be rejected".to_string());
+    }
+    if exception.requested_by == ctx.sender() {
+        return Err("Requester cannot reject their own policy exception".to_string());
+    }
+    let metadata = {
+        let mut map = match exception
+            .metadata
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<Value>(s).ok())
+        {
+            Some(Value::Object(m)) => m,
+            _ => serde_json::Map::new(),
+        };
+        if let Some(extra) = params
+            .metadata
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<Value>(s).ok())
+        {
+            if let Value::Object(extra_map) = extra {
+                for (k, v) in extra_map {
+                    map.insert(k, v);
+                }
+            }
+        }
+        map.insert("reject_reason".into(), Value::String(params.reason.clone()));
+        Some(Value::Object(map).to_string())
+    };
+    // Keep policy_hold on the expense unless cleared separately.
+    ctx.db
+        .hr_expense_policy_exception()
+        .id()
+        .update(HrExpensePolicyException {
+            state: ExpensePolicyExceptionState::Rejected,
+            approved_by: Some(ctx.sender()),
+            resolved_at: Some(ctx.timestamp),
+            metadata,
+            ..exception
+        });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(exception.company_id),
+            table_name: "hr_expense_policy_exception",
+            record_id: exception_id,
+            action: "UPDATE",
+            old_values: Some(r#"{"state":"Pending"}"#.into()),
+            new_values: Some(
+                serde_json::json!({
+                    "state": "Rejected",
+                    "reject_reason": params.reason,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["state".into(), "metadata".into()],
             metadata: None,
         },
     );

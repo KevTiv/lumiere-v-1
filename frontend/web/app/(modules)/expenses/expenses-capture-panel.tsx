@@ -3,13 +3,17 @@
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
+  createExpenseReceiptAndResolveId,
   useCreateExpense,
   useCreateExpenseIntegrationIntent,
+  useExpenseMileageRates,
+  useExpensePerDiemRates,
 } from "@lumiere/query-hooks/hooks/expenses"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { Button } from "@lumiere/ui"
+import { expenseRateRowsToSelectOptions } from "@/lib/form-lookup"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
   discardExpenseCapture,
@@ -22,6 +26,7 @@ import {
   requeueExpenseCapture,
   type ExpenseCapturePayload,
 } from "@/lib/expense-capture-outbox"
+import { newExpenseReceiptClientRequestId } from "@/lib/expenses-create-params"
 import type {
   CreateExpenseParams,
   ExpenseLineKind,
@@ -35,6 +40,8 @@ function lineKindTag(kind: ExpenseCapturePayload["lineKind"]): ExpenseLineKind {
 function payloadToCreateParams(
   payload: ExpenseCapturePayload,
   clientRequestId: string,
+  attachmentIds: bigint[],
+  paymentMode: ExpensePaymentMode,
 ): Partial<CreateExpenseParams> {
   return {
     employeeId: BigInt(payload.employeeId),
@@ -45,7 +52,7 @@ function payloadToCreateParams(
     currencyId: BigInt(payload.currencyId),
     description: payload.description,
     taxIds: [],
-    attachmentIds: payload.hasReceipt ? [1n] : [],
+    attachmentIds,
     projectId: payload.projectId ? BigInt(payload.projectId) : undefined,
     lineKind: lineKindTag(payload.lineKind),
     mileageDistance: payload.mileageDistance,
@@ -53,13 +60,15 @@ function payloadToCreateParams(
     perDiemDays: payload.perDiemDays,
     perDiemRateId: payload.perDiemRateId ? BigInt(payload.perDiemRateId) : undefined,
     clientRequestId,
-    paymentMode: { tag: "OutOfPocket" } as ExpensePaymentMode,
+    paymentMode,
+    merchantKey: payload.merchantKey,
   }
 }
 
 function delayedSyncPayloadJson(
   payload: ExpenseCapturePayload,
   clientRequestId: string,
+  attachmentIds: number[],
 ): string {
   return JSON.stringify({
     employee_id: Number(payload.employeeId),
@@ -69,8 +78,10 @@ function delayedSyncPayloadJson(
     quantity: payload.quantity,
     description: payload.description,
     client_request_id: clientRequestId,
-    attachment_ids: payload.hasReceipt ? [1] : [],
+    attachment_ids: attachmentIds,
     project_id: payload.projectId ? Number(payload.projectId) : undefined,
+    payment_mode: payload.paymentMode ?? "OutOfPocket",
+    merchant_key: payload.merchantKey,
   })
 }
 
@@ -82,6 +93,16 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
   const createIntent = useCreateExpenseIntegrationIntent(orgId, operatingCompanyId)
   const { data: employees = [] } = useEmployees(orgId)
   const { data: pricelists = [] } = usePricelists(orgId)
+  const { data: mileageRates = [] } = useExpenseMileageRates(orgId)
+  const { data: perDiemRates = [] } = useExpensePerDiemRates(orgId)
+  const mileageRateOptions = useMemo(
+    () => expenseRateRowsToSelectOptions(mileageRates),
+    [mileageRates],
+  )
+  const perDiemRateOptions = useMemo(
+    () => expenseRateRowsToSelectOptions(perDiemRates),
+    [perDiemRates],
+  )
 
   const deviceId = useMemo(() => getOrCreateExpenseCaptureDeviceId(), [])
   const [busy, setBusy] = useState(false)
@@ -99,13 +120,20 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
   const [amount, setAmount] = useState("")
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [hasReceipt, setHasReceipt] = useState(true)
+  const [paymentMode, setPaymentMode] = useState<"OutOfPocket" | "CorporateCard">("OutOfPocket")
   const [lineKind, setLineKind] = useState<ExpenseCapturePayload["lineKind"]>("Standard")
   const [receiptNote, setReceiptNote] = useState("")
+  const [mileageDistance, setMileageDistance] = useState("")
+  const [mileageRateId, setMileageRateId] = useState("")
+  const [perDiemDays, setPerDiemDays] = useState("")
+  const [perDiemRateId, setPerDiemRateId] = useState("")
 
   const buildPayload = (): ExpenseCapturePayload | null => {
     const pl = pricelists.find((p) => String(p.id) === pricelistId)
     const currencyId = pl?.currencyId ?? pl?.currency_id
     if (!employeeId || !currencyId || !name.trim()) return null
+    if (lineKind === "Mileage" && (!mileageDistance || !mileageRateId)) return null
+    if (lineKind === "PerDiem" && (!perDiemDays || !perDiemRateId)) return null
     return {
       employeeId,
       name: name.trim(),
@@ -116,20 +144,50 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
       description: receiptNote.trim() || undefined,
       hasReceipt,
       lineKind,
+      paymentMode,
+      mileageDistance:
+        lineKind === "Mileage" && mileageDistance ? Number(mileageDistance) : undefined,
+      mileageRateId: lineKind === "Mileage" && mileageRateId ? mileageRateId : undefined,
+      perDiemDays: lineKind === "PerDiem" && perDiemDays ? Number(perDiemDays) : undefined,
+      perDiemRateId: lineKind === "PerDiem" && perDiemRateId ? perDiemRateId : undefined,
     }
   }
 
+  const resolveAttachmentIds = async (payload: ExpenseCapturePayload): Promise<bigint[]> => {
+    if (!payload.hasReceipt) return []
+    const receiptClientRequestId = newExpenseReceiptClientRequestId()
+    const storageKey = `capture:${deviceId}:${receiptClientRequestId}`
+    const receiptId = await createExpenseReceiptAndResolveId(orgId, {
+      companyId: operatingCompanyId,
+      employeeId: BigInt(payload.employeeId),
+      storageKey,
+      clientRequestId: receiptClientRequestId,
+      fileName: "capture-receipt",
+      mimeType: "application/octet-stream",
+    })
+    return [receiptId]
+  }
+
   const syncOne = async (payload: ExpenseCapturePayload, clientRequestId: string) => {
+    const attachmentIds = await resolveAttachmentIds(payload)
+    const attachmentNums = attachmentIds.map((id) => Number(id))
+    const mode = {
+      tag: (payload.paymentMode ?? "OutOfPocket") as "OutOfPocket" | "CorporateCard",
+    } as ExpensePaymentMode
     try {
       await createIntent.mutateAsync({
         intentType: "delayed_sync",
         idempotencyKey: clientRequestId,
         deviceId,
-        payload: delayedSyncPayloadJson(payload, clientRequestId),
+        payload: delayedSyncPayloadJson(payload, clientRequestId, attachmentNums),
       })
-      await createExpense.mutateAsync(payloadToCreateParams(payload, clientRequestId))
+      await createExpense.mutateAsync(
+        payloadToCreateParams(payload, clientRequestId, attachmentIds, mode),
+      )
     } catch {
-      await createExpense.mutateAsync(payloadToCreateParams(payload, clientRequestId))
+      await createExpense.mutateAsync(
+        payloadToCreateParams(payload, clientRequestId, attachmentIds, mode),
+      )
     }
   }
 
@@ -246,11 +304,11 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
         </Button>
       </div>
 
-      {error ? (
+      {error && (
         <p className="text-sm text-muted-foreground" role="status" data-testid="expenses-capture-status">
           {error}
         </p>
-      ) : null}
+      )}
 
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="text-xs space-y-1">
@@ -291,7 +349,6 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
             className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={t("expenses.forms.newExpense.fields.namePlaceholder")}
             data-testid="expenses-capture-name"
           />
         </label>
@@ -302,7 +359,6 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
             className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
             data-testid="expenses-capture-amount"
           />
         </label>
@@ -327,74 +383,158 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
             <option value="PerDiem">{t("expenses.forms.newExpense.fields.lineKindPerDiem")}</option>
           </select>
         </label>
-        <label className="text-xs flex items-center gap-2 pt-5">
+        <label className="text-xs space-y-1">
+          <span>{t("expenses.forms.newExpense.fields.paymentMode")}</span>
+          <select
+            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+            value={paymentMode}
+            onChange={(e) =>
+              setPaymentMode(e.target.value as "OutOfPocket" | "CorporateCard")
+            }
+          >
+            <option value="OutOfPocket">
+              {t("expenses.forms.newExpense.fields.paymentModeOutOfPocket")}
+            </option>
+            <option value="CorporateCard">
+              {t("expenses.forms.newExpense.fields.paymentModeCorporateCard")}
+            </option>
+          </select>
+        </label>
+        {lineKind === "Mileage" ? (
+          <>
+            <label className="text-xs space-y-1">
+              <span>{t("expenses.forms.newExpense.fields.mileageDistance")}</span>
+              <input
+                type="number"
+                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                value={mileageDistance}
+                onChange={(e) => setMileageDistance(e.target.value)}
+                data-testid="expenses-capture-distance"
+              />
+            </label>
+            <label className="text-xs space-y-1">
+              <span>{t("expenses.forms.newExpense.fields.mileageRateId")}</span>
+              <select
+                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                value={mileageRateId}
+                onChange={(e) => setMileageRateId(e.target.value)}
+                data-testid="expenses-capture-mileage-rate"
+              >
+                <option value="">
+                  {mileageRateOptions.length === 0
+                    ? t("expenses.forms.newExpense.fields.noMileageRates")
+                    : t("expenses.forms.newExpense.fields.rateIdPlaceholder")}
+                </option>
+                {mileageRateOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : null}
+        {lineKind === "PerDiem" ? (
+          <>
+            <label className="text-xs space-y-1">
+              <span>{t("expenses.forms.newExpense.fields.perDiemDays")}</span>
+              <input
+                type="number"
+                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                value={perDiemDays}
+                onChange={(e) => setPerDiemDays(e.target.value)}
+                data-testid="expenses-capture-per-diem-days"
+              />
+            </label>
+            <label className="text-xs space-y-1">
+              <span>{t("expenses.forms.newExpense.fields.perDiemRateId")}</span>
+              <select
+                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                value={perDiemRateId}
+                onChange={(e) => setPerDiemRateId(e.target.value)}
+                data-testid="expenses-capture-per-diem-rate"
+              >
+                <option value="">
+                  {perDiemRateOptions.length === 0
+                    ? t("expenses.forms.newExpense.fields.noPerDiemRates")
+                    : t("expenses.forms.newExpense.fields.rateIdPlaceholder")}
+                </option>
+                {perDiemRateOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : null}
+        <label className="text-xs space-y-1 sm:col-span-2">
+          <span>{t("expenses.forms.newExpense.fields.description")}</span>
+          <input
+            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+            value={receiptNote}
+            onChange={(e) => setReceiptNote(e.target.value)}
+          />
+        </label>
+        <label className="text-xs flex items-center gap-2 sm:col-span-2">
           <input
             type="checkbox"
             checked={hasReceipt}
             onChange={(e) => setHasReceipt(e.target.checked)}
           />
-          <span>{t("expenses.capture.receiptStub")}</span>
-        </label>
-        <label className="text-xs space-y-1 sm:col-span-2">
-          <span>{t("expenses.capture.receiptNote")}</span>
-          <input
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            value={receiptNote}
-            onChange={(e) => setReceiptNote(e.target.value)}
-            placeholder={t("expenses.capture.receiptNotePlaceholder")}
-          />
+          <span>{t("expenses.forms.newExpense.fields.hasReceipt")}</span>
         </label>
       </div>
 
-      <Button
-        type="button"
-        disabled={busy}
-        onClick={() => void captureDelayedSync()}
-        data-testid="expenses-capture-submit"
-      >
-        {t("expenses.capture.submit")}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          disabled={busy}
+          onClick={() => void captureDelayedSync()}
+          data-testid="expenses-capture-submit"
+        >
+          {t("expenses.capture.submit")}
+        </Button>
+      </div>
 
-      {queued.length > 0 ? (
+      {queued.length > 0 && (
         <ul className="text-xs text-muted-foreground space-y-2" data-testid="expenses-capture-queue">
-          {queued.map((q) => (
+          {queued.map((item) => (
             <li
-              key={q.clientRequestId}
-              className="flex flex-wrap items-center gap-2"
-              data-testid={`expenses-capture-item-${q.syncState}`}
+              key={item.clientRequestId}
+              className="flex flex-wrap items-center justify-between gap-2 rounded border px-2 py-1.5"
+              data-testid={`expenses-capture-item-${item.syncState}`}
             >
               <span>
-                {q.payload.name} · {q.syncState}
-                {q.lastError ? ` — ${q.lastError}` : ""}
+                {item.payload.name} · {item.syncState}
+                {item.lastError ? ` — ${item.lastError}` : ""}
               </span>
-              {(q.syncState === "error" || q.syncState === "conflict") && (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => void retryItem(q.clientRequestId)}
-                    data-testid="expenses-capture-retry"
-                  >
-                    {t("expenses.capture.retry")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => discardItem(q.clientRequestId)}
-                    data-testid="expenses-capture-discard"
-                  >
-                    {t("expenses.capture.discard")}
-                  </Button>
-                </>
-              )}
+              <span className="flex gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void retryItem(item.clientRequestId)}
+                  data-testid="expenses-capture-retry"
+                >
+                  {t("expenses.capture.retry")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => discardItem(item.clientRequestId)}
+                  data-testid="expenses-capture-discard"
+                >
+                  {t("expenses.capture.discard")}
+                </Button>
+              </span>
             </li>
           ))}
         </ul>
-      ) : null}
+      )}
     </div>
   )
 }
