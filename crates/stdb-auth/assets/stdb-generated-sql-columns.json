@@ -704,6 +704,7 @@
     "file_size",
     "mimetype",
     "url",
+    "checksum",
     "changes_description"
   ],
   "AddLandedCostLineParams": [
@@ -991,6 +992,8 @@
     "reviewed_by",
     "reviewed_at",
     "is_approved",
+    "document_id",
+    "document_version_id",
     "company_id",
     "create_uid",
     "create_date",
@@ -1281,6 +1284,10 @@
     "status",
     "provider_message_id",
     "operational_message_id",
+    "metadata"
+  ],
+  "ApplyDocumentLegalHoldParams": [
+    "reason",
     "metadata"
   ],
   "ApplyExpenseAdvanceParams": [
@@ -1825,6 +1832,15 @@
     "tokens_used",
     "cost",
     "error_message"
+  ],
+  "CompleteDocumentSignatureRequestParams": [
+    "file_name",
+    "file_size",
+    "mimetype",
+    "url",
+    "checksum",
+    "changes_description",
+    "metadata"
   ],
   "CompleteOffboardingItemParams": [
     "item",
@@ -3137,6 +3153,7 @@
     "is_favorite",
     "sequence",
     "storage_id",
+    "residency_region",
     "metadata"
   ],
   "CreateDocumentParams": [
@@ -3146,12 +3163,18 @@
     "file_size",
     "mimetype",
     "url",
+    "checksum",
     "folder_id",
     "res_model",
     "res_id",
     "partner_id",
     "tag_ids",
     "is_favorite",
+    "index_content",
+    "classification_id",
+    "retention_days",
+    "fiscal_kind",
+    "residency_region",
     "metadata"
   ],
   "CreateDocumentProcessingJobParams": [
@@ -3159,6 +3182,14 @@
     "job_type",
     "ai_agent_id",
     "input_data",
+    "document_id",
+    "document_version_id",
+    "metadata"
+  ],
+  "CreateDocumentSignatureRequestParams": [
+    "provider",
+    "external_envelope_id",
+    "signers_json",
     "metadata"
   ],
   "CreateDocumentTemplateParams": [
@@ -3574,6 +3605,7 @@
     "is_todo_item",
     "sequence",
     "article_url",
+    "is_published",
     "website_url",
     "metadata"
   ],
@@ -5888,6 +5920,7 @@
     "write_access_ids",
     "read_access_ids",
     "document_count",
+    "residency_region",
     "is_hidden",
     "is_readonly",
     "is_access_restricted",
@@ -5911,6 +5944,7 @@
     "mimetype",
     "checksum",
     "index_content",
+    "index_language",
     "access_token",
     "url",
     "res_model",
@@ -5924,6 +5958,7 @@
     "is_locked",
     "locked_by",
     "locked_at",
+    "locked_until",
     "is_favorite",
     "is_shared",
     "share_link",
@@ -5931,6 +5966,11 @@
     "is_deleted",
     "deleted_at",
     "deleted_by",
+    "classification_id",
+    "retention_days",
+    "purge_after",
+    "fiscal_kind",
+    "residency_region",
     "version_count",
     "current_version_id",
     "download_count",
@@ -5939,6 +5979,22 @@
     "activity_ids",
     "message_follower_ids",
     "message_ids",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "DocumentExternalRef": [
+    "id",
+    "organization_id",
+    "document_id",
+    "provider",
+    "connection_id",
+    "external_id",
+    "etag",
+    "last_sync_at",
+    "last_direction",
     "create_uid",
     "create_date",
     "write_uid",
@@ -5961,6 +6017,7 @@
     "write_access_ids",
     "read_access_ids",
     "document_count",
+    "residency_region",
     "is_hidden",
     "is_readonly",
     "is_access_restricted",
@@ -5974,9 +6031,57 @@
     "write_date",
     "metadata"
   ],
+  "DocumentLegalHold": [
+    "id",
+    "organization_id",
+    "document_id",
+    "reason",
+    "held_by",
+    "held_at",
+    "is_active",
+    "released_at",
+    "released_by",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "DocumentPresence": [
+    "id",
+    "organization_id",
+    "document_id",
+    "user_id",
+    "user_name",
+    "last_seen"
+  ],
+  "DocumentRetentionPurgeJob": [
+    "scheduled_id",
+    "scheduled_at",
+    "organization_id"
+  ],
   "DocumentSequence": [
     "doc_type",
     "next_number"
+  ],
+  "DocumentSignatureRequest": [
+    "id",
+    "organization_id",
+    "company_id",
+    "document_id",
+    "provider",
+    "external_envelope_id",
+    "status",
+    "signers_json",
+    "completed_version_id",
+    "requested_by",
+    "requested_at",
+    "completed_at",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
   ],
   "DocumentTemplate": [
     "id",
@@ -5999,6 +6104,7 @@
   ],
   "DocumentVersion": [
     "id",
+    "organization_id",
     "document_id",
     "version_number",
     "name",
@@ -6326,6 +6432,7 @@
     "webhook_url",
     "webhook_secret_reference",
     "sync_direction",
+    "conflict_policy",
     "sync_frequency_minutes",
     "last_sync_at",
     "next_sync_at",
@@ -7586,6 +7693,14 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "KnowledgeArticlePresence": [
+    "id",
+    "organization_id",
+    "article_id",
+    "user_id",
+    "user_name",
+    "last_seen"
   ],
   "Lead": [
     "id",
@@ -10181,6 +10296,9 @@
     "date_planned",
     "metadata"
   ],
+  "ReleaseDocumentLegalHoldParams": [
+    "metadata"
+  ],
   "RenewSubscriptionParams": [
     "intervals",
     "notes"
@@ -10756,6 +10874,9 @@
     "write_date",
     "metadata"
   ],
+  "ScheduleDocumentRetentionPurgeParams": [
+    "delay_seconds"
+  ],
   "ScheduledReport": [
     "id",
     "organization_id",
@@ -10910,6 +11031,17 @@
     "replace_all",
     "rules",
     "metadata"
+  ],
+  "SetDocumentIndexContentParams": [
+    "content",
+    "language"
+  ],
+  "SetDocumentRetentionParams": [
+    "classification_id",
+    "retention_days"
+  ],
+  "SetDriveConflictPolicyParams": [
+    "conflict_policy"
   ],
   "SetExpenseAllocationsParams": [
     "lines"
@@ -12031,6 +12163,21 @@
     "updated_at",
     "metadata"
   ],
+  "SyncExternalFileToDocumentParams": [
+    "provider",
+    "connection_id",
+    "external_id",
+    "etag",
+    "name",
+    "file_name",
+    "file_size",
+    "mimetype",
+    "url",
+    "checksum",
+    "folder_id",
+    "company_id",
+    "metadata"
+  ],
   "TaxDeadline": [
     "id",
     "organization_id",
@@ -12623,6 +12770,19 @@
     "manager_id",
     "note",
     "is_active"
+  ],
+  "UpdateDocumentFolderParams": [
+    "name",
+    "description",
+    "parent_id",
+    "sequence",
+    "is_access_restricted",
+    "is_hidden",
+    "is_readonly",
+    "is_favorite",
+    "storage_id",
+    "residency_region",
+    "metadata"
   ],
   "UpdateDocumentParams": [
     "name",

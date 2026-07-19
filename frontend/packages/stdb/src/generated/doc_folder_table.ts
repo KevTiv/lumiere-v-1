@@ -26,6 +26,7 @@ export default __t.row({
   writeAccessIds: __t.array(__t.identity()).name("write_access_ids"),
   readAccessIds: __t.array(__t.identity()).name("read_access_ids"),
   documentCount: __t.u32().name("document_count"),
+  residencyRegion: __t.option(__t.string()).name("residency_region"),
   isHidden: __t.bool().name("is_hidden"),
   isReadonly: __t.bool().name("is_readonly"),
   isAccessRestricted: __t.bool().name("is_access_restricted"),

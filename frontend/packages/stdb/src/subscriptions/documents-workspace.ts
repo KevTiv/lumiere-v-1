@@ -8,7 +8,11 @@ export const DOCUMENTS_WORKSPACE_RESOURCE_KEYS = [
   "ai-document-processing-jobs",
   "ai-insights",
   "documents",
+  "documents-deleted",
   "document-folders",
+  "document-versions",
+  "document-templates",
+  "mail-templates",
   "knowledge-articles",
   "knowledge-categories",
 ] as const;

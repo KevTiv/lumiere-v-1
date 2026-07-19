@@ -13,12 +13,18 @@ pub struct CreateDocumentParams {
     pub file_size: u64,
     pub mimetype: String,
     pub url: String,
+    pub checksum: String,
     pub folder_id: Option<u64>,
     pub res_model: Option<String>,
     pub res_id: Option<u64>,
     pub partner_id: Option<u64>,
     pub tag_ids: Vec<u64>,
     pub is_favorite: bool,
+    pub index_content: Option<String>,
+    pub classification_id: Option<u64>,
+    pub retention_days: Option<u32>,
+    pub fiscal_kind: Option<String>,
+    pub residency_region: Option<String>,
     pub metadata: Option<String>,
 }
 

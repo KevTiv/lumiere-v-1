@@ -8,6 +8,10 @@
 /// | **DocumentVersion** | Version history for documents |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::documents::pack_locale::{
+    build_default_index_content, compute_purge_after, document_residency_region_for_company,
+    document_search_language_for_company, truncate_index_content, validate_fiscal_archive,
+};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
@@ -42,6 +46,8 @@ pub struct DocumentFolder {
     pub write_access_ids: Vec<Identity>,
     pub read_access_ids: Vec<Identity>,
     pub document_count: u32,
+    /// Object-store residency tag (e.g. `au`, `sg`, `br`) — guides blob path selection.
+    pub residency_region: Option<String>,
     pub is_hidden: bool,
     pub is_readonly: bool,
     pub is_access_restricted: bool,
@@ -79,6 +85,8 @@ pub struct Document {
     pub mimetype: String,
     pub checksum: Option<String>,
     pub index_content: Option<String>,
+    /// Analyzer/locale hint for FTS (from country pack or explicit index).
+    pub index_language: Option<String>,
     pub access_token: Option<String>,
     pub url: Option<String>,
     pub res_model: Option<String>,
@@ -92,6 +100,8 @@ pub struct Document {
     pub is_locked: bool,
     pub locked_by: Option<Identity>,
     pub locked_at: Option<Timestamp>,
+    /// When set, lock auto-expires at this timestamp (optional lease TTL).
+    pub locked_until: Option<Timestamp>,
     pub is_favorite: bool,
     pub is_shared: bool,
     pub share_link: Option<String>,
@@ -99,6 +109,15 @@ pub struct Document {
     pub is_deleted: bool,
     pub deleted_at: Option<Timestamp>,
     pub deleted_by: Option<Identity>,
+    /// Link to `data_classification` for retention policy.
+    pub classification_id: Option<u64>,
+    pub retention_days: Option<u32>,
+    /// When set and in the past, soft-deleted docs are eligible for hard purge.
+    pub purge_after: Option<Timestamp>,
+    /// Pack-aware fiscal archive kind (`nfe_xml`, `myinvois_xml`, …).
+    pub fiscal_kind: Option<String>,
+    /// Object-store residency tag inherited from folder/pack/upload.
+    pub residency_region: Option<String>,
     pub version_count: u32,
     pub current_version_id: Option<u64>,
     pub download_count: u32,
@@ -119,13 +138,15 @@ pub struct Document {
 #[spacetimedb::table(
     accessor = document_version,
     public,
-    index(name = "by_document", accessor = version_by_document, btree(columns = [document_id]))
+    index(name = "by_document", accessor = version_by_document, btree(columns = [document_id])),
+    index(accessor = version_by_org, btree(columns = [organization_id]))
 )]
 pub struct DocumentVersion {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64,
     pub document_id: u64,
     pub version_number: u32,
     pub name: String,
@@ -158,6 +179,7 @@ pub struct CreateDocumentFolderParams {
     pub is_favorite: bool,
     pub sequence: u32,
     pub storage_id: Option<u64>,
+    pub residency_region: Option<String>,
     pub metadata: Option<String>,
 }
 
@@ -171,12 +193,20 @@ pub struct CreateDocumentParams {
     pub file_size: u64,
     pub mimetype: String,
     pub url: String,
+    /// SHA-256 hex of the object bytes (required with non-empty url).
+    pub checksum: String,
     pub folder_id: Option<u64>,
     pub res_model: Option<String>,
     pub res_id: Option<u64>,
     pub partner_id: Option<u64>,
     pub tag_ids: Vec<u64>,
     pub is_favorite: bool,
+    /// Optional extracted text / FTS body (capped server-side).
+    pub index_content: Option<String>,
+    pub classification_id: Option<u64>,
+    pub retention_days: Option<u32>,
+    pub fiscal_kind: Option<String>,
+    pub residency_region: Option<String>,
     pub metadata: Option<String>,
 }
 
@@ -188,6 +218,8 @@ pub struct AddDocumentVersionParams {
     pub file_size: u64,
     pub mimetype: String,
     pub url: String,
+    /// SHA-256 hex of the object bytes (required with non-empty url).
+    pub checksum: String,
     pub changes_description: Option<String>,
 }
 
@@ -204,6 +236,134 @@ pub struct UpdateDocumentParams {
     pub res_id: Option<u64>,
     pub partner_id: Option<u64>,
     pub metadata: Option<String>,
+}
+
+/// Params for updating a document folder (rename / move / flags).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateDocumentFolderParams {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub parent_id: Option<u64>,
+    pub sequence: Option<u32>,
+    pub is_access_restricted: Option<bool>,
+    pub is_hidden: Option<bool>,
+    pub is_readonly: Option<bool>,
+    pub is_favorite: Option<bool>,
+    pub storage_id: Option<u64>,
+    pub residency_region: Option<String>,
+    pub metadata: Option<String>,
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+fn validate_blob_registration(url: &str, file_size: u64, checksum: &str) -> Result<(), String> {
+    if url.trim().is_empty() {
+        return Err("url is required — upload the file to object storage before registering".to_string());
+    }
+    if file_size == 0 {
+        return Err("file_size must be greater than zero".to_string());
+    }
+    let checksum = checksum.trim();
+    if checksum.is_empty() {
+        return Err("checksum is required (sha-256 hex of object bytes)".to_string());
+    }
+    if checksum.len() != 64 || !checksum.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err("checksum must be a 64-character sha-256 hex digest".to_string());
+    }
+    Ok(())
+}
+
+fn lock_is_expired(doc: &Document, now: Timestamp) -> bool {
+    match doc.locked_until {
+        Some(until) => {
+            now.to_micros_since_unix_epoch() >= until.to_micros_since_unix_epoch()
+        }
+        None => false,
+    }
+}
+
+/// Clear an expired lock in-place and persist. Returns the (possibly refreshed) document.
+fn refresh_expired_lock(ctx: &ReducerContext, doc: Document) -> Document {
+    if doc.is_locked && lock_is_expired(&doc, ctx.timestamp) {
+        let cleared = Document {
+            is_locked: false,
+            locked_by: None,
+            locked_at: None,
+            locked_until: None,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..doc
+        };
+        ctx.db.document().id().update(cleared.clone());
+        return cleared;
+    }
+    doc
+}
+
+fn adjust_folder_document_count(
+    ctx: &ReducerContext,
+    folder_id: Option<u64>,
+    delta: i32,
+) {
+    let Some(fid) = folder_id else {
+        return;
+    };
+    let Some(folder) = ctx.db.doc_folder().id().find(&fid) else {
+        return;
+    };
+    let next = if delta >= 0 {
+        folder.document_count.saturating_add(delta as u32)
+    } else {
+        folder
+            .document_count
+            .saturating_sub((-delta) as u32)
+    };
+    ctx.db.doc_folder().id().update(DocumentFolder {
+        document_count: next,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..folder
+    });
+}
+
+fn folder_allows_write(folder: &DocumentFolder, sender: Identity) -> Result<(), String> {
+    if folder.is_readonly {
+        return Err("Folder is read-only".to_string());
+    }
+    if !folder.is_access_restricted {
+        return Ok(());
+    }
+    if folder.owner_id == sender || folder.write_access_ids.contains(&sender) {
+        return Ok(());
+    }
+    Err("You do not have write access to this folder".to_string())
+}
+
+fn folder_allows_read(folder: &DocumentFolder, sender: Identity) -> Result<(), String> {
+    if !folder.is_access_restricted {
+        return Ok(());
+    }
+    if folder.owner_id == sender
+        || folder.write_access_ids.contains(&sender)
+        || folder.read_access_ids.contains(&sender)
+    {
+        return Ok(());
+    }
+    Err("You do not have read access to this folder".to_string())
+}
+
+fn ensure_folder_company_scope(
+    folder: &DocumentFolder,
+    company_id: Option<u64>,
+) -> Result<(), String> {
+    match (folder.company_id, company_id) {
+        (Some(fc), Some(c)) if fc != c => {
+            Err("Folder does not belong to this company".to_string())
+        }
+        _ => Ok(()),
+    }
 }
 
 // ============================================================================
@@ -254,6 +414,9 @@ pub fn create_document_folder(
         write_access_ids,
         read_access_ids: Vec::new(),
         document_count: 0,
+        residency_region: params.residency_region.or_else(|| {
+            document_residency_region_for_company(ctx, organization_id, company_id)
+        }),
         is_hidden: params.is_hidden,
         is_readonly: params.is_readonly,
         is_access_restricted: params.is_access_restricted,
@@ -296,9 +459,15 @@ pub fn create_document(
     params: CreateDocumentParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "document", "create")?;
+    validate_blob_registration(&params.url, params.file_size, &params.checksum)?;
 
-    // Validate folder belongs to this org if specified
-    if let Some(fid) = params.folder_id {
+    if let Some(ref kind) = params.fiscal_kind {
+        validate_fiscal_archive(ctx, organization_id, company_id, kind, &params.mimetype)?;
+    }
+
+    let folder_id = params.folder_id;
+    let mut folder_residency = None;
+    if let Some(fid) = folder_id {
         let folder = ctx
             .db
             .doc_folder()
@@ -308,7 +477,22 @@ pub fn create_document(
         if folder.organization_id != organization_id {
             return Err("Folder does not belong to this organization".to_string());
         }
+        ensure_folder_company_scope(&folder, company_id)?;
+        folder_allows_write(&folder, ctx.sender())?;
+        folder_residency = folder.residency_region.clone();
     }
+
+    let checksum = params.checksum.trim().to_lowercase();
+    let index_content = Some(truncate_index_content(&build_default_index_content(
+        &params.name,
+        params.description.as_deref(),
+        &params.file_name,
+        params.index_content.as_deref(),
+    )));
+    let index_language = document_search_language_for_company(ctx, organization_id, company_id);
+    let residency_region = params.residency_region.or(folder_residency).or_else(|| {
+        document_residency_region_for_company(ctx, organization_id, company_id)
+    });
 
     let doc = ctx.db.document().insert(Document {
         id: 0,
@@ -318,8 +502,9 @@ pub fn create_document(
         file_name: params.file_name.clone(),
         file_size: params.file_size,
         mimetype: params.mimetype.clone(),
-        checksum: None,
-        index_content: None,
+        checksum: Some(checksum.clone()),
+        index_content,
+        index_language,
         access_token: None,
         url: Some(params.url.clone()),
         res_model: params.res_model,
@@ -328,11 +513,12 @@ pub fn create_document(
         partner_id: params.partner_id,
         owner_id: ctx.sender(),
         company_id,
-        folder_id: params.folder_id,
+        folder_id,
         tag_ids: params.tag_ids,
         is_locked: false,
         locked_by: None,
         locked_at: None,
+        locked_until: None,
         is_favorite: params.is_favorite,
         is_shared: false,
         share_link: None,
@@ -340,6 +526,11 @@ pub fn create_document(
         is_deleted: false,
         deleted_at: None,
         deleted_by: None,
+        classification_id: params.classification_id,
+        retention_days: params.retention_days,
+        purge_after: None,
+        fiscal_kind: params.fiscal_kind,
+        residency_region,
         version_count: 1,
         current_version_id: None,
         download_count: 0,
@@ -358,13 +549,14 @@ pub fn create_document(
     // Create initial version
     let version = ctx.db.document_version().insert(DocumentVersion {
         id: 0,
+        organization_id,
         document_id: doc.id,
         version_number: 1,
         name: "Initial version".to_string(),
         file_name: params.file_name,
         file_size: params.file_size,
         mimetype: params.mimetype,
-        checksum: None,
+        checksum: Some(checksum),
         url: params.url,
         changes_description: None,
         created_by: ctx.sender(),
@@ -382,17 +574,7 @@ pub fn create_document(
         ..doc
     });
 
-    // Increment folder document count
-    if let Some(fid) = params.folder_id {
-        if let Some(folder) = ctx.db.doc_folder().id().find(&fid) {
-            ctx.db.doc_folder().id().update(DocumentFolder {
-                document_count: folder.document_count + 1,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..folder
-            });
-        }
-    }
+    adjust_folder_document_count(ctx, folder_id, 1);
 
     write_audit_log_v2(
         ctx,
@@ -422,6 +604,7 @@ pub fn add_document_version(
     params: AddDocumentVersionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "document", "write")?;
+    validate_blob_registration(&params.url, params.file_size, &params.checksum)?;
 
     let doc = ctx
         .db
@@ -434,22 +617,39 @@ pub fn add_document_version(
         return Err("Document does not belong to this organization".to_string());
     }
 
+    if doc.is_deleted {
+        return Err("Cannot version a deleted document".to_string());
+    }
+
+    let doc = refresh_expired_lock(ctx, doc);
+
     if doc.is_locked && doc.locked_by != Some(ctx.sender()) {
         return Err("Document is locked by another user".to_string());
     }
 
-    let new_version_number = doc.version_count + 1;
+    if let Some(fid) = doc.folder_id {
+        if let Some(folder) = ctx.db.doc_folder().id().find(&fid) {
+            folder_allows_write(&folder, ctx.sender())?;
+        }
+    }
+
+    let old_version_count = doc.version_count;
+    let company_id = doc.company_id;
+    let current_version_id = doc.current_version_id;
+    let new_version_number = old_version_count + 1;
+    let checksum = params.checksum.trim().to_lowercase();
 
     let version = ctx.db.document_version().insert(DocumentVersion {
         id: 0,
+        organization_id,
         document_id,
         version_number: new_version_number,
         name: format!("Version {}", new_version_number),
-        file_name: params.file_name,
+        file_name: params.file_name.clone(),
         file_size: params.file_size,
-        mimetype: params.mimetype,
-        checksum: None,
-        url: params.url,
+        mimetype: params.mimetype.clone(),
+        checksum: Some(checksum.clone()),
+        url: params.url.clone(),
         changes_description: params.changes_description,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
@@ -458,7 +658,7 @@ pub fn add_document_version(
     });
 
     // Mark old current version as not current
-    if let Some(old_vid) = doc.current_version_id {
+    if let Some(old_vid) = current_version_id {
         if let Some(old_v) = ctx.db.document_version().id().find(&old_vid) {
             ctx.db.document_version().id().update(DocumentVersion {
                 is_current: false,
@@ -470,6 +670,11 @@ pub fn add_document_version(
     ctx.db.document().id().update(Document {
         version_count: new_version_number,
         current_version_id: Some(version.id),
+        file_name: params.file_name,
+        file_size: params.file_size,
+        mimetype: params.mimetype,
+        checksum: Some(checksum),
+        url: Some(params.url),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..doc
@@ -479,11 +684,11 @@ pub fn add_document_version(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id,
             table_name: "document",
             record_id: document_id,
             action: "UPDATE",
-            old_values: Some(format!("{{\"version_count\":{}}}", doc.version_count)),
+            old_values: Some(format!("{{\"version_count\":{}}}", old_version_count)),
             new_values: Some(format!("{{\"version_count\":{}}}", new_version_number)),
             changed_fields: vec!["new_version".to_string()],
             metadata: None,
@@ -498,12 +703,14 @@ pub fn add_document_version(
     Ok(())
 }
 
-/// Lock a document for exclusive editing
+/// Lock a document for exclusive editing.
+/// Optional `lease_seconds` sets `locked_until` (TTL); omit/`None` for an open-ended lock.
 #[reducer]
 pub fn lock_document(
     ctx: &ReducerContext,
     organization_id: u64,
     document_id: u64,
+    lease_seconds: Option<u64>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "document", "write")?;
 
@@ -518,14 +725,32 @@ pub fn lock_document(
         return Err("Document does not belong to this organization".to_string());
     }
 
+    if doc.is_deleted {
+        return Err("Cannot lock a deleted document".to_string());
+    }
+
+    let doc = refresh_expired_lock(ctx, doc);
+
     if doc.is_locked {
         return Err("Document is already locked".to_string());
     }
 
+    if let Some(fid) = doc.folder_id {
+        if let Some(folder) = ctx.db.doc_folder().id().find(&fid) {
+            folder_allows_write(&folder, ctx.sender())?;
+        }
+    }
+
+    let locked_until = lease_seconds.map(|secs| {
+        ctx.timestamp + std::time::Duration::from_secs(secs.max(1))
+    });
+
+    let company_id = doc.company_id;
     ctx.db.document().id().update(Document {
         is_locked: true,
         locked_by: Some(ctx.sender()),
         locked_at: Some(ctx.timestamp),
+        locked_until,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..doc
@@ -535,7 +760,7 @@ pub fn lock_document(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id,
             table_name: "document",
             record_id: document_id,
             action: "UPDATE",
@@ -570,14 +795,22 @@ pub fn unlock_document(
         return Err("Document does not belong to this organization".to_string());
     }
 
+    let doc = refresh_expired_lock(ctx, doc);
+
+    if !doc.is_locked {
+        return Ok(());
+    }
+
     if doc.locked_by != Some(ctx.sender()) {
         check_permission(ctx, organization_id, "document", "admin")?; // Admins can force-unlock
     }
 
+    let company_id = doc.company_id;
     ctx.db.document().id().update(Document {
         is_locked: false,
         locked_by: None,
         locked_at: None,
+        locked_until: None,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..doc
@@ -587,7 +820,7 @@ pub fn unlock_document(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id,
             table_name: "document",
             record_id: document_id,
             action: "UPDATE",
@@ -622,28 +855,49 @@ pub fn delete_document(
         return Err("Document does not belong to this organization".to_string());
     }
 
+    if doc.is_deleted {
+        return Err("Document is already deleted".to_string());
+    }
+
+    if crate::documents::legal_hold::document_has_active_legal_hold(
+        ctx,
+        organization_id,
+        document_id,
+    ) {
+        return Err("Cannot delete a document under legal hold".to_string());
+    }
+
+    let doc = refresh_expired_lock(ctx, doc);
+
     if doc.is_locked {
         return Err("Cannot delete a locked document".to_string());
     }
 
-    let doc_name = doc.name.clone();
-
-    // Decrement folder count
     if let Some(fid) = doc.folder_id {
         if let Some(folder) = ctx.db.doc_folder().id().find(&fid) {
-            ctx.db.doc_folder().id().update(DocumentFolder {
-                document_count: folder.document_count.saturating_sub(1),
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..folder
-            });
+            folder_allows_write(&folder, ctx.sender())?;
         }
     }
+
+    let doc_name = doc.name.clone();
+    let company_id = doc.company_id;
+    let folder_id = doc.folder_id;
+
+    adjust_folder_document_count(ctx, folder_id, -1);
+
+    let purge_after = doc.retention_days.and_then(|days| {
+        if days > 0 {
+            Some(compute_purge_after(ctx.timestamp, days))
+        } else {
+            None
+        }
+    });
 
     ctx.db.document().id().update(Document {
         is_deleted: true,
         deleted_at: Some(ctx.timestamp),
         deleted_by: Some(ctx.sender()),
+        purge_after,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..doc
@@ -653,7 +907,7 @@ pub fn delete_document(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id,
             table_name: "document",
             record_id: document_id,
             action: "DELETE",
@@ -665,6 +919,78 @@ pub fn delete_document(
     );
 
     log::info!("Document soft-deleted: id={}", document_id);
+    Ok(())
+}
+
+/// Restore a soft-deleted document (recycle bin).
+#[reducer]
+pub fn restore_document(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    document_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "document", "write")?;
+
+    let doc = ctx
+        .db
+        .document()
+        .id()
+        .find(&document_id)
+        .ok_or("Document not found")?;
+
+    if doc.organization_id != organization_id {
+        return Err("Document does not belong to this organization".to_string());
+    }
+
+    if !doc.is_deleted {
+        return Ok(());
+    }
+
+    if let Some(fid) = doc.folder_id {
+        let folder = ctx
+            .db
+            .doc_folder()
+            .id()
+            .find(&fid)
+            .ok_or("Folder not found")?;
+        if folder.organization_id != organization_id {
+            return Err("Folder does not belong to this organization".to_string());
+        }
+        ensure_folder_company_scope(&folder, doc.company_id)?;
+        folder_allows_write(&folder, ctx.sender())?;
+    }
+
+    let company_id = doc.company_id;
+    let folder_id = doc.folder_id;
+
+    ctx.db.document().id().update(Document {
+        is_deleted: false,
+        deleted_at: None,
+        deleted_by: None,
+        purge_after: None,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..doc
+    });
+
+    adjust_folder_document_count(ctx, folder_id, 1);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id,
+            table_name: "document",
+            record_id: document_id,
+            action: "UPDATE",
+            old_values: Some("{\"is_deleted\":true}".to_string()),
+            new_values: Some("{\"is_deleted\":false}".to_string()),
+            changed_fields: vec!["restored".to_string()],
+            metadata: None,
+        },
+    );
+
+    log::info!("Document restored: id={}", document_id);
     Ok(())
 }
 
@@ -689,17 +1015,53 @@ pub fn update_document(
         return Err("Document does not belong to this organization".to_string());
     }
 
+    if doc.is_deleted {
+        return Err("Cannot update a deleted document".to_string());
+    }
+
+    let doc = refresh_expired_lock(ctx, doc);
+
     if doc.is_locked && doc.locked_by != Some(ctx.sender()) {
         return Err("Document is locked by another user".to_string());
     }
 
+    if let Some(fid) = doc.folder_id {
+        if let Some(folder) = ctx.db.doc_folder().id().find(&fid) {
+            folder_allows_write(&folder, ctx.sender())?;
+        }
+    }
+
+    let old_folder_id = doc.folder_id;
+    let folder_changing = params.folder_id.is_some();
+    let target_folder_id = if folder_changing {
+        params.folder_id
+    } else {
+        doc.folder_id
+    };
+    if let Some(fid) = target_folder_id {
+        if Some(fid) != old_folder_id {
+            let folder = ctx
+                .db
+                .doc_folder()
+                .id()
+                .find(&fid)
+                .ok_or("Folder not found")?;
+            if folder.organization_id != organization_id {
+                return Err("Folder does not belong to this organization".to_string());
+            }
+            ensure_folder_company_scope(&folder, doc.company_id)?;
+            folder_allows_write(&folder, ctx.sender())?;
+        }
+    }
+
     // Track changed fields
     let mut changed_fields = Vec::new();
+    let company_id = doc.company_id;
 
     let new_doc = Document {
         name: params.name.unwrap_or(doc.name.clone()),
         description: params.description.or(doc.description.clone()),
-        folder_id: params.folder_id.or(doc.folder_id),
+        folder_id: target_folder_id,
         tag_ids: params.tag_ids.unwrap_or(doc.tag_ids.clone()),
         is_favorite: params.is_favorite.unwrap_or(doc.is_favorite),
         res_model: params.res_model.or(doc.res_model.clone()),
@@ -739,13 +1101,18 @@ pub fn update_document(
         changed_fields.push("metadata");
     }
 
+    if new_doc.folder_id != old_folder_id {
+        adjust_folder_document_count(ctx, old_folder_id, -1);
+        adjust_folder_document_count(ctx, new_doc.folder_id, 1);
+    }
+
     ctx.db.document().id().update(new_doc);
 
     write_audit_log_v2(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id,
             table_name: "document",
             record_id: document_id,
             action: "UPDATE",
@@ -757,6 +1124,178 @@ pub fn update_document(
     );
 
     log::info!("Document updated: id={}", document_id);
+    Ok(())
+}
+
+/// Update folder metadata (rename / move / flags).
+#[reducer]
+pub fn update_document_folder(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    folder_id: u64,
+    params: UpdateDocumentFolderParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "document_folder", "write")?;
+
+    let folder = ctx
+        .db
+        .doc_folder()
+        .id()
+        .find(&folder_id)
+        .ok_or("Folder not found")?;
+
+    if folder.organization_id != organization_id {
+        return Err("Folder does not belong to this organization".to_string());
+    }
+
+    folder_allows_write(&folder, ctx.sender())?;
+
+    let parent_changing = params.parent_id.is_some();
+    // `None` in Option update means "no change" for parent — use a sentinel: only apply when
+    // caller sends Some. Moving to root requires passing parent_id: Some(0) is wrong; keep
+    // parent optional as "set if Some". Clearing parent (root) is expressed by omitting move.
+    let new_parent_id = if parent_changing {
+        params.parent_id
+    } else {
+        folder.parent_id
+    };
+
+    if new_parent_id == Some(folder_id) {
+        return Err("Folder cannot be its own parent".to_string());
+    }
+
+    let parent_path = if let Some(pid) = new_parent_id {
+        let parent = ctx
+            .db
+            .doc_folder()
+            .id()
+            .find(&pid)
+            .ok_or("Parent folder not found")?;
+        if parent.organization_id != organization_id {
+            return Err("Parent folder does not belong to this organization".to_string());
+        }
+        // Prevent cycles: new parent must not be under this folder's path.
+        let cycle_marker = format!("/{}/", folder_id);
+        if parent.parent_path.contains(&cycle_marker)
+            || parent.parent_path.ends_with(&format!("/{}", folder_id))
+            || parent.id == folder_id
+        {
+            return Err("Cannot move folder under one of its descendants".to_string());
+        }
+        format!("{}/{}", parent.parent_path, pid)
+    } else {
+        "/".to_string()
+    };
+
+    let mut changed_fields = Vec::new();
+    let company_id = folder.company_id;
+    let updated = DocumentFolder {
+        name: params.name.unwrap_or(folder.name.clone()),
+        description: params.description.or(folder.description.clone()),
+        parent_id: new_parent_id,
+        parent_path,
+        sequence: params.sequence.unwrap_or(folder.sequence),
+        is_access_restricted: params
+            .is_access_restricted
+            .unwrap_or(folder.is_access_restricted),
+        is_hidden: params.is_hidden.unwrap_or(folder.is_hidden),
+        is_readonly: params.is_readonly.unwrap_or(folder.is_readonly),
+        is_favorite: params.is_favorite.unwrap_or(folder.is_favorite),
+        storage_id: params.storage_id.or(folder.storage_id),
+        residency_region: params.residency_region.or(folder.residency_region.clone()),
+        metadata: params.metadata.or(folder.metadata.clone()),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..folder.clone()
+    };
+
+    if updated.name != folder.name {
+        changed_fields.push("name");
+    }
+    if updated.parent_id != folder.parent_id {
+        changed_fields.push("parent_id");
+    }
+    if updated.description != folder.description {
+        changed_fields.push("description");
+    }
+    if updated.sequence != folder.sequence {
+        changed_fields.push("sequence");
+    }
+
+    ctx.db.doc_folder().id().update(updated);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id,
+            table_name: "document_folder",
+            record_id: folder_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: changed_fields.into_iter().map(|s| s.to_string()).collect(),
+            metadata: None,
+        },
+    );
+
+    log::info!("Document folder updated: id={}", folder_id);
+    Ok(())
+}
+
+/// Delete an empty document folder (no child folders, no documents).
+#[reducer]
+pub fn delete_document_folder(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    folder_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "document_folder", "delete")?;
+
+    let folder = ctx
+        .db
+        .doc_folder()
+        .id()
+        .find(&folder_id)
+        .ok_or("Folder not found")?;
+
+    if folder.organization_id != organization_id {
+        return Err("Folder does not belong to this organization".to_string());
+    }
+
+    folder_allows_write(&folder, ctx.sender())?;
+
+    if folder.document_count > 0 {
+        return Err("Cannot delete a folder that still contains documents".to_string());
+    }
+
+    let has_children = ctx.db.doc_folder().iter().any(|f| {
+        f.organization_id == organization_id && f.parent_id == Some(folder_id)
+    });
+    if has_children {
+        return Err("Cannot delete a folder that still has child folders".to_string());
+    }
+
+    let company_id = folder.company_id;
+    let name = folder.name.clone();
+    ctx.db.doc_folder().id().delete(&folder_id);
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id,
+            table_name: "document_folder",
+            record_id: folder_id,
+            action: "DELETE",
+            old_values: Some(format!("{{\"name\":\"{}\"}}", name)),
+            new_values: None,
+            changed_fields: vec!["deleted".to_string()],
+            metadata: None,
+        },
+    );
+
+    log::info!("Document folder deleted: id={}", folder_id);
     Ok(())
 }
 
@@ -778,6 +1317,16 @@ pub fn record_document_view(
 
     if doc.organization_id != organization_id {
         return Err("Document does not belong to this organization".to_string());
+    }
+
+    if doc.is_deleted {
+        return Err("Document is deleted".to_string());
+    }
+
+    if let Some(fid) = doc.folder_id {
+        if let Some(folder) = ctx.db.doc_folder().id().find(&fid) {
+            folder_allows_read(&folder, ctx.sender())?;
+        }
     }
 
     ctx.db.document().id().update(Document {

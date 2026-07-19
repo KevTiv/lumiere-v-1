@@ -10,6 +10,14 @@ import {
   newKnowledgeCategoryForm,
   newDocumentFolderForm,
   newDocumentProcessingJobForm,
+  newDocumentTemplateForm,
+  newMailTemplateForm,
+  uploadDocumentVersionForm,
+  editKnowledgeArticleForm,
+  editDocumentFolderForm,
+  addArticleMemberForm,
+  reindexDocumentForm,
+  setDocumentRetentionForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
   csvImportForm,
@@ -23,18 +31,34 @@ import { useDocumentsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { AiResultPanel } from "@/lib/ai-result-panel"
 import {
   useDocuments,
+  useDeletedDocuments,
   useKnowledgeArticles,
   useKnowledgeCategories,
   useDocumentFolders,
   useCreateDocument,
   useUpdateDocument,
   useDeleteDocument,
+  useRestoreDocument,
   useLockDocument,
   useUnlockDocument,
   useRecordDocumentView,
+  useAddDocumentVersion,
+  useSetDocumentIndexContent,
+  useSetDocumentRetention,
+  usePurgeExpiredDocuments,
+  useApplyDocumentLegalHold,
+  useUpdateDocumentPresence,
   useCreateKnowledgeArticle,
+  useUpdateKnowledgeArticle,
+  useDeleteKnowledgeArticle,
+  useLockKnowledgeArticle,
+  useUnlockKnowledgeArticle,
+  useSetArticlePublished,
+  useAddArticleMember,
   useCreateKnowledgeCategory,
   useCreateDocumentFolder,
+  useUpdateDocumentFolder,
+  useDeleteDocumentFolder,
   useDocumentsCsvImportMutations,
   useAiDocumentProcessingJobs,
   useAiInsightsForOrg,
@@ -44,11 +68,28 @@ import {
   useAcknowledgeInsight,
 } from "@lumiere/query-hooks/hooks/documents"
 import {
+  useDocumentTemplates,
+  useMailTemplates,
+  useCreateDocumentTemplate,
+  useCreateMailTemplate,
+} from "@lumiere/query-hooks/hooks/templates"
+import {
+  firstFileFromFormValue,
+  uploadDocumentBlob,
+} from "@/lib/document-blob-upload"
+import {
   toCreateDocumentParams,
   toCreateDocumentFolderParams,
   toCreateDocumentProcessingJobParams,
   toCreateKnowledgeArticleParams,
   toCreateKnowledgeCategoryParams,
+  toCreateDocumentTemplateParams,
+  toCreateMailTemplateParams,
+  toAddDocumentVersionParams,
+  toUpdateKnowledgeArticleParams,
+  toUpdateDocumentFolderParams,
+  toSetDocumentIndexContentParams,
+  toSetDocumentRetentionParams,
 } from "@/lib/documents-create-params"
 import { optionalBigIntU64 } from "@/lib/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -67,6 +108,12 @@ export { DOCUMENTS_UI_REDUCERS } from "@/lib/documents-ui-reducers"
 
 type DocumentRowAction =
   | { action: "updateDocument"; row: Record<string, unknown>; form: FormConfig }
+  | { action: "uploadVersion"; row: Record<string, unknown>; form: FormConfig }
+  | { action: "reindexDocument"; row: Record<string, unknown>; form: FormConfig }
+  | { action: "setRetention"; row: Record<string, unknown>; form: FormConfig }
+  | { action: "updateArticle"; row: Record<string, unknown>; form: FormConfig }
+  | { action: "updateFolder"; row: Record<string, unknown>; form: FormConfig }
+  | { action: "addArticleMember"; row: Record<string, unknown>; form: FormConfig }
   | null
 
 const aiInsightsGenerateForm: FormConfig = {
@@ -174,6 +221,7 @@ function editDocumentForm(row: Record<string, unknown>): FormConfig {
 
 interface DocumentsClientProps {
   initialDocuments?: Record<string, unknown>[]
+  initialDeletedDocuments?: Record<string, unknown>[]
   initialArticles?: Record<string, unknown>[]
   initialCategories?: Record<string, unknown>[]
   initialFolders?: Record<string, unknown>[]
@@ -220,6 +268,7 @@ export function DocumentsClient(props: DocumentsClientProps) {
 
 function DocumentsClientLoaded({
   initialDocuments,
+  initialDeletedDocuments,
   initialArticles,
   initialCategories,
   initialFolders,
@@ -248,27 +297,54 @@ function DocumentsClientLoaded({
   const [generateInsightsResult, setGenerateInsightsResult] = useState<Record<string, unknown> | null>(null)
 
   const { data: documents = [] } = useDocuments(orgId, initialDocuments)
+  const { data: deletedDocuments = [] } = useDeletedDocuments(
+    orgId,
+    initialDeletedDocuments as QueryRows | undefined,
+  )
   const { data: articles = [] } = useKnowledgeArticles(orgId, initialArticles)
   const { data: categories = [] } = useKnowledgeCategories(orgId, initialCategories as QueryRows | undefined)
   const { data: folders = [] } = useDocumentFolders(orgId, initialFolders as QueryRows | undefined)
   const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs as QueryRows | undefined)
   const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights as QueryRows | undefined)
+  const { data: documentTemplates = [] } = useDocumentTemplates(organizationId)
+  const { data: mailTemplates = [] } = useMailTemplates(organizationId)
   const { data: aiAgents = [] } = useAiAgents(organizationId, organizationId > 0)
   const createDocument = useCreateDocument(orgId, operatingCompanyId)
   const updateDocument = useUpdateDocument(orgId)
   const deleteDocument = useDeleteDocument(orgId)
+  const restoreDocument = useRestoreDocument(orgId)
   const lockDocument = useLockDocument(orgId)
   const unlockDocument = useUnlockDocument(orgId)
   const recordDocumentView = useRecordDocumentView(orgId)
+  const addDocumentVersion = useAddDocumentVersion(orgId)
+  const setDocumentIndexContent = useSetDocumentIndexContent(orgId)
+  const setDocumentRetention = useSetDocumentRetention(orgId)
+  const purgeExpiredDocuments = usePurgeExpiredDocuments(orgId)
+  const applyDocumentLegalHold = useApplyDocumentLegalHold(orgId)
+  const updateDocumentPresence = useUpdateDocumentPresence(orgId)
   const createKnowledgeArticle = useCreateKnowledgeArticle(orgId, operatingCompanyId)
+  const updateKnowledgeArticle = useUpdateKnowledgeArticle(orgId, operatingCompanyId)
+  const deleteKnowledgeArticle = useDeleteKnowledgeArticle(orgId)
+  const lockKnowledgeArticle = useLockKnowledgeArticle(orgId)
+  const unlockKnowledgeArticle = useUnlockKnowledgeArticle(orgId)
+  const setArticlePublished = useSetArticlePublished(orgId, operatingCompanyId)
+  const addArticleMember = useAddArticleMember(orgId)
   const createKnowledgeCategory = useCreateKnowledgeCategory(orgId, operatingCompanyId)
   const createDocumentFolder = useCreateDocumentFolder(orgId)
+  const updateDocumentFolder = useUpdateDocumentFolder(orgId)
+  const deleteDocumentFolder = useDeleteDocumentFolder(orgId)
+  const createDocumentTemplate = useCreateDocumentTemplate(organizationId)
+  const createMailTemplate = useCreateMailTemplate(organizationId)
   const createProcessingJob = useCreateDocumentProcessingJob(orgId, operatingCompanyId)
   const completeProcessingJob = useCompleteDocumentProcessingJob(orgId)
   const approveProcessingJob = useApproveDocumentProcessingJob(orgId)
   const acknowledgeInsight = useAcknowledgeInsight(orgId)
   const csvImports = useDocumentsCsvImportMutations(orgId)
   const runInsightsScan = useRunAiSkill()
+  const versionFormConfig = useMemo(() => uploadDocumentVersionForm(t), [t])
+  const documentTemplateFormConfig = useMemo(() => newDocumentTemplateForm(t), [t])
+  const mailTemplateFormConfig = useMemo(() => newMailTemplateForm(t), [t])
+  const articleMemberFormConfig = useMemo(() => addArticleMemberForm(t), [t])
 
   useEffect(() => {
     if (csvKind) setCsvError(null)
@@ -439,13 +515,36 @@ function DocumentsClientLoaded({
                   },
                 },
                 {
+                  id: "upload-version",
+                  label: "Upload version",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    setDocumentToolbarError(null)
+                    if (rows.length !== 1) {
+                      setDocumentToolbarError("Select one document to version.")
+                      return
+                    }
+                    setDocumentRowSubmitError(null)
+                    setDocumentRowAction({
+                      action: "uploadVersion",
+                      row: rows[0],
+                      form: versionFormConfig,
+                    })
+                  },
+                },
+                {
                   id: "lock-document",
                   label: "Lock",
                   requiresSelection: true,
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
-                      for (const row of rows) await lockDocument.mutateAsync(row.id as string | number)
+                      for (const row of rows) {
+                        await lockDocument.mutateAsync({
+                          documentId: row.id as string | number,
+                          leaseSeconds: 3600,
+                        })
+                      }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
                     }
@@ -478,6 +577,128 @@ function DocumentsClientLoaded({
                   },
                 },
                 {
+                  id: "reindex-document",
+                  label: "Reindex",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    setDocumentToolbarError(null)
+                    if (rows.length !== 1) {
+                      setDocumentToolbarError("Select one document to reindex.")
+                      return
+                    }
+                    const row = rows[0]
+                    const seed = [
+                      String(row.name ?? ""),
+                      String(row.fileName ?? ""),
+                      String(row.description ?? ""),
+                      String(row.indexContent ?? ""),
+                    ]
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                      .join("\n")
+                    setDocumentRowSubmitError(null)
+                    setDocumentRowAction({
+                      action: "reindexDocument",
+                      row,
+                      form: {
+                        ...reindexDocumentForm(t),
+                        sections: reindexDocumentForm(t).sections.map((section) => ({
+                          ...section,
+                          fields: section.fields.map((field) =>
+                            field.name === "content"
+                              ? { ...field, defaultValue: seed }
+                              : field.name === "language"
+                                ? {
+                                    ...field,
+                                    defaultValue: String(row.indexLanguage ?? ""),
+                                  }
+                                : field,
+                          ),
+                        })),
+                      },
+                    })
+                  },
+                },
+                {
+                  id: "set-retention",
+                  label: "Set retention",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    setDocumentToolbarError(null)
+                    if (rows.length !== 1) {
+                      setDocumentToolbarError("Select one document for retention.")
+                      return
+                    }
+                    const row = rows[0]
+                    setDocumentRowSubmitError(null)
+                    setDocumentRowAction({
+                      action: "setRetention",
+                      row,
+                      form: {
+                        ...setDocumentRetentionForm(t),
+                        sections: setDocumentRetentionForm(t).sections.map((section) => ({
+                          ...section,
+                          fields: section.fields.map((field) =>
+                            field.name === "retentionDays"
+                              ? {
+                                  ...field,
+                                  defaultValue:
+                                    row.retentionDays != null
+                                      ? Number(row.retentionDays)
+                                      : undefined,
+                                }
+                              : field.name === "classificationId"
+                                ? {
+                                    ...field,
+                                    defaultValue:
+                                      row.classificationId != null
+                                        ? Number(row.classificationId)
+                                        : undefined,
+                                  }
+                                : field,
+                          ),
+                        })),
+                      },
+                    })
+                  },
+                },
+                {
+                  id: "legal-hold",
+                  label: "Legal hold",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await applyDocumentLegalHold.mutateAsync({
+                          documentId: row.id as string | number,
+                          reason: "Legal hold",
+                        })
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+                {
+                  id: "presence-ping",
+                  label: "Presence ping",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await updateDocumentPresence.mutateAsync({
+                          documentId: row.id as string | number,
+                          userName: "User",
+                        })
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+                {
                   id: "delete-document",
                   label: "Delete",
                   requiresSelection: true,
@@ -499,18 +720,129 @@ function DocumentsClientLoaded({
           return {
             ...tab,
             createForm: knowledgeArticleFormConfig,
-            entityConfig: addCsvToolbar(tab.entityConfig, [
-              {
-                id: "csv-kb-category",
-                label: t("documents.toolbar.importCategoryCsv"),
-                onClick: (_rows) => setCsvKind("knowledge_category"),
-              },
-              {
-                id: "csv-kb-article",
-                label: t("documents.toolbar.importArticleCsv"),
-                onClick: (_rows) => setCsvKind("knowledge_article"),
-              },
-            ]),
+            entityConfig: withTableActions(
+              tab.entityConfig,
+              [
+                {
+                  id: "csv-kb-category",
+                  label: t("documents.toolbar.importCategoryCsv"),
+                  onClick: (_rows) => setCsvKind("knowledge_category"),
+                },
+                {
+                  id: "csv-kb-article",
+                  label: t("documents.toolbar.importArticleCsv"),
+                  onClick: (_rows) => setCsvKind("knowledge_article"),
+                },
+                {
+                  id: "edit-article",
+                  label: "Edit",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    if (rows.length !== 1) return
+                    setDocumentRowAction({
+                      action: "updateArticle",
+                      row: rows[0],
+                      form: editKnowledgeArticleForm(t, rows[0]),
+                    })
+                  },
+                },
+                {
+                  id: "publish-article",
+                  label: "Publish",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await setArticlePublished.mutateAsync({
+                          articleId: row.id as string | number,
+                          params: { isPublished: true },
+                        })
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+                {
+                  id: "unpublish-article",
+                  label: "Unpublish",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await setArticlePublished.mutateAsync({
+                          articleId: row.id as string | number,
+                          params: { isPublished: false },
+                        })
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+                {
+                  id: "lock-article",
+                  label: "Lock",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await lockKnowledgeArticle.mutateAsync(row.id as string | number)
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+                {
+                  id: "unlock-article",
+                  label: "Unlock",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await unlockKnowledgeArticle.mutateAsync(row.id as string | number)
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+                {
+                  id: "add-article-member",
+                  label: "Add member",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    if (rows.length !== 1) return
+                    setDocumentRowAction({
+                      action: "addArticleMember",
+                      row: rows[0],
+                      form: articleMemberFormConfig,
+                    })
+                  },
+                },
+                {
+                  id: "delete-article",
+                  label: "Delete",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await deleteKnowledgeArticle.mutateAsync(row.id as string | number)
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+              ],
+              false,
+            ),
           }
         }
         if (tab.id === "knowledge-categories" && tab.entityConfig) {
@@ -530,6 +862,93 @@ function DocumentsClientLoaded({
           return {
             ...tab,
             createForm: documentFolderFormConfig,
+            entityConfig: withTableActions(
+              tab.entityConfig,
+              [
+                {
+                  id: "edit-folder",
+                  label: "Edit folder",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    if (rows.length !== 1) return
+                    setDocumentRowAction({
+                      action: "updateFolder",
+                      row: rows[0],
+                      form: mergeSelectOptionsForFields(editDocumentFolderForm(t, rows[0]), {
+                        parentId: folderSelectOptions,
+                      }),
+                    })
+                  },
+                },
+                {
+                  id: "delete-folder",
+                  label: "Delete folder",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await deleteDocumentFolder.mutateAsync(row.id as string | number)
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+              ],
+              true,
+            ),
+          }
+        }
+        if (tab.id === "documents-recycle-bin" && tab.entityConfig) {
+          return {
+            ...tab,
+            entityConfig: withTableActions(
+              tab.entityConfig,
+              [
+                {
+                  id: "restore-document",
+                  label: "Restore",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await restoreDocument.mutateAsync(row.id as string | number)
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+                {
+                  id: "purge-expired",
+                  label: "Purge expired",
+                  requiresSelection: false,
+                  onClick: async () => {
+                    setDocumentToolbarError(null)
+                    try {
+                      await purgeExpiredDocuments.mutateAsync()
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+              ],
+              true,
+            ),
+          }
+        }
+        if (tab.id === "document-templates" && tab.entityConfig) {
+          return {
+            ...tab,
+            createForm: documentTemplateFormConfig,
+          }
+        }
+        if (tab.id === "mail-templates" && tab.entityConfig) {
+          return {
+            ...tab,
+            createForm: mailTemplateFormConfig,
           }
         }
         if (tab.id === "document-processing" && tab.entityConfig) {
@@ -630,6 +1049,12 @@ function DocumentsClientLoaded({
       lockDocument,
       recordDocumentView,
       unlockDocument,
+      setDocumentIndexContent,
+      setDocumentRetention,
+      purgeExpiredDocuments,
+      applyDocumentLegalHold,
+      updateDocumentPresence,
+      restoreDocument,
       runInsightsScan,
       documentFormConfig,
       knowledgeArticleFormConfig,
@@ -645,10 +1070,23 @@ function DocumentsClientLoaded({
       "knowledge-base": articles as unknown as Record<string, unknown>[],
       "knowledge-categories": categories as unknown as Record<string, unknown>[],
       "document-folders": folders as unknown as Record<string, unknown>[],
+      "documents-recycle-bin": deletedDocuments as unknown as Record<string, unknown>[],
+      "document-templates": documentTemplates as unknown as Record<string, unknown>[],
+      "mail-templates": mailTemplates as unknown as Record<string, unknown>[],
       "document-processing": processingJobs as unknown as Record<string, unknown>[],
       "document-insights": aiInsights as unknown as Record<string, unknown>[],
     }),
-    [documents, articles, categories, folders, processingJobs, aiInsights],
+    [
+      documents,
+      deletedDocuments,
+      articles,
+      categories,
+      folders,
+      documentTemplates,
+      mailTemplates,
+      processingJobs,
+      aiInsights,
+    ],
   )
 
   const handleFormSubmit = async (
@@ -657,8 +1095,37 @@ function DocumentsClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createDocument" || action === "uploadDocument") {
-      const params = toCreateDocumentParams(formData)
-      if (!params) return
+      const file = firstFileFromFormValue(formData.file)
+      if (!file) {
+        throw new Error(t("documents.forms.newDocument.fields.fileHint"))
+      }
+      const folderId = optionalBigIntU64(formData.folderId)
+      const folderResidency =
+        folderId != null
+          ? folders.find((f) => String(f.id) === String(folderId))?.residencyRegion
+          : undefined
+      const residency =
+        (typeof formData.residencyRegion === "string" && formData.residencyRegion.trim()) ||
+        (typeof folderResidency === "string" ? folderResidency : undefined) ||
+        undefined
+      const uploaded = await uploadDocumentBlob({
+        file,
+        companyId: operatingCompanyId,
+        residency: residency ? String(residency) : undefined,
+      })
+      const params = toCreateDocumentParams({
+        ...formData,
+        fileName: uploaded.fileName,
+        fileSize: uploaded.fileSize,
+        mimetype: uploaded.mimetype,
+        url: uploaded.url,
+        checksum: uploaded.checksum,
+        indexContent: formData.indexContent ?? uploaded.extractedText,
+        residencyRegion: formData.residencyRegion ?? residency,
+      })
+      if (!params) {
+        throw new Error("Document registration params incomplete after upload")
+      }
       await createDocument.mutateAsync(params)
     } else if (action === "createArticle") {
       const params = toCreateKnowledgeArticleParams(formData, operatingCompanyId)
@@ -675,6 +1142,14 @@ function DocumentsClientLoaded({
         companyId: operatingCompanyId,
         ...params,
       })
+    } else if (action === "createDocumentTemplate") {
+      const params = toCreateDocumentTemplateParams(formData)
+      if (!params) throw new Error("Document template params incomplete")
+      await createDocumentTemplate.mutateAsync(params as unknown as Record<string, unknown>)
+    } else if (action === "createMailTemplate") {
+      const params = toCreateMailTemplateParams(formData)
+      if (!params) throw new Error("Mail template params incomplete")
+      await createMailTemplate.mutateAsync(params as unknown as Record<string, unknown>)
     } else if (action === "createDocumentProcessingJob") {
       await createProcessingJob.mutateAsync(toCreateDocumentProcessingJobParams(formData))
     }
@@ -684,12 +1159,27 @@ function DocumentsClientLoaded({
     createDocument.isPending ||
     updateDocument.isPending ||
     deleteDocument.isPending ||
+    restoreDocument.isPending ||
     lockDocument.isPending ||
     unlockDocument.isPending ||
     recordDocumentView.isPending ||
+    addDocumentVersion.isPending ||
+    setDocumentIndexContent.isPending ||
+    setDocumentRetention.isPending ||
+    purgeExpiredDocuments.isPending ||
     createKnowledgeArticle.isPending ||
+    updateKnowledgeArticle.isPending ||
+    deleteKnowledgeArticle.isPending ||
+    lockKnowledgeArticle.isPending ||
+    unlockKnowledgeArticle.isPending ||
+    setArticlePublished.isPending ||
+    addArticleMember.isPending ||
     createKnowledgeCategory.isPending ||
     createDocumentFolder.isPending ||
+    updateDocumentFolder.isPending ||
+    deleteDocumentFolder.isPending ||
+    createDocumentTemplate.isPending ||
+    createMailTemplate.isPending ||
     createProcessingJob.isPending ||
     completeProcessingJob.isPending ||
     approveProcessingJob.isPending ||
@@ -829,17 +1319,82 @@ function DocumentsClientLoaded({
           onSubmit={async (formData) => {
             setDocumentRowSubmitError(null)
             try {
-              await updateDocument.mutateAsync({
-                documentId: documentRowAction.row.id as string | number,
-                params: {
-                  name: formData.name,
-                  fileName: formData.fileName,
-                  mimetype: formData.mimetype,
-                  description: formData.description,
-                  isFavorite: Boolean(formData.isFavorite),
-                  isShared: Boolean(formData.isShared),
-                },
-              })
+              if (documentRowAction.action === "updateDocument") {
+                await updateDocument.mutateAsync({
+                  documentId: documentRowAction.row.id as string | number,
+                  params: {
+                    name: formData.name,
+                    description: formData.description,
+                    isFavorite: Boolean(formData.isFavorite),
+                    folderId: optionalBigIntU64(formData.folderId),
+                  },
+                })
+              } else if (documentRowAction.action === "uploadVersion") {
+                const file = firstFileFromFormValue(formData.file)
+                if (!file) throw new Error("Select a file to upload")
+                const residency =
+                  typeof documentRowAction.row.residencyRegion === "string"
+                    ? documentRowAction.row.residencyRegion
+                    : undefined
+                const uploaded = await uploadDocumentBlob({
+                  file,
+                  companyId: operatingCompanyId,
+                  residency,
+                })
+                const params = toAddDocumentVersionParams({
+                  ...formData,
+                  fileName: uploaded.fileName,
+                  fileSize: uploaded.fileSize,
+                  mimetype: uploaded.mimetype,
+                  url: uploaded.url,
+                  checksum: uploaded.checksum,
+                })
+                if (!params) throw new Error("Version params incomplete after upload")
+                await addDocumentVersion.mutateAsync({
+                  documentId: documentRowAction.row.id as string | number,
+                  params,
+                })
+                if (uploaded.extractedText) {
+                  await setDocumentIndexContent.mutateAsync({
+                    documentId: documentRowAction.row.id as string | number,
+                    params: { content: uploaded.extractedText },
+                  })
+                }
+                if (formData.unlockAfter !== false) {
+                  await unlockDocument.mutateAsync(
+                    documentRowAction.row.id as string | number,
+                  )
+                }
+              } else if (documentRowAction.action === "reindexDocument") {
+                const params = toSetDocumentIndexContentParams(formData)
+                if (!params) throw new Error("Index content is required")
+                await setDocumentIndexContent.mutateAsync({
+                  documentId: documentRowAction.row.id as string | number,
+                  params,
+                })
+              } else if (documentRowAction.action === "setRetention") {
+                await setDocumentRetention.mutateAsync({
+                  documentId: documentRowAction.row.id as string | number,
+                  params: toSetDocumentRetentionParams(formData),
+                })
+              } else if (documentRowAction.action === "updateArticle") {
+                await updateKnowledgeArticle.mutateAsync({
+                  articleId: documentRowAction.row.id as string | number,
+                  params: toUpdateKnowledgeArticleParams(formData, operatingCompanyId),
+                })
+              } else if (documentRowAction.action === "updateFolder") {
+                await updateDocumentFolder.mutateAsync({
+                  folderId: documentRowAction.row.id as string | number,
+                  params: toUpdateDocumentFolderParams(formData),
+                })
+              } else if (documentRowAction.action === "addArticleMember") {
+                const member = String(formData.member ?? "").trim()
+                if (!member) throw new Error("Member identity is required")
+                await addArticleMember.mutateAsync({
+                  articleId: documentRowAction.row.id as string | number,
+                  member,
+                })
+              }
               setDocumentRowAction(null)
             } catch (e) {
               setDocumentRowSubmitError(e instanceof Error ? e.message : String(e))

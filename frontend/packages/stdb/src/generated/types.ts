@@ -848,6 +848,7 @@ export const AddDocumentVersionParams = __t.object("AddDocumentVersionParams", {
   fileSize: __t.u64(),
   mimetype: __t.string(),
   url: __t.string(),
+  checksum: __t.string(),
   changesDescription: __t.option(__t.string()),
 });
 export type AddDocumentVersionParams = __Infer<typeof AddDocumentVersionParams>;
@@ -1181,6 +1182,8 @@ export const AiDocumentProcessingJob = __t.object("AiDocumentProcessingJob", {
   reviewedBy: __t.option(__t.identity()),
   reviewedAt: __t.option(__t.timestamp()),
   isApproved: __t.bool(),
+  documentId: __t.option(__t.u64()),
+  documentVersionId: __t.option(__t.u64()),
   companyId: __t.option(__t.u64()),
   createUid: __t.identity(),
   createDate: __t.timestamp(),
@@ -1531,6 +1534,12 @@ export const AppendCrmConversationMessageParams = __t.object("AppendCrmConversat
   metadata: __t.option(__t.string()),
 });
 export type AppendCrmConversationMessageParams = __Infer<typeof AppendCrmConversationMessageParams>;
+
+export const ApplyDocumentLegalHoldParams = __t.object("ApplyDocumentLegalHoldParams", {
+  reason: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type ApplyDocumentLegalHoldParams = __Infer<typeof ApplyDocumentLegalHoldParams>;
 
 export const ApplyExpenseAdvanceParams = __t.object("ApplyExpenseAdvanceParams", {
   amount: __t.f64(),
@@ -2235,6 +2244,17 @@ export const CompleteDocumentProcessingJobParams = __t.object("CompleteDocumentP
   errorMessage: __t.option(__t.string()),
 });
 export type CompleteDocumentProcessingJobParams = __Infer<typeof CompleteDocumentProcessingJobParams>;
+
+export const CompleteDocumentSignatureRequestParams = __t.object("CompleteDocumentSignatureRequestParams", {
+  fileName: __t.string(),
+  fileSize: __t.u64(),
+  mimetype: __t.string(),
+  url: __t.string(),
+  checksum: __t.string(),
+  changesDescription: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type CompleteDocumentSignatureRequestParams = __Infer<typeof CompleteDocumentSignatureRequestParams>;
 
 export const CompleteOffboardingItemParams = __t.object("CompleteOffboardingItemParams", {
   item: __t.string(),
@@ -3843,6 +3863,7 @@ export const CreateDocumentFolderParams = __t.object("CreateDocumentFolderParams
   isFavorite: __t.bool(),
   sequence: __t.u32(),
   storageId: __t.option(__t.u64()),
+  residencyRegion: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
 });
 export type CreateDocumentFolderParams = __Infer<typeof CreateDocumentFolderParams>;
@@ -3854,12 +3875,18 @@ export const CreateDocumentParams = __t.object("CreateDocumentParams", {
   fileSize: __t.u64(),
   mimetype: __t.string(),
   url: __t.string(),
+  checksum: __t.string(),
   folderId: __t.option(__t.u64()),
   resModel: __t.option(__t.string()),
   resId: __t.option(__t.u64()),
   partnerId: __t.option(__t.u64()),
   tagIds: __t.array(__t.u64()),
   isFavorite: __t.bool(),
+  indexContent: __t.option(__t.string()),
+  classificationId: __t.option(__t.u64()),
+  retentionDays: __t.option(__t.u32()),
+  fiscalKind: __t.option(__t.string()),
+  residencyRegion: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
 });
 export type CreateDocumentParams = __Infer<typeof CreateDocumentParams>;
@@ -3869,9 +3896,19 @@ export const CreateDocumentProcessingJobParams = __t.object("CreateDocumentProce
   jobType: __t.string(),
   aiAgentId: __t.option(__t.u64()),
   inputData: __t.option(__t.string()),
+  documentId: __t.option(__t.u64()),
+  documentVersionId: __t.option(__t.u64()),
   metadata: __t.option(__t.string()),
 });
 export type CreateDocumentProcessingJobParams = __Infer<typeof CreateDocumentProcessingJobParams>;
+
+export const CreateDocumentSignatureRequestParams = __t.object("CreateDocumentSignatureRequestParams", {
+  provider: __t.string(),
+  externalEnvelopeId: __t.string(),
+  signersJson: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateDocumentSignatureRequestParams = __Infer<typeof CreateDocumentSignatureRequestParams>;
 
 export const CreateDocumentTemplateParams = __t.object("CreateDocumentTemplateParams", {
   name: __t.string(),
@@ -4390,6 +4427,7 @@ export const CreateKnowledgeArticleParams = __t.object("CreateKnowledgeArticlePa
   isTodoItem: __t.bool(),
   sequence: __t.u32(),
   articleUrl: __t.option(__t.string()),
+  isPublished: __t.bool(),
   websiteUrl: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
 });
@@ -7111,6 +7149,7 @@ export const Document = __t.object("Document", {
   mimetype: __t.string(),
   checksum: __t.option(__t.string()),
   indexContent: __t.option(__t.string()),
+  indexLanguage: __t.option(__t.string()),
   accessToken: __t.option(__t.string()),
   url: __t.option(__t.string()),
   resModel: __t.option(__t.string()),
@@ -7124,6 +7163,7 @@ export const Document = __t.object("Document", {
   isLocked: __t.bool(),
   lockedBy: __t.option(__t.identity()),
   lockedAt: __t.option(__t.timestamp()),
+  lockedUntil: __t.option(__t.timestamp()),
   isFavorite: __t.bool(),
   isShared: __t.bool(),
   shareLink: __t.option(__t.string()),
@@ -7131,6 +7171,11 @@ export const Document = __t.object("Document", {
   isDeleted: __t.bool(),
   deletedAt: __t.option(__t.timestamp()),
   deletedBy: __t.option(__t.identity()),
+  classificationId: __t.option(__t.u64()),
+  retentionDays: __t.option(__t.u32()),
+  purgeAfter: __t.option(__t.timestamp()),
+  fiscalKind: __t.option(__t.string()),
+  residencyRegion: __t.option(__t.string()),
   versionCount: __t.u32(),
   currentVersionId: __t.option(__t.u64()),
   downloadCount: __t.u32(),
@@ -7146,6 +7191,24 @@ export const Document = __t.object("Document", {
   metadata: __t.option(__t.string()),
 });
 export type Document = __Infer<typeof Document>;
+
+export const DocumentExternalRef = __t.object("DocumentExternalRef", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  documentId: __t.u64(),
+  provider: __t.string(),
+  connectionId: __t.option(__t.u64()),
+  externalId: __t.string(),
+  etag: __t.option(__t.string()),
+  lastSyncAt: __t.timestamp(),
+  lastDirection: __t.string(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type DocumentExternalRef = __Infer<typeof DocumentExternalRef>;
 
 export const DocumentFolder = __t.object("DocumentFolder", {
   id: __t.u64(),
@@ -7163,6 +7226,7 @@ export const DocumentFolder = __t.object("DocumentFolder", {
   writeAccessIds: __t.array(__t.identity()),
   readAccessIds: __t.array(__t.identity()),
   documentCount: __t.u32(),
+  residencyRegion: __t.option(__t.string()),
   isHidden: __t.bool(),
   isReadonly: __t.bool(),
   isAccessRestricted: __t.bool(),
@@ -7178,11 +7242,67 @@ export const DocumentFolder = __t.object("DocumentFolder", {
 });
 export type DocumentFolder = __Infer<typeof DocumentFolder>;
 
+export const DocumentLegalHold = __t.object("DocumentLegalHold", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  documentId: __t.u64(),
+  reason: __t.string(),
+  heldBy: __t.identity(),
+  heldAt: __t.timestamp(),
+  isActive: __t.bool(),
+  releasedAt: __t.option(__t.timestamp()),
+  releasedBy: __t.option(__t.identity()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type DocumentLegalHold = __Infer<typeof DocumentLegalHold>;
+
+export const DocumentPresence = __t.object("DocumentPresence", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  documentId: __t.u64(),
+  userId: __t.identity(),
+  userName: __t.string(),
+  lastSeen: __t.timestamp(),
+});
+export type DocumentPresence = __Infer<typeof DocumentPresence>;
+
+export const DocumentRetentionPurgeJob = __t.object("DocumentRetentionPurgeJob", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+  organizationId: __t.u64(),
+});
+export type DocumentRetentionPurgeJob = __Infer<typeof DocumentRetentionPurgeJob>;
+
 export const DocumentSequence = __t.object("DocumentSequence", {
   docType: __t.string(),
   nextNumber: __t.u64(),
 });
 export type DocumentSequence = __Infer<typeof DocumentSequence>;
+
+export const DocumentSignatureRequest = __t.object("DocumentSignatureRequest", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  documentId: __t.u64(),
+  provider: __t.string(),
+  externalEnvelopeId: __t.string(),
+  status: __t.string(),
+  signersJson: __t.option(__t.string()),
+  completedVersionId: __t.option(__t.u64()),
+  requestedBy: __t.identity(),
+  requestedAt: __t.timestamp(),
+  completedAt: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type DocumentSignatureRequest = __Infer<typeof DocumentSignatureRequest>;
 
 export const DocumentTemplate = __t.object("DocumentTemplate", {
   id: __t.u64(),
@@ -7207,6 +7327,7 @@ export type DocumentTemplate = __Infer<typeof DocumentTemplate>;
 
 export const DocumentVersion = __t.object("DocumentVersion", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   documentId: __t.u64(),
   versionNumber: __t.u32(),
   name: __t.string(),
@@ -7228,6 +7349,15 @@ export const DoneStockMoveParams = __t.object("DoneStockMoveParams", {
   quantityDone: __t.f64(),
 });
 export type DoneStockMoveParams = __Infer<typeof DoneStockMoveParams>;
+
+// The tagged union or sum type for the algebraic type `DriveConflictPolicy`.
+export const DriveConflictPolicy = __t.enum("DriveConflictPolicy", {
+  PreferRemote: __t.unit(),
+  PreferLocal: __t.unit(),
+  Skip: __t.unit(),
+  Manual: __t.unit(),
+});
+export type DriveConflictPolicy = __Infer<typeof DriveConflictPolicy>;
 
 // The tagged union or sum type for the algebraic type `EmploymentType`.
 export const EmploymentType = __t.enum("EmploymentType", {
@@ -7688,6 +7818,9 @@ export const GoogleDriveConnection = __t.object("GoogleDriveConnection", {
   webhookSecretReference: __t.option(__t.string()),
   get syncDirection() {
     return SyncDirection;
+  },
+  get conflictPolicy() {
+    return DriveConflictPolicy;
   },
   syncFrequencyMinutes: __t.u32(),
   lastSyncAt: __t.option(__t.timestamp()),
@@ -9151,6 +9284,16 @@ export const KnowledgeArticleCategory = __t.object("KnowledgeArticleCategory", {
   metadata: __t.option(__t.string()),
 });
 export type KnowledgeArticleCategory = __Infer<typeof KnowledgeArticleCategory>;
+
+export const KnowledgeArticlePresence = __t.object("KnowledgeArticlePresence", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  articleId: __t.u64(),
+  userId: __t.identity(),
+  userName: __t.string(),
+  lastSeen: __t.timestamp(),
+});
+export type KnowledgeArticlePresence = __Infer<typeof KnowledgeArticlePresence>;
 
 // The tagged union or sum type for the algebraic type `LandedCostState`.
 export const LandedCostState = __t.enum("LandedCostState", {
@@ -12396,6 +12539,11 @@ export const ReleaseBlanketToPoParams = __t.object("ReleaseBlanketToPoParams", {
 });
 export type ReleaseBlanketToPoParams = __Infer<typeof ReleaseBlanketToPoParams>;
 
+export const ReleaseDocumentLegalHoldParams = __t.object("ReleaseDocumentLegalHoldParams", {
+  metadata: __t.option(__t.string()),
+});
+export type ReleaseDocumentLegalHoldParams = __Infer<typeof ReleaseDocumentLegalHoldParams>;
+
 export const RenewSubscriptionParams = __t.object("RenewSubscriptionParams", {
   intervals: __t.u32(),
   notes: __t.option(__t.string()),
@@ -13101,6 +13249,11 @@ export const SavedReport = __t.object("SavedReport", {
 });
 export type SavedReport = __Infer<typeof SavedReport>;
 
+export const ScheduleDocumentRetentionPurgeParams = __t.object("ScheduleDocumentRetentionPurgeParams", {
+  delaySeconds: __t.option(__t.u64()),
+});
+export type ScheduleDocumentRetentionPurgeParams = __Infer<typeof ScheduleDocumentRetentionPurgeParams>;
+
 export const ScheduledReport = __t.object("ScheduledReport", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -13334,6 +13487,25 @@ export const SetContactSegmentRulesParams = __t.object("SetContactSegmentRulesPa
   metadata: __t.option(__t.string()),
 });
 export type SetContactSegmentRulesParams = __Infer<typeof SetContactSegmentRulesParams>;
+
+export const SetDocumentIndexContentParams = __t.object("SetDocumentIndexContentParams", {
+  content: __t.string(),
+  language: __t.option(__t.string()),
+});
+export type SetDocumentIndexContentParams = __Infer<typeof SetDocumentIndexContentParams>;
+
+export const SetDocumentRetentionParams = __t.object("SetDocumentRetentionParams", {
+  classificationId: __t.option(__t.u64()),
+  retentionDays: __t.option(__t.u32()),
+});
+export type SetDocumentRetentionParams = __Infer<typeof SetDocumentRetentionParams>;
+
+export const SetDriveConflictPolicyParams = __t.object("SetDriveConflictPolicyParams", {
+  get conflictPolicy() {
+    return DriveConflictPolicy;
+  },
+});
+export type SetDriveConflictPolicyParams = __Infer<typeof SetDriveConflictPolicyParams>;
 
 export const SetExpenseAllocationsParams = __t.object("SetExpenseAllocationsParams", {
   get lines() {
@@ -14593,6 +14765,23 @@ export const SyncDirection = __t.enum("SyncDirection", {
 });
 export type SyncDirection = __Infer<typeof SyncDirection>;
 
+export const SyncExternalFileToDocumentParams = __t.object("SyncExternalFileToDocumentParams", {
+  provider: __t.string(),
+  connectionId: __t.option(__t.u64()),
+  externalId: __t.string(),
+  etag: __t.option(__t.string()),
+  name: __t.string(),
+  fileName: __t.string(),
+  fileSize: __t.u64(),
+  mimetype: __t.string(),
+  url: __t.string(),
+  checksum: __t.string(),
+  folderId: __t.option(__t.u64()),
+  companyId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type SyncExternalFileToDocumentParams = __Infer<typeof SyncExternalFileToDocumentParams>;
+
 // The tagged union or sum type for the algebraic type `SyncStatus`.
 export const SyncStatus = __t.enum("SyncStatus", {
   Connected: __t.unit(),
@@ -15373,6 +15562,21 @@ export const UpdateDepartmentParams = __t.object("UpdateDepartmentParams", {
   isActive: __t.option(__t.bool()),
 });
 export type UpdateDepartmentParams = __Infer<typeof UpdateDepartmentParams>;
+
+export const UpdateDocumentFolderParams = __t.object("UpdateDocumentFolderParams", {
+  name: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+  parentId: __t.option(__t.u64()),
+  sequence: __t.option(__t.u32()),
+  isAccessRestricted: __t.option(__t.bool()),
+  isHidden: __t.option(__t.bool()),
+  isReadonly: __t.option(__t.bool()),
+  isFavorite: __t.option(__t.bool()),
+  storageId: __t.option(__t.u64()),
+  residencyRegion: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateDocumentFolderParams = __Infer<typeof UpdateDocumentFolderParams>;
 
 export const UpdateDocumentParams = __t.object("UpdateDocumentParams", {
   name: __t.option(__t.string()),

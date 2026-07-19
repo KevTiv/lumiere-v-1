@@ -211,9 +211,15 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "dashboards",
   "dashboard-widgets",
   "documents",
+  "documents-deleted",
   "document-folders",
+  "document-versions",
+  "document-templates",
+  "mail-templates",
   "knowledge-articles",
   "knowledge-categories",
+  "ai-document-processing-jobs",
+  "ai-insights",
   "helpdesk-tickets",
   "helpdesk-teams",
   "helpdesk-stages",
@@ -1177,9 +1183,29 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
   "dashboard-widgets": (id, fa) =>
     selectOrgScopedSql("dashboard-widgets", "dashboard_widget", id, fa, ""),
   documents: (id, fa) =>
-    selectOrgScopedSql("documents", "document", id, fa, ""),
+    selectOrgScopedSql(
+      "documents",
+      "document",
+      id,
+      fa,
+      " AND is_deleted = false",
+    ),
+  "documents-deleted": (id, fa) =>
+    selectOrgScopedSql(
+      "documents-deleted",
+      "document",
+      id,
+      fa,
+      " AND is_deleted = true",
+    ),
   "document-folders": (id, fa) =>
     selectOrgScopedSql("document-folders", "doc_folder", id, fa, ""),
+  "document-versions": (id, fa) =>
+    selectOrgScopedSql("document-versions", "document_version", id, fa, ""),
+  "document-templates": (id, fa) =>
+    selectOrgScopedSql("document-templates", "document_template", id, fa, ""),
+  "mail-templates": (id, fa) =>
+    selectOrgScopedSql("mail-templates", "mail_template", id, fa, ""),
   "knowledge-articles": (id, fa) =>
     selectOrgScopedSql(
       "knowledge-articles",
@@ -1667,6 +1693,18 @@ function subscriptionSqlForCompanyScopedResource(
     const filter = companyIdsEqualityOr("company_id", ids)
     return [`SELECT ${c} FROM shipping_method WHERE ${filter} ORDER BY name ASC`]
   }
+  if (resource === "ai-document-processing-jobs") {
+    if (!ids?.length) return null
+    const c = resolveHttpSqlColumns("ai-document-processing-jobs", fa).join(", ")
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM ai_document_processing_job WHERE ${filter}`]
+  }
+  if (resource === "ai-insights") {
+    if (!ids?.length) return null
+    const c = resolveHttpSqlColumns("ai-insights", fa).join(", ")
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [`SELECT ${c} FROM ai_insight WHERE ${filter}`]
+  }
   if (resource === "pos-payment-methods") {
     if (!ids?.length) return null
     const c = resolveHttpSqlColumns("pos-payment-methods", fa).join(", ")
@@ -1844,6 +1882,8 @@ const EXTRA_COMPANY_SCOPED_ERP_KEYS = [
   "delivery-carriers",
   "delivery-price-rules",
   "shipping-methods",
+  "ai-document-processing-jobs",
+  "ai-insights",
 ] as const
 
 /** Keys for org-scoped ERP tables ({@link ERP_ORG_SQL} plus company-scoped resources). */

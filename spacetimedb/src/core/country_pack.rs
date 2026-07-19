@@ -334,7 +334,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Australia GST",
             "oceania",
             "1.0.0",
-            r#"{"fiscal_year_start_month":7,"bas_reporting":true,"company_id_kind":"ABN","hr_statutory_id_kinds":["TFN"],"expense_require_receipt":true,"expense_require_tax_ids":true,"expense_fbt_entertainment":true}"#,
+            r#"{"fiscal_year_start_month":7,"bas_reporting":true,"company_id_kind":"ABN","hr_statutory_id_kinds":["TFN"],"expense_require_receipt":true,"expense_require_tax_ids":true,"expense_fbt_entertainment":true,"document_search_language":"en","document_search_analyzer":"english","document_residency_region":"au","fiscal_archive_kinds":["tax_invoice_pdf"]}"#,
         ),
         (
             "nz",
@@ -342,7 +342,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "New Zealand GST",
             "oceania",
             "1.0.0",
-            r#"{"fiscal_year_start_month":4,"gst_rate":0.15,"company_id_kind":"NZBN","hr_statutory_id_kinds":["IRD"],"expense_require_receipt":true}"#,
+            r#"{"fiscal_year_start_month":4,"gst_rate":0.15,"company_id_kind":"NZBN","hr_statutory_id_kinds":["IRD"],"expense_require_receipt":true,"document_search_language":"en","document_search_analyzer":"english","document_residency_region":"nz","fiscal_archive_kinds":["tax_invoice_pdf"]}"#,
         ),
         (
             "za",
@@ -350,7 +350,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "South Africa VAT",
             "southern_africa",
             "1.0.0",
-            r#"{"vat_rate":0.15,"currency":"ZAR","hr_statutory_id_kinds":["SA_ID","SARS_TAX"],"expense_require_receipt":true}"#,
+            r#"{"vat_rate":0.15,"currency":"ZAR","hr_statutory_id_kinds":["SA_ID","SARS_TAX"],"expense_require_receipt":true,"document_search_language":"en","document_search_analyzer":"english","document_residency_region":"za","fiscal_archive_kinds":["tax_invoice_pdf"]}"#,
         ),
         (
             "sg",
@@ -358,17 +358,18 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Singapore GST",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"gst_rate":0.09,"iras":true,"company_id_kind":"UEN","hr_statutory_id_kinds":["NRIC","FIN"],"expense_require_receipt":true}"#,
+            r#"{"gst_rate":0.09,"iras":true,"company_id_kind":"UEN","hr_statutory_id_kinds":["NRIC","FIN"],"expense_require_receipt":true,"document_search_language":"en","document_search_analyzer":"english","document_residency_region":"sg","fiscal_archive_kinds":["tax_invoice_pdf"]}"#,
         ),
     ];
 
     for (pack_key, country_code, name, region, version, metadata) in packs {
         let key = pack_key.to_string();
         if let Some(existing) = ctx.db.country_pack_definition().pack_key().find(&key) {
-            // Upsert expense evidence / FBT flags when catalog metadata advances.
+            // Upsert expense evidence / FBT flags / document Wave C keys when catalog advances.
             let meta = existing.metadata.as_deref().unwrap_or("");
             let needs_expense_flags = !meta.contains("expense_require_receipt")
-                || (pack_key == "au" && !meta.contains("expense_fbt_entertainment"));
+                || (pack_key == "au" && !meta.contains("expense_fbt_entertainment"))
+                || !meta.contains("document_search_language");
             if needs_expense_flags {
                 ctx.db
                     .country_pack_definition()
@@ -417,7 +418,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Brazil taxes",
             "southern_cone",
             "1.0.0",
-            r#"{"nfe_adapter":true,"currency":"BRL","inflation_mode":"optional","company_id_kind":"CNPJ","hr_statutory_id_kinds":["CPF","PIS"],"expense_require_receipt":true,"expense_require_tax_ids":true}"#,
+            r#"{"nfe_adapter":true,"currency":"BRL","inflation_mode":"optional","company_id_kind":"CNPJ","hr_statutory_id_kinds":["CPF","PIS"],"expense_require_receipt":true,"expense_require_tax_ids":true,"document_search_language":"pt-BR","document_search_analyzer":"portuguese","document_residency_region":"br","fiscal_archive_kinds":["nfe_xml","nfe_pdf","danfe_pdf"]}"#,
         ),
         (
             "ar",
@@ -425,7 +426,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Argentina IVA",
             "southern_cone",
             "1.0.0",
-            r#"{"currency":"ARS","inflation_mode":"optional","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
+            r#"{"currency":"ARS","inflation_mode":"optional","expense_require_receipt":true,"expense_require_tax_ids":true,"document_search_language":"es","document_search_analyzer":"spanish","document_residency_region":"ar","fiscal_archive_kinds":["tax_invoice_pdf"]}"#,
         ),
         (
             "cl",
@@ -433,7 +434,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Chile IVA",
             "southern_cone",
             "1.0.0",
-            r#"{"currency":"CLP","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
+            r#"{"currency":"CLP","expense_require_receipt":true,"expense_require_tax_ids":true,"document_search_language":"es","document_search_analyzer":"spanish","document_residency_region":"cl","fiscal_archive_kinds":["tax_invoice_pdf"]}"#,
         ),
         (
             "my",
@@ -441,7 +442,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Malaysia SST",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"currency":"MYR","e_invoice":"peppol","expense_require_receipt":true}"#,
+            r#"{"currency":"MYR","e_invoice":"peppol","expense_require_receipt":true,"document_search_language":"ms","document_search_analyzer":"standard","document_residency_region":"my","fiscal_archive_kinds":["myinvois_xml","tax_invoice_pdf"]}"#,
         ),
         (
             "id",
@@ -449,7 +450,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Indonesia PPN",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"currency":"IDR","e_invoice":"coretax","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
+            r#"{"currency":"IDR","e_invoice":"coretax","expense_require_receipt":true,"expense_require_tax_ids":true,"document_search_language":"id","document_search_analyzer":"standard","document_residency_region":"id","fiscal_archive_kinds":["efaktur_pdf","efaktur_xml"]}"#,
         ),
         (
             "th",
@@ -457,7 +458,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Thailand VAT",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"currency":"THB","expense_require_receipt":true}"#,
+            r#"{"currency":"THB","expense_require_receipt":true,"document_search_language":"th","document_search_analyzer":"standard","document_residency_region":"th","fiscal_archive_kinds":["tax_invoice_pdf"]}"#,
         ),
         (
             "ph",
@@ -465,18 +466,16 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Philippines VAT",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"currency":"PHP","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
+            r#"{"currency":"PHP","expense_require_receipt":true,"expense_require_tax_ids":true,"document_search_language":"en","document_search_analyzer":"english","document_residency_region":"ph","fiscal_archive_kinds":["tax_invoice_pdf"]}"#,
         ),
     ];
 
     for (pack_key, country_code, name, region, version, metadata) in extra_packs {
         let key = pack_key.to_string();
         if let Some(existing) = ctx.db.country_pack_definition().pack_key().find(&key) {
-            let needs_expense_flags = !existing
-                .metadata
-                .as_deref()
-                .unwrap_or("")
-                .contains("expense_require_receipt");
+            let meta = existing.metadata.as_deref().unwrap_or("");
+            let needs_expense_flags =
+                !meta.contains("expense_require_receipt") || !meta.contains("document_search_language");
             if needs_expense_flags {
                 ctx.db
                     .country_pack_definition()

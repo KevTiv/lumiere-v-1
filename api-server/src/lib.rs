@@ -2,6 +2,7 @@
 
 mod auth_password;
 pub mod config;
+pub mod document_blobs;
 pub mod domain_queries;
 pub mod error;
 pub mod metrics;

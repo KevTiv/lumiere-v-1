@@ -11,6 +11,7 @@ import {
 } from "spacetimedb";
 import {
   SyncDirection,
+  DriveConflictPolicy,
   IntegrationStatus,
   SyncStatus,
 } from "./types";
@@ -34,6 +35,9 @@ export default __t.row({
   webhookSecretReference: __t.option(__t.string()).name("webhook_secret_reference"),
   get syncDirection() {
     return SyncDirection.name("sync_direction");
+  },
+  get conflictPolicy() {
+    return DriveConflictPolicy.name("conflict_policy");
   },
   syncFrequencyMinutes: __t.u32().name("sync_frequency_minutes"),
   lastSyncAt: __t.option(__t.timestamp()).name("last_sync_at"),

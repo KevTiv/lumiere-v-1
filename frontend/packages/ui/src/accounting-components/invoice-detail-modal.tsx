@@ -61,11 +61,13 @@ interface InvoiceDetailModalProps {
   onRecordPayment?: () => void
   onRecalculateTotals?: () => void
   onDownloadPdf?: () => void
+  onArchivePdf?: () => void
   onSendEmail?: () => void
   postDraftPending?: boolean
   recordPaymentPending?: boolean
   recalculateTotalsPending?: boolean
   downloadPdfPending?: boolean
+  archivePdfPending?: boolean
   sendEmailPending?: boolean
 }
 
@@ -78,11 +80,13 @@ export function InvoiceDetailModal({
   onRecordPayment,
   onRecalculateTotals,
   onDownloadPdf,
+  onArchivePdf,
   onSendEmail,
   postDraftPending,
   recordPaymentPending,
   recalculateTotalsPending,
   downloadPdfPending,
+  archivePdfPending,
   sendEmailPending,
 }: InvoiceDetailModalProps) {
   const { t } = useTranslation()
@@ -172,6 +176,18 @@ export function InvoiceDetailModal({
             <Button variant="outline" size="sm" className="gap-2" type="button" disabled={!onDownloadPdf || downloadPdfPending} onClick={() => onDownloadPdf?.()}>
               <Printer className="h-4 w-4" />{t("accounting.invoices.invoiceActions.print")}
             </Button>
+            {onArchivePdf ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                type="button"
+                disabled={archivePdfPending}
+                onClick={() => onArchivePdf()}
+              >
+                Archive to Documents
+              </Button>
+            ) : null}
             {isDraft &&
               moveTypeIsInvoiceOrRefund(invoice.moveType) &&
               onRecalculateTotals && (

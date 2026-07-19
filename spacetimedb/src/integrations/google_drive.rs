@@ -45,6 +45,8 @@ pub struct GoogleDriveConnection {
 
     // Sync settings
     pub sync_direction: SyncDirection, // Upload, Download, Bidirectional
+    /// Bidirectional / inbound conflict policy (SharePoint workers reuse the same enum).
+    pub conflict_policy: DriveConflictPolicy,
     pub sync_frequency_minutes: u32,
     pub last_sync_at: Option<Timestamp>,
     pub next_sync_at: Option<Timestamp>,
@@ -69,6 +71,19 @@ pub enum SyncDirection {
     UploadOnly,
     DownloadOnly,
     Bidirectional,
+}
+
+/// Conflict resolution when an inbound remote file maps to an existing Document.
+#[derive(spacetimedb::SpacetimeType, Clone, Debug, PartialEq)]
+pub enum DriveConflictPolicy {
+    /// Remote wins: create a new document version from the inbound file.
+    PreferRemote,
+    /// Keep local document bytes; only update sync bookkeeping.
+    PreferLocal,
+    /// Leave the local document unchanged (no version).
+    Skip,
+    /// Fail the sync reducer when etags differ so an operator can resolve.
+    Manual,
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -130,6 +145,7 @@ pub fn create_google_drive_connection(
             webhook_url,
             webhook_secret_reference,
             sync_direction,
+            conflict_policy: DriveConflictPolicy::PreferRemote,
             sync_frequency_minutes,
             last_sync_at: None,
             next_sync_at: None,

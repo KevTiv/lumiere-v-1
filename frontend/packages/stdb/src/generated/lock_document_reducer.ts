@@ -13,4 +13,5 @@ import {
 export default {
   organizationId: __t.u64(),
   documentId: __t.u64(),
+  leaseSeconds: __t.option(__t.u64()),
 };

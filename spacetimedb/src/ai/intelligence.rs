@@ -10,6 +10,10 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::core::queue::{queue_job, QueueJob};
+use crate::documents::documents::{document, document_version, Document};
+use crate::documents::pack_locale::{
+    document_search_language_for_company, truncate_index_content,
+};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{InsightSeverity, JobStatus};
 
@@ -76,6 +80,9 @@ pub struct CreateDocumentProcessingJobParams {
     pub job_type: String,
     pub ai_agent_id: Option<u64>,
     pub input_data: Option<String>,
+    /// Optional link to DMS document for OCR / extraction pipelines.
+    pub document_id: Option<u64>,
+    pub document_version_id: Option<u64>,
     pub metadata: Option<String>,
 }
 
@@ -177,6 +184,9 @@ pub struct AiDocumentProcessingJob {
     pub reviewed_by: Option<Identity>,
     pub reviewed_at: Option<Timestamp>,
     pub is_approved: bool,
+    /// Linked DMS document (Wave D OCR / expenses-AP extraction).
+    pub document_id: Option<u64>,
+    pub document_version_id: Option<u64>,
     pub company_id: Option<u64>,
     pub create_uid: Identity,
     pub create_date: Timestamp,
@@ -427,6 +437,29 @@ pub fn create_document_processing_job(
     let operating_company_id = company_id_from_scope(ctx, organization_id, company_id)?;
     let stored_company_id = Some(operating_company_id);
 
+    if let Some(doc_id) = params.document_id {
+        let doc = ctx
+            .db
+            .document()
+            .id()
+            .find(&doc_id)
+            .ok_or("Linked document not found")?;
+        if doc.organization_id != organization_id {
+            return Err("Linked document does not belong to this organization".to_string());
+        }
+        if let Some(ver_id) = params.document_version_id {
+            let ver = ctx
+                .db
+                .document_version()
+                .id()
+                .find(&ver_id)
+                .ok_or("Linked document version not found")?;
+            if ver.document_id != doc_id || ver.organization_id != organization_id {
+                return Err("document_version_id does not match document".to_string());
+            }
+        }
+    }
+
     let job = ctx
         .db
         .ai_document_processing_job()
@@ -451,6 +484,8 @@ pub fn create_document_processing_job(
             reviewed_at: None,
             // System-managed: set to true only via approve_document_processing_job
             is_approved: false,
+            document_id: params.document_id,
+            document_version_id: params.document_version_id,
             company_id: stored_company_id,
             create_uid: ctx.sender(),
             create_date: ctx.timestamp,
@@ -585,6 +620,65 @@ pub fn approve_document_processing_job(
         return Err("Job must be completed before approval".to_string());
     }
 
+    // Promote approved OCR / extraction into the linked document search index (expenses/AP).
+    if let Some(doc_id) = job.document_id {
+        if let Some(extracted) = job.extracted_data.as_ref() {
+            let content = truncate_index_content(extracted);
+            if !content.is_empty() {
+                if let Some(doc) = ctx.db.document().id().find(&doc_id) {
+                    if doc.organization_id == organization_id && !doc.is_deleted {
+                        let language = document_search_language_for_company(
+                            ctx,
+                            organization_id,
+                            doc.company_id,
+                        );
+                        let mut meta = doc.metadata.clone();
+                        let doc_type = job.document_type.to_ascii_lowercase();
+                        if doc_type.contains("invoice")
+                            || doc_type.contains("receipt")
+                            || doc_type.contains("expense")
+                            || doc_type.contains("bill")
+                        {
+                            let approved_for = serde_json::json!({
+                                "approved_extraction_for": ["expenses", "ap"],
+                                "processing_job_id": job_id,
+                            });
+                            meta = Some(match meta {
+                                Some(existing) => {
+                                    if let Ok(mut v) =
+                                        serde_json::from_str::<serde_json::Value>(&existing)
+                                    {
+                                        if let Some(obj) = v.as_object_mut() {
+                                            obj.insert(
+                                                "approved_extraction".to_string(),
+                                                approved_for,
+                                            );
+                                            v.to_string()
+                                        } else {
+                                            approved_for.to_string()
+                                        }
+                                    } else {
+                                        approved_for.to_string()
+                                    }
+                                }
+                                None => approved_for.to_string(),
+                            });
+                        }
+                        ctx.db.document().id().update(Document {
+                            index_content: Some(content),
+                            index_language: language.or(doc.index_language.clone()),
+                            metadata: meta,
+                            write_uid: ctx.sender(),
+                            write_date: ctx.timestamp,
+                            ..doc
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    let job_company_id = job.company_id;
     ctx.db
         .ai_document_processing_job()
         .id()
@@ -601,7 +695,7 @@ pub fn approve_document_processing_job(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: job.company_id,
+            company_id: job_company_id,
             table_name: "ai_document_processing_job",
             record_id: job_id,
             action: "write",

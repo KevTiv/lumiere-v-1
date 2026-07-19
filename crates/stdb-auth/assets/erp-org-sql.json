@@ -1323,10 +1323,17 @@
     "table": "dashboard_widget"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND is_deleted = false",
     "mapKey": "documents",
     "order_by": "",
     "resource_key": "documents",
+    "table": "document"
+  },
+  {
+    "extra_where": " AND is_deleted = true",
+    "mapKey": "documents-deleted",
+    "order_by": "",
+    "resource_key": "documents-deleted",
     "table": "document"
   },
   {
@@ -1335,6 +1342,27 @@
     "order_by": "",
     "resource_key": "document-folders",
     "table": "doc_folder"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "document-versions",
+    "order_by": "",
+    "resource_key": "document-versions",
+    "table": "document_version"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "document-templates",
+    "order_by": "",
+    "resource_key": "document-templates",
+    "table": "document_template"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "mail-templates",
+    "order_by": "",
+    "resource_key": "mail-templates",
+    "table": "mail_template"
   },
   {
     "extra_where": "",

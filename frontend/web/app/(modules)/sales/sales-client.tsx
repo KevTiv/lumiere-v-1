@@ -188,6 +188,9 @@ import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use
 import { useModuleTab } from '@/hooks/use-module-tab';
 import { useModuleFilters } from '@/hooks/use-module-filters';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
+import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
+import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
+import { RecordDocumentAttachments } from '@/components/record-document-attachments';
 import {
   SalesOpsPanel,
   parseOpsQueueFilter,
@@ -451,6 +454,7 @@ function SalesClientLoaded({
     orgId,
     operatingCompanyId,
   );
+  const createDocument = useCreateDocument(orgId, operatingCompanyId);
   const createSaleContract = useCreateSaleContract(orgId, operatingCompanyId);
   const createSaleCpqConstraint = useCreateSaleCpqConstraint(
     orgId,
@@ -1663,6 +1667,29 @@ function SalesClientLoaded({
             },
           },
           {
+            id: 'archive-pdf-dms',
+            label: 'Archive PDF to Documents',
+            requiresSelection: true,
+            onClick: (rows) => {
+              if (rows.length !== 1) return;
+              const id = rows[0]?.id;
+              if (id == null) return;
+              void (async () => {
+                try {
+                  const params = await archiveRenderedPdfAsDocument({
+                    kind: 'sale-order',
+                    recordId: Number(id),
+                    companyId: operatingCompanyId,
+                    name: String(rows[0]?.name ?? `Sale order ${id}`),
+                  });
+                  await createDocument.mutateAsync(params);
+                } catch (e) {
+                  window.alert(e instanceof Error ? e.message : String(e));
+                }
+              })();
+            },
+          },
+          {
             id: 'lock-orders',
             label: t('sales.actions.lockOrders'),
             requiresSelection: true,
@@ -2709,17 +2736,27 @@ function SalesClientLoaded({
         }}
       />
       {chatterTarget ? (
-        <RecordChatterDialog
-          key={`${chatterTarget.resModel}-${chatterTarget.resId.toString()}`}
-          open
-          onOpenChange={(open) => {
-            if (!open) setChatterTarget(null);
-          }}
-          organizationId={organizationId}
-          resModel={chatterTarget.resModel}
-          resId={chatterTarget.resId}
-          recordTitle={chatterTarget.recordTitle}
-        />
+        <>
+          <RecordChatterDialog
+            key={`${chatterTarget.resModel}-${chatterTarget.resId.toString()}`}
+            open
+            onOpenChange={(open) => {
+              if (!open) setChatterTarget(null);
+            }}
+            organizationId={organizationId}
+            resModel={chatterTarget.resModel}
+            resId={chatterTarget.resId}
+            recordTitle={chatterTarget.recordTitle}
+          />
+          <div className="mx-4 mb-4 max-w-3xl">
+            <RecordDocumentAttachments
+              organizationId={orgId}
+              resModel={chatterTarget.resModel}
+              resId={chatterTarget.resId}
+              title={`Attachments — ${chatterTarget.recordTitle ?? chatterTarget.resModel}`}
+            />
+          </div>
+        </>
       ) : null}
       <RuntimeFormModal
         open={quickActionForm !== null}

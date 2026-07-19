@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub(super) struct LockDocumentArgs {
     pub organization_id: u64,
     pub document_id: u64,
+    pub lease_seconds: Option<u64>,
 }
 
 impl From<LockDocumentArgs> for super::Reducer {
@@ -16,6 +17,7 @@ impl From<LockDocumentArgs> for super::Reducer {
         Self::LockDocument {
             organization_id: args.organization_id,
             document_id: args.document_id,
+            lease_seconds: args.lease_seconds,
         }
     }
 }
@@ -35,8 +37,13 @@ pub trait lock_document {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`lock_document:lock_document_then`] to run a callback after the reducer completes.
-    fn lock_document(&self, organization_id: u64, document_id: u64) -> __sdk::Result<()> {
-        self.lock_document_then(organization_id, document_id, |_, _| {})
+    fn lock_document(
+        &self,
+        organization_id: u64,
+        document_id: u64,
+        lease_seconds: Option<u64>,
+    ) -> __sdk::Result<()> {
+        self.lock_document_then(organization_id, document_id, lease_seconds, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `lock_document` to run as soon as possible,
@@ -49,6 +56,7 @@ pub trait lock_document {
         &self,
         organization_id: u64,
         document_id: u64,
+        lease_seconds: Option<u64>,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -61,6 +69,7 @@ impl lock_document for super::RemoteReducers {
         &self,
         organization_id: u64,
         document_id: u64,
+        lease_seconds: Option<u64>,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -70,6 +79,7 @@ impl lock_document for super::RemoteReducers {
             LockDocumentArgs {
                 organization_id,
                 document_id,
+                lease_seconds,
             },
             callback,
         )

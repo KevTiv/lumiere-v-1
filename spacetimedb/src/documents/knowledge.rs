@@ -140,6 +140,7 @@ pub struct CreateKnowledgeArticleParams {
     pub is_todo_item: bool,
     pub sequence: u32,
     pub article_url: Option<String>,
+    pub is_published: bool,
     pub website_url: Option<String>,
     pub metadata: Option<String>,
 }
@@ -334,7 +335,7 @@ pub fn create_knowledge_article(
         internal_permission: params.internal_permission,
         inherited_permission: None,
         inherited_permission_parent_id: None,
-        is_published: false,
+        is_published: params.is_published,
         website_url: params.website_url,
         activity_ids: Vec::new(),
         message_follower_ids: Vec::new(),

@@ -29,24 +29,55 @@ export function toCreateDocumentParams(
   formData: Record<string, unknown>,
 ): CreateDocumentParams | null {
   const name = requiredTrimmedString(formData.name)
-  const fileName = requiredTrimmedString(formData.fileName)
-  if (!name || !fileName) return null
+  const fileName =
+    requiredTrimmedString(formData.fileName) ??
+    requiredTrimmedString(formData.uploadedFileName)
+  const url = requiredTrimmedString(formData.url)
+  const checksum = requiredTrimmedString(formData.checksum)
+  if (!name || !fileName || !url || !checksum) return null
 
-  const mimetype = optionalTrimmedString(formData.mimetype) ?? "application/octet-stream"
+  const fileSizeRaw = formData.fileSize
+  const fileSize =
+    typeof fileSizeRaw === "bigint"
+      ? fileSizeRaw
+      : typeof fileSizeRaw === "number"
+        ? BigInt(fileSizeRaw)
+        : typeof fileSizeRaw === "string" && fileSizeRaw.trim() !== ""
+          ? BigInt(fileSizeRaw)
+          : null
+  if (fileSize === null || fileSize <= 0n) return null
+
+  const mimetype =
+    optionalTrimmedString(formData.mimetype) ?? "application/octet-stream"
+
+  const retentionRaw = formData.retentionDays
+  const retentionDays =
+    retentionRaw != null && String(retentionRaw).trim() !== ""
+      ? Math.max(0, Math.floor(Number(retentionRaw)))
+      : undefined
 
   return {
     name,
     description: optionalTrimmedString(formData.description),
     fileName,
-    fileSize: 0n,
+    fileSize,
     mimetype,
-    url: "",
+    url,
+    checksum,
     folderId: optionalBigIntU64(formData.folderId),
-    resModel: undefined,
-    resId: undefined,
-    partnerId: undefined,
+    resModel: optionalTrimmedString(formData.resModel),
+    resId: optionalBigIntU64(formData.resId),
+    partnerId: optionalBigIntU64(formData.partnerId),
     tagIds: u64IdArrayFromForm(formData.tagIds),
     isFavorite: Boolean(formData.isFavorite),
+    indexContent: optionalTrimmedString(formData.indexContent),
+    classificationId: optionalBigIntU64(formData.classificationId),
+    retentionDays:
+      retentionDays === undefined || Number.isNaN(retentionDays)
+        ? undefined
+        : retentionDays,
+    fiscalKind: optionalTrimmedString(formData.fiscalKind),
+    residencyRegion: optionalTrimmedString(formData.residencyRegion),
     metadata: undefined,
   }
 }
@@ -72,8 +103,78 @@ export function toCreateKnowledgeArticleParams(
     isTodoItem: false,
     sequence: 10,
     articleUrl: undefined,
+    isPublished: Boolean(formData.isPublished),
     websiteUrl: undefined,
     metadata: undefined,
+  }
+}
+
+export function toUpdateKnowledgeArticleParams(
+  formData: Record<string, unknown>,
+  companyId?: bigint,
+): Record<string, unknown> {
+  return {
+    companyId,
+    name: optionalTrimmedString(formData.name),
+    description: optionalTrimmedString(formData.description),
+    body: optionalTrimmedString(formData.body),
+    categoryId: optionalBigIntU64(formData.categoryId),
+    isPublished:
+      formData.isPublished === undefined ? undefined : Boolean(formData.isPublished),
+    websiteUrl: optionalTrimmedString(formData.websiteUrl),
+  }
+}
+
+export function toAddDocumentVersionParams(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const fileName =
+    requiredTrimmedString(formData.fileName) ??
+    requiredTrimmedString(formData.uploadedFileName)
+  const url = requiredTrimmedString(formData.url)
+  const checksum = requiredTrimmedString(formData.checksum)
+  if (!fileName || !url || !checksum) return null
+  const fileSizeRaw = formData.fileSize
+  const fileSize =
+    typeof fileSizeRaw === "bigint"
+      ? fileSizeRaw
+      : typeof fileSizeRaw === "number"
+        ? BigInt(fileSizeRaw)
+        : typeof fileSizeRaw === "string" && fileSizeRaw.trim() !== ""
+          ? BigInt(fileSizeRaw)
+          : null
+  if (fileSize === null || fileSize <= 0n) return null
+  return {
+    fileName,
+    fileSize,
+    mimetype: optionalTrimmedString(formData.mimetype) ?? "application/octet-stream",
+    url,
+    checksum,
+    changesDescription: optionalTrimmedString(formData.changesDescription),
+  }
+}
+
+export function toUpdateDocumentFolderParams(
+  formData: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    name: optionalTrimmedString(formData.name),
+    description: optionalTrimmedString(formData.description),
+    parentId: optionalBigIntU64(formData.parentId),
+    sequence:
+      formData.sequence != null && String(formData.sequence).trim() !== ""
+        ? Math.max(0, Math.floor(Number(formData.sequence)))
+        : undefined,
+    isAccessRestricted:
+      formData.isAccessRestricted === undefined
+        ? undefined
+        : Boolean(formData.isAccessRestricted),
+    isHidden: formData.isHidden === undefined ? undefined : Boolean(formData.isHidden),
+    isReadonly:
+      formData.isReadonly === undefined ? undefined : Boolean(formData.isReadonly),
+    isFavorite:
+      formData.isFavorite === undefined ? undefined : Boolean(formData.isFavorite),
+    residencyRegion: optionalTrimmedString(formData.residencyRegion),
   }
 }
 
@@ -121,7 +222,36 @@ export function toCreateDocumentFolderParams(
     isFavorite: Boolean(formData.isFavorite),
     sequence,
     storageId: optionalBigIntU64(formData.storageId),
+    residencyRegion: optionalTrimmedString(formData.residencyRegion),
     metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+export function toSetDocumentIndexContentParams(
+  formData: Record<string, unknown>,
+): { content: string; language?: string } | null {
+  const content = requiredTrimmedString(formData.content)
+  if (!content) return null
+  return {
+    content,
+    language: optionalTrimmedString(formData.language),
+  }
+}
+
+export function toSetDocumentRetentionParams(
+  formData: Record<string, unknown>,
+): { classificationId?: bigint; retentionDays?: number } {
+  const retentionRaw = formData.retentionDays
+  const retentionDays =
+    retentionRaw != null && String(retentionRaw).trim() !== ""
+      ? Math.max(0, Math.floor(Number(retentionRaw)))
+      : undefined
+  return {
+    classificationId: optionalBigIntU64(formData.classificationId),
+    retentionDays:
+      retentionDays === undefined || Number.isNaN(retentionDays)
+        ? undefined
+        : retentionDays,
   }
 }
 
@@ -133,6 +263,10 @@ export function toCreateDocumentProcessingJobParams(
     jobType: String(formData.jobType ?? formData.job_type ?? ""),
     aiAgentId: optionalBigIntU64(formData.aiAgentId ?? formData.ai_agent_id),
     inputData: optionalTrimmedString(formData.inputData ?? formData.input_data),
+    documentId: optionalBigIntU64(formData.documentId ?? formData.document_id),
+    documentVersionId: optionalBigIntU64(
+      formData.documentVersionId ?? formData.document_version_id,
+    ),
     metadata: optionalTrimmedString(formData.metadata),
   }
 }

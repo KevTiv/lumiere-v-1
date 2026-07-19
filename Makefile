@@ -72,6 +72,10 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_all_hr_tests \
 	run_manufacturing_workcenter_test \
 	run_documents_folder_test \
+	run_documents_wave_a_tests \
+	run_documents_wave_b_tests \
+	run_documents_wave_c_tests \
+	run_documents_wave_d_tests \
 	run_workflow_definition_test \
 	run_subscription_plan_test
 

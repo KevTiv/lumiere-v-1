@@ -110,6 +110,26 @@ export function useAiInsightsForOrg(organizationId: bigint, initialData?: QueryR
   })
 }
 
+export function useDocumentVersions(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['document-versions', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/document-versions', 'Failed to fetch document versions'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useDeletedDocuments(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['documents-deleted', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/documents-deleted', 'Failed to fetch deleted documents'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export function useCreateDocument(organizationId: bigint, companyId: bigint) {
@@ -161,17 +181,55 @@ export function useDeleteDocument(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete document')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['documents-deleted', k] })
+      void qc.invalidateQueries({ queryKey: ['document-folders', k] })
+    },
+  })
+}
+
+export function useRestoreDocument(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (documentId: bigint | number | string) => {
+      const { urlPath, init } = documentsBffPost("restore_document", [
+        organizationId,
+        toScalarU64(documentId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['documents-deleted', k] })
+      void qc.invalidateQueries({ queryKey: ['document-folders', k] })
+    },
   })
 }
 
 export function useLockDocument(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (documentId: bigint | number | string) => {
+    mutationFn: async (
+      input:
+        | ScalarId
+        | { documentId: ScalarId; leaseSeconds?: number | null },
+    ) => {
+      const documentId =
+        typeof input === "object" && input !== null && "documentId" in input
+          ? input.documentId
+          : input
+      const leaseSeconds =
+        typeof input === "object" && input !== null && "documentId" in input
+          ? (input.leaseSeconds ?? null)
+          : null
       const { urlPath, init } = documentsBffPost("lock_document", [
         organizationId,
         toScalarU64(documentId),
+        leaseSeconds == null ? null : Number(leaseSeconds),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to lock document')
@@ -208,12 +266,15 @@ export function useAddDocumentVersion(organizationId: bigint) {
       const { urlPath, init } = documentsBffPost("add_document_version", [
         organizationId,
         toScalarU64(documentId),
-        stdbParamsToJson(params as object),
+        stdbParamsToJson(params as object, "AddDocumentVersionParams"),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add document version')
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] })
+      qc.invalidateQueries({ queryKey: ['document-versions', rqBigIntKey(organizationId)] })
+    },
   })
 }
 
@@ -227,6 +288,162 @@ export function useRecordDocumentView(organizationId: bigint) {
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to record document view')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useSetDocumentIndexContent(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      documentId,
+      params,
+    }: {
+      documentId: bigint | number | string
+      params: { content: string; language?: string }
+    }) => {
+      const { urlPath, init } = documentsBffPost("set_document_index_content", [
+        organizationId,
+        toScalarU64(documentId),
+        stdbParamsToJson(params as object, "SetDocumentIndexContentParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useSetDocumentRetention(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      documentId,
+      params,
+    }: {
+      documentId: bigint | number | string
+      params: { classificationId?: bigint; retentionDays?: number }
+    }) => {
+      const { urlPath, init } = documentsBffPost("set_document_retention", [
+        organizationId,
+        toScalarU64(documentId),
+        stdbParamsToJson(params as object, "SetDocumentRetentionParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['documents-deleted', k] })
+    },
+  })
+}
+
+export function usePurgeExpiredDocuments(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { urlPath, init } = documentsBffPost("purge_expired_documents", [organizationId])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['documents-deleted', k] })
+      void qc.invalidateQueries({ queryKey: ['document-folders', k] })
+    },
+  })
+}
+
+export function useScheduleDocumentRetentionPurge(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params?: { delaySeconds?: number }) => {
+      const { urlPath, init } = documentsBffPost("schedule_document_retention_purge", [
+        organizationId,
+        stdbParamsToJson(
+          { delaySeconds: params?.delaySeconds ?? 60 } as object,
+          "ScheduleDocumentRetentionPurgeParams",
+        ),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['documents-deleted', k] })
+    },
+  })
+}
+
+export function useApplyDocumentLegalHold(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      documentId,
+      reason,
+    }: {
+      documentId: bigint | number | string
+      reason: string
+    }) => {
+      const { urlPath, init } = documentsBffPost("apply_document_legal_hold", [
+        organizationId,
+        toScalarU64(documentId),
+        stdbParamsToJson({ reason, metadata: undefined } as object, "ApplyDocumentLegalHoldParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useUpdateDocumentPresence(organizationId: bigint) {
+  return useMutation({
+    mutationFn: async ({
+      documentId,
+      userName,
+    }: {
+      documentId: bigint | number | string
+      userName: string
+    }) => {
+      const { urlPath, init } = documentsBffPost("update_document_presence", [
+        organizationId,
+        toScalarU64(documentId),
+        userName,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+  })
+}
+
+export function useCreateDocumentSignatureRequest(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      documentId,
+      params,
+    }: {
+      documentId: bigint | number | string
+      params: {
+        provider: string
+        externalEnvelopeId: string
+        signersJson?: string
+        metadata?: string
+      }
+    }) => {
+      const { urlPath, init } = documentsBffPost("create_document_signature_request", [
+        organizationId,
+        toScalarU64(documentId),
+        stdbParamsToJson(params as object, "CreateDocumentSignatureRequestParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
@@ -246,6 +463,45 @@ export function useCreateDocumentFolder(organizationId: bigint) {
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create document folder')
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['document-folders', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useUpdateDocumentFolder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      folderId,
+      params,
+    }: {
+      folderId: ScalarId
+      params: Record<string, unknown>
+    }) => {
+      const { urlPath, init } = documentsBffPost("update_document_folder", [
+        organizationId,
+        toScalarU64(folderId),
+        stdbParamsToJson(params, "UpdateDocumentFolderParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['document-folders', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useDeleteDocumentFolder(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (folderId: ScalarId) => {
+      const { urlPath, init } = documentsBffPost("delete_document_folder", [
+        organizationId,
+        toScalarU64(folderId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['document-folders', rqBigIntKey(organizationId)] }),

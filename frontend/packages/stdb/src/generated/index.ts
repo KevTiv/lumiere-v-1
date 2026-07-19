@@ -73,6 +73,7 @@ import AmendSubscriptionReducer from "./amend_subscription_reducer";
 import AppendAiAgentRunStepReducer from "./append_ai_agent_run_step_reducer";
 import AppendAiChatMessageReducer from "./append_ai_chat_message_reducer";
 import AppendCrmConversationMessageReducer from "./append_crm_conversation_message_reducer";
+import ApplyDocumentLegalHoldReducer from "./apply_document_legal_hold_reducer";
 import ApplyExpenseAdvanceToSheetReducer from "./apply_expense_advance_to_sheet_reducer";
 import ApplyExpenseIntegrationIntentReducer from "./apply_expense_integration_intent_reducer";
 import ApplyGlobalMigrationsReducer from "./apply_global_migrations_reducer";
@@ -153,6 +154,8 @@ import CancelWorkflowInstanceReducer from "./cancel_workflow_instance_reducer";
 import CheckMoAvailabilityReducer from "./check_mo_availability_reducer";
 import ClaimHubWithTokenReducer from "./claim_hub_with_token_reducer";
 import ClaimQueueJobReducer from "./claim_queue_job_reducer";
+import ClearDocumentPresenceReducer from "./clear_document_presence_reducer";
+import ClearKnowledgeArticlePresenceReducer from "./clear_knowledge_article_presence_reducer";
 import ClearOpportunityPresenceReducer from "./clear_opportunity_presence_reducer";
 import ClearProposalPresenceReducer from "./clear_proposal_presence_reducer";
 import CloseAccountAssetReducer from "./close_account_asset_reducer";
@@ -165,6 +168,7 @@ import CloseTicketReducer from "./close_ticket_reducer";
 import CompleteActivityReducer from "./complete_activity_reducer";
 import CompleteAiAgentRunReducer from "./complete_ai_agent_run_reducer";
 import CompleteDocumentProcessingJobReducer from "./complete_document_processing_job_reducer";
+import CompleteDocumentSignatureRequestReducer from "./complete_document_signature_request_reducer";
 import CompleteIntercompanyTransactionReducer from "./complete_intercompany_transaction_reducer";
 import CompleteOffboardingItemReducer from "./complete_offboarding_item_reducer";
 import CompleteOnboardingItemReducer from "./complete_onboarding_item_reducer";
@@ -270,6 +274,7 @@ import CreateDepreciationLineReducer from "./create_depreciation_line_reducer";
 import CreateDocumentReducer from "./create_document_reducer";
 import CreateDocumentFolderReducer from "./create_document_folder_reducer";
 import CreateDocumentProcessingJobReducer from "./create_document_processing_job_reducer";
+import CreateDocumentSignatureRequestReducer from "./create_document_signature_request_reducer";
 import CreateDocumentTemplateReducer from "./create_document_template_reducer";
 import CreateEliminationEntryReducer from "./create_elimination_entry_reducer";
 import CreateEmployeeReducer from "./create_employee_reducer";
@@ -466,6 +471,7 @@ import DeleteCalendarEventReducer from "./delete_calendar_event_reducer";
 import DeleteCompanyReducer from "./delete_company_reducer";
 import DeleteContactReducer from "./delete_contact_reducer";
 import DeleteDocumentReducer from "./delete_document_reducer";
+import DeleteDocumentFolderReducer from "./delete_document_folder_reducer";
 import DeleteFinancialReportReducer from "./delete_financial_report_reducer";
 import DeleteFiscalYearReducer from "./delete_fiscal_year_reducer";
 import DeleteFormFieldReducer from "./delete_form_field_reducer";
@@ -675,6 +681,7 @@ import ProcessInventoryAdjustmentReducer from "./process_inventory_adjustment_re
 import ProcessPendingScansReducer from "./process_pending_scans_reducer";
 import ProduceManufacturingOrderReducer from "./produce_manufacturing_order_reducer";
 import PromoteAiSkillVersionReducer from "./promote_ai_skill_version_reducer";
+import PurgeExpiredDocumentsReducer from "./purge_expired_documents_reducer";
 import QueueMailFromTemplateReducer from "./queue_mail_from_template_reducer";
 import RateSubscriptionUsageEventsReducer from "./rate_subscription_usage_events_reducer";
 import RebaseDeferredSchedulesForSubscriptionReducer from "./rebase_deferred_schedules_for_subscription_reducer";
@@ -732,6 +739,7 @@ import RejectExpensePolicyExceptionReducer from "./reject_expense_policy_excepti
 import RejectSupplierIntakeReducer from "./reject_supplier_intake_reducer";
 import RejectTimesheetsReducer from "./reject_timesheets_reducer";
 import ReleaseBlanketToPoReducer from "./release_blanket_to_po_reducer";
+import ReleaseDocumentLegalHoldReducer from "./release_document_legal_hold_reducer";
 import ReleasePickingWaveReducer from "./release_picking_wave_reducer";
 import RemoveArticleMemberReducer from "./remove_article_member_reducer";
 import RemoveCasbinRuleReducer from "./remove_casbin_rule_reducer";
@@ -753,6 +761,7 @@ import ResetLeaveToDraftReducer from "./reset_leave_to_draft_reducer";
 import ResolveInventoryExceptionReducer from "./resolve_inventory_exception_reducer";
 import ResolveIotAlertReducer from "./resolve_iot_alert_reducer";
 import ResolveProposalCommentReducer from "./resolve_proposal_comment_reducer";
+import RestoreDocumentReducer from "./restore_document_reducer";
 import RestoreProductCategoryReducer from "./restore_product_category_reducer";
 import ResumeSubscriptionReducer from "./resume_subscription_reducer";
 import RetryIntercompanyTransactionReducer from "./retry_intercompany_transaction_reducer";
@@ -800,6 +809,10 @@ import RunCrmOpportunityConvertTestReducer from "./run_crm_opportunity_convert_t
 import RunCrmRelationshipAdminTestReducer from "./run_crm_relationship_admin_test_reducer";
 import RunCrmWave2TestReducer from "./run_crm_wave_2_test_reducer";
 import RunDocumentsFolderTestReducer from "./run_documents_folder_test_reducer";
+import RunDocumentsWaveATestsReducer from "./run_documents_wave_a_tests_reducer";
+import RunDocumentsWaveBTestsReducer from "./run_documents_wave_b_tests_reducer";
+import RunDocumentsWaveCTestsReducer from "./run_documents_wave_c_tests_reducer";
+import RunDocumentsWaveDTestsReducer from "./run_documents_wave_d_tests_reducer";
 import RunExpensesWaveATestReducer from "./run_expenses_wave_a_test_reducer";
 import RunExpensesWaveBTestReducer from "./run_expenses_wave_b_test_reducer";
 import RunExpensesWaveCTestReducer from "./run_expenses_wave_c_test_reducer";
@@ -886,6 +899,7 @@ import RunTraceabilityReportReducer from "./run_traceability_report_reducer";
 import RunWorkflowDefinitionTestReducer from "./run_workflow_definition_test_reducer";
 import SaveImportMappingTemplateReducer from "./save_import_mapping_template_reducer";
 import SaveProposalVersionReducer from "./save_proposal_version_reducer";
+import ScheduleDocumentRetentionPurgeReducer from "./schedule_document_retention_purge_reducer";
 import ScheduleSalesSlaEscalationReducer from "./schedule_sales_sla_escalation_reducer";
 import ScheduleTaxDeadlineUpdatesReducer from "./schedule_tax_deadline_updates_reducer";
 import SeedDevDataReducer from "./seed_dev_data_reducer";
@@ -909,9 +923,12 @@ import SetCompanyVerticalPackReducer from "./set_company_vertical_pack_reducer";
 import SetConsolidationCompanyRateReducer from "./set_consolidation_company_rate_reducer";
 import SetContactCommunicationPreferenceReducer from "./set_contact_communication_preference_reducer";
 import SetContactSegmentRulesReducer from "./set_contact_segment_rules_reducer";
+import SetDocumentIndexContentReducer from "./set_document_index_content_reducer";
+import SetDocumentRetentionReducer from "./set_document_retention_reducer";
 import SetExpenseAllocationsReducer from "./set_expense_allocations_reducer";
 import SetExpenseFraudHoldReducer from "./set_expense_fraud_hold_reducer";
 import SetFormRoleConfigReducer from "./set_form_role_config_reducer";
+import SetGoogleDriveConflictPolicyReducer from "./set_google_drive_conflict_policy_reducer";
 import SetIntercompanyRuleActiveReducer from "./set_intercompany_rule_active_reducer";
 import SetIotThresholdReducer from "./set_iot_threshold_reducer";
 import SetProjectActiveReducer from "./set_project_active_reducer";
@@ -947,6 +964,7 @@ import SubmitPerformanceReviewReducer from "./submit_performance_review_reducer"
 import SubmitPurchaseRequisitionReducer from "./submit_purchase_requisition_reducer";
 import SubmitSupplierIntakeReducer from "./submit_supplier_intake_reducer";
 import SubscribeToRecordReducer from "./subscribe_to_record_reducer";
+import SyncExternalFileToDocumentReducer from "./sync_external_file_to_document_reducer";
 import SyncHubDevicesReducer from "./sync_hub_devices_reducer";
 import TestIotDeviceReducer from "./test_iot_device_reducer";
 import ToggleProjectFavoriteReducer from "./toggle_project_favorite_reducer";
@@ -1010,6 +1028,8 @@ import UpdateCrossoveredBudgetReducer from "./update_crossovered_budget_reducer"
 import UpdateDepartmentReducer from "./update_department_reducer";
 import UpdateDeviceStatusReducer from "./update_device_status_reducer";
 import UpdateDocumentReducer from "./update_document_reducer";
+import UpdateDocumentFolderReducer from "./update_document_folder_reducer";
+import UpdateDocumentPresenceReducer from "./update_document_presence_reducer";
 import UpdateDocumentTemplateReducer from "./update_document_template_reducer";
 import UpdateEmployeeReducer from "./update_employee_reducer";
 import UpdateExpenseReducer from "./update_expense_reducer";
@@ -1027,6 +1047,7 @@ import UpdateIntegrationStatusReducer from "./update_integration_status_reducer"
 import UpdateIntercompanyRuleReducer from "./update_intercompany_rule_reducer";
 import UpdateJobPositionReducer from "./update_job_position_reducer";
 import UpdateKnowledgeArticleReducer from "./update_knowledge_article_reducer";
+import UpdateKnowledgeArticlePresenceReducer from "./update_knowledge_article_presence_reducer";
 import UpdateKnowledgeCategoryReducer from "./update_knowledge_category_reducer";
 import UpdateLandedCostReducer from "./update_landed_cost_reducer";
 import UpdateLeadAddressReducer from "./update_lead_address_reducer";
@@ -1256,7 +1277,11 @@ import DeliveryCarrierRow from "./delivery_carrier_table";
 import DeliveryPriceRuleRow from "./delivery_price_rule_table";
 import DocFolderRow from "./doc_folder_table";
 import DocumentRow from "./document_table";
+import DocumentExternalRefRow from "./document_external_ref_table";
+import DocumentLegalHoldRow from "./document_legal_hold_table";
+import DocumentPresenceRow from "./document_presence_table";
 import DocumentSequenceRow from "./document_sequence_table";
+import DocumentSignatureRequestRow from "./document_signature_request_table";
 import DocumentTemplateRow from "./document_template_table";
 import DocumentVersionRow from "./document_version_table";
 import ExpenseCardStatementLineRow from "./expense_card_statement_line_table";
@@ -1340,6 +1365,7 @@ import IotTelemetryRow from "./iot_telemetry_table";
 import IotThresholdRow from "./iot_threshold_table";
 import KbCategoryRow from "./kb_category_table";
 import KnowledgeArticleRow from "./knowledge_article_table";
+import KnowledgeArticlePresenceRow from "./knowledge_article_presence_table";
 import LeadRow from "./lead_table";
 import LeadLostReasonRow from "./lead_lost_reason_table";
 import LeadScoreRow from "./lead_score_table";
@@ -3553,6 +3579,60 @@ const tablesSchema = __schema({
       { name: 'document_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, DocumentRow),
+  document_external_ref: __table({
+    name: 'document_external_ref',
+    indexes: [
+      { name: 'external_ref_by_document', algorithm: 'btree', columns: [
+        'documentId',
+      ] },
+      { name: 'external_ref_by_external_id', algorithm: 'btree', columns: [
+        'externalId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'external_ref_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'document_external_ref_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, DocumentExternalRefRow),
+  document_legal_hold: __table({
+    name: 'document_legal_hold',
+    indexes: [
+      { name: 'legal_hold_by_document', algorithm: 'btree', columns: [
+        'documentId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'legal_hold_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'document_legal_hold_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, DocumentLegalHoldRow),
+  document_presence: __table({
+    name: 'document_presence',
+    indexes: [
+      { name: 'doc_presence_by_document', algorithm: 'btree', columns: [
+        'documentId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'doc_presence_by_user', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+    ],
+    constraints: [
+      { name: 'document_presence_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, DocumentPresenceRow),
   document_sequence: __table({
     name: 'document_sequence',
     indexes: [
@@ -3564,6 +3644,26 @@ const tablesSchema = __schema({
       { name: 'document_sequence_doc_type_key', constraint: 'unique', columns: ['docType'] },
     ],
   }, DocumentSequenceRow),
+  document_signature_request: __table({
+    name: 'document_signature_request',
+    indexes: [
+      { name: 'signature_by_document', algorithm: 'btree', columns: [
+        'documentId',
+      ] },
+      { name: 'signature_by_envelope', algorithm: 'btree', columns: [
+        'externalEnvelopeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'signature_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'document_signature_request_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, DocumentSignatureRequestRow),
   document_template: __table({
     name: 'document_template',
     indexes: [
@@ -3589,6 +3689,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'version_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -5083,6 +5186,23 @@ const tablesSchema = __schema({
       { name: 'knowledge_article_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, KnowledgeArticleRow),
+  knowledge_article_presence: __table({
+    name: 'knowledge_article_presence',
+    indexes: [
+      { name: 'article_presence_by_article', algorithm: 'btree', columns: [
+        'articleId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'article_presence_by_user', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+    ],
+    constraints: [
+      { name: 'knowledge_article_presence_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, KnowledgeArticlePresenceRow),
   lead: __table({
     name: 'lead',
     indexes: [
@@ -8628,6 +8748,7 @@ const reducersSchema = __reducers(
   __reducerSchema("append_ai_agent_run_step", AppendAiAgentRunStepReducer),
   __reducerSchema("append_ai_chat_message", AppendAiChatMessageReducer),
   __reducerSchema("append_crm_conversation_message", AppendCrmConversationMessageReducer),
+  __reducerSchema("apply_document_legal_hold", ApplyDocumentLegalHoldReducer),
   __reducerSchema("apply_expense_advance_to_sheet", ApplyExpenseAdvanceToSheetReducer),
   __reducerSchema("apply_expense_integration_intent", ApplyExpenseIntegrationIntentReducer),
   __reducerSchema("apply_global_migrations", ApplyGlobalMigrationsReducer),
@@ -8708,6 +8829,8 @@ const reducersSchema = __reducers(
   __reducerSchema("check_mo_availability", CheckMoAvailabilityReducer),
   __reducerSchema("claim_hub_with_token", ClaimHubWithTokenReducer),
   __reducerSchema("claim_queue_job", ClaimQueueJobReducer),
+  __reducerSchema("clear_document_presence", ClearDocumentPresenceReducer),
+  __reducerSchema("clear_knowledge_article_presence", ClearKnowledgeArticlePresenceReducer),
   __reducerSchema("clear_opportunity_presence", ClearOpportunityPresenceReducer),
   __reducerSchema("clear_proposal_presence", ClearProposalPresenceReducer),
   __reducerSchema("close_account_asset", CloseAccountAssetReducer),
@@ -8720,6 +8843,7 @@ const reducersSchema = __reducers(
   __reducerSchema("complete_activity", CompleteActivityReducer),
   __reducerSchema("complete_ai_agent_run", CompleteAiAgentRunReducer),
   __reducerSchema("complete_document_processing_job", CompleteDocumentProcessingJobReducer),
+  __reducerSchema("complete_document_signature_request", CompleteDocumentSignatureRequestReducer),
   __reducerSchema("complete_intercompany_transaction", CompleteIntercompanyTransactionReducer),
   __reducerSchema("complete_offboarding_item", CompleteOffboardingItemReducer),
   __reducerSchema("complete_onboarding_item", CompleteOnboardingItemReducer),
@@ -8825,6 +8949,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_document", CreateDocumentReducer),
   __reducerSchema("create_document_folder", CreateDocumentFolderReducer),
   __reducerSchema("create_document_processing_job", CreateDocumentProcessingJobReducer),
+  __reducerSchema("create_document_signature_request", CreateDocumentSignatureRequestReducer),
   __reducerSchema("create_document_template", CreateDocumentTemplateReducer),
   __reducerSchema("create_elimination_entry", CreateEliminationEntryReducer),
   __reducerSchema("create_employee", CreateEmployeeReducer),
@@ -9021,6 +9146,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_company", DeleteCompanyReducer),
   __reducerSchema("delete_contact", DeleteContactReducer),
   __reducerSchema("delete_document", DeleteDocumentReducer),
+  __reducerSchema("delete_document_folder", DeleteDocumentFolderReducer),
   __reducerSchema("delete_financial_report", DeleteFinancialReportReducer),
   __reducerSchema("delete_fiscal_year", DeleteFiscalYearReducer),
   __reducerSchema("delete_form_field", DeleteFormFieldReducer),
@@ -9230,6 +9356,7 @@ const reducersSchema = __reducers(
   __reducerSchema("process_pending_scans", ProcessPendingScansReducer),
   __reducerSchema("produce_manufacturing_order", ProduceManufacturingOrderReducer),
   __reducerSchema("promote_ai_skill_version", PromoteAiSkillVersionReducer),
+  __reducerSchema("purge_expired_documents", PurgeExpiredDocumentsReducer),
   __reducerSchema("queue_mail_from_template", QueueMailFromTemplateReducer),
   __reducerSchema("rate_subscription_usage_events", RateSubscriptionUsageEventsReducer),
   __reducerSchema("rebase_deferred_schedules_for_subscription", RebaseDeferredSchedulesForSubscriptionReducer),
@@ -9287,6 +9414,7 @@ const reducersSchema = __reducers(
   __reducerSchema("reject_supplier_intake", RejectSupplierIntakeReducer),
   __reducerSchema("reject_timesheets", RejectTimesheetsReducer),
   __reducerSchema("release_blanket_to_po", ReleaseBlanketToPoReducer),
+  __reducerSchema("release_document_legal_hold", ReleaseDocumentLegalHoldReducer),
   __reducerSchema("release_picking_wave", ReleasePickingWaveReducer),
   __reducerSchema("remove_article_member", RemoveArticleMemberReducer),
   __reducerSchema("remove_casbin_rule", RemoveCasbinRuleReducer),
@@ -9308,6 +9436,7 @@ const reducersSchema = __reducers(
   __reducerSchema("resolve_inventory_exception", ResolveInventoryExceptionReducer),
   __reducerSchema("resolve_iot_alert", ResolveIotAlertReducer),
   __reducerSchema("resolve_proposal_comment", ResolveProposalCommentReducer),
+  __reducerSchema("restore_document", RestoreDocumentReducer),
   __reducerSchema("restore_product_category", RestoreProductCategoryReducer),
   __reducerSchema("resume_subscription", ResumeSubscriptionReducer),
   __reducerSchema("retry_intercompany_transaction", RetryIntercompanyTransactionReducer),
@@ -9355,6 +9484,10 @@ const reducersSchema = __reducers(
   __reducerSchema("run_crm_relationship_admin_test", RunCrmRelationshipAdminTestReducer),
   __reducerSchema("run_crm_wave_2_test", RunCrmWave2TestReducer),
   __reducerSchema("run_documents_folder_test", RunDocumentsFolderTestReducer),
+  __reducerSchema("run_documents_wave_a_tests", RunDocumentsWaveATestsReducer),
+  __reducerSchema("run_documents_wave_b_tests", RunDocumentsWaveBTestsReducer),
+  __reducerSchema("run_documents_wave_c_tests", RunDocumentsWaveCTestsReducer),
+  __reducerSchema("run_documents_wave_d_tests", RunDocumentsWaveDTestsReducer),
   __reducerSchema("run_expenses_wave_a_test", RunExpensesWaveATestReducer),
   __reducerSchema("run_expenses_wave_b_test", RunExpensesWaveBTestReducer),
   __reducerSchema("run_expenses_wave_c_test", RunExpensesWaveCTestReducer),
@@ -9441,6 +9574,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_workflow_definition_test", RunWorkflowDefinitionTestReducer),
   __reducerSchema("save_import_mapping_template", SaveImportMappingTemplateReducer),
   __reducerSchema("save_proposal_version", SaveProposalVersionReducer),
+  __reducerSchema("schedule_document_retention_purge", ScheduleDocumentRetentionPurgeReducer),
   __reducerSchema("schedule_sales_sla_escalation", ScheduleSalesSlaEscalationReducer),
   __reducerSchema("schedule_tax_deadline_updates", ScheduleTaxDeadlineUpdatesReducer),
   __reducerSchema("seed_dev_data", SeedDevDataReducer),
@@ -9464,9 +9598,12 @@ const reducersSchema = __reducers(
   __reducerSchema("set_consolidation_company_rate", SetConsolidationCompanyRateReducer),
   __reducerSchema("set_contact_communication_preference", SetContactCommunicationPreferenceReducer),
   __reducerSchema("set_contact_segment_rules", SetContactSegmentRulesReducer),
+  __reducerSchema("set_document_index_content", SetDocumentIndexContentReducer),
+  __reducerSchema("set_document_retention", SetDocumentRetentionReducer),
   __reducerSchema("set_expense_allocations", SetExpenseAllocationsReducer),
   __reducerSchema("set_expense_fraud_hold", SetExpenseFraudHoldReducer),
   __reducerSchema("set_form_role_config", SetFormRoleConfigReducer),
+  __reducerSchema("set_google_drive_conflict_policy", SetGoogleDriveConflictPolicyReducer),
   __reducerSchema("set_intercompany_rule_active", SetIntercompanyRuleActiveReducer),
   __reducerSchema("set_iot_threshold", SetIotThresholdReducer),
   __reducerSchema("set_project_active", SetProjectActiveReducer),
@@ -9502,6 +9639,7 @@ const reducersSchema = __reducers(
   __reducerSchema("submit_purchase_requisition", SubmitPurchaseRequisitionReducer),
   __reducerSchema("submit_supplier_intake", SubmitSupplierIntakeReducer),
   __reducerSchema("subscribe_to_record", SubscribeToRecordReducer),
+  __reducerSchema("sync_external_file_to_document", SyncExternalFileToDocumentReducer),
   __reducerSchema("sync_hub_devices", SyncHubDevicesReducer),
   __reducerSchema("test_iot_device", TestIotDeviceReducer),
   __reducerSchema("toggle_project_favorite", ToggleProjectFavoriteReducer),
@@ -9565,6 +9703,8 @@ const reducersSchema = __reducers(
   __reducerSchema("update_department", UpdateDepartmentReducer),
   __reducerSchema("update_device_status", UpdateDeviceStatusReducer),
   __reducerSchema("update_document", UpdateDocumentReducer),
+  __reducerSchema("update_document_folder", UpdateDocumentFolderReducer),
+  __reducerSchema("update_document_presence", UpdateDocumentPresenceReducer),
   __reducerSchema("update_document_template", UpdateDocumentTemplateReducer),
   __reducerSchema("update_employee", UpdateEmployeeReducer),
   __reducerSchema("update_expense", UpdateExpenseReducer),
@@ -9582,6 +9722,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_intercompany_rule", UpdateIntercompanyRuleReducer),
   __reducerSchema("update_job_position", UpdateJobPositionReducer),
   __reducerSchema("update_knowledge_article", UpdateKnowledgeArticleReducer),
+  __reducerSchema("update_knowledge_article_presence", UpdateKnowledgeArticlePresenceReducer),
   __reducerSchema("update_knowledge_category", UpdateKnowledgeCategoryReducer),
   __reducerSchema("update_landed_cost", UpdateLandedCostReducer),
   __reducerSchema("update_lead_address", UpdateLeadAddressReducer),

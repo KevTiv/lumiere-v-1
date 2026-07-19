@@ -25,7 +25,15 @@ export const documentsTableConfig = (t: TFunction): EntityViewConfig => ({
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("documents.documents.searchPlaceholder"),
-    searchKeys: ["name", "fileName", "resName"],
+    searchKeys: [
+      "name",
+      "fileName",
+      "resName",
+      "description",
+      "indexContent",
+      "fiscalKind",
+      "residencyRegion",
+    ],
     filters: [
       {
         key: "isDeleted",
@@ -42,6 +50,9 @@ export const documentsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "fileName", label: t("documents.documents.columns.fileName"), width: "min-w-36" },
       { key: "mimetype", label: t("documents.documents.columns.mimetype"), width: "min-w-24" },
       { key: "fileSize", label: t("documents.documents.columns.fileSize"), type: "number", align: "right" },
+      { key: "fiscalKind", label: t("documents.documents.columns.fiscalKind"), width: "min-w-28" },
+      { key: "residencyRegion", label: t("documents.documents.columns.residencyRegion"), width: "min-w-20" },
+      { key: "retentionDays", label: t("documents.documents.columns.retentionDays"), type: "number", align: "right" },
       { key: "isFavorite", label: t("documents.documents.columns.isFavorite"), type: "boolean" },
       { key: "isShared", label: t("documents.documents.columns.isShared"), type: "boolean" },
       { key: "versionCount", label: t("documents.documents.columns.versionCount"), type: "number", align: "right" },
@@ -222,6 +233,67 @@ export const documentAiInsightsTableConfig = (t: TFunction): EntityViewConfig =>
   },
 })
 
+export const documentsRecycleBinTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "documents-recycle-bin-table",
+  title: "Recycle bin",
+  description: "Soft-deleted documents that can be restored.",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("documents.documents.searchPlaceholder"),
+    searchKeys: ["name", "fileName"],
+    columns: [
+      { key: "name", label: t("documents.documents.columns.name"), width: "min-w-48" },
+      { key: "fileName", label: t("documents.documents.columns.fileName"), width: "min-w-36" },
+      { key: "deletedAt", label: "Deleted at", type: "date" },
+      { key: "versionCount", label: t("documents.documents.columns.versionCount"), type: "number", align: "right" },
+    ],
+    emptyMessage: "Recycle bin is empty",
+  },
+})
+
+export const documentTemplatesTableConfig = (_t: TFunction): EntityViewConfig => ({
+  id: "document-templates-table",
+  title: "Document templates",
+  description: "PDF / HTML document layouts.",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: "Search templates…",
+    searchKeys: ["name", "model"],
+    columns: [
+      { key: "name", label: "Name", width: "min-w-48" },
+      { key: "model", label: "Model", width: "min-w-32" },
+      { key: "reportType", label: "Report type", width: "min-w-28" },
+      { key: "isDefault", label: "Default", type: "boolean" },
+      { key: "isActive", label: "Active", type: "boolean" },
+    ],
+    emptyMessage: "No document templates yet",
+  },
+})
+
+export const mailTemplatesTableConfig = (_t: TFunction): EntityViewConfig => ({
+  id: "mail-templates-table",
+  title: "Mail templates",
+  description: "Outbound email templates.",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: "Search mail templates…",
+    searchKeys: ["name", "model", "subject"],
+    columns: [
+      { key: "name", label: "Name", width: "min-w-48" },
+      { key: "model", label: "Model", width: "min-w-32" },
+      { key: "subject", label: "Subject", width: "min-w-40" },
+      { key: "isActive", label: "Active", type: "boolean" },
+    ],
+    emptyMessage: "No mail templates yet",
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const documentsEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "documents-table": documentsTableConfig(t),
@@ -230,4 +302,7 @@ export const documentsEntityConfigs = (t: TFunction): Record<string, EntityViewC
   "document-folders-table": documentFoldersTableConfig(t),
   "document-processing-jobs-table": documentProcessingJobsTableConfig(t),
   "document-ai-insights-table": documentAiInsightsTableConfig(t),
+  "documents-recycle-bin-table": documentsRecycleBinTableConfig(t),
+  "document-templates-table": documentTemplatesTableConfig(t),
+  "mail-templates-table": mailTemplatesTableConfig(t),
 })

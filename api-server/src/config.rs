@@ -29,6 +29,8 @@ pub struct Config {
     pub report_renderer_url: Option<String>,
     /// Mounted, durable object-store volume for opaque owner-report artifacts.
     pub report_artifact_dir: PathBuf,
+    /// Local object-store root for DMS document blobs (presign/upload/complete).
+    pub document_blob_dir: PathBuf,
     /// Bounded polling interval for the scheduled owner-report worker.
     pub owner_report_worker_poll_secs: u64,
     /// Stable worker name used for queue registration and heartbeats.
@@ -146,6 +148,9 @@ impl Config {
         let report_artifact_dir = std::env::var("LUMIERE_REPORT_ARTIFACT_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("lumiere-owner-reports"));
+        let document_blob_dir = std::env::var("LUMIERE_DOCUMENT_BLOB_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| std::env::temp_dir().join("lumiere-document-blobs"));
         let owner_report_worker_poll_secs = std::env::var("LUMIERE_OWNER_REPORT_WORKER_POLL_SECS")
             .ok()
             .and_then(|value| value.parse::<u64>().ok())
@@ -174,6 +179,7 @@ impl Config {
             cookie_secure,
             report_renderer_url,
             report_artifact_dir,
+            document_blob_dir,
             owner_report_worker_poll_secs,
             owner_report_worker_name,
             owner_report_worker_port,

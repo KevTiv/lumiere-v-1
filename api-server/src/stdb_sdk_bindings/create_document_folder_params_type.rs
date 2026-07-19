@@ -16,6 +16,7 @@ pub struct CreateDocumentFolderParams {
     pub is_favorite: bool,
     pub sequence: u32,
     pub storage_id: Option<u64>,
+    pub residency_region: Option<String>,
     pub metadata: Option<String>,
 }
 

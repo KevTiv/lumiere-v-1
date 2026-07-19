@@ -2,6 +2,7 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
+use super::drive_conflict_policy_type::DriveConflictPolicy;
 use super::google_drive_connection_type::GoogleDriveConnection;
 use super::integration_status_type::IntegrationStatus;
 use super::sync_direction_type::SyncDirection;

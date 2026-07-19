@@ -1,9 +1,48 @@
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
-use crate::documents::documents::{create_document_folder, doc_folder, CreateDocumentFolderParams};
+use crate::core::country_pack::{
+    country_pack_definition, set_company_country_pack, SetCompanyCountryPackParams,
+};
+use crate::documents::documents::{
+    create_document, create_document_folder, delete_document, delete_document_folder, doc_folder,
+    document, document_version, lock_document, restore_document, update_document,
+    update_document_folder, CreateDocumentFolderParams, CreateDocumentParams, Document,
+    DocumentFolder, UpdateDocumentFolderParams, UpdateDocumentParams,
+};
+use crate::documents::pack_locale::{
+    document_search_analyzer_for_company, document_search_language_for_company,
+};
+use crate::ai::intelligence::{
+    ai_document_processing_job, approve_document_processing_job, complete_document_processing_job,
+    create_document_processing_job, CompleteDocumentProcessingJobParams,
+    CreateDocumentProcessingJobParams,
+};
+use crate::documents::drive_sync::{
+    document_external_ref, set_google_drive_conflict_policy, sync_external_file_to_document,
+    SetDriveConflictPolicyParams, SyncExternalFileToDocumentParams,
+};
+use crate::documents::esign::{
+    complete_document_signature_request, create_document_signature_request,
+    document_signature_request, CompleteDocumentSignatureRequestParams,
+    CreateDocumentSignatureRequestParams,
+};
+use crate::documents::legal_hold::{
+    apply_document_legal_hold, document_legal_hold, release_document_legal_hold,
+    ApplyDocumentLegalHoldParams, ReleaseDocumentLegalHoldParams,
+};
+use crate::documents::presence::{
+    clear_document_presence, document_presence, update_document_presence,
+};
+use crate::documents::regional::{
+    purge_expired_documents, set_document_index_content, set_document_retention,
+    SetDocumentIndexContentParams, SetDocumentRetentionParams,
+};
+use crate::integrations::google_drive::{
+    create_google_drive_connection, google_drive_connection, DriveConflictPolicy, SyncDirection,
+};
 use crate::helpdesk::tickets::{
     create_helpdesk_stage, create_helpdesk_team, create_ticket, helpdesk_stage, helpdesk_team,
     helpdesk_ticket, update_ticket, CreateHelpdeskStageParams, CreateHelpdeskTeamParams,
@@ -290,6 +329,7 @@ pub fn test_documents_folder_create(ctx: &ReducerContext) -> Result<(), String> 
             is_favorite: false,
             sequence: 1,
             storage_id: None,
+            residency_region: None,
             metadata: Some(r#"{"test":"folder"}"#.to_string()),
         },
     )?;
@@ -305,6 +345,310 @@ pub fn test_documents_folder_create(ctx: &ReducerContext) -> Result<(), String> 
         return Err("Unexpected folder sequence".to_string());
     }
 
+    Ok(())
+}
+
+pub fn test_documents_create_rejects_empty_blob(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let err = create_document(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        CreateDocumentParams {
+            name: "Empty".to_string(),
+            description: None,
+            file_name: "empty.pdf".to_string(),
+            file_size: 0,
+            mimetype: "application/pdf".to_string(),
+            url: String::new(),
+            checksum: String::new(),
+            folder_id: None,
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: None,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )
+    .err()
+    .ok_or("expected empty blob registration to fail")?;
+    if !err.contains("url is required") && !err.contains("file_size") && !err.contains("checksum") {
+        return Err(format!("unexpected error: {err}"));
+    }
+    Ok(())
+}
+
+pub fn test_documents_create_and_lock(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let checksum = "a".repeat(64);
+
+    create_document_folder(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentFolderParams {
+            name: "Wave A Folder".to_string(),
+            description: None,
+            parent_id: None,
+            is_access_restricted: false,
+            is_hidden: false,
+            is_readonly: false,
+            is_favorite: false,
+            sequence: 2,
+            storage_id: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let folder = ctx
+        .db
+        .doc_folder()
+        .iter()
+        .find(|f| f.organization_id == org_id && f.name == "Wave A Folder")
+        .ok_or("folder missing")?;
+
+    create_document(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentParams {
+            name: "Wave A Doc".to_string(),
+            description: None,
+            file_name: "wave-a.pdf".to_string(),
+            file_size: 128,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/deadbeef".to_string(),
+            checksum: checksum.clone(),
+            folder_id: Some(folder.id),
+            res_model: Some("sale_order".to_string()),
+            res_id: Some(42),
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: None,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+
+    let doc = ctx
+        .db
+        .document()
+        .iter()
+        .find(|d| d.organization_id == org_id && d.name == "Wave A Doc")
+        .ok_or("document missing")?;
+    if doc.checksum.as_deref() != Some(checksum.as_str()) {
+        return Err("checksum not stored".to_string());
+    }
+    if doc.res_model.as_deref() != Some("sale_order") || doc.res_id != Some(42) {
+        return Err("res link not stored".to_string());
+    }
+    let version = ctx
+        .db
+        .document_version()
+        .iter()
+        .find(|v| v.document_id == doc.id && v.is_current)
+        .ok_or("version missing")?;
+    if version.organization_id != org_id {
+        return Err("version organization_id mismatch".to_string());
+    }
+
+    lock_document(ctx, org_id, doc.id, None)?;
+    let locked = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("doc gone after lock")?;
+    if !locked.is_locked {
+        return Err("expected locked".to_string());
+    }
+
+    Ok(())
+}
+
+pub fn test_documents_folder_acl_blocks_write(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+
+    create_document_folder(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentFolderParams {
+            name: "Restricted Folder".to_string(),
+            description: None,
+            parent_id: None,
+            is_access_restricted: true,
+            is_hidden: false,
+            is_readonly: false,
+            is_favorite: false,
+            sequence: 3,
+            storage_id: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let folder = ctx
+        .db
+        .doc_folder()
+        .iter()
+        .find(|f| f.organization_id == org_id && f.name == "Restricted Folder")
+        .ok_or("restricted folder missing")?;
+
+    // Strip write ACL so even the creator fails subsequent writes (owner still allowed —
+    // clear owner by pointing write list empty and using a different synthetic owner).
+    // Owner always has write; simulate non-owner by clearing write_access and changing owner.
+    let foreign = Identity::from_byte_array([9u8; 32]);
+    ctx.db.doc_folder().id().update(DocumentFolder {
+        owner_id: foreign,
+        write_access_ids: vec![],
+        read_access_ids: vec![],
+        ..folder.clone()
+    });
+
+    let err = create_document(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentParams {
+            name: "Blocked".to_string(),
+            description: None,
+            file_name: "blocked.pdf".to_string(),
+            file_size: 10,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/aa".to_string(),
+            checksum: "b".repeat(64),
+            folder_id: Some(folder.id),
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: None,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )
+    .err()
+    .ok_or("expected ACL denial")?;
+    if !err.contains("write access") {
+        return Err(format!("unexpected ACL error: {err}"));
+    }
+    Ok(())
+}
+
+pub fn test_documents_company_isolation(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture_a = OrgFixture::seed_minimal(ctx)?;
+    let fixture_b = OrgFixture::seed_minimal(ctx)?;
+
+    create_document_folder(
+        ctx,
+        fixture_a.organization_id,
+        Some(fixture_a.company_id),
+        CreateDocumentFolderParams {
+            name: "Company A Folder".to_string(),
+            description: None,
+            parent_id: None,
+            is_access_restricted: false,
+            is_hidden: false,
+            is_readonly: false,
+            is_favorite: false,
+            sequence: 1,
+            storage_id: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let folder_a = ctx
+        .db
+        .doc_folder()
+        .iter()
+        .find(|f| {
+            f.organization_id == fixture_a.organization_id && f.name == "Company A Folder"
+        })
+        .ok_or("folder a missing")?;
+
+    let company_mismatch = create_document(
+        ctx,
+        fixture_a.organization_id,
+        Some(fixture_b.company_id),
+        CreateDocumentParams {
+            name: "Cross company".to_string(),
+            description: None,
+            file_name: "x.pdf".to_string(),
+            file_size: 10,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/cc".to_string(),
+            checksum: "c".repeat(64),
+            folder_id: Some(folder_a.id),
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: None,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )
+    .err()
+    .ok_or("expected company mismatch to fail")?;
+    if !company_mismatch.contains("company") {
+        return Err(format!("expected company isolation, got: {company_mismatch}"));
+    }
+
+    let org_mismatch = create_document(
+        ctx,
+        fixture_b.organization_id,
+        Some(fixture_b.company_id),
+        CreateDocumentParams {
+            name: "Cross org".to_string(),
+            description: None,
+            file_name: "y.pdf".to_string(),
+            file_size: 10,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/dd".to_string(),
+            checksum: "d".repeat(64),
+            folder_id: Some(folder_a.id),
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: None,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )
+    .err()
+    .ok_or("expected cross-org folder create to fail")?;
+    if !org_mismatch.contains("organization") {
+        return Err(format!("expected org isolation, got: {org_mismatch}"));
+    }
     Ok(())
 }
 
@@ -445,6 +789,795 @@ pub fn test_subscription_plan_create(ctx: &ReducerContext) -> Result<(), String>
 
     if plan.product_id != fixture.product_id {
         return Err("Subscription plan product mismatch".to_string());
+    }
+
+    Ok(())
+}
+
+pub fn test_documents_wave_b_restore_and_folder_ops(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let checksum = "d".repeat(64);
+
+    create_document_folder(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentFolderParams {
+            name: "Wave B Source".to_string(),
+            description: None,
+            parent_id: None,
+            is_access_restricted: false,
+            is_hidden: false,
+            is_readonly: false,
+            is_favorite: false,
+            sequence: 1,
+            storage_id: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    create_document_folder(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentFolderParams {
+            name: "Wave B Dest".to_string(),
+            description: None,
+            parent_id: None,
+            is_access_restricted: false,
+            is_hidden: false,
+            is_readonly: false,
+            is_favorite: false,
+            sequence: 2,
+            storage_id: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let source = ctx
+        .db
+        .doc_folder()
+        .iter()
+        .find(|f| f.organization_id == org_id && f.name == "Wave B Source")
+        .ok_or("source folder missing")?;
+    let dest = ctx
+        .db
+        .doc_folder()
+        .iter()
+        .find(|f| f.organization_id == org_id && f.name == "Wave B Dest")
+        .ok_or("dest folder missing")?;
+
+    update_document_folder(
+        ctx,
+        org_id,
+        source.id,
+        UpdateDocumentFolderParams {
+            name: Some("Wave B Source Renamed".to_string()),
+            description: None,
+            parent_id: None,
+            sequence: None,
+            is_access_restricted: None,
+            is_hidden: None,
+            is_readonly: None,
+            is_favorite: None,
+            storage_id: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let renamed = ctx
+        .db
+        .doc_folder()
+        .id()
+        .find(&source.id)
+        .ok_or("folder gone after rename")?;
+    if renamed.name != "Wave B Source Renamed" {
+        return Err("folder rename failed".to_string());
+    }
+
+    create_document(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentParams {
+            name: "Wave B Doc".to_string(),
+            description: None,
+            file_name: "wave-b.pdf".to_string(),
+            file_size: 64,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/waveb".to_string(),
+            checksum: checksum.clone(),
+            folder_id: Some(source.id),
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: None,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let doc = ctx
+        .db
+        .document()
+        .iter()
+        .find(|d| d.organization_id == org_id && d.name == "Wave B Doc")
+        .ok_or("wave b doc missing")?;
+
+    let source_after_create = ctx
+        .db
+        .doc_folder()
+        .id()
+        .find(&source.id)
+        .ok_or("source gone")?;
+    if source_after_create.document_count != 1 {
+        return Err(format!(
+            "expected source count 1, got {}",
+            source_after_create.document_count
+        ));
+    }
+
+    update_document(
+        ctx,
+        org_id,
+        doc.id,
+        UpdateDocumentParams {
+            name: None,
+            description: None,
+            folder_id: Some(dest.id),
+            tag_ids: None,
+            is_favorite: None,
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            metadata: None,
+        },
+    )?;
+    let source_after_move = ctx
+        .db
+        .doc_folder()
+        .id()
+        .find(&source.id)
+        .ok_or("source gone after move")?;
+    let dest_after_move = ctx
+        .db
+        .doc_folder()
+        .id()
+        .find(&dest.id)
+        .ok_or("dest gone after move")?;
+    if source_after_move.document_count != 0 || dest_after_move.document_count != 1 {
+        return Err(format!(
+            "folder counts after move: source={}, dest={}",
+            source_after_move.document_count, dest_after_move.document_count
+        ));
+    }
+
+    delete_document(ctx, org_id, doc.id)?;
+    let deleted = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("doc gone after soft-delete")?;
+    if !deleted.is_deleted {
+        return Err("expected soft-deleted".to_string());
+    }
+    let dest_after_delete = ctx
+        .db
+        .doc_folder()
+        .id()
+        .find(&dest.id)
+        .ok_or("dest gone after delete")?;
+    if dest_after_delete.document_count != 0 {
+        return Err("dest count should be 0 after delete".to_string());
+    }
+
+    restore_document(ctx, org_id, doc.id)?;
+    let restored = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("doc gone after restore")?;
+    if restored.is_deleted {
+        return Err("expected restored".to_string());
+    }
+    let dest_after_restore = ctx
+        .db
+        .doc_folder()
+        .id()
+        .find(&dest.id)
+        .ok_or("dest gone after restore")?;
+    if dest_after_restore.document_count != 1 {
+        return Err("dest count should be 1 after restore".to_string());
+    }
+
+    // Empty source folder can be deleted; dest still has a document.
+    delete_document_folder(ctx, org_id, source.id)?;
+    if ctx.db.doc_folder().id().find(&source.id).is_some() {
+        return Err("source folder should be deleted".to_string());
+    }
+    let dest_delete_err = delete_document_folder(ctx, org_id, dest.id)
+        .err()
+        .ok_or("expected non-empty folder delete failure")?;
+    if !dest_delete_err.contains("still contains documents") {
+        return Err(format!("unexpected delete error: {dest_delete_err}"));
+    }
+
+    lock_document(ctx, org_id, doc.id, Some(3_600))?;
+    let leased = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("doc gone after lease lock")?;
+    if leased.locked_until.is_none() {
+        return Err("expected locked_until for leased lock".to_string());
+    }
+
+    Ok(())
+}
+
+pub fn test_documents_wave_c_index_retention_fiscal(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let checksum = "c".repeat(64);
+
+    if ctx
+        .db
+        .country_pack_definition()
+        .pack_key()
+        .find(&"au".to_string())
+        .is_none()
+    {
+        return Err("au country pack missing — run migrations".into());
+    }
+    set_company_country_pack(
+        ctx,
+        org_id,
+        fixture.company_id,
+        SetCompanyCountryPackParams {
+            pack_key: "au".into(),
+            enabled: true,
+            configuration: None,
+        },
+    )?;
+
+    let lang = document_search_language_for_company(ctx, org_id, Some(fixture.company_id))
+        .ok_or("expected au document_search_language")?;
+    if lang != "en" {
+        return Err(format!("expected au search language en, got {lang}"));
+    }
+    let analyzer = document_search_analyzer_for_company(ctx, org_id, Some(fixture.company_id))
+        .ok_or("expected au document_search_analyzer")?;
+    if analyzer != "english" {
+        return Err(format!("expected au analyzer english, got {analyzer}"));
+    }
+
+    create_document_folder(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentFolderParams {
+            name: "Wave C Folder".to_string(),
+            description: None,
+            parent_id: None,
+            is_access_restricted: false,
+            is_hidden: false,
+            is_readonly: false,
+            is_favorite: false,
+            sequence: 1,
+            storage_id: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let folder = ctx
+        .db
+        .doc_folder()
+        .iter()
+        .find(|f| f.organization_id == org_id && f.name == "Wave C Folder")
+        .ok_or("wave c folder missing")?;
+    if folder.residency_region.as_deref() != Some("au") {
+        return Err(format!(
+            "expected folder residency au from pack, got {:?}",
+            folder.residency_region
+        ));
+    }
+
+    let fiscal_err = create_document(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentParams {
+            name: "Bad fiscal".to_string(),
+            description: None,
+            file_name: "nfe.pdf".to_string(),
+            file_size: 32,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/au/badfiscal".to_string(),
+            checksum: checksum.clone(),
+            folder_id: Some(folder.id),
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: None,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: Some("nfe_xml".to_string()),
+            residency_region: None,
+            metadata: None,
+        },
+    )
+    .err()
+    .ok_or("expected fiscal MIME rejection")?;
+    if !fiscal_err.contains("fiscal_kind") {
+        return Err(format!("unexpected fiscal error: {fiscal_err}"));
+    }
+
+    let tax_invoice_mime_err = create_document(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentParams {
+            name: "Wave C Indexed".to_string(),
+            description: Some("searchable body phrase".to_string()),
+            file_name: "wave-c.txt".to_string(),
+            file_size: 48,
+            mimetype: "text/plain".to_string(),
+            url: "/api/documents/blobs/object/1/au/wavec".to_string(),
+            checksum: checksum.clone(),
+            folder_id: Some(folder.id),
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: Some("extra extract token".to_string()),
+            classification_id: None,
+            retention_days: Some(30),
+            fiscal_kind: Some("tax_invoice_pdf".to_string()),
+            residency_region: None,
+            metadata: None,
+        },
+    )
+    .err()
+    .ok_or_else(|| "tax_invoice_pdf requires application/pdf".to_string())?;
+    if !tax_invoice_mime_err.contains("MIME") && !tax_invoice_mime_err.contains("fiscal_kind") {
+        return Err(format!(
+            "unexpected tax_invoice error: {tax_invoice_mime_err}"
+        ));
+    }
+
+    create_document(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentParams {
+            name: "Wave C Indexed".to_string(),
+            description: Some("searchable body phrase".to_string()),
+            file_name: "wave-c.pdf".to_string(),
+            file_size: 48,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/au/wavec".to_string(),
+            checksum: checksum.clone(),
+            folder_id: Some(folder.id),
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: Some("extra extract token".to_string()),
+            classification_id: None,
+            retention_days: Some(30),
+            fiscal_kind: Some("tax_invoice_pdf".to_string()),
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+
+    let doc = ctx
+        .db
+        .document()
+        .iter()
+        .find(|d| d.organization_id == org_id && d.name == "Wave C Indexed")
+        .ok_or("wave c doc missing")?;
+    let index = doc
+        .index_content
+        .as_deref()
+        .ok_or("expected default index_content")?;
+    if !index.contains("Wave C Indexed")
+        || !index.contains("searchable body phrase")
+        || !index.contains("extra extract token")
+    {
+        return Err(format!("index_content incomplete: {index}"));
+    }
+    if doc.index_language.as_deref() != Some("en") {
+        return Err(format!(
+            "expected index_language en, got {:?}",
+            doc.index_language
+        ));
+    }
+    if doc.residency_region.as_deref() != Some("au") {
+        return Err(format!(
+            "expected residency au, got {:?}",
+            doc.residency_region
+        ));
+    }
+    if doc.fiscal_kind.as_deref() != Some("tax_invoice_pdf") {
+        return Err(format!("expected fiscal_kind, got {:?}", doc.fiscal_kind));
+    }
+    if doc.retention_days != Some(30) {
+        return Err(format!(
+            "expected retention_days 30, got {:?}",
+            doc.retention_days
+        ));
+    }
+
+    set_document_index_content(
+        ctx,
+        org_id,
+        doc.id,
+        SetDocumentIndexContentParams {
+            content: "reindexed unique phrase xyzzy".to_string(),
+            language: Some("en".to_string()),
+        },
+    )?;
+    let reindexed = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("doc gone after reindex")?;
+    if reindexed.index_content.as_deref() != Some("reindexed unique phrase xyzzy") {
+        return Err("reindex did not replace index_content".to_string());
+    }
+
+    set_document_retention(
+        ctx,
+        org_id,
+        doc.id,
+        SetDocumentRetentionParams {
+            classification_id: None,
+            retention_days: Some(7),
+        },
+    )?;
+    delete_document(ctx, org_id, doc.id)?;
+    let soft = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("doc gone after soft-delete")?;
+    if soft.purge_after.is_none() {
+        return Err("expected purge_after after soft-delete with retention".to_string());
+    }
+
+    // Force eligibility for purge (domain test can mutate rows).
+    ctx.db.document().id().update(Document {
+        purge_after: Some(ctx.timestamp),
+        ..soft
+    });
+    purge_expired_documents(ctx, org_id)?;
+    if ctx.db.document().id().find(&doc.id).is_some() {
+        return Err("expected hard purge of expired document".to_string());
+    }
+
+    Ok(())
+}
+
+pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let checksum = "d".repeat(64);
+
+    create_document(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentParams {
+            name: "Wave D Hold Doc".to_string(),
+            description: None,
+            file_name: "hold.pdf".to_string(),
+            file_size: 64,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/hold".to_string(),
+            checksum: checksum.clone(),
+            folder_id: None,
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: None,
+            classification_id: None,
+            retention_days: Some(7),
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let doc = ctx
+        .db
+        .document()
+        .iter()
+        .find(|d| d.organization_id == org_id && d.name == "Wave D Hold Doc")
+        .ok_or("wave d doc missing")?;
+
+    apply_document_legal_hold(
+        ctx,
+        org_id,
+        doc.id,
+        ApplyDocumentLegalHoldParams {
+            reason: "litigation hold".to_string(),
+            metadata: None,
+        },
+    )?;
+    let doc_id = doc.id;
+    let doc_url = doc.url.clone().unwrap_or_default();
+    let doc_version_id = doc.current_version_id;
+
+    let del_err = delete_document(ctx, org_id, doc_id)
+        .err()
+        .ok_or("expected legal hold to block delete")?;
+    if !del_err.contains("legal hold") {
+        return Err(format!("unexpected delete error: {del_err}"));
+    }
+
+    // Soft-delete bypass for purge test: force deleted + purge_after while hold active.
+    let held = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc_id)
+        .ok_or("doc missing before purge probe")?;
+    ctx.db.document().id().update(Document {
+        is_deleted: true,
+        deleted_at: Some(ctx.timestamp),
+        purge_after: Some(ctx.timestamp),
+        ..held
+    });
+    purge_expired_documents(ctx, org_id)?;
+    if ctx.db.document().id().find(&doc_id).is_none() {
+        return Err("legal hold must block purge".to_string());
+    }
+
+    let hold = ctx
+        .db
+        .document_legal_hold()
+        .iter()
+        .find(|h| h.document_id == doc_id && h.is_active)
+        .ok_or("active hold missing")?;
+    release_document_legal_hold(
+        ctx,
+        org_id,
+        hold.id,
+        ReleaseDocumentLegalHoldParams { metadata: None },
+    )?;
+
+    // Restore for OCR / presence / e-sign paths.
+    let after_hold = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc_id)
+        .ok_or("doc missing after hold release")?;
+    ctx.db.document().id().update(Document {
+        is_deleted: false,
+        deleted_at: None,
+        deleted_by: None,
+        purge_after: None,
+        ..after_hold
+    });
+
+    update_document_presence(ctx, org_id, doc_id, "Tester".to_string())?;
+    if ctx
+        .db
+        .document_presence()
+        .iter()
+        .filter(|p| p.document_id == doc_id)
+        .count()
+        != 1
+    {
+        return Err("expected document presence row".to_string());
+    }
+    clear_document_presence(ctx, doc_id)?;
+
+    create_document_processing_job(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateDocumentProcessingJobParams {
+            document_type: "invoice".to_string(),
+            job_type: "OCR".to_string(),
+            ai_agent_id: None,
+            input_data: Some(format!("{{\"url\":\"{doc_url}\"}}")),
+            document_id: Some(doc_id),
+            document_version_id: doc_version_id,
+            metadata: None,
+        },
+    )?;
+    let job = ctx
+        .db
+        .ai_document_processing_job()
+        .iter()
+        .filter(|j| j.document_id == Some(doc_id))
+        .max_by_key(|j| j.id)
+        .ok_or("ocr job missing")?;
+    complete_document_processing_job(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        job.id,
+        CompleteDocumentProcessingJobParams {
+            extracted_data: Some(r#"{"vendor":"Acme","total":12.5}"#.to_string()),
+            confidence_score: Some(0.9),
+            model_used: Some("text-extract".to_string()),
+            tokens_used: Some(10),
+            cost: Some(0.0),
+            error_message: None,
+        },
+    )?;
+    approve_document_processing_job(ctx, org_id, Some(fixture.company_id), job.id)?;
+    let indexed = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc_id)
+        .ok_or("doc gone after OCR approve")?;
+    if !indexed
+        .index_content
+        .as_deref()
+        .unwrap_or("")
+        .contains("Acme")
+    {
+        return Err("approved OCR should populate index_content".to_string());
+    }
+
+    create_document_signature_request(
+        ctx,
+        org_id,
+        doc_id,
+        CreateDocumentSignatureRequestParams {
+            provider: "external_tsp".to_string(),
+            external_envelope_id: "env-wave-d-1".to_string(),
+            signers_json: Some(r#"[{"email":"a@example.com"}]"#.to_string()),
+            metadata: None,
+        },
+    )?;
+    let sig = ctx
+        .db
+        .document_signature_request()
+        .iter()
+        .find(|s| s.document_id == doc_id && s.status == "pending")
+        .ok_or("signature request missing")?;
+    let signed_checksum = "e".repeat(64);
+    complete_document_signature_request(
+        ctx,
+        org_id,
+        sig.id,
+        CompleteDocumentSignatureRequestParams {
+            file_name: "hold-signed.pdf".to_string(),
+            file_size: 80,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/hold-signed".to_string(),
+            checksum: signed_checksum,
+            changes_description: None,
+            metadata: None,
+        },
+    )?;
+    let completed_sig = ctx
+        .db
+        .document_signature_request()
+        .id()
+        .find(&sig.id)
+        .ok_or("sig gone")?;
+    if completed_sig.status != "completed" || completed_sig.completed_version_id.is_none() {
+        return Err("signature completion should set version".to_string());
+    }
+
+    create_google_drive_connection(
+        ctx,
+        org_id,
+        "Wave D Drive".to_string(),
+        "drive@example.com".to_string(),
+        "gd-acc-1".to_string(),
+        "vault://test/drive".to_string(),
+        None,
+        None,
+        true,
+        false,
+        None,
+        None,
+        SyncDirection::Bidirectional,
+        60,
+        vec!["pdf".to_string()],
+        25,
+    )?;
+    let conn = ctx
+        .db
+        .google_drive_connection()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.name == "Wave D Drive")
+        .ok_or("drive connection missing")?;
+    set_google_drive_conflict_policy(
+        ctx,
+        org_id,
+        conn.id,
+        SetDriveConflictPolicyParams {
+            conflict_policy: DriveConflictPolicy::PreferRemote,
+        },
+    )?;
+
+    let sync_checksum = "f".repeat(64);
+    sync_external_file_to_document(
+        ctx,
+        org_id,
+        SyncExternalFileToDocumentParams {
+            provider: "google_drive".to_string(),
+            connection_id: Some(conn.id),
+            external_id: "gfile-1".to_string(),
+            etag: Some("etag-1".to_string()),
+            name: "Imported Drive File".to_string(),
+            file_name: "imported.pdf".to_string(),
+            file_size: 100,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/imported".to_string(),
+            checksum: sync_checksum.clone(),
+            folder_id: None,
+            company_id: Some(fixture.company_id),
+            metadata: None,
+        },
+    )?;
+    let xref = ctx
+        .db
+        .document_external_ref()
+        .iter()
+        .find(|r| r.organization_id == org_id && r.external_id == "gfile-1")
+        .ok_or("external ref missing")?;
+    // Second sync with new etag should version.
+    sync_external_file_to_document(
+        ctx,
+        org_id,
+        SyncExternalFileToDocumentParams {
+            provider: "google_drive".to_string(),
+            connection_id: Some(conn.id),
+            external_id: "gfile-1".to_string(),
+            etag: Some("etag-2".to_string()),
+            name: "Imported Drive File".to_string(),
+            file_name: "imported-v2.pdf".to_string(),
+            file_size: 120,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/imported-v2".to_string(),
+            checksum: "a".repeat(64),
+            folder_id: None,
+            company_id: Some(fixture.company_id),
+            metadata: None,
+        },
+    )?;
+    let synced_doc = ctx
+        .db
+        .document()
+        .id()
+        .find(&xref.document_id)
+        .ok_or("synced doc missing")?;
+    if synced_doc.version_count < 2 {
+        return Err(format!(
+            "expected version bump after PreferRemote sync, got {}",
+            synced_doc.version_count
+        ));
     }
 
     Ok(())

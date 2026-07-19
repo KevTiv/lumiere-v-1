@@ -125,6 +125,7 @@ async fn pivot_table_xlsx(
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(crate::document_blobs::blob_router())
         .route(
             "/documents/pdf/financial-report/:report_id",
             get(financial_report_pdf),

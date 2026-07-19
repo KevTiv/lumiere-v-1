@@ -20,6 +20,7 @@ pub struct CreateKnowledgeArticleParams {
     pub is_todo_item: bool,
     pub sequence: u32,
     pub article_url: Option<String>,
+    pub is_published: bool,
     pub website_url: Option<String>,
     pub metadata: Option<String>,
 }

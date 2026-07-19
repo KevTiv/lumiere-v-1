@@ -333,6 +333,8 @@ import {
   useMailTemplates,
   useQueueMailFromTemplate,
 } from "@lumiere/query-hooks/hooks/templates"
+import { useCreateDocument } from "@lumiere/query-hooks/hooks/documents"
+import { archiveRenderedPdfAsDocument } from "@/lib/archive-document-pdf"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
   enumTag,
@@ -1464,7 +1466,8 @@ function AccountingClientLoaded({
     Number(operatingCompanyId),
   )
   const dispatchQueuedMail = useDispatchQueuedMail()
-  const [invoiceDocBusy, setInvoiceDocBusy] = useState<"download" | "send" | null>(null)
+  const createDocument = useCreateDocument(orgId, operatingCompanyId)
+  const [invoiceDocBusy, setInvoiceDocBusy] = useState<"download" | "send" | "archive" | null>(null)
   const cancelMove = useCancelAccountMove(organizationId)
   const addAccountMoveLine = useAddAccountMoveLine(organizationId)
   const deleteAccountMoveLine = useDeleteAccountMoveLine(organizationId)
@@ -2505,6 +2508,32 @@ function AccountingClientLoaded({
       setInvoiceDocBusy(null)
     }
   }, [selectedInvoice, toast, t])
+
+  const handleInvoiceArchivePdf = useCallback(async () => {
+    if (!selectedInvoice?.id) return
+    try {
+      setInvoiceDocBusy("archive")
+      const params = await archiveRenderedPdfAsDocument({
+        kind: "account-move",
+        recordId: Number(selectedInvoice.id),
+        companyId: operatingCompanyId,
+        name: String(selectedInvoice.name ?? `Invoice ${selectedInvoice.id}`),
+      })
+      await createDocument.mutateAsync(params)
+      toast({
+        title: "Archived to Documents",
+        description: "PDF stored as a linked document version.",
+      })
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Archive PDF",
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setInvoiceDocBusy(null)
+    }
+  }, [selectedInvoice, operatingCompanyId, createDocument, toast])
 
   const handleInvoiceSendEmail = useCallback(async () => {
     if (!selectedInvoice?.id) return
@@ -3888,6 +3917,7 @@ function AccountingClientLoaded({
             : undefined
         }
         onDownloadPdf={selectedInvoice ? () => void handleInvoiceDownloadPdf() : undefined}
+        onArchivePdf={selectedInvoice ? () => void handleInvoiceArchivePdf() : undefined}
         onSendEmail={selectedInvoice ? () => void handleInvoiceSendEmail() : undefined}
         onRecalculateTotals={
           selectedInvoice
@@ -3899,6 +3929,7 @@ function AccountingClientLoaded({
         }
         postDraftPending={postMove.isPending || postInvoice.isPending}
         downloadPdfPending={invoiceDocBusy === "download"}
+        archivePdfPending={invoiceDocBusy === "archive"}
         sendEmailPending={invoiceDocBusy === "send"}
         recalculateTotalsPending={computeInvoiceTotals.isPending}
       />

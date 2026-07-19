@@ -34,6 +34,8 @@ export default __t.row({
   reviewedBy: __t.option(__t.identity()).name("reviewed_by"),
   reviewedAt: __t.option(__t.timestamp()).name("reviewed_at"),
   isApproved: __t.bool().name("is_approved"),
+  documentId: __t.option(__t.u64()).name("document_id"),
+  documentVersionId: __t.option(__t.u64()).name("document_version_id"),
   companyId: __t.option(__t.u64()).name("company_id"),
   createUid: __t.identity().name("create_uid"),
   createDate: __t.timestamp().name("create_date"),

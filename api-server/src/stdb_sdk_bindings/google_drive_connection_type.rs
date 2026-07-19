@@ -4,6 +4,7 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::drive_conflict_policy_type::DriveConflictPolicy;
 use super::integration_status_type::IntegrationStatus;
 use super::sync_direction_type::SyncDirection;
 use super::sync_status_type::SyncStatus;
@@ -27,6 +28,7 @@ pub struct GoogleDriveConnection {
     pub webhook_url: Option<String>,
     pub webhook_secret_reference: Option<String>,
     pub sync_direction: SyncDirection,
+    pub conflict_policy: DriveConflictPolicy,
     pub sync_frequency_minutes: u32,
     pub last_sync_at: Option<__sdk::Timestamp>,
     pub next_sync_at: Option<__sdk::Timestamp>,
@@ -67,6 +69,7 @@ pub struct GoogleDriveConnectionCols {
     pub webhook_secret_reference:
         __sdk::__query_builder::Col<GoogleDriveConnection, Option<String>>,
     pub sync_direction: __sdk::__query_builder::Col<GoogleDriveConnection, SyncDirection>,
+    pub conflict_policy: __sdk::__query_builder::Col<GoogleDriveConnection, DriveConflictPolicy>,
     pub sync_frequency_minutes: __sdk::__query_builder::Col<GoogleDriveConnection, u32>,
     pub last_sync_at: __sdk::__query_builder::Col<GoogleDriveConnection, Option<__sdk::Timestamp>>,
     pub next_sync_at: __sdk::__query_builder::Col<GoogleDriveConnection, Option<__sdk::Timestamp>>,
@@ -108,6 +111,7 @@ impl __sdk::__query_builder::HasCols for GoogleDriveConnection {
                 "webhook_secret_reference",
             ),
             sync_direction: __sdk::__query_builder::Col::new(table_name, "sync_direction"),
+            conflict_policy: __sdk::__query_builder::Col::new(table_name, "conflict_policy"),
             sync_frequency_minutes: __sdk::__query_builder::Col::new(
                 table_name,
                 "sync_frequency_minutes",

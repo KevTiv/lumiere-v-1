@@ -53,6 +53,7 @@ import type { EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, Form
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
+import { RecordDocumentAttachments } from "@/components/record-document-attachments"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import { groupBy } from "@/lib/utils"
 import {
@@ -2862,17 +2863,27 @@ function PurchasingClientLoaded({
         }}
       />
       {chatterTarget ? (
-        <RecordChatterDialog
-          key={`${chatterTarget.resModel}-${chatterTarget.resId.toString()}`}
-          open
-          onOpenChange={(open) => {
-            if (!open) setChatterTarget(null)
-          }}
-          organizationId={organizationId}
-          resModel={chatterTarget.resModel}
-          resId={chatterTarget.resId}
-          recordTitle={chatterTarget.recordTitle}
-        />
+        <>
+          <RecordChatterDialog
+            key={`${chatterTarget.resModel}-${chatterTarget.resId.toString()}`}
+            open
+            onOpenChange={(open) => {
+              if (!open) setChatterTarget(null)
+            }}
+            organizationId={organizationId}
+            resModel={chatterTarget.resModel}
+            resId={chatterTarget.resId}
+            recordTitle={chatterTarget.recordTitle}
+          />
+          <div className="mx-4 mb-4 max-w-3xl">
+            <RecordDocumentAttachments
+              organizationId={orgId}
+              resModel={chatterTarget.resModel}
+              resId={chatterTarget.resId}
+              title={`Attachments — ${chatterTarget.recordTitle ?? chatterTarget.resModel}`}
+            />
+          </div>
+        </>
       ) : null}
       <RuntimeFormModal
         key={formModalKey}

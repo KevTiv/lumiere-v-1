@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct DocumentVersion {
     pub id: u64,
+    pub organization_id: u64,
     pub document_id: u64,
     pub version_number: u32,
     pub name: String,
@@ -32,6 +33,7 @@ impl __sdk::InModule for DocumentVersion {
 /// Provides typed access to columns for query building.
 pub struct DocumentVersionCols {
     pub id: __sdk::__query_builder::Col<DocumentVersion, u64>,
+    pub organization_id: __sdk::__query_builder::Col<DocumentVersion, u64>,
     pub document_id: __sdk::__query_builder::Col<DocumentVersion, u64>,
     pub version_number: __sdk::__query_builder::Col<DocumentVersion, u32>,
     pub name: __sdk::__query_builder::Col<DocumentVersion, String>,
@@ -52,6 +54,7 @@ impl __sdk::__query_builder::HasCols for DocumentVersion {
     fn cols(table_name: &'static str) -> Self::Cols {
         DocumentVersionCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             document_id: __sdk::__query_builder::Col::new(table_name, "document_id"),
             version_number: __sdk::__query_builder::Col::new(table_name, "version_number"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
@@ -78,6 +81,7 @@ impl __sdk::__query_builder::HasCols for DocumentVersion {
 pub struct DocumentVersionIxCols {
     pub document_id: __sdk::__query_builder::IxCol<DocumentVersion, u64>,
     pub id: __sdk::__query_builder::IxCol<DocumentVersion, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<DocumentVersion, u64>,
 }
 
 impl __sdk::__query_builder::HasIxCols for DocumentVersion {
@@ -86,6 +90,7 @@ impl __sdk::__query_builder::HasIxCols for DocumentVersion {
         DocumentVersionIxCols {
             document_id: __sdk::__query_builder::IxCol::new(table_name, "document_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
         }
     }
 }

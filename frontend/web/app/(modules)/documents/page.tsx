@@ -4,6 +4,8 @@ import { DocumentsClient } from "./documents-client"
 
 const SSR_RESOURCES = [
   "documents",
+  "documents-deleted",
+  "document-versions",
   "knowledge-articles",
   "knowledge-categories",
   "document-folders",
@@ -17,12 +19,21 @@ export default async function DocumentsPage() {
     return <DocumentsClient />
   }
 
-  const [documents, articles, categories, folders, processingJobs, insights] =
-    await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
+  const [
+    documents,
+    deletedDocuments,
+    _documentVersions,
+    articles,
+    categories,
+    folders,
+    processingJobs,
+    insights,
+  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
 
   return (
     <DocumentsClient
       initialDocuments={documents}
+      initialDeletedDocuments={deletedDocuments}
       initialArticles={articles}
       initialCategories={categories}
       initialFolders={folders}

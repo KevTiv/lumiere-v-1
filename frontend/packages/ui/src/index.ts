@@ -83,6 +83,7 @@ export * from "./lib/hr-entity-configs";
 export * from "./lib/hr-form-configs";
 export * from "./lib/documents-entity-configs";
 export * from "./lib/documents-form-configs";
+export * from "./documents/record-attachments-panel";
 export * from "./lib/calendar-types";
 export * from "./lib/calendar-entity-configs";
 export * from "./lib/calendar-form-configs";

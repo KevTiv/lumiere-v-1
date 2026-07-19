@@ -262,4 +262,6 @@ pub fn identity_disconnected(ctx: &ReducerContext) {
     for id in opp_presence_ids {
         ctx.db.opportunity_presence().id().delete(&id);
     }
+
+    crate::documents::presence::clear_all_presence_for_sender(ctx);
 }

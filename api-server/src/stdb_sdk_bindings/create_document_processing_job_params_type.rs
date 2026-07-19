@@ -11,6 +11,8 @@ pub struct CreateDocumentProcessingJobParams {
     pub job_type: String,
     pub ai_agent_id: Option<u64>,
     pub input_data: Option<String>,
+    pub document_id: Option<u64>,
+    pub document_version_id: Option<u64>,
     pub metadata: Option<String>,
 }
 

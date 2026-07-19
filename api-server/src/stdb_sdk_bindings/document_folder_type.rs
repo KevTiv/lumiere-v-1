@@ -22,6 +22,7 @@ pub struct DocumentFolder {
     pub write_access_ids: Vec<__sdk::Identity>,
     pub read_access_ids: Vec<__sdk::Identity>,
     pub document_count: u32,
+    pub residency_region: Option<String>,
     pub is_hidden: bool,
     pub is_readonly: bool,
     pub is_access_restricted: bool,
@@ -59,6 +60,7 @@ pub struct DocumentFolderCols {
     pub write_access_ids: __sdk::__query_builder::Col<DocumentFolder, Vec<__sdk::Identity>>,
     pub read_access_ids: __sdk::__query_builder::Col<DocumentFolder, Vec<__sdk::Identity>>,
     pub document_count: __sdk::__query_builder::Col<DocumentFolder, u32>,
+    pub residency_region: __sdk::__query_builder::Col<DocumentFolder, Option<String>>,
     pub is_hidden: __sdk::__query_builder::Col<DocumentFolder, bool>,
     pub is_readonly: __sdk::__query_builder::Col<DocumentFolder, bool>,
     pub is_access_restricted: __sdk::__query_builder::Col<DocumentFolder, bool>,
@@ -92,6 +94,7 @@ impl __sdk::__query_builder::HasCols for DocumentFolder {
             write_access_ids: __sdk::__query_builder::Col::new(table_name, "write_access_ids"),
             read_access_ids: __sdk::__query_builder::Col::new(table_name, "read_access_ids"),
             document_count: __sdk::__query_builder::Col::new(table_name, "document_count"),
+            residency_region: __sdk::__query_builder::Col::new(table_name, "residency_region"),
             is_hidden: __sdk::__query_builder::Col::new(table_name, "is_hidden"),
             is_readonly: __sdk::__query_builder::Col::new(table_name, "is_readonly"),
             is_access_restricted: __sdk::__query_builder::Col::new(

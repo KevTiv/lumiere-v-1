@@ -7,6 +7,7 @@ import {
   type DocumentExportKind,
   type DocumentPdfKind,
 } from "@lumiere/stdb/commands"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
@@ -63,6 +64,42 @@ export function useMailTemplates(organizationId: number, enabled = true) {
   })
 }
 
+export function useCreateDocumentTemplate(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const { urlPath, init } = templatesBffPost("create_document_template", [
+        organizationId,
+        null,
+        stdbParamsToJson(params, "CreateDocumentTemplateParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["document-templates", String(organizationId)] })
+    },
+  })
+}
+
+export function useCreateMailTemplate(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: Record<string, unknown>) => {
+      const { urlPath, init } = templatesBffPost("create_mail_template", [
+        organizationId,
+        null,
+        stdbParamsToJson(params, "CreateMailTemplateParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["mail-templates", String(organizationId)] })
+    },
+  })
+}
+
 export function useQueueMailFromTemplate(organizationId: number, companyId: number) {
   const qc = useQueryClient()
   return useMutation({
@@ -109,6 +146,16 @@ export async function downloadDocumentPdf(
   filename?: string,
 ): Promise<void> {
   await downloadDocumentExport("pdf", kind, id, filename)
+}
+
+/** Fetch a rendered PDF as a Blob (for DMS archive) without forcing a browser download. */
+export async function fetchDocumentPdfBlob(
+  kind: DocumentPdfKind,
+  id: number,
+): Promise<Blob> {
+  const r = await apiFetch(documentExportUrl("pdf", kind, id))
+  if (!r.ok) throw new Error(await parseCallError(r))
+  return r.blob()
 }
 
 export async function downloadDocumentExport(

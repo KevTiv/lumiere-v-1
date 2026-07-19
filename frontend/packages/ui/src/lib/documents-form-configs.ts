@@ -22,28 +22,14 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
           width: "full",
         },
         {
-          id: "fileName",
-          name: "fileName",
-          type: "text",
-          label: t("documents.forms.newDocument.fields.fileName"),
-          placeholder: t("documents.forms.newDocument.fields.fileNamePlaceholder"),
+          id: "file",
+          name: "file",
+          type: "file",
+          label: t("documents.forms.newDocument.fields.file"),
+          description: t("documents.forms.newDocument.fields.fileHint"),
           required: true,
-          width: "1/2",
-        },
-        {
-          id: "mimetype",
-          name: "mimetype",
-          type: "select",
-          label: t("documents.forms.newDocument.fields.mimetype"),
-          width: "1/2",
-          options: [
-            { value: "application/pdf", label: t("documents.forms.newDocument.fields.options.pdf") },
-            { value: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", label: t("documents.forms.newDocument.fields.options.excel") },
-            { value: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", label: t("documents.forms.newDocument.fields.options.word") },
-            { value: "image/png", label: t("documents.forms.newDocument.fields.options.png") },
-            { value: "image/jpeg", label: t("documents.forms.newDocument.fields.options.jpeg") },
-            { value: "text/plain", label: t("documents.forms.newDocument.fields.options.text") },
-          ],
+          width: "full",
+          accept: ".pdf,.png,.jpg,.jpeg,.txt,.doc,.docx,.xls,.xlsx,application/pdf,image/*,text/plain",
         },
         {
           id: "description",
@@ -62,13 +48,6 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
           width: "1/2",
         },
         {
-          id: "isShared",
-          name: "isShared",
-          type: "checkbox",
-          label: t("documents.forms.newDocument.fields.isShared"),
-          width: "1/2",
-        },
-        {
           id: "folderId",
           name: "folderId",
           type: "select",
@@ -78,12 +57,68 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
           options: emptySelect,
         },
         {
+          id: "resModel",
+          name: "resModel",
+          type: "select",
+          label: t("documents.forms.newDocument.fields.resModel"),
+          width: "1/2",
+          options: [
+            { value: "", label: t("documents.forms.newDocument.fields.resModelNone") },
+            { value: "sale_order", label: "sale_order" },
+            { value: "purchase_order", label: "purchase_order" },
+            { value: "account_move", label: "account_move" },
+            { value: "hr_expense", label: "hr_expense" },
+            { value: "contact", label: "contact" },
+          ],
+        },
+        {
+          id: "resId",
+          name: "resId",
+          type: "number",
+          label: t("documents.forms.newDocument.fields.resId"),
+          width: "1/2",
+        },
+        {
           id: "tagIds",
           name: "tagIds",
           type: "text",
           label: t("documents.forms.newDocument.fields.tagIds"),
           placeholder: t("documents.forms.newDocument.fields.tagIdsHint"),
           width: "full",
+        },
+        {
+          id: "retentionDays",
+          name: "retentionDays",
+          type: "number",
+          label: t("documents.forms.newDocument.fields.retentionDays"),
+          placeholder: t("documents.forms.newDocument.fields.retentionDaysHint"),
+          width: "1/2",
+          min: 0,
+        },
+        {
+          id: "fiscalKind",
+          name: "fiscalKind",
+          type: "select",
+          label: t("documents.forms.newDocument.fields.fiscalKind"),
+          width: "1/2",
+          options: [
+            { value: "", label: t("documents.forms.newDocument.fields.fiscalKindNone") },
+            { value: "tax_invoice_pdf", label: "tax_invoice_pdf" },
+            { value: "nfe_xml", label: "nfe_xml" },
+            { value: "nfe_pdf", label: "nfe_pdf" },
+            { value: "danfe_pdf", label: "danfe_pdf" },
+            { value: "myinvois_xml", label: "myinvois_xml" },
+            { value: "efaktur_xml", label: "efaktur_xml" },
+            { value: "efaktur_pdf", label: "efaktur_pdf" },
+          ],
+        },
+        {
+          id: "residencyRegion",
+          name: "residencyRegion",
+          type: "text",
+          label: t("documents.forms.newDocument.fields.residencyRegion"),
+          placeholder: t("documents.forms.newDocument.fields.residencyRegionHint"),
+          width: "1/2",
         },
       ],
     },
@@ -267,6 +302,78 @@ export const newDocumentFolderForm = (t: TFunction): FormConfig => ({
           label: t("documents.forms.newFolder.fields.isHidden"),
           width: "1/2",
         },
+        {
+          id: "residencyRegion",
+          name: "residencyRegion",
+          type: "text",
+          label: t("documents.forms.newFolder.fields.residencyRegion"),
+          placeholder: t("documents.forms.newFolder.fields.residencyRegionHint"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const reindexDocumentForm = (t: TFunction): FormConfig => ({
+  id: "reindex-document",
+  title: t("documents.forms.reindexDocument.title"),
+  description: t("documents.forms.reindexDocument.description"),
+  sections: [
+    {
+      id: "index",
+      title: t("documents.forms.reindexDocument.sections.index"),
+      fields: [
+        {
+          id: "content",
+          name: "content",
+          type: "textarea",
+          label: t("documents.forms.reindexDocument.fields.content"),
+          placeholder: t("documents.forms.reindexDocument.fields.contentPlaceholder"),
+          required: true,
+          width: "full",
+          rows: 6,
+        },
+        {
+          id: "language",
+          name: "language",
+          type: "text",
+          label: t("documents.forms.reindexDocument.fields.language"),
+          placeholder: t("documents.forms.reindexDocument.fields.languageHint"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const setDocumentRetentionForm = (t: TFunction): FormConfig => ({
+  id: "set-document-retention",
+  title: t("documents.forms.setRetention.title"),
+  description: t("documents.forms.setRetention.description"),
+  sections: [
+    {
+      id: "retention",
+      title: t("documents.forms.setRetention.sections.retention"),
+      fields: [
+        {
+          id: "retentionDays",
+          name: "retentionDays",
+          type: "number",
+          label: t("documents.forms.setRetention.fields.retentionDays"),
+          placeholder: t("documents.forms.setRetention.fields.retentionDaysHint"),
+          width: "1/2",
+          min: 0,
+        },
+        {
+          id: "classificationId",
+          name: "classificationId",
+          type: "number",
+          label: t("documents.forms.setRetention.fields.classificationId"),
+          placeholder: t("documents.forms.setRetention.fields.classificationIdHint"),
+          width: "1/2",
+          min: 0,
+        },
       ],
     },
   ],
@@ -298,6 +405,24 @@ export const newDocumentProcessingJobForm = (t: TFunction): FormConfig => ({
           placeholder: t("documents.forms.newProcessingJob.fields.jobTypePlaceholder"),
           required: true,
           width: "1/2",
+        },
+        {
+          id: "documentId",
+          name: "documentId",
+          type: "number",
+          label: t("documents.forms.newProcessingJob.fields.documentId"),
+          placeholder: t("documents.forms.newProcessingJob.fields.documentIdHint"),
+          width: "1/2",
+          min: 0,
+        },
+        {
+          id: "documentVersionId",
+          name: "documentVersionId",
+          type: "number",
+          label: t("documents.forms.newProcessingJob.fields.documentVersionId"),
+          placeholder: t("documents.forms.newProcessingJob.fields.documentVersionIdHint"),
+          width: "1/2",
+          min: 0,
         },
         {
           id: "aiAgentId",
@@ -414,6 +539,280 @@ export const acknowledgeDocumentInsightForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const uploadDocumentVersionForm = (t: TFunction): FormConfig => ({
+  id: "upload-document-version",
+  title: "Upload new version",
+  description: "Check in a new file revision for the selected document.",
+  submitLabel: "Upload version",
+  sections: [
+    {
+      id: "version",
+      fields: [
+        {
+          id: "file",
+          name: "file",
+          type: "file",
+          label: "File",
+          required: true,
+          width: "full",
+          accept: ".pdf,.png,.jpg,.jpeg,.txt,.doc,.docx,.xls,.xlsx,application/pdf,image/*,text/plain",
+        },
+        {
+          id: "changesDescription",
+          name: "changesDescription",
+          type: "textarea",
+          label: "Change notes",
+          rows: 2,
+          width: "full",
+        },
+        {
+          id: "unlockAfter",
+          name: "unlockAfter",
+          type: "checkbox",
+          label: "Unlock after check-in",
+          defaultValue: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const editKnowledgeArticleForm = (
+  t: TFunction,
+  row: Record<string, unknown>,
+): FormConfig => ({
+  id: "edit-knowledge-article",
+  title: "Update article",
+  submitLabel: "Save article",
+  sections: [
+    {
+      id: "article",
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("documents.forms.newArticle.fields.name"),
+          required: true,
+          defaultValue: String(row.name ?? ""),
+          width: "full",
+        },
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("documents.forms.newArticle.fields.description"),
+          defaultValue: String(row.description ?? ""),
+          rows: 2,
+          width: "full",
+        },
+        {
+          id: "body",
+          name: "body",
+          type: "textarea",
+          label: t("documents.forms.newArticle.fields.body"),
+          defaultValue: String(row.body ?? ""),
+          rows: 6,
+          width: "full",
+        },
+        {
+          id: "isPublished",
+          name: "isPublished",
+          type: "checkbox",
+          label: t("documents.forms.newArticle.fields.isPublished"),
+          defaultValue: Boolean(row.isPublished),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const editDocumentFolderForm = (
+  t: TFunction,
+  row: Record<string, unknown>,
+): FormConfig => ({
+  id: "edit-document-folder",
+  title: "Update folder",
+  submitLabel: "Save folder",
+  sections: [
+    {
+      id: "folder",
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("documents.forms.newFolder.fields.name"),
+          required: true,
+          defaultValue: String(row.name ?? ""),
+          width: "full",
+        },
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("documents.forms.newFolder.fields.description"),
+          defaultValue: String(row.description ?? ""),
+          rows: 2,
+          width: "full",
+        },
+        {
+          id: "parentId",
+          name: "parentId",
+          type: "select",
+          label: t("documents.forms.newFolder.fields.parentId"),
+          defaultValue: row.parentId != null ? String(row.parentId) : "",
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "sequence",
+          name: "sequence",
+          type: "number",
+          label: t("documents.forms.newFolder.fields.sequence"),
+          defaultValue: Number(row.sequence ?? 10),
+          width: "1/2",
+        },
+        {
+          id: "isFavorite",
+          name: "isFavorite",
+          type: "checkbox",
+          label: t("documents.forms.newFolder.fields.isFavorite"),
+          defaultValue: Boolean(row.isFavorite),
+          width: "1/2",
+        },
+        {
+          id: "isHidden",
+          name: "isHidden",
+          type: "checkbox",
+          label: t("documents.forms.newFolder.fields.isHidden"),
+          defaultValue: Boolean(row.isHidden),
+          width: "1/2",
+        },
+        {
+          id: "residencyRegion",
+          name: "residencyRegion",
+          type: "text",
+          label: t("documents.forms.newFolder.fields.residencyRegion"),
+          placeholder: t("documents.forms.newFolder.fields.residencyRegionHint"),
+          defaultValue: String(row.residencyRegion ?? ""),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const addArticleMemberForm = (_t: TFunction): FormConfig => ({
+  id: "add-article-member",
+  title: "Add article member",
+  submitLabel: "Add member",
+  sections: [
+    {
+      id: "member",
+      fields: [
+        {
+          id: "member",
+          name: "member",
+          type: "text",
+          label: "Member identity (hex)",
+          required: true,
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const newDocumentTemplateForm = (_t: TFunction): FormConfig => ({
+  id: "new-document-template",
+  title: "New document template",
+  submitLabel: "Create template",
+  sections: [
+    {
+      id: "template",
+      fields: [
+        { id: "name", name: "name", type: "text", label: "Name", required: true, width: "full" },
+        { id: "model", name: "model", type: "text", label: "Model", required: true, width: "1/2", placeholder: "sale.order" },
+        {
+          id: "reportType",
+          name: "reportType",
+          type: "text",
+          label: "Report type",
+          defaultValue: "qweb-pdf",
+          width: "1/2",
+        },
+        {
+          id: "bodyHtml",
+          name: "bodyHtml",
+          type: "textarea",
+          label: "Body HTML",
+          required: true,
+          rows: 8,
+          width: "full",
+        },
+        {
+          id: "isDefault",
+          name: "isDefault",
+          type: "checkbox",
+          label: "Default",
+          width: "1/2",
+        },
+        {
+          id: "isActive",
+          name: "isActive",
+          type: "checkbox",
+          label: "Active",
+          defaultValue: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const newMailTemplateForm = (_t: TFunction): FormConfig => ({
+  id: "new-mail-template",
+  title: "New mail template",
+  submitLabel: "Create template",
+  sections: [
+    {
+      id: "template",
+      fields: [
+        { id: "name", name: "name", type: "text", label: "Name", required: true, width: "full" },
+        { id: "model", name: "model", type: "text", label: "Model", required: true, width: "1/2" },
+        { id: "subject", name: "subject", type: "text", label: "Subject", required: true, width: "1/2" },
+        {
+          id: "bodyHtml",
+          name: "bodyHtml",
+          type: "textarea",
+          label: "Body HTML",
+          required: true,
+          rows: 6,
+          width: "full",
+        },
+        {
+          id: "attachDocument",
+          name: "attachDocument",
+          type: "checkbox",
+          label: "Attach document",
+          width: "1/2",
+        },
+        {
+          id: "isActive",
+          name: "isActive",
+          type: "checkbox",
+          label: "Active",
+          defaultValue: true,
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
 export const documentsFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-document": newDocumentForm(t),
   "new-knowledge-article": newKnowledgeArticleForm(t),
@@ -422,4 +821,9 @@ export const documentsFormConfigs = (t: TFunction): Record<string, FormConfig> =
   "new-document-processing-job": newDocumentProcessingJobForm(t),
   "complete-document-processing-job": completeDocumentProcessingJobForm(t),
   "acknowledge-document-insight": acknowledgeDocumentInsightForm(t),
+  "upload-document-version": uploadDocumentVersionForm(t),
+  "new-document-template": newDocumentTemplateForm(t),
+  "new-mail-template": newMailTemplateForm(t),
+  "reindex-document": reindexDocumentForm(t),
+  "set-document-retention": setDocumentRetentionForm(t),
 })

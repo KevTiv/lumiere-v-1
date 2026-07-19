@@ -7260,7 +7260,7 @@
     "documents": {
       "title": "Documents",
       "description": "Files, attachments, and managed documents",
-      "searchPlaceholder": "Search documents…",
+      "searchPlaceholder": "Search name, file, or indexed content…",
       "emptyMessage": "No documents found.",
       "columns": {
         "name": "Name",
@@ -7270,7 +7270,10 @@
         "isFavorite": "Favorite",
         "isShared": "Shared",
         "versionCount": "Versions",
-        "createDate": "Created"
+        "createDate": "Created",
+        "fiscalKind": "Fiscal kind",
+        "residencyRegion": "Residency",
+        "retentionDays": "Retention"
       },
       "filters": {
         "isDeleted": {
@@ -7428,6 +7431,8 @@
         "fields": {
           "name": "Document Name",
           "namePlaceholder": "Q4 Financial Report",
+          "file": "File",
+          "fileHint": "Uploads to object storage, then registers metadata (checksum required)",
           "fileName": "File Name",
           "fileNamePlaceholder": "report-q4-2024.pdf",
           "mimetype": "File Type",
@@ -7435,8 +7440,11 @@
           "descriptionPlaceholder": "Brief description of this document…",
           "isFavorite": "Mark as Favorite",
           "isShared": "Share with Team",
-          "folderId": "Folder ID",
-          "folderIdHint": "Optional document folder row id",
+          "folderId": "Folder",
+          "folderIdHint": "Optional document folder",
+          "resModel": "Linked record type",
+          "resModelNone": "None",
+          "resId": "Linked record ID",
           "tagIds": "Tag IDs",
           "tagIdsHint": "Comma-separated numeric ids (optional)",
           "options": {
@@ -7446,7 +7454,13 @@
             "png": "PNG",
             "jpeg": "JPEG",
             "text": "Text"
-          }
+          },
+          "retentionDays": "Retention days",
+          "retentionDaysHint": "Days to keep after soft-delete before purge (optional)",
+          "fiscalKind": "Fiscal archive kind",
+          "fiscalKindNone": "None",
+          "residencyRegion": "Residency region",
+          "residencyRegionHint": "e.g. au, br, my — defaults from folder/country pack"
         }
       },
       "newArticle": {
@@ -7514,7 +7528,9 @@
           "parentId": "Parent folder ID",
           "sequence": "Sequence",
           "isFavorite": "Favorite",
-          "isHidden": "Hidden"
+          "isHidden": "Hidden",
+          "residencyRegion": "Residency region",
+          "residencyRegionHint": "Optional storage residency tag (e.g. au)"
         }
       },
       "newProcessingJob": {
@@ -7533,7 +7549,11 @@
           "inputData": "Input payload (optional)",
           "inputDataPlaceholder": "Text or JSON consumed by the worker",
           "metadata": "Metadata (optional)",
-          "metadataPlaceholder": "Opaque JSON string for your integration"
+          "metadataPlaceholder": "Opaque JSON string for your integration",
+          "documentId": "Document ID",
+          "documentIdHint": "Optional DMS document row id for OCR linkage",
+          "documentVersionId": "Document version ID",
+          "documentVersionIdHint": "Optional version row id"
         }
       },
       "completeProcessingJob": {
@@ -7565,6 +7585,32 @@
         "fields": {
           "actionTaken": "Action taken (optional)",
           "actionTakenPlaceholder": "e.g. Updated policy doc, notified finance…"
+        }
+      },
+      "reindexDocument": {
+        "title": "Reindex document",
+        "description": "Replace searchable text extracted for this document.",
+        "sections": {
+          "index": "Search index"
+        },
+        "fields": {
+          "content": "Index content",
+          "contentPlaceholder": "Paste extracted text or keywords…",
+          "language": "Language",
+          "languageHint": "e.g. en, pt-BR, ms (optional; pack default used if empty)"
+        }
+      },
+      "setRetention": {
+        "title": "Set retention",
+        "description": "Classification and retention window for purge after delete.",
+        "sections": {
+          "retention": "Retention"
+        },
+        "fields": {
+          "retentionDays": "Retention days",
+          "retentionDaysHint": "Days after soft-delete before purge",
+          "classificationId": "Classification ID",
+          "classificationIdHint": "Optional data_classification row id"
         }
       }
     }

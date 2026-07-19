@@ -11,6 +11,7 @@ pub struct AddDocumentVersionParams {
     pub file_size: u64,
     pub mimetype: String,
     pub url: String,
+    pub checksum: String,
     pub changes_description: Option<String>,
 }
 

@@ -11,6 +11,10 @@ pub fn run_all_platform_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_hr_leave_type_test(ctx)?;
     run_manufacturing_workcenter_test(ctx)?;
     run_documents_folder_test(ctx)?;
+    run_documents_wave_a_tests(ctx)?;
+    run_documents_wave_b_tests(ctx)?;
+    run_documents_wave_c_tests(ctx)?;
+    run_documents_wave_d_tests(ctx)?;
     run_workflow_definition_test(ctx)?;
     run_subscription_plan_test(ctx)?;
     run_tenant_isolation_tests(ctx)?;
@@ -38,6 +42,37 @@ pub fn run_manufacturing_workcenter_test(ctx: &ReducerContext) -> Result<(), Str
 #[spacetimedb::reducer]
 pub fn run_documents_folder_test(ctx: &ReducerContext) -> Result<(), String> {
     platform_smoke::test_documents_folder_create(ctx).map_err(|e| format!("documents: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_documents_wave_a_tests(ctx: &ReducerContext) -> Result<(), String> {
+    platform_smoke::test_documents_create_rejects_empty_blob(ctx)
+        .map_err(|e| format!("documents empty blob: {e}"))?;
+    platform_smoke::test_documents_create_and_lock(ctx)
+        .map_err(|e| format!("documents create/lock: {e}"))?;
+    platform_smoke::test_documents_folder_acl_blocks_write(ctx)
+        .map_err(|e| format!("documents ACL: {e}"))?;
+    platform_smoke::test_documents_company_isolation(ctx)
+        .map_err(|e| format!("documents isolation: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_documents_wave_b_tests(ctx: &ReducerContext) -> Result<(), String> {
+    platform_smoke::test_documents_wave_b_restore_and_folder_ops(ctx)
+        .map_err(|e| format!("documents wave b: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_documents_wave_c_tests(ctx: &ReducerContext) -> Result<(), String> {
+    platform_smoke::test_documents_wave_c_index_retention_fiscal(ctx)
+        .map_err(|e| format!("documents wave c: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_documents_wave_d_tests(ctx: &ReducerContext) -> Result<(), String> {
+    platform_smoke::test_documents_wave_d_hold_ocr_drive_esign_presence(ctx)
+        .map_err(|e| format!("documents wave d: {e}"))
 }
 
 #[spacetimedb::reducer]

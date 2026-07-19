@@ -85,6 +85,7 @@ pub mod analytics_metric_type;
 pub mod append_ai_agent_run_step_params_type;
 pub mod append_ai_chat_message_params_type;
 pub mod append_crm_conversation_message_params_type;
+pub mod apply_document_legal_hold_params_type;
 pub mod apply_expense_advance_params_type;
 pub mod apply_index_linked_renewal_params_type;
 pub mod apply_omnichannel_allocation_params_type;
@@ -140,6 +141,7 @@ pub mod company_scope_params_type;
 pub mod company_vertical_pack_type;
 pub mod complete_ai_agent_run_params_type;
 pub mod complete_document_processing_job_params_type;
+pub mod complete_document_signature_request_params_type;
 pub mod complete_offboarding_item_params_type;
 pub mod complete_onboarding_item_params_type;
 pub mod complete_performance_review_params_type;
@@ -246,6 +248,7 @@ pub mod create_depreciation_line_params_type;
 pub mod create_document_folder_params_type;
 pub mod create_document_params_type;
 pub mod create_document_processing_job_params_type;
+pub mod create_document_signature_request_params_type;
 pub mod create_document_template_params_type;
 pub mod create_elimination_entry_params_type;
 pub mod create_employee_params_type;
@@ -447,11 +450,17 @@ pub mod device_sync_entry_type;
 pub mod discount_policy_type;
 pub mod dispose_account_asset_params_type;
 pub mod document_type;
+pub mod document_external_ref_type;
 pub mod document_folder_type;
+pub mod document_legal_hold_type;
+pub mod document_presence_type;
+pub mod document_retention_purge_job_type;
 pub mod document_sequence_type;
+pub mod document_signature_request_type;
 pub mod document_template_type;
 pub mod document_version_type;
 pub mod done_stock_move_params_type;
+pub mod drive_conflict_policy_type;
 pub mod employment_type_type;
 pub mod end_contact_role_params_type;
 pub mod enqueue_job_params_type;
@@ -575,6 +584,7 @@ pub mod job_status_type;
 pub mod journal_type_type;
 pub mod knowledge_article_type;
 pub mod knowledge_article_category_type;
+pub mod knowledge_article_presence_type;
 pub mod landed_cost_state_type;
 pub mod lead_type;
 pub mod lead_lost_reason_type;
@@ -761,6 +771,7 @@ pub mod reject_approval_request_params_type;
 pub mod reject_expense_policy_exception_params_type;
 pub mod reject_timesheets_params_type;
 pub mod release_blanket_to_po_params_type;
+pub mod release_document_legal_hold_params_type;
 pub mod renew_subscription_params_type;
 pub mod reopen_timesheets_params_type;
 pub mod replenishment_rule_type;
@@ -799,6 +810,7 @@ pub mod sales_integration_intent_type;
 pub mod sales_sla_escalation_job_type;
 pub mod save_import_mapping_template_params_type;
 pub mod saved_report_type;
+pub mod schedule_document_retention_purge_params_type;
 pub mod scheduled_report_type;
 pub mod scheduled_report_run_type;
 pub mod schema_migration_type;
@@ -819,6 +831,9 @@ pub mod set_company_country_pack_params_type;
 pub mod set_company_vertical_pack_params_type;
 pub mod set_consolidation_company_rate_params_type;
 pub mod set_contact_segment_rules_params_type;
+pub mod set_document_index_content_params_type;
+pub mod set_document_retention_params_type;
+pub mod set_drive_conflict_policy_params_type;
 pub mod set_expense_allocations_params_type;
 pub mod set_expense_fraud_hold_params_type;
 pub mod set_purchase_approval_delegate_params_type;
@@ -874,6 +889,7 @@ pub mod subscription_usage_charge_type;
 pub mod subscription_usage_event_type;
 pub mod supplier_intake_request_type;
 pub mod sync_direction_type;
+pub mod sync_external_file_to_document_params_type;
 pub mod sync_status_type;
 pub mod task_state_type;
 pub mod tax_amount_type_type;
@@ -937,6 +953,7 @@ pub mod update_crossovered_budget_line_params_type;
 pub mod update_crossovered_budget_params_type;
 pub mod update_dashboard_share_params_type;
 pub mod update_department_params_type;
+pub mod update_document_folder_params_type;
 pub mod update_document_params_type;
 pub mod update_document_template_params_type;
 pub mod update_employee_params_type;
@@ -1103,6 +1120,7 @@ pub mod amend_subscription_reducer;
 pub mod append_ai_agent_run_step_reducer;
 pub mod append_ai_chat_message_reducer;
 pub mod append_crm_conversation_message_reducer;
+pub mod apply_document_legal_hold_reducer;
 pub mod apply_expense_advance_to_sheet_reducer;
 pub mod apply_expense_integration_intent_reducer;
 pub mod apply_global_migrations_reducer;
@@ -1183,6 +1201,8 @@ pub mod cancel_workflow_instance_reducer;
 pub mod check_mo_availability_reducer;
 pub mod claim_hub_with_token_reducer;
 pub mod claim_queue_job_reducer;
+pub mod clear_document_presence_reducer;
+pub mod clear_knowledge_article_presence_reducer;
 pub mod clear_opportunity_presence_reducer;
 pub mod clear_proposal_presence_reducer;
 pub mod close_account_asset_reducer;
@@ -1195,6 +1215,7 @@ pub mod close_ticket_reducer;
 pub mod complete_activity_reducer;
 pub mod complete_ai_agent_run_reducer;
 pub mod complete_document_processing_job_reducer;
+pub mod complete_document_signature_request_reducer;
 pub mod complete_intercompany_transaction_reducer;
 pub mod complete_offboarding_item_reducer;
 pub mod complete_onboarding_item_reducer;
@@ -1300,6 +1321,7 @@ pub mod create_depreciation_line_reducer;
 pub mod create_document_reducer;
 pub mod create_document_folder_reducer;
 pub mod create_document_processing_job_reducer;
+pub mod create_document_signature_request_reducer;
 pub mod create_document_template_reducer;
 pub mod create_elimination_entry_reducer;
 pub mod create_employee_reducer;
@@ -1496,6 +1518,7 @@ pub mod delete_calendar_event_reducer;
 pub mod delete_company_reducer;
 pub mod delete_contact_reducer;
 pub mod delete_document_reducer;
+pub mod delete_document_folder_reducer;
 pub mod delete_financial_report_reducer;
 pub mod delete_fiscal_year_reducer;
 pub mod delete_form_field_reducer;
@@ -1705,6 +1728,7 @@ pub mod process_inventory_adjustment_reducer;
 pub mod process_pending_scans_reducer;
 pub mod produce_manufacturing_order_reducer;
 pub mod promote_ai_skill_version_reducer;
+pub mod purge_expired_documents_reducer;
 pub mod queue_mail_from_template_reducer;
 pub mod rate_subscription_usage_events_reducer;
 pub mod rebase_deferred_schedules_for_subscription_reducer;
@@ -1762,6 +1786,7 @@ pub mod reject_expense_policy_exception_reducer;
 pub mod reject_supplier_intake_reducer;
 pub mod reject_timesheets_reducer;
 pub mod release_blanket_to_po_reducer;
+pub mod release_document_legal_hold_reducer;
 pub mod release_picking_wave_reducer;
 pub mod remove_article_member_reducer;
 pub mod remove_casbin_rule_reducer;
@@ -1783,6 +1808,7 @@ pub mod reset_leave_to_draft_reducer;
 pub mod resolve_inventory_exception_reducer;
 pub mod resolve_iot_alert_reducer;
 pub mod resolve_proposal_comment_reducer;
+pub mod restore_document_reducer;
 pub mod restore_product_category_reducer;
 pub mod resume_subscription_reducer;
 pub mod retry_intercompany_transaction_reducer;
@@ -1830,6 +1856,10 @@ pub mod run_crm_opportunity_convert_test_reducer;
 pub mod run_crm_relationship_admin_test_reducer;
 pub mod run_crm_wave_2_test_reducer;
 pub mod run_documents_folder_test_reducer;
+pub mod run_documents_wave_a_tests_reducer;
+pub mod run_documents_wave_b_tests_reducer;
+pub mod run_documents_wave_c_tests_reducer;
+pub mod run_documents_wave_d_tests_reducer;
 pub mod run_expenses_wave_a_test_reducer;
 pub mod run_expenses_wave_b_test_reducer;
 pub mod run_expenses_wave_c_test_reducer;
@@ -1916,6 +1946,7 @@ pub mod run_traceability_report_reducer;
 pub mod run_workflow_definition_test_reducer;
 pub mod save_import_mapping_template_reducer;
 pub mod save_proposal_version_reducer;
+pub mod schedule_document_retention_purge_reducer;
 pub mod schedule_sales_sla_escalation_reducer;
 pub mod schedule_tax_deadline_updates_reducer;
 pub mod seed_dev_data_reducer;
@@ -1939,9 +1970,12 @@ pub mod set_company_vertical_pack_reducer;
 pub mod set_consolidation_company_rate_reducer;
 pub mod set_contact_communication_preference_reducer;
 pub mod set_contact_segment_rules_reducer;
+pub mod set_document_index_content_reducer;
+pub mod set_document_retention_reducer;
 pub mod set_expense_allocations_reducer;
 pub mod set_expense_fraud_hold_reducer;
 pub mod set_form_role_config_reducer;
+pub mod set_google_drive_conflict_policy_reducer;
 pub mod set_intercompany_rule_active_reducer;
 pub mod set_iot_threshold_reducer;
 pub mod set_project_active_reducer;
@@ -1977,6 +2011,7 @@ pub mod submit_performance_review_reducer;
 pub mod submit_purchase_requisition_reducer;
 pub mod submit_supplier_intake_reducer;
 pub mod subscribe_to_record_reducer;
+pub mod sync_external_file_to_document_reducer;
 pub mod sync_hub_devices_reducer;
 pub mod test_iot_device_reducer;
 pub mod toggle_project_favorite_reducer;
@@ -2040,6 +2075,8 @@ pub mod update_crossovered_budget_reducer;
 pub mod update_department_reducer;
 pub mod update_device_status_reducer;
 pub mod update_document_reducer;
+pub mod update_document_folder_reducer;
+pub mod update_document_presence_reducer;
 pub mod update_document_template_reducer;
 pub mod update_employee_reducer;
 pub mod update_expense_reducer;
@@ -2057,6 +2094,7 @@ pub mod update_integration_status_reducer;
 pub mod update_intercompany_rule_reducer;
 pub mod update_job_position_reducer;
 pub mod update_knowledge_article_reducer;
+pub mod update_knowledge_article_presence_reducer;
 pub mod update_knowledge_category_reducer;
 pub mod update_landed_cost_reducer;
 pub mod update_lead_address_reducer;
@@ -2282,7 +2320,11 @@ pub mod delivery_carrier_table;
 pub mod delivery_price_rule_table;
 pub mod doc_folder_table;
 pub mod document_table;
+pub mod document_external_ref_table;
+pub mod document_legal_hold_table;
+pub mod document_presence_table;
 pub mod document_sequence_table;
+pub mod document_signature_request_table;
 pub mod document_template_table;
 pub mod document_version_table;
 pub mod expense_card_statement_line_table;
@@ -2366,6 +2408,7 @@ pub mod iot_telemetry_table;
 pub mod iot_threshold_table;
 pub mod kb_category_table;
 pub mod knowledge_article_table;
+pub mod knowledge_article_presence_table;
 pub mod lead_table;
 pub mod lead_lost_reason_table;
 pub mod lead_score_table;
@@ -2636,6 +2679,7 @@ pub use analytics_metric_type::AnalyticsMetric;
 pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
 pub use append_ai_chat_message_params_type::AppendAiChatMessageParams;
 pub use append_crm_conversation_message_params_type::AppendCrmConversationMessageParams;
+pub use apply_document_legal_hold_params_type::ApplyDocumentLegalHoldParams;
 pub use apply_expense_advance_params_type::ApplyExpenseAdvanceParams;
 pub use apply_index_linked_renewal_params_type::ApplyIndexLinkedRenewalParams;
 pub use apply_omnichannel_allocation_params_type::ApplyOmnichannelAllocationParams;
@@ -2691,6 +2735,7 @@ pub use company_scope_params_type::CompanyScopeParams;
 pub use company_vertical_pack_type::CompanyVerticalPack;
 pub use complete_ai_agent_run_params_type::CompleteAiAgentRunParams;
 pub use complete_document_processing_job_params_type::CompleteDocumentProcessingJobParams;
+pub use complete_document_signature_request_params_type::CompleteDocumentSignatureRequestParams;
 pub use complete_offboarding_item_params_type::CompleteOffboardingItemParams;
 pub use complete_onboarding_item_params_type::CompleteOnboardingItemParams;
 pub use complete_performance_review_params_type::CompletePerformanceReviewParams;
@@ -2797,6 +2842,7 @@ pub use create_depreciation_line_params_type::CreateDepreciationLineParams;
 pub use create_document_folder_params_type::CreateDocumentFolderParams;
 pub use create_document_params_type::CreateDocumentParams;
 pub use create_document_processing_job_params_type::CreateDocumentProcessingJobParams;
+pub use create_document_signature_request_params_type::CreateDocumentSignatureRequestParams;
 pub use create_document_template_params_type::CreateDocumentTemplateParams;
 pub use create_elimination_entry_params_type::CreateEliminationEntryParams;
 pub use create_employee_params_type::CreateEmployeeParams;
@@ -2998,11 +3044,17 @@ pub use device_sync_entry_type::DeviceSyncEntry;
 pub use discount_policy_type::DiscountPolicy;
 pub use dispose_account_asset_params_type::DisposeAccountAssetParams;
 pub use document_type::Document;
+pub use document_external_ref_type::DocumentExternalRef;
 pub use document_folder_type::DocumentFolder;
+pub use document_legal_hold_type::DocumentLegalHold;
+pub use document_presence_type::DocumentPresence;
+pub use document_retention_purge_job_type::DocumentRetentionPurgeJob;
 pub use document_sequence_type::DocumentSequence;
+pub use document_signature_request_type::DocumentSignatureRequest;
 pub use document_template_type::DocumentTemplate;
 pub use document_version_type::DocumentVersion;
 pub use done_stock_move_params_type::DoneStockMoveParams;
+pub use drive_conflict_policy_type::DriveConflictPolicy;
 pub use employment_type_type::EmploymentType;
 pub use end_contact_role_params_type::EndContactRoleParams;
 pub use enqueue_job_params_type::EnqueueJobParams;
@@ -3126,6 +3178,7 @@ pub use job_status_type::JobStatus;
 pub use journal_type_type::JournalType;
 pub use knowledge_article_type::KnowledgeArticle;
 pub use knowledge_article_category_type::KnowledgeArticleCategory;
+pub use knowledge_article_presence_type::KnowledgeArticlePresence;
 pub use landed_cost_state_type::LandedCostState;
 pub use lead_type::Lead;
 pub use lead_lost_reason_type::LeadLostReason;
@@ -3312,6 +3365,7 @@ pub use reject_approval_request_params_type::RejectApprovalRequestParams;
 pub use reject_expense_policy_exception_params_type::RejectExpensePolicyExceptionParams;
 pub use reject_timesheets_params_type::RejectTimesheetsParams;
 pub use release_blanket_to_po_params_type::ReleaseBlanketToPoParams;
+pub use release_document_legal_hold_params_type::ReleaseDocumentLegalHoldParams;
 pub use renew_subscription_params_type::RenewSubscriptionParams;
 pub use reopen_timesheets_params_type::ReopenTimesheetsParams;
 pub use replenishment_rule_type::ReplenishmentRule;
@@ -3350,6 +3404,7 @@ pub use sales_integration_intent_type::SalesIntegrationIntent;
 pub use sales_sla_escalation_job_type::SalesSlaEscalationJob;
 pub use save_import_mapping_template_params_type::SaveImportMappingTemplateParams;
 pub use saved_report_type::SavedReport;
+pub use schedule_document_retention_purge_params_type::ScheduleDocumentRetentionPurgeParams;
 pub use scheduled_report_type::ScheduledReport;
 pub use scheduled_report_run_type::ScheduledReportRun;
 pub use schema_migration_type::SchemaMigration;
@@ -3370,6 +3425,9 @@ pub use set_company_country_pack_params_type::SetCompanyCountryPackParams;
 pub use set_company_vertical_pack_params_type::SetCompanyVerticalPackParams;
 pub use set_consolidation_company_rate_params_type::SetConsolidationCompanyRateParams;
 pub use set_contact_segment_rules_params_type::SetContactSegmentRulesParams;
+pub use set_document_index_content_params_type::SetDocumentIndexContentParams;
+pub use set_document_retention_params_type::SetDocumentRetentionParams;
+pub use set_drive_conflict_policy_params_type::SetDriveConflictPolicyParams;
 pub use set_expense_allocations_params_type::SetExpenseAllocationsParams;
 pub use set_expense_fraud_hold_params_type::SetExpenseFraudHoldParams;
 pub use set_purchase_approval_delegate_params_type::SetPurchaseApprovalDelegateParams;
@@ -3425,6 +3483,7 @@ pub use subscription_usage_charge_type::SubscriptionUsageCharge;
 pub use subscription_usage_event_type::SubscriptionUsageEvent;
 pub use supplier_intake_request_type::SupplierIntakeRequest;
 pub use sync_direction_type::SyncDirection;
+pub use sync_external_file_to_document_params_type::SyncExternalFileToDocumentParams;
 pub use sync_status_type::SyncStatus;
 pub use task_state_type::TaskState;
 pub use tax_amount_type_type::TaxAmountType;
@@ -3488,6 +3547,7 @@ pub use update_crossovered_budget_line_params_type::UpdateCrossoveredBudgetLineP
 pub use update_crossovered_budget_params_type::UpdateCrossoveredBudgetParams;
 pub use update_dashboard_share_params_type::UpdateDashboardShareParams;
 pub use update_department_params_type::UpdateDepartmentParams;
+pub use update_document_folder_params_type::UpdateDocumentFolderParams;
 pub use update_document_params_type::UpdateDocumentParams;
 pub use update_document_template_params_type::UpdateDocumentTemplateParams;
 pub use update_employee_params_type::UpdateEmployeeParams;
@@ -3726,7 +3786,11 @@ pub use delivery_carrier_table::*;
 pub use delivery_price_rule_table::*;
 pub use doc_folder_table::*;
 pub use document_table::*;
+pub use document_external_ref_table::*;
+pub use document_legal_hold_table::*;
+pub use document_presence_table::*;
 pub use document_sequence_table::*;
+pub use document_signature_request_table::*;
 pub use document_template_table::*;
 pub use document_version_table::*;
 pub use expense_card_statement_line_table::*;
@@ -3810,6 +3874,7 @@ pub use iot_telemetry_table::*;
 pub use iot_threshold_table::*;
 pub use kb_category_table::*;
 pub use knowledge_article_table::*;
+pub use knowledge_article_presence_table::*;
 pub use lead_table::*;
 pub use lead_lost_reason_table::*;
 pub use lead_score_table::*;
@@ -4044,6 +4109,7 @@ pub use amend_subscription_reducer::amend_subscription;
 pub use append_ai_agent_run_step_reducer::append_ai_agent_run_step;
 pub use append_ai_chat_message_reducer::append_ai_chat_message;
 pub use append_crm_conversation_message_reducer::append_crm_conversation_message;
+pub use apply_document_legal_hold_reducer::apply_document_legal_hold;
 pub use apply_expense_advance_to_sheet_reducer::apply_expense_advance_to_sheet;
 pub use apply_expense_integration_intent_reducer::apply_expense_integration_intent;
 pub use apply_global_migrations_reducer::apply_global_migrations;
@@ -4124,6 +4190,8 @@ pub use cancel_workflow_instance_reducer::cancel_workflow_instance;
 pub use check_mo_availability_reducer::check_mo_availability;
 pub use claim_hub_with_token_reducer::claim_hub_with_token;
 pub use claim_queue_job_reducer::claim_queue_job;
+pub use clear_document_presence_reducer::clear_document_presence;
+pub use clear_knowledge_article_presence_reducer::clear_knowledge_article_presence;
 pub use clear_opportunity_presence_reducer::clear_opportunity_presence;
 pub use clear_proposal_presence_reducer::clear_proposal_presence;
 pub use close_account_asset_reducer::close_account_asset;
@@ -4136,6 +4204,7 @@ pub use close_ticket_reducer::close_ticket;
 pub use complete_activity_reducer::complete_activity;
 pub use complete_ai_agent_run_reducer::complete_ai_agent_run;
 pub use complete_document_processing_job_reducer::complete_document_processing_job;
+pub use complete_document_signature_request_reducer::complete_document_signature_request;
 pub use complete_intercompany_transaction_reducer::complete_intercompany_transaction;
 pub use complete_offboarding_item_reducer::complete_offboarding_item;
 pub use complete_onboarding_item_reducer::complete_onboarding_item;
@@ -4241,6 +4310,7 @@ pub use create_depreciation_line_reducer::create_depreciation_line;
 pub use create_document_reducer::create_document;
 pub use create_document_folder_reducer::create_document_folder;
 pub use create_document_processing_job_reducer::create_document_processing_job;
+pub use create_document_signature_request_reducer::create_document_signature_request;
 pub use create_document_template_reducer::create_document_template;
 pub use create_elimination_entry_reducer::create_elimination_entry;
 pub use create_employee_reducer::create_employee;
@@ -4437,6 +4507,7 @@ pub use delete_calendar_event_reducer::delete_calendar_event;
 pub use delete_company_reducer::delete_company;
 pub use delete_contact_reducer::delete_contact;
 pub use delete_document_reducer::delete_document;
+pub use delete_document_folder_reducer::delete_document_folder;
 pub use delete_financial_report_reducer::delete_financial_report;
 pub use delete_fiscal_year_reducer::delete_fiscal_year;
 pub use delete_form_field_reducer::delete_form_field;
@@ -4646,6 +4717,7 @@ pub use process_inventory_adjustment_reducer::process_inventory_adjustment;
 pub use process_pending_scans_reducer::process_pending_scans;
 pub use produce_manufacturing_order_reducer::produce_manufacturing_order;
 pub use promote_ai_skill_version_reducer::promote_ai_skill_version;
+pub use purge_expired_documents_reducer::purge_expired_documents;
 pub use queue_mail_from_template_reducer::queue_mail_from_template;
 pub use rate_subscription_usage_events_reducer::rate_subscription_usage_events;
 pub use rebase_deferred_schedules_for_subscription_reducer::rebase_deferred_schedules_for_subscription;
@@ -4703,6 +4775,7 @@ pub use reject_expense_policy_exception_reducer::reject_expense_policy_exception
 pub use reject_supplier_intake_reducer::reject_supplier_intake;
 pub use reject_timesheets_reducer::reject_timesheets;
 pub use release_blanket_to_po_reducer::release_blanket_to_po;
+pub use release_document_legal_hold_reducer::release_document_legal_hold;
 pub use release_picking_wave_reducer::release_picking_wave;
 pub use remove_article_member_reducer::remove_article_member;
 pub use remove_casbin_rule_reducer::remove_casbin_rule;
@@ -4724,6 +4797,7 @@ pub use reset_leave_to_draft_reducer::reset_leave_to_draft;
 pub use resolve_inventory_exception_reducer::resolve_inventory_exception;
 pub use resolve_iot_alert_reducer::resolve_iot_alert;
 pub use resolve_proposal_comment_reducer::resolve_proposal_comment;
+pub use restore_document_reducer::restore_document;
 pub use restore_product_category_reducer::restore_product_category;
 pub use resume_subscription_reducer::resume_subscription;
 pub use retry_intercompany_transaction_reducer::retry_intercompany_transaction;
@@ -4771,6 +4845,10 @@ pub use run_crm_opportunity_convert_test_reducer::run_crm_opportunity_convert_te
 pub use run_crm_relationship_admin_test_reducer::run_crm_relationship_admin_test;
 pub use run_crm_wave_2_test_reducer::run_crm_wave_2_test;
 pub use run_documents_folder_test_reducer::run_documents_folder_test;
+pub use run_documents_wave_a_tests_reducer::run_documents_wave_a_tests;
+pub use run_documents_wave_b_tests_reducer::run_documents_wave_b_tests;
+pub use run_documents_wave_c_tests_reducer::run_documents_wave_c_tests;
+pub use run_documents_wave_d_tests_reducer::run_documents_wave_d_tests;
 pub use run_expenses_wave_a_test_reducer::run_expenses_wave_a_test;
 pub use run_expenses_wave_b_test_reducer::run_expenses_wave_b_test;
 pub use run_expenses_wave_c_test_reducer::run_expenses_wave_c_test;
@@ -4857,6 +4935,7 @@ pub use run_traceability_report_reducer::run_traceability_report;
 pub use run_workflow_definition_test_reducer::run_workflow_definition_test;
 pub use save_import_mapping_template_reducer::save_import_mapping_template;
 pub use save_proposal_version_reducer::save_proposal_version;
+pub use schedule_document_retention_purge_reducer::schedule_document_retention_purge;
 pub use schedule_sales_sla_escalation_reducer::schedule_sales_sla_escalation;
 pub use schedule_tax_deadline_updates_reducer::schedule_tax_deadline_updates;
 pub use seed_dev_data_reducer::seed_dev_data;
@@ -4880,9 +4959,12 @@ pub use set_company_vertical_pack_reducer::set_company_vertical_pack;
 pub use set_consolidation_company_rate_reducer::set_consolidation_company_rate;
 pub use set_contact_communication_preference_reducer::set_contact_communication_preference;
 pub use set_contact_segment_rules_reducer::set_contact_segment_rules;
+pub use set_document_index_content_reducer::set_document_index_content;
+pub use set_document_retention_reducer::set_document_retention;
 pub use set_expense_allocations_reducer::set_expense_allocations;
 pub use set_expense_fraud_hold_reducer::set_expense_fraud_hold;
 pub use set_form_role_config_reducer::set_form_role_config;
+pub use set_google_drive_conflict_policy_reducer::set_google_drive_conflict_policy;
 pub use set_intercompany_rule_active_reducer::set_intercompany_rule_active;
 pub use set_iot_threshold_reducer::set_iot_threshold;
 pub use set_project_active_reducer::set_project_active;
@@ -4918,6 +5000,7 @@ pub use submit_performance_review_reducer::submit_performance_review;
 pub use submit_purchase_requisition_reducer::submit_purchase_requisition;
 pub use submit_supplier_intake_reducer::submit_supplier_intake;
 pub use subscribe_to_record_reducer::subscribe_to_record;
+pub use sync_external_file_to_document_reducer::sync_external_file_to_document;
 pub use sync_hub_devices_reducer::sync_hub_devices;
 pub use test_iot_device_reducer::test_iot_device;
 pub use toggle_project_favorite_reducer::toggle_project_favorite;
@@ -4981,6 +5064,8 @@ pub use update_crossovered_budget_reducer::update_crossovered_budget;
 pub use update_department_reducer::update_department;
 pub use update_device_status_reducer::update_device_status;
 pub use update_document_reducer::update_document;
+pub use update_document_folder_reducer::update_document_folder;
+pub use update_document_presence_reducer::update_document_presence;
 pub use update_document_template_reducer::update_document_template;
 pub use update_employee_reducer::update_employee;
 pub use update_expense_reducer::update_expense;
@@ -4998,6 +5083,7 @@ pub use update_integration_status_reducer::update_integration_status;
 pub use update_intercompany_rule_reducer::update_intercompany_rule;
 pub use update_job_position_reducer::update_job_position;
 pub use update_knowledge_article_reducer::update_knowledge_article;
+pub use update_knowledge_article_presence_reducer::update_knowledge_article_presence;
 pub use update_knowledge_category_reducer::update_knowledge_category;
 pub use update_landed_cost_reducer::update_landed_cost;
 pub use update_lead_address_reducer::update_lead_address;
@@ -5331,6 +5417,11 @@ pub enum Reducer {
         organization_id: u64,
         conversation_id: u64,
         params: AppendCrmConversationMessageParams,
+}    ,
+    ApplyDocumentLegalHold {
+        organization_id: u64,
+        document_id: u64,
+        params: ApplyDocumentLegalHoldParams,
 }    ,
     ApplyExpenseAdvanceToSheet {
         organization_id: u64,
@@ -5711,6 +5802,12 @@ pub enum Reducer {
         organization_id: u64,
         job_id: u64,
 }    ,
+    ClearDocumentPresence {
+        document_id: u64,
+}    ,
+    ClearKnowledgeArticlePresence {
+        article_id: u64,
+}    ,
     ClearOpportunityPresence {
         opportunity_id: u64,
 }    ,
@@ -5766,6 +5863,11 @@ pub enum Reducer {
         company_id: Option::<u64>,
         job_id: u64,
         params: CompleteDocumentProcessingJobParams,
+}    ,
+    CompleteDocumentSignatureRequest {
+        organization_id: u64,
+        request_id: u64,
+        params: CompleteDocumentSignatureRequestParams,
 }    ,
     CompleteIntercompanyTransaction {
         organization_id: u64,
@@ -6250,6 +6352,11 @@ pub enum Reducer {
         organization_id: u64,
         company_id: Option::<u64>,
         params: CreateDocumentProcessingJobParams,
+}    ,
+    CreateDocumentSignatureRequest {
+        organization_id: u64,
+        document_id: u64,
+        params: CreateDocumentSignatureRequestParams,
 }    ,
     CreateDocumentTemplate {
         organization_id: u64,
@@ -7169,6 +7276,10 @@ pub enum Reducer {
         organization_id: u64,
         document_id: u64,
 }    ,
+    DeleteDocumentFolder {
+        organization_id: u64,
+        folder_id: u64,
+}    ,
     DeleteFinancialReport {
         organization_id: u64,
         company_id: u64,
@@ -7890,6 +8001,7 @@ pub enum Reducer {
     LockDocument {
         organization_id: u64,
         document_id: u64,
+        lease_seconds: Option::<u64>,
 }    ,
     LockKnowledgeArticle {
         organization_id: u64,
@@ -8123,6 +8235,9 @@ pub enum Reducer {
         organization_id: u64,
         skill_version_id: u64,
         reason: Option::<String>,
+}    ,
+    PurgeExpiredDocuments {
+        organization_id: u64,
 }    ,
     QueueMailFromTemplate {
         organization_id: u64,
@@ -8414,6 +8529,11 @@ pub enum Reducer {
         blanket_order_id: u64,
         params: ReleaseBlanketToPoParams,
 }    ,
+    ReleaseDocumentLegalHold {
+        organization_id: u64,
+        hold_id: u64,
+        params: ReleaseDocumentLegalHoldParams,
+}    ,
     ReleasePickingWave {
         organization_id: u64,
         company_id: u64,
@@ -8510,6 +8630,10 @@ pub enum Reducer {
 }    ,
     ResolveProposalComment {
         comment_id: u64,
+}    ,
+    RestoreDocument {
+        organization_id: u64,
+        document_id: u64,
 }    ,
     RestoreProductCategory {
         organization_id: u64,
@@ -8614,6 +8738,10 @@ pub enum Reducer {
     RunCrmRelationshipAdminTest ,
     RunCrmWave2Test ,
     RunDocumentsFolderTest ,
+    RunDocumentsWaveATests ,
+    RunDocumentsWaveBTests ,
+    RunDocumentsWaveCTests ,
+    RunDocumentsWaveDTests ,
     RunExpensesWaveATest ,
     RunExpensesWaveBTest ,
     RunExpensesWaveCTest ,
@@ -8727,6 +8855,10 @@ pub enum Reducer {
         message: String,
         sections_json: String,
 }    ,
+    ScheduleDocumentRetentionPurge {
+        organization_id: u64,
+        params: ScheduleDocumentRetentionPurgeParams,
+}    ,
     ScheduleSalesSlaEscalation {
         organization_id: u64,
         company_id: u64,
@@ -8833,6 +8965,16 @@ pub enum Reducer {
         segment_id: u64,
         params: SetContactSegmentRulesParams,
 }    ,
+    SetDocumentIndexContent {
+        organization_id: u64,
+        document_id: u64,
+        params: SetDocumentIndexContentParams,
+}    ,
+    SetDocumentRetention {
+        organization_id: u64,
+        document_id: u64,
+        params: SetDocumentRetentionParams,
+}    ,
     SetExpenseAllocations {
         organization_id: u64,
         expense_id: u64,
@@ -8847,6 +8989,11 @@ pub enum Reducer {
         organization_id: u64,
         configuration_id: u64,
         params: CreateRoleConfigParams,
+}    ,
+    SetGoogleDriveConflictPolicy {
+        organization_id: u64,
+        connection_id: u64,
+        params: SetDriveConflictPolicyParams,
 }    ,
     SetIntercompanyRuleActive {
         organization_id: u64,
@@ -9026,6 +9173,10 @@ pub enum Reducer {
         res_model: String,
         res_id: u64,
         subtypes: Vec::<String>,
+}    ,
+    SyncExternalFileToDocument {
+        organization_id: u64,
+        params: SyncExternalFileToDocumentParams,
 }    ,
     SyncHubDevices {
         organization_id: u64,
@@ -9340,6 +9491,16 @@ pub enum Reducer {
         document_id: u64,
         params: UpdateDocumentParams,
 }    ,
+    UpdateDocumentFolder {
+        organization_id: u64,
+        folder_id: u64,
+        params: UpdateDocumentFolderParams,
+}    ,
+    UpdateDocumentPresence {
+        organization_id: u64,
+        document_id: u64,
+        user_name: String,
+}    ,
     UpdateDocumentTemplate {
         organization_id: u64,
         company_id: Option::<u64>,
@@ -9449,6 +9610,11 @@ pub enum Reducer {
         organization_id: u64,
         article_id: u64,
         params: UpdateKnowledgeArticleParams,
+}    ,
+    UpdateKnowledgeArticlePresence {
+        organization_id: u64,
+        article_id: u64,
+        user_name: String,
 }    ,
     UpdateKnowledgeCategory {
         organization_id: u64,
@@ -10092,6 +10258,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AppendAiAgentRunStep { .. } => "append_ai_agent_run_step",
             Reducer::AppendAiChatMessage { .. } => "append_ai_chat_message",
             Reducer::AppendCrmConversationMessage { .. } => "append_crm_conversation_message",
+            Reducer::ApplyDocumentLegalHold { .. } => "apply_document_legal_hold",
             Reducer::ApplyExpenseAdvanceToSheet { .. } => "apply_expense_advance_to_sheet",
             Reducer::ApplyExpenseIntegrationIntent { .. } => "apply_expense_integration_intent",
             Reducer::ApplyGlobalMigrations => "apply_global_migrations",
@@ -10172,6 +10339,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::CheckMoAvailability { .. } => "check_mo_availability",
             Reducer::ClaimHubWithToken { .. } => "claim_hub_with_token",
             Reducer::ClaimQueueJob { .. } => "claim_queue_job",
+            Reducer::ClearDocumentPresence { .. } => "clear_document_presence",
+            Reducer::ClearKnowledgeArticlePresence { .. } => "clear_knowledge_article_presence",
             Reducer::ClearOpportunityPresence { .. } => "clear_opportunity_presence",
             Reducer::ClearProposalPresence { .. } => "clear_proposal_presence",
             Reducer::CloseAccountAsset { .. } => "close_account_asset",
@@ -10184,6 +10353,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CompleteActivity { .. } => "complete_activity",
             Reducer::CompleteAiAgentRun { .. } => "complete_ai_agent_run",
             Reducer::CompleteDocumentProcessingJob { .. } => "complete_document_processing_job",
+            Reducer::CompleteDocumentSignatureRequest { .. } => "complete_document_signature_request",
             Reducer::CompleteIntercompanyTransaction { .. } => "complete_intercompany_transaction",
             Reducer::CompleteOffboardingItem { .. } => "complete_offboarding_item",
             Reducer::CompleteOnboardingItem { .. } => "complete_onboarding_item",
@@ -10289,6 +10459,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateDocument { .. } => "create_document",
             Reducer::CreateDocumentFolder { .. } => "create_document_folder",
             Reducer::CreateDocumentProcessingJob { .. } => "create_document_processing_job",
+            Reducer::CreateDocumentSignatureRequest { .. } => "create_document_signature_request",
             Reducer::CreateDocumentTemplate { .. } => "create_document_template",
             Reducer::CreateEliminationEntry { .. } => "create_elimination_entry",
             Reducer::CreateEmployee { .. } => "create_employee",
@@ -10485,6 +10656,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeleteCompany { .. } => "delete_company",
             Reducer::DeleteContact { .. } => "delete_contact",
             Reducer::DeleteDocument { .. } => "delete_document",
+            Reducer::DeleteDocumentFolder { .. } => "delete_document_folder",
             Reducer::DeleteFinancialReport { .. } => "delete_financial_report",
             Reducer::DeleteFiscalYear { .. } => "delete_fiscal_year",
             Reducer::DeleteFormField { .. } => "delete_form_field",
@@ -10694,6 +10866,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ProcessPendingScans { .. } => "process_pending_scans",
             Reducer::ProduceManufacturingOrder { .. } => "produce_manufacturing_order",
             Reducer::PromoteAiSkillVersion { .. } => "promote_ai_skill_version",
+            Reducer::PurgeExpiredDocuments { .. } => "purge_expired_documents",
             Reducer::QueueMailFromTemplate { .. } => "queue_mail_from_template",
             Reducer::RateSubscriptionUsageEvents { .. } => "rate_subscription_usage_events",
             Reducer::RebaseDeferredSchedulesForSubscription { .. } => "rebase_deferred_schedules_for_subscription",
@@ -10751,6 +10924,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RejectSupplierIntake { .. } => "reject_supplier_intake",
             Reducer::RejectTimesheets { .. } => "reject_timesheets",
             Reducer::ReleaseBlanketToPo { .. } => "release_blanket_to_po",
+            Reducer::ReleaseDocumentLegalHold { .. } => "release_document_legal_hold",
             Reducer::ReleasePickingWave { .. } => "release_picking_wave",
             Reducer::RemoveArticleMember { .. } => "remove_article_member",
             Reducer::RemoveCasbinRule { .. } => "remove_casbin_rule",
@@ -10772,6 +10946,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ResolveInventoryException { .. } => "resolve_inventory_exception",
             Reducer::ResolveIotAlert { .. } => "resolve_iot_alert",
             Reducer::ResolveProposalComment { .. } => "resolve_proposal_comment",
+            Reducer::RestoreDocument { .. } => "restore_document",
             Reducer::RestoreProductCategory { .. } => "restore_product_category",
             Reducer::ResumeSubscription { .. } => "resume_subscription",
             Reducer::RetryIntercompanyTransaction { .. } => "retry_intercompany_transaction",
@@ -10819,6 +10994,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunCrmRelationshipAdminTest => "run_crm_relationship_admin_test",
             Reducer::RunCrmWave2Test => "run_crm_wave_2_test",
             Reducer::RunDocumentsFolderTest => "run_documents_folder_test",
+            Reducer::RunDocumentsWaveATests => "run_documents_wave_a_tests",
+            Reducer::RunDocumentsWaveBTests => "run_documents_wave_b_tests",
+            Reducer::RunDocumentsWaveCTests => "run_documents_wave_c_tests",
+            Reducer::RunDocumentsWaveDTests => "run_documents_wave_d_tests",
             Reducer::RunExpensesWaveATest => "run_expenses_wave_a_test",
             Reducer::RunExpensesWaveBTest => "run_expenses_wave_b_test",
             Reducer::RunExpensesWaveCTest => "run_expenses_wave_c_test",
@@ -10905,6 +11084,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunWorkflowDefinitionTest => "run_workflow_definition_test",
             Reducer::SaveImportMappingTemplate { .. } => "save_import_mapping_template",
             Reducer::SaveProposalVersion { .. } => "save_proposal_version",
+            Reducer::ScheduleDocumentRetentionPurge { .. } => "schedule_document_retention_purge",
             Reducer::ScheduleSalesSlaEscalation { .. } => "schedule_sales_sla_escalation",
             Reducer::ScheduleTaxDeadlineUpdates { .. } => "schedule_tax_deadline_updates",
             Reducer::SeedDevData => "seed_dev_data",
@@ -10928,9 +11108,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetConsolidationCompanyRate { .. } => "set_consolidation_company_rate",
             Reducer::SetContactCommunicationPreference { .. } => "set_contact_communication_preference",
             Reducer::SetContactSegmentRules { .. } => "set_contact_segment_rules",
+            Reducer::SetDocumentIndexContent { .. } => "set_document_index_content",
+            Reducer::SetDocumentRetention { .. } => "set_document_retention",
             Reducer::SetExpenseAllocations { .. } => "set_expense_allocations",
             Reducer::SetExpenseFraudHold { .. } => "set_expense_fraud_hold",
             Reducer::SetFormRoleConfig { .. } => "set_form_role_config",
+            Reducer::SetGoogleDriveConflictPolicy { .. } => "set_google_drive_conflict_policy",
             Reducer::SetIntercompanyRuleActive { .. } => "set_intercompany_rule_active",
             Reducer::SetIotThreshold { .. } => "set_iot_threshold",
             Reducer::SetProjectActive { .. } => "set_project_active",
@@ -10966,6 +11149,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SubmitPurchaseRequisition { .. } => "submit_purchase_requisition",
             Reducer::SubmitSupplierIntake { .. } => "submit_supplier_intake",
             Reducer::SubscribeToRecord { .. } => "subscribe_to_record",
+            Reducer::SyncExternalFileToDocument { .. } => "sync_external_file_to_document",
             Reducer::SyncHubDevices { .. } => "sync_hub_devices",
             Reducer::TestIotDevice { .. } => "test_iot_device",
             Reducer::ToggleProjectFavorite { .. } => "toggle_project_favorite",
@@ -11029,6 +11213,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateDepartment { .. } => "update_department",
             Reducer::UpdateDeviceStatus { .. } => "update_device_status",
             Reducer::UpdateDocument { .. } => "update_document",
+            Reducer::UpdateDocumentFolder { .. } => "update_document_folder",
+            Reducer::UpdateDocumentPresence { .. } => "update_document_presence",
             Reducer::UpdateDocumentTemplate { .. } => "update_document_template",
             Reducer::UpdateEmployee { .. } => "update_employee",
             Reducer::UpdateExpense { .. } => "update_expense",
@@ -11046,6 +11232,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateIntercompanyRule { .. } => "update_intercompany_rule",
             Reducer::UpdateJobPosition { .. } => "update_job_position",
             Reducer::UpdateKnowledgeArticle { .. } => "update_knowledge_article",
+            Reducer::UpdateKnowledgeArticlePresence { .. } => "update_knowledge_article_presence",
             Reducer::UpdateKnowledgeCategory { .. } => "update_knowledge_category",
             Reducer::UpdateLandedCost { .. } => "update_landed_cost",
             Reducer::UpdateLeadAddress { .. } => "update_lead_address",
@@ -11547,6 +11734,15 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
 }             => __sats::bsatn::to_vec(&append_crm_conversation_message_reducer::AppendCrmConversationMessageArgs {
                 organization_id: organization_id.clone(),
                 conversation_id: conversation_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::ApplyDocumentLegalHold{
+                organization_id,
+                document_id,
+                params,
+}             => __sats::bsatn::to_vec(&apply_document_legal_hold_reducer::ApplyDocumentLegalHoldArgs {
+                organization_id: organization_id.clone(),
+                document_id: document_id.clone(),
                 params: params.clone(),
 }),
             Reducer::ApplyExpenseAdvanceToSheet{
@@ -12229,6 +12425,16 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 job_id: job_id.clone(),
 }),
+            Reducer::ClearDocumentPresence{
+                document_id,
+}             => __sats::bsatn::to_vec(&clear_document_presence_reducer::ClearDocumentPresenceArgs {
+                document_id: document_id.clone(),
+}),
+            Reducer::ClearKnowledgeArticlePresence{
+                article_id,
+}             => __sats::bsatn::to_vec(&clear_knowledge_article_presence_reducer::ClearKnowledgeArticlePresenceArgs {
+                article_id: article_id.clone(),
+}),
             Reducer::ClearOpportunityPresence{
                 opportunity_id,
 }             => __sats::bsatn::to_vec(&clear_opportunity_presence_reducer::ClearOpportunityPresenceArgs {
@@ -12327,6 +12533,15 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 job_id: job_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CompleteDocumentSignatureRequest{
+                organization_id,
+                request_id,
+                params,
+}             => __sats::bsatn::to_vec(&complete_document_signature_request_reducer::CompleteDocumentSignatureRequestArgs {
+                organization_id: organization_id.clone(),
+                request_id: request_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CompleteIntercompanyTransaction{
@@ -13190,6 +13405,15 @@ Reducer::BillProjectMilestone{
 }             => __sats::bsatn::to_vec(&create_document_processing_job_reducer::CreateDocumentProcessingJobArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateDocumentSignatureRequest{
+                organization_id,
+                document_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_document_signature_request_reducer::CreateDocumentSignatureRequestArgs {
+                organization_id: organization_id.clone(),
+                document_id: document_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateDocumentTemplate{
@@ -14832,6 +15056,13 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 document_id: document_id.clone(),
 }),
+            Reducer::DeleteDocumentFolder{
+                organization_id,
+                folder_id,
+}             => __sats::bsatn::to_vec(&delete_document_folder_reducer::DeleteDocumentFolderArgs {
+                organization_id: organization_id.clone(),
+                folder_id: folder_id.clone(),
+}),
             Reducer::DeleteFinancialReport{
                 organization_id,
                 company_id,
@@ -16113,9 +16344,11 @@ Reducer::ErrorIntercompanyTransaction{
             Reducer::LockDocument{
                 organization_id,
                 document_id,
+                lease_seconds,
 }             => __sats::bsatn::to_vec(&lock_document_reducer::LockDocumentArgs {
                 organization_id: organization_id.clone(),
                 document_id: document_id.clone(),
+                lease_seconds: lease_seconds.clone(),
 }),
             Reducer::LockKnowledgeArticle{
                 organization_id,
@@ -16535,6 +16768,11 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 skill_version_id: skill_version_id.clone(),
                 reason: reason.clone(),
+}),
+            Reducer::PurgeExpiredDocuments{
+                organization_id,
+}             => __sats::bsatn::to_vec(&purge_expired_documents_reducer::PurgeExpiredDocumentsArgs {
+                organization_id: organization_id.clone(),
 }),
             Reducer::QueueMailFromTemplate{
                 organization_id,
@@ -17059,6 +17297,15 @@ Reducer::MoveStockQuant{
                 blanket_order_id: blanket_order_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::ReleaseDocumentLegalHold{
+                organization_id,
+                hold_id,
+                params,
+}             => __sats::bsatn::to_vec(&release_document_legal_hold_reducer::ReleaseDocumentLegalHoldArgs {
+                organization_id: organization_id.clone(),
+                hold_id: hold_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ReleasePickingWave{
                 organization_id,
                 company_id,
@@ -17231,6 +17478,13 @@ Reducer::MoveStockQuant{
                 comment_id,
 }             => __sats::bsatn::to_vec(&resolve_proposal_comment_reducer::ResolveProposalCommentArgs {
                 comment_id: comment_id.clone(),
+}),
+            Reducer::RestoreDocument{
+                organization_id,
+                document_id,
+}             => __sats::bsatn::to_vec(&restore_document_reducer::RestoreDocumentArgs {
+                organization_id: organization_id.clone(),
+                document_id: document_id.clone(),
 }),
             Reducer::RestoreProductCategory{
                 organization_id,
@@ -17422,6 +17676,14 @@ Reducer::RunCrmRelationshipAdminTest => __sats::bsatn::to_vec(&run_crm_relations
 Reducer::RunCrmWave2Test => __sats::bsatn::to_vec(&run_crm_wave_2_test_reducer::RunCrmWave2TestArgs {
                 }),
 Reducer::RunDocumentsFolderTest => __sats::bsatn::to_vec(&run_documents_folder_test_reducer::RunDocumentsFolderTestArgs {
+                }),
+Reducer::RunDocumentsWaveATests => __sats::bsatn::to_vec(&run_documents_wave_a_tests_reducer::RunDocumentsWaveATestsArgs {
+                }),
+Reducer::RunDocumentsWaveBTests => __sats::bsatn::to_vec(&run_documents_wave_b_tests_reducer::RunDocumentsWaveBTestsArgs {
+                }),
+Reducer::RunDocumentsWaveCTests => __sats::bsatn::to_vec(&run_documents_wave_c_tests_reducer::RunDocumentsWaveCTestsArgs {
+                }),
+Reducer::RunDocumentsWaveDTests => __sats::bsatn::to_vec(&run_documents_wave_d_tests_reducer::RunDocumentsWaveDTestsArgs {
                 }),
 Reducer::RunExpensesWaveATest => __sats::bsatn::to_vec(&run_expenses_wave_a_test_reducer::RunExpensesWaveATestArgs {
                 }),
@@ -17642,6 +17904,13 @@ Reducer::SaveImportMappingTemplate{
                 message: message.clone(),
                 sections_json: sections_json.clone(),
 }),
+            Reducer::ScheduleDocumentRetentionPurge{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&schedule_document_retention_purge_reducer::ScheduleDocumentRetentionPurgeArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ScheduleSalesSlaEscalation{
                 organization_id,
                 company_id,
@@ -17832,6 +18101,24 @@ Reducer::SeedHrCountryPackOverlays{
                 segment_id: segment_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::SetDocumentIndexContent{
+                organization_id,
+                document_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_document_index_content_reducer::SetDocumentIndexContentArgs {
+                organization_id: organization_id.clone(),
+                document_id: document_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::SetDocumentRetention{
+                organization_id,
+                document_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_document_retention_reducer::SetDocumentRetentionArgs {
+                organization_id: organization_id.clone(),
+                document_id: document_id.clone(),
+                params: params.clone(),
+}),
             Reducer::SetExpenseAllocations{
                 organization_id,
                 expense_id,
@@ -17857,6 +18144,15 @@ Reducer::SeedHrCountryPackOverlays{
 }             => __sats::bsatn::to_vec(&set_form_role_config_reducer::SetFormRoleConfigArgs {
                 organization_id: organization_id.clone(),
                 configuration_id: configuration_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::SetGoogleDriveConflictPolicy{
+                organization_id,
+                connection_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_google_drive_conflict_policy_reducer::SetGoogleDriveConflictPolicyArgs {
+                organization_id: organization_id.clone(),
+                connection_id: connection_id.clone(),
                 params: params.clone(),
 }),
             Reducer::SetIntercompanyRuleActive{
@@ -18181,6 +18477,13 @@ Reducer::SeedHrCountryPackOverlays{
                 res_model: res_model.clone(),
                 res_id: res_id.clone(),
                 subtypes: subtypes.clone(),
+}),
+            Reducer::SyncExternalFileToDocument{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&sync_external_file_to_document_reducer::SyncExternalFileToDocumentArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
 }),
             Reducer::SyncHubDevices{
                 organization_id,
@@ -18745,6 +19048,24 @@ Reducer::SeedHrCountryPackOverlays{
                 document_id: document_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateDocumentFolder{
+                organization_id,
+                folder_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_document_folder_reducer::UpdateDocumentFolderArgs {
+                organization_id: organization_id.clone(),
+                folder_id: folder_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateDocumentPresence{
+                organization_id,
+                document_id,
+                user_name,
+}             => __sats::bsatn::to_vec(&update_document_presence_reducer::UpdateDocumentPresenceArgs {
+                organization_id: organization_id.clone(),
+                document_id: document_id.clone(),
+                user_name: user_name.clone(),
+}),
             Reducer::UpdateDocumentTemplate{
                 organization_id,
                 company_id,
@@ -18947,6 +19268,15 @@ Reducer::SeedHrCountryPackOverlays{
                 organization_id: organization_id.clone(),
                 article_id: article_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::UpdateKnowledgeArticlePresence{
+                organization_id,
+                article_id,
+                user_name,
+}             => __sats::bsatn::to_vec(&update_knowledge_article_presence_reducer::UpdateKnowledgeArticlePresenceArgs {
+                organization_id: organization_id.clone(),
+                article_id: article_id.clone(),
+                user_name: user_name.clone(),
 }),
             Reducer::UpdateKnowledgeCategory{
                 organization_id,
@@ -20140,7 +20470,11 @@ pub struct DbUpdate {
     delivery_price_rule: __sdk::TableUpdate<DeliveryPriceRule>,
     doc_folder: __sdk::TableUpdate<DocumentFolder>,
     document: __sdk::TableUpdate<Document>,
+    document_external_ref: __sdk::TableUpdate<DocumentExternalRef>,
+    document_legal_hold: __sdk::TableUpdate<DocumentLegalHold>,
+    document_presence: __sdk::TableUpdate<DocumentPresence>,
     document_sequence: __sdk::TableUpdate<DocumentSequence>,
+    document_signature_request: __sdk::TableUpdate<DocumentSignatureRequest>,
     document_template: __sdk::TableUpdate<DocumentTemplate>,
     document_version: __sdk::TableUpdate<DocumentVersion>,
     expense_card_statement_line: __sdk::TableUpdate<ExpenseCardStatementLine>,
@@ -20224,6 +20558,7 @@ pub struct DbUpdate {
     iot_threshold: __sdk::TableUpdate<IoTThreshold>,
     kb_category: __sdk::TableUpdate<KnowledgeArticleCategory>,
     knowledge_article: __sdk::TableUpdate<KnowledgeArticle>,
+    knowledge_article_presence: __sdk::TableUpdate<KnowledgeArticlePresence>,
     lead: __sdk::TableUpdate<Lead>,
     lead_lost_reason: __sdk::TableUpdate<LeadLostReason>,
     lead_score: __sdk::TableUpdate<LeadScore>,
@@ -20540,7 +20875,11 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "delivery_price_rule" => db_update.delivery_price_rule.append(delivery_price_rule_table::parse_table_update(table_update)?),
     "doc_folder" => db_update.doc_folder.append(doc_folder_table::parse_table_update(table_update)?),
     "document" => db_update.document.append(document_table::parse_table_update(table_update)?),
+    "document_external_ref" => db_update.document_external_ref.append(document_external_ref_table::parse_table_update(table_update)?),
+    "document_legal_hold" => db_update.document_legal_hold.append(document_legal_hold_table::parse_table_update(table_update)?),
+    "document_presence" => db_update.document_presence.append(document_presence_table::parse_table_update(table_update)?),
     "document_sequence" => db_update.document_sequence.append(document_sequence_table::parse_table_update(table_update)?),
+    "document_signature_request" => db_update.document_signature_request.append(document_signature_request_table::parse_table_update(table_update)?),
     "document_template" => db_update.document_template.append(document_template_table::parse_table_update(table_update)?),
     "document_version" => db_update.document_version.append(document_version_table::parse_table_update(table_update)?),
     "expense_card_statement_line" => db_update.expense_card_statement_line.append(expense_card_statement_line_table::parse_table_update(table_update)?),
@@ -20624,6 +20963,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "iot_threshold" => db_update.iot_threshold.append(iot_threshold_table::parse_table_update(table_update)?),
     "kb_category" => db_update.kb_category.append(kb_category_table::parse_table_update(table_update)?),
     "knowledge_article" => db_update.knowledge_article.append(knowledge_article_table::parse_table_update(table_update)?),
+    "knowledge_article_presence" => db_update.knowledge_article_presence.append(knowledge_article_presence_table::parse_table_update(table_update)?),
     "lead" => db_update.lead.append(lead_table::parse_table_update(table_update)?),
     "lead_lost_reason" => db_update.lead_lost_reason.append(lead_lost_reason_table::parse_table_update(table_update)?),
     "lead_score" => db_update.lead_score.append(lead_score_table::parse_table_update(table_update)?),
@@ -20952,7 +21292,11 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.delivery_price_rule = cache.apply_diff_to_table::<DeliveryPriceRule>("delivery_price_rule", &self.delivery_price_rule).with_updates_by_pk(|row| &row.id);
         diff.doc_folder = cache.apply_diff_to_table::<DocumentFolder>("doc_folder", &self.doc_folder).with_updates_by_pk(|row| &row.id);
         diff.document = cache.apply_diff_to_table::<Document>("document", &self.document).with_updates_by_pk(|row| &row.id);
+        diff.document_external_ref = cache.apply_diff_to_table::<DocumentExternalRef>("document_external_ref", &self.document_external_ref).with_updates_by_pk(|row| &row.id);
+        diff.document_legal_hold = cache.apply_diff_to_table::<DocumentLegalHold>("document_legal_hold", &self.document_legal_hold).with_updates_by_pk(|row| &row.id);
+        diff.document_presence = cache.apply_diff_to_table::<DocumentPresence>("document_presence", &self.document_presence).with_updates_by_pk(|row| &row.id);
         diff.document_sequence = cache.apply_diff_to_table::<DocumentSequence>("document_sequence", &self.document_sequence).with_updates_by_pk(|row| &row.doc_type);
+        diff.document_signature_request = cache.apply_diff_to_table::<DocumentSignatureRequest>("document_signature_request", &self.document_signature_request).with_updates_by_pk(|row| &row.id);
         diff.document_template = cache.apply_diff_to_table::<DocumentTemplate>("document_template", &self.document_template).with_updates_by_pk(|row| &row.id);
         diff.document_version = cache.apply_diff_to_table::<DocumentVersion>("document_version", &self.document_version).with_updates_by_pk(|row| &row.id);
         diff.expense_card_statement_line = cache.apply_diff_to_table::<ExpenseCardStatementLine>("expense_card_statement_line", &self.expense_card_statement_line).with_updates_by_pk(|row| &row.id);
@@ -21036,6 +21380,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.iot_threshold = cache.apply_diff_to_table::<IoTThreshold>("iot_threshold", &self.iot_threshold).with_updates_by_pk(|row| &row.id);
         diff.kb_category = cache.apply_diff_to_table::<KnowledgeArticleCategory>("kb_category", &self.kb_category).with_updates_by_pk(|row| &row.id);
         diff.knowledge_article = cache.apply_diff_to_table::<KnowledgeArticle>("knowledge_article", &self.knowledge_article).with_updates_by_pk(|row| &row.id);
+        diff.knowledge_article_presence = cache.apply_diff_to_table::<KnowledgeArticlePresence>("knowledge_article_presence", &self.knowledge_article_presence).with_updates_by_pk(|row| &row.id);
         diff.lead = cache.apply_diff_to_table::<Lead>("lead", &self.lead).with_updates_by_pk(|row| &row.id);
         diff.lead_lost_reason = cache.apply_diff_to_table::<LeadLostReason>("lead_lost_reason", &self.lead_lost_reason).with_updates_by_pk(|row| &row.id);
         diff.lead_score = cache.apply_diff_to_table::<LeadScore>("lead_score", &self.lead_score).with_updates_by_pk(|row| &row.id);
@@ -21349,7 +21694,11 @@ for table_rows in raw.tables {
                 "delivery_price_rule" => db_update.delivery_price_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "doc_folder" => db_update.doc_folder.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document" => db_update.document.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "document_external_ref" => db_update.document_external_ref.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "document_legal_hold" => db_update.document_legal_hold.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "document_presence" => db_update.document_presence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "document_signature_request" => db_update.document_signature_request.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_version" => db_update.document_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "expense_card_statement_line" => db_update.expense_card_statement_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -21433,6 +21782,7 @@ for table_rows in raw.tables {
                 "iot_threshold" => db_update.iot_threshold.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "kb_category" => db_update.kb_category.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "knowledge_article" => db_update.knowledge_article.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "knowledge_article_presence" => db_update.knowledge_article_presence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "lead" => db_update.lead.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "lead_lost_reason" => db_update.lead_lost_reason.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "lead_score" => db_update.lead_score.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -21746,7 +22096,11 @@ for table_rows in raw.tables {
                 "delivery_price_rule" => db_update.delivery_price_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "doc_folder" => db_update.doc_folder.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document" => db_update.document.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "document_external_ref" => db_update.document_external_ref.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "document_legal_hold" => db_update.document_legal_hold.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "document_presence" => db_update.document_presence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "document_signature_request" => db_update.document_signature_request.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_version" => db_update.document_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "expense_card_statement_line" => db_update.expense_card_statement_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -21830,6 +22184,7 @@ for table_rows in raw.tables {
                 "iot_threshold" => db_update.iot_threshold.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "kb_category" => db_update.kb_category.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "knowledge_article" => db_update.knowledge_article.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "knowledge_article_presence" => db_update.knowledge_article_presence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "lead" => db_update.lead.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "lead_lost_reason" => db_update.lead_lost_reason.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "lead_score" => db_update.lead_score.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -22145,7 +22500,11 @@ pub struct AppliedDiff<'r> {
     delivery_price_rule: __sdk::TableAppliedDiff<'r, DeliveryPriceRule>,
     doc_folder: __sdk::TableAppliedDiff<'r, DocumentFolder>,
     document: __sdk::TableAppliedDiff<'r, Document>,
+    document_external_ref: __sdk::TableAppliedDiff<'r, DocumentExternalRef>,
+    document_legal_hold: __sdk::TableAppliedDiff<'r, DocumentLegalHold>,
+    document_presence: __sdk::TableAppliedDiff<'r, DocumentPresence>,
     document_sequence: __sdk::TableAppliedDiff<'r, DocumentSequence>,
+    document_signature_request: __sdk::TableAppliedDiff<'r, DocumentSignatureRequest>,
     document_template: __sdk::TableAppliedDiff<'r, DocumentTemplate>,
     document_version: __sdk::TableAppliedDiff<'r, DocumentVersion>,
     expense_card_statement_line: __sdk::TableAppliedDiff<'r, ExpenseCardStatementLine>,
@@ -22229,6 +22588,7 @@ pub struct AppliedDiff<'r> {
     iot_threshold: __sdk::TableAppliedDiff<'r, IoTThreshold>,
     kb_category: __sdk::TableAppliedDiff<'r, KnowledgeArticleCategory>,
     knowledge_article: __sdk::TableAppliedDiff<'r, KnowledgeArticle>,
+    knowledge_article_presence: __sdk::TableAppliedDiff<'r, KnowledgeArticlePresence>,
     lead: __sdk::TableAppliedDiff<'r, Lead>,
     lead_lost_reason: __sdk::TableAppliedDiff<'r, LeadLostReason>,
     lead_score: __sdk::TableAppliedDiff<'r, LeadScore>,
@@ -22545,7 +22905,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<DeliveryPriceRule>("delivery_price_rule", &self.delivery_price_rule, event);
         callbacks.invoke_table_row_callbacks::<DocumentFolder>("doc_folder", &self.doc_folder, event);
         callbacks.invoke_table_row_callbacks::<Document>("document", &self.document, event);
+        callbacks.invoke_table_row_callbacks::<DocumentExternalRef>("document_external_ref", &self.document_external_ref, event);
+        callbacks.invoke_table_row_callbacks::<DocumentLegalHold>("document_legal_hold", &self.document_legal_hold, event);
+        callbacks.invoke_table_row_callbacks::<DocumentPresence>("document_presence", &self.document_presence, event);
         callbacks.invoke_table_row_callbacks::<DocumentSequence>("document_sequence", &self.document_sequence, event);
+        callbacks.invoke_table_row_callbacks::<DocumentSignatureRequest>("document_signature_request", &self.document_signature_request, event);
         callbacks.invoke_table_row_callbacks::<DocumentTemplate>("document_template", &self.document_template, event);
         callbacks.invoke_table_row_callbacks::<DocumentVersion>("document_version", &self.document_version, event);
         callbacks.invoke_table_row_callbacks::<ExpenseCardStatementLine>("expense_card_statement_line", &self.expense_card_statement_line, event);
@@ -22629,6 +22993,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<IoTThreshold>("iot_threshold", &self.iot_threshold, event);
         callbacks.invoke_table_row_callbacks::<KnowledgeArticleCategory>("kb_category", &self.kb_category, event);
         callbacks.invoke_table_row_callbacks::<KnowledgeArticle>("knowledge_article", &self.knowledge_article, event);
+        callbacks.invoke_table_row_callbacks::<KnowledgeArticlePresence>("knowledge_article_presence", &self.knowledge_article_presence, event);
         callbacks.invoke_table_row_callbacks::<Lead>("lead", &self.lead, event);
         callbacks.invoke_table_row_callbacks::<LeadLostReason>("lead_lost_reason", &self.lead_lost_reason, event);
         callbacks.invoke_table_row_callbacks::<LeadScore>("lead_score", &self.lead_score, event);
@@ -23576,7 +23941,11 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         delivery_price_rule_table::register_table(client_cache);
         doc_folder_table::register_table(client_cache);
         document_table::register_table(client_cache);
+        document_external_ref_table::register_table(client_cache);
+        document_legal_hold_table::register_table(client_cache);
+        document_presence_table::register_table(client_cache);
         document_sequence_table::register_table(client_cache);
+        document_signature_request_table::register_table(client_cache);
         document_template_table::register_table(client_cache);
         document_version_table::register_table(client_cache);
         expense_card_statement_line_table::register_table(client_cache);
@@ -23660,6 +24029,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         iot_threshold_table::register_table(client_cache);
         kb_category_table::register_table(client_cache);
         knowledge_article_table::register_table(client_cache);
+        knowledge_article_presence_table::register_table(client_cache);
         lead_table::register_table(client_cache);
         lead_lost_reason_table::register_table(client_cache);
         lead_score_table::register_table(client_cache);
@@ -23968,7 +24338,11 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "delivery_price_rule",
         "doc_folder",
         "document",
+        "document_external_ref",
+        "document_legal_hold",
+        "document_presence",
         "document_sequence",
+        "document_signature_request",
         "document_template",
         "document_version",
         "expense_card_statement_line",
@@ -24052,6 +24426,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "iot_threshold",
         "kb_category",
         "knowledge_article",
+        "knowledge_article_presence",
         "lead",
         "lead_lost_reason",
         "lead_score",
