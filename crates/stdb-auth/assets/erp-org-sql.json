@@ -658,6 +658,69 @@
     "table": "hr_employee_skill"
   },
   {
+    "extra_where": " AND active = true",
+    "mapKey": "onboarding-templates",
+    "order_by": "",
+    "resource_key": "onboarding-templates",
+    "table": "hr_onboarding_template"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "onboarding-template-items",
+    "order_by": " ORDER BY sequence ASC, id ASC",
+    "resource_key": "onboarding-template-items",
+    "table": "hr_onboarding_template_item"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "onboarding-progress",
+    "order_by": "",
+    "resource_key": "onboarding-progress",
+    "table": "hr_onboarding_progress"
+  },
+  {
+    "extra_where": " AND active = true",
+    "mapKey": "performance-cycles",
+    "order_by": "",
+    "resource_key": "performance-cycles",
+    "table": "hr_performance_cycle"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "performance-goals",
+    "order_by": "",
+    "resource_key": "performance-goals",
+    "table": "hr_performance_goal"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "performance-reviews",
+    "order_by": "",
+    "resource_key": "performance-reviews",
+    "table": "hr_performance_review"
+  },
+  {
+    "extra_where": " AND active = true",
+    "mapKey": "benefit-plans",
+    "order_by": "",
+    "resource_key": "benefit-plans",
+    "table": "hr_benefit_plan"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "benefit-enrollments",
+    "order_by": "",
+    "resource_key": "benefit-enrollments",
+    "table": "hr_benefit_enrollment"
+  },
+  {
+    "extra_where": " AND active = true",
+    "mapKey": "employee-documents",
+    "order_by": "",
+    "resource_key": "employee-documents",
+    "table": "hr_employee_document"
+  },
+  {
     "extra_where": "",
     "mapKey": "products",
     "order_by": "",
@@ -1050,10 +1113,24 @@
     "table": "mrp_routing_workcenter"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND is_active = true",
     "mapKey": "employees",
     "order_by": "",
     "resource_key": "employees",
+    "table": "hr_employee"
+  },
+  {
+    "extra_where": " AND is_active = true",
+    "mapKey": "my-employee",
+    "order_by": "",
+    "resource_key": "my-employee",
+    "table": "hr_employee"
+  },
+  {
+    "extra_where": " AND is_active = true",
+    "mapKey": "direct-reports",
+    "order_by": "",
+    "resource_key": "direct-reports",
     "table": "hr_employee"
   },
   {
@@ -1065,9 +1142,51 @@
   },
   {
     "extra_where": "",
+    "mapKey": "job-positions",
+    "order_by": "",
+    "resource_key": "job-positions",
+    "table": "hr_job_position"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "applicants",
+    "order_by": "",
+    "resource_key": "applicants",
+    "table": "hr_applicant"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "leave-types",
+    "order_by": "",
+    "resource_key": "leave-types",
+    "table": "hr_leave_type"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "payroll-structures",
+    "order_by": "",
+    "resource_key": "payroll-structures",
+    "table": "hr_payroll_structure"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "salary-rules",
+    "order_by": "",
+    "resource_key": "salary-rules",
+    "table": "hr_salary_rule"
+  },
+  {
+    "extra_where": "",
     "mapKey": "leave-requests",
     "order_by": "",
     "resource_key": "leave-requests",
+    "table": "hr_leave"
+  },
+  {
+    "extra_where": " AND (state = 'confirm' OR state = 'validatedOne')",
+    "mapKey": "leaves-to-approve",
+    "order_by": "",
+    "resource_key": "leaves-to-approve",
     "table": "hr_leave"
   },
   {
@@ -1079,10 +1198,73 @@
   },
   {
     "extra_where": "",
+    "mapKey": "attendance",
+    "order_by": "",
+    "resource_key": "attendance",
+    "table": "hr_attendance"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "compensation-events",
+    "order_by": " ORDER BY effective_from DESC",
+    "resource_key": "compensation-events",
+    "table": "hr_compensation_event"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "work-schedules",
+    "order_by": "",
+    "resource_key": "work-schedules",
+    "table": "hr_work_schedule"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "labor-cost-snapshots",
+    "order_by": " ORDER BY period_start DESC, id DESC",
+    "resource_key": "labor-cost-snapshots",
+    "table": "hr_labor_cost_snapshot"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "shift-opt-jobs",
+    "order_by": " ORDER BY created_at DESC, id DESC",
+    "resource_key": "shift-opt-jobs",
+    "table": "hr_shift_opt_job"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "global-assignments",
+    "order_by": " ORDER BY date_from DESC, id DESC",
+    "resource_key": "global-assignments",
+    "table": "hr_global_assignment"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "hr-capacity-forecast",
+    "order_by": " ORDER BY period_start DESC, id DESC",
+    "resource_key": "hr-capacity-forecast",
+    "table": "hr_capacity_forecast"
+  },
+  {
+    "extra_where": "",
     "mapKey": "payslips",
     "order_by": "",
     "resource_key": "payslips",
     "table": "hr_payslip"
+  },
+  {
+    "extra_where": " AND state = 'verify'",
+    "mapKey": "payslips-to-export",
+    "order_by": "",
+    "resource_key": "payslips-to-export",
+    "table": "hr_payslip"
+  },
+  {
+    "extra_where": " AND status = 'pending'",
+    "mapKey": "hr-integration-intents",
+    "order_by": "",
+    "resource_key": "hr-integration-intents",
+    "table": "hr_integration_intent"
   },
   {
     "extra_where": "",

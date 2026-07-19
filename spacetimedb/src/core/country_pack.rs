@@ -334,7 +334,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Australia GST",
             "oceania",
             "1.0.0",
-            r#"{"fiscal_year_start_month":7,"bas_reporting":true,"company_id_kind":"ABN","expense_require_receipt":true,"expense_require_tax_ids":true,"expense_fbt_entertainment":true}"#,
+            r#"{"fiscal_year_start_month":7,"bas_reporting":true,"company_id_kind":"ABN","hr_statutory_id_kinds":["TFN"],"expense_require_receipt":true,"expense_require_tax_ids":true,"expense_fbt_entertainment":true}"#,
         ),
         (
             "nz",
@@ -342,7 +342,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "New Zealand GST",
             "oceania",
             "1.0.0",
-            r#"{"fiscal_year_start_month":4,"gst_rate":0.15,"company_id_kind":"NZBN","expense_require_receipt":true}"#,
+            r#"{"fiscal_year_start_month":4,"gst_rate":0.15,"company_id_kind":"NZBN","hr_statutory_id_kinds":["IRD"],"expense_require_receipt":true}"#,
         ),
         (
             "za",
@@ -350,7 +350,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "South Africa VAT",
             "southern_africa",
             "1.0.0",
-            r#"{"vat_rate":0.15,"currency":"ZAR","expense_require_receipt":true}"#,
+            r#"{"vat_rate":0.15,"currency":"ZAR","hr_statutory_id_kinds":["SA_ID","SARS_TAX"],"expense_require_receipt":true}"#,
         ),
         (
             "sg",
@@ -358,7 +358,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Singapore GST",
             "maritime_se_asia",
             "1.0.0",
-            r#"{"gst_rate":0.09,"iras":true,"company_id_kind":"UEN","expense_require_receipt":true}"#,
+            r#"{"gst_rate":0.09,"iras":true,"company_id_kind":"UEN","hr_statutory_id_kinds":["NRIC","FIN"],"expense_require_receipt":true}"#,
         ),
     ];
 
@@ -417,7 +417,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             "Brazil taxes",
             "southern_cone",
             "1.0.0",
-            r#"{"nfe_adapter":true,"currency":"BRL","inflation_mode":"optional","company_id_kind":"CNPJ","expense_require_receipt":true,"expense_require_tax_ids":true}"#,
+            r#"{"nfe_adapter":true,"currency":"BRL","inflation_mode":"optional","company_id_kind":"CNPJ","hr_statutory_id_kinds":["CPF","PIS"],"expense_require_receipt":true,"expense_require_tax_ids":true}"#,
         ),
         (
             "ar",

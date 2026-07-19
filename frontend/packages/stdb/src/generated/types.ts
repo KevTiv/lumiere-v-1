@@ -875,6 +875,17 @@ export const AddOrgMemberParams = __t.object("AddOrgMemberParams", {
 });
 export type AddOrgMemberParams = __Infer<typeof AddOrgMemberParams>;
 
+export const AddPerformanceGoalParams = __t.object("AddPerformanceGoalParams", {
+  employeeId: __t.u64(),
+  title: __t.string(),
+  description: __t.option(__t.string()),
+  targetValue: __t.option(__t.f64()),
+  weight: __t.f64(),
+  state: __t.string(),
+  reviewerEmployeeId: __t.option(__t.u64()),
+});
+export type AddPerformanceGoalParams = __Infer<typeof AddPerformanceGoalParams>;
+
 export const AddPurchaseOrderLineParams = __t.object("AddPurchaseOrderLineParams", {
   productId: __t.u64(),
   quantity: __t.f64(),
@@ -1617,6 +1628,13 @@ export const ApprovalRule = __t.object("ApprovalRule", {
 });
 export type ApprovalRule = __Infer<typeof ApprovalRule>;
 
+export const ArchiveEmployeeParams = __t.object("ArchiveEmployeeParams", {
+  terminationDate: __t.option(__t.timestamp()),
+  overrideIncompleteChecklist: __t.bool(),
+  overrideReason: __t.option(__t.string()),
+});
+export type ArchiveEmployeeParams = __Infer<typeof ArchiveEmployeeParams>;
+
 // The tagged union or sum type for the algebraic type `AssetState`.
 export const AssetState = __t.enum("AssetState", {
   Draft: __t.unit(),
@@ -1633,6 +1651,13 @@ export const AssetType = __t.enum("AssetType", {
 });
 export type AssetType = __Infer<typeof AssetType>;
 
+export const AssignBenefitEnrollmentParams = __t.object("AssignBenefitEnrollmentParams", {
+  planId: __t.u64(),
+  employeeId: __t.u64(),
+  effectiveFrom: __t.timestamp(),
+});
+export type AssignBenefitEnrollmentParams = __Infer<typeof AssignBenefitEnrollmentParams>;
+
 export const AssignContactRoleParams = __t.object("AssignContactRoleParams", {
   contactId: __t.u64(),
   companyId: __t.option(__t.u64()),
@@ -1642,6 +1667,11 @@ export const AssignContactRoleParams = __t.object("AssignContactRoleParams", {
   metadata: __t.option(__t.string()),
 });
 export type AssignContactRoleParams = __Infer<typeof AssignContactRoleParams>;
+
+export const AssignOnboardingTemplateParams = __t.object("AssignOnboardingTemplateParams", {
+  templateId: __t.u64(),
+});
+export type AssignOnboardingTemplateParams = __Infer<typeof AssignOnboardingTemplateParams>;
 
 export const AssignRoleParams = __t.object("AssignRoleParams", {
   expiresAtMicros: __t.option(__t.u64()),
@@ -2206,6 +2236,24 @@ export const CompleteDocumentProcessingJobParams = __t.object("CompleteDocumentP
 });
 export type CompleteDocumentProcessingJobParams = __Infer<typeof CompleteDocumentProcessingJobParams>;
 
+export const CompleteOffboardingItemParams = __t.object("CompleteOffboardingItemParams", {
+  item: __t.string(),
+  notes: __t.option(__t.string()),
+});
+export type CompleteOffboardingItemParams = __Infer<typeof CompleteOffboardingItemParams>;
+
+export const CompleteOnboardingItemParams = __t.object("CompleteOnboardingItemParams", {
+  templateItemId: __t.u64(),
+  notes: __t.option(__t.string()),
+});
+export type CompleteOnboardingItemParams = __Infer<typeof CompleteOnboardingItemParams>;
+
+export const CompletePerformanceReviewParams = __t.object("CompletePerformanceReviewParams", {
+  managerRating: __t.f64(),
+  summary: __t.option(__t.string()),
+});
+export type CompletePerformanceReviewParams = __Infer<typeof CompletePerformanceReviewParams>;
+
 // The tagged union or sum type for the algebraic type `ComputePrice`.
 export const ComputePrice = __t.enum("ComputePrice", {
   Fixed: __t.unit(),
@@ -2218,6 +2266,7 @@ export const ConfirmPayslipParams = __t.object("ConfirmPayslipParams", {
   companyId: __t.option(__t.u64()),
   grossWage: __t.f64(),
   netWage: __t.f64(),
+  calculationSource: __t.string(),
 });
 export type ConfirmPayslipParams = __Infer<typeof ConfirmPayslipParams>;
 
@@ -3230,6 +3279,14 @@ export const CreateAssignmentRuleParams = __t.object("CreateAssignmentRuleParams
 });
 export type CreateAssignmentRuleParams = __Infer<typeof CreateAssignmentRuleParams>;
 
+export const CreateAttendancePunchParams = __t.object("CreateAttendancePunchParams", {
+  employeeId: __t.u64(),
+  checkIn: __t.timestamp(),
+  checkOut: __t.option(__t.timestamp()),
+  source: __t.string(),
+});
+export type CreateAttendancePunchParams = __Infer<typeof CreateAttendancePunchParams>;
+
 export const CreateAuditRuleParams = __t.object("CreateAuditRuleParams", {
   tableName: __t.string(),
   logReads: __t.bool(),
@@ -3276,6 +3333,14 @@ export const CreateBarcodeRuleParams = __t.object("CreateBarcodeRuleParams", {
   metadata: __t.option(__t.string()),
 });
 export type CreateBarcodeRuleParams = __Infer<typeof CreateBarcodeRuleParams>;
+
+export const CreateBenefitPlanParams = __t.object("CreateBenefitPlanParams", {
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  planType: __t.string(),
+  active: __t.bool(),
+});
+export type CreateBenefitPlanParams = __Infer<typeof CreateBenefitPlanParams>;
 
 export const CreateBillFromPurchaseOrderParams = __t.object("CreateBillFromPurchaseOrderParams", {
   journalId: __t.u64(),
@@ -4112,6 +4177,26 @@ export const CreateHelpdeskTeamParams = __t.object("CreateHelpdeskTeamParams", {
 });
 export type CreateHelpdeskTeamParams = __Infer<typeof CreateHelpdeskTeamParams>;
 
+export const CreateHrApplicantParams = __t.object("CreateHrApplicantParams", {
+  companyId: __t.option(__t.u64()),
+  jobPositionId: __t.u64(),
+  name: __t.string(),
+  email: __t.option(__t.string()),
+  stage: __t.string(),
+  notes: __t.option(__t.string()),
+});
+export type CreateHrApplicantParams = __Infer<typeof CreateHrApplicantParams>;
+
+export const CreateHrEmployeeDocumentParams = __t.object("CreateHrEmployeeDocumentParams", {
+  docType: __t.string(),
+  attachmentId: __t.string(),
+  purpose: __t.string(),
+  title: __t.option(__t.string()),
+  notes: __t.option(__t.string()),
+  active: __t.bool(),
+});
+export type CreateHrEmployeeDocumentParams = __Infer<typeof CreateHrEmployeeDocumentParams>;
+
 export const CreateHrEmployeeSkillParams = __t.object("CreateHrEmployeeSkillParams", {
   employeeId: __t.u64(),
   skillId: __t.u64(),
@@ -4121,6 +4206,47 @@ export const CreateHrEmployeeSkillParams = __t.object("CreateHrEmployeeSkillPara
   metadata: __t.option(__t.string()),
 });
 export type CreateHrEmployeeSkillParams = __Infer<typeof CreateHrEmployeeSkillParams>;
+
+export const CreateHrGlobalAssignmentParams = __t.object("CreateHrGlobalAssignmentParams", {
+  employeeId: __t.u64(),
+  homeCompanyId: __t.u64(),
+  hostCompanyId: __t.u64(),
+  dateFrom: __t.timestamp(),
+  dateTo: __t.option(__t.timestamp()),
+  status: __t.string(),
+  notes: __t.option(__t.string()),
+});
+export type CreateHrGlobalAssignmentParams = __Infer<typeof CreateHrGlobalAssignmentParams>;
+
+export const CreateHrIntegrationIntentParams = __t.object("CreateHrIntegrationIntentParams", {
+  companyId: __t.option(__t.u64()),
+  intentKind: __t.string(),
+  idempotencyKey: __t.string(),
+  payslipId: __t.option(__t.u64()),
+  exportIntentId: __t.option(__t.u64()),
+  payload: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateHrIntegrationIntentParams = __Infer<typeof CreateHrIntegrationIntentParams>;
+
+export const CreateHrLaborCostSnapshotParams = __t.object("CreateHrLaborCostSnapshotParams", {
+  employeeId: __t.option(__t.u64()),
+  periodStart: __t.timestamp(),
+  periodEnd: __t.timestamp(),
+  totalLaborCost: __t.f64(),
+  currencyCode: __t.string(),
+  status: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateHrLaborCostSnapshotParams = __Infer<typeof CreateHrLaborCostSnapshotParams>;
+
+export const CreateHrShiftOptJobParams = __t.object("CreateHrShiftOptJobParams", {
+  scope: __t.string(),
+  status: __t.string(),
+  metadata: __t.option(__t.string()),
+  resultSummary: __t.option(__t.string()),
+});
+export type CreateHrShiftOptJobParams = __Infer<typeof CreateHrShiftOptJobParams>;
 
 export const CreateHrSkillParams = __t.object("CreateHrSkillParams", {
   name: __t.string(),
@@ -4465,6 +4591,24 @@ export const CreateMrpProductionParams = __t.object("CreateMrpProductionParams",
 });
 export type CreateMrpProductionParams = __Infer<typeof CreateMrpProductionParams>;
 
+export const CreateOnboardingTemplateItemParams = __t.object("CreateOnboardingTemplateItemParams", {
+  title: __t.string(),
+  description: __t.option(__t.string()),
+  sequence: __t.u32(),
+  required: __t.bool(),
+});
+export type CreateOnboardingTemplateItemParams = __Infer<typeof CreateOnboardingTemplateItemParams>;
+
+export const CreateOnboardingTemplateParams = __t.object("CreateOnboardingTemplateParams", {
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  active: __t.bool(),
+  get items() {
+    return __t.array(CreateOnboardingTemplateItemParams);
+  },
+});
+export type CreateOnboardingTemplateParams = __Infer<typeof CreateOnboardingTemplateParams>;
+
 export const CreateOperationalMessageParams = __t.object("CreateOperationalMessageParams", {
   companyId: __t.option(__t.u64()),
   templateId: __t.u64(),
@@ -4705,6 +4849,14 @@ export const CreatePaymentTransactionParams = __t.object("CreatePaymentTransacti
 });
 export type CreatePaymentTransactionParams = __Infer<typeof CreatePaymentTransactionParams>;
 
+export const CreatePayrollExportIntentParams = __t.object("CreatePayrollExportIntentParams", {
+  packKey: __t.option(__t.string()),
+  idempotencyKey: __t.string(),
+  payload: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreatePayrollExportIntentParams = __Infer<typeof CreatePayrollExportIntentParams>;
+
 export const CreatePayrollStructureParams = __t.object("CreatePayrollStructureParams", {
   name: __t.string(),
   type: __t.string(),
@@ -4723,6 +4875,16 @@ export const CreatePayslipParams = __t.object("CreatePayslipParams", {
   notes: __t.option(__t.string()),
 });
 export type CreatePayslipParams = __Infer<typeof CreatePayslipParams>;
+
+export const CreatePerformanceCycleParams = __t.object("CreatePerformanceCycleParams", {
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  startDate: __t.timestamp(),
+  endDate: __t.timestamp(),
+  state: __t.string(),
+  active: __t.bool(),
+});
+export type CreatePerformanceCycleParams = __Infer<typeof CreatePerformanceCycleParams>;
 
 export const CreatePickingBatchParams = __t.object("CreatePickingBatchParams", {
   companyId: __t.option(__t.u64()),
@@ -5652,6 +5814,14 @@ export const CreateSodConflictRuleParams = __t.object("CreateSodConflictRulePara
 });
 export type CreateSodConflictRuleParams = __Infer<typeof CreateSodConflictRuleParams>;
 
+export const CreateStatutoryIdParams = __t.object("CreateStatutoryIdParams", {
+  employeeId: __t.u64(),
+  idKind: __t.string(),
+  value: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateStatutoryIdParams = __Infer<typeof CreateStatutoryIdParams>;
+
 export const CreateStockInventoryLineParams = __t.object("CreateStockInventoryLineParams", {
   productId: __t.u64(),
   productVariantId: __t.option(__t.u64()),
@@ -6466,6 +6636,14 @@ export const CreateWhatsAppBusinessAccountParams = __t.object("CreateWhatsAppBus
 });
 export type CreateWhatsAppBusinessAccountParams = __Infer<typeof CreateWhatsAppBusinessAccountParams>;
 
+export const CreateWorkScheduleParams = __t.object("CreateWorkScheduleParams", {
+  employeeId: __t.u64(),
+  name: __t.string(),
+  workHoursPerWeek: __t.f64(),
+  isActive: __t.bool(),
+});
+export type CreateWorkScheduleParams = __Infer<typeof CreateWorkScheduleParams>;
+
 export const CreateWorkcenterParams = __t.object("CreateWorkcenterParams", {
   companyId: __t.option(__t.u64()),
   name: __t.string(),
@@ -6827,6 +7005,11 @@ export const DeleteAccountMoveLineParams = __t.object("DeleteAccountMoveLinePara
   companyId: __t.option(__t.u64()),
 });
 export type DeleteAccountMoveLineParams = __Infer<typeof DeleteAccountMoveLineParams>;
+
+export const DeleteHrEmployeeDocumentParams = __t.object("DeleteHrEmployeeDocumentParams", {
+  reason: __t.option(__t.string()),
+});
+export type DeleteHrEmployeeDocumentParams = __Infer<typeof DeleteHrEmployeeDocumentParams>;
 
 export const DeliveryCarrier = __t.object("DeliveryCarrier", {
   id: __t.u64(),
@@ -7628,6 +7811,96 @@ export const HelpdeskTicketState = __t.enum("HelpdeskTicketState", {
 });
 export type HelpdeskTicketState = __Infer<typeof HelpdeskTicketState>;
 
+export const HrApplicant = __t.object("HrApplicant", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  jobPositionId: __t.u64(),
+  name: __t.string(),
+  email: __t.option(__t.string()),
+  stage: __t.string(),
+  notes: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrApplicant = __Infer<typeof HrApplicant>;
+
+export const HrAttendance = __t.object("HrAttendance", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  checkIn: __t.timestamp(),
+  checkOut: __t.option(__t.timestamp()),
+  source: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type HrAttendance = __Infer<typeof HrAttendance>;
+
+export const HrBenefitEnrollment = __t.object("HrBenefitEnrollment", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  planId: __t.u64(),
+  employeeId: __t.u64(),
+  state: __t.string(),
+  effectiveFrom: __t.timestamp(),
+  effectiveTo: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrBenefitEnrollment = __Infer<typeof HrBenefitEnrollment>;
+
+export const HrBenefitPlan = __t.object("HrBenefitPlan", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  planType: __t.string(),
+  active: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrBenefitPlan = __Infer<typeof HrBenefitPlan>;
+
+export const HrCapacityForecast = __t.object("HrCapacityForecast", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  periodStart: __t.timestamp(),
+  periodEnd: __t.timestamp(),
+  scheduledHours: __t.f64(),
+  leaveHours: __t.f64(),
+  attendanceHours: __t.f64(),
+  availableHours: __t.f64(),
+  metadata: __t.option(__t.string()),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrCapacityForecast = __Infer<typeof HrCapacityForecast>;
+
+export const HrCompensationEvent = __t.object("HrCompensationEvent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  contractId: __t.u64(),
+  wage: __t.f64(),
+  currencyId: __t.u64(),
+  effectiveFrom: __t.timestamp(),
+  reason: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+});
+export type HrCompensationEvent = __Infer<typeof HrCompensationEvent>;
+
 export const HrContract = __t.object("HrContract", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -7647,6 +7920,18 @@ export const HrContract = __t.object("HrContract", {
   createdAt: __t.timestamp(),
 });
 export type HrContract = __Infer<typeof HrContract>;
+
+export const HrCountryPackLeaveDefault = __t.object("HrCountryPackLeaveDefault", {
+  id: __t.u64(),
+  packKey: __t.string(),
+  name: __t.string(),
+  code: __t.string(),
+  maxLeaves: __t.f64(),
+  allocationType: __t.string(),
+  sortOrder: __t.u32(),
+  metadata: __t.option(__t.string()),
+});
+export type HrCountryPackLeaveDefault = __Infer<typeof HrCountryPackLeaveDefault>;
 
 export const HrDepartment = __t.object("HrDepartment", {
   id: __t.u64(),
@@ -7701,6 +7986,24 @@ export const HrEmployee = __t.object("HrEmployee", {
   metadata: __t.option(__t.string()),
 });
 export type HrEmployee = __Infer<typeof HrEmployee>;
+
+export const HrEmployeeDocument = __t.object("HrEmployeeDocument", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  docType: __t.string(),
+  attachmentId: __t.string(),
+  purpose: __t.string(),
+  title: __t.option(__t.string()),
+  notes: __t.option(__t.string()),
+  active: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrEmployeeDocument = __Infer<typeof HrEmployeeDocument>;
 
 export const HrEmployeeSkill = __t.object("HrEmployeeSkill", {
   id: __t.u64(),
@@ -7903,6 +8206,48 @@ export const HrExpenseSheet = __t.object("HrExpenseSheet", {
 });
 export type HrExpenseSheet = __Infer<typeof HrExpenseSheet>;
 
+export const HrGlobalAssignment = __t.object("HrGlobalAssignment", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  homeCompanyId: __t.u64(),
+  hostCompanyId: __t.u64(),
+  dateFrom: __t.timestamp(),
+  dateTo: __t.option(__t.timestamp()),
+  status: __t.string(),
+  notes: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrGlobalAssignment = __Infer<typeof HrGlobalAssignment>;
+
+export const HrIntegrationIntent = __t.object("HrIntegrationIntent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  intentKind: __t.string(),
+  status: __t.string(),
+  idempotencyKey: __t.string(),
+  payslipId: __t.option(__t.u64()),
+  exportIntentId: __t.option(__t.u64()),
+  payload: __t.string(),
+  resultRef: __t.option(__t.string()),
+  externalRef: __t.option(__t.string()),
+  payloadHash: __t.option(__t.string()),
+  lastError: __t.option(__t.string()),
+  attemptCount: __t.u32(),
+  appliedAt: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type HrIntegrationIntent = __Infer<typeof HrIntegrationIntent>;
+
 export const HrJobPosition = __t.object("HrJobPosition", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -7918,6 +8263,21 @@ export const HrJobPosition = __t.object("HrJobPosition", {
   createdAt: __t.timestamp(),
 });
 export type HrJobPosition = __Infer<typeof HrJobPosition>;
+
+export const HrLaborCostSnapshot = __t.object("HrLaborCostSnapshot", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.option(__t.u64()),
+  periodStart: __t.timestamp(),
+  periodEnd: __t.timestamp(),
+  totalLaborCost: __t.f64(),
+  currencyCode: __t.string(),
+  status: __t.string(),
+  metadata: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+});
+export type HrLaborCostSnapshot = __Infer<typeof HrLaborCostSnapshot>;
 
 export const HrLeave = __t.object("HrLeave", {
   id: __t.u64(),
@@ -7940,6 +8300,19 @@ export const HrLeave = __t.object("HrLeave", {
   deletedAt: __t.option(__t.timestamp()),
 });
 export type HrLeave = __Infer<typeof HrLeave>;
+
+export const HrLeaveAllocation = __t.object("HrLeaveAllocation", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  leaveTypeId: __t.u64(),
+  periodYear: __t.u32(),
+  allocatedDays: __t.f64(),
+  usedDays: __t.f64(),
+  createdAt: __t.timestamp(),
+});
+export type HrLeaveAllocation = __Infer<typeof HrLeaveAllocation>;
 
 // The tagged union or sum type for the algebraic type `HrLeaveState`.
 export const HrLeaveState = __t.enum("HrLeaveState", {
@@ -7966,6 +8339,94 @@ export const HrLeaveType = __t.object("HrLeaveType", {
   createdAt: __t.timestamp(),
 });
 export type HrLeaveType = __Infer<typeof HrLeaveType>;
+
+export const HrOffboardingChecklist = __t.object("HrOffboardingChecklist", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  status: __t.string(),
+  assetsReturned: __t.bool(),
+  accessRevoked: __t.bool(),
+  docsCollected: __t.bool(),
+  assetsNotes: __t.option(__t.string()),
+  accessNotes: __t.option(__t.string()),
+  docsNotes: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrOffboardingChecklist = __Infer<typeof HrOffboardingChecklist>;
+
+export const HrOnboardingProgress = __t.object("HrOnboardingProgress", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  templateId: __t.u64(),
+  templateItemId: __t.u64(),
+  status: __t.string(),
+  completedAt: __t.option(__t.timestamp()),
+  notes: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrOnboardingProgress = __Infer<typeof HrOnboardingProgress>;
+
+export const HrOnboardingTemplate = __t.object("HrOnboardingTemplate", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  active: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrOnboardingTemplate = __Infer<typeof HrOnboardingTemplate>;
+
+export const HrOnboardingTemplateItem = __t.object("HrOnboardingTemplateItem", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  templateId: __t.u64(),
+  title: __t.string(),
+  description: __t.option(__t.string()),
+  sequence: __t.u32(),
+  required: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrOnboardingTemplateItem = __Infer<typeof HrOnboardingTemplateItem>;
+
+export const HrPayrollExportIntent = __t.object("HrPayrollExportIntent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  payslipId: __t.u64(),
+  packKey: __t.string(),
+  status: __t.string(),
+  idempotencyKey: __t.string(),
+  payload: __t.string(),
+  payloadHash: __t.option(__t.string()),
+  externalRef: __t.option(__t.string()),
+  lastError: __t.option(__t.string()),
+  attemptCount: __t.u32(),
+  appliedAt: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type HrPayrollExportIntent = __Infer<typeof HrPayrollExportIntent>;
 
 export const HrPayrollStructure = __t.object("HrPayrollStructure", {
   id: __t.u64(),
@@ -7994,10 +8455,84 @@ export const HrPayslip = __t.object("HrPayslip", {
   get state() {
     return PayslipState;
   },
+  calculationSource: __t.option(__t.string()),
+  calculationMetadata: __t.option(__t.string()),
+  accountMoveId: __t.option(__t.u64()),
+  exportIntentId: __t.option(__t.u64()),
   notes: __t.option(__t.string()),
   createdAt: __t.timestamp(),
 });
 export type HrPayslip = __Infer<typeof HrPayslip>;
+
+export const HrPerformanceCycle = __t.object("HrPerformanceCycle", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  startDate: __t.timestamp(),
+  endDate: __t.timestamp(),
+  state: __t.string(),
+  active: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrPerformanceCycle = __Infer<typeof HrPerformanceCycle>;
+
+export const HrPerformanceGoal = __t.object("HrPerformanceGoal", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  cycleId: __t.u64(),
+  employeeId: __t.u64(),
+  title: __t.string(),
+  description: __t.option(__t.string()),
+  targetValue: __t.option(__t.f64()),
+  weight: __t.f64(),
+  state: __t.string(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrPerformanceGoal = __Infer<typeof HrPerformanceGoal>;
+
+export const HrPerformanceReview = __t.object("HrPerformanceReview", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  cycleId: __t.u64(),
+  employeeId: __t.u64(),
+  reviewerEmployeeId: __t.option(__t.u64()),
+  state: __t.string(),
+  selfRating: __t.option(__t.f64()),
+  managerRating: __t.option(__t.f64()),
+  summary: __t.option(__t.string()),
+  submittedAt: __t.option(__t.timestamp()),
+  completedAt: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type HrPerformanceReview = __Infer<typeof HrPerformanceReview>;
+
+export const HrPiiAccessLog = __t.object("HrPiiAccessLog", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  actorIdentity: __t.identity(),
+  purpose: __t.string(),
+  resourceKey: __t.string(),
+  tableName: __t.string(),
+  recordId: __t.u64(),
+  fieldsAccessed: __t.string(),
+  rowCount: __t.u32(),
+  accessedAt: __t.timestamp(),
+});
+export type HrPiiAccessLog = __Infer<typeof HrPiiAccessLog>;
 
 export const HrResource = __t.object("HrResource", {
   id: __t.u64(),
@@ -8027,6 +8562,19 @@ export const HrSalaryRule = __t.object("HrSalaryRule", {
 });
 export type HrSalaryRule = __Infer<typeof HrSalaryRule>;
 
+export const HrShiftOptJob = __t.object("HrShiftOptJob", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  status: __t.string(),
+  scope: __t.string(),
+  metadata: __t.option(__t.string()),
+  resultSummary: __t.option(__t.string()),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type HrShiftOptJob = __Infer<typeof HrShiftOptJob>;
+
 export const HrSkill = __t.object("HrSkill", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -8043,6 +8591,33 @@ export const HrSkill = __t.object("HrSkill", {
   metadata: __t.option(__t.string()),
 });
 export type HrSkill = __Infer<typeof HrSkill>;
+
+export const HrStatutoryId = __t.object("HrStatutoryId", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  idKind: __t.string(),
+  value: __t.string(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type HrStatutoryId = __Infer<typeof HrStatutoryId>;
+
+export const HrWorkSchedule = __t.object("HrWorkSchedule", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  employeeId: __t.u64(),
+  name: __t.string(),
+  workHoursPerWeek: __t.f64(),
+  isActive: __t.bool(),
+  createdAt: __t.timestamp(),
+});
+export type HrWorkSchedule = __Infer<typeof HrWorkSchedule>;
 
 export const ImportJob = __t.object("ImportJob", {
   id: __t.u64(),
@@ -8721,6 +9296,17 @@ export const LogAuditEventParams = __t.object("LogAuditEventParams", {
   metadata: __t.option(__t.string()),
 });
 export type LogAuditEventParams = __Infer<typeof LogAuditEventParams>;
+
+export const LogHrPiiReadParams = __t.object("LogHrPiiReadParams", {
+  companyId: __t.option(__t.u64()),
+  purpose: __t.string(),
+  resourceKey: __t.string(),
+  tableName: __t.string(),
+  recordId: __t.u64(),
+  fieldsAccessed: __t.array(__t.string()),
+  rowCount: __t.u32(),
+});
+export type LogHrPiiReadParams = __Infer<typeof LogHrPiiReadParams>;
 
 export const LogTimesheetParams = __t.object("LogTimesheetParams", {
   companyId: __t.option(__t.u64()),
@@ -10156,6 +10742,15 @@ export const PostExpenseSheetParams = __t.object("PostExpenseSheetParams", {
   clientRequestId: __t.option(__t.string()),
 });
 export type PostExpenseSheetParams = __Infer<typeof PostExpenseSheetParams>;
+
+export const PostPayslipParams = __t.object("PostPayslipParams", {
+  journalId: __t.u64(),
+  expenseAccountId: __t.u64(),
+  payableAccountId: __t.u64(),
+  taxWithholdingAccountId: __t.option(__t.u64()),
+  accountingDate: __t.timestamp(),
+});
+export type PostPayslipParams = __Infer<typeof PostPayslipParams>;
 
 export const PostRealizedFxParams = __t.object("PostRealizedFxParams", {
   paymentId: __t.u64(),
@@ -11625,6 +12220,19 @@ export const RecordGeneratedOwnerReportParams = __t.object("RecordGeneratedOwner
 });
 export type RecordGeneratedOwnerReportParams = __Infer<typeof RecordGeneratedOwnerReportParams>;
 
+export const RecordHrIntegrationResultParams = __t.object("RecordHrIntegrationResultParams", {
+  status: __t.string(),
+  externalRef: __t.option(__t.string()),
+  payloadHash: __t.option(__t.string()),
+  resultRef: __t.option(__t.string()),
+  lastError: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+  grossWage: __t.option(__t.f64()),
+  netWage: __t.option(__t.f64()),
+  calculationMetadata: __t.option(__t.string()),
+});
+export type RecordHrIntegrationResultParams = __Infer<typeof RecordHrIntegrationResultParams>;
+
 export const RecordInventoryIntegrationResultParams = __t.object("RecordInventoryIntegrationResultParams", {
   status: __t.string(),
   externalReference: __t.option(__t.string()),
@@ -11636,6 +12244,15 @@ export const RecordInventoryIntegrationResultParams = __t.object("RecordInventor
   metadata: __t.option(__t.string()),
 });
 export type RecordInventoryIntegrationResultParams = __Infer<typeof RecordInventoryIntegrationResultParams>;
+
+export const RecordPayrollExportResultParams = __t.object("RecordPayrollExportResultParams", {
+  status: __t.string(),
+  externalRef: __t.option(__t.string()),
+  payloadHash: __t.option(__t.string()),
+  lastError: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type RecordPayrollExportResultParams = __Infer<typeof RecordPayrollExportResultParams>;
 
 export const RecordPrivacyConsentParams = __t.object("RecordPrivacyConsentParams", {
   contactId: __t.u64(),
@@ -11691,6 +12308,13 @@ export const RefreshCapacityForecastParams = __t.object("RefreshCapacityForecast
   metadata: __t.option(__t.string()),
 });
 export type RefreshCapacityForecastParams = __Infer<typeof RefreshCapacityForecastParams>;
+
+export const RefreshHrCapacityForecastParams = __t.object("RefreshHrCapacityForecastParams", {
+  employeeId: __t.option(__t.u64()),
+  periodStart: __t.timestamp(),
+  periodEnd: __t.timestamp(),
+});
+export type RefreshHrCapacityForecastParams = __Infer<typeof RefreshHrCapacityForecastParams>;
 
 export const RefreshInventoryExceptionsParams = __t.object("RefreshInventoryExceptionsParams", {
   upsertOnly: __t.bool(),
@@ -12565,6 +13189,13 @@ export const SectionStatus = __t.enum("SectionStatus", {
   Reviewed: __t.unit(),
 });
 export type SectionStatus = __Infer<typeof SectionStatus>;
+
+export const SeedHrCountryPackOverlaysParams = __t.object("SeedHrCountryPackOverlaysParams", {
+  packKeys: __t.array(__t.string()),
+  seedHolidays: __t.bool(),
+  materializeLeaveTypes: __t.bool(),
+});
+export type SeedHrCountryPackOverlaysParams = __Infer<typeof SeedHrCountryPackOverlaysParams>;
 
 export const SeedPackHolidaysParams = __t.object("SeedPackHolidaysParams", {
   packKeys: __t.array(__t.string()),
@@ -13514,6 +14145,12 @@ export const StockTraceabilityReport = __t.object("StockTraceabilityReport", {
   metadata: __t.option(__t.string()),
 });
 export type StockTraceabilityReport = __Infer<typeof StockTraceabilityReport>;
+
+export const SubmitPerformanceReviewParams = __t.object("SubmitPerformanceReviewParams", {
+  selfRating: __t.f64(),
+  summary: __t.option(__t.string()),
+});
+export type SubmitPerformanceReviewParams = __Infer<typeof SubmitPerformanceReviewParams>;
 
 export const SubmitSupplierIntakeParams = __t.object("SubmitSupplierIntakeParams", {
   companyName: __t.string(),
@@ -14688,6 +15325,8 @@ export const UpdateContractParams = __t.object("UpdateContractParams", {
   jobId: __t.option(__t.u64()),
   departmentId: __t.option(__t.u64()),
   notes: __t.option(__t.string()),
+  wageChangeReason: __t.option(__t.string()),
+  wageEffectiveFrom: __t.option(__t.timestamp()),
 });
 export type UpdateContractParams = __Infer<typeof UpdateContractParams>;
 
@@ -14852,6 +15491,13 @@ export const UpdateFormFieldParams = __t.object("UpdateFormFieldParams", {
 });
 export type UpdateFormFieldParams = __Infer<typeof UpdateFormFieldParams>;
 
+export const UpdateHrApplicantParams = __t.object("UpdateHrApplicantParams", {
+  stage: __t.option(__t.string()),
+  email: __t.option(__t.string()),
+  notes: __t.option(__t.string()),
+});
+export type UpdateHrApplicantParams = __Infer<typeof UpdateHrApplicantParams>;
+
 export const UpdateHrEmployeeSkillParams = __t.object("UpdateHrEmployeeSkillParams", {
   level: __t.option(__t.u32()),
   notes: __t.option(__t.option(__t.string())),
@@ -14859,6 +15505,16 @@ export const UpdateHrEmployeeSkillParams = __t.object("UpdateHrEmployeeSkillPara
   metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateHrEmployeeSkillParams = __Infer<typeof UpdateHrEmployeeSkillParams>;
+
+export const UpdateHrGlobalAssignmentParams = __t.object("UpdateHrGlobalAssignmentParams", {
+  homeCompanyId: __t.option(__t.u64()),
+  hostCompanyId: __t.option(__t.u64()),
+  dateFrom: __t.option(__t.timestamp()),
+  dateTo: __t.option(__t.timestamp()),
+  status: __t.option(__t.string()),
+  notes: __t.option(__t.string()),
+});
+export type UpdateHrGlobalAssignmentParams = __Infer<typeof UpdateHrGlobalAssignmentParams>;
 
 export const UpdateHrSkillParams = __t.object("UpdateHrSkillParams", {
   name: __t.option(__t.string()),
@@ -15448,6 +16104,13 @@ export const UpdateSodConflictRuleParams = __t.object("UpdateSodConflictRulePara
   metadata: __t.option(__t.string()),
 });
 export type UpdateSodConflictRuleParams = __Infer<typeof UpdateSodConflictRuleParams>;
+
+export const UpdateStatutoryIdParams = __t.object("UpdateStatutoryIdParams", {
+  idKind: __t.option(__t.string()),
+  value: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateStatutoryIdParams = __Infer<typeof UpdateStatutoryIdParams>;
 
 export const UpdateStockLocationParams = __t.object("UpdateStockLocationParams", {
   name: __t.option(__t.string()),

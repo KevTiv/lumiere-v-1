@@ -1,6 +1,8 @@
 import { authSubscriptions } from "./auth";
 import {
   type FieldAccessContext,
+  hasHrPermission,
+  identitySqlLiteral,
   resolveHttpSqlColumns,
   selectOrgScopedSql,
   selectRolesActiveSql,
@@ -21,6 +23,8 @@ export interface SubscriptionQueryContext {
   identityHex?: string;
   /** Passed to {@link authSubscriptions} when resource is `auth`. */
   roleNames?: string[];
+  /** When set (e.g. from `my-employee` query), scopes `direct-reports` without subqueries. */
+  managerEmployeeId?: number;
   /** When set (e.g. from the same sources as `/api/query`), subscription SQL matches API column projection. */
   fieldAccess?: FieldAccessContext;
 }
@@ -123,6 +127,15 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "hr-resources",
   "hr-skills",
   "hr-employee-skills",
+  "onboarding-templates",
+  "onboarding-template-items",
+  "onboarding-progress",
+  "performance-cycles",
+  "performance-goals",
+  "performance-reviews",
+  "benefit-plans",
+  "benefit-enrollments",
+  "employee-documents",
   "products",
   "product-categories",
   "uoms",
@@ -180,10 +193,15 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "mrp-workcenters",
   "mrp-routing-workcenters",
   "employees",
+  "my-employee",
+  "direct-reports",
   "departments",
   "leave-requests",
+  "leaves-to-approve",
   "contracts",
   "payslips",
+  "payslips-to-export",
+  "hr-integration-intents",
   "financial-reports",
   "trial-balances",
   "saved-reports",
@@ -749,6 +767,31 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       fa,
       "",
     ),
+  "onboarding-templates": (id, fa) =>
+    selectOrgScopedSql("onboarding-templates", "hr_onboarding_template", id, fa, " AND active = true"),
+  "onboarding-template-items": (id, fa) =>
+    selectOrgScopedSql(
+      "onboarding-template-items",
+      "hr_onboarding_template_item",
+      id,
+      fa,
+      "",
+      " ORDER BY sequence ASC, id ASC",
+    ),
+  "onboarding-progress": (id, fa) =>
+    selectOrgScopedSql("onboarding-progress", "hr_onboarding_progress", id, fa, ""),
+  "performance-cycles": (id, fa) =>
+    selectOrgScopedSql("performance-cycles", "hr_performance_cycle", id, fa, " AND active = true"),
+  "performance-goals": (id, fa) =>
+    selectOrgScopedSql("performance-goals", "hr_performance_goal", id, fa, ""),
+  "performance-reviews": (id, fa) =>
+    selectOrgScopedSql("performance-reviews", "hr_performance_review", id, fa, ""),
+  "benefit-plans": (id, fa) =>
+    selectOrgScopedSql("benefit-plans", "hr_benefit_plan", id, fa, " AND active = true"),
+  "benefit-enrollments": (id, fa) =>
+    selectOrgScopedSql("benefit-enrollments", "hr_benefit_enrollment", id, fa, ""),
+  "employee-documents": (id, fa) =>
+    selectOrgScopedSql("employee-documents", "hr_employee_document", id, fa, " AND active = true"),
   products: (id, fa) => selectOrgScopedSql("products", "product", id, fa, ""),
   "product-categories": (id, fa) =>
     selectOrgScopedSql(
@@ -1023,14 +1066,101 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       " ORDER BY workcenter_id ASC, sequence ASC",
     ),
   employees: (id, fa) =>
-    selectOrgScopedSql("employees", "hr_employee", id, fa, ""),
+    selectOrgScopedSql("employees", "hr_employee", id, fa, " AND is_active = true"),
+  "my-employee": (id, fa) =>
+    selectOrgScopedSql("my-employee", "hr_employee", id, fa, " AND is_active = true"),
+  "direct-reports": (id, fa) =>
+    selectOrgScopedSql("direct-reports", "hr_employee", id, fa, " AND is_active = true"),
   departments: (id, fa) =>
     selectOrgScopedSql("departments", "hr_department", id, fa, ""),
+  "job-positions": (id, fa) =>
+    selectOrgScopedSql("job-positions", "hr_job_position", id, fa, ""),
+  applicants: (id, fa) =>
+    selectOrgScopedSql("applicants", "hr_applicant", id, fa, ""),
+  "leave-types": (id, fa) =>
+    selectOrgScopedSql("leave-types", "hr_leave_type", id, fa, ""),
+  "payroll-structures": (id, fa) =>
+    selectOrgScopedSql("payroll-structures", "hr_payroll_structure", id, fa, ""),
+  "salary-rules": (id, fa) =>
+    selectOrgScopedSql("salary-rules", "hr_salary_rule", id, fa, ""),
   "leave-requests": (id, fa) =>
     selectOrgScopedSql("leave-requests", "hr_leave", id, fa, ""),
+  "leaves-to-approve": (id, fa) =>
+    selectOrgScopedSql(
+      "leaves-to-approve",
+      "hr_leave",
+      id,
+      fa,
+      " AND (state = 'confirm' OR state = 'validatedOne')",
+    ),
   contracts: (id, fa) =>
     selectOrgScopedSql("contracts", "hr_contract", id, fa, ""),
+  attendance: (id, fa) =>
+    selectOrgScopedSql("attendance", "hr_attendance", id, fa, ""),
+  "compensation-events": (id, fa) =>
+    selectOrgScopedSql(
+      "compensation-events",
+      "hr_compensation_event",
+      id,
+      fa,
+      "",
+      " ORDER BY effective_from DESC",
+    ),
+  "work-schedules": (id, fa) =>
+    selectOrgScopedSql("work-schedules", "hr_work_schedule", id, fa, ""),
+  "labor-cost-snapshots": (id, fa) =>
+    selectOrgScopedSql(
+      "labor-cost-snapshots",
+      "hr_labor_cost_snapshot",
+      id,
+      fa,
+      "",
+      " ORDER BY period_start DESC, id DESC",
+    ),
+  "shift-opt-jobs": (id, fa) =>
+    selectOrgScopedSql(
+      "shift-opt-jobs",
+      "hr_shift_opt_job",
+      id,
+      fa,
+      "",
+      " ORDER BY created_at DESC, id DESC",
+    ),
+  "global-assignments": (id, fa) =>
+    selectOrgScopedSql(
+      "global-assignments",
+      "hr_global_assignment",
+      id,
+      fa,
+      "",
+      " ORDER BY date_from DESC, id DESC",
+    ),
+  "hr-capacity-forecast": (id, fa) =>
+    selectOrgScopedSql(
+      "hr-capacity-forecast",
+      "hr_capacity_forecast",
+      id,
+      fa,
+      "",
+      " ORDER BY period_start DESC, id DESC",
+    ),
   payslips: (id, fa) => selectOrgScopedSql("payslips", "hr_payslip", id, fa, ""),
+  "payslips-to-export": (id, fa) =>
+    selectOrgScopedSql(
+      "payslips-to-export",
+      "hr_payslip",
+      id,
+      fa,
+      " AND state = 'verify'",
+    ),
+  "hr-integration-intents": (id, fa) =>
+    selectOrgScopedSql(
+      "hr-integration-intents",
+      "hr_integration_intent",
+      id,
+      fa,
+      " AND status = 'pending'",
+    ),
   "financial-reports": (id, fa) =>
     selectOrgScopedSql("financial-reports", "financial_report", id, fa, ""),
   "trial-balances": (id, fa) =>
@@ -1619,6 +1749,41 @@ export function subscriptionQueriesForResource(
   if (r === "user-roles") {
     if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
     return [selectUserRoleAssignmentsForIdentitySql(ctx.identityHex, ctx.fieldAccess)];
+  }
+
+  if (r === "my-employee") {
+    if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
+    const org = ctx.organizationId;
+    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
+    const idLit = identitySqlLiteral(ctx.identityHex);
+    const cols = resolveHttpSqlColumns("my-employee", ctx.fieldAccess).join(", ");
+    return [
+      `SELECT ${cols} FROM hr_employee WHERE organization_id = ${Number(org)} AND user_id = ${idLit} AND is_active = true`,
+    ];
+  }
+
+  if (r === "direct-reports") {
+    const managerId = ctx.managerEmployeeId;
+    if (managerId === undefined || managerId === null || managerId <= 0) return null;
+    const org = ctx.organizationId;
+    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
+    const cols = resolveHttpSqlColumns("direct-reports", ctx.fieldAccess).join(", ");
+    return [
+      `SELECT ${cols} FROM hr_employee WHERE organization_id = ${Number(org)} AND parent_id = ${Number(managerId)} AND is_active = true`,
+    ];
+  }
+
+  if (r === "employee-documents") {
+    const org = ctx.organizationId;
+    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
+    const cols = resolveHttpSqlColumns("employee-documents", ctx.fieldAccess).join(", ");
+    let extra = " AND active = true";
+    if (!hasHrPermission(ctx.fieldAccess, "hr_employee", "view_pii")) {
+      extra += " AND purpose NOT IN ('tax_id', 'identity')";
+    }
+    return [
+      `SELECT ${cols} FROM hr_employee_document WHERE organization_id = ${Number(org)}${extra}`,
+    ];
   }
 
   if (r === "org-permissions") {

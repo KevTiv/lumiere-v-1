@@ -12,5 +12,6 @@ import {
 
 export default {
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   contractId: __t.u64(),
 };

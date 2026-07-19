@@ -401,6 +401,39 @@ export const contractDetailConfig = (t: TFunction): EntityDetailConfig => ({
   ],
 })
 
+// ── Attendance ────────────────────────────────────────────────────────────────
+
+export const attendanceTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "attendance-table",
+  title: t("hr.attendance.title"),
+  description: t("hr.attendance.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("hr.attendance.searchPlaceholder"),
+    searchKeys: ["employeeId", "source"],
+    columns: [
+      { key: "employeeId", label: t("hr.attendance.columns.employeeId"), width: "min-w-32" },
+      {
+        key: "checkIn",
+        label: t("hr.attendance.columns.checkIn"),
+        type: "relative-date",
+        sortable: true,
+        width: "min-w-36",
+      },
+      {
+        key: "checkOut",
+        label: t("hr.attendance.columns.checkOut"),
+        type: "relative-date",
+        width: "min-w-36",
+      },
+      { key: "source", label: t("hr.attendance.columns.source"), width: "min-w-24" },
+    ],
+    emptyMessage: t("hr.attendance.emptyMessage"),
+  },
+})
+
 // ── Payslips ──────────────────────────────────────────────────────────────────
 export const payslipsTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "payslips-table",
@@ -539,6 +572,153 @@ export const salaryRulesTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+export const onboardingTemplatesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "onboarding-templates-table",
+  title: "Onboarding templates",
+  description: "Reusable hire checklists assigned to new employees",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: "Search templates…",
+    searchKeys: ["name", "description"],
+    columns: [
+      { key: "name", label: "Name", width: "min-w-40", sortable: true },
+      { key: "description", label: "Description", width: "min-w-48" },
+      { key: "active", label: "Active", type: "boolean", width: "min-w-20" },
+      { key: "companyId", label: "Company", width: "min-w-24" },
+    ],
+    emptyMessage: "No onboarding templates yet — create one to assign on hire.",
+  },
+})
+
+export const performanceCyclesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "performance-cycles-table",
+  title: "Performance cycles",
+  description: "Review periods for goals and employee evaluations",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: "Search cycles…",
+    searchKeys: ["name", "state"],
+    columns: [
+      { key: "name", label: "Name", width: "min-w-40", sortable: true },
+      { key: "state", label: "State", type: "badge", width: "min-w-24" },
+      { key: "startDate", label: "Start", type: "date", width: "min-w-28" },
+      { key: "endDate", label: "End", type: "date", width: "min-w-28" },
+      { key: "active", label: "Active", type: "boolean", width: "min-w-20" },
+    ],
+    emptyMessage: "No performance cycles — create one to start goal setting.",
+  },
+})
+
+export const performanceGoalsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "performance-goals-table",
+  title: "Performance goals",
+  description: "Employee goals linked to review cycles",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: "Search goals…",
+    searchKeys: ["title", "employeeId", "cycleId"],
+    columns: [
+      { key: "title", label: "Goal", width: "min-w-40" },
+      { key: "employeeId", label: "Employee", width: "min-w-28" },
+      { key: "cycleId", label: "Cycle", width: "min-w-24" },
+      { key: "state", label: "State", type: "badge", width: "min-w-24" },
+      { key: "weight", label: "Weight", type: "number", align: "right", width: "min-w-20" },
+    ],
+    emptyMessage: "No goals yet — add goals from a performance cycle.",
+  },
+})
+
+export const performanceReviewsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "performance-reviews-table",
+  title: "Performance reviews",
+  description: "Self and manager review workflow per employee and cycle",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: "Search reviews…",
+    searchKeys: ["employeeId", "cycleId", "state"],
+    filters: [
+      {
+        key: "state",
+        label: "State",
+        type: "select",
+        options: [
+          { value: "draft", label: "Draft" },
+          { value: "submitted", label: "Submitted" },
+          { value: "completed", label: "Completed" },
+        ],
+      },
+    ],
+    columns: [
+      { key: "employeeId", label: "Employee", width: "min-w-28" },
+      { key: "cycleId", label: "Cycle", width: "min-w-24" },
+      { key: "state", label: "State", type: "badge", width: "min-w-24" },
+      { key: "selfRating", label: "Self", type: "number", align: "right", width: "min-w-16" },
+      { key: "managerRating", label: "Manager", type: "number", align: "right", width: "min-w-20" },
+    ],
+    emptyMessage: "Reviews appear when goals are added for an employee in a cycle.",
+  },
+})
+
+export const benefitPlansTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "benefit-plans-table",
+  title: "Benefit plans",
+  description: "Catalog of benefit offerings for employee enrollment",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: "Search plans…",
+    searchKeys: ["name", "planType"],
+    columns: [
+      { key: "name", label: "Name", width: "min-w-40", sortable: true },
+      { key: "planType", label: "Type", width: "min-w-24" },
+      { key: "description", label: "Description", width: "min-w-48" },
+      { key: "active", label: "Active", type: "boolean", width: "min-w-20" },
+    ],
+    emptyMessage: "No benefit plans — create a plan to enroll employees.",
+  },
+})
+
+export const benefitEnrollmentsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "benefit-enrollments-table",
+  title: "Benefit enrollments",
+  description: "Active and terminated employee benefit assignments",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: "Search enrollments…",
+    searchKeys: ["employeeId", "planId", "state"],
+    filters: [
+      {
+        key: "state",
+        label: "State",
+        type: "select",
+        options: [
+          { value: "enrolled", label: "Enrolled" },
+          { value: "terminated", label: "Terminated" },
+        ],
+      },
+    ],
+    columns: [
+      { key: "employeeId", label: "Employee", width: "min-w-28" },
+      { key: "planId", label: "Plan", width: "min-w-24" },
+      { key: "state", label: "State", type: "badge", width: "min-w-24" },
+      { key: "effectiveFrom", label: "From", type: "date", width: "min-w-28" },
+      { key: "effectiveTo", label: "To", type: "date", width: "min-w-28" },
+    ],
+    emptyMessage: "No enrollments — assign employees to benefit plans.",
+  },
+})
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 export const hrEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> => ({
   "employees-table": employeesTableConfig(t),
@@ -550,4 +730,11 @@ export const hrEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> 
   "leave-types-table": leaveTypesTableConfig(t),
   "payroll-structures-table": payrollStructuresTableConfig(t),
   "salary-rules-table": salaryRulesTableConfig(t),
+  "onboarding-templates-table": onboardingTemplatesTableConfig(t),
+  "attendance-table": attendanceTableConfig(t),
+  "performance-cycles-table": performanceCyclesTableConfig(t),
+  "performance-goals-table": performanceGoalsTableConfig(t),
+  "performance-reviews-table": performanceReviewsTableConfig(t),
+  "benefit-plans-table": benefitPlansTableConfig(t),
+  "benefit-enrollments-table": benefitEnrollmentsTableConfig(t),
 })

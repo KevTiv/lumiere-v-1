@@ -149,6 +149,109 @@ export function resolveReadColumns(
   return assertSafeSqlIdentifiers([...reg.mandatory, ...reg.defaultRestricted])
 }
 
+const HR_EMPLOYEE_SENSITIVE = [
+  'gender',
+  'birthday',
+  'marital',
+  'emergency_contact',
+  'emergency_phone',
+  'barcode',
+] as const
+const HR_EMPLOYEE_PIN = 'pin'
+const HR_CONTRACT_COMP = ['wage'] as const
+const HR_PAYSLIP_COMP = ['basic_wage', 'gross_wage', 'net_wage'] as const
+
+export function hasHrPermission(
+  fieldAccess: FieldAccessContext,
+  resource: string,
+  action: string,
+): boolean {
+  if (fieldAccess.isSuperuser) return true
+  const perm = `${resource}:${action}`
+  const wildcard = `${resource}:*`
+  return (
+    fieldAccess.rolePermissions.includes('*:*')
+    || fieldAccess.rolePermissions.includes(perm)
+    || fieldAccess.rolePermissions.includes(wildcard)
+  )
+}
+
+const HR_STATUTORY_ID_VALUE = 'value'
+
+/** Strip `pin` from broad feeds; gate wages behind `view_comp`; purpose-scoped sensitive columns. */
+export function applyHrFieldPolicy(
+  resourceKey: QueryResourceKey,
+  cols: string[],
+  fieldAccess: FieldAccessContext | undefined,
+): string[] {
+  if (!fieldAccess || fieldAccess.isSuperuser || fieldAccess.rolePermissions.includes('*:*')) {
+    return cols
+  }
+
+  let out = cols.filter(c => c !== HR_EMPLOYEE_PIN)
+
+  if (resourceKey === 'employees') {
+    out = out.filter(c => !(HR_EMPLOYEE_SENSITIVE as readonly string[]).includes(c))
+  }
+
+  if (resourceKey === 'my-employee') {
+    if (hasHrPermission(fieldAccess, 'hr_employee', 'view_pii')) {
+      out = uniquePreserveOrder([
+        ...out,
+        ...HR_EMPLOYEE_SENSITIVE,
+        HR_EMPLOYEE_PIN,
+      ])
+    }
+  }
+
+  if (resourceKey === 'direct-reports') {
+    out = out.filter(c => !(HR_EMPLOYEE_SENSITIVE as readonly string[]).includes(c))
+  }
+
+  if (resourceKey === 'contracts') {
+    if (hasHrPermission(fieldAccess, 'hr_contract', 'view_comp')) {
+      out = uniquePreserveOrder([...out, ...HR_CONTRACT_COMP])
+    } else {
+      out = out.filter(c => !(HR_CONTRACT_COMP as readonly string[]).includes(c))
+    }
+  }
+
+  if (resourceKey === 'payslips') {
+    if (hasHrPermission(fieldAccess, 'hr_payroll', 'view_comp')) {
+      out = uniquePreserveOrder([...out, ...HR_PAYSLIP_COMP])
+    } else {
+      out = out.filter(c => !(HR_PAYSLIP_COMP as readonly string[]).includes(c))
+    }
+  }
+
+  if (resourceKey === 'hr-statutory-ids') {
+    if (hasHrPermission(fieldAccess, 'hr_employee', 'view_statutory_id')) {
+      out = uniquePreserveOrder([...out, HR_STATUTORY_ID_VALUE])
+    } else {
+      out = out.filter(c => c !== HR_STATUTORY_ID_VALUE)
+    }
+  }
+
+  return assertSafeSqlIdentifiers(out)
+}
+
+export function purposeForHrResource(resourceKey: string): string {
+  if (resourceKey === 'my-employee') return 'hr_self'
+  if (resourceKey === 'direct-reports') return 'hr_manager'
+  return 'hr_admin'
+}
+
+export function isHrPiiResource(resourceKey: string): boolean {
+  return (
+    resourceKey === 'employees'
+    || resourceKey === 'my-employee'
+    || resourceKey === 'direct-reports'
+    || resourceKey === 'contracts'
+    || resourceKey === 'payslips'
+    || resourceKey === 'hr-statutory-ids'
+  )
+}
+
 /**
  * Columns to exclude from HTTP SQL queries for specific resources.
  * Identity columns (user_id, assigned_to, created_by) cause "Unsupported" errors in SpacetimeDB HTTP SQL.
@@ -210,7 +313,8 @@ export function resolveHttpSqlColumns(
     restricted !== null
       ? restricted
       : assertSafeSqlIdentifiers(uniquePreserveOrder([...reg.mandatory, ...reg.defaultRestricted]))
-  return assertSafeSqlIdentifiers(filterHttpSqlUnsafeColumns(cols, resourceKey))
+  const policyCols = applyHrFieldPolicy(resourceKey, cols, fieldAccess)
+  return assertSafeSqlIdentifiers(filterHttpSqlUnsafeColumns(policyCols, resourceKey))
 }
 
 /** Explicit column list for a generated row `typeName` (PascalCase, e.g. `UserProfile`). */
@@ -268,7 +372,7 @@ export function selectRolesActiveSql(fieldAccess: FieldAccessContext | undefined
 }
 
 /** SpacetimeDB HTTP SQL: Identity columns use `0x` + 64 hex, not quoted UUIDs. */
-function identitySqlLiteral(hex64: string): string {
+export function identitySqlLiteral(hex64: string): string {
   const s = hex64.trim().replace(/^0x/i, '')
   if (s.length !== 64 || !/^[0-9a-fA-F]+$/.test(s)) {
     throw new Error(`invalid SpacetimeDB identity hex (expected 64 hex digits, got len ${s.length})`)

@@ -4918,6 +4918,22 @@
     "device_id",
     "metadata"
   ],
+  "CreateHrIntegrationIntentParams": [
+    "company_id",
+    "payslip_id",
+    "export_intent_id",
+    "metadata"
+  ],
+  "RecordHrIntegrationResultParams": [
+    "external_ref",
+    "payload_hash",
+    "result_ref",
+    "last_error",
+    "metadata",
+    "gross_wage",
+    "net_wage",
+    "calculation_metadata"
+  ],
   "CreateExpenseProjectRebillParams": [
     "partner_id",
     "fiscal_position_id",

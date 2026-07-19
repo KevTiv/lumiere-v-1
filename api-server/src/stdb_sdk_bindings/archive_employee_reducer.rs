@@ -4,13 +4,15 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::archive_employee_params_type::ArchiveEmployeeParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct ArchiveEmployeeArgs {
     pub organization_id: u64,
     pub company_id: u64,
     pub employee_id: u64,
-    pub termination_date: Option<__sdk::Timestamp>,
+    pub params: ArchiveEmployeeParams,
 }
 
 impl From<ArchiveEmployeeArgs> for super::Reducer {
@@ -19,7 +21,7 @@ impl From<ArchiveEmployeeArgs> for super::Reducer {
             organization_id: args.organization_id,
             company_id: args.company_id,
             employee_id: args.employee_id,
-            termination_date: args.termination_date,
+            params: args.params,
         }
     }
 }
@@ -44,15 +46,9 @@ pub trait archive_employee {
         organization_id: u64,
         company_id: u64,
         employee_id: u64,
-        termination_date: Option<__sdk::Timestamp>,
+        params: ArchiveEmployeeParams,
     ) -> __sdk::Result<()> {
-        self.archive_employee_then(
-            organization_id,
-            company_id,
-            employee_id,
-            termination_date,
-            |_, _| {},
-        )
+        self.archive_employee_then(organization_id, company_id, employee_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `archive_employee` to run as soon as possible,
@@ -66,7 +62,7 @@ pub trait archive_employee {
         organization_id: u64,
         company_id: u64,
         employee_id: u64,
-        termination_date: Option<__sdk::Timestamp>,
+        params: ArchiveEmployeeParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -80,7 +76,7 @@ impl archive_employee for super::RemoteReducers {
         organization_id: u64,
         company_id: u64,
         employee_id: u64,
-        termination_date: Option<__sdk::Timestamp>,
+        params: ArchiveEmployeeParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -91,7 +87,7 @@ impl archive_employee for super::RemoteReducers {
                 organization_id,
                 company_id,
                 employee_id,
-                termination_date,
+                params,
             },
             callback,
         )

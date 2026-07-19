@@ -3684,6 +3684,7 @@
         "dateEnd": "End",
         "wage": "Wage"
       },
+      "compensationTimeline": "Compensation history",
       "filters": {
         "state": {
           "label": "Status",
@@ -3700,6 +3701,18 @@
         "Open": "Running",
         "Expired": "Expired",
         "Cancelled": "Cancelled"
+      }
+    },
+    "attendance": {
+      "title": "Attendance",
+      "description": "Time punches with leave conflict checks",
+      "searchPlaceholder": "Search punches…",
+      "emptyMessage": "No attendance punches recorded.",
+      "columns": {
+        "employeeId": "Employee",
+        "checkIn": "Check in",
+        "checkOut": "Check out",
+        "source": "Source"
       }
     },
     "payslips": {
@@ -4018,6 +4031,69 @@
             "fixed": "Fixed",
             "percent": "Percentage"
           }
+        }
+      },
+      "editEmployee": {
+        "title": "Edit Employee",
+        "submitLabel": "Update employee",
+        "sections": {
+          "details": "Employee Details"
+        }
+      },
+      "editDepartment": {
+        "title": "Edit Department",
+        "submitLabel": "Update department",
+        "sections": {
+          "details": "Department Details"
+        },
+        "fields": {
+          "isActive": "Active"
+        }
+      },
+      "editJobPosition": {
+        "title": "Edit Job Position",
+        "submitLabel": "Update job position",
+        "sections": {
+          "details": "Position Details"
+        },
+        "fields": {
+          "isActive": "Active"
+        }
+      },
+      "editContract": {
+        "title": "Edit Contract",
+        "submitLabel": "Update contract",
+        "sections": {
+          "details": "Contract Details"
+        },
+        "fields": {
+          "notes": "Notes",
+          "wageEffectiveFrom": "Wage effective from",
+          "wageChangeReason": "Reason for wage change"
+        }
+      },
+      "newAttendancePunch": {
+        "title": "Record attendance punch",
+        "description": "Rejected if punch overlaps approved leave.",
+        "submitLabel": "Record punch",
+        "sections": {
+          "punch": "Punch details"
+        },
+        "fields": {
+          "employeeId": "Employee",
+          "checkIn": "Check in",
+          "checkOut": "Check out",
+          "source": "Source",
+          "sourceManual": "Manual",
+          "sourceKiosk": "Kiosk",
+          "sourceImport": "Import"
+        }
+      },
+      "editLeaveType": {
+        "title": "Edit Leave Type",
+        "submitLabel": "Update leave type",
+        "sections": {
+          "details": "Leave Type Details"
         }
       }
     }

@@ -143,3 +143,158 @@ export function OrgChartPanel({
     </div>
   )
 }
+
+function formatCompEventDate(raw: unknown): string {
+  if (raw == null) return "—"
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return String(raw)
+  const ms = n > 1e15 ? n / 1000 : n
+  return new Date(ms).toLocaleDateString()
+}
+
+export function CompensationTimelinePanel({
+  contractId,
+  events,
+}: {
+  contractId: string
+  events: QueryRows
+}) {
+  const rows = useMemo(() => {
+    return events
+      .filter((e) => String((e as Record<string, unknown>).contractId) === contractId)
+      .sort((a, b) => {
+        const ae = Number((a as Record<string, unknown>).effectiveFrom ?? 0)
+        const be = Number((b as Record<string, unknown>).effectiveFrom ?? 0)
+        return be - ae
+      })
+  }, [contractId, events])
+
+  if (rows.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No compensation changes recorded for this contract yet.
+      </p>
+    )
+  }
+
+  return (
+    <ul className="space-y-3">
+      {rows.map((row) => {
+        const r = row as Record<string, unknown>
+        return (
+          <li key={String(r.id)} className="rounded-md border border-border px-3 py-2 text-sm">
+            <div className="font-medium">{formatCompEventDate(r.effectiveFrom)}</div>
+            <div className="text-muted-foreground">
+              Wage: {String(r.wage ?? "—")}
+              {r.reason ? ` · ${String(r.reason)}` : ""}
+            </div>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function fieldOrDash(record: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const v = record[key]
+    if (v != null && String(v).trim() !== "") return String(v)
+  }
+  return "—"
+}
+
+/** Simple approval timeline from leave row approval fields (audit tab covers full history). */
+export function LeaveApprovalTimelinePanel({
+  record,
+}: {
+  record: Record<string, unknown>
+}) {
+  const state = fieldOrDash(record, "state", "State")
+  const steps = [
+    { label: "Created", detail: fieldOrDash(record, "createdAt", "created_at") },
+    { label: "Manager", detail: fieldOrDash(record, "managerId", "manager_id") },
+    { label: "First approver", detail: fieldOrDash(record, "firstApproverId", "first_approver_id") },
+    { label: "Second approver", detail: fieldOrDash(record, "secondApproverId", "second_approver_id") },
+    { label: "Current state", detail: state },
+  ]
+
+  return (
+    <div className="space-y-3" data-testid="hr-leave-approval-timeline">
+      {steps.map((step) => (
+        <div key={step.label} className="rounded-md border border-border px-3 py-2 text-sm">
+          <div className="font-medium">{step.label}</div>
+          <div className="text-muted-foreground">{step.detail}</div>
+        </div>
+      ))}
+      <p className="text-xs text-muted-foreground">
+        Full mutation history is on the Audit tab.
+      </p>
+    </div>
+  )
+}
+
+export function HrOpsQueuePanel({
+  leavesToApprove,
+  payslipsToExport,
+  hrIntegrationIntentsPending,
+}: {
+  leavesToApprove: number
+  payslipsToExport: number
+  hrIntegrationIntentsPending?: number
+}) {
+  return (
+    <div
+      className="rounded-lg border p-4 mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+      data-testid="hr-ops-queue-panel"
+    >
+      <div className="rounded-md border px-3 py-2">
+        <div className="text-xs text-muted-foreground">Leaves to approve</div>
+        <div className="text-2xl font-semibold tabular-nums">{leavesToApprove}</div>
+      </div>
+      <div className="rounded-md border px-3 py-2">
+        <div className="text-xs text-muted-foreground">Payslips to export</div>
+        <div className="text-2xl font-semibold tabular-nums">{payslipsToExport}</div>
+      </div>
+      <div className="rounded-md border px-3 py-2">
+        <div className="text-xs text-muted-foreground">Integration intents pending</div>
+        <div className="text-2xl font-semibold tabular-nums">{hrIntegrationIntentsPending ?? 0}</div>
+      </div>
+    </div>
+  )
+}
+
+export function HrAdvancedWfmPanel({
+  laborCostSnapshots,
+  shiftOptJobs,
+  globalAssignments,
+  capacityForecast,
+}: {
+  laborCostSnapshots: number
+  shiftOptJobs: number
+  globalAssignments: number
+  capacityForecast: number
+}) {
+  return (
+    <div
+      className="rounded-lg border p-4 mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+      data-testid="hr-advanced-wfm-panel"
+    >
+      <div className="rounded-md border px-3 py-2">
+        <div className="text-xs text-muted-foreground">Labor cost snapshots</div>
+        <div className="text-2xl font-semibold tabular-nums">{laborCostSnapshots}</div>
+      </div>
+      <div className="rounded-md border px-3 py-2">
+        <div className="text-xs text-muted-foreground">Shift opt jobs</div>
+        <div className="text-2xl font-semibold tabular-nums">{shiftOptJobs}</div>
+      </div>
+      <div className="rounded-md border px-3 py-2">
+        <div className="text-xs text-muted-foreground">Global assignments</div>
+        <div className="text-2xl font-semibold tabular-nums">{globalAssignments}</div>
+      </div>
+      <div className="rounded-md border px-3 py-2">
+        <div className="text-xs text-muted-foreground">Capacity forecast rows</div>
+        <div className="text-2xl font-semibold tabular-nums">{capacityForecast}</div>
+      </div>
+    </div>
+  )
+}

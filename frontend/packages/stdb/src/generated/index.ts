@@ -52,6 +52,7 @@ import AddFormFieldReducer from "./add_form_field_reducer";
 import AddLandedCostLineReducer from "./add_landed_cost_line_reducer";
 import AddMemberToQualityTeamReducer from "./add_member_to_quality_team_reducer";
 import AddOrgMemberReducer from "./add_org_member_reducer";
+import AddPerformanceGoalReducer from "./add_performance_goal_reducer";
 import AddProposalCommentReducer from "./add_proposal_comment_reducer";
 import AddProposalLineItemReducer from "./add_proposal_line_item_reducer";
 import AddProposalSourceDocReducer from "./add_proposal_source_doc_reducer";
@@ -75,11 +76,13 @@ import AppendCrmConversationMessageReducer from "./append_crm_conversation_messa
 import ApplyExpenseAdvanceToSheetReducer from "./apply_expense_advance_to_sheet_reducer";
 import ApplyExpenseIntegrationIntentReducer from "./apply_expense_integration_intent_reducer";
 import ApplyGlobalMigrationsReducer from "./apply_global_migrations_reducer";
+import ApplyHrIntegrationIntentReducer from "./apply_hr_integration_intent_reducer";
 import ApplyIndexLinkedRenewalReducer from "./apply_index_linked_renewal_reducer";
 import ApplyLandedCostsReducer from "./apply_landed_costs_reducer";
 import ApplyOmnichannelAllocationReducer from "./apply_omnichannel_allocation_reducer";
 import ApplyOrgMigrationsReducer from "./apply_org_migrations_reducer";
 import ApplyPendingExpenseIntegrationIntentsReducer from "./apply_pending_expense_integration_intents_reducer";
+import ApplyPendingHrIntegrationIntentsReducer from "./apply_pending_hr_integration_intents_reducer";
 import ApplyPendingProjectIntegrationIntentsReducer from "./apply_pending_project_integration_intents_reducer";
 import ApplyProjectChangeOrderReducer from "./apply_project_change_order_reducer";
 import ApplyProjectIntegrationIntentReducer from "./apply_project_integration_intent_reducer";
@@ -105,7 +108,9 @@ import ArchiveContactIdentityReducer from "./archive_contact_identity_reducer";
 import ArchiveEmployeeReducer from "./archive_employee_reducer";
 import ArchiveFinancialReportReducer from "./archive_financial_report_reducer";
 import ArchivePaymentAccountReducer from "./archive_payment_account_reducer";
+import AssignBenefitEnrollmentReducer from "./assign_benefit_enrollment_reducer";
 import AssignContactRoleReducer from "./assign_contact_role_reducer";
+import AssignOnboardingTemplateReducer from "./assign_onboarding_template_reducer";
 import AssignQualityAlertReducer from "./assign_quality_alert_reducer";
 import AssignRoleReducer from "./assign_role_reducer";
 import AssignStockMoveReducer from "./assign_stock_move_reducer";
@@ -161,6 +166,9 @@ import CompleteActivityReducer from "./complete_activity_reducer";
 import CompleteAiAgentRunReducer from "./complete_ai_agent_run_reducer";
 import CompleteDocumentProcessingJobReducer from "./complete_document_processing_job_reducer";
 import CompleteIntercompanyTransactionReducer from "./complete_intercompany_transaction_reducer";
+import CompleteOffboardingItemReducer from "./complete_offboarding_item_reducer";
+import CompleteOnboardingItemReducer from "./complete_onboarding_item_reducer";
+import CompletePerformanceReviewReducer from "./complete_performance_review_reducer";
 import CompletePickingBatchReducer from "./complete_picking_batch_reducer";
 import CompletePickingWaveReducer from "./complete_picking_wave_reducer";
 import CompleteProductivityLogReducer from "./complete_productivity_log_reducer";
@@ -221,10 +229,12 @@ import CreateAnalyticLineReducer from "./create_analytic_line_reducer";
 import CreateAnalyticsMetricReducer from "./create_analytics_metric_reducer";
 import CreateApprovalRuleReducer from "./create_approval_rule_reducer";
 import CreateAssignmentRuleReducer from "./create_assignment_rule_reducer";
+import CreateAttendancePunchReducer from "./create_attendance_punch_reducer";
 import CreateAuditRuleReducer from "./create_audit_rule_reducer";
 import CreateBadDebtWriteOffReducer from "./create_bad_debt_write_off_reducer";
 import CreateBarcodeNomenclatureReducer from "./create_barcode_nomenclature_reducer";
 import CreateBarcodeRuleReducer from "./create_barcode_rule_reducer";
+import CreateBenefitPlanReducer from "./create_benefit_plan_reducer";
 import CreateBillFromPurchaseOrderReducer from "./create_bill_from_purchase_order_reducer";
 import CreateBillingAccountReducer from "./create_billing_account_reducer";
 import CreateBomReducer from "./create_bom_reducer";
@@ -283,7 +293,13 @@ import CreateGoogleDriveConnectionReducer from "./create_google_drive_connection
 import CreateHelpdeskSlaReducer from "./create_helpdesk_sla_reducer";
 import CreateHelpdeskStageReducer from "./create_helpdesk_stage_reducer";
 import CreateHelpdeskTeamReducer from "./create_helpdesk_team_reducer";
+import CreateHrApplicantReducer from "./create_hr_applicant_reducer";
+import CreateHrEmployeeDocumentReducer from "./create_hr_employee_document_reducer";
 import CreateHrEmployeeSkillReducer from "./create_hr_employee_skill_reducer";
+import CreateHrGlobalAssignmentReducer from "./create_hr_global_assignment_reducer";
+import CreateHrIntegrationIntentReducer from "./create_hr_integration_intent_reducer";
+import CreateHrLaborCostSnapshotReducer from "./create_hr_labor_cost_snapshot_reducer";
+import CreateHrShiftOptJobReducer from "./create_hr_shift_opt_job_reducer";
 import CreateHrSkillReducer from "./create_hr_skill_reducer";
 import CreateIncotermReducer from "./create_incoterm_reducer";
 import CreateIntercompanyRuleReducer from "./create_intercompany_rule_reducer";
@@ -310,6 +326,7 @@ import CreateMailTemplateReducer from "./create_mail_template_reducer";
 import CreateManufacturingOrderReducer from "./create_manufacturing_order_reducer";
 import CreateMessageBatchReducer from "./create_message_batch_reducer";
 import CreateMessageTemplateReducer from "./create_message_template_reducer";
+import CreateOnboardingTemplateReducer from "./create_onboarding_template_reducer";
 import CreateOperationalMessageReducer from "./create_operational_message_reducer";
 import CreateOpportunityReducer from "./create_opportunity_reducer";
 import CreateOpportunityLineReducer from "./create_opportunity_line_reducer";
@@ -325,8 +342,10 @@ import CreatePaymentMethodReducer from "./create_payment_method_reducer";
 import CreatePaymentTermReducer from "./create_payment_term_reducer";
 import CreatePaymentTermLineReducer from "./create_payment_term_line_reducer";
 import CreatePaymentTransactionReducer from "./create_payment_transaction_reducer";
+import CreatePayrollExportIntentReducer from "./create_payroll_export_intent_reducer";
 import CreatePayrollStructureReducer from "./create_payroll_structure_reducer";
 import CreatePayslipReducer from "./create_payslip_reducer";
+import CreatePerformanceCycleReducer from "./create_performance_cycle_reducer";
 import CreatePickingBatchReducer from "./create_picking_batch_reducer";
 import CreatePickingWaveReducer from "./create_picking_wave_reducer";
 import CreatePosConfigReducer from "./create_pos_config_reducer";
@@ -382,6 +401,7 @@ import CreateSavedReportReducer from "./create_saved_report_reducer";
 import CreateScheduledReportReducer from "./create_scheduled_report_reducer";
 import CreateShippingMethodReducer from "./create_shipping_method_reducer";
 import CreateSodConflictRuleReducer from "./create_sod_conflict_rule_reducer";
+import CreateStatutoryIdReducer from "./create_statutory_id_reducer";
 import CreateStockInventoryReducer from "./create_stock_inventory_reducer";
 import CreateStockInventoryLineReducer from "./create_stock_inventory_line_reducer";
 import CreateStockLocationReducer from "./create_stock_location_reducer";
@@ -421,6 +441,7 @@ import CreateWarehouse3DZoneReducer from "./create_warehouse_3_d_zone_reducer";
 import CreateWarehouseSyncIntentReducer from "./create_warehouse_sync_intent_reducer";
 import CreateWarehouseTaskReducer from "./create_warehouse_task_reducer";
 import CreateWhatsappBusinessAccountReducer from "./create_whatsapp_business_account_reducer";
+import CreateWorkScheduleReducer from "./create_work_schedule_reducer";
 import CreateWorkcenterReducer from "./create_workcenter_reducer";
 import CreateWorkflowReducer from "./create_workflow_reducer";
 import CreateWorkingCalendarReducer from "./create_working_calendar_reducer";
@@ -448,7 +469,9 @@ import DeleteDocumentReducer from "./delete_document_reducer";
 import DeleteFinancialReportReducer from "./delete_financial_report_reducer";
 import DeleteFiscalYearReducer from "./delete_fiscal_year_reducer";
 import DeleteFormFieldReducer from "./delete_form_field_reducer";
+import DeleteHrEmployeeDocumentReducer from "./delete_hr_employee_document_reducer";
 import DeleteHrEmployeeSkillReducer from "./delete_hr_employee_skill_reducer";
+import DeleteHrGlobalAssignmentReducer from "./delete_hr_global_assignment_reducer";
 import DeleteImportMappingTemplateReducer from "./delete_import_mapping_template_reducer";
 import DeleteIntegrationReducer from "./delete_integration_reducer";
 import DeleteIntercompanyRuleReducer from "./delete_intercompany_rule_reducer";
@@ -478,6 +501,7 @@ import DeleteSaleOrderLineReducer from "./delete_sale_order_line_reducer";
 import DeleteSaleOrderOptionReducer from "./delete_sale_order_option_reducer";
 import DeleteSavedReportReducer from "./delete_saved_report_reducer";
 import DeleteSearchEmbeddingReducer from "./delete_search_embedding_reducer";
+import DeleteStatutoryIdReducer from "./delete_statutory_id_reducer";
 import DeleteStockLocationReducer from "./delete_stock_location_reducer";
 import DeleteStockProductionLotReducer from "./delete_stock_production_lot_reducer";
 import DeleteStockProductionSerialReducer from "./delete_stock_production_serial_reducer";
@@ -607,12 +631,14 @@ import LockKnowledgeArticleReducer from "./lock_knowledge_article_reducer";
 import LockPurchaseOrderReducer from "./lock_purchase_order_reducer";
 import LockSaleOrderReducer from "./lock_sale_order_reducer";
 import LogAuditEventReducer from "./log_audit_event_reducer";
+import LogHrPiiReadReducer from "./log_hr_pii_read_reducer";
 import LogTimesheetReducer from "./log_timesheet_reducer";
 import LogWorkcenterProductivityReducer from "./log_workcenter_productivity_reducer";
 import MarkActionSentReducer from "./mark_action_sent_reducer";
 import MarkEmbeddingSyncedReducer from "./mark_embedding_synced_reducer";
 import MarkInviteAcceptedReducer from "./mark_invite_accepted_reducer";
 import MarkMailMessageDeliveredReducer from "./mark_mail_message_delivered_reducer";
+import MarkOnboardingDoneReducer from "./mark_onboarding_done_reducer";
 import MarkResetTokenUsedReducer from "./mark_reset_token_used_reducer";
 import MatchBankLineReducer from "./match_bank_line_reducer";
 import MatchEliminationEntriesReducer from "./match_elimination_entries_reducer";
@@ -641,6 +667,7 @@ import PostLandedCostsReducer from "./post_landed_costs_reducer";
 import PostMessageReducer from "./post_message_reducer";
 import PostPaymentReducer from "./post_payment_reducer";
 import PostPaymentTransactionReducer from "./post_payment_transaction_reducer";
+import PostPayslipReducer from "./post_payslip_reducer";
 import PostRealizedFxGainLossReducer from "./post_realized_fx_gain_loss_reducer";
 import ProcessConsolidationReducer from "./process_consolidation_reducer";
 import ProcessIntercompanyTransactionReducer from "./process_intercompany_transaction_reducer";
@@ -669,8 +696,10 @@ import RecordDocumentViewReducer from "./record_document_view_reducer";
 import RecordGeneratedOwnerReportReducer from "./record_generated_owner_report_reducer";
 import RecordGoogleDriveSyncReducer from "./record_google_drive_sync_reducer";
 import RecordGoogleDriveSyncErrorReducer from "./record_google_drive_sync_error_reducer";
+import RecordHrIntegrationResultReducer from "./record_hr_integration_result_reducer";
 import RecordInventoryIntegrationResultReducer from "./record_inventory_integration_result_reducer";
 import RecordMessageCopiedReducer from "./record_message_copied_reducer";
+import RecordPayrollExportResultReducer from "./record_payroll_export_result_reducer";
 import RecordPrivacyConsentReducer from "./record_privacy_consent_reducer";
 import RecordPurchasingIntegrationResultReducer from "./record_purchasing_integration_result_reducer";
 import RecordReportRunReducer from "./record_report_run_reducer";
@@ -681,6 +710,7 @@ import RecordTelemetryBatchReducer from "./record_telemetry_batch_reducer";
 import RecordWhatsappHealthCheckReducer from "./record_whatsapp_health_check_reducer";
 import RecordWhatsappMessageSentReducer from "./record_whatsapp_message_sent_reducer";
 import RefreshCapacityForecastReducer from "./refresh_capacity_forecast_reducer";
+import RefreshHrCapacityForecastReducer from "./refresh_hr_capacity_forecast_reducer";
 import RefreshInventoryExceptionsReducer from "./refresh_inventory_exceptions_reducer";
 import RefreshPolicySnapshotReducer from "./refresh_policy_snapshot_reducer";
 import RefreshProjectEarnedValueReducer from "./refresh_project_earned_value_reducer";
@@ -752,6 +782,7 @@ import RunAllCoreTestsReducer from "./run_all_core_tests_reducer";
 import RunAllCrmTestsReducer from "./run_all_crm_tests_reducer";
 import RunAllDomainTestsReducer from "./run_all_domain_tests_reducer";
 import RunAllExpensesTestsReducer from "./run_all_expenses_tests_reducer";
+import RunAllHrTestsReducer from "./run_all_hr_tests_reducer";
 import RunAllInventoryTestsReducer from "./run_all_inventory_tests_reducer";
 import RunAllPlatformTestsReducer from "./run_all_platform_tests_reducer";
 import RunAllProjectsTestsReducer from "./run_all_projects_tests_reducer";
@@ -779,6 +810,7 @@ import RunFxRevaluationReducer from "./run_fx_revaluation_reducer";
 import RunFxRevaluationBatchReducer from "./run_fx_revaluation_batch_reducer";
 import RunHelpdeskTicketTestReducer from "./run_helpdesk_ticket_test_reducer";
 import RunHrLeaveTypeTestReducer from "./run_hr_leave_type_test_reducer";
+import RunHrWaveATestReducer from "./run_hr_wave_a_test_reducer";
 import RunInventory3PlAsnTestReducer from "./run_inventory_3_pl_asn_test_reducer";
 import RunInventoryAdjustmentTestReducer from "./run_inventory_adjustment_test_reducer";
 import RunInventoryAtpFailClosedTestReducer from "./run_inventory_atp_fail_closed_test_reducer";
@@ -857,6 +889,7 @@ import SaveProposalVersionReducer from "./save_proposal_version_reducer";
 import ScheduleSalesSlaEscalationReducer from "./schedule_sales_sla_escalation_reducer";
 import ScheduleTaxDeadlineUpdatesReducer from "./schedule_tax_deadline_updates_reducer";
 import SeedDevDataReducer from "./seed_dev_data_reducer";
+import SeedHrCountryPackOverlaysReducer from "./seed_hr_country_pack_overlays_reducer";
 import SeedOrganizationFormConfigsReducer from "./seed_organization_form_configs_reducer";
 import SeedPackHolidaysReducer from "./seed_pack_holidays_reducer";
 import SeedStatutoryExpenseMileageRatesReducer from "./seed_statutory_expense_mileage_rates_reducer";
@@ -898,6 +931,7 @@ import SolveQualityAlertReducer from "./solve_quality_alert_reducer";
 import StageBankStatementImportReducer from "./stage_bank_statement_import_reducer";
 import StartCycleCountSessionReducer from "./start_cycle_count_session_reducer";
 import StartManufacturingOrderReducer from "./start_manufacturing_order_reducer";
+import StartOffboardingReducer from "./start_offboarding_reducer";
 import StartPickingBatchReducer from "./start_picking_batch_reducer";
 import StartQualityCheckReducer from "./start_quality_check_reducer";
 import StartTimesheetTimerReducer from "./start_timesheet_timer_reducer";
@@ -908,6 +942,8 @@ import StoreSsoUserCredentialReducer from "./store_sso_user_credential_reducer";
 import StoreUserCredentialReducer from "./store_user_credential_reducer";
 import SubmitExpenseReducer from "./submit_expense_reducer";
 import SubmitExpenseSheetReducer from "./submit_expense_sheet_reducer";
+import SubmitLeaveReducer from "./submit_leave_reducer";
+import SubmitPerformanceReviewReducer from "./submit_performance_review_reducer";
 import SubmitPurchaseRequisitionReducer from "./submit_purchase_requisition_reducer";
 import SubmitSupplierIntakeReducer from "./submit_supplier_intake_reducer";
 import SubscribeToRecordReducer from "./subscribe_to_record_reducer";
@@ -916,6 +952,7 @@ import TestIotDeviceReducer from "./test_iot_device_reducer";
 import ToggleProjectFavoriteReducer from "./toggle_project_favorite_reducer";
 import UnassignTeamMemberSkillReducer from "./unassign_team_member_skill_reducer";
 import UnblockWorkcenterReducer from "./unblock_workcenter_reducer";
+import UnenrollBenefitEnrollmentReducer from "./unenroll_benefit_enrollment_reducer";
 import UnlinkDeviceReducer from "./unlink_device_reducer";
 import UnlockDocumentReducer from "./unlock_document_reducer";
 import UnlockKnowledgeArticleReducer from "./unlock_knowledge_article_reducer";
@@ -981,7 +1018,9 @@ import UpdateFiscalYearReducer from "./update_fiscal_year_reducer";
 import UpdateFormFieldReducer from "./update_form_field_reducer";
 import UpdateGoogleDriveConnectionReducer from "./update_google_drive_connection_reducer";
 import UpdateGoogleDriveCredentialsReducer from "./update_google_drive_credentials_reducer";
+import UpdateHrApplicantReducer from "./update_hr_applicant_reducer";
 import UpdateHrEmployeeSkillReducer from "./update_hr_employee_skill_reducer";
+import UpdateHrGlobalAssignmentReducer from "./update_hr_global_assignment_reducer";
 import UpdateHrSkillReducer from "./update_hr_skill_reducer";
 import UpdateHubHeartbeatReducer from "./update_hub_heartbeat_reducer";
 import UpdateIntegrationStatusReducer from "./update_integration_status_reducer";
@@ -1045,6 +1084,7 @@ import UpdateSaleOrderLineReducer from "./update_sale_order_line_reducer";
 import UpdateSaleOrderOptionReducer from "./update_sale_order_option_reducer";
 import UpdateSavedReportReducer from "./update_saved_report_reducer";
 import UpdateSodConflictRuleReducer from "./update_sod_conflict_rule_reducer";
+import UpdateStatutoryIdReducer from "./update_statutory_id_reducer";
 import UpdateStockInventoryStateReducer from "./update_stock_inventory_state_reducer";
 import UpdateStockLocationReducer from "./update_stock_location_reducer";
 import UpdateStockProductionLotReducer from "./update_stock_production_lot_reducer";
@@ -1234,9 +1274,17 @@ import HelpdeskSlaRow from "./helpdesk_sla_table";
 import HelpdeskStageRow from "./helpdesk_stage_table";
 import HelpdeskTeamRow from "./helpdesk_team_table";
 import HelpdeskTicketRow from "./helpdesk_ticket_table";
+import HrApplicantRow from "./hr_applicant_table";
+import HrAttendanceRow from "./hr_attendance_table";
+import HrBenefitEnrollmentRow from "./hr_benefit_enrollment_table";
+import HrBenefitPlanRow from "./hr_benefit_plan_table";
+import HrCapacityForecastRow from "./hr_capacity_forecast_table";
+import HrCompensationEventRow from "./hr_compensation_event_table";
 import HrContractRow from "./hr_contract_table";
+import HrCountryPackLeaveDefaultRow from "./hr_country_pack_leave_default_table";
 import HrDepartmentRow from "./hr_department_table";
 import HrEmployeeRow from "./hr_employee_table";
+import HrEmployeeDocumentRow from "./hr_employee_document_table";
 import HrEmployeeSkillRow from "./hr_employee_skill_table";
 import HrExpenseRow from "./hr_expense_table";
 import HrExpenseAdvanceRow from "./hr_expense_advance_table";
@@ -1247,14 +1295,30 @@ import HrExpensePerDiemRateRow from "./hr_expense_per_diem_rate_table";
 import HrExpensePolicyRow from "./hr_expense_policy_table";
 import HrExpensePolicyExceptionRow from "./hr_expense_policy_exception_table";
 import HrExpenseReceiptRow from "./hr_expense_receipt_table";
+import HrGlobalAssignmentRow from "./hr_global_assignment_table";
+import HrIntegrationIntentRow from "./hr_integration_intent_table";
 import HrJobPositionRow from "./hr_job_position_table";
+import HrLaborCostSnapshotRow from "./hr_labor_cost_snapshot_table";
 import HrLeaveRow from "./hr_leave_table";
+import HrLeaveAllocationRow from "./hr_leave_allocation_table";
 import HrLeaveTypeRow from "./hr_leave_type_table";
+import HrOffboardingChecklistRow from "./hr_offboarding_checklist_table";
+import HrOnboardingProgressRow from "./hr_onboarding_progress_table";
+import HrOnboardingTemplateRow from "./hr_onboarding_template_table";
+import HrOnboardingTemplateItemRow from "./hr_onboarding_template_item_table";
+import HrPayrollExportIntentRow from "./hr_payroll_export_intent_table";
 import HrPayrollStructureRow from "./hr_payroll_structure_table";
 import HrPayslipRow from "./hr_payslip_table";
+import HrPerformanceCycleRow from "./hr_performance_cycle_table";
+import HrPerformanceGoalRow from "./hr_performance_goal_table";
+import HrPerformanceReviewRow from "./hr_performance_review_table";
+import HrPiiAccessLogRow from "./hr_pii_access_log_table";
 import HrResourceRow from "./hr_resource_table";
 import HrSalaryRuleRow from "./hr_salary_rule_table";
+import HrShiftOptJobRow from "./hr_shift_opt_job_table";
 import HrSkillRow from "./hr_skill_table";
+import HrStatutoryIdRow from "./hr_statutory_id_table";
+import HrWorkScheduleRow from "./hr_work_schedule_table";
 import ImportJobRow from "./import_job_table";
 import ImportJobErrorRow from "./import_job_error_table";
 import ImportJobRecordRow from "./import_job_record_table";
@@ -3802,6 +3866,123 @@ const tablesSchema = __schema({
       { name: 'helpdesk_ticket_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HelpdeskTicketRow),
+  hr_applicant: __table({
+    name: 'hr_applicant',
+    indexes: [
+      { name: 'applicant_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'applicant_by_job', algorithm: 'btree', columns: [
+        'jobPositionId',
+      ] },
+      { name: 'applicant_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_applicant_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrApplicantRow),
+  hr_attendance: __table({
+    name: 'hr_attendance',
+    indexes: [
+      { name: 'attendance_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'attendance_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'attendance_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_attendance_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrAttendanceRow),
+  hr_benefit_enrollment: __table({
+    name: 'hr_benefit_enrollment',
+    indexes: [
+      { name: 'benefit_enroll_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'benefit_enroll_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'benefit_enroll_by_plan', algorithm: 'btree', columns: [
+        'planId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_benefit_enrollment_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrBenefitEnrollmentRow),
+  hr_benefit_plan: __table({
+    name: 'hr_benefit_plan',
+    indexes: [
+      { name: 'benefit_plan_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'benefit_plan_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_benefit_plan_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrBenefitPlanRow),
+  hr_capacity_forecast: __table({
+    name: 'hr_capacity_forecast',
+    indexes: [
+      { name: 'hr_capacity_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'hr_capacity_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'hr_capacity_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_capacity_forecast_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrCapacityForecastRow),
+  hr_compensation_event: __table({
+    name: 'hr_compensation_event',
+    indexes: [
+      { name: 'compensation_by_contract', algorithm: 'btree', columns: [
+        'contractId',
+      ] },
+      { name: 'compensation_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'compensation_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_compensation_event_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrCompensationEventRow),
   hr_contract: __table({
     name: 'hr_contract',
     indexes: [
@@ -3822,6 +4003,20 @@ const tablesSchema = __schema({
       { name: 'hr_contract_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrContractRow),
+  hr_country_pack_leave_default: __table({
+    name: 'hr_country_pack_leave_default',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'hr_leave_default_by_pack', algorithm: 'btree', columns: [
+        'packKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_country_pack_leave_default_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrCountryPackLeaveDefaultRow),
   hr_department: __table({
     name: 'hr_department',
     indexes: [
@@ -3859,6 +4054,26 @@ const tablesSchema = __schema({
       { name: 'hr_employee_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrEmployeeRow),
+  hr_employee_document: __table({
+    name: 'hr_employee_document',
+    indexes: [
+      { name: 'emp_doc_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'emp_doc_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'emp_doc_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_employee_document_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrEmployeeDocumentRow),
   hr_employee_skill: __table({
     name: 'hr_employee_skill',
     indexes: [
@@ -4044,6 +4259,55 @@ const tablesSchema = __schema({
       { name: 'hr_expense_receipt_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrExpenseReceiptRow),
+  hr_global_assignment: __table({
+    name: 'hr_global_assignment',
+    indexes: [
+      { name: 'global_assign_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'global_assign_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'global_assign_by_host', algorithm: 'btree', columns: [
+        'hostCompanyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'global_assign_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_global_assignment_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrGlobalAssignmentRow),
+  hr_integration_intent: __table({
+    name: 'hr_integration_intent',
+    indexes: [
+      { name: 'hr_intent_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'hr_intent_by_key', algorithm: 'btree', columns: [
+        'idempotencyKey',
+      ] },
+      { name: 'hr_intent_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'hr_intent_by_payslip', algorithm: 'btree', columns: [
+        'payslipId',
+      ] },
+      { name: 'hr_intent_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_integration_intent_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrIntegrationIntentRow),
   hr_job_position: __table({
     name: 'hr_job_position',
     indexes: [
@@ -4061,6 +4325,26 @@ const tablesSchema = __schema({
       { name: 'hr_job_position_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrJobPositionRow),
+  hr_labor_cost_snapshot: __table({
+    name: 'hr_labor_cost_snapshot',
+    indexes: [
+      { name: 'labor_cost_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'labor_cost_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'labor_cost_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_labor_cost_snapshot_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrLaborCostSnapshotRow),
   hr_leave: __table({
     name: 'hr_leave',
     indexes: [
@@ -4081,6 +4365,23 @@ const tablesSchema = __schema({
       { name: 'hr_leave_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrLeaveRow),
+  hr_leave_allocation: __table({
+    name: 'hr_leave_allocation',
+    indexes: [
+      { name: 'leave_allocation_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'leave_allocation_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_leave_allocation_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrLeaveAllocationRow),
   hr_leave_type: __table({
     name: 'hr_leave_type',
     indexes: [
@@ -4095,6 +4396,103 @@ const tablesSchema = __schema({
       { name: 'hr_leave_type_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrLeaveTypeRow),
+  hr_offboarding_checklist: __table({
+    name: 'hr_offboarding_checklist',
+    indexes: [
+      { name: 'offboarding_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'offboarding_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_offboarding_checklist_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrOffboardingChecklistRow),
+  hr_onboarding_progress: __table({
+    name: 'hr_onboarding_progress',
+    indexes: [
+      { name: 'onboarding_prog_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'onboarding_prog_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'onboarding_prog_by_template', algorithm: 'btree', columns: [
+        'templateId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_onboarding_progress_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrOnboardingProgressRow),
+  hr_onboarding_template: __table({
+    name: 'hr_onboarding_template',
+    indexes: [
+      { name: 'onboarding_tpl_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'onboarding_tpl_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_onboarding_template_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrOnboardingTemplateRow),
+  hr_onboarding_template_item: __table({
+    name: 'hr_onboarding_template_item',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'onboarding_tpl_item_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'onboarding_tpl_item_by_template', algorithm: 'btree', columns: [
+        'templateId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_onboarding_template_item_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrOnboardingTemplateItemRow),
+  hr_payroll_export_intent: __table({
+    name: 'hr_payroll_export_intent',
+    indexes: [
+      { name: 'payroll_export_intent_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'payroll_export_intent_by_key', algorithm: 'btree', columns: [
+        'idempotencyKey',
+      ] },
+      { name: 'payroll_export_intent_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'payroll_export_intent_by_payslip', algorithm: 'btree', columns: [
+        'payslipId',
+      ] },
+      { name: 'payroll_export_intent_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_payroll_export_intent_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrPayrollExportIntentRow),
   hr_payroll_structure: __table({
     name: 'hr_payroll_structure',
     indexes: [
@@ -4129,6 +4527,80 @@ const tablesSchema = __schema({
       { name: 'hr_payslip_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrPayslipRow),
+  hr_performance_cycle: __table({
+    name: 'hr_performance_cycle',
+    indexes: [
+      { name: 'perf_cycle_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'perf_cycle_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_performance_cycle_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrPerformanceCycleRow),
+  hr_performance_goal: __table({
+    name: 'hr_performance_goal',
+    indexes: [
+      { name: 'perf_goal_by_cycle', algorithm: 'btree', columns: [
+        'cycleId',
+      ] },
+      { name: 'perf_goal_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'perf_goal_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_performance_goal_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrPerformanceGoalRow),
+  hr_performance_review: __table({
+    name: 'hr_performance_review',
+    indexes: [
+      { name: 'perf_review_by_cycle', algorithm: 'btree', columns: [
+        'cycleId',
+      ] },
+      { name: 'perf_review_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'perf_review_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_performance_review_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrPerformanceReviewRow),
+  hr_pii_access_log: __table({
+    name: 'hr_pii_access_log',
+    indexes: [
+      { name: 'pii_log_by_actor', algorithm: 'btree', columns: [
+        'actorIdentity',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'pii_log_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_pii_access_log_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrPiiAccessLogRow),
   hr_resource: __table({
     name: 'hr_resource',
     indexes: [
@@ -4160,6 +4632,26 @@ const tablesSchema = __schema({
       { name: 'hr_salary_rule_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrSalaryRuleRow),
+  hr_shift_opt_job: __table({
+    name: 'hr_shift_opt_job',
+    indexes: [
+      { name: 'shift_opt_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'shift_opt_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'shift_opt_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_shift_opt_job_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrShiftOptJobRow),
   hr_skill: __table({
     name: 'hr_skill',
     indexes: [
@@ -4177,6 +4669,43 @@ const tablesSchema = __schema({
       { name: 'hr_skill_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HrSkillRow),
+  hr_statutory_id: __table({
+    name: 'hr_statutory_id',
+    indexes: [
+      { name: 'statutory_id_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'statutory_id_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'statutory_id_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_statutory_id_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrStatutoryIdRow),
+  hr_work_schedule: __table({
+    name: 'hr_work_schedule',
+    indexes: [
+      { name: 'work_schedule_by_employee', algorithm: 'btree', columns: [
+        'employeeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'work_schedule_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'hr_work_schedule_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HrWorkScheduleRow),
   import_job: __table({
     name: 'import_job',
     indexes: [
@@ -8078,6 +8607,7 @@ const reducersSchema = __reducers(
   __reducerSchema("add_landed_cost_line", AddLandedCostLineReducer),
   __reducerSchema("add_member_to_quality_team", AddMemberToQualityTeamReducer),
   __reducerSchema("add_org_member", AddOrgMemberReducer),
+  __reducerSchema("add_performance_goal", AddPerformanceGoalReducer),
   __reducerSchema("add_proposal_comment", AddProposalCommentReducer),
   __reducerSchema("add_proposal_line_item", AddProposalLineItemReducer),
   __reducerSchema("add_proposal_source_doc", AddProposalSourceDocReducer),
@@ -8101,11 +8631,13 @@ const reducersSchema = __reducers(
   __reducerSchema("apply_expense_advance_to_sheet", ApplyExpenseAdvanceToSheetReducer),
   __reducerSchema("apply_expense_integration_intent", ApplyExpenseIntegrationIntentReducer),
   __reducerSchema("apply_global_migrations", ApplyGlobalMigrationsReducer),
+  __reducerSchema("apply_hr_integration_intent", ApplyHrIntegrationIntentReducer),
   __reducerSchema("apply_index_linked_renewal", ApplyIndexLinkedRenewalReducer),
   __reducerSchema("apply_landed_costs", ApplyLandedCostsReducer),
   __reducerSchema("apply_omnichannel_allocation", ApplyOmnichannelAllocationReducer),
   __reducerSchema("apply_org_migrations", ApplyOrgMigrationsReducer),
   __reducerSchema("apply_pending_expense_integration_intents", ApplyPendingExpenseIntegrationIntentsReducer),
+  __reducerSchema("apply_pending_hr_integration_intents", ApplyPendingHrIntegrationIntentsReducer),
   __reducerSchema("apply_pending_project_integration_intents", ApplyPendingProjectIntegrationIntentsReducer),
   __reducerSchema("apply_project_change_order", ApplyProjectChangeOrderReducer),
   __reducerSchema("apply_project_integration_intent", ApplyProjectIntegrationIntentReducer),
@@ -8131,7 +8663,9 @@ const reducersSchema = __reducers(
   __reducerSchema("archive_employee", ArchiveEmployeeReducer),
   __reducerSchema("archive_financial_report", ArchiveFinancialReportReducer),
   __reducerSchema("archive_payment_account", ArchivePaymentAccountReducer),
+  __reducerSchema("assign_benefit_enrollment", AssignBenefitEnrollmentReducer),
   __reducerSchema("assign_contact_role", AssignContactRoleReducer),
+  __reducerSchema("assign_onboarding_template", AssignOnboardingTemplateReducer),
   __reducerSchema("assign_quality_alert", AssignQualityAlertReducer),
   __reducerSchema("assign_role", AssignRoleReducer),
   __reducerSchema("assign_stock_move", AssignStockMoveReducer),
@@ -8187,6 +8721,9 @@ const reducersSchema = __reducers(
   __reducerSchema("complete_ai_agent_run", CompleteAiAgentRunReducer),
   __reducerSchema("complete_document_processing_job", CompleteDocumentProcessingJobReducer),
   __reducerSchema("complete_intercompany_transaction", CompleteIntercompanyTransactionReducer),
+  __reducerSchema("complete_offboarding_item", CompleteOffboardingItemReducer),
+  __reducerSchema("complete_onboarding_item", CompleteOnboardingItemReducer),
+  __reducerSchema("complete_performance_review", CompletePerformanceReviewReducer),
   __reducerSchema("complete_picking_batch", CompletePickingBatchReducer),
   __reducerSchema("complete_picking_wave", CompletePickingWaveReducer),
   __reducerSchema("complete_productivity_log", CompleteProductivityLogReducer),
@@ -8247,10 +8784,12 @@ const reducersSchema = __reducers(
   __reducerSchema("create_analytics_metric", CreateAnalyticsMetricReducer),
   __reducerSchema("create_approval_rule", CreateApprovalRuleReducer),
   __reducerSchema("create_assignment_rule", CreateAssignmentRuleReducer),
+  __reducerSchema("create_attendance_punch", CreateAttendancePunchReducer),
   __reducerSchema("create_audit_rule", CreateAuditRuleReducer),
   __reducerSchema("create_bad_debt_write_off", CreateBadDebtWriteOffReducer),
   __reducerSchema("create_barcode_nomenclature", CreateBarcodeNomenclatureReducer),
   __reducerSchema("create_barcode_rule", CreateBarcodeRuleReducer),
+  __reducerSchema("create_benefit_plan", CreateBenefitPlanReducer),
   __reducerSchema("create_bill_from_purchase_order", CreateBillFromPurchaseOrderReducer),
   __reducerSchema("create_billing_account", CreateBillingAccountReducer),
   __reducerSchema("create_bom", CreateBomReducer),
@@ -8309,7 +8848,13 @@ const reducersSchema = __reducers(
   __reducerSchema("create_helpdesk_sla", CreateHelpdeskSlaReducer),
   __reducerSchema("create_helpdesk_stage", CreateHelpdeskStageReducer),
   __reducerSchema("create_helpdesk_team", CreateHelpdeskTeamReducer),
+  __reducerSchema("create_hr_applicant", CreateHrApplicantReducer),
+  __reducerSchema("create_hr_employee_document", CreateHrEmployeeDocumentReducer),
   __reducerSchema("create_hr_employee_skill", CreateHrEmployeeSkillReducer),
+  __reducerSchema("create_hr_global_assignment", CreateHrGlobalAssignmentReducer),
+  __reducerSchema("create_hr_integration_intent", CreateHrIntegrationIntentReducer),
+  __reducerSchema("create_hr_labor_cost_snapshot", CreateHrLaborCostSnapshotReducer),
+  __reducerSchema("create_hr_shift_opt_job", CreateHrShiftOptJobReducer),
   __reducerSchema("create_hr_skill", CreateHrSkillReducer),
   __reducerSchema("create_incoterm", CreateIncotermReducer),
   __reducerSchema("create_intercompany_rule", CreateIntercompanyRuleReducer),
@@ -8336,6 +8881,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_manufacturing_order", CreateManufacturingOrderReducer),
   __reducerSchema("create_message_batch", CreateMessageBatchReducer),
   __reducerSchema("create_message_template", CreateMessageTemplateReducer),
+  __reducerSchema("create_onboarding_template", CreateOnboardingTemplateReducer),
   __reducerSchema("create_operational_message", CreateOperationalMessageReducer),
   __reducerSchema("create_opportunity", CreateOpportunityReducer),
   __reducerSchema("create_opportunity_line", CreateOpportunityLineReducer),
@@ -8351,8 +8897,10 @@ const reducersSchema = __reducers(
   __reducerSchema("create_payment_term", CreatePaymentTermReducer),
   __reducerSchema("create_payment_term_line", CreatePaymentTermLineReducer),
   __reducerSchema("create_payment_transaction", CreatePaymentTransactionReducer),
+  __reducerSchema("create_payroll_export_intent", CreatePayrollExportIntentReducer),
   __reducerSchema("create_payroll_structure", CreatePayrollStructureReducer),
   __reducerSchema("create_payslip", CreatePayslipReducer),
+  __reducerSchema("create_performance_cycle", CreatePerformanceCycleReducer),
   __reducerSchema("create_picking_batch", CreatePickingBatchReducer),
   __reducerSchema("create_picking_wave", CreatePickingWaveReducer),
   __reducerSchema("create_pos_config", CreatePosConfigReducer),
@@ -8408,6 +8956,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_scheduled_report", CreateScheduledReportReducer),
   __reducerSchema("create_shipping_method", CreateShippingMethodReducer),
   __reducerSchema("create_sod_conflict_rule", CreateSodConflictRuleReducer),
+  __reducerSchema("create_statutory_id", CreateStatutoryIdReducer),
   __reducerSchema("create_stock_inventory", CreateStockInventoryReducer),
   __reducerSchema("create_stock_inventory_line", CreateStockInventoryLineReducer),
   __reducerSchema("create_stock_location", CreateStockLocationReducer),
@@ -8447,6 +8996,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_warehouse_sync_intent", CreateWarehouseSyncIntentReducer),
   __reducerSchema("create_warehouse_task", CreateWarehouseTaskReducer),
   __reducerSchema("create_whatsapp_business_account", CreateWhatsappBusinessAccountReducer),
+  __reducerSchema("create_work_schedule", CreateWorkScheduleReducer),
   __reducerSchema("create_workcenter", CreateWorkcenterReducer),
   __reducerSchema("create_workflow", CreateWorkflowReducer),
   __reducerSchema("create_working_calendar", CreateWorkingCalendarReducer),
@@ -8474,7 +9024,9 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_financial_report", DeleteFinancialReportReducer),
   __reducerSchema("delete_fiscal_year", DeleteFiscalYearReducer),
   __reducerSchema("delete_form_field", DeleteFormFieldReducer),
+  __reducerSchema("delete_hr_employee_document", DeleteHrEmployeeDocumentReducer),
   __reducerSchema("delete_hr_employee_skill", DeleteHrEmployeeSkillReducer),
+  __reducerSchema("delete_hr_global_assignment", DeleteHrGlobalAssignmentReducer),
   __reducerSchema("delete_import_mapping_template", DeleteImportMappingTemplateReducer),
   __reducerSchema("delete_integration", DeleteIntegrationReducer),
   __reducerSchema("delete_intercompany_rule", DeleteIntercompanyRuleReducer),
@@ -8504,6 +9056,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_sale_order_option", DeleteSaleOrderOptionReducer),
   __reducerSchema("delete_saved_report", DeleteSavedReportReducer),
   __reducerSchema("delete_search_embedding", DeleteSearchEmbeddingReducer),
+  __reducerSchema("delete_statutory_id", DeleteStatutoryIdReducer),
   __reducerSchema("delete_stock_location", DeleteStockLocationReducer),
   __reducerSchema("delete_stock_production_lot", DeleteStockProductionLotReducer),
   __reducerSchema("delete_stock_production_serial", DeleteStockProductionSerialReducer),
@@ -8633,12 +9186,14 @@ const reducersSchema = __reducers(
   __reducerSchema("lock_purchase_order", LockPurchaseOrderReducer),
   __reducerSchema("lock_sale_order", LockSaleOrderReducer),
   __reducerSchema("log_audit_event", LogAuditEventReducer),
+  __reducerSchema("log_hr_pii_read", LogHrPiiReadReducer),
   __reducerSchema("log_timesheet", LogTimesheetReducer),
   __reducerSchema("log_workcenter_productivity", LogWorkcenterProductivityReducer),
   __reducerSchema("mark_action_sent", MarkActionSentReducer),
   __reducerSchema("mark_embedding_synced", MarkEmbeddingSyncedReducer),
   __reducerSchema("mark_invite_accepted", MarkInviteAcceptedReducer),
   __reducerSchema("mark_mail_message_delivered", MarkMailMessageDeliveredReducer),
+  __reducerSchema("mark_onboarding_done", MarkOnboardingDoneReducer),
   __reducerSchema("mark_reset_token_used", MarkResetTokenUsedReducer),
   __reducerSchema("match_bank_line", MatchBankLineReducer),
   __reducerSchema("match_elimination_entries", MatchEliminationEntriesReducer),
@@ -8667,6 +9222,7 @@ const reducersSchema = __reducers(
   __reducerSchema("post_message", PostMessageReducer),
   __reducerSchema("post_payment", PostPaymentReducer),
   __reducerSchema("post_payment_transaction", PostPaymentTransactionReducer),
+  __reducerSchema("post_payslip", PostPayslipReducer),
   __reducerSchema("post_realized_fx_gain_loss", PostRealizedFxGainLossReducer),
   __reducerSchema("process_consolidation", ProcessConsolidationReducer),
   __reducerSchema("process_intercompany_transaction", ProcessIntercompanyTransactionReducer),
@@ -8695,8 +9251,10 @@ const reducersSchema = __reducers(
   __reducerSchema("record_generated_owner_report", RecordGeneratedOwnerReportReducer),
   __reducerSchema("record_google_drive_sync", RecordGoogleDriveSyncReducer),
   __reducerSchema("record_google_drive_sync_error", RecordGoogleDriveSyncErrorReducer),
+  __reducerSchema("record_hr_integration_result", RecordHrIntegrationResultReducer),
   __reducerSchema("record_inventory_integration_result", RecordInventoryIntegrationResultReducer),
   __reducerSchema("record_message_copied", RecordMessageCopiedReducer),
+  __reducerSchema("record_payroll_export_result", RecordPayrollExportResultReducer),
   __reducerSchema("record_privacy_consent", RecordPrivacyConsentReducer),
   __reducerSchema("record_purchasing_integration_result", RecordPurchasingIntegrationResultReducer),
   __reducerSchema("record_report_run", RecordReportRunReducer),
@@ -8707,6 +9265,7 @@ const reducersSchema = __reducers(
   __reducerSchema("record_whatsapp_health_check", RecordWhatsappHealthCheckReducer),
   __reducerSchema("record_whatsapp_message_sent", RecordWhatsappMessageSentReducer),
   __reducerSchema("refresh_capacity_forecast", RefreshCapacityForecastReducer),
+  __reducerSchema("refresh_hr_capacity_forecast", RefreshHrCapacityForecastReducer),
   __reducerSchema("refresh_inventory_exceptions", RefreshInventoryExceptionsReducer),
   __reducerSchema("refresh_policy_snapshot", RefreshPolicySnapshotReducer),
   __reducerSchema("refresh_project_earned_value", RefreshProjectEarnedValueReducer),
@@ -8778,6 +9337,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_all_crm_tests", RunAllCrmTestsReducer),
   __reducerSchema("run_all_domain_tests", RunAllDomainTestsReducer),
   __reducerSchema("run_all_expenses_tests", RunAllExpensesTestsReducer),
+  __reducerSchema("run_all_hr_tests", RunAllHrTestsReducer),
   __reducerSchema("run_all_inventory_tests", RunAllInventoryTestsReducer),
   __reducerSchema("run_all_platform_tests", RunAllPlatformTestsReducer),
   __reducerSchema("run_all_projects_tests", RunAllProjectsTestsReducer),
@@ -8805,6 +9365,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_fx_revaluation_batch", RunFxRevaluationBatchReducer),
   __reducerSchema("run_helpdesk_ticket_test", RunHelpdeskTicketTestReducer),
   __reducerSchema("run_hr_leave_type_test", RunHrLeaveTypeTestReducer),
+  __reducerSchema("run_hr_wave_a_test", RunHrWaveATestReducer),
   __reducerSchema("run_inventory_3_pl_asn_test", RunInventory3PlAsnTestReducer),
   __reducerSchema("run_inventory_adjustment_test", RunInventoryAdjustmentTestReducer),
   __reducerSchema("run_inventory_atp_fail_closed_test", RunInventoryAtpFailClosedTestReducer),
@@ -8883,6 +9444,7 @@ const reducersSchema = __reducers(
   __reducerSchema("schedule_sales_sla_escalation", ScheduleSalesSlaEscalationReducer),
   __reducerSchema("schedule_tax_deadline_updates", ScheduleTaxDeadlineUpdatesReducer),
   __reducerSchema("seed_dev_data", SeedDevDataReducer),
+  __reducerSchema("seed_hr_country_pack_overlays", SeedHrCountryPackOverlaysReducer),
   __reducerSchema("seed_organization_form_configs", SeedOrganizationFormConfigsReducer),
   __reducerSchema("seed_pack_holidays", SeedPackHolidaysReducer),
   __reducerSchema("seed_statutory_expense_mileage_rates", SeedStatutoryExpenseMileageRatesReducer),
@@ -8924,6 +9486,7 @@ const reducersSchema = __reducers(
   __reducerSchema("stage_bank_statement_import", StageBankStatementImportReducer),
   __reducerSchema("start_cycle_count_session", StartCycleCountSessionReducer),
   __reducerSchema("start_manufacturing_order", StartManufacturingOrderReducer),
+  __reducerSchema("start_offboarding", StartOffboardingReducer),
   __reducerSchema("start_picking_batch", StartPickingBatchReducer),
   __reducerSchema("start_quality_check", StartQualityCheckReducer),
   __reducerSchema("start_timesheet_timer", StartTimesheetTimerReducer),
@@ -8934,6 +9497,8 @@ const reducersSchema = __reducers(
   __reducerSchema("store_user_credential", StoreUserCredentialReducer),
   __reducerSchema("submit_expense", SubmitExpenseReducer),
   __reducerSchema("submit_expense_sheet", SubmitExpenseSheetReducer),
+  __reducerSchema("submit_leave", SubmitLeaveReducer),
+  __reducerSchema("submit_performance_review", SubmitPerformanceReviewReducer),
   __reducerSchema("submit_purchase_requisition", SubmitPurchaseRequisitionReducer),
   __reducerSchema("submit_supplier_intake", SubmitSupplierIntakeReducer),
   __reducerSchema("subscribe_to_record", SubscribeToRecordReducer),
@@ -8942,6 +9507,7 @@ const reducersSchema = __reducers(
   __reducerSchema("toggle_project_favorite", ToggleProjectFavoriteReducer),
   __reducerSchema("unassign_team_member_skill", UnassignTeamMemberSkillReducer),
   __reducerSchema("unblock_workcenter", UnblockWorkcenterReducer),
+  __reducerSchema("unenroll_benefit_enrollment", UnenrollBenefitEnrollmentReducer),
   __reducerSchema("unlink_device", UnlinkDeviceReducer),
   __reducerSchema("unlock_document", UnlockDocumentReducer),
   __reducerSchema("unlock_knowledge_article", UnlockKnowledgeArticleReducer),
@@ -9007,7 +9573,9 @@ const reducersSchema = __reducers(
   __reducerSchema("update_form_field", UpdateFormFieldReducer),
   __reducerSchema("update_google_drive_connection", UpdateGoogleDriveConnectionReducer),
   __reducerSchema("update_google_drive_credentials", UpdateGoogleDriveCredentialsReducer),
+  __reducerSchema("update_hr_applicant", UpdateHrApplicantReducer),
   __reducerSchema("update_hr_employee_skill", UpdateHrEmployeeSkillReducer),
+  __reducerSchema("update_hr_global_assignment", UpdateHrGlobalAssignmentReducer),
   __reducerSchema("update_hr_skill", UpdateHrSkillReducer),
   __reducerSchema("update_hub_heartbeat", UpdateHubHeartbeatReducer),
   __reducerSchema("update_integration_status", UpdateIntegrationStatusReducer),
@@ -9071,6 +9639,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_sale_order_option", UpdateSaleOrderOptionReducer),
   __reducerSchema("update_saved_report", UpdateSavedReportReducer),
   __reducerSchema("update_sod_conflict_rule", UpdateSodConflictRuleReducer),
+  __reducerSchema("update_statutory_id", UpdateStatutoryIdReducer),
   __reducerSchema("update_stock_inventory_state", UpdateStockInventoryStateReducer),
   __reducerSchema("update_stock_location", UpdateStockLocationReducer),
   __reducerSchema("update_stock_production_lot", UpdateStockProductionLotReducer),

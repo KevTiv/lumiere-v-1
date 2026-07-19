@@ -5,6 +5,8 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::hr::offboarding::{assert_offboarding_ready_for_archive, ArchiveEmployeeParams};
+use crate::hr::pii::employee_audit_json;
 use crate::types::EmploymentType;
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -457,6 +459,7 @@ pub fn create_employee(
         deleted_at: None,
         metadata: params.metadata,
     });
+    let new_snapshot = employee_audit_json(&employee);
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -466,8 +469,12 @@ pub fn create_employee(
             record_id: employee.id,
             action: "CREATE",
             old_values: None,
-            new_values: None,
-            changed_fields: vec![],
+            new_values: Some(new_snapshot),
+            changed_fields: vec![
+                "name".to_string(),
+                "department_id".to_string(),
+                "employment_type".to_string(),
+            ],
             metadata: None,
         },
     );
@@ -495,7 +502,26 @@ pub fn update_employee(
     if emp.company_id != company_id {
         return Err("Employee does not belong to this company".to_string());
     }
-    ctx.db.hr_employee().id().update(HrEmployee {
+    let old_snapshot = employee_audit_json(&emp);
+    let changed_fields: Vec<String> = [
+        (params.name.is_some(), "name"),
+        (params.job_title.is_some(), "job_title"),
+        (params.job_id.is_some(), "job_id"),
+        (params.department_id.is_some(), "department_id"),
+        (params.parent_id.is_some(), "parent_id"),
+        (params.work_email.is_some(), "work_email"),
+        (params.work_phone.is_some(), "work_phone"),
+        (params.mobile_phone.is_some(), "mobile_phone"),
+        (params.work_location.is_some(), "work_location"),
+        (params.work_contact_partner_id.is_some(), "work_contact_partner_id"),
+        (params.employment_type.is_some(), "employment_type"),
+        (params.user_id.is_some(), "user_id"),
+    ]
+    .into_iter()
+    .filter(|(set, _)| *set)
+    .map(|(_, field)| field.to_string())
+    .collect();
+    let updated = HrEmployee {
         name: params.name.unwrap_or(emp.name),
         job_title: params.job_title.or(emp.job_title),
         job_id: params.job_id.or(emp.job_id),
@@ -511,7 +537,9 @@ pub fn update_employee(
         employment_type: params.employment_type.unwrap_or(emp.employment_type),
         user_id: params.user_id.or(emp.user_id),
         ..emp
-    });
+    };
+    let new_snapshot = employee_audit_json(&updated);
+    ctx.db.hr_employee().id().update(updated);
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -520,9 +548,9 @@ pub fn update_employee(
             table_name: "hr_employee",
             record_id: employee_id,
             action: "UPDATE",
-            old_values: None,
-            new_values: None,
-            changed_fields: vec![],
+            old_values: Some(old_snapshot),
+            new_values: Some(new_snapshot),
+            changed_fields,
             metadata: None,
         },
     );
@@ -535,7 +563,7 @@ pub fn archive_employee(
     organization_id: u64,
     company_id: u64,
     employee_id: u64,
-    termination_date: Option<Timestamp>,
+    params: ArchiveEmployeeParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_employee", "update")?;
     let emp = ctx
@@ -550,12 +578,24 @@ pub fn archive_employee(
     if emp.company_id != company_id {
         return Err("Employee does not belong to this company".to_string());
     }
-    ctx.db.hr_employee().id().update(HrEmployee {
+    assert_offboarding_ready_for_archive(ctx, organization_id, company_id, employee_id, &params)?;
+    let old_snapshot = employee_audit_json(&emp);
+    let archived = HrEmployee {
         is_active: false,
-        date_terminated: termination_date.or(Some(ctx.timestamp)),
+        date_terminated: params.termination_date.or(Some(ctx.timestamp)),
         deleted_at: Some(ctx.timestamp),
         ..emp
-    });
+    };
+    let new_snapshot = employee_audit_json(&archived);
+    ctx.db.hr_employee().id().update(archived);
+    let metadata = if params.override_incomplete_checklist {
+        Some(format!(
+            "archive_employee;override={}",
+            params.override_reason.unwrap_or_default()
+        ))
+    } else {
+        Some("archive_employee".to_string())
+    };
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -564,14 +604,14 @@ pub fn archive_employee(
             table_name: "hr_employee",
             record_id: employee_id,
             action: "UPDATE",
-            old_values: None,
-            new_values: None,
+            old_values: Some(old_snapshot),
+            new_values: Some(new_snapshot),
             changed_fields: vec![
                 "is_active".to_string(),
                 "date_terminated".to_string(),
                 "deleted_at".to_string(),
             ],
-            metadata: None,
+            metadata,
         },
     );
     Ok(())

@@ -6096,8 +6096,12 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         basic_wage: 8_000.0,
         gross_wage: 8_000.0,
         net_wage: 6_800.0, // 15% tax deducted
-        state: PayslipState::Done,
-        notes: Some("Confirmed payslip".to_string()),
+        state: PayslipState::Verify,
+        calculation_source: Some("manual".to_string()),
+        calculation_metadata: None,
+        account_move_id: None,
+        export_intent_id: None,
+        notes: Some("Approved for export (seed demo)".to_string()),
         created_at: ctx.timestamp,
     });
 
@@ -6115,8 +6119,12 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         basic_wage: 9_500.0,
         gross_wage: 9_500.0,
         net_wage: 8_075.0, // 15% tax deducted
-        state: PayslipState::Done,
-        notes: Some("Confirmed payslip".to_string()),
+        state: PayslipState::Verify,
+        calculation_source: Some("manual".to_string()),
+        calculation_metadata: None,
+        account_move_id: None,
+        export_intent_id: None,
+        notes: Some("Approved for export (seed demo)".to_string()),
         created_at: ctx.timestamp,
     });
 

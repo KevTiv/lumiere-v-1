@@ -5,6 +5,7 @@ use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::hr::compensation::append_compensation_event;
 use crate::types::ContractState;
 
 // ── Table ─────────────────────────────────────────────────────────────────────
@@ -61,6 +62,8 @@ pub struct UpdateContractParams {
     pub job_id: Option<u64>,
     pub department_id: Option<u64>,
     pub notes: Option<String>,
+    pub wage_change_reason: Option<String>,
+    pub wage_effective_from: Option<Timestamp>,
 }
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
@@ -133,15 +136,39 @@ pub fn update_contract(
     if contract.company_id != company_id {
         return Err("Contract does not belong to this company".to_string());
     }
+    let new_wage = params.wage.unwrap_or(contract.wage);
+    if let Some(w) = params.wage {
+        if w < 0.0 {
+            return Err("Wage cannot be negative".to_string());
+        }
+    }
+    let wage_changed = params.wage.is_some() && (new_wage - contract.wage).abs() > f64::EPSILON;
+
     ctx.db.hr_contract().id().update(HrContract {
         name: params.name.unwrap_or(contract.name),
-        wage: params.wage.unwrap_or(contract.wage),
+        wage: new_wage,
         date_end: params.date_end.or(contract.date_end),
         job_id: params.job_id.or(contract.job_id),
         department_id: params.department_id.or(contract.department_id),
         notes: params.notes.or(contract.notes),
         ..contract
     });
+
+    if wage_changed {
+        let effective_from = params.wage_effective_from.unwrap_or(ctx.timestamp);
+        append_compensation_event(
+            ctx,
+            organization_id,
+            company_id,
+            contract.employee_id,
+            contract_id,
+            new_wage,
+            contract.currency_id,
+            effective_from,
+            params.wage_change_reason,
+        );
+    }
+
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -152,7 +179,11 @@ pub fn update_contract(
             action: "UPDATE",
             old_values: None,
             new_values: None,
-            changed_fields: vec![],
+            changed_fields: if wage_changed {
+                vec!["wage".to_string()]
+            } else {
+                vec![]
+            },
             metadata: None,
         },
     );
@@ -163,6 +194,7 @@ pub fn update_contract(
 pub fn open_contract(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     contract_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_contract", "update")?;
@@ -175,7 +207,12 @@ pub fn open_contract(
     if contract.organization_id != organization_id {
         return Err("Contract belongs to a different organization".to_string());
     }
-    let company_id = contract.company_id;
+    if contract.company_id != company_id {
+        return Err("Contract does not belong to this company".to_string());
+    }
+    if contract.state != ContractState::New {
+        return Err("Contract can only be opened from New state".to_string());
+    }
     ctx.db.hr_contract().id().update(HrContract {
         state: ContractState::Open,
         ..contract
@@ -201,6 +238,7 @@ pub fn open_contract(
 pub fn expire_contract(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     contract_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_contract", "update")?;
@@ -213,7 +251,12 @@ pub fn expire_contract(
     if contract.organization_id != organization_id {
         return Err("Contract belongs to a different organization".to_string());
     }
-    let company_id = contract.company_id;
+    if contract.company_id != company_id {
+        return Err("Contract does not belong to this company".to_string());
+    }
+    if contract.state != ContractState::Open {
+        return Err("Contract can only be expired from Open state".to_string());
+    }
     ctx.db.hr_contract().id().update(HrContract {
         state: ContractState::Expired,
         ..contract
@@ -239,6 +282,7 @@ pub fn expire_contract(
 pub fn cancel_contract(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     contract_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_contract", "update")?;
@@ -251,7 +295,12 @@ pub fn cancel_contract(
     if contract.organization_id != organization_id {
         return Err("Contract belongs to a different organization".to_string());
     }
-    let company_id = contract.company_id;
+    if contract.company_id != company_id {
+        return Err("Contract does not belong to this company".to_string());
+    }
+    if contract.state != ContractState::New && contract.state != ContractState::Open {
+        return Err("Contract can only be cancelled from New or Open state".to_string());
+    }
     ctx.db.hr_contract().id().update(HrContract {
         state: ContractState::Cancelled,
         ..contract

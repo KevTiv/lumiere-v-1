@@ -47,6 +47,7 @@ pub mod add_casbin_rule_params_type;
 pub mod add_document_version_params_type;
 pub mod add_landed_cost_line_params_type;
 pub mod add_org_member_params_type;
+pub mod add_performance_goal_params_type;
 pub mod add_purchase_order_line_params_type;
 pub mod add_purchase_requisition_line_params_type;
 pub mod add_purchase_rfq_line_params_type;
@@ -93,9 +94,12 @@ pub mod apply_subscription_bundle_params_type;
 pub mod apply_subscription_invoice_payment_params_type;
 pub mod approval_request_type;
 pub mod approval_rule_type;
+pub mod archive_employee_params_type;
 pub mod asset_state_type;
 pub mod asset_type_type;
+pub mod assign_benefit_enrollment_params_type;
 pub mod assign_contact_role_params_type;
+pub mod assign_onboarding_template_params_type;
 pub mod assign_role_params_type;
 pub mod assign_team_member_skill_params_type;
 pub mod assign_user_to_picking_params_type;
@@ -136,6 +140,9 @@ pub mod company_scope_params_type;
 pub mod company_vertical_pack_type;
 pub mod complete_ai_agent_run_params_type;
 pub mod complete_document_processing_job_params_type;
+pub mod complete_offboarding_item_params_type;
+pub mod complete_onboarding_item_params_type;
+pub mod complete_performance_review_params_type;
 pub mod compute_price_type;
 pub mod confirm_payslip_params_type;
 pub mod consignment_agreement_type;
@@ -197,10 +204,12 @@ pub mod create_analytic_line_params_type;
 pub mod create_analytics_metric_params_type;
 pub mod create_approval_rule_params_type;
 pub mod create_assignment_rule_params_type;
+pub mod create_attendance_punch_params_type;
 pub mod create_audit_rule_params_type;
 pub mod create_bad_debt_write_off_params_type;
 pub mod create_barcode_nomenclature_params_type;
 pub mod create_barcode_rule_params_type;
+pub mod create_benefit_plan_params_type;
 pub mod create_bill_from_purchase_order_params_type;
 pub mod create_billing_account_params_type;
 pub mod create_bom_params_type;
@@ -257,7 +266,13 @@ pub mod create_form_field_params_type;
 pub mod create_helpdesk_sla_params_type;
 pub mod create_helpdesk_stage_params_type;
 pub mod create_helpdesk_team_params_type;
+pub mod create_hr_applicant_params_type;
+pub mod create_hr_employee_document_params_type;
 pub mod create_hr_employee_skill_params_type;
+pub mod create_hr_global_assignment_params_type;
+pub mod create_hr_integration_intent_params_type;
+pub mod create_hr_labor_cost_snapshot_params_type;
+pub mod create_hr_shift_opt_job_params_type;
 pub mod create_hr_skill_params_type;
 pub mod create_incoterm_params_type;
 pub mod create_intercompany_rule_params_type;
@@ -281,6 +296,8 @@ pub mod create_mail_template_params_type;
 pub mod create_message_batch_params_type;
 pub mod create_message_template_params_type;
 pub mod create_mrp_production_params_type;
+pub mod create_onboarding_template_item_params_type;
+pub mod create_onboarding_template_params_type;
 pub mod create_operational_message_params_type;
 pub mod create_opportunity_line_params_type;
 pub mod create_opportunity_params_type;
@@ -295,8 +312,10 @@ pub mod create_payment_params_type;
 pub mod create_payment_term_line_params_type;
 pub mod create_payment_term_params_type;
 pub mod create_payment_transaction_params_type;
+pub mod create_payroll_export_intent_params_type;
 pub mod create_payroll_structure_params_type;
 pub mod create_payslip_params_type;
+pub mod create_performance_cycle_params_type;
 pub mod create_picking_batch_params_type;
 pub mod create_picking_wave_params_type;
 pub mod create_pos_config_params_type;
@@ -358,6 +377,7 @@ pub mod create_saved_report_params_type;
 pub mod create_scheduled_report_params_type;
 pub mod create_shipping_method_params_type;
 pub mod create_sod_conflict_rule_params_type;
+pub mod create_statutory_id_params_type;
 pub mod create_stock_inventory_line_params_type;
 pub mod create_stock_inventory_params_type;
 pub mod create_stock_location_params_type;
@@ -397,6 +417,7 @@ pub mod create_warehouse_params_type;
 pub mod create_warehouse_sync_intent_params_type;
 pub mod create_warehouse_task_params_type;
 pub mod create_whats_app_business_account_params_type;
+pub mod create_work_schedule_params_type;
 pub mod create_workcenter_params_type;
 pub mod create_workcenter_productivity_params_type;
 pub mod create_workflow_params_type;
@@ -417,6 +438,7 @@ pub mod deferred_revenue_line_type;
 pub mod deferred_revenue_schedule_type;
 pub mod delegated_admin_scope_type;
 pub mod delete_account_move_line_params_type;
+pub mod delete_hr_employee_document_params_type;
 pub mod delivery_carrier_type;
 pub mod delivery_price_rule_type;
 pub mod deprecate_account_account_params_type;
@@ -475,9 +497,17 @@ pub mod helpdesk_stage_type;
 pub mod helpdesk_team_type;
 pub mod helpdesk_ticket_type;
 pub mod helpdesk_ticket_state_type;
+pub mod hr_applicant_type;
+pub mod hr_attendance_type;
+pub mod hr_benefit_enrollment_type;
+pub mod hr_benefit_plan_type;
+pub mod hr_capacity_forecast_type;
+pub mod hr_compensation_event_type;
 pub mod hr_contract_type;
+pub mod hr_country_pack_leave_default_type;
 pub mod hr_department_type;
 pub mod hr_employee_type;
+pub mod hr_employee_document_type;
 pub mod hr_employee_skill_type;
 pub mod hr_expense_type;
 pub mod hr_expense_advance_type;
@@ -489,15 +519,31 @@ pub mod hr_expense_policy_type;
 pub mod hr_expense_policy_exception_type;
 pub mod hr_expense_receipt_type;
 pub mod hr_expense_sheet_type;
+pub mod hr_global_assignment_type;
+pub mod hr_integration_intent_type;
 pub mod hr_job_position_type;
+pub mod hr_labor_cost_snapshot_type;
 pub mod hr_leave_type;
+pub mod hr_leave_allocation_type;
 pub mod hr_leave_state_type;
 pub mod hr_leave_type_type;
+pub mod hr_offboarding_checklist_type;
+pub mod hr_onboarding_progress_type;
+pub mod hr_onboarding_template_type;
+pub mod hr_onboarding_template_item_type;
+pub mod hr_payroll_export_intent_type;
 pub mod hr_payroll_structure_type;
 pub mod hr_payslip_type;
+pub mod hr_performance_cycle_type;
+pub mod hr_performance_goal_type;
+pub mod hr_performance_review_type;
+pub mod hr_pii_access_log_type;
 pub mod hr_resource_type;
 pub mod hr_salary_rule_type;
+pub mod hr_shift_opt_job_type;
 pub mod hr_skill_type;
+pub mod hr_statutory_id_type;
+pub mod hr_work_schedule_type;
 pub mod import_job_type;
 pub mod import_job_error_type;
 pub mod import_job_record_type;
@@ -539,6 +585,7 @@ pub mod line_invoice_status_type;
 pub mod line_state_type;
 pub mod link_subcontractor_cost_params_type;
 pub mod log_audit_event_params_type;
+pub mod log_hr_pii_read_params_type;
 pub mod log_timesheet_params_type;
 pub mod mail_follower_type;
 pub mod mail_message_type;
@@ -617,6 +664,7 @@ pub mod pos_session_type;
 pub mod pos_status_type;
 pub mod pos_terminal_type;
 pub mod post_expense_sheet_params_type;
+pub mod post_payslip_params_type;
 pub mod post_realized_fx_params_type;
 pub mod pricelist_applied_on_type;
 pub mod privacy_consent_type;
@@ -690,7 +738,9 @@ pub mod record_custom_field_entry_type;
 pub mod record_custom_field_value_type;
 pub mod record_cycle_count_line_params_type;
 pub mod record_generated_owner_report_params_type;
+pub mod record_hr_integration_result_params_type;
 pub mod record_inventory_integration_result_params_type;
+pub mod record_payroll_export_result_params_type;
 pub mod record_privacy_consent_params_type;
 pub mod record_purchasing_integration_result_params_type;
 pub mod record_sales_integration_result_params_type;
@@ -698,6 +748,7 @@ pub mod record_subscription_payment_failure_params_type;
 pub mod record_telemetry_params_type;
 pub mod record_whats_app_health_check_params_type;
 pub mod refresh_capacity_forecast_params_type;
+pub mod refresh_hr_capacity_forecast_params_type;
 pub mod refresh_inventory_exceptions_params_type;
 pub mod refresh_project_earned_value_params_type;
 pub mod refresh_project_margin_params_type;
@@ -707,6 +758,7 @@ pub mod register_device_params_type;
 pub mod register_hub_params_type;
 pub mod register_queue_worker_params_type;
 pub mod reject_approval_request_params_type;
+pub mod reject_expense_policy_exception_params_type;
 pub mod reject_timesheets_params_type;
 pub mod release_blanket_to_po_params_type;
 pub mod renew_subscription_params_type;
@@ -752,7 +804,9 @@ pub mod scheduled_report_run_type;
 pub mod schema_migration_type;
 pub mod search_embedding_type;
 pub mod section_status_type;
+pub mod seed_hr_country_pack_overlays_params_type;
 pub mod seed_pack_holidays_params_type;
+pub mod seed_statutory_expense_mileage_rates_params_type;
 pub mod segment_member_type;
 pub mod segment_rule_clause_type;
 pub mod segment_rule_field_type;
@@ -800,6 +854,7 @@ pub mod stock_reorder_group_type;
 pub mod stock_route_type;
 pub mod stock_rule_type;
 pub mod stock_traceability_report_type;
+pub mod submit_performance_review_params_type;
 pub mod submit_supplier_intake_params_type;
 pub mod subscription_type;
 pub mod subscription_amendment_type;
@@ -889,7 +944,9 @@ pub mod update_expense_params_type;
 pub mod update_financial_report_params_type;
 pub mod update_fiscal_year_params_type;
 pub mod update_form_field_params_type;
+pub mod update_hr_applicant_params_type;
 pub mod update_hr_employee_skill_params_type;
+pub mod update_hr_global_assignment_params_type;
 pub mod update_hr_skill_params_type;
 pub mod update_intercompany_rule_params_type;
 pub mod update_job_position_params_type;
@@ -939,6 +996,7 @@ pub mod update_sale_order_option_params_type;
 pub mod update_sale_order_params_type;
 pub mod update_saved_report_params_type;
 pub mod update_sod_conflict_rule_params_type;
+pub mod update_statutory_id_params_type;
 pub mod update_stock_location_params_type;
 pub mod update_stock_production_lot_params_type;
 pub mod update_stock_production_serial_params_type;
@@ -1024,6 +1082,7 @@ pub mod add_form_field_reducer;
 pub mod add_landed_cost_line_reducer;
 pub mod add_member_to_quality_team_reducer;
 pub mod add_org_member_reducer;
+pub mod add_performance_goal_reducer;
 pub mod add_proposal_comment_reducer;
 pub mod add_proposal_line_item_reducer;
 pub mod add_proposal_source_doc_reducer;
@@ -1047,11 +1106,13 @@ pub mod append_crm_conversation_message_reducer;
 pub mod apply_expense_advance_to_sheet_reducer;
 pub mod apply_expense_integration_intent_reducer;
 pub mod apply_global_migrations_reducer;
+pub mod apply_hr_integration_intent_reducer;
 pub mod apply_index_linked_renewal_reducer;
 pub mod apply_landed_costs_reducer;
 pub mod apply_omnichannel_allocation_reducer;
 pub mod apply_org_migrations_reducer;
 pub mod apply_pending_expense_integration_intents_reducer;
+pub mod apply_pending_hr_integration_intents_reducer;
 pub mod apply_pending_project_integration_intents_reducer;
 pub mod apply_project_change_order_reducer;
 pub mod apply_project_integration_intent_reducer;
@@ -1077,7 +1138,9 @@ pub mod archive_contact_identity_reducer;
 pub mod archive_employee_reducer;
 pub mod archive_financial_report_reducer;
 pub mod archive_payment_account_reducer;
+pub mod assign_benefit_enrollment_reducer;
 pub mod assign_contact_role_reducer;
+pub mod assign_onboarding_template_reducer;
 pub mod assign_quality_alert_reducer;
 pub mod assign_role_reducer;
 pub mod assign_stock_move_reducer;
@@ -1133,6 +1196,9 @@ pub mod complete_activity_reducer;
 pub mod complete_ai_agent_run_reducer;
 pub mod complete_document_processing_job_reducer;
 pub mod complete_intercompany_transaction_reducer;
+pub mod complete_offboarding_item_reducer;
+pub mod complete_onboarding_item_reducer;
+pub mod complete_performance_review_reducer;
 pub mod complete_picking_batch_reducer;
 pub mod complete_picking_wave_reducer;
 pub mod complete_productivity_log_reducer;
@@ -1193,10 +1259,12 @@ pub mod create_analytic_line_reducer;
 pub mod create_analytics_metric_reducer;
 pub mod create_approval_rule_reducer;
 pub mod create_assignment_rule_reducer;
+pub mod create_attendance_punch_reducer;
 pub mod create_audit_rule_reducer;
 pub mod create_bad_debt_write_off_reducer;
 pub mod create_barcode_nomenclature_reducer;
 pub mod create_barcode_rule_reducer;
+pub mod create_benefit_plan_reducer;
 pub mod create_bill_from_purchase_order_reducer;
 pub mod create_billing_account_reducer;
 pub mod create_bom_reducer;
@@ -1255,7 +1323,13 @@ pub mod create_google_drive_connection_reducer;
 pub mod create_helpdesk_sla_reducer;
 pub mod create_helpdesk_stage_reducer;
 pub mod create_helpdesk_team_reducer;
+pub mod create_hr_applicant_reducer;
+pub mod create_hr_employee_document_reducer;
 pub mod create_hr_employee_skill_reducer;
+pub mod create_hr_global_assignment_reducer;
+pub mod create_hr_integration_intent_reducer;
+pub mod create_hr_labor_cost_snapshot_reducer;
+pub mod create_hr_shift_opt_job_reducer;
 pub mod create_hr_skill_reducer;
 pub mod create_incoterm_reducer;
 pub mod create_intercompany_rule_reducer;
@@ -1282,6 +1356,7 @@ pub mod create_mail_template_reducer;
 pub mod create_manufacturing_order_reducer;
 pub mod create_message_batch_reducer;
 pub mod create_message_template_reducer;
+pub mod create_onboarding_template_reducer;
 pub mod create_operational_message_reducer;
 pub mod create_opportunity_reducer;
 pub mod create_opportunity_line_reducer;
@@ -1297,8 +1372,10 @@ pub mod create_payment_method_reducer;
 pub mod create_payment_term_reducer;
 pub mod create_payment_term_line_reducer;
 pub mod create_payment_transaction_reducer;
+pub mod create_payroll_export_intent_reducer;
 pub mod create_payroll_structure_reducer;
 pub mod create_payslip_reducer;
+pub mod create_performance_cycle_reducer;
 pub mod create_picking_batch_reducer;
 pub mod create_picking_wave_reducer;
 pub mod create_pos_config_reducer;
@@ -1354,6 +1431,7 @@ pub mod create_saved_report_reducer;
 pub mod create_scheduled_report_reducer;
 pub mod create_shipping_method_reducer;
 pub mod create_sod_conflict_rule_reducer;
+pub mod create_statutory_id_reducer;
 pub mod create_stock_inventory_reducer;
 pub mod create_stock_inventory_line_reducer;
 pub mod create_stock_location_reducer;
@@ -1393,6 +1471,7 @@ pub mod create_warehouse_3_d_zone_reducer;
 pub mod create_warehouse_sync_intent_reducer;
 pub mod create_warehouse_task_reducer;
 pub mod create_whatsapp_business_account_reducer;
+pub mod create_work_schedule_reducer;
 pub mod create_workcenter_reducer;
 pub mod create_workflow_reducer;
 pub mod create_working_calendar_reducer;
@@ -1420,7 +1499,9 @@ pub mod delete_document_reducer;
 pub mod delete_financial_report_reducer;
 pub mod delete_fiscal_year_reducer;
 pub mod delete_form_field_reducer;
+pub mod delete_hr_employee_document_reducer;
 pub mod delete_hr_employee_skill_reducer;
+pub mod delete_hr_global_assignment_reducer;
 pub mod delete_import_mapping_template_reducer;
 pub mod delete_integration_reducer;
 pub mod delete_intercompany_rule_reducer;
@@ -1450,6 +1531,7 @@ pub mod delete_sale_order_line_reducer;
 pub mod delete_sale_order_option_reducer;
 pub mod delete_saved_report_reducer;
 pub mod delete_search_embedding_reducer;
+pub mod delete_statutory_id_reducer;
 pub mod delete_stock_location_reducer;
 pub mod delete_stock_production_lot_reducer;
 pub mod delete_stock_production_serial_reducer;
@@ -1579,12 +1661,14 @@ pub mod lock_knowledge_article_reducer;
 pub mod lock_purchase_order_reducer;
 pub mod lock_sale_order_reducer;
 pub mod log_audit_event_reducer;
+pub mod log_hr_pii_read_reducer;
 pub mod log_timesheet_reducer;
 pub mod log_workcenter_productivity_reducer;
 pub mod mark_action_sent_reducer;
 pub mod mark_embedding_synced_reducer;
 pub mod mark_invite_accepted_reducer;
 pub mod mark_mail_message_delivered_reducer;
+pub mod mark_onboarding_done_reducer;
 pub mod mark_reset_token_used_reducer;
 pub mod match_bank_line_reducer;
 pub mod match_elimination_entries_reducer;
@@ -1613,6 +1697,7 @@ pub mod post_landed_costs_reducer;
 pub mod post_message_reducer;
 pub mod post_payment_reducer;
 pub mod post_payment_transaction_reducer;
+pub mod post_payslip_reducer;
 pub mod post_realized_fx_gain_loss_reducer;
 pub mod process_consolidation_reducer;
 pub mod process_intercompany_transaction_reducer;
@@ -1641,8 +1726,10 @@ pub mod record_document_view_reducer;
 pub mod record_generated_owner_report_reducer;
 pub mod record_google_drive_sync_reducer;
 pub mod record_google_drive_sync_error_reducer;
+pub mod record_hr_integration_result_reducer;
 pub mod record_inventory_integration_result_reducer;
 pub mod record_message_copied_reducer;
+pub mod record_payroll_export_result_reducer;
 pub mod record_privacy_consent_reducer;
 pub mod record_purchasing_integration_result_reducer;
 pub mod record_report_run_reducer;
@@ -1653,6 +1740,7 @@ pub mod record_telemetry_batch_reducer;
 pub mod record_whatsapp_health_check_reducer;
 pub mod record_whatsapp_message_sent_reducer;
 pub mod refresh_capacity_forecast_reducer;
+pub mod refresh_hr_capacity_forecast_reducer;
 pub mod refresh_inventory_exceptions_reducer;
 pub mod refresh_policy_snapshot_reducer;
 pub mod refresh_project_earned_value_reducer;
@@ -1670,6 +1758,7 @@ pub mod register_payment_on_invoice_reducer;
 pub mod register_queue_worker_reducer;
 pub mod reject_ai_action_draft_reducer;
 pub mod reject_approval_request_reducer;
+pub mod reject_expense_policy_exception_reducer;
 pub mod reject_supplier_intake_reducer;
 pub mod reject_timesheets_reducer;
 pub mod release_blanket_to_po_reducer;
@@ -1723,6 +1812,7 @@ pub mod run_all_core_tests_reducer;
 pub mod run_all_crm_tests_reducer;
 pub mod run_all_domain_tests_reducer;
 pub mod run_all_expenses_tests_reducer;
+pub mod run_all_hr_tests_reducer;
 pub mod run_all_inventory_tests_reducer;
 pub mod run_all_platform_tests_reducer;
 pub mod run_all_projects_tests_reducer;
@@ -1750,6 +1840,7 @@ pub mod run_fx_revaluation_reducer;
 pub mod run_fx_revaluation_batch_reducer;
 pub mod run_helpdesk_ticket_test_reducer;
 pub mod run_hr_leave_type_test_reducer;
+pub mod run_hr_wave_a_test_reducer;
 pub mod run_inventory_3_pl_asn_test_reducer;
 pub mod run_inventory_adjustment_test_reducer;
 pub mod run_inventory_atp_fail_closed_test_reducer;
@@ -1828,8 +1919,10 @@ pub mod save_proposal_version_reducer;
 pub mod schedule_sales_sla_escalation_reducer;
 pub mod schedule_tax_deadline_updates_reducer;
 pub mod seed_dev_data_reducer;
+pub mod seed_hr_country_pack_overlays_reducer;
 pub mod seed_organization_form_configs_reducer;
 pub mod seed_pack_holidays_reducer;
+pub mod seed_statutory_expense_mileage_rates_reducer;
 pub mod send_purchase_order_reducer;
 pub mod send_sale_order_quotation_reducer;
 pub mod set_ai_agent_active_reducer;
@@ -1868,6 +1961,7 @@ pub mod solve_quality_alert_reducer;
 pub mod stage_bank_statement_import_reducer;
 pub mod start_cycle_count_session_reducer;
 pub mod start_manufacturing_order_reducer;
+pub mod start_offboarding_reducer;
 pub mod start_picking_batch_reducer;
 pub mod start_quality_check_reducer;
 pub mod start_timesheet_timer_reducer;
@@ -1878,6 +1972,8 @@ pub mod store_sso_user_credential_reducer;
 pub mod store_user_credential_reducer;
 pub mod submit_expense_reducer;
 pub mod submit_expense_sheet_reducer;
+pub mod submit_leave_reducer;
+pub mod submit_performance_review_reducer;
 pub mod submit_purchase_requisition_reducer;
 pub mod submit_supplier_intake_reducer;
 pub mod subscribe_to_record_reducer;
@@ -1886,6 +1982,7 @@ pub mod test_iot_device_reducer;
 pub mod toggle_project_favorite_reducer;
 pub mod unassign_team_member_skill_reducer;
 pub mod unblock_workcenter_reducer;
+pub mod unenroll_benefit_enrollment_reducer;
 pub mod unlink_device_reducer;
 pub mod unlock_document_reducer;
 pub mod unlock_knowledge_article_reducer;
@@ -1951,7 +2048,9 @@ pub mod update_fiscal_year_reducer;
 pub mod update_form_field_reducer;
 pub mod update_google_drive_connection_reducer;
 pub mod update_google_drive_credentials_reducer;
+pub mod update_hr_applicant_reducer;
 pub mod update_hr_employee_skill_reducer;
+pub mod update_hr_global_assignment_reducer;
 pub mod update_hr_skill_reducer;
 pub mod update_hub_heartbeat_reducer;
 pub mod update_integration_status_reducer;
@@ -2015,6 +2114,7 @@ pub mod update_sale_order_line_reducer;
 pub mod update_sale_order_option_reducer;
 pub mod update_saved_report_reducer;
 pub mod update_sod_conflict_rule_reducer;
+pub mod update_statutory_id_reducer;
 pub mod update_stock_inventory_state_reducer;
 pub mod update_stock_location_reducer;
 pub mod update_stock_production_lot_reducer;
@@ -2200,9 +2300,17 @@ pub mod helpdesk_sla_table;
 pub mod helpdesk_stage_table;
 pub mod helpdesk_team_table;
 pub mod helpdesk_ticket_table;
+pub mod hr_applicant_table;
+pub mod hr_attendance_table;
+pub mod hr_benefit_enrollment_table;
+pub mod hr_benefit_plan_table;
+pub mod hr_capacity_forecast_table;
+pub mod hr_compensation_event_table;
 pub mod hr_contract_table;
+pub mod hr_country_pack_leave_default_table;
 pub mod hr_department_table;
 pub mod hr_employee_table;
+pub mod hr_employee_document_table;
 pub mod hr_employee_skill_table;
 pub mod hr_expense_table;
 pub mod hr_expense_advance_table;
@@ -2213,14 +2321,30 @@ pub mod hr_expense_per_diem_rate_table;
 pub mod hr_expense_policy_table;
 pub mod hr_expense_policy_exception_table;
 pub mod hr_expense_receipt_table;
+pub mod hr_global_assignment_table;
+pub mod hr_integration_intent_table;
 pub mod hr_job_position_table;
+pub mod hr_labor_cost_snapshot_table;
 pub mod hr_leave_table;
+pub mod hr_leave_allocation_table;
 pub mod hr_leave_type_table;
+pub mod hr_offboarding_checklist_table;
+pub mod hr_onboarding_progress_table;
+pub mod hr_onboarding_template_table;
+pub mod hr_onboarding_template_item_table;
+pub mod hr_payroll_export_intent_table;
 pub mod hr_payroll_structure_table;
 pub mod hr_payslip_table;
+pub mod hr_performance_cycle_table;
+pub mod hr_performance_goal_table;
+pub mod hr_performance_review_table;
+pub mod hr_pii_access_log_table;
 pub mod hr_resource_table;
 pub mod hr_salary_rule_table;
+pub mod hr_shift_opt_job_table;
 pub mod hr_skill_table;
+pub mod hr_statutory_id_table;
+pub mod hr_work_schedule_table;
 pub mod import_job_table;
 pub mod import_job_error_table;
 pub mod import_job_record_table;
@@ -2474,6 +2598,7 @@ pub use add_casbin_rule_params_type::AddCasbinRuleParams;
 pub use add_document_version_params_type::AddDocumentVersionParams;
 pub use add_landed_cost_line_params_type::AddLandedCostLineParams;
 pub use add_org_member_params_type::AddOrgMemberParams;
+pub use add_performance_goal_params_type::AddPerformanceGoalParams;
 pub use add_purchase_order_line_params_type::AddPurchaseOrderLineParams;
 pub use add_purchase_requisition_line_params_type::AddPurchaseRequisitionLineParams;
 pub use add_purchase_rfq_line_params_type::AddPurchaseRfqLineParams;
@@ -2520,9 +2645,12 @@ pub use apply_subscription_bundle_params_type::ApplySubscriptionBundleParams;
 pub use apply_subscription_invoice_payment_params_type::ApplySubscriptionInvoicePaymentParams;
 pub use approval_request_type::ApprovalRequest;
 pub use approval_rule_type::ApprovalRule;
+pub use archive_employee_params_type::ArchiveEmployeeParams;
 pub use asset_state_type::AssetState;
 pub use asset_type_type::AssetType;
+pub use assign_benefit_enrollment_params_type::AssignBenefitEnrollmentParams;
 pub use assign_contact_role_params_type::AssignContactRoleParams;
+pub use assign_onboarding_template_params_type::AssignOnboardingTemplateParams;
 pub use assign_role_params_type::AssignRoleParams;
 pub use assign_team_member_skill_params_type::AssignTeamMemberSkillParams;
 pub use assign_user_to_picking_params_type::AssignUserToPickingParams;
@@ -2563,6 +2691,9 @@ pub use company_scope_params_type::CompanyScopeParams;
 pub use company_vertical_pack_type::CompanyVerticalPack;
 pub use complete_ai_agent_run_params_type::CompleteAiAgentRunParams;
 pub use complete_document_processing_job_params_type::CompleteDocumentProcessingJobParams;
+pub use complete_offboarding_item_params_type::CompleteOffboardingItemParams;
+pub use complete_onboarding_item_params_type::CompleteOnboardingItemParams;
+pub use complete_performance_review_params_type::CompletePerformanceReviewParams;
 pub use compute_price_type::ComputePrice;
 pub use confirm_payslip_params_type::ConfirmPayslipParams;
 pub use consignment_agreement_type::ConsignmentAgreement;
@@ -2624,10 +2755,12 @@ pub use create_analytic_line_params_type::CreateAnalyticLineParams;
 pub use create_analytics_metric_params_type::CreateAnalyticsMetricParams;
 pub use create_approval_rule_params_type::CreateApprovalRuleParams;
 pub use create_assignment_rule_params_type::CreateAssignmentRuleParams;
+pub use create_attendance_punch_params_type::CreateAttendancePunchParams;
 pub use create_audit_rule_params_type::CreateAuditRuleParams;
 pub use create_bad_debt_write_off_params_type::CreateBadDebtWriteOffParams;
 pub use create_barcode_nomenclature_params_type::CreateBarcodeNomenclatureParams;
 pub use create_barcode_rule_params_type::CreateBarcodeRuleParams;
+pub use create_benefit_plan_params_type::CreateBenefitPlanParams;
 pub use create_bill_from_purchase_order_params_type::CreateBillFromPurchaseOrderParams;
 pub use create_billing_account_params_type::CreateBillingAccountParams;
 pub use create_bom_params_type::CreateBomParams;
@@ -2684,7 +2817,13 @@ pub use create_form_field_params_type::CreateFormFieldParams;
 pub use create_helpdesk_sla_params_type::CreateHelpdeskSlaParams;
 pub use create_helpdesk_stage_params_type::CreateHelpdeskStageParams;
 pub use create_helpdesk_team_params_type::CreateHelpdeskTeamParams;
+pub use create_hr_applicant_params_type::CreateHrApplicantParams;
+pub use create_hr_employee_document_params_type::CreateHrEmployeeDocumentParams;
 pub use create_hr_employee_skill_params_type::CreateHrEmployeeSkillParams;
+pub use create_hr_global_assignment_params_type::CreateHrGlobalAssignmentParams;
+pub use create_hr_integration_intent_params_type::CreateHrIntegrationIntentParams;
+pub use create_hr_labor_cost_snapshot_params_type::CreateHrLaborCostSnapshotParams;
+pub use create_hr_shift_opt_job_params_type::CreateHrShiftOptJobParams;
 pub use create_hr_skill_params_type::CreateHrSkillParams;
 pub use create_incoterm_params_type::CreateIncotermParams;
 pub use create_intercompany_rule_params_type::CreateIntercompanyRuleParams;
@@ -2708,6 +2847,8 @@ pub use create_mail_template_params_type::CreateMailTemplateParams;
 pub use create_message_batch_params_type::CreateMessageBatchParams;
 pub use create_message_template_params_type::CreateMessageTemplateParams;
 pub use create_mrp_production_params_type::CreateMrpProductionParams;
+pub use create_onboarding_template_item_params_type::CreateOnboardingTemplateItemParams;
+pub use create_onboarding_template_params_type::CreateOnboardingTemplateParams;
 pub use create_operational_message_params_type::CreateOperationalMessageParams;
 pub use create_opportunity_line_params_type::CreateOpportunityLineParams;
 pub use create_opportunity_params_type::CreateOpportunityParams;
@@ -2722,8 +2863,10 @@ pub use create_payment_params_type::CreatePaymentParams;
 pub use create_payment_term_line_params_type::CreatePaymentTermLineParams;
 pub use create_payment_term_params_type::CreatePaymentTermParams;
 pub use create_payment_transaction_params_type::CreatePaymentTransactionParams;
+pub use create_payroll_export_intent_params_type::CreatePayrollExportIntentParams;
 pub use create_payroll_structure_params_type::CreatePayrollStructureParams;
 pub use create_payslip_params_type::CreatePayslipParams;
+pub use create_performance_cycle_params_type::CreatePerformanceCycleParams;
 pub use create_picking_batch_params_type::CreatePickingBatchParams;
 pub use create_picking_wave_params_type::CreatePickingWaveParams;
 pub use create_pos_config_params_type::CreatePosConfigParams;
@@ -2785,6 +2928,7 @@ pub use create_saved_report_params_type::CreateSavedReportParams;
 pub use create_scheduled_report_params_type::CreateScheduledReportParams;
 pub use create_shipping_method_params_type::CreateShippingMethodParams;
 pub use create_sod_conflict_rule_params_type::CreateSodConflictRuleParams;
+pub use create_statutory_id_params_type::CreateStatutoryIdParams;
 pub use create_stock_inventory_line_params_type::CreateStockInventoryLineParams;
 pub use create_stock_inventory_params_type::CreateStockInventoryParams;
 pub use create_stock_location_params_type::CreateStockLocationParams;
@@ -2824,6 +2968,7 @@ pub use create_warehouse_params_type::CreateWarehouseParams;
 pub use create_warehouse_sync_intent_params_type::CreateWarehouseSyncIntentParams;
 pub use create_warehouse_task_params_type::CreateWarehouseTaskParams;
 pub use create_whats_app_business_account_params_type::CreateWhatsAppBusinessAccountParams;
+pub use create_work_schedule_params_type::CreateWorkScheduleParams;
 pub use create_workcenter_params_type::CreateWorkcenterParams;
 pub use create_workcenter_productivity_params_type::CreateWorkcenterProductivityParams;
 pub use create_workflow_params_type::CreateWorkflowParams;
@@ -2844,6 +2989,7 @@ pub use deferred_revenue_line_type::DeferredRevenueLine;
 pub use deferred_revenue_schedule_type::DeferredRevenueSchedule;
 pub use delegated_admin_scope_type::DelegatedAdminScope;
 pub use delete_account_move_line_params_type::DeleteAccountMoveLineParams;
+pub use delete_hr_employee_document_params_type::DeleteHrEmployeeDocumentParams;
 pub use delivery_carrier_type::DeliveryCarrier;
 pub use delivery_price_rule_type::DeliveryPriceRule;
 pub use deprecate_account_account_params_type::DeprecateAccountAccountParams;
@@ -2902,9 +3048,17 @@ pub use helpdesk_stage_type::HelpdeskStage;
 pub use helpdesk_team_type::HelpdeskTeam;
 pub use helpdesk_ticket_type::HelpdeskTicket;
 pub use helpdesk_ticket_state_type::HelpdeskTicketState;
+pub use hr_applicant_type::HrApplicant;
+pub use hr_attendance_type::HrAttendance;
+pub use hr_benefit_enrollment_type::HrBenefitEnrollment;
+pub use hr_benefit_plan_type::HrBenefitPlan;
+pub use hr_capacity_forecast_type::HrCapacityForecast;
+pub use hr_compensation_event_type::HrCompensationEvent;
 pub use hr_contract_type::HrContract;
+pub use hr_country_pack_leave_default_type::HrCountryPackLeaveDefault;
 pub use hr_department_type::HrDepartment;
 pub use hr_employee_type::HrEmployee;
+pub use hr_employee_document_type::HrEmployeeDocument;
 pub use hr_employee_skill_type::HrEmployeeSkill;
 pub use hr_expense_type::HrExpense;
 pub use hr_expense_advance_type::HrExpenseAdvance;
@@ -2916,15 +3070,31 @@ pub use hr_expense_policy_type::HrExpensePolicy;
 pub use hr_expense_policy_exception_type::HrExpensePolicyException;
 pub use hr_expense_receipt_type::HrExpenseReceipt;
 pub use hr_expense_sheet_type::HrExpenseSheet;
+pub use hr_global_assignment_type::HrGlobalAssignment;
+pub use hr_integration_intent_type::HrIntegrationIntent;
 pub use hr_job_position_type::HrJobPosition;
+pub use hr_labor_cost_snapshot_type::HrLaborCostSnapshot;
 pub use hr_leave_type::HrLeave;
+pub use hr_leave_allocation_type::HrLeaveAllocation;
 pub use hr_leave_state_type::HrLeaveState;
 pub use hr_leave_type_type::HrLeaveType;
+pub use hr_offboarding_checklist_type::HrOffboardingChecklist;
+pub use hr_onboarding_progress_type::HrOnboardingProgress;
+pub use hr_onboarding_template_type::HrOnboardingTemplate;
+pub use hr_onboarding_template_item_type::HrOnboardingTemplateItem;
+pub use hr_payroll_export_intent_type::HrPayrollExportIntent;
 pub use hr_payroll_structure_type::HrPayrollStructure;
 pub use hr_payslip_type::HrPayslip;
+pub use hr_performance_cycle_type::HrPerformanceCycle;
+pub use hr_performance_goal_type::HrPerformanceGoal;
+pub use hr_performance_review_type::HrPerformanceReview;
+pub use hr_pii_access_log_type::HrPiiAccessLog;
 pub use hr_resource_type::HrResource;
 pub use hr_salary_rule_type::HrSalaryRule;
+pub use hr_shift_opt_job_type::HrShiftOptJob;
 pub use hr_skill_type::HrSkill;
+pub use hr_statutory_id_type::HrStatutoryId;
+pub use hr_work_schedule_type::HrWorkSchedule;
 pub use import_job_type::ImportJob;
 pub use import_job_error_type::ImportJobError;
 pub use import_job_record_type::ImportJobRecord;
@@ -2966,6 +3136,7 @@ pub use line_invoice_status_type::LineInvoiceStatus;
 pub use line_state_type::LineState;
 pub use link_subcontractor_cost_params_type::LinkSubcontractorCostParams;
 pub use log_audit_event_params_type::LogAuditEventParams;
+pub use log_hr_pii_read_params_type::LogHrPiiReadParams;
 pub use log_timesheet_params_type::LogTimesheetParams;
 pub use mail_follower_type::MailFollower;
 pub use mail_message_type::MailMessage;
@@ -3044,6 +3215,7 @@ pub use pos_session_type::PosSession;
 pub use pos_status_type::PosStatus;
 pub use pos_terminal_type::PosTerminal;
 pub use post_expense_sheet_params_type::PostExpenseSheetParams;
+pub use post_payslip_params_type::PostPayslipParams;
 pub use post_realized_fx_params_type::PostRealizedFxParams;
 pub use pricelist_applied_on_type::PricelistAppliedOn;
 pub use privacy_consent_type::PrivacyConsent;
@@ -3117,7 +3289,9 @@ pub use record_custom_field_entry_type::RecordCustomFieldEntry;
 pub use record_custom_field_value_type::RecordCustomFieldValue;
 pub use record_cycle_count_line_params_type::RecordCycleCountLineParams;
 pub use record_generated_owner_report_params_type::RecordGeneratedOwnerReportParams;
+pub use record_hr_integration_result_params_type::RecordHrIntegrationResultParams;
 pub use record_inventory_integration_result_params_type::RecordInventoryIntegrationResultParams;
+pub use record_payroll_export_result_params_type::RecordPayrollExportResultParams;
 pub use record_privacy_consent_params_type::RecordPrivacyConsentParams;
 pub use record_purchasing_integration_result_params_type::RecordPurchasingIntegrationResultParams;
 pub use record_sales_integration_result_params_type::RecordSalesIntegrationResultParams;
@@ -3125,6 +3299,7 @@ pub use record_subscription_payment_failure_params_type::RecordSubscriptionPayme
 pub use record_telemetry_params_type::RecordTelemetryParams;
 pub use record_whats_app_health_check_params_type::RecordWhatsAppHealthCheckParams;
 pub use refresh_capacity_forecast_params_type::RefreshCapacityForecastParams;
+pub use refresh_hr_capacity_forecast_params_type::RefreshHrCapacityForecastParams;
 pub use refresh_inventory_exceptions_params_type::RefreshInventoryExceptionsParams;
 pub use refresh_project_earned_value_params_type::RefreshProjectEarnedValueParams;
 pub use refresh_project_margin_params_type::RefreshProjectMarginParams;
@@ -3134,6 +3309,7 @@ pub use register_device_params_type::RegisterDeviceParams;
 pub use register_hub_params_type::RegisterHubParams;
 pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
 pub use reject_approval_request_params_type::RejectApprovalRequestParams;
+pub use reject_expense_policy_exception_params_type::RejectExpensePolicyExceptionParams;
 pub use reject_timesheets_params_type::RejectTimesheetsParams;
 pub use release_blanket_to_po_params_type::ReleaseBlanketToPoParams;
 pub use renew_subscription_params_type::RenewSubscriptionParams;
@@ -3179,7 +3355,9 @@ pub use scheduled_report_run_type::ScheduledReportRun;
 pub use schema_migration_type::SchemaMigration;
 pub use search_embedding_type::SearchEmbedding;
 pub use section_status_type::SectionStatus;
+pub use seed_hr_country_pack_overlays_params_type::SeedHrCountryPackOverlaysParams;
 pub use seed_pack_holidays_params_type::SeedPackHolidaysParams;
+pub use seed_statutory_expense_mileage_rates_params_type::SeedStatutoryExpenseMileageRatesParams;
 pub use segment_member_type::SegmentMember;
 pub use segment_rule_clause_type::SegmentRuleClause;
 pub use segment_rule_field_type::SegmentRuleField;
@@ -3227,6 +3405,7 @@ pub use stock_reorder_group_type::StockReorderGroup;
 pub use stock_route_type::StockRoute;
 pub use stock_rule_type::StockRule;
 pub use stock_traceability_report_type::StockTraceabilityReport;
+pub use submit_performance_review_params_type::SubmitPerformanceReviewParams;
 pub use submit_supplier_intake_params_type::SubmitSupplierIntakeParams;
 pub use subscription_type::Subscription;
 pub use subscription_amendment_type::SubscriptionAmendment;
@@ -3316,7 +3495,9 @@ pub use update_expense_params_type::UpdateExpenseParams;
 pub use update_financial_report_params_type::UpdateFinancialReportParams;
 pub use update_fiscal_year_params_type::UpdateFiscalYearParams;
 pub use update_form_field_params_type::UpdateFormFieldParams;
+pub use update_hr_applicant_params_type::UpdateHrApplicantParams;
 pub use update_hr_employee_skill_params_type::UpdateHrEmployeeSkillParams;
+pub use update_hr_global_assignment_params_type::UpdateHrGlobalAssignmentParams;
 pub use update_hr_skill_params_type::UpdateHrSkillParams;
 pub use update_intercompany_rule_params_type::UpdateIntercompanyRuleParams;
 pub use update_job_position_params_type::UpdateJobPositionParams;
@@ -3366,6 +3547,7 @@ pub use update_sale_order_option_params_type::UpdateSaleOrderOptionParams;
 pub use update_sale_order_params_type::UpdateSaleOrderParams;
 pub use update_saved_report_params_type::UpdateSavedReportParams;
 pub use update_sod_conflict_rule_params_type::UpdateSodConflictRuleParams;
+pub use update_statutory_id_params_type::UpdateStatutoryIdParams;
 pub use update_stock_location_params_type::UpdateStockLocationParams;
 pub use update_stock_production_lot_params_type::UpdateStockProductionLotParams;
 pub use update_stock_production_serial_params_type::UpdateStockProductionSerialParams;
@@ -3562,9 +3744,17 @@ pub use helpdesk_sla_table::*;
 pub use helpdesk_stage_table::*;
 pub use helpdesk_team_table::*;
 pub use helpdesk_ticket_table::*;
+pub use hr_applicant_table::*;
+pub use hr_attendance_table::*;
+pub use hr_benefit_enrollment_table::*;
+pub use hr_benefit_plan_table::*;
+pub use hr_capacity_forecast_table::*;
+pub use hr_compensation_event_table::*;
 pub use hr_contract_table::*;
+pub use hr_country_pack_leave_default_table::*;
 pub use hr_department_table::*;
 pub use hr_employee_table::*;
+pub use hr_employee_document_table::*;
 pub use hr_employee_skill_table::*;
 pub use hr_expense_table::*;
 pub use hr_expense_advance_table::*;
@@ -3575,14 +3765,30 @@ pub use hr_expense_per_diem_rate_table::*;
 pub use hr_expense_policy_table::*;
 pub use hr_expense_policy_exception_table::*;
 pub use hr_expense_receipt_table::*;
+pub use hr_global_assignment_table::*;
+pub use hr_integration_intent_table::*;
 pub use hr_job_position_table::*;
+pub use hr_labor_cost_snapshot_table::*;
 pub use hr_leave_table::*;
+pub use hr_leave_allocation_table::*;
 pub use hr_leave_type_table::*;
+pub use hr_offboarding_checklist_table::*;
+pub use hr_onboarding_progress_table::*;
+pub use hr_onboarding_template_table::*;
+pub use hr_onboarding_template_item_table::*;
+pub use hr_payroll_export_intent_table::*;
 pub use hr_payroll_structure_table::*;
 pub use hr_payslip_table::*;
+pub use hr_performance_cycle_table::*;
+pub use hr_performance_goal_table::*;
+pub use hr_performance_review_table::*;
+pub use hr_pii_access_log_table::*;
 pub use hr_resource_table::*;
 pub use hr_salary_rule_table::*;
+pub use hr_shift_opt_job_table::*;
 pub use hr_skill_table::*;
+pub use hr_statutory_id_table::*;
+pub use hr_work_schedule_table::*;
 pub use import_job_table::*;
 pub use import_job_error_table::*;
 pub use import_job_record_table::*;
@@ -3817,6 +4023,7 @@ pub use add_form_field_reducer::add_form_field;
 pub use add_landed_cost_line_reducer::add_landed_cost_line;
 pub use add_member_to_quality_team_reducer::add_member_to_quality_team;
 pub use add_org_member_reducer::add_org_member;
+pub use add_performance_goal_reducer::add_performance_goal;
 pub use add_proposal_comment_reducer::add_proposal_comment;
 pub use add_proposal_line_item_reducer::add_proposal_line_item;
 pub use add_proposal_source_doc_reducer::add_proposal_source_doc;
@@ -3840,11 +4047,13 @@ pub use append_crm_conversation_message_reducer::append_crm_conversation_message
 pub use apply_expense_advance_to_sheet_reducer::apply_expense_advance_to_sheet;
 pub use apply_expense_integration_intent_reducer::apply_expense_integration_intent;
 pub use apply_global_migrations_reducer::apply_global_migrations;
+pub use apply_hr_integration_intent_reducer::apply_hr_integration_intent;
 pub use apply_index_linked_renewal_reducer::apply_index_linked_renewal;
 pub use apply_landed_costs_reducer::apply_landed_costs;
 pub use apply_omnichannel_allocation_reducer::apply_omnichannel_allocation;
 pub use apply_org_migrations_reducer::apply_org_migrations;
 pub use apply_pending_expense_integration_intents_reducer::apply_pending_expense_integration_intents;
+pub use apply_pending_hr_integration_intents_reducer::apply_pending_hr_integration_intents;
 pub use apply_pending_project_integration_intents_reducer::apply_pending_project_integration_intents;
 pub use apply_project_change_order_reducer::apply_project_change_order;
 pub use apply_project_integration_intent_reducer::apply_project_integration_intent;
@@ -3870,7 +4079,9 @@ pub use archive_contact_identity_reducer::archive_contact_identity;
 pub use archive_employee_reducer::archive_employee;
 pub use archive_financial_report_reducer::archive_financial_report;
 pub use archive_payment_account_reducer::archive_payment_account;
+pub use assign_benefit_enrollment_reducer::assign_benefit_enrollment;
 pub use assign_contact_role_reducer::assign_contact_role;
+pub use assign_onboarding_template_reducer::assign_onboarding_template;
 pub use assign_quality_alert_reducer::assign_quality_alert;
 pub use assign_role_reducer::assign_role;
 pub use assign_stock_move_reducer::assign_stock_move;
@@ -3926,6 +4137,9 @@ pub use complete_activity_reducer::complete_activity;
 pub use complete_ai_agent_run_reducer::complete_ai_agent_run;
 pub use complete_document_processing_job_reducer::complete_document_processing_job;
 pub use complete_intercompany_transaction_reducer::complete_intercompany_transaction;
+pub use complete_offboarding_item_reducer::complete_offboarding_item;
+pub use complete_onboarding_item_reducer::complete_onboarding_item;
+pub use complete_performance_review_reducer::complete_performance_review;
 pub use complete_picking_batch_reducer::complete_picking_batch;
 pub use complete_picking_wave_reducer::complete_picking_wave;
 pub use complete_productivity_log_reducer::complete_productivity_log;
@@ -3986,10 +4200,12 @@ pub use create_analytic_line_reducer::create_analytic_line;
 pub use create_analytics_metric_reducer::create_analytics_metric;
 pub use create_approval_rule_reducer::create_approval_rule;
 pub use create_assignment_rule_reducer::create_assignment_rule;
+pub use create_attendance_punch_reducer::create_attendance_punch;
 pub use create_audit_rule_reducer::create_audit_rule;
 pub use create_bad_debt_write_off_reducer::create_bad_debt_write_off;
 pub use create_barcode_nomenclature_reducer::create_barcode_nomenclature;
 pub use create_barcode_rule_reducer::create_barcode_rule;
+pub use create_benefit_plan_reducer::create_benefit_plan;
 pub use create_bill_from_purchase_order_reducer::create_bill_from_purchase_order;
 pub use create_billing_account_reducer::create_billing_account;
 pub use create_bom_reducer::create_bom;
@@ -4048,7 +4264,13 @@ pub use create_google_drive_connection_reducer::create_google_drive_connection;
 pub use create_helpdesk_sla_reducer::create_helpdesk_sla;
 pub use create_helpdesk_stage_reducer::create_helpdesk_stage;
 pub use create_helpdesk_team_reducer::create_helpdesk_team;
+pub use create_hr_applicant_reducer::create_hr_applicant;
+pub use create_hr_employee_document_reducer::create_hr_employee_document;
 pub use create_hr_employee_skill_reducer::create_hr_employee_skill;
+pub use create_hr_global_assignment_reducer::create_hr_global_assignment;
+pub use create_hr_integration_intent_reducer::create_hr_integration_intent;
+pub use create_hr_labor_cost_snapshot_reducer::create_hr_labor_cost_snapshot;
+pub use create_hr_shift_opt_job_reducer::create_hr_shift_opt_job;
 pub use create_hr_skill_reducer::create_hr_skill;
 pub use create_incoterm_reducer::create_incoterm;
 pub use create_intercompany_rule_reducer::create_intercompany_rule;
@@ -4075,6 +4297,7 @@ pub use create_mail_template_reducer::create_mail_template;
 pub use create_manufacturing_order_reducer::create_manufacturing_order;
 pub use create_message_batch_reducer::create_message_batch;
 pub use create_message_template_reducer::create_message_template;
+pub use create_onboarding_template_reducer::create_onboarding_template;
 pub use create_operational_message_reducer::create_operational_message;
 pub use create_opportunity_reducer::create_opportunity;
 pub use create_opportunity_line_reducer::create_opportunity_line;
@@ -4090,8 +4313,10 @@ pub use create_payment_method_reducer::create_payment_method;
 pub use create_payment_term_reducer::create_payment_term;
 pub use create_payment_term_line_reducer::create_payment_term_line;
 pub use create_payment_transaction_reducer::create_payment_transaction;
+pub use create_payroll_export_intent_reducer::create_payroll_export_intent;
 pub use create_payroll_structure_reducer::create_payroll_structure;
 pub use create_payslip_reducer::create_payslip;
+pub use create_performance_cycle_reducer::create_performance_cycle;
 pub use create_picking_batch_reducer::create_picking_batch;
 pub use create_picking_wave_reducer::create_picking_wave;
 pub use create_pos_config_reducer::create_pos_config;
@@ -4147,6 +4372,7 @@ pub use create_saved_report_reducer::create_saved_report;
 pub use create_scheduled_report_reducer::create_scheduled_report;
 pub use create_shipping_method_reducer::create_shipping_method;
 pub use create_sod_conflict_rule_reducer::create_sod_conflict_rule;
+pub use create_statutory_id_reducer::create_statutory_id;
 pub use create_stock_inventory_reducer::create_stock_inventory;
 pub use create_stock_inventory_line_reducer::create_stock_inventory_line;
 pub use create_stock_location_reducer::create_stock_location;
@@ -4186,6 +4412,7 @@ pub use create_warehouse_3_d_zone_reducer::create_warehouse_3_d_zone;
 pub use create_warehouse_sync_intent_reducer::create_warehouse_sync_intent;
 pub use create_warehouse_task_reducer::create_warehouse_task;
 pub use create_whatsapp_business_account_reducer::create_whatsapp_business_account;
+pub use create_work_schedule_reducer::create_work_schedule;
 pub use create_workcenter_reducer::create_workcenter;
 pub use create_workflow_reducer::create_workflow;
 pub use create_working_calendar_reducer::create_working_calendar;
@@ -4213,7 +4440,9 @@ pub use delete_document_reducer::delete_document;
 pub use delete_financial_report_reducer::delete_financial_report;
 pub use delete_fiscal_year_reducer::delete_fiscal_year;
 pub use delete_form_field_reducer::delete_form_field;
+pub use delete_hr_employee_document_reducer::delete_hr_employee_document;
 pub use delete_hr_employee_skill_reducer::delete_hr_employee_skill;
+pub use delete_hr_global_assignment_reducer::delete_hr_global_assignment;
 pub use delete_import_mapping_template_reducer::delete_import_mapping_template;
 pub use delete_integration_reducer::delete_integration;
 pub use delete_intercompany_rule_reducer::delete_intercompany_rule;
@@ -4243,6 +4472,7 @@ pub use delete_sale_order_line_reducer::delete_sale_order_line;
 pub use delete_sale_order_option_reducer::delete_sale_order_option;
 pub use delete_saved_report_reducer::delete_saved_report;
 pub use delete_search_embedding_reducer::delete_search_embedding;
+pub use delete_statutory_id_reducer::delete_statutory_id;
 pub use delete_stock_location_reducer::delete_stock_location;
 pub use delete_stock_production_lot_reducer::delete_stock_production_lot;
 pub use delete_stock_production_serial_reducer::delete_stock_production_serial;
@@ -4372,12 +4602,14 @@ pub use lock_knowledge_article_reducer::lock_knowledge_article;
 pub use lock_purchase_order_reducer::lock_purchase_order;
 pub use lock_sale_order_reducer::lock_sale_order;
 pub use log_audit_event_reducer::log_audit_event;
+pub use log_hr_pii_read_reducer::log_hr_pii_read;
 pub use log_timesheet_reducer::log_timesheet;
 pub use log_workcenter_productivity_reducer::log_workcenter_productivity;
 pub use mark_action_sent_reducer::mark_action_sent;
 pub use mark_embedding_synced_reducer::mark_embedding_synced;
 pub use mark_invite_accepted_reducer::mark_invite_accepted;
 pub use mark_mail_message_delivered_reducer::mark_mail_message_delivered;
+pub use mark_onboarding_done_reducer::mark_onboarding_done;
 pub use mark_reset_token_used_reducer::mark_reset_token_used;
 pub use match_bank_line_reducer::match_bank_line;
 pub use match_elimination_entries_reducer::match_elimination_entries;
@@ -4406,6 +4638,7 @@ pub use post_landed_costs_reducer::post_landed_costs;
 pub use post_message_reducer::post_message;
 pub use post_payment_reducer::post_payment;
 pub use post_payment_transaction_reducer::post_payment_transaction;
+pub use post_payslip_reducer::post_payslip;
 pub use post_realized_fx_gain_loss_reducer::post_realized_fx_gain_loss;
 pub use process_consolidation_reducer::process_consolidation;
 pub use process_intercompany_transaction_reducer::process_intercompany_transaction;
@@ -4434,8 +4667,10 @@ pub use record_document_view_reducer::record_document_view;
 pub use record_generated_owner_report_reducer::record_generated_owner_report;
 pub use record_google_drive_sync_reducer::record_google_drive_sync;
 pub use record_google_drive_sync_error_reducer::record_google_drive_sync_error;
+pub use record_hr_integration_result_reducer::record_hr_integration_result;
 pub use record_inventory_integration_result_reducer::record_inventory_integration_result;
 pub use record_message_copied_reducer::record_message_copied;
+pub use record_payroll_export_result_reducer::record_payroll_export_result;
 pub use record_privacy_consent_reducer::record_privacy_consent;
 pub use record_purchasing_integration_result_reducer::record_purchasing_integration_result;
 pub use record_report_run_reducer::record_report_run;
@@ -4446,6 +4681,7 @@ pub use record_telemetry_batch_reducer::record_telemetry_batch;
 pub use record_whatsapp_health_check_reducer::record_whatsapp_health_check;
 pub use record_whatsapp_message_sent_reducer::record_whatsapp_message_sent;
 pub use refresh_capacity_forecast_reducer::refresh_capacity_forecast;
+pub use refresh_hr_capacity_forecast_reducer::refresh_hr_capacity_forecast;
 pub use refresh_inventory_exceptions_reducer::refresh_inventory_exceptions;
 pub use refresh_policy_snapshot_reducer::refresh_policy_snapshot;
 pub use refresh_project_earned_value_reducer::refresh_project_earned_value;
@@ -4463,6 +4699,7 @@ pub use register_payment_on_invoice_reducer::register_payment_on_invoice;
 pub use register_queue_worker_reducer::register_queue_worker;
 pub use reject_ai_action_draft_reducer::reject_ai_action_draft;
 pub use reject_approval_request_reducer::reject_approval_request;
+pub use reject_expense_policy_exception_reducer::reject_expense_policy_exception;
 pub use reject_supplier_intake_reducer::reject_supplier_intake;
 pub use reject_timesheets_reducer::reject_timesheets;
 pub use release_blanket_to_po_reducer::release_blanket_to_po;
@@ -4516,6 +4753,7 @@ pub use run_all_core_tests_reducer::run_all_core_tests;
 pub use run_all_crm_tests_reducer::run_all_crm_tests;
 pub use run_all_domain_tests_reducer::run_all_domain_tests;
 pub use run_all_expenses_tests_reducer::run_all_expenses_tests;
+pub use run_all_hr_tests_reducer::run_all_hr_tests;
 pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_platform_tests_reducer::run_all_platform_tests;
 pub use run_all_projects_tests_reducer::run_all_projects_tests;
@@ -4543,6 +4781,7 @@ pub use run_fx_revaluation_reducer::run_fx_revaluation;
 pub use run_fx_revaluation_batch_reducer::run_fx_revaluation_batch;
 pub use run_helpdesk_ticket_test_reducer::run_helpdesk_ticket_test;
 pub use run_hr_leave_type_test_reducer::run_hr_leave_type_test;
+pub use run_hr_wave_a_test_reducer::run_hr_wave_a_test;
 pub use run_inventory_3_pl_asn_test_reducer::run_inventory_3_pl_asn_test;
 pub use run_inventory_adjustment_test_reducer::run_inventory_adjustment_test;
 pub use run_inventory_atp_fail_closed_test_reducer::run_inventory_atp_fail_closed_test;
@@ -4621,8 +4860,10 @@ pub use save_proposal_version_reducer::save_proposal_version;
 pub use schedule_sales_sla_escalation_reducer::schedule_sales_sla_escalation;
 pub use schedule_tax_deadline_updates_reducer::schedule_tax_deadline_updates;
 pub use seed_dev_data_reducer::seed_dev_data;
+pub use seed_hr_country_pack_overlays_reducer::seed_hr_country_pack_overlays;
 pub use seed_organization_form_configs_reducer::seed_organization_form_configs;
 pub use seed_pack_holidays_reducer::seed_pack_holidays;
+pub use seed_statutory_expense_mileage_rates_reducer::seed_statutory_expense_mileage_rates;
 pub use send_purchase_order_reducer::send_purchase_order;
 pub use send_sale_order_quotation_reducer::send_sale_order_quotation;
 pub use set_ai_agent_active_reducer::set_ai_agent_active;
@@ -4661,6 +4902,7 @@ pub use solve_quality_alert_reducer::solve_quality_alert;
 pub use stage_bank_statement_import_reducer::stage_bank_statement_import;
 pub use start_cycle_count_session_reducer::start_cycle_count_session;
 pub use start_manufacturing_order_reducer::start_manufacturing_order;
+pub use start_offboarding_reducer::start_offboarding;
 pub use start_picking_batch_reducer::start_picking_batch;
 pub use start_quality_check_reducer::start_quality_check;
 pub use start_timesheet_timer_reducer::start_timesheet_timer;
@@ -4671,6 +4913,8 @@ pub use store_sso_user_credential_reducer::store_sso_user_credential;
 pub use store_user_credential_reducer::store_user_credential;
 pub use submit_expense_reducer::submit_expense;
 pub use submit_expense_sheet_reducer::submit_expense_sheet;
+pub use submit_leave_reducer::submit_leave;
+pub use submit_performance_review_reducer::submit_performance_review;
 pub use submit_purchase_requisition_reducer::submit_purchase_requisition;
 pub use submit_supplier_intake_reducer::submit_supplier_intake;
 pub use subscribe_to_record_reducer::subscribe_to_record;
@@ -4679,6 +4923,7 @@ pub use test_iot_device_reducer::test_iot_device;
 pub use toggle_project_favorite_reducer::toggle_project_favorite;
 pub use unassign_team_member_skill_reducer::unassign_team_member_skill;
 pub use unblock_workcenter_reducer::unblock_workcenter;
+pub use unenroll_benefit_enrollment_reducer::unenroll_benefit_enrollment;
 pub use unlink_device_reducer::unlink_device;
 pub use unlock_document_reducer::unlock_document;
 pub use unlock_knowledge_article_reducer::unlock_knowledge_article;
@@ -4744,7 +4989,9 @@ pub use update_fiscal_year_reducer::update_fiscal_year;
 pub use update_form_field_reducer::update_form_field;
 pub use update_google_drive_connection_reducer::update_google_drive_connection;
 pub use update_google_drive_credentials_reducer::update_google_drive_credentials;
+pub use update_hr_applicant_reducer::update_hr_applicant;
 pub use update_hr_employee_skill_reducer::update_hr_employee_skill;
+pub use update_hr_global_assignment_reducer::update_hr_global_assignment;
 pub use update_hr_skill_reducer::update_hr_skill;
 pub use update_hub_heartbeat_reducer::update_hub_heartbeat;
 pub use update_integration_status_reducer::update_integration_status;
@@ -4808,6 +5055,7 @@ pub use update_sale_order_line_reducer::update_sale_order_line;
 pub use update_sale_order_option_reducer::update_sale_order_option;
 pub use update_saved_report_reducer::update_saved_report;
 pub use update_sod_conflict_rule_reducer::update_sod_conflict_rule;
+pub use update_statutory_id_reducer::update_statutory_id;
 pub use update_stock_inventory_state_reducer::update_stock_inventory_state;
 pub use update_stock_location_reducer::update_stock_location;
 pub use update_stock_production_lot_reducer::update_stock_production_lot;
@@ -4962,6 +5210,12 @@ pub enum Reducer {
         organization_id: u64,
         params: AddOrgMemberParams,
 }    ,
+    AddPerformanceGoal {
+        organization_id: u64,
+        company_id: u64,
+        cycle_id: u64,
+        params: AddPerformanceGoalParams,
+}    ,
     AddProposalComment {
         proposal_id: u64,
         section_id: u64,
@@ -5089,6 +5343,10 @@ pub enum Reducer {
         intent_id: u64,
 }    ,
     ApplyGlobalMigrations ,
+    ApplyHrIntegrationIntent {
+        organization_id: u64,
+        intent_id: u64,
+}    ,
     ApplyIndexLinkedRenewal {
         organization_id: u64,
         company_id: u64,
@@ -5110,6 +5368,10 @@ pub enum Reducer {
         organization_id: u64,
 }    ,
     ApplyPendingExpenseIntegrationIntents {
+        organization_id: u64,
+        limit: u32,
+}    ,
+    ApplyPendingHrIntegrationIntents {
         organization_id: u64,
         limit: u32,
 }    ,
@@ -5196,6 +5458,7 @@ pub enum Reducer {
 }    ,
     ApproveLeave {
         organization_id: u64,
+        company_id: u64,
         leave_id: u64,
 }    ,
     ApprovePurchaseRequisition {
@@ -5221,7 +5484,7 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         employee_id: u64,
-        termination_date: Option::<__sdk::Timestamp>,
+        params: ArchiveEmployeeParams,
 }    ,
     ArchiveFinancialReport {
         organization_id: u64,
@@ -5232,9 +5495,20 @@ pub enum Reducer {
         organization_id: u64,
         account_id: u64,
 }    ,
+    AssignBenefitEnrollment {
+        organization_id: u64,
+        company_id: u64,
+        params: AssignBenefitEnrollmentParams,
+}    ,
     AssignContactRole {
         organization_id: u64,
         params: AssignContactRoleParams,
+}    ,
+    AssignOnboardingTemplate {
+        organization_id: u64,
+        company_id: u64,
+        employee_id: u64,
+        params: AssignOnboardingTemplateParams,
 }    ,
     AssignQualityAlert {
         organization_id: u64,
@@ -5334,6 +5608,7 @@ pub enum Reducer {
 }    ,
     CancelContract {
         organization_id: u64,
+        company_id: u64,
         contract_id: u64,
 }    ,
     CancelIntercompanyTransaction {
@@ -5496,6 +5771,24 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         transaction_id: u64,
+}    ,
+    CompleteOffboardingItem {
+        organization_id: u64,
+        company_id: u64,
+        employee_id: u64,
+        params: CompleteOffboardingItemParams,
+}    ,
+    CompleteOnboardingItem {
+        organization_id: u64,
+        company_id: u64,
+        employee_id: u64,
+        params: CompleteOnboardingItemParams,
+}    ,
+    CompletePerformanceReview {
+        organization_id: u64,
+        company_id: u64,
+        review_id: u64,
+        params: CompletePerformanceReviewParams,
 }    ,
     CompletePickingBatch {
         organization_id: u64,
@@ -5772,6 +6065,11 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateAssignmentRuleParams,
 }    ,
+    CreateAttendancePunch {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateAttendancePunchParams,
+}    ,
     CreateAuditRule {
         organization_id: u64,
         params: CreateAuditRuleParams,
@@ -5788,6 +6086,11 @@ pub enum Reducer {
     CreateBarcodeRule {
         organization_id: u64,
         params: CreateBarcodeRuleParams,
+}    ,
+    CreateBenefitPlan {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateBenefitPlanParams,
 }    ,
     CreateBillFromPurchaseOrder {
         organization_id: u64,
@@ -6063,10 +6366,39 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateHelpdeskTeamParams,
 }    ,
+    CreateHrApplicant {
+        organization_id: u64,
+        params: CreateHrApplicantParams,
+}    ,
+    CreateHrEmployeeDocument {
+        organization_id: u64,
+        company_id: u64,
+        employee_id: u64,
+        params: CreateHrEmployeeDocumentParams,
+}    ,
     CreateHrEmployeeSkill {
         organization_id: u64,
         company_id: u64,
         params: CreateHrEmployeeSkillParams,
+}    ,
+    CreateHrGlobalAssignment {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateHrGlobalAssignmentParams,
+}    ,
+    CreateHrIntegrationIntent {
+        organization_id: u64,
+        params: CreateHrIntegrationIntentParams,
+}    ,
+    CreateHrLaborCostSnapshot {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateHrLaborCostSnapshotParams,
+}    ,
+    CreateHrShiftOptJob {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateHrShiftOptJobParams,
 }    ,
     CreateHrSkill {
         organization_id: u64,
@@ -6190,6 +6522,11 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateMessageTemplateParams,
 }    ,
+    CreateOnboardingTemplate {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateOnboardingTemplateParams,
+}    ,
     CreateOperationalMessage {
         organization_id: u64,
         params: CreateOperationalMessageParams,
@@ -6254,6 +6591,12 @@ pub enum Reducer {
         organization_id: u64,
         params: CreatePaymentTransactionParams,
 }    ,
+    CreatePayrollExportIntent {
+        organization_id: u64,
+        company_id: u64,
+        payslip_id: u64,
+        params: CreatePayrollExportIntentParams,
+}    ,
     CreatePayrollStructure {
         organization_id: u64,
         params: CreatePayrollStructureParams,
@@ -6261,6 +6604,11 @@ pub enum Reducer {
     CreatePayslip {
         organization_id: u64,
         params: CreatePayslipParams,
+}    ,
+    CreatePerformanceCycle {
+        organization_id: u64,
+        company_id: u64,
+        params: CreatePerformanceCycleParams,
 }    ,
     CreatePickingBatch {
         organization_id: u64,
@@ -6526,6 +6874,11 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateSodConflictRuleParams,
 }    ,
+    CreateStatutoryId {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateStatutoryIdParams,
+}    ,
     CreateStockInventory {
         organization_id: u64,
         params: CreateStockInventoryParams,
@@ -6704,6 +7057,11 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateWhatsAppBusinessAccountParams,
 }    ,
+    CreateWorkSchedule {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateWorkScheduleParams,
+}    ,
     CreateWorkcenter {
         organization_id: u64,
         params: CreateWorkcenterParams,
@@ -6826,10 +7184,22 @@ pub enum Reducer {
         configuration_id: u64,
         field_id: String,
 }    ,
+    DeleteHrEmployeeDocument {
+        organization_id: u64,
+        company_id: u64,
+        employee_id: u64,
+        document_id: u64,
+        params: DeleteHrEmployeeDocumentParams,
+}    ,
     DeleteHrEmployeeSkill {
         organization_id: u64,
         company_id: u64,
         employee_skill_id: u64,
+}    ,
+    DeleteHrGlobalAssignment {
+        organization_id: u64,
+        company_id: u64,
+        assignment_id: u64,
 }    ,
     DeleteImportMappingTemplate {
         organization_id: u64,
@@ -6953,6 +7323,11 @@ pub enum Reducer {
         company_id: Option::<u64>,
         content_type: String,
         content_id: u64,
+}    ,
+    DeleteStatutoryId {
+        organization_id: u64,
+        company_id: u64,
+        statutory_id: u64,
 }    ,
     DeleteStockLocation {
         organization_id: u64,
@@ -7084,6 +7459,7 @@ pub enum Reducer {
 }    ,
     ExpireContract {
         organization_id: u64,
+        company_id: u64,
         contract_id: u64,
 }    ,
     ExplodeBom {
@@ -7531,6 +7907,10 @@ pub enum Reducer {
         organization_id: u64,
         params: LogAuditEventParams,
 }    ,
+    LogHrPiiRead {
+        organization_id: u64,
+        params: LogHrPiiReadParams,
+}    ,
     LogTimesheet {
         organization_id: u64,
         params: LogTimesheetParams,
@@ -7559,6 +7939,11 @@ pub enum Reducer {
         organization_id: u64,
         message_id: u64,
         delivery_metadata: Option::<String>,
+}    ,
+    MarkOnboardingDone {
+        organization_id: u64,
+        company_id: u64,
+        employee_id: u64,
 }    ,
     MarkResetTokenUsed {
         token_id: u64,
@@ -7597,6 +7982,7 @@ pub enum Reducer {
 }    ,
     OpenContract {
         organization_id: u64,
+        company_id: u64,
         contract_id: u64,
 }    ,
     OpenCrmConversation {
@@ -7699,6 +8085,12 @@ pub enum Reducer {
     PostPaymentTransaction {
         organization_id: u64,
         transaction_id: u64,
+}    ,
+    PostPayslip {
+        organization_id: u64,
+        company_id: u64,
+        payslip_id: u64,
+        params: PostPayslipParams,
 }    ,
     PostRealizedFxGainLoss {
         organization_id: u64,
@@ -7840,6 +8232,12 @@ pub enum Reducer {
         organization_id: u64,
         error_message: String,
 }    ,
+    RecordHrIntegrationResult {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
+        params: RecordHrIntegrationResultParams,
+}    ,
     RecordInventoryIntegrationResult {
         organization_id: u64,
         company_id: u64,
@@ -7849,6 +8247,12 @@ pub enum Reducer {
     RecordMessageCopied {
         organization_id: u64,
         message_id: u64,
+}    ,
+    RecordPayrollExportResult {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
+        params: RecordPayrollExportResultParams,
 }    ,
     RecordPrivacyConsent {
         organization_id: u64,
@@ -7901,6 +8305,11 @@ pub enum Reducer {
         company_id: u64,
         params: RefreshCapacityForecastParams,
 }    ,
+    RefreshHrCapacityForecast {
+        organization_id: u64,
+        company_id: u64,
+        params: RefreshHrCapacityForecastParams,
+}    ,
     RefreshInventoryExceptions {
         organization_id: u64,
         company_id: u64,
@@ -7949,6 +8358,7 @@ pub enum Reducer {
 }    ,
     RefuseLeave {
         organization_id: u64,
+        company_id: u64,
         leave_id: u64,
 }    ,
     RegisterIotDevice {
@@ -7983,6 +8393,11 @@ pub enum Reducer {
         company_id: u64,
         request_id: u64,
         params: RejectApprovalRequestParams,
+}    ,
+    RejectExpensePolicyException {
+        organization_id: u64,
+        exception_id: u64,
+        params: RejectExpensePolicyExceptionParams,
 }    ,
     RejectSupplierIntake {
         organization_id: u64,
@@ -8081,6 +8496,7 @@ pub enum Reducer {
 }    ,
     ResetLeaveToDraft {
         organization_id: u64,
+        company_id: u64,
         leave_id: u64,
 }    ,
     ResolveInventoryException {
@@ -8176,6 +8592,7 @@ pub enum Reducer {
     RunAllCrmTests ,
     RunAllDomainTests ,
     RunAllExpensesTests ,
+    RunAllHrTests ,
     RunAllInventoryTests ,
     RunAllPlatformTests ,
     RunAllProjectsTests ,
@@ -8215,6 +8632,7 @@ pub enum Reducer {
 }    ,
     RunHelpdeskTicketTest ,
     RunHrLeaveTypeTest ,
+    RunHrWaveATest ,
     RunInventory3PlAsnTest ,
     RunInventoryAdjustmentTest ,
     RunInventoryAtpFailClosedTest ,
@@ -8318,6 +8736,11 @@ pub enum Reducer {
         organization_id: Option::<u64>,
 }    ,
     SeedDevData ,
+    SeedHrCountryPackOverlays {
+        organization_id: u64,
+        company_id: u64,
+        params: SeedHrCountryPackOverlaysParams,
+}    ,
     SeedOrganizationFormConfigs {
         organization_id: u64,
 }    ,
@@ -8325,6 +8748,10 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         params: SeedPackHolidaysParams,
+}    ,
+    SeedStatutoryExpenseMileageRates {
+        organization_id: u64,
+        params: SeedStatutoryExpenseMileageRatesParams,
 }    ,
     SendPurchaseOrder {
         organization_id: u64,
@@ -8521,6 +8948,11 @@ pub enum Reducer {
         organization_id: u64,
         mo_id: u64,
 }    ,
+    StartOffboarding {
+        organization_id: u64,
+        company_id: u64,
+        employee_id: u64,
+}    ,
     StartPickingBatch {
         organization_id: u64,
         batch_id: u64,
@@ -8570,6 +9002,17 @@ pub enum Reducer {
         organization_id: u64,
         sheet_id: u64,
 }    ,
+    SubmitLeave {
+        organization_id: u64,
+        company_id: u64,
+        leave_id: u64,
+}    ,
+    SubmitPerformanceReview {
+        organization_id: u64,
+        company_id: u64,
+        review_id: u64,
+        params: SubmitPerformanceReviewParams,
+}    ,
     SubmitPurchaseRequisition {
         organization_id: u64,
         requisition_id: u64,
@@ -8604,6 +9047,11 @@ pub enum Reducer {
     UnblockWorkcenter {
         organization_id: u64,
         workcenter_id: u64,
+}    ,
+    UnenrollBenefitEnrollment {
+        organization_id: u64,
+        company_id: u64,
+        enrollment_id: u64,
 }    ,
     UnlinkDevice {
         organization_id: u64,
@@ -8947,11 +9395,23 @@ pub enum Reducer {
         organization_id: u64,
         credentials_reference: String,
 }    ,
+    UpdateHrApplicant {
+        organization_id: u64,
+        company_id: u64,
+        applicant_id: u64,
+        params: UpdateHrApplicantParams,
+}    ,
     UpdateHrEmployeeSkill {
         organization_id: u64,
         company_id: u64,
         employee_skill_id: u64,
         params: UpdateHrEmployeeSkillParams,
+}    ,
+    UpdateHrGlobalAssignment {
+        organization_id: u64,
+        company_id: u64,
+        assignment_id: u64,
+        params: UpdateHrGlobalAssignmentParams,
 }    ,
     UpdateHrSkill {
         organization_id: u64,
@@ -9295,6 +9755,12 @@ pub enum Reducer {
         rule_id: u64,
         params: UpdateSodConflictRuleParams,
 }    ,
+    UpdateStatutoryId {
+        organization_id: u64,
+        company_id: u64,
+        statutory_id: u64,
+        params: UpdateStatutoryIdParams,
+}    ,
     UpdateStockInventoryState {
         organization_id: u64,
         inventory_id: u64,
@@ -9605,6 +10071,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AddLandedCostLine { .. } => "add_landed_cost_line",
             Reducer::AddMemberToQualityTeam { .. } => "add_member_to_quality_team",
             Reducer::AddOrgMember { .. } => "add_org_member",
+            Reducer::AddPerformanceGoal { .. } => "add_performance_goal",
             Reducer::AddProposalComment { .. } => "add_proposal_comment",
             Reducer::AddProposalLineItem { .. } => "add_proposal_line_item",
             Reducer::AddProposalSourceDoc { .. } => "add_proposal_source_doc",
@@ -9628,11 +10095,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApplyExpenseAdvanceToSheet { .. } => "apply_expense_advance_to_sheet",
             Reducer::ApplyExpenseIntegrationIntent { .. } => "apply_expense_integration_intent",
             Reducer::ApplyGlobalMigrations => "apply_global_migrations",
+            Reducer::ApplyHrIntegrationIntent { .. } => "apply_hr_integration_intent",
             Reducer::ApplyIndexLinkedRenewal { .. } => "apply_index_linked_renewal",
             Reducer::ApplyLandedCosts { .. } => "apply_landed_costs",
             Reducer::ApplyOmnichannelAllocation { .. } => "apply_omnichannel_allocation",
             Reducer::ApplyOrgMigrations { .. } => "apply_org_migrations",
             Reducer::ApplyPendingExpenseIntegrationIntents { .. } => "apply_pending_expense_integration_intents",
+            Reducer::ApplyPendingHrIntegrationIntents { .. } => "apply_pending_hr_integration_intents",
             Reducer::ApplyPendingProjectIntegrationIntents { .. } => "apply_pending_project_integration_intents",
             Reducer::ApplyProjectChangeOrder { .. } => "apply_project_change_order",
             Reducer::ApplyProjectIntegrationIntent { .. } => "apply_project_integration_intent",
@@ -9658,7 +10127,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::ArchiveEmployee { .. } => "archive_employee",
             Reducer::ArchiveFinancialReport { .. } => "archive_financial_report",
             Reducer::ArchivePaymentAccount { .. } => "archive_payment_account",
+            Reducer::AssignBenefitEnrollment { .. } => "assign_benefit_enrollment",
             Reducer::AssignContactRole { .. } => "assign_contact_role",
+            Reducer::AssignOnboardingTemplate { .. } => "assign_onboarding_template",
             Reducer::AssignQualityAlert { .. } => "assign_quality_alert",
             Reducer::AssignRole { .. } => "assign_role",
             Reducer::AssignStockMove { .. } => "assign_stock_move",
@@ -9714,6 +10185,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::CompleteAiAgentRun { .. } => "complete_ai_agent_run",
             Reducer::CompleteDocumentProcessingJob { .. } => "complete_document_processing_job",
             Reducer::CompleteIntercompanyTransaction { .. } => "complete_intercompany_transaction",
+            Reducer::CompleteOffboardingItem { .. } => "complete_offboarding_item",
+            Reducer::CompleteOnboardingItem { .. } => "complete_onboarding_item",
+            Reducer::CompletePerformanceReview { .. } => "complete_performance_review",
             Reducer::CompletePickingBatch { .. } => "complete_picking_batch",
             Reducer::CompletePickingWave { .. } => "complete_picking_wave",
             Reducer::CompleteProductivityLog { .. } => "complete_productivity_log",
@@ -9774,10 +10248,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateAnalyticsMetric { .. } => "create_analytics_metric",
             Reducer::CreateApprovalRule { .. } => "create_approval_rule",
             Reducer::CreateAssignmentRule { .. } => "create_assignment_rule",
+            Reducer::CreateAttendancePunch { .. } => "create_attendance_punch",
             Reducer::CreateAuditRule { .. } => "create_audit_rule",
             Reducer::CreateBadDebtWriteOff { .. } => "create_bad_debt_write_off",
             Reducer::CreateBarcodeNomenclature { .. } => "create_barcode_nomenclature",
             Reducer::CreateBarcodeRule { .. } => "create_barcode_rule",
+            Reducer::CreateBenefitPlan { .. } => "create_benefit_plan",
             Reducer::CreateBillFromPurchaseOrder { .. } => "create_bill_from_purchase_order",
             Reducer::CreateBillingAccount { .. } => "create_billing_account",
             Reducer::CreateBom { .. } => "create_bom",
@@ -9836,7 +10312,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateHelpdeskSla { .. } => "create_helpdesk_sla",
             Reducer::CreateHelpdeskStage { .. } => "create_helpdesk_stage",
             Reducer::CreateHelpdeskTeam { .. } => "create_helpdesk_team",
+            Reducer::CreateHrApplicant { .. } => "create_hr_applicant",
+            Reducer::CreateHrEmployeeDocument { .. } => "create_hr_employee_document",
             Reducer::CreateHrEmployeeSkill { .. } => "create_hr_employee_skill",
+            Reducer::CreateHrGlobalAssignment { .. } => "create_hr_global_assignment",
+            Reducer::CreateHrIntegrationIntent { .. } => "create_hr_integration_intent",
+            Reducer::CreateHrLaborCostSnapshot { .. } => "create_hr_labor_cost_snapshot",
+            Reducer::CreateHrShiftOptJob { .. } => "create_hr_shift_opt_job",
             Reducer::CreateHrSkill { .. } => "create_hr_skill",
             Reducer::CreateIncoterm { .. } => "create_incoterm",
             Reducer::CreateIntercompanyRule { .. } => "create_intercompany_rule",
@@ -9863,6 +10345,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateManufacturingOrder { .. } => "create_manufacturing_order",
             Reducer::CreateMessageBatch { .. } => "create_message_batch",
             Reducer::CreateMessageTemplate { .. } => "create_message_template",
+            Reducer::CreateOnboardingTemplate { .. } => "create_onboarding_template",
             Reducer::CreateOperationalMessage { .. } => "create_operational_message",
             Reducer::CreateOpportunity { .. } => "create_opportunity",
             Reducer::CreateOpportunityLine { .. } => "create_opportunity_line",
@@ -9878,8 +10361,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreatePaymentTerm { .. } => "create_payment_term",
             Reducer::CreatePaymentTermLine { .. } => "create_payment_term_line",
             Reducer::CreatePaymentTransaction { .. } => "create_payment_transaction",
+            Reducer::CreatePayrollExportIntent { .. } => "create_payroll_export_intent",
             Reducer::CreatePayrollStructure { .. } => "create_payroll_structure",
             Reducer::CreatePayslip { .. } => "create_payslip",
+            Reducer::CreatePerformanceCycle { .. } => "create_performance_cycle",
             Reducer::CreatePickingBatch { .. } => "create_picking_batch",
             Reducer::CreatePickingWave { .. } => "create_picking_wave",
             Reducer::CreatePosConfig { .. } => "create_pos_config",
@@ -9935,6 +10420,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateScheduledReport { .. } => "create_scheduled_report",
             Reducer::CreateShippingMethod { .. } => "create_shipping_method",
             Reducer::CreateSodConflictRule { .. } => "create_sod_conflict_rule",
+            Reducer::CreateStatutoryId { .. } => "create_statutory_id",
             Reducer::CreateStockInventory { .. } => "create_stock_inventory",
             Reducer::CreateStockInventoryLine { .. } => "create_stock_inventory_line",
             Reducer::CreateStockLocation { .. } => "create_stock_location",
@@ -9974,6 +10460,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateWarehouseSyncIntent { .. } => "create_warehouse_sync_intent",
             Reducer::CreateWarehouseTask { .. } => "create_warehouse_task",
             Reducer::CreateWhatsappBusinessAccount { .. } => "create_whatsapp_business_account",
+            Reducer::CreateWorkSchedule { .. } => "create_work_schedule",
             Reducer::CreateWorkcenter { .. } => "create_workcenter",
             Reducer::CreateWorkflow { .. } => "create_workflow",
             Reducer::CreateWorkingCalendar { .. } => "create_working_calendar",
@@ -10001,7 +10488,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeleteFinancialReport { .. } => "delete_financial_report",
             Reducer::DeleteFiscalYear { .. } => "delete_fiscal_year",
             Reducer::DeleteFormField { .. } => "delete_form_field",
+            Reducer::DeleteHrEmployeeDocument { .. } => "delete_hr_employee_document",
             Reducer::DeleteHrEmployeeSkill { .. } => "delete_hr_employee_skill",
+            Reducer::DeleteHrGlobalAssignment { .. } => "delete_hr_global_assignment",
             Reducer::DeleteImportMappingTemplate { .. } => "delete_import_mapping_template",
             Reducer::DeleteIntegration { .. } => "delete_integration",
             Reducer::DeleteIntercompanyRule { .. } => "delete_intercompany_rule",
@@ -10031,6 +10520,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeleteSaleOrderOption { .. } => "delete_sale_order_option",
             Reducer::DeleteSavedReport { .. } => "delete_saved_report",
             Reducer::DeleteSearchEmbedding { .. } => "delete_search_embedding",
+            Reducer::DeleteStatutoryId { .. } => "delete_statutory_id",
             Reducer::DeleteStockLocation { .. } => "delete_stock_location",
             Reducer::DeleteStockProductionLot { .. } => "delete_stock_production_lot",
             Reducer::DeleteStockProductionSerial { .. } => "delete_stock_production_serial",
@@ -10160,12 +10650,14 @@ impl __sdk::Reducer for Reducer {
             Reducer::LockPurchaseOrder { .. } => "lock_purchase_order",
             Reducer::LockSaleOrder { .. } => "lock_sale_order",
             Reducer::LogAuditEvent { .. } => "log_audit_event",
+            Reducer::LogHrPiiRead { .. } => "log_hr_pii_read",
             Reducer::LogTimesheet { .. } => "log_timesheet",
             Reducer::LogWorkcenterProductivity { .. } => "log_workcenter_productivity",
             Reducer::MarkActionSent { .. } => "mark_action_sent",
             Reducer::MarkEmbeddingSynced { .. } => "mark_embedding_synced",
             Reducer::MarkInviteAccepted { .. } => "mark_invite_accepted",
             Reducer::MarkMailMessageDelivered { .. } => "mark_mail_message_delivered",
+            Reducer::MarkOnboardingDone { .. } => "mark_onboarding_done",
             Reducer::MarkResetTokenUsed { .. } => "mark_reset_token_used",
             Reducer::MatchBankLine { .. } => "match_bank_line",
             Reducer::MatchEliminationEntries { .. } => "match_elimination_entries",
@@ -10194,6 +10686,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::PostMessage { .. } => "post_message",
             Reducer::PostPayment { .. } => "post_payment",
             Reducer::PostPaymentTransaction { .. } => "post_payment_transaction",
+            Reducer::PostPayslip { .. } => "post_payslip",
             Reducer::PostRealizedFxGainLoss { .. } => "post_realized_fx_gain_loss",
             Reducer::ProcessConsolidation { .. } => "process_consolidation",
             Reducer::ProcessIntercompanyTransaction { .. } => "process_intercompany_transaction",
@@ -10222,8 +10715,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordGeneratedOwnerReport { .. } => "record_generated_owner_report",
             Reducer::RecordGoogleDriveSync { .. } => "record_google_drive_sync",
             Reducer::RecordGoogleDriveSyncError { .. } => "record_google_drive_sync_error",
+            Reducer::RecordHrIntegrationResult { .. } => "record_hr_integration_result",
             Reducer::RecordInventoryIntegrationResult { .. } => "record_inventory_integration_result",
             Reducer::RecordMessageCopied { .. } => "record_message_copied",
+            Reducer::RecordPayrollExportResult { .. } => "record_payroll_export_result",
             Reducer::RecordPrivacyConsent { .. } => "record_privacy_consent",
             Reducer::RecordPurchasingIntegrationResult { .. } => "record_purchasing_integration_result",
             Reducer::RecordReportRun { .. } => "record_report_run",
@@ -10234,6 +10729,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordWhatsappHealthCheck { .. } => "record_whatsapp_health_check",
             Reducer::RecordWhatsappMessageSent { .. } => "record_whatsapp_message_sent",
             Reducer::RefreshCapacityForecast { .. } => "refresh_capacity_forecast",
+            Reducer::RefreshHrCapacityForecast { .. } => "refresh_hr_capacity_forecast",
             Reducer::RefreshInventoryExceptions { .. } => "refresh_inventory_exceptions",
             Reducer::RefreshPolicySnapshot { .. } => "refresh_policy_snapshot",
             Reducer::RefreshProjectEarnedValue { .. } => "refresh_project_earned_value",
@@ -10251,6 +10747,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RegisterQueueWorker { .. } => "register_queue_worker",
             Reducer::RejectAiActionDraft { .. } => "reject_ai_action_draft",
             Reducer::RejectApprovalRequest { .. } => "reject_approval_request",
+            Reducer::RejectExpensePolicyException { .. } => "reject_expense_policy_exception",
             Reducer::RejectSupplierIntake { .. } => "reject_supplier_intake",
             Reducer::RejectTimesheets { .. } => "reject_timesheets",
             Reducer::ReleaseBlanketToPo { .. } => "release_blanket_to_po",
@@ -10304,6 +10801,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllCrmTests => "run_all_crm_tests",
             Reducer::RunAllDomainTests => "run_all_domain_tests",
             Reducer::RunAllExpensesTests => "run_all_expenses_tests",
+            Reducer::RunAllHrTests => "run_all_hr_tests",
             Reducer::RunAllInventoryTests => "run_all_inventory_tests",
             Reducer::RunAllPlatformTests => "run_all_platform_tests",
             Reducer::RunAllProjectsTests => "run_all_projects_tests",
@@ -10331,6 +10829,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunFxRevaluationBatch { .. } => "run_fx_revaluation_batch",
             Reducer::RunHelpdeskTicketTest => "run_helpdesk_ticket_test",
             Reducer::RunHrLeaveTypeTest => "run_hr_leave_type_test",
+            Reducer::RunHrWaveATest => "run_hr_wave_a_test",
             Reducer::RunInventory3PlAsnTest => "run_inventory_3_pl_asn_test",
             Reducer::RunInventoryAdjustmentTest => "run_inventory_adjustment_test",
             Reducer::RunInventoryAtpFailClosedTest => "run_inventory_atp_fail_closed_test",
@@ -10409,8 +10908,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::ScheduleSalesSlaEscalation { .. } => "schedule_sales_sla_escalation",
             Reducer::ScheduleTaxDeadlineUpdates { .. } => "schedule_tax_deadline_updates",
             Reducer::SeedDevData => "seed_dev_data",
+            Reducer::SeedHrCountryPackOverlays { .. } => "seed_hr_country_pack_overlays",
             Reducer::SeedOrganizationFormConfigs { .. } => "seed_organization_form_configs",
             Reducer::SeedPackHolidays { .. } => "seed_pack_holidays",
+            Reducer::SeedStatutoryExpenseMileageRates { .. } => "seed_statutory_expense_mileage_rates",
             Reducer::SendPurchaseOrder { .. } => "send_purchase_order",
             Reducer::SendSaleOrderQuotation { .. } => "send_sale_order_quotation",
             Reducer::SetAiAgentActive { .. } => "set_ai_agent_active",
@@ -10449,6 +10950,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::StageBankStatementImport { .. } => "stage_bank_statement_import",
             Reducer::StartCycleCountSession { .. } => "start_cycle_count_session",
             Reducer::StartManufacturingOrder { .. } => "start_manufacturing_order",
+            Reducer::StartOffboarding { .. } => "start_offboarding",
             Reducer::StartPickingBatch { .. } => "start_picking_batch",
             Reducer::StartQualityCheck { .. } => "start_quality_check",
             Reducer::StartTimesheetTimer { .. } => "start_timesheet_timer",
@@ -10459,6 +10961,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::StoreUserCredential { .. } => "store_user_credential",
             Reducer::SubmitExpense { .. } => "submit_expense",
             Reducer::SubmitExpenseSheet { .. } => "submit_expense_sheet",
+            Reducer::SubmitLeave { .. } => "submit_leave",
+            Reducer::SubmitPerformanceReview { .. } => "submit_performance_review",
             Reducer::SubmitPurchaseRequisition { .. } => "submit_purchase_requisition",
             Reducer::SubmitSupplierIntake { .. } => "submit_supplier_intake",
             Reducer::SubscribeToRecord { .. } => "subscribe_to_record",
@@ -10467,6 +10971,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ToggleProjectFavorite { .. } => "toggle_project_favorite",
             Reducer::UnassignTeamMemberSkill { .. } => "unassign_team_member_skill",
             Reducer::UnblockWorkcenter { .. } => "unblock_workcenter",
+            Reducer::UnenrollBenefitEnrollment { .. } => "unenroll_benefit_enrollment",
             Reducer::UnlinkDevice { .. } => "unlink_device",
             Reducer::UnlockDocument { .. } => "unlock_document",
             Reducer::UnlockKnowledgeArticle { .. } => "unlock_knowledge_article",
@@ -10532,7 +11037,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateFormField { .. } => "update_form_field",
             Reducer::UpdateGoogleDriveConnection { .. } => "update_google_drive_connection",
             Reducer::UpdateGoogleDriveCredentials { .. } => "update_google_drive_credentials",
+            Reducer::UpdateHrApplicant { .. } => "update_hr_applicant",
             Reducer::UpdateHrEmployeeSkill { .. } => "update_hr_employee_skill",
+            Reducer::UpdateHrGlobalAssignment { .. } => "update_hr_global_assignment",
             Reducer::UpdateHrSkill { .. } => "update_hr_skill",
             Reducer::UpdateHubHeartbeat { .. } => "update_hub_heartbeat",
             Reducer::UpdateIntegrationStatus { .. } => "update_integration_status",
@@ -10596,6 +11103,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateSaleOrderOption { .. } => "update_sale_order_option",
             Reducer::UpdateSavedReport { .. } => "update_saved_report",
             Reducer::UpdateSodConflictRule { .. } => "update_sod_conflict_rule",
+            Reducer::UpdateStatutoryId { .. } => "update_statutory_id",
             Reducer::UpdateStockInventoryState { .. } => "update_stock_inventory_state",
             Reducer::UpdateStockLocation { .. } => "update_stock_location",
             Reducer::UpdateStockProductionLot { .. } => "update_stock_production_lot",
@@ -10816,6 +11324,17 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
 }             => __sats::bsatn::to_vec(&add_org_member_reducer::AddOrgMemberArgs {
                 user_identity: user_identity.clone(),
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::AddPerformanceGoal{
+                organization_id,
+                company_id,
+                cycle_id,
+                params,
+}             => __sats::bsatn::to_vec(&add_performance_goal_reducer::AddPerformanceGoalArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                cycle_id: cycle_id.clone(),
                 params: params.clone(),
 }),
             Reducer::AddProposalComment{
@@ -11050,7 +11569,14 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
 }),
             Reducer::ApplyGlobalMigrations => __sats::bsatn::to_vec(&apply_global_migrations_reducer::ApplyGlobalMigrationsArgs {
                 }),
-Reducer::ApplyIndexLinkedRenewal{
+Reducer::ApplyHrIntegrationIntent{
+                organization_id,
+                intent_id,
+}             => __sats::bsatn::to_vec(&apply_hr_integration_intent_reducer::ApplyHrIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                intent_id: intent_id.clone(),
+}),
+            Reducer::ApplyIndexLinkedRenewal{
                 organization_id,
                 company_id,
                 subscription_id,
@@ -11090,6 +11616,13 @@ Reducer::ApplyIndexLinkedRenewal{
                 organization_id,
                 limit,
 }             => __sats::bsatn::to_vec(&apply_pending_expense_integration_intents_reducer::ApplyPendingExpenseIntegrationIntentsArgs {
+                organization_id: organization_id.clone(),
+                limit: limit.clone(),
+}),
+            Reducer::ApplyPendingHrIntegrationIntents{
+                organization_id,
+                limit,
+}             => __sats::bsatn::to_vec(&apply_pending_hr_integration_intents_reducer::ApplyPendingHrIntegrationIntentsArgs {
                 organization_id: organization_id.clone(),
                 limit: limit.clone(),
 }),
@@ -11240,9 +11773,11 @@ Reducer::ApplyIndexLinkedRenewal{
 }),
             Reducer::ApproveLeave{
                 organization_id,
+                company_id,
                 leave_id,
 }             => __sats::bsatn::to_vec(&approve_leave_reducer::ApproveLeaveArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 leave_id: leave_id.clone(),
 }),
             Reducer::ApprovePurchaseRequisition{
@@ -11283,12 +11818,12 @@ Reducer::ApplyIndexLinkedRenewal{
                 organization_id,
                 company_id,
                 employee_id,
-                termination_date,
+                params,
 }             => __sats::bsatn::to_vec(&archive_employee_reducer::ArchiveEmployeeArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 employee_id: employee_id.clone(),
-                termination_date: termination_date.clone(),
+                params: params.clone(),
 }),
             Reducer::ArchiveFinancialReport{
                 organization_id,
@@ -11306,11 +11841,31 @@ Reducer::ApplyIndexLinkedRenewal{
                 organization_id: organization_id.clone(),
                 account_id: account_id.clone(),
 }),
+            Reducer::AssignBenefitEnrollment{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&assign_benefit_enrollment_reducer::AssignBenefitEnrollmentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::AssignContactRole{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&assign_contact_role_reducer::AssignContactRoleArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::AssignOnboardingTemplate{
+                organization_id,
+                company_id,
+                employee_id,
+                params,
+}             => __sats::bsatn::to_vec(&assign_onboarding_template_reducer::AssignOnboardingTemplateArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                employee_id: employee_id.clone(),
                 params: params.clone(),
 }),
             Reducer::AssignQualityAlert{
@@ -11488,9 +12043,11 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::CancelContract{
                 organization_id,
+                company_id,
                 contract_id,
 }             => __sats::bsatn::to_vec(&cancel_contract_reducer::CancelContractArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 contract_id: contract_id.clone(),
 }),
             Reducer::CancelIntercompanyTransaction{
@@ -11780,6 +12337,39 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 transaction_id: transaction_id.clone(),
+}),
+            Reducer::CompleteOffboardingItem{
+                organization_id,
+                company_id,
+                employee_id,
+                params,
+}             => __sats::bsatn::to_vec(&complete_offboarding_item_reducer::CompleteOffboardingItemArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                employee_id: employee_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CompleteOnboardingItem{
+                organization_id,
+                company_id,
+                employee_id,
+                params,
+}             => __sats::bsatn::to_vec(&complete_onboarding_item_reducer::CompleteOnboardingItemArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                employee_id: employee_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CompletePerformanceReview{
+                organization_id,
+                company_id,
+                review_id,
+                params,
+}             => __sats::bsatn::to_vec(&complete_performance_review_reducer::CompletePerformanceReviewArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                review_id: review_id.clone(),
+                params: params.clone(),
 }),
             Reducer::CompletePickingBatch{
                 organization_id,
@@ -12271,6 +12861,15 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateAttendancePunch{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_attendance_punch_reducer::CreateAttendancePunchArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateAuditRule{
                 organization_id,
                 params,
@@ -12299,6 +12898,15 @@ Reducer::BillProjectMilestone{
                 params,
 }             => __sats::bsatn::to_vec(&create_barcode_rule_reducer::CreateBarcodeRuleArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateBenefitPlan{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_benefit_plan_reducer::CreateBenefitPlanArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateBillFromPurchaseOrder{
@@ -12791,11 +13399,63 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateHrApplicant{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_hr_applicant_reducer::CreateHrApplicantArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateHrEmployeeDocument{
+                organization_id,
+                company_id,
+                employee_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_hr_employee_document_reducer::CreateHrEmployeeDocumentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                employee_id: employee_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateHrEmployeeSkill{
                 organization_id,
                 company_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_hr_employee_skill_reducer::CreateHrEmployeeSkillArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateHrGlobalAssignment{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_hr_global_assignment_reducer::CreateHrGlobalAssignmentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateHrIntegrationIntent{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_hr_integration_intent_reducer::CreateHrIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateHrLaborCostSnapshot{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_hr_labor_cost_snapshot_reducer::CreateHrLaborCostSnapshotArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateHrShiftOptJob{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_hr_shift_opt_job_reducer::CreateHrShiftOptJobArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 params: params.clone(),
@@ -13018,6 +13678,15 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateOnboardingTemplate{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_onboarding_template_reducer::CreateOnboardingTemplateArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateOperationalMessage{
                 organization_id,
                 params,
@@ -13131,6 +13800,17 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreatePayrollExportIntent{
+                organization_id,
+                company_id,
+                payslip_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_payroll_export_intent_reducer::CreatePayrollExportIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                payslip_id: payslip_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreatePayrollStructure{
                 organization_id,
                 params,
@@ -13143,6 +13823,15 @@ Reducer::BillProjectMilestone{
                 params,
 }             => __sats::bsatn::to_vec(&create_payslip_reducer::CreatePayslipArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreatePerformanceCycle{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_performance_cycle_reducer::CreatePerformanceCycleArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreatePickingBatch{
@@ -13618,6 +14307,15 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateStatutoryId{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_statutory_id_reducer::CreateStatutoryIdArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateStockInventory{
                 organization_id,
                 params,
@@ -13935,6 +14633,15 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateWorkSchedule{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_work_schedule_reducer::CreateWorkScheduleArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateWorkcenter{
                 organization_id,
                 params,
@@ -14152,6 +14859,19 @@ Reducer::BillProjectMilestone{
                 configuration_id: configuration_id.clone(),
                 field_id: field_id.clone(),
 }),
+            Reducer::DeleteHrEmployeeDocument{
+                organization_id,
+                company_id,
+                employee_id,
+                document_id,
+                params,
+}             => __sats::bsatn::to_vec(&delete_hr_employee_document_reducer::DeleteHrEmployeeDocumentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                employee_id: employee_id.clone(),
+                document_id: document_id.clone(),
+                params: params.clone(),
+}),
             Reducer::DeleteHrEmployeeSkill{
                 organization_id,
                 company_id,
@@ -14160,6 +14880,15 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 employee_skill_id: employee_skill_id.clone(),
+}),
+            Reducer::DeleteHrGlobalAssignment{
+                organization_id,
+                company_id,
+                assignment_id,
+}             => __sats::bsatn::to_vec(&delete_hr_global_assignment_reducer::DeleteHrGlobalAssignmentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                assignment_id: assignment_id.clone(),
 }),
             Reducer::DeleteImportMappingTemplate{
                 organization_id,
@@ -14377,6 +15106,15 @@ Reducer::BillProjectMilestone{
                 company_id: company_id.clone(),
                 content_type: content_type.clone(),
                 content_id: content_id.clone(),
+}),
+            Reducer::DeleteStatutoryId{
+                organization_id,
+                company_id,
+                statutory_id,
+}             => __sats::bsatn::to_vec(&delete_statutory_id_reducer::DeleteStatutoryIdArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                statutory_id: statutory_id.clone(),
 }),
             Reducer::DeleteStockLocation{
                 organization_id,
@@ -14607,9 +15345,11 @@ Reducer::ErrorIntercompanyTransaction{
 }),
             Reducer::ExpireContract{
                 organization_id,
+                company_id,
                 contract_id,
 }             => __sats::bsatn::to_vec(&expire_contract_reducer::ExpireContractArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 contract_id: contract_id.clone(),
 }),
             Reducer::ExplodeBom{
@@ -15405,6 +16145,13 @@ Reducer::ErrorIntercompanyTransaction{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::LogHrPiiRead{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&log_hr_pii_read_reducer::LogHrPiiReadArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::LogTimesheet{
                 organization_id,
                 params,
@@ -15456,6 +16203,15 @@ Reducer::ErrorIntercompanyTransaction{
                 organization_id: organization_id.clone(),
                 message_id: message_id.clone(),
                 delivery_metadata: delivery_metadata.clone(),
+}),
+            Reducer::MarkOnboardingDone{
+                organization_id,
+                company_id,
+                employee_id,
+}             => __sats::bsatn::to_vec(&mark_onboarding_done_reducer::MarkOnboardingDoneArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                employee_id: employee_id.clone(),
 }),
             Reducer::MarkResetTokenUsed{
                 token_id,
@@ -15522,9 +16278,11 @@ Reducer::MoveStockQuant{
 }),
             Reducer::OpenContract{
                 organization_id,
+                company_id,
                 contract_id,
 }             => __sats::bsatn::to_vec(&open_contract_reducer::OpenContractArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 contract_id: contract_id.clone(),
 }),
             Reducer::OpenCrmConversation{
@@ -15709,6 +16467,17 @@ Reducer::MoveStockQuant{
 }             => __sats::bsatn::to_vec(&post_payment_transaction_reducer::PostPaymentTransactionArgs {
                 organization_id: organization_id.clone(),
                 transaction_id: transaction_id.clone(),
+}),
+            Reducer::PostPayslip{
+                organization_id,
+                company_id,
+                payslip_id,
+                params,
+}             => __sats::bsatn::to_vec(&post_payslip_reducer::PostPayslipArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                payslip_id: payslip_id.clone(),
+                params: params.clone(),
 }),
             Reducer::PostRealizedFxGainLoss{
                 organization_id,
@@ -15962,6 +16731,17 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 error_message: error_message.clone(),
 }),
+            Reducer::RecordHrIntegrationResult{
+                organization_id,
+                company_id,
+                intent_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_hr_integration_result_reducer::RecordHrIntegrationResultArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                intent_id: intent_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RecordInventoryIntegrationResult{
                 organization_id,
                 company_id,
@@ -15979,6 +16759,17 @@ Reducer::MoveStockQuant{
 }             => __sats::bsatn::to_vec(&record_message_copied_reducer::RecordMessageCopiedArgs {
                 organization_id: organization_id.clone(),
                 message_id: message_id.clone(),
+}),
+            Reducer::RecordPayrollExportResult{
+                organization_id,
+                company_id,
+                intent_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_payroll_export_result_reducer::RecordPayrollExportResultArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                intent_id: intent_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RecordPrivacyConsent{
                 organization_id,
@@ -16072,6 +16863,15 @@ Reducer::MoveStockQuant{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::RefreshHrCapacityForecast{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&refresh_hr_capacity_forecast_reducer::RefreshHrCapacityForecastArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RefreshInventoryExceptions{
                 organization_id,
                 company_id,
@@ -16156,9 +16956,11 @@ Reducer::MoveStockQuant{
 }),
             Reducer::RefuseLeave{
                 organization_id,
+                company_id,
                 leave_id,
 }             => __sats::bsatn::to_vec(&refuse_leave_reducer::RefuseLeaveArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 leave_id: leave_id.clone(),
 }),
             Reducer::RegisterIotDevice{
@@ -16219,6 +17021,15 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 request_id: request_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RejectExpensePolicyException{
+                organization_id,
+                exception_id,
+                params,
+}             => __sats::bsatn::to_vec(&reject_expense_policy_exception_reducer::RejectExpensePolicyExceptionArgs {
+                organization_id: organization_id.clone(),
+                exception_id: exception_id.clone(),
                 params: params.clone(),
 }),
             Reducer::RejectSupplierIntake{
@@ -16393,9 +17204,11 @@ Reducer::MoveStockQuant{
 }),
             Reducer::ResetLeaveToDraft{
                 organization_id,
+                company_id,
                 leave_id,
 }             => __sats::bsatn::to_vec(&reset_leave_to_draft_reducer::ResetLeaveToDraftArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 leave_id: leave_id.clone(),
 }),
             Reducer::ResolveInventoryException{
@@ -16567,6 +17380,8 @@ Reducer::RunAllDomainTests => __sats::bsatn::to_vec(&run_all_domain_tests_reduce
                 }),
 Reducer::RunAllExpensesTests => __sats::bsatn::to_vec(&run_all_expenses_tests_reducer::RunAllExpensesTestsArgs {
                 }),
+Reducer::RunAllHrTests => __sats::bsatn::to_vec(&run_all_hr_tests_reducer::RunAllHrTestsArgs {
+                }),
 Reducer::RunAllInventoryTests => __sats::bsatn::to_vec(&run_all_inventory_tests_reducer::RunAllInventoryTestsArgs {
                 }),
 Reducer::RunAllPlatformTests => __sats::bsatn::to_vec(&run_all_platform_tests_reducer::RunAllPlatformTestsArgs {
@@ -16641,6 +17456,8 @@ Reducer::RunFxRevaluation{
             Reducer::RunHelpdeskTicketTest => __sats::bsatn::to_vec(&run_helpdesk_ticket_test_reducer::RunHelpdeskTicketTestArgs {
                 }),
 Reducer::RunHrLeaveTypeTest => __sats::bsatn::to_vec(&run_hr_leave_type_test_reducer::RunHrLeaveTypeTestArgs {
+                }),
+Reducer::RunHrWaveATest => __sats::bsatn::to_vec(&run_hr_wave_a_test_reducer::RunHrWaveATestArgs {
                 }),
 Reducer::RunInventory3PlAsnTest => __sats::bsatn::to_vec(&run_inventory_3_pl_asn_test_reducer::RunInventory3PlAsnTestArgs {
                 }),
@@ -16841,7 +17658,16 @@ Reducer::SaveImportMappingTemplate{
 }),
             Reducer::SeedDevData => __sats::bsatn::to_vec(&seed_dev_data_reducer::SeedDevDataArgs {
                 }),
-Reducer::SeedOrganizationFormConfigs{
+Reducer::SeedHrCountryPackOverlays{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&seed_hr_country_pack_overlays_reducer::SeedHrCountryPackOverlaysArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::SeedOrganizationFormConfigs{
                 organization_id,
 }             => __sats::bsatn::to_vec(&seed_organization_form_configs_reducer::SeedOrganizationFormConfigsArgs {
                 organization_id: organization_id.clone(),
@@ -16853,6 +17679,13 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&seed_pack_holidays_reducer::SeedPackHolidaysArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::SeedStatutoryExpenseMileageRates{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&seed_statutory_expense_mileage_rates_reducer::SeedStatutoryExpenseMileageRatesArgs {
+                organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
             Reducer::SendPurchaseOrder{
@@ -17207,6 +18040,15 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 mo_id: mo_id.clone(),
 }),
+            Reducer::StartOffboarding{
+                organization_id,
+                company_id,
+                employee_id,
+}             => __sats::bsatn::to_vec(&start_offboarding_reducer::StartOffboardingArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                employee_id: employee_id.clone(),
+}),
             Reducer::StartPickingBatch{
                 organization_id,
                 batch_id,
@@ -17295,6 +18137,26 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 sheet_id: sheet_id.clone(),
 }),
+            Reducer::SubmitLeave{
+                organization_id,
+                company_id,
+                leave_id,
+}             => __sats::bsatn::to_vec(&submit_leave_reducer::SubmitLeaveArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                leave_id: leave_id.clone(),
+}),
+            Reducer::SubmitPerformanceReview{
+                organization_id,
+                company_id,
+                review_id,
+                params,
+}             => __sats::bsatn::to_vec(&submit_performance_review_reducer::SubmitPerformanceReviewArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                review_id: review_id.clone(),
+                params: params.clone(),
+}),
             Reducer::SubmitPurchaseRequisition{
                 organization_id,
                 requisition_id,
@@ -17356,6 +18218,15 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&unblock_workcenter_reducer::UnblockWorkcenterArgs {
                 organization_id: organization_id.clone(),
                 workcenter_id: workcenter_id.clone(),
+}),
+            Reducer::UnenrollBenefitEnrollment{
+                organization_id,
+                company_id,
+                enrollment_id,
+}             => __sats::bsatn::to_vec(&unenroll_benefit_enrollment_reducer::UnenrollBenefitEnrollmentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                enrollment_id: enrollment_id.clone(),
 }),
             Reducer::UnlinkDevice{
                 organization_id,
@@ -17976,6 +18847,17 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 credentials_reference: credentials_reference.clone(),
 }),
+            Reducer::UpdateHrApplicant{
+                organization_id,
+                company_id,
+                applicant_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_hr_applicant_reducer::UpdateHrApplicantArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                applicant_id: applicant_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdateHrEmployeeSkill{
                 organization_id,
                 company_id,
@@ -17985,6 +18867,17 @@ Reducer::SeedOrganizationFormConfigs{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 employee_skill_id: employee_skill_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateHrGlobalAssignment{
+                organization_id,
+                company_id,
+                assignment_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_hr_global_assignment_reducer::UpdateHrGlobalAssignmentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                assignment_id: assignment_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateHrSkill{
@@ -18606,6 +19499,17 @@ Reducer::SeedOrganizationFormConfigs{
 }             => __sats::bsatn::to_vec(&update_sod_conflict_rule_reducer::UpdateSodConflictRuleArgs {
                 organization_id: organization_id.clone(),
                 rule_id: rule_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateStatutoryId{
+                organization_id,
+                company_id,
+                statutory_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_statutory_id_reducer::UpdateStatutoryIdArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                statutory_id: statutory_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateStockInventoryState{
@@ -19254,9 +20158,17 @@ pub struct DbUpdate {
     helpdesk_stage: __sdk::TableUpdate<HelpdeskStage>,
     helpdesk_team: __sdk::TableUpdate<HelpdeskTeam>,
     helpdesk_ticket: __sdk::TableUpdate<HelpdeskTicket>,
+    hr_applicant: __sdk::TableUpdate<HrApplicant>,
+    hr_attendance: __sdk::TableUpdate<HrAttendance>,
+    hr_benefit_enrollment: __sdk::TableUpdate<HrBenefitEnrollment>,
+    hr_benefit_plan: __sdk::TableUpdate<HrBenefitPlan>,
+    hr_capacity_forecast: __sdk::TableUpdate<HrCapacityForecast>,
+    hr_compensation_event: __sdk::TableUpdate<HrCompensationEvent>,
     hr_contract: __sdk::TableUpdate<HrContract>,
+    hr_country_pack_leave_default: __sdk::TableUpdate<HrCountryPackLeaveDefault>,
     hr_department: __sdk::TableUpdate<HrDepartment>,
     hr_employee: __sdk::TableUpdate<HrEmployee>,
+    hr_employee_document: __sdk::TableUpdate<HrEmployeeDocument>,
     hr_employee_skill: __sdk::TableUpdate<HrEmployeeSkill>,
     hr_expense: __sdk::TableUpdate<HrExpense>,
     hr_expense_advance: __sdk::TableUpdate<HrExpenseAdvance>,
@@ -19267,14 +20179,30 @@ pub struct DbUpdate {
     hr_expense_policy: __sdk::TableUpdate<HrExpensePolicy>,
     hr_expense_policy_exception: __sdk::TableUpdate<HrExpensePolicyException>,
     hr_expense_receipt: __sdk::TableUpdate<HrExpenseReceipt>,
+    hr_global_assignment: __sdk::TableUpdate<HrGlobalAssignment>,
+    hr_integration_intent: __sdk::TableUpdate<HrIntegrationIntent>,
     hr_job_position: __sdk::TableUpdate<HrJobPosition>,
+    hr_labor_cost_snapshot: __sdk::TableUpdate<HrLaborCostSnapshot>,
     hr_leave: __sdk::TableUpdate<HrLeave>,
+    hr_leave_allocation: __sdk::TableUpdate<HrLeaveAllocation>,
     hr_leave_type: __sdk::TableUpdate<HrLeaveType>,
+    hr_offboarding_checklist: __sdk::TableUpdate<HrOffboardingChecklist>,
+    hr_onboarding_progress: __sdk::TableUpdate<HrOnboardingProgress>,
+    hr_onboarding_template: __sdk::TableUpdate<HrOnboardingTemplate>,
+    hr_onboarding_template_item: __sdk::TableUpdate<HrOnboardingTemplateItem>,
+    hr_payroll_export_intent: __sdk::TableUpdate<HrPayrollExportIntent>,
     hr_payroll_structure: __sdk::TableUpdate<HrPayrollStructure>,
     hr_payslip: __sdk::TableUpdate<HrPayslip>,
+    hr_performance_cycle: __sdk::TableUpdate<HrPerformanceCycle>,
+    hr_performance_goal: __sdk::TableUpdate<HrPerformanceGoal>,
+    hr_performance_review: __sdk::TableUpdate<HrPerformanceReview>,
+    hr_pii_access_log: __sdk::TableUpdate<HrPiiAccessLog>,
     hr_resource: __sdk::TableUpdate<HrResource>,
     hr_salary_rule: __sdk::TableUpdate<HrSalaryRule>,
+    hr_shift_opt_job: __sdk::TableUpdate<HrShiftOptJob>,
     hr_skill: __sdk::TableUpdate<HrSkill>,
+    hr_statutory_id: __sdk::TableUpdate<HrStatutoryId>,
+    hr_work_schedule: __sdk::TableUpdate<HrWorkSchedule>,
     import_job: __sdk::TableUpdate<ImportJob>,
     import_job_error: __sdk::TableUpdate<ImportJobError>,
     import_job_record: __sdk::TableUpdate<ImportJobRecord>,
@@ -19630,9 +20558,17 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "helpdesk_stage" => db_update.helpdesk_stage.append(helpdesk_stage_table::parse_table_update(table_update)?),
     "helpdesk_team" => db_update.helpdesk_team.append(helpdesk_team_table::parse_table_update(table_update)?),
     "helpdesk_ticket" => db_update.helpdesk_ticket.append(helpdesk_ticket_table::parse_table_update(table_update)?),
+    "hr_applicant" => db_update.hr_applicant.append(hr_applicant_table::parse_table_update(table_update)?),
+    "hr_attendance" => db_update.hr_attendance.append(hr_attendance_table::parse_table_update(table_update)?),
+    "hr_benefit_enrollment" => db_update.hr_benefit_enrollment.append(hr_benefit_enrollment_table::parse_table_update(table_update)?),
+    "hr_benefit_plan" => db_update.hr_benefit_plan.append(hr_benefit_plan_table::parse_table_update(table_update)?),
+    "hr_capacity_forecast" => db_update.hr_capacity_forecast.append(hr_capacity_forecast_table::parse_table_update(table_update)?),
+    "hr_compensation_event" => db_update.hr_compensation_event.append(hr_compensation_event_table::parse_table_update(table_update)?),
     "hr_contract" => db_update.hr_contract.append(hr_contract_table::parse_table_update(table_update)?),
+    "hr_country_pack_leave_default" => db_update.hr_country_pack_leave_default.append(hr_country_pack_leave_default_table::parse_table_update(table_update)?),
     "hr_department" => db_update.hr_department.append(hr_department_table::parse_table_update(table_update)?),
     "hr_employee" => db_update.hr_employee.append(hr_employee_table::parse_table_update(table_update)?),
+    "hr_employee_document" => db_update.hr_employee_document.append(hr_employee_document_table::parse_table_update(table_update)?),
     "hr_employee_skill" => db_update.hr_employee_skill.append(hr_employee_skill_table::parse_table_update(table_update)?),
     "hr_expense" => db_update.hr_expense.append(hr_expense_table::parse_table_update(table_update)?),
     "hr_expense_advance" => db_update.hr_expense_advance.append(hr_expense_advance_table::parse_table_update(table_update)?),
@@ -19643,14 +20579,30 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "hr_expense_policy" => db_update.hr_expense_policy.append(hr_expense_policy_table::parse_table_update(table_update)?),
     "hr_expense_policy_exception" => db_update.hr_expense_policy_exception.append(hr_expense_policy_exception_table::parse_table_update(table_update)?),
     "hr_expense_receipt" => db_update.hr_expense_receipt.append(hr_expense_receipt_table::parse_table_update(table_update)?),
+    "hr_global_assignment" => db_update.hr_global_assignment.append(hr_global_assignment_table::parse_table_update(table_update)?),
+    "hr_integration_intent" => db_update.hr_integration_intent.append(hr_integration_intent_table::parse_table_update(table_update)?),
     "hr_job_position" => db_update.hr_job_position.append(hr_job_position_table::parse_table_update(table_update)?),
+    "hr_labor_cost_snapshot" => db_update.hr_labor_cost_snapshot.append(hr_labor_cost_snapshot_table::parse_table_update(table_update)?),
     "hr_leave" => db_update.hr_leave.append(hr_leave_table::parse_table_update(table_update)?),
+    "hr_leave_allocation" => db_update.hr_leave_allocation.append(hr_leave_allocation_table::parse_table_update(table_update)?),
     "hr_leave_type" => db_update.hr_leave_type.append(hr_leave_type_table::parse_table_update(table_update)?),
+    "hr_offboarding_checklist" => db_update.hr_offboarding_checklist.append(hr_offboarding_checklist_table::parse_table_update(table_update)?),
+    "hr_onboarding_progress" => db_update.hr_onboarding_progress.append(hr_onboarding_progress_table::parse_table_update(table_update)?),
+    "hr_onboarding_template" => db_update.hr_onboarding_template.append(hr_onboarding_template_table::parse_table_update(table_update)?),
+    "hr_onboarding_template_item" => db_update.hr_onboarding_template_item.append(hr_onboarding_template_item_table::parse_table_update(table_update)?),
+    "hr_payroll_export_intent" => db_update.hr_payroll_export_intent.append(hr_payroll_export_intent_table::parse_table_update(table_update)?),
     "hr_payroll_structure" => db_update.hr_payroll_structure.append(hr_payroll_structure_table::parse_table_update(table_update)?),
     "hr_payslip" => db_update.hr_payslip.append(hr_payslip_table::parse_table_update(table_update)?),
+    "hr_performance_cycle" => db_update.hr_performance_cycle.append(hr_performance_cycle_table::parse_table_update(table_update)?),
+    "hr_performance_goal" => db_update.hr_performance_goal.append(hr_performance_goal_table::parse_table_update(table_update)?),
+    "hr_performance_review" => db_update.hr_performance_review.append(hr_performance_review_table::parse_table_update(table_update)?),
+    "hr_pii_access_log" => db_update.hr_pii_access_log.append(hr_pii_access_log_table::parse_table_update(table_update)?),
     "hr_resource" => db_update.hr_resource.append(hr_resource_table::parse_table_update(table_update)?),
     "hr_salary_rule" => db_update.hr_salary_rule.append(hr_salary_rule_table::parse_table_update(table_update)?),
+    "hr_shift_opt_job" => db_update.hr_shift_opt_job.append(hr_shift_opt_job_table::parse_table_update(table_update)?),
     "hr_skill" => db_update.hr_skill.append(hr_skill_table::parse_table_update(table_update)?),
+    "hr_statutory_id" => db_update.hr_statutory_id.append(hr_statutory_id_table::parse_table_update(table_update)?),
+    "hr_work_schedule" => db_update.hr_work_schedule.append(hr_work_schedule_table::parse_table_update(table_update)?),
     "import_job" => db_update.import_job.append(import_job_table::parse_table_update(table_update)?),
     "import_job_error" => db_update.import_job_error.append(import_job_error_table::parse_table_update(table_update)?),
     "import_job_record" => db_update.import_job_record.append(import_job_record_table::parse_table_update(table_update)?),
@@ -20018,9 +20970,17 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.helpdesk_stage = cache.apply_diff_to_table::<HelpdeskStage>("helpdesk_stage", &self.helpdesk_stage).with_updates_by_pk(|row| &row.id);
         diff.helpdesk_team = cache.apply_diff_to_table::<HelpdeskTeam>("helpdesk_team", &self.helpdesk_team).with_updates_by_pk(|row| &row.id);
         diff.helpdesk_ticket = cache.apply_diff_to_table::<HelpdeskTicket>("helpdesk_ticket", &self.helpdesk_ticket).with_updates_by_pk(|row| &row.id);
+        diff.hr_applicant = cache.apply_diff_to_table::<HrApplicant>("hr_applicant", &self.hr_applicant).with_updates_by_pk(|row| &row.id);
+        diff.hr_attendance = cache.apply_diff_to_table::<HrAttendance>("hr_attendance", &self.hr_attendance).with_updates_by_pk(|row| &row.id);
+        diff.hr_benefit_enrollment = cache.apply_diff_to_table::<HrBenefitEnrollment>("hr_benefit_enrollment", &self.hr_benefit_enrollment).with_updates_by_pk(|row| &row.id);
+        diff.hr_benefit_plan = cache.apply_diff_to_table::<HrBenefitPlan>("hr_benefit_plan", &self.hr_benefit_plan).with_updates_by_pk(|row| &row.id);
+        diff.hr_capacity_forecast = cache.apply_diff_to_table::<HrCapacityForecast>("hr_capacity_forecast", &self.hr_capacity_forecast).with_updates_by_pk(|row| &row.id);
+        diff.hr_compensation_event = cache.apply_diff_to_table::<HrCompensationEvent>("hr_compensation_event", &self.hr_compensation_event).with_updates_by_pk(|row| &row.id);
         diff.hr_contract = cache.apply_diff_to_table::<HrContract>("hr_contract", &self.hr_contract).with_updates_by_pk(|row| &row.id);
+        diff.hr_country_pack_leave_default = cache.apply_diff_to_table::<HrCountryPackLeaveDefault>("hr_country_pack_leave_default", &self.hr_country_pack_leave_default).with_updates_by_pk(|row| &row.id);
         diff.hr_department = cache.apply_diff_to_table::<HrDepartment>("hr_department", &self.hr_department).with_updates_by_pk(|row| &row.id);
         diff.hr_employee = cache.apply_diff_to_table::<HrEmployee>("hr_employee", &self.hr_employee).with_updates_by_pk(|row| &row.id);
+        diff.hr_employee_document = cache.apply_diff_to_table::<HrEmployeeDocument>("hr_employee_document", &self.hr_employee_document).with_updates_by_pk(|row| &row.id);
         diff.hr_employee_skill = cache.apply_diff_to_table::<HrEmployeeSkill>("hr_employee_skill", &self.hr_employee_skill).with_updates_by_pk(|row| &row.id);
         diff.hr_expense = cache.apply_diff_to_table::<HrExpense>("hr_expense", &self.hr_expense).with_updates_by_pk(|row| &row.id);
         diff.hr_expense_advance = cache.apply_diff_to_table::<HrExpenseAdvance>("hr_expense_advance", &self.hr_expense_advance).with_updates_by_pk(|row| &row.id);
@@ -20031,14 +20991,30 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.hr_expense_policy = cache.apply_diff_to_table::<HrExpensePolicy>("hr_expense_policy", &self.hr_expense_policy).with_updates_by_pk(|row| &row.id);
         diff.hr_expense_policy_exception = cache.apply_diff_to_table::<HrExpensePolicyException>("hr_expense_policy_exception", &self.hr_expense_policy_exception).with_updates_by_pk(|row| &row.id);
         diff.hr_expense_receipt = cache.apply_diff_to_table::<HrExpenseReceipt>("hr_expense_receipt", &self.hr_expense_receipt).with_updates_by_pk(|row| &row.id);
+        diff.hr_global_assignment = cache.apply_diff_to_table::<HrGlobalAssignment>("hr_global_assignment", &self.hr_global_assignment).with_updates_by_pk(|row| &row.id);
+        diff.hr_integration_intent = cache.apply_diff_to_table::<HrIntegrationIntent>("hr_integration_intent", &self.hr_integration_intent).with_updates_by_pk(|row| &row.id);
         diff.hr_job_position = cache.apply_diff_to_table::<HrJobPosition>("hr_job_position", &self.hr_job_position).with_updates_by_pk(|row| &row.id);
+        diff.hr_labor_cost_snapshot = cache.apply_diff_to_table::<HrLaborCostSnapshot>("hr_labor_cost_snapshot", &self.hr_labor_cost_snapshot).with_updates_by_pk(|row| &row.id);
         diff.hr_leave = cache.apply_diff_to_table::<HrLeave>("hr_leave", &self.hr_leave).with_updates_by_pk(|row| &row.id);
+        diff.hr_leave_allocation = cache.apply_diff_to_table::<HrLeaveAllocation>("hr_leave_allocation", &self.hr_leave_allocation).with_updates_by_pk(|row| &row.id);
         diff.hr_leave_type = cache.apply_diff_to_table::<HrLeaveType>("hr_leave_type", &self.hr_leave_type).with_updates_by_pk(|row| &row.id);
+        diff.hr_offboarding_checklist = cache.apply_diff_to_table::<HrOffboardingChecklist>("hr_offboarding_checklist", &self.hr_offboarding_checklist).with_updates_by_pk(|row| &row.id);
+        diff.hr_onboarding_progress = cache.apply_diff_to_table::<HrOnboardingProgress>("hr_onboarding_progress", &self.hr_onboarding_progress).with_updates_by_pk(|row| &row.id);
+        diff.hr_onboarding_template = cache.apply_diff_to_table::<HrOnboardingTemplate>("hr_onboarding_template", &self.hr_onboarding_template).with_updates_by_pk(|row| &row.id);
+        diff.hr_onboarding_template_item = cache.apply_diff_to_table::<HrOnboardingTemplateItem>("hr_onboarding_template_item", &self.hr_onboarding_template_item).with_updates_by_pk(|row| &row.id);
+        diff.hr_payroll_export_intent = cache.apply_diff_to_table::<HrPayrollExportIntent>("hr_payroll_export_intent", &self.hr_payroll_export_intent).with_updates_by_pk(|row| &row.id);
         diff.hr_payroll_structure = cache.apply_diff_to_table::<HrPayrollStructure>("hr_payroll_structure", &self.hr_payroll_structure).with_updates_by_pk(|row| &row.id);
         diff.hr_payslip = cache.apply_diff_to_table::<HrPayslip>("hr_payslip", &self.hr_payslip).with_updates_by_pk(|row| &row.id);
+        diff.hr_performance_cycle = cache.apply_diff_to_table::<HrPerformanceCycle>("hr_performance_cycle", &self.hr_performance_cycle).with_updates_by_pk(|row| &row.id);
+        diff.hr_performance_goal = cache.apply_diff_to_table::<HrPerformanceGoal>("hr_performance_goal", &self.hr_performance_goal).with_updates_by_pk(|row| &row.id);
+        diff.hr_performance_review = cache.apply_diff_to_table::<HrPerformanceReview>("hr_performance_review", &self.hr_performance_review).with_updates_by_pk(|row| &row.id);
+        diff.hr_pii_access_log = cache.apply_diff_to_table::<HrPiiAccessLog>("hr_pii_access_log", &self.hr_pii_access_log).with_updates_by_pk(|row| &row.id);
         diff.hr_resource = cache.apply_diff_to_table::<HrResource>("hr_resource", &self.hr_resource).with_updates_by_pk(|row| &row.id);
         diff.hr_salary_rule = cache.apply_diff_to_table::<HrSalaryRule>("hr_salary_rule", &self.hr_salary_rule).with_updates_by_pk(|row| &row.id);
+        diff.hr_shift_opt_job = cache.apply_diff_to_table::<HrShiftOptJob>("hr_shift_opt_job", &self.hr_shift_opt_job).with_updates_by_pk(|row| &row.id);
         diff.hr_skill = cache.apply_diff_to_table::<HrSkill>("hr_skill", &self.hr_skill).with_updates_by_pk(|row| &row.id);
+        diff.hr_statutory_id = cache.apply_diff_to_table::<HrStatutoryId>("hr_statutory_id", &self.hr_statutory_id).with_updates_by_pk(|row| &row.id);
+        diff.hr_work_schedule = cache.apply_diff_to_table::<HrWorkSchedule>("hr_work_schedule", &self.hr_work_schedule).with_updates_by_pk(|row| &row.id);
         diff.import_job = cache.apply_diff_to_table::<ImportJob>("import_job", &self.import_job).with_updates_by_pk(|row| &row.id);
         diff.import_job_error = cache.apply_diff_to_table::<ImportJobError>("import_job_error", &self.import_job_error).with_updates_by_pk(|row| &row.id);
         diff.import_job_record = cache.apply_diff_to_table::<ImportJobRecord>("import_job_record", &self.import_job_record).with_updates_by_pk(|row| &row.id);
@@ -20391,9 +21367,17 @@ for table_rows in raw.tables {
                 "helpdesk_stage" => db_update.helpdesk_stage.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "helpdesk_team" => db_update.helpdesk_team.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "helpdesk_ticket" => db_update.helpdesk_ticket.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_applicant" => db_update.hr_applicant.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_attendance" => db_update.hr_attendance.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_benefit_enrollment" => db_update.hr_benefit_enrollment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_benefit_plan" => db_update.hr_benefit_plan.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_capacity_forecast" => db_update.hr_capacity_forecast.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_compensation_event" => db_update.hr_compensation_event.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_contract" => db_update.hr_contract.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_country_pack_leave_default" => db_update.hr_country_pack_leave_default.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_department" => db_update.hr_department.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_employee" => db_update.hr_employee.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_employee_document" => db_update.hr_employee_document.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_employee_skill" => db_update.hr_employee_skill.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_expense" => db_update.hr_expense.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_expense_advance" => db_update.hr_expense_advance.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -20404,14 +21388,30 @@ for table_rows in raw.tables {
                 "hr_expense_policy" => db_update.hr_expense_policy.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_expense_policy_exception" => db_update.hr_expense_policy_exception.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_expense_receipt" => db_update.hr_expense_receipt.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_global_assignment" => db_update.hr_global_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_integration_intent" => db_update.hr_integration_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_job_position" => db_update.hr_job_position.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_labor_cost_snapshot" => db_update.hr_labor_cost_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_leave" => db_update.hr_leave.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_leave_allocation" => db_update.hr_leave_allocation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_leave_type" => db_update.hr_leave_type.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_offboarding_checklist" => db_update.hr_offboarding_checklist.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_onboarding_progress" => db_update.hr_onboarding_progress.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_onboarding_template" => db_update.hr_onboarding_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_onboarding_template_item" => db_update.hr_onboarding_template_item.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_payroll_export_intent" => db_update.hr_payroll_export_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_payroll_structure" => db_update.hr_payroll_structure.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_payslip" => db_update.hr_payslip.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_performance_cycle" => db_update.hr_performance_cycle.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_performance_goal" => db_update.hr_performance_goal.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_performance_review" => db_update.hr_performance_review.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_pii_access_log" => db_update.hr_pii_access_log.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_resource" => db_update.hr_resource.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_salary_rule" => db_update.hr_salary_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_shift_opt_job" => db_update.hr_shift_opt_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "hr_skill" => db_update.hr_skill.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_statutory_id" => db_update.hr_statutory_id.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "hr_work_schedule" => db_update.hr_work_schedule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "import_job" => db_update.import_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "import_job_error" => db_update.import_job_error.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "import_job_record" => db_update.import_job_record.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -20764,9 +21764,17 @@ for table_rows in raw.tables {
                 "helpdesk_stage" => db_update.helpdesk_stage.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "helpdesk_team" => db_update.helpdesk_team.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "helpdesk_ticket" => db_update.helpdesk_ticket.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_applicant" => db_update.hr_applicant.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_attendance" => db_update.hr_attendance.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_benefit_enrollment" => db_update.hr_benefit_enrollment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_benefit_plan" => db_update.hr_benefit_plan.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_capacity_forecast" => db_update.hr_capacity_forecast.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_compensation_event" => db_update.hr_compensation_event.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_contract" => db_update.hr_contract.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_country_pack_leave_default" => db_update.hr_country_pack_leave_default.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_department" => db_update.hr_department.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_employee" => db_update.hr_employee.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_employee_document" => db_update.hr_employee_document.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_employee_skill" => db_update.hr_employee_skill.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_expense" => db_update.hr_expense.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_expense_advance" => db_update.hr_expense_advance.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -20777,14 +21785,30 @@ for table_rows in raw.tables {
                 "hr_expense_policy" => db_update.hr_expense_policy.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_expense_policy_exception" => db_update.hr_expense_policy_exception.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_expense_receipt" => db_update.hr_expense_receipt.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_global_assignment" => db_update.hr_global_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_integration_intent" => db_update.hr_integration_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_job_position" => db_update.hr_job_position.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_labor_cost_snapshot" => db_update.hr_labor_cost_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_leave" => db_update.hr_leave.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_leave_allocation" => db_update.hr_leave_allocation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_leave_type" => db_update.hr_leave_type.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_offboarding_checklist" => db_update.hr_offboarding_checklist.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_onboarding_progress" => db_update.hr_onboarding_progress.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_onboarding_template" => db_update.hr_onboarding_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_onboarding_template_item" => db_update.hr_onboarding_template_item.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_payroll_export_intent" => db_update.hr_payroll_export_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_payroll_structure" => db_update.hr_payroll_structure.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_payslip" => db_update.hr_payslip.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_performance_cycle" => db_update.hr_performance_cycle.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_performance_goal" => db_update.hr_performance_goal.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_performance_review" => db_update.hr_performance_review.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_pii_access_log" => db_update.hr_pii_access_log.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_resource" => db_update.hr_resource.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_salary_rule" => db_update.hr_salary_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_shift_opt_job" => db_update.hr_shift_opt_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "hr_skill" => db_update.hr_skill.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_statutory_id" => db_update.hr_statutory_id.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "hr_work_schedule" => db_update.hr_work_schedule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "import_job" => db_update.import_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "import_job_error" => db_update.import_job_error.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "import_job_record" => db_update.import_job_record.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -21139,9 +22163,17 @@ pub struct AppliedDiff<'r> {
     helpdesk_stage: __sdk::TableAppliedDiff<'r, HelpdeskStage>,
     helpdesk_team: __sdk::TableAppliedDiff<'r, HelpdeskTeam>,
     helpdesk_ticket: __sdk::TableAppliedDiff<'r, HelpdeskTicket>,
+    hr_applicant: __sdk::TableAppliedDiff<'r, HrApplicant>,
+    hr_attendance: __sdk::TableAppliedDiff<'r, HrAttendance>,
+    hr_benefit_enrollment: __sdk::TableAppliedDiff<'r, HrBenefitEnrollment>,
+    hr_benefit_plan: __sdk::TableAppliedDiff<'r, HrBenefitPlan>,
+    hr_capacity_forecast: __sdk::TableAppliedDiff<'r, HrCapacityForecast>,
+    hr_compensation_event: __sdk::TableAppliedDiff<'r, HrCompensationEvent>,
     hr_contract: __sdk::TableAppliedDiff<'r, HrContract>,
+    hr_country_pack_leave_default: __sdk::TableAppliedDiff<'r, HrCountryPackLeaveDefault>,
     hr_department: __sdk::TableAppliedDiff<'r, HrDepartment>,
     hr_employee: __sdk::TableAppliedDiff<'r, HrEmployee>,
+    hr_employee_document: __sdk::TableAppliedDiff<'r, HrEmployeeDocument>,
     hr_employee_skill: __sdk::TableAppliedDiff<'r, HrEmployeeSkill>,
     hr_expense: __sdk::TableAppliedDiff<'r, HrExpense>,
     hr_expense_advance: __sdk::TableAppliedDiff<'r, HrExpenseAdvance>,
@@ -21152,14 +22184,30 @@ pub struct AppliedDiff<'r> {
     hr_expense_policy: __sdk::TableAppliedDiff<'r, HrExpensePolicy>,
     hr_expense_policy_exception: __sdk::TableAppliedDiff<'r, HrExpensePolicyException>,
     hr_expense_receipt: __sdk::TableAppliedDiff<'r, HrExpenseReceipt>,
+    hr_global_assignment: __sdk::TableAppliedDiff<'r, HrGlobalAssignment>,
+    hr_integration_intent: __sdk::TableAppliedDiff<'r, HrIntegrationIntent>,
     hr_job_position: __sdk::TableAppliedDiff<'r, HrJobPosition>,
+    hr_labor_cost_snapshot: __sdk::TableAppliedDiff<'r, HrLaborCostSnapshot>,
     hr_leave: __sdk::TableAppliedDiff<'r, HrLeave>,
+    hr_leave_allocation: __sdk::TableAppliedDiff<'r, HrLeaveAllocation>,
     hr_leave_type: __sdk::TableAppliedDiff<'r, HrLeaveType>,
+    hr_offboarding_checklist: __sdk::TableAppliedDiff<'r, HrOffboardingChecklist>,
+    hr_onboarding_progress: __sdk::TableAppliedDiff<'r, HrOnboardingProgress>,
+    hr_onboarding_template: __sdk::TableAppliedDiff<'r, HrOnboardingTemplate>,
+    hr_onboarding_template_item: __sdk::TableAppliedDiff<'r, HrOnboardingTemplateItem>,
+    hr_payroll_export_intent: __sdk::TableAppliedDiff<'r, HrPayrollExportIntent>,
     hr_payroll_structure: __sdk::TableAppliedDiff<'r, HrPayrollStructure>,
     hr_payslip: __sdk::TableAppliedDiff<'r, HrPayslip>,
+    hr_performance_cycle: __sdk::TableAppliedDiff<'r, HrPerformanceCycle>,
+    hr_performance_goal: __sdk::TableAppliedDiff<'r, HrPerformanceGoal>,
+    hr_performance_review: __sdk::TableAppliedDiff<'r, HrPerformanceReview>,
+    hr_pii_access_log: __sdk::TableAppliedDiff<'r, HrPiiAccessLog>,
     hr_resource: __sdk::TableAppliedDiff<'r, HrResource>,
     hr_salary_rule: __sdk::TableAppliedDiff<'r, HrSalaryRule>,
+    hr_shift_opt_job: __sdk::TableAppliedDiff<'r, HrShiftOptJob>,
     hr_skill: __sdk::TableAppliedDiff<'r, HrSkill>,
+    hr_statutory_id: __sdk::TableAppliedDiff<'r, HrStatutoryId>,
+    hr_work_schedule: __sdk::TableAppliedDiff<'r, HrWorkSchedule>,
     import_job: __sdk::TableAppliedDiff<'r, ImportJob>,
     import_job_error: __sdk::TableAppliedDiff<'r, ImportJobError>,
     import_job_record: __sdk::TableAppliedDiff<'r, ImportJobRecord>,
@@ -21515,9 +22563,17 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<HelpdeskStage>("helpdesk_stage", &self.helpdesk_stage, event);
         callbacks.invoke_table_row_callbacks::<HelpdeskTeam>("helpdesk_team", &self.helpdesk_team, event);
         callbacks.invoke_table_row_callbacks::<HelpdeskTicket>("helpdesk_ticket", &self.helpdesk_ticket, event);
+        callbacks.invoke_table_row_callbacks::<HrApplicant>("hr_applicant", &self.hr_applicant, event);
+        callbacks.invoke_table_row_callbacks::<HrAttendance>("hr_attendance", &self.hr_attendance, event);
+        callbacks.invoke_table_row_callbacks::<HrBenefitEnrollment>("hr_benefit_enrollment", &self.hr_benefit_enrollment, event);
+        callbacks.invoke_table_row_callbacks::<HrBenefitPlan>("hr_benefit_plan", &self.hr_benefit_plan, event);
+        callbacks.invoke_table_row_callbacks::<HrCapacityForecast>("hr_capacity_forecast", &self.hr_capacity_forecast, event);
+        callbacks.invoke_table_row_callbacks::<HrCompensationEvent>("hr_compensation_event", &self.hr_compensation_event, event);
         callbacks.invoke_table_row_callbacks::<HrContract>("hr_contract", &self.hr_contract, event);
+        callbacks.invoke_table_row_callbacks::<HrCountryPackLeaveDefault>("hr_country_pack_leave_default", &self.hr_country_pack_leave_default, event);
         callbacks.invoke_table_row_callbacks::<HrDepartment>("hr_department", &self.hr_department, event);
         callbacks.invoke_table_row_callbacks::<HrEmployee>("hr_employee", &self.hr_employee, event);
+        callbacks.invoke_table_row_callbacks::<HrEmployeeDocument>("hr_employee_document", &self.hr_employee_document, event);
         callbacks.invoke_table_row_callbacks::<HrEmployeeSkill>("hr_employee_skill", &self.hr_employee_skill, event);
         callbacks.invoke_table_row_callbacks::<HrExpense>("hr_expense", &self.hr_expense, event);
         callbacks.invoke_table_row_callbacks::<HrExpenseAdvance>("hr_expense_advance", &self.hr_expense_advance, event);
@@ -21528,14 +22584,30 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<HrExpensePolicy>("hr_expense_policy", &self.hr_expense_policy, event);
         callbacks.invoke_table_row_callbacks::<HrExpensePolicyException>("hr_expense_policy_exception", &self.hr_expense_policy_exception, event);
         callbacks.invoke_table_row_callbacks::<HrExpenseReceipt>("hr_expense_receipt", &self.hr_expense_receipt, event);
+        callbacks.invoke_table_row_callbacks::<HrGlobalAssignment>("hr_global_assignment", &self.hr_global_assignment, event);
+        callbacks.invoke_table_row_callbacks::<HrIntegrationIntent>("hr_integration_intent", &self.hr_integration_intent, event);
         callbacks.invoke_table_row_callbacks::<HrJobPosition>("hr_job_position", &self.hr_job_position, event);
+        callbacks.invoke_table_row_callbacks::<HrLaborCostSnapshot>("hr_labor_cost_snapshot", &self.hr_labor_cost_snapshot, event);
         callbacks.invoke_table_row_callbacks::<HrLeave>("hr_leave", &self.hr_leave, event);
+        callbacks.invoke_table_row_callbacks::<HrLeaveAllocation>("hr_leave_allocation", &self.hr_leave_allocation, event);
         callbacks.invoke_table_row_callbacks::<HrLeaveType>("hr_leave_type", &self.hr_leave_type, event);
+        callbacks.invoke_table_row_callbacks::<HrOffboardingChecklist>("hr_offboarding_checklist", &self.hr_offboarding_checklist, event);
+        callbacks.invoke_table_row_callbacks::<HrOnboardingProgress>("hr_onboarding_progress", &self.hr_onboarding_progress, event);
+        callbacks.invoke_table_row_callbacks::<HrOnboardingTemplate>("hr_onboarding_template", &self.hr_onboarding_template, event);
+        callbacks.invoke_table_row_callbacks::<HrOnboardingTemplateItem>("hr_onboarding_template_item", &self.hr_onboarding_template_item, event);
+        callbacks.invoke_table_row_callbacks::<HrPayrollExportIntent>("hr_payroll_export_intent", &self.hr_payroll_export_intent, event);
         callbacks.invoke_table_row_callbacks::<HrPayrollStructure>("hr_payroll_structure", &self.hr_payroll_structure, event);
         callbacks.invoke_table_row_callbacks::<HrPayslip>("hr_payslip", &self.hr_payslip, event);
+        callbacks.invoke_table_row_callbacks::<HrPerformanceCycle>("hr_performance_cycle", &self.hr_performance_cycle, event);
+        callbacks.invoke_table_row_callbacks::<HrPerformanceGoal>("hr_performance_goal", &self.hr_performance_goal, event);
+        callbacks.invoke_table_row_callbacks::<HrPerformanceReview>("hr_performance_review", &self.hr_performance_review, event);
+        callbacks.invoke_table_row_callbacks::<HrPiiAccessLog>("hr_pii_access_log", &self.hr_pii_access_log, event);
         callbacks.invoke_table_row_callbacks::<HrResource>("hr_resource", &self.hr_resource, event);
         callbacks.invoke_table_row_callbacks::<HrSalaryRule>("hr_salary_rule", &self.hr_salary_rule, event);
+        callbacks.invoke_table_row_callbacks::<HrShiftOptJob>("hr_shift_opt_job", &self.hr_shift_opt_job, event);
         callbacks.invoke_table_row_callbacks::<HrSkill>("hr_skill", &self.hr_skill, event);
+        callbacks.invoke_table_row_callbacks::<HrStatutoryId>("hr_statutory_id", &self.hr_statutory_id, event);
+        callbacks.invoke_table_row_callbacks::<HrWorkSchedule>("hr_work_schedule", &self.hr_work_schedule, event);
         callbacks.invoke_table_row_callbacks::<ImportJob>("import_job", &self.import_job, event);
         callbacks.invoke_table_row_callbacks::<ImportJobError>("import_job_error", &self.import_job_error, event);
         callbacks.invoke_table_row_callbacks::<ImportJobRecord>("import_job_record", &self.import_job_record, event);
@@ -22522,9 +23594,17 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         helpdesk_stage_table::register_table(client_cache);
         helpdesk_team_table::register_table(client_cache);
         helpdesk_ticket_table::register_table(client_cache);
+        hr_applicant_table::register_table(client_cache);
+        hr_attendance_table::register_table(client_cache);
+        hr_benefit_enrollment_table::register_table(client_cache);
+        hr_benefit_plan_table::register_table(client_cache);
+        hr_capacity_forecast_table::register_table(client_cache);
+        hr_compensation_event_table::register_table(client_cache);
         hr_contract_table::register_table(client_cache);
+        hr_country_pack_leave_default_table::register_table(client_cache);
         hr_department_table::register_table(client_cache);
         hr_employee_table::register_table(client_cache);
+        hr_employee_document_table::register_table(client_cache);
         hr_employee_skill_table::register_table(client_cache);
         hr_expense_table::register_table(client_cache);
         hr_expense_advance_table::register_table(client_cache);
@@ -22535,14 +23615,30 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         hr_expense_policy_table::register_table(client_cache);
         hr_expense_policy_exception_table::register_table(client_cache);
         hr_expense_receipt_table::register_table(client_cache);
+        hr_global_assignment_table::register_table(client_cache);
+        hr_integration_intent_table::register_table(client_cache);
         hr_job_position_table::register_table(client_cache);
+        hr_labor_cost_snapshot_table::register_table(client_cache);
         hr_leave_table::register_table(client_cache);
+        hr_leave_allocation_table::register_table(client_cache);
         hr_leave_type_table::register_table(client_cache);
+        hr_offboarding_checklist_table::register_table(client_cache);
+        hr_onboarding_progress_table::register_table(client_cache);
+        hr_onboarding_template_table::register_table(client_cache);
+        hr_onboarding_template_item_table::register_table(client_cache);
+        hr_payroll_export_intent_table::register_table(client_cache);
         hr_payroll_structure_table::register_table(client_cache);
         hr_payslip_table::register_table(client_cache);
+        hr_performance_cycle_table::register_table(client_cache);
+        hr_performance_goal_table::register_table(client_cache);
+        hr_performance_review_table::register_table(client_cache);
+        hr_pii_access_log_table::register_table(client_cache);
         hr_resource_table::register_table(client_cache);
         hr_salary_rule_table::register_table(client_cache);
+        hr_shift_opt_job_table::register_table(client_cache);
         hr_skill_table::register_table(client_cache);
+        hr_statutory_id_table::register_table(client_cache);
+        hr_work_schedule_table::register_table(client_cache);
         import_job_table::register_table(client_cache);
         import_job_error_table::register_table(client_cache);
         import_job_record_table::register_table(client_cache);
@@ -22890,9 +23986,17 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "helpdesk_stage",
         "helpdesk_team",
         "helpdesk_ticket",
+        "hr_applicant",
+        "hr_attendance",
+        "hr_benefit_enrollment",
+        "hr_benefit_plan",
+        "hr_capacity_forecast",
+        "hr_compensation_event",
         "hr_contract",
+        "hr_country_pack_leave_default",
         "hr_department",
         "hr_employee",
+        "hr_employee_document",
         "hr_employee_skill",
         "hr_expense",
         "hr_expense_advance",
@@ -22903,14 +24007,30 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "hr_expense_policy",
         "hr_expense_policy_exception",
         "hr_expense_receipt",
+        "hr_global_assignment",
+        "hr_integration_intent",
         "hr_job_position",
+        "hr_labor_cost_snapshot",
         "hr_leave",
+        "hr_leave_allocation",
         "hr_leave_type",
+        "hr_offboarding_checklist",
+        "hr_onboarding_progress",
+        "hr_onboarding_template",
+        "hr_onboarding_template_item",
+        "hr_payroll_export_intent",
         "hr_payroll_structure",
         "hr_payslip",
+        "hr_performance_cycle",
+        "hr_performance_goal",
+        "hr_performance_review",
+        "hr_pii_access_log",
         "hr_resource",
         "hr_salary_rule",
+        "hr_shift_opt_job",
         "hr_skill",
+        "hr_statutory_id",
+        "hr_work_schedule",
         "import_job",
         "import_job_error",
         "import_job_record",

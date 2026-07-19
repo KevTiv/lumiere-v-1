@@ -12,6 +12,10 @@ pub struct CreateExpenseAdvanceParams {
     pub name: String,
     pub amount: f64,
     pub currency_id: u64,
+    pub journal_id: u64,
+    pub cash_account_id: u64,
+    pub advance_account_id: u64,
+    pub accounting_date: __sdk::Timestamp,
     pub client_request_id: Option<String>,
     pub metadata: Option<String>,
 }

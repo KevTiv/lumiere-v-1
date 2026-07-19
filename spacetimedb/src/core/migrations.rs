@@ -5,12 +5,14 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::country_pack::seed_country_pack_catalog;
+use crate::hr::country_pack_hr::seed_hr_country_pack_leave_catalog;
 use crate::core::permissions::{sod_conflict_rule, SodConflictRule};
 use crate::core::users::user_profile;
 use crate::forms::migrations::run_seed_organization_form_configs;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 pub const MIGRATION_COUNTRY_PACK_CATALOG: u64 = 1;
+pub const MIGRATION_HR_COUNTRY_PACK_LEAVE_CATALOG: u64 = 4;
 pub const MIGRATION_ORG_FORM_CONFIGS: u64 = 2;
 pub const MIGRATION_ORG_FINANCE_SOD: u64 = 3;
 
@@ -95,6 +97,7 @@ fn apply_global_migration(ctx: &ReducerContext, version: u64, name: &str) -> Res
 
     match version {
         MIGRATION_COUNTRY_PACK_CATALOG => seed_country_pack_catalog(ctx),
+        MIGRATION_HR_COUNTRY_PACK_LEAVE_CATALOG => seed_hr_country_pack_leave_catalog(ctx),
         _ => return Err(format!("unknown global migration version {version}")),
     }
 
@@ -165,6 +168,11 @@ pub(crate) fn apply_pending_global_migrations(ctx: &ReducerContext) -> Result<()
         ctx,
         MIGRATION_COUNTRY_PACK_CATALOG,
         "seed_country_pack_catalog",
+    )?;
+    apply_global_migration(
+        ctx,
+        MIGRATION_HR_COUNTRY_PACK_LEAVE_CATALOG,
+        "seed_hr_country_pack_leave_catalog",
     )?;
     Ok(())
 }

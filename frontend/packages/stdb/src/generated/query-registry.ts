@@ -37,7 +37,9 @@ export type QueryResourceKey =
   | "analytic-distribution-models"
   | "analytic-lines"
   | "analytics-metrics"
+  | "applicants"
   | "assignment-rules"
+  | "attendance"
   | "audit-log"
   | "audit-rules"
   | "bank-match-candidates"
@@ -45,6 +47,8 @@ export type QueryResourceKey =
   | "bank-statements"
   | "barcode-nomenclatures"
   | "barcode-rules"
+  | "benefit-enrollments"
+  | "benefit-plans"
   | "budget-lines"
   | "budget-posts"
   | "budgets"
@@ -53,6 +57,7 @@ export type QueryResourceKey =
   | "cartonization-results"
   | "casbin-rule"
   | "companies"
+  | "compensation-events"
   | "consolidation-accounts"
   | "consolidation-elimination-entries"
   | "consolidation-journals"
@@ -82,8 +87,10 @@ export type QueryResourceKey =
   | "delivery-price-rules"
   | "departments"
   | "depreciation-lines"
+  | "direct-reports"
   | "document-folders"
   | "documents"
+  | "employee-documents"
   | "employees"
   | "expense-advances"
   | "expense-card-statement-unmatched"
@@ -103,13 +110,17 @@ export type QueryResourceKey =
   | "form-configs"
   | "form-role-configs"
   | "fx-revaluation-runs"
+  | "global-assignments"
   | "helpdesk-slas"
   | "helpdesk-stages"
   | "helpdesk-teams"
   | "helpdesk-tickets"
+  | "hr-capacity-forecast"
   | "hr-employee-skills"
+  | "hr-integration-intents"
   | "hr-resources"
   | "hr-skills"
+  | "hr-statutory-ids"
   | "intercompany-rules"
   | "intercompany-transactions"
   | "inventory-adjustments"
@@ -128,6 +139,7 @@ export type QueryResourceKey =
   | "job-positions"
   | "knowledge-articles"
   | "knowledge-categories"
+  | "labor-cost-snapshots"
   | "landed-cost-lines"
   | "landed-costs"
   | "lead-lost-reasons"
@@ -137,6 +149,7 @@ export type QueryResourceKey =
   | "leads"
   | "leave-requests"
   | "leave-types"
+  | "leaves-to-approve"
   | "mail-followers"
   | "mail-messages"
   | "message-batches"
@@ -147,6 +160,10 @@ export type QueryResourceKey =
   | "mrp-routing-workcenters"
   | "mrp-workcenters"
   | "mrp-workorders"
+  | "my-employee"
+  | "onboarding-progress"
+  | "onboarding-template-items"
+  | "onboarding-templates"
   | "operational-messages"
   | "opportunities"
   | "opportunity-lines"
@@ -163,6 +180,10 @@ export type QueryResourceKey =
   | "payment-transactions"
   | "payroll-structures"
   | "payslips"
+  | "payslips-to-export"
+  | "performance-cycles"
+  | "performance-goals"
+  | "performance-reviews"
   | "picking-batches"
   | "picking-waves"
   | "pos-configs"
@@ -231,6 +252,7 @@ export type QueryResourceKey =
   | "scheduled-reports"
   | "segment-members"
   | "serial-lot-traceability"
+  | "shift-opt-jobs"
   | "shipping-methods"
   | "sod-conflict-rules"
   | "stock-cycle-counts"
@@ -289,6 +311,7 @@ export type QueryResourceKey =
   | "warehouse-sync-intents-pending"
   | "warehouse-tasks"
   | "warehouses"
+  | "work-schedules"
   | "workflow-activities"
   | "workflow-instances"
   | "workflow-transitions"
@@ -465,10 +488,22 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["name", "category", "metric_type", "is_active"],
     mandatory: ["id", "organization_id"],
   },
+  "applicants": {
+    table: "hr_applicant",
+    aliases: ["applicants", "hr_applicant"],
+    defaultRestricted: ["name", "email", "stage", "job_position_id", "company_id"],
+    mandatory: ["id", "organization_id"],
+  },
   "assignment-rules": {
     table: "assignment_rule",
     aliases: ["assignment-rules", "assignment_rule"],
     defaultRestricted: ["name", "model", "domain", "assign_type", "user_ids", "team_id", "priority", "metadata"],
+    mandatory: ["id", "organization_id"],
+  },
+  "attendance": {
+    table: "hr_attendance",
+    aliases: ["attendance", "hr_attendance"],
+    defaultRestricted: ["employee_id", "company_id", "check_in", "check_out", "source"],
     mandatory: ["id", "organization_id"],
   },
   "audit-log": {
@@ -511,6 +546,18 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "barcode_rule",
     aliases: ["barcode-rules", "barcode_rule"],
     defaultRestricted: ["name", "pattern", "encoding", "is_active"],
+    mandatory: ["id", "organization_id"],
+  },
+  "benefit-enrollments": {
+    table: "hr_benefit_enrollment",
+    aliases: ["benefit-enrollments", "hr_benefit_enrollment"],
+    defaultRestricted: ["state", "employee_id", "plan_id", "company_id", "effective_from", "effective_to"],
+    mandatory: ["id", "organization_id"],
+  },
+  "benefit-plans": {
+    table: "hr_benefit_plan",
+    aliases: ["benefit-plans", "hr_benefit_plan"],
+    defaultRestricted: ["name", "description", "plan_type", "active", "company_id"],
     mandatory: ["id", "organization_id"],
   },
   "budget-lines": {
@@ -559,6 +606,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "company",
     aliases: ["companies", "company"],
     defaultRestricted: ["name", "code", "currency_id", "fiscal_year_end_month", "fiscal_year_end_day", "is_parent", "parent_id", "tax_id", "company_registry", "address_street", "address_city", "address_zip", "address_country_code", "deleted_at"],
+    mandatory: ["id", "organization_id"],
+  },
+  "compensation-events": {
+    table: "hr_compensation_event",
+    aliases: ["compensation-events", "hr_compensation_event"],
+    defaultRestricted: ["employee_id", "contract_id", "wage", "currency_id", "effective_from", "reason", "company_id"],
     mandatory: ["id", "organization_id"],
   },
   "consolidation-accounts": {
@@ -648,7 +701,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   "contracts": {
     table: "hr_contract",
     aliases: ["contracts", "hr_contract"],
-    defaultRestricted: ["name", "employee_id", "state", "company_id"],
+    defaultRestricted: ["name", "employee_id", "state", "company_id", "job_id", "department_id", "date_start", "date_end", "currency_id", "notes"],
     mandatory: ["id", "organization_id"],
   },
   "crm-conversation-messages": {
@@ -735,6 +788,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["asset_id", "name", "sequence", "amount", "depreciation_date", "remaining_value", "depreciated_value"],
     mandatory: ["id", "asset_id"],
   },
+  "direct-reports": {
+    table: "hr_employee",
+    aliases: ["direct-reports", "hr_employee_reports"],
+    defaultRestricted: ["name", "work_email", "department_id", "company_id", "job_title", "job_id", "parent_id", "is_active", "employee_number", "work_phone", "mobile_phone", "work_location", "date_hired", "employment_type"],
+    mandatory: ["id", "organization_id"],
+  },
   "document-folders": {
     table: "doc_folder",
     aliases: ["document-folders", "doc_folder"],
@@ -747,10 +806,16 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["name", "company_id"],
     mandatory: ["id", "organization_id"],
   },
+  "employee-documents": {
+    table: "hr_employee_document",
+    aliases: ["employee-documents", "hr_employee_document"],
+    defaultRestricted: ["employee_id", "doc_type", "attachment_id", "purpose", "title", "notes", "active", "company_id"],
+    mandatory: ["id", "organization_id"],
+  },
   "employees": {
     table: "hr_employee",
     aliases: ["employees", "hr_employee"],
-    defaultRestricted: ["name", "work_email", "department_id", "company_id"],
+    defaultRestricted: ["name", "work_email", "department_id", "company_id", "job_title", "job_id", "parent_id", "is_active"],
     mandatory: ["id", "organization_id"],
   },
   "expense-advances": {
@@ -861,6 +926,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["currency_code", "as_of_date", "move_id", "journal_id", "total_gain", "total_loss", "net_adjustment", "reference", "metadata"],
     mandatory: ["id", "organization_id", "company_id"],
   },
+  "global-assignments": {
+    table: "hr_global_assignment",
+    aliases: ["global-assignments", "hr_global_assignment"],
+    defaultRestricted: ["company_id", "employee_id", "home_company_id", "host_company_id", "date_from", "date_to", "status", "notes"],
+    mandatory: ["id", "organization_id"],
+  },
   "helpdesk-slas": {
     table: "helpdesk_sla",
     aliases: ["helpdesk-slas", "helpdesk_sla"],
@@ -885,10 +956,22 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["name", "partner_id", "stage_id"],
     mandatory: ["id", "organization_id"],
   },
+  "hr-capacity-forecast": {
+    table: "hr_capacity_forecast",
+    aliases: ["hr-capacity-forecast", "hr_capacity_forecast"],
+    defaultRestricted: ["company_id", "employee_id", "period_start", "period_end", "scheduled_hours", "leave_hours", "attendance_hours", "available_hours", "metadata", "write_date"],
+    mandatory: ["id", "organization_id"],
+  },
   "hr-employee-skills": {
     table: "hr_employee_skill",
     aliases: ["hr-employee-skills", "hr_employee_skill"],
     defaultRestricted: ["employee_id", "skill_id", "level", "company_id", "active"],
+    mandatory: ["id", "organization_id"],
+  },
+  "hr-integration-intents": {
+    table: "hr_integration_intent",
+    aliases: ["hr-integration-intents", "hr_integration_intent"],
+    defaultRestricted: ["intent_kind", "status", "company_id", "payslip_id", "export_intent_id", "idempotency_key", "payload", "result_ref", "external_ref", "payload_hash", "last_error"],
     mandatory: ["id", "organization_id"],
   },
   "hr-resources": {
@@ -901,6 +984,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "hr_skill",
     aliases: ["hr-skills", "hr_skill"],
     defaultRestricted: ["name", "code", "category", "company_id", "active"],
+    mandatory: ["id", "organization_id"],
+  },
+  "hr-statutory-ids": {
+    table: "hr_statutory_id",
+    aliases: ["hr-statutory-ids", "hr_statutory_id"],
+    defaultRestricted: ["employee_id", "id_kind", "company_id"],
     mandatory: ["id", "organization_id"],
   },
   "intercompany-rules": {
@@ -1011,6 +1100,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["name", "article_count", "parent_id", "sequence"],
     mandatory: ["id", "organization_id"],
   },
+  "labor-cost-snapshots": {
+    table: "hr_labor_cost_snapshot",
+    aliases: ["labor-cost-snapshots", "hr_labor_cost_snapshot"],
+    defaultRestricted: ["company_id", "employee_id", "period_start", "period_end", "total_labor_cost", "currency_code", "status", "metadata", "created_at"],
+    mandatory: ["id", "organization_id"],
+  },
   "landed-cost-lines": {
     table: "stock_landed_cost_lines",
     aliases: ["landed-cost-lines", "stock_landed_cost_lines"],
@@ -1063,6 +1158,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "hr_leave_type",
     aliases: ["leave-types", "hr_leave_type"],
     defaultRestricted: ["name", "code", "allocation_type", "company_id"],
+    mandatory: ["id", "organization_id"],
+  },
+  "leaves-to-approve": {
+    table: "hr_leave",
+    aliases: ["leaves-to-approve", "hr_leave"],
+    defaultRestricted: ["employee_id", "leave_type_id", "state", "company_id", "date_from", "date_to", "number_of_days", "manager_id"],
     mandatory: ["id", "organization_id"],
   },
   "mail-followers": {
@@ -1123,6 +1224,30 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "mrp_workorder",
     aliases: ["mrp-workorders", "mrp_workorder"],
     defaultRestricted: ["state", "production_id", "company_id"],
+    mandatory: ["id", "organization_id"],
+  },
+  "my-employee": {
+    table: "hr_employee",
+    aliases: ["my-employee", "hr_employee_self"],
+    defaultRestricted: ["name", "work_email", "department_id", "company_id", "job_title", "job_id", "parent_id", "is_active", "employee_number", "work_phone", "mobile_phone", "work_location", "date_hired", "employment_type", "gender", "birthday", "marital", "emergency_contact", "emergency_phone", "barcode"],
+    mandatory: ["id", "organization_id"],
+  },
+  "onboarding-progress": {
+    table: "hr_onboarding_progress",
+    aliases: ["onboarding-progress", "hr_onboarding_progress"],
+    defaultRestricted: ["employee_id", "template_id", "template_item_id", "status", "completed_at", "notes", "company_id"],
+    mandatory: ["id", "organization_id"],
+  },
+  "onboarding-template-items": {
+    table: "hr_onboarding_template_item",
+    aliases: ["onboarding-template-items", "hr_onboarding_template_item"],
+    defaultRestricted: ["template_id", "title", "description", "sequence", "required", "company_id"],
+    mandatory: ["id", "organization_id"],
+  },
+  "onboarding-templates": {
+    table: "hr_onboarding_template",
+    aliases: ["onboarding-templates", "hr_onboarding_template"],
+    defaultRestricted: ["name", "description", "active", "company_id"],
     mandatory: ["id", "organization_id"],
   },
   "operational-messages": {
@@ -1218,7 +1343,31 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   "payslips": {
     table: "hr_payslip",
     aliases: ["payslips", "hr_payslip"],
-    defaultRestricted: ["name", "employee_id", "state", "company_id"],
+    defaultRestricted: ["name", "employee_id", "state", "company_id", "number", "contract_id", "struct_id", "date_from", "date_to", "notes", "export_intent_id", "account_move_id", "calculation_source", "calculation_metadata", "basic_wage", "gross_wage", "net_wage"],
+    mandatory: ["id", "organization_id"],
+  },
+  "payslips-to-export": {
+    table: "hr_payslip",
+    aliases: ["payslips-to-export", "hr_payslip"],
+    defaultRestricted: ["name", "employee_id", "state", "company_id", "date_from", "date_to", "struct_id"],
+    mandatory: ["id", "organization_id"],
+  },
+  "performance-cycles": {
+    table: "hr_performance_cycle",
+    aliases: ["performance-cycles", "hr_performance_cycle"],
+    defaultRestricted: ["name", "description", "state", "active", "company_id", "start_date", "end_date"],
+    mandatory: ["id", "organization_id"],
+  },
+  "performance-goals": {
+    table: "hr_performance_goal",
+    aliases: ["performance-goals", "hr_performance_goal"],
+    defaultRestricted: ["title", "description", "state", "employee_id", "cycle_id", "company_id", "weight", "target_value"],
+    mandatory: ["id", "organization_id"],
+  },
+  "performance-reviews": {
+    table: "hr_performance_review",
+    aliases: ["performance-reviews", "hr_performance_review"],
+    defaultRestricted: ["state", "employee_id", "cycle_id", "company_id", "self_rating", "manager_rating", "summary"],
     mandatory: ["id", "organization_id"],
   },
   "picking-batches": {
@@ -1629,6 +1778,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["product_id", "document_type", "document_id", "quantity", "uom_id", "date", "serial_id", "lot_id", "move_id"],
     mandatory: ["id", "organization_id"],
   },
+  "shift-opt-jobs": {
+    table: "hr_shift_opt_job",
+    aliases: ["shift-opt-jobs", "hr_shift_opt_job"],
+    defaultRestricted: ["company_id", "status", "scope", "metadata", "result_summary", "created_at", "updated_at"],
+    mandatory: ["id", "organization_id"],
+  },
   "shipping-methods": {
     table: "shipping_method",
     aliases: ["shipping-methods", "shipping_method"],
@@ -1977,6 +2132,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["name", "code", "company_id", "active"],
     mandatory: ["id", "organization_id"],
   },
+  "work-schedules": {
+    table: "hr_work_schedule",
+    aliases: ["work-schedules", "hr_work_schedule"],
+    defaultRestricted: ["employee_id", "name", "work_hours_per_week", "is_active", "company_id"],
+    mandatory: ["id", "organization_id"],
+  },
   "workflow-activities": {
     table: "workflow_activity",
     aliases: ["workflow-activities", "workflow_activity"],
@@ -2015,4 +2176,4 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   }
 }
 
-export const QUERY_RESOURCE_KEYS: readonly QueryResourceKey[] = ["account-account-types", "account-accounts", "account-assets", "account-groups", "account-journals", "account-move-lines", "account-moves", "account-payment-term-lines", "account-payment-terms", "account-payments", "account-periods", "account-reconciliation-widgets", "account-taxes", "activities", "adjustment-reasons", "ai-agents", "ai-document-processing-jobs", "ai-insights", "ai-reducer-allowlist", "ai-skills", "ai-team-member-skills", "ai-team-members", "amortization-lines", "amortization-schedules", "analytic-accounts", "analytic-distribution-models", "analytic-lines", "analytics-metrics", "assignment-rules", "audit-log", "audit-rules", "bank-match-candidates", "bank-statement-lines", "bank-statements", "barcode-nomenclatures", "barcode-rules", "budget-lines", "budget-posts", "budgets", "calendar-events", "capacity-forecast-by-employee", "cartonization-results", "casbin-rule", "companies", "consolidation-accounts", "consolidation-elimination-entries", "consolidation-journals", "contact-communication-preferences", "contact-duplicate-candidates", "contact-phone-identities", "contact-relationship-insights", "contact-relationships", "contact-role-assignments", "contact-segment-rules", "contact-segments", "contact-tag-assignments", "contact-tags", "contacts", "contracts", "crm-conversation-messages", "crm-conversations", "crm-forecast-snapshots", "dashboard-widgets", "dashboards", "data-classification-rules", "data-classifications", "deferred-revenue-lines", "deferred-revenue-schedules", "delegated-admin-scopes", "delivery-carriers", "delivery-price-rules", "departments", "depreciation-lines", "document-folders", "documents", "employees", "expense-advances", "expense-card-statement-unmatched", "expense-mileage-rates", "expense-per-diem-rates", "expense-policy-exceptions", "expense-receipts", "expense-sheets", "expense-sheets-to-approve", "expenses", "expenses-missing-receipt", "financial-reports", "fiscal-years", "fixed-assets", "fleet-vehicles", "form-config-fields", "form-configs", "form-role-configs", "fx-revaluation-runs", "helpdesk-slas", "helpdesk-stages", "helpdesk-teams", "helpdesk-tickets", "hr-employee-skills", "hr-resources", "hr-skills", "intercompany-rules", "intercompany-transactions", "inventory-adjustments", "inventory-exceptions", "inventory-exceptions-expired-lots", "inventory-exceptions-open-qc", "inventory-exceptions-short-atp", "inventory-valuations", "iot-actions", "iot-alerts", "iot-devices", "iot-hubs", "iot-pairing-tokens", "iot-telemetry", "iot-thresholds", "job-positions", "knowledge-articles", "knowledge-categories", "landed-cost-lines", "landed-costs", "lead-lost-reasons", "lead-score-factors", "lead-scores", "lead-sources", "leads", "leave-requests", "leave-types", "mail-followers", "mail-messages", "message-batches", "message-templates", "mrp-bom-lines", "mrp-boms", "mrp-productions", "mrp-routing-workcenters", "mrp-workcenters", "mrp-workorders", "operational-messages", "opportunities", "opportunity-lines", "opportunity-presence", "opportunity-stages", "packaging-materials", "partner-banks", "partner-credit-controls", "partner-credit-holds", "payment-accounts", "payment-fees", "payment-reconciliations", "payment-reversals", "payment-transactions", "payroll-structures", "payslips", "picking-batches", "picking-waves", "pos-configs", "pos-loyalty-cards", "pos-loyalty-programs", "pos-payment-methods", "pos-sessions", "pos-terminals", "pricelist-items", "pricelists", "privacy-consent", "product-categories", "products", "project-baselines", "project-change-orders", "project-earned-value-by-project", "project-integration-intents", "project-margin-by-project", "project-milestones", "project-rate-card-lines", "project-rate-cards", "project-revenue-lines", "project-revenue-schedules", "project-subcontractor-costs", "projects", "proposal-comments", "proposal-line-items", "proposal-presence", "proposal-sections", "proposal-source-docs", "proposal-versions", "proposals", "public-holidays", "purchase-order-lines", "purchase-order-lines-over-billed", "purchase-orders", "purchase-orders-partial-receipt", "purchase-orders-to-approve", "purchase-requisition-lines", "purchase-requisitions", "purchase-return-lines", "purchase-returns", "purchase-rfq-bids", "purchase-rfq-lines", "purchase-rfqs", "quality-alerts", "quality-checks", "quality-teams", "record-custom-field-values", "replenishment-rules", "report-templates", "resource-allocations", "resource-capacity-by-employee", "resource-utilisation-by-employee", "return-order-lines", "return-orders", "revenue-recognition-rules", "roles", "salary-rules", "sale-commissions", "sale-commissions-pending", "sale-order-lines", "sale-orders", "sale-orders-to-approve", "saved-reports", "scheduled-reports", "segment-members", "serial-lot-traceability", "shipping-methods", "sod-conflict-rules", "stock-cycle-counts", "stock-inventories", "stock-locations", "stock-moves", "stock-packages", "stock-pickings", "stock-production-lots", "stock-production-serials", "stock-quants", "stock-routes", "stock-rules", "stock-traceability-reports", "subscription-amend-pending", "subscription-amendments", "subscription-billing-runs", "subscription-bundle-items", "subscription-bundles", "subscription-collections", "subscription-commitments", "subscription-due-to-bill", "subscription-entitlements", "subscription-lines", "subscription-past-due", "subscription-payment-intents", "subscription-plans", "subscription-price-indexes", "subscription-price-tiers", "subscription-rating-backlog", "subscription-tax-settle-intents", "subscription-usage-charges", "subscription-usage-events", "subscriptions", "supplier-intakes", "tasks", "tax-deadlines", "tax-groups", "tax-jurisdictions", "tax-schedules", "timesheets", "timesheets-to-validate", "timesheets-unbilled", "trial-balances", "uoms", "user-custom-fields", "user-organization", "user-profile", "user-role-assignment", "user-roles", "utm-campaigns", "utm-media", "utm-sources", "warehouse-3d-zones", "warehouse-sync-intents", "warehouse-sync-intents-pending", "warehouse-tasks", "warehouses", "workflow-activities", "workflow-instances", "workflow-transitions", "workflow-workitems", "workflows", "working-calendars"]
+export const QUERY_RESOURCE_KEYS: readonly QueryResourceKey[] = ["account-account-types", "account-accounts", "account-assets", "account-groups", "account-journals", "account-move-lines", "account-moves", "account-payment-term-lines", "account-payment-terms", "account-payments", "account-periods", "account-reconciliation-widgets", "account-taxes", "activities", "adjustment-reasons", "ai-agents", "ai-document-processing-jobs", "ai-insights", "ai-reducer-allowlist", "ai-skills", "ai-team-member-skills", "ai-team-members", "amortization-lines", "amortization-schedules", "analytic-accounts", "analytic-distribution-models", "analytic-lines", "analytics-metrics", "applicants", "assignment-rules", "attendance", "audit-log", "audit-rules", "bank-match-candidates", "bank-statement-lines", "bank-statements", "barcode-nomenclatures", "barcode-rules", "benefit-enrollments", "benefit-plans", "budget-lines", "budget-posts", "budgets", "calendar-events", "capacity-forecast-by-employee", "cartonization-results", "casbin-rule", "companies", "compensation-events", "consolidation-accounts", "consolidation-elimination-entries", "consolidation-journals", "contact-communication-preferences", "contact-duplicate-candidates", "contact-phone-identities", "contact-relationship-insights", "contact-relationships", "contact-role-assignments", "contact-segment-rules", "contact-segments", "contact-tag-assignments", "contact-tags", "contacts", "contracts", "crm-conversation-messages", "crm-conversations", "crm-forecast-snapshots", "dashboard-widgets", "dashboards", "data-classification-rules", "data-classifications", "deferred-revenue-lines", "deferred-revenue-schedules", "delegated-admin-scopes", "delivery-carriers", "delivery-price-rules", "departments", "depreciation-lines", "direct-reports", "document-folders", "documents", "employee-documents", "employees", "expense-advances", "expense-card-statement-unmatched", "expense-mileage-rates", "expense-per-diem-rates", "expense-policy-exceptions", "expense-receipts", "expense-sheets", "expense-sheets-to-approve", "expenses", "expenses-missing-receipt", "financial-reports", "fiscal-years", "fixed-assets", "fleet-vehicles", "form-config-fields", "form-configs", "form-role-configs", "fx-revaluation-runs", "global-assignments", "helpdesk-slas", "helpdesk-stages", "helpdesk-teams", "helpdesk-tickets", "hr-capacity-forecast", "hr-employee-skills", "hr-integration-intents", "hr-resources", "hr-skills", "hr-statutory-ids", "intercompany-rules", "intercompany-transactions", "inventory-adjustments", "inventory-exceptions", "inventory-exceptions-expired-lots", "inventory-exceptions-open-qc", "inventory-exceptions-short-atp", "inventory-valuations", "iot-actions", "iot-alerts", "iot-devices", "iot-hubs", "iot-pairing-tokens", "iot-telemetry", "iot-thresholds", "job-positions", "knowledge-articles", "knowledge-categories", "labor-cost-snapshots", "landed-cost-lines", "landed-costs", "lead-lost-reasons", "lead-score-factors", "lead-scores", "lead-sources", "leads", "leave-requests", "leave-types", "leaves-to-approve", "mail-followers", "mail-messages", "message-batches", "message-templates", "mrp-bom-lines", "mrp-boms", "mrp-productions", "mrp-routing-workcenters", "mrp-workcenters", "mrp-workorders", "my-employee", "onboarding-progress", "onboarding-template-items", "onboarding-templates", "operational-messages", "opportunities", "opportunity-lines", "opportunity-presence", "opportunity-stages", "packaging-materials", "partner-banks", "partner-credit-controls", "partner-credit-holds", "payment-accounts", "payment-fees", "payment-reconciliations", "payment-reversals", "payment-transactions", "payroll-structures", "payslips", "payslips-to-export", "performance-cycles", "performance-goals", "performance-reviews", "picking-batches", "picking-waves", "pos-configs", "pos-loyalty-cards", "pos-loyalty-programs", "pos-payment-methods", "pos-sessions", "pos-terminals", "pricelist-items", "pricelists", "privacy-consent", "product-categories", "products", "project-baselines", "project-change-orders", "project-earned-value-by-project", "project-integration-intents", "project-margin-by-project", "project-milestones", "project-rate-card-lines", "project-rate-cards", "project-revenue-lines", "project-revenue-schedules", "project-subcontractor-costs", "projects", "proposal-comments", "proposal-line-items", "proposal-presence", "proposal-sections", "proposal-source-docs", "proposal-versions", "proposals", "public-holidays", "purchase-order-lines", "purchase-order-lines-over-billed", "purchase-orders", "purchase-orders-partial-receipt", "purchase-orders-to-approve", "purchase-requisition-lines", "purchase-requisitions", "purchase-return-lines", "purchase-returns", "purchase-rfq-bids", "purchase-rfq-lines", "purchase-rfqs", "quality-alerts", "quality-checks", "quality-teams", "record-custom-field-values", "replenishment-rules", "report-templates", "resource-allocations", "resource-capacity-by-employee", "resource-utilisation-by-employee", "return-order-lines", "return-orders", "revenue-recognition-rules", "roles", "salary-rules", "sale-commissions", "sale-commissions-pending", "sale-order-lines", "sale-orders", "sale-orders-to-approve", "saved-reports", "scheduled-reports", "segment-members", "serial-lot-traceability", "shift-opt-jobs", "shipping-methods", "sod-conflict-rules", "stock-cycle-counts", "stock-inventories", "stock-locations", "stock-moves", "stock-packages", "stock-pickings", "stock-production-lots", "stock-production-serials", "stock-quants", "stock-routes", "stock-rules", "stock-traceability-reports", "subscription-amend-pending", "subscription-amendments", "subscription-billing-runs", "subscription-bundle-items", "subscription-bundles", "subscription-collections", "subscription-commitments", "subscription-due-to-bill", "subscription-entitlements", "subscription-lines", "subscription-past-due", "subscription-payment-intents", "subscription-plans", "subscription-price-indexes", "subscription-price-tiers", "subscription-rating-backlog", "subscription-tax-settle-intents", "subscription-usage-charges", "subscription-usage-events", "subscriptions", "supplier-intakes", "tasks", "tax-deadlines", "tax-groups", "tax-jurisdictions", "tax-schedules", "timesheets", "timesheets-to-validate", "timesheets-unbilled", "trial-balances", "uoms", "user-custom-fields", "user-organization", "user-profile", "user-role-assignment", "user-roles", "utm-campaigns", "utm-media", "utm-sources", "warehouse-3d-zones", "warehouse-sync-intents", "warehouse-sync-intents-pending", "warehouse-tasks", "warehouses", "work-schedules", "workflow-activities", "workflow-instances", "workflow-transitions", "workflow-workitems", "workflows", "working-calendars"]

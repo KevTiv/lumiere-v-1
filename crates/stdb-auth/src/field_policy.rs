@@ -294,6 +294,127 @@ pub(crate) fn resolve_read_columns(
     Ok(Some(assert_safe_sql_identifiers(&cols)?))
 }
 
+const HR_EMPLOYEE_SENSITIVE: &[&str] = &[
+    "gender",
+    "birthday",
+    "marital",
+    "emergency_contact",
+    "emergency_phone",
+    "barcode",
+];
+const HR_EMPLOYEE_PIN: &str = "pin";
+const HR_CONTRACT_COMP: &[&str] = &["wage"];
+const HR_PAYSLIP_COMP: &[&str] = &["basic_wage", "gross_wage", "net_wage"];
+const HR_STATUTORY_ID_VALUE: &str = "value";
+
+pub fn has_hr_permission(field_access: Option<&FieldAccessContext>, resource: &str, action: &str) -> bool {
+    let Some(fa) = field_access else {
+        return false;
+    };
+    if fa.is_superuser {
+        return true;
+    }
+    let perm = format!("{resource}:{action}");
+    let wildcard = format!("{resource}:*");
+    fa.role_permissions.iter().any(|p| {
+        p == "*:*" || p == &perm || p == &wildcard
+    })
+}
+
+/// Strip `pin` from broad feeds; gate wages behind `view_comp`; sensitive PII behind purpose/resource.
+pub fn apply_hr_field_policy(
+    resource_key: &str,
+    cols: Vec<String>,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<Vec<String>, String> {
+    let Some(fa) = field_access else {
+        return Ok(strip_hr_pin(cols));
+    };
+    if fa.is_superuser || fa.role_permissions.iter().any(|p| p == "*:*") {
+        return Ok(cols);
+    }
+
+    let mut out: Vec<String> = cols.into_iter().filter(|c| c != HR_EMPLOYEE_PIN).collect();
+
+    if resource_key == "employees" {
+        out.retain(|c| !HR_EMPLOYEE_SENSITIVE.contains(&c.as_str()));
+    }
+
+    if resource_key == "my-employee" {
+        if has_hr_permission(Some(fa), "hr_employee", "view_pii") {
+            out.extend(HR_EMPLOYEE_SENSITIVE.iter().map(|s| (*s).to_string()));
+            out.push(HR_EMPLOYEE_PIN.to_string());
+        }
+    }
+
+    if resource_key == "direct-reports" {
+        out.retain(|c| !HR_EMPLOYEE_SENSITIVE.contains(&c.as_str()));
+    }
+
+    if resource_key == "contracts" && has_hr_permission(Some(fa), "hr_contract", "view_comp") {
+        out.extend(HR_CONTRACT_COMP.iter().map(|s| (*s).to_string()));
+    } else if resource_key == "contracts" {
+        out.retain(|c| !HR_CONTRACT_COMP.contains(&c.as_str()));
+    }
+
+    if resource_key == "payslips" && has_hr_permission(Some(fa), "hr_payroll", "view_comp") {
+        out.extend(HR_PAYSLIP_COMP.iter().map(|s| (*s).to_string()));
+    } else if resource_key == "payslips" {
+        out.retain(|c| !HR_PAYSLIP_COMP.contains(&c.as_str()));
+    }
+
+    if resource_key == "hr-statutory-ids"
+        && has_hr_permission(Some(fa), "hr_employee", "view_statutory_id")
+    {
+        out.push(HR_STATUTORY_ID_VALUE.to_string());
+    } else if resource_key == "hr-statutory-ids" {
+        out.retain(|c| c != HR_STATUTORY_ID_VALUE);
+    }
+
+    Ok(unique_preserve_order(&out))
+}
+
+fn strip_hr_pin(cols: Vec<String>) -> Vec<String> {
+    cols.into_iter().filter(|c| c != HR_EMPLOYEE_PIN).collect()
+}
+
+pub fn purpose_for_hr_resource(resource_key: &str) -> &'static str {
+    match resource_key {
+        "my-employee" => "hr_self",
+        "direct-reports" => "hr_manager",
+        _ => "hr_admin",
+    }
+}
+
+pub fn hr_fields_require_read_audit(resource_key: &str, fields: &[String]) -> bool {
+    let set: std::collections::HashSet<&str> = fields.iter().map(String::as_str).collect();
+    if set.contains(HR_EMPLOYEE_PIN) {
+        return true;
+    }
+    if HR_EMPLOYEE_SENSITIVE.iter().any(|c| set.contains(*c)) {
+        return true;
+    }
+    if resource_key == "contracts" && HR_CONTRACT_COMP.iter().any(|c| set.contains(*c)) {
+        return true;
+    }
+    if resource_key == "payslips" && HR_PAYSLIP_COMP.iter().any(|c| set.contains(*c)) {
+        return true;
+    }
+    false
+}
+
+pub fn is_hr_pii_resource(resource_key: &str) -> bool {
+    matches!(
+        resource_key,
+        "employees"
+            | "my-employee"
+            | "direct-reports"
+            | "contracts"
+            | "payslips"
+            | "employee-documents"
+    )
+}
+
 pub fn resolve_http_sql_columns(
     resource_key: &str,
     field_access: Option<&FieldAccessContext>,
@@ -307,6 +428,7 @@ pub fn resolve_http_sql_columns(
         merged.extend_from_slice(&reg.default_restricted);
         assert_safe_sql_identifiers(&unique_preserve_order(&merged))?
     };
+    let cols = apply_hr_field_policy(resource_key, cols, field_access)?;
     assert_safe_sql_identifiers(&filter_http_sql_unsafe_columns(&cols, Some(resource_key)))
 }
 

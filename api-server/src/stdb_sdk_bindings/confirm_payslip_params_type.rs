@@ -10,6 +10,7 @@ pub struct ConfirmPayslipParams {
     pub company_id: Option<u64>,
     pub gross_wage: f64,
     pub net_wage: f64,
+    pub calculation_source: String,
 }
 
 impl __sdk::InModule for ConfirmPayslipParams {

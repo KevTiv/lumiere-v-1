@@ -8,8 +8,9 @@ use serde_json::Value;
 
 use crate::error::ApiError;
 use stdb_auth::{
-    erp_org_extra_where, identity_sql_literal, registry_get, resolve_http_sql_columns,
-    select_company_scoped_sql, select_org_scoped_sql, FieldAccessContext,
+    erp_org_extra_where, hr_fields_require_read_audit, identity_sql_literal, is_hr_pii_resource,
+    purpose_for_hr_resource, registry_get, resolve_http_sql_columns, select_company_scoped_sql,
+    select_org_scoped_sql, FieldAccessContext,
 };
 use stdb_client::StdbClient;
 
@@ -142,6 +143,54 @@ pub async fn default_company_id(client: &StdbClient, org_id: u64) -> Result<Opti
         .await?
         .into_iter()
         .next())
+}
+
+async fn manager_employee_id(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+) -> Result<Option<u64>, ApiError> {
+    let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let sql = format!(
+        "SELECT id FROM hr_employee WHERE organization_id = {organization_id} AND user_id = {id} AND is_active = true LIMIT 1"
+    );
+    let rows = client
+        .query_sql(&sql)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(rows
+        .first()
+        .and_then(|r| r.get("id").and_then(|v| v.as_u64())))
+}
+
+async fn maybe_log_hr_pii_read(
+    client: &StdbClient,
+    organization_id: u64,
+    resource: &str,
+    table_name: &str,
+    fields: &[String],
+    row_count: u32,
+    record_id: u64,
+) {
+    if !is_hr_pii_resource(resource) || !hr_fields_require_read_audit(resource, fields) {
+        return;
+    }
+    let purpose = purpose_for_hr_resource(resource);
+    let args = serde_json::json!([
+        organization_id,
+        {
+            "company_id": null,
+            "purpose": purpose,
+            "resource_key": resource,
+            "table_name": table_name,
+            "record_id": record_id,
+            "fields_accessed": fields,
+            "row_count": row_count,
+        }
+    ]);
+    if let Err(e) = client.call_reducer("log_hr_pii_read", args).await {
+        tracing::warn!(resource, error = %e, "hr pii read audit failed");
+    }
 }
 
 pub async fn execute_resource_query(
@@ -938,6 +987,61 @@ pub async fn execute_resource_query(
         _ => {}
     }
 
+    if resource == "my-employee" {
+        let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+        let cols = resolve_http_sql_columns("my-employee", fa).map_err(ApiError::Internal)?;
+        let col_part = cols.join(", ");
+        let sql = format!(
+            "SELECT {col_part} FROM hr_employee WHERE organization_id = {organization_id} AND user_id = {id} AND is_active = true"
+        );
+        let rows = client
+            .query_sql(&sql)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        let record_id = rows
+            .first()
+            .and_then(|r| r.get("id").and_then(|v| v.as_u64()))
+            .unwrap_or(0);
+        maybe_log_hr_pii_read(
+            client,
+            organization_id,
+            resource,
+            "hr_employee",
+            &cols,
+            rows.len() as u32,
+            record_id,
+        )
+        .await;
+        return Ok(rows);
+    }
+
+    if resource == "direct-reports" {
+        let Some(manager_id) = manager_employee_id(client, organization_id, identity_hex).await?
+        else {
+            return Ok(vec![]);
+        };
+        let cols = resolve_http_sql_columns("direct-reports", fa).map_err(ApiError::Internal)?;
+        let col_part = cols.join(", ");
+        let sql = format!(
+            "SELECT {col_part} FROM hr_employee WHERE organization_id = {organization_id} AND parent_id = {manager_id} AND is_active = true"
+        );
+        let rows = client
+            .query_sql(&sql)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        maybe_log_hr_pii_read(
+            client,
+            organization_id,
+            resource,
+            "hr_employee",
+            &cols,
+            rows.len() as u32,
+            0,
+        )
+        .await;
+        return Ok(rows);
+    }
+
     let Some(reg) = registry_get(resource) else {
         return Err(ApiError::NotFound(format!(
             "Unknown resource: \"{resource}\""
@@ -990,12 +1094,33 @@ pub async fn execute_resource_query(
         || resource == "contact-phone-identities"
         || resource == "leads"
         || resource == "product-categories"
+        || resource == "employees"
+        || resource == "my-employee"
+        || resource == "direct-reports"
     {
         filter_and_strip_soft_deleted(&mut rows);
     }
 
     if resource == "contact-phone-identities" || resource == "payment-accounts" {
         filter_and_strip_archived(&mut rows);
+    }
+
+    if is_hr_pii_resource(resource) {
+        let cols = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
+        let record_id = rows
+            .first()
+            .and_then(|r| r.get("id").and_then(|v| v.as_u64()))
+            .unwrap_or(0);
+        maybe_log_hr_pii_read(
+            client,
+            organization_id,
+            resource,
+            &reg.table,
+            &cols,
+            rows.len() as u32,
+            record_id,
+        )
+        .await;
     }
 
     match resource {

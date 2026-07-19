@@ -107,6 +107,10 @@ pub mod purchasing_tests;
 #[path = "../tests/expenses/mod.rs"]
 pub mod expenses_tests;
 
+/// HR domain tests — call `run_all_hr_tests` reducer to execute.
+#[path = "../tests/hr/mod.rs"]
+pub mod hr_tests;
+
 /// Subscriptions domain tests — call `run_all_subscriptions_tests` reducer to execute.
 #[path = "../tests/subscriptions/mod.rs"]
 pub mod subscriptions_tests;
@@ -143,6 +147,7 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
     purchasing_tests::run_purchasing_bill_balanced_test(ctx)
         .map_err(|e| format!("purchasing: {e}"))?;
     expenses_tests::run_all_expenses_tests(ctx).map_err(|e| format!("expenses: {e}"))?;
+    hr_tests::run_all_hr_tests(ctx).map_err(|e| format!("hr: {e}"))?;
     subscriptions_tests::run_all_subscriptions_tests(ctx)
         .map_err(|e| format!("subscriptions: {e}"))?;
     projects_tests::run_all_projects_tests(ctx).map_err(|e| format!("projects: {e}"))?;

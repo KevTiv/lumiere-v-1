@@ -18,6 +18,8 @@ pub struct SubscriptionQueryContext<'a> {
     pub company_ids: Option<&'a [u64]>,
     pub identity_hex: Option<&'a str>,
     pub role_names: Option<&'a [String]>,
+    /// Manager's `hr_employee.id` for `direct-reports` (no SQL subqueries).
+    pub manager_employee_id: Option<u64>,
     pub field_access: Option<&'a FieldAccessContext>,
 }
 
@@ -311,6 +313,47 @@ pub fn subscription_queries_for_resource(
         )?]));
     }
 
+    if r == "my-employee" {
+        let Some(org) = ctx.organization_id else {
+            return Ok(None);
+        };
+        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
+            return Ok(None);
+        };
+        let id_lit = crate::field_policy::identity_sql_literal(id)?;
+        let cols = resolve_http_sql_columns("my-employee", ctx.field_access)?.join(", ");
+        return Ok(Some(vec![format!(
+            "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND user_id = {id_lit} AND is_active = true"
+        )]));
+    }
+
+    if r == "direct-reports" {
+        let Some(org) = ctx.organization_id else {
+            return Ok(None);
+        };
+        let Some(manager_id) = ctx.manager_employee_id.filter(|&id| id > 0) else {
+            return Ok(None);
+        };
+        let cols = resolve_http_sql_columns("direct-reports", ctx.field_access)?.join(", ");
+        return Ok(Some(vec![format!(
+            "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND parent_id = {manager_id} AND is_active = true"
+        )]));
+    }
+
+    if r == "employee-documents" {
+        let Some(org) = ctx.organization_id else {
+            return Ok(None);
+        };
+        let cols = resolve_http_sql_columns("employee-documents", ctx.field_access)?.join(", ");
+        let mut extra = String::from(" AND active = true");
+        if !crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "view_pii") {
+            extra.push_str(" AND purpose NOT IN ('tax_id', 'identity')");
+        }
+        return Ok(Some(vec![format!(
+            "SELECT {cols} FROM hr_employee_document WHERE organization_id = {org}{extra}"
+        )]));
+    }
+
     let Some(org) = ctx.organization_id else {
         return Ok(None);
     };
@@ -337,6 +380,7 @@ pub fn create_client_subscriptions<T: AsRef<str>>(
         company_ids: ctx.company_ids,
         identity_hex,
         role_names: ctx.role_names,
+        manager_employee_id: ctx.manager_employee_id,
         field_access: ctx.field_access,
     };
 

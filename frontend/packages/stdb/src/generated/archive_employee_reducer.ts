@@ -10,9 +10,15 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  ArchiveEmployeeParams,
+} from "./types";
+
 export default {
   organizationId: __t.u64(),
   companyId: __t.u64(),
   employeeId: __t.u64(),
-  terminationDate: __t.option(__t.timestamp()),
+  get params() {
+    return ArchiveEmployeeParams;
+  },
 };

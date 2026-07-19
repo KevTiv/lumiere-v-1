@@ -590,6 +590,330 @@ export const newSalaryRuleForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const editEmployeeForm = (t: TFunction): FormConfig => ({
+  id: "edit-employee",
+  title: t("hr.forms.editEmployee.title"),
+  submitLabel: t("hr.forms.editEmployee.submitLabel"),
+  sections: [
+    {
+      id: "emp-edit",
+      title: t("hr.forms.editEmployee.sections.details"),
+      fields: [
+        {
+          id: "emp-edit-name",
+          type: "text",
+          name: "name",
+          label: t("hr.forms.newEmployee.fields.name"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "emp-edit-employment-type",
+          type: "select",
+          name: "employmentType",
+          label: t("hr.forms.newEmployee.fields.employmentType"),
+          width: "1/2",
+          options: [
+            { value: "FullTime", label: t("hr.forms.newEmployee.fields.options.FullTime") },
+            { value: "PartTime", label: t("hr.forms.newEmployee.fields.options.PartTime") },
+            { value: "Contract", label: t("hr.forms.newEmployee.fields.options.Contract") },
+            { value: "Intern", label: t("hr.forms.newEmployee.fields.options.Intern") },
+          ],
+        },
+        {
+          id: "emp-edit-job-title",
+          type: "text",
+          name: "jobTitle",
+          label: t("hr.forms.newEmployee.fields.jobTitle"),
+          width: "1/2",
+        },
+        {
+          id: "emp-edit-department",
+          type: "select",
+          name: "departmentId",
+          label: t("hr.forms.newEmployee.fields.departmentId"),
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "emp-edit-work-email",
+          type: "text",
+          name: "workEmail",
+          label: t("hr.forms.newEmployee.fields.workEmail"),
+          width: "1/2",
+        },
+        {
+          id: "emp-edit-work-phone",
+          type: "text",
+          name: "workPhone",
+          label: t("hr.forms.newEmployee.fields.workPhone"),
+          width: "1/2",
+        },
+        {
+          id: "emp-edit-work-location",
+          type: "text",
+          name: "workLocation",
+          label: t("hr.forms.newEmployee.fields.workLocation"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const editDepartmentForm = (t: TFunction): FormConfig => ({
+  id: "edit-department",
+  title: t("hr.forms.editDepartment.title"),
+  submitLabel: t("hr.forms.editDepartment.submitLabel"),
+  sections: [
+    {
+      id: "dept-edit",
+      title: t("hr.forms.editDepartment.sections.details"),
+      fields: [
+        {
+          id: "dept-edit-name",
+          type: "text",
+          name: "name",
+          label: t("hr.forms.newDepartment.fields.name"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "dept-edit-parent",
+          type: "select",
+          name: "parentId",
+          label: t("hr.forms.newDepartment.fields.parentId"),
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "dept-edit-manager",
+          type: "select",
+          name: "managerId",
+          label: t("hr.forms.newDepartment.fields.managerId"),
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "dept-edit-note",
+          type: "textarea",
+          name: "note",
+          label: t("hr.forms.newDepartment.fields.note"),
+          width: "full",
+        },
+        {
+          id: "dept-edit-active",
+          type: "checkbox",
+          name: "isActive",
+          label: t("hr.forms.editDepartment.fields.isActive"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const editJobPositionForm = (t: TFunction): FormConfig => ({
+  id: "edit-job-position",
+  title: t("hr.forms.editJobPosition.title"),
+  submitLabel: t("hr.forms.editJobPosition.submitLabel"),
+  sections: [
+    {
+      id: "job-edit",
+      title: t("hr.forms.editJobPosition.sections.details"),
+      fields: [
+        {
+          id: "job-edit-name",
+          type: "text",
+          name: "name",
+          label: t("hr.forms.newJobPosition.fields.name"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "job-edit-department",
+          type: "select",
+          name: "departmentId",
+          label: t("hr.forms.newJobPosition.fields.departmentId"),
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "job-edit-expected",
+          type: "number",
+          name: "expectedEmployees",
+          label: t("hr.forms.newJobPosition.fields.expectedEmployees"),
+          width: "1/2",
+        },
+        {
+          id: "job-edit-state",
+          type: "select",
+          name: "state",
+          label: t("hr.forms.newJobPosition.fields.state"),
+          width: "1/2",
+          options: [
+            { value: "recruit", label: t("hr.forms.newJobPosition.fields.options.recruit") },
+            { value: "open", label: t("hr.forms.newJobPosition.fields.options.open") },
+          ],
+        },
+        {
+          id: "job-edit-active",
+          type: "checkbox",
+          name: "isActive",
+          label: t("hr.forms.editJobPosition.fields.isActive"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const editContractForm = (t: TFunction): FormConfig => ({
+  id: "edit-contract",
+  title: t("hr.forms.editContract.title"),
+  submitLabel: t("hr.forms.editContract.submitLabel"),
+  sections: [
+    {
+      id: "contract-edit",
+      title: t("hr.forms.editContract.sections.details"),
+      fields: [
+        {
+          id: "contract-edit-name",
+          type: "text",
+          name: "name",
+          label: t("hr.forms.newContract.fields.name"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "contract-edit-wage",
+          type: "number",
+          name: "wage",
+          label: t("hr.forms.newContract.fields.wage"),
+          width: "1/2",
+        },
+        {
+          id: "contract-edit-wage-effective",
+          type: "date",
+          name: "wageEffectiveFrom",
+          label: t("hr.forms.editContract.fields.wageEffectiveFrom"),
+          width: "1/2",
+        },
+        {
+          id: "contract-edit-wage-reason",
+          type: "text",
+          name: "wageChangeReason",
+          label: t("hr.forms.editContract.fields.wageChangeReason"),
+          width: "full",
+        },
+        {
+          id: "contract-edit-date-end",
+          type: "date",
+          name: "dateEnd",
+          label: t("hr.forms.newContract.fields.dateEnd"),
+          width: "1/2",
+        },
+        {
+          id: "contract-edit-notes",
+          type: "textarea",
+          name: "notes",
+          label: t("hr.forms.editContract.fields.notes"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+export const editLeaveTypeForm = (t: TFunction): FormConfig => ({
+  id: "edit-leave-type",
+  title: t("hr.forms.editLeaveType.title"),
+  submitLabel: t("hr.forms.editLeaveType.submitLabel"),
+  sections: [
+    {
+      id: "leave-type-edit",
+      title: t("hr.forms.editLeaveType.sections.details"),
+      fields: [
+        {
+          id: "lt-edit-name",
+          type: "text",
+          name: "name",
+          label: t("hr.forms.newLeaveType.fields.name"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "lt-edit-max",
+          type: "number",
+          name: "maxLeaves",
+          label: t("hr.forms.newLeaveType.fields.maxLeaves"),
+          width: "1/2",
+        },
+        {
+          id: "lt-edit-active",
+          type: "checkbox",
+          name: "isActive",
+          label: t("hr.forms.newLeaveType.fields.isActive"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
+export const newAttendancePunchForm = (t: TFunction): FormConfig => ({
+  id: "new-attendance-punch",
+  title: t("hr.forms.newAttendancePunch.title"),
+  description: t("hr.forms.newAttendancePunch.description"),
+  submitLabel: t("hr.forms.newAttendancePunch.submitLabel"),
+  sections: [
+    {
+      id: "punch",
+      title: t("hr.forms.newAttendancePunch.sections.punch"),
+      fields: [
+        {
+          id: "att-employee",
+          type: "select",
+          name: "employeeId",
+          label: t("hr.forms.newAttendancePunch.fields.employeeId"),
+          required: true,
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
+          id: "att-check-in",
+          type: "datetime-local",
+          name: "checkIn",
+          label: t("hr.forms.newAttendancePunch.fields.checkIn"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "att-check-out",
+          type: "datetime-local",
+          name: "checkOut",
+          label: t("hr.forms.newAttendancePunch.fields.checkOut"),
+          width: "1/2",
+        },
+        {
+          id: "att-source",
+          type: "select",
+          name: "source",
+          label: t("hr.forms.newAttendancePunch.fields.source"),
+          required: true,
+          width: "1/2",
+          defaultValue: "manual",
+          options: [
+            { value: "manual", label: t("hr.forms.newAttendancePunch.fields.sourceManual") },
+            { value: "kiosk", label: t("hr.forms.newAttendancePunch.fields.sourceKiosk") },
+            { value: "import", label: t("hr.forms.newAttendancePunch.fields.sourceImport") },
+          ],
+        },
+      ],
+    },
+  ],
+})
+
 export const hrFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-employee": newEmployeeForm(t),
   "new-leave-request": newLeaveRequestForm(t),
@@ -600,4 +924,10 @@ export const hrFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-leave-type": newLeaveTypeForm(t),
   "new-payroll-structure": newPayrollStructureForm(t),
   "new-salary-rule": newSalaryRuleForm(t),
+  "new-attendance-punch": newAttendancePunchForm(t),
+  "edit-employee": editEmployeeForm(t),
+  "edit-department": editDepartmentForm(t),
+  "edit-job-position": editJobPositionForm(t),
+  "edit-contract": editContractForm(t),
+  "edit-leave-type": editLeaveTypeForm(t),
 })

@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub(super) struct CancelContractArgs {
     pub organization_id: u64,
+    pub company_id: u64,
     pub contract_id: u64,
 }
 
@@ -15,6 +16,7 @@ impl From<CancelContractArgs> for super::Reducer {
     fn from(args: CancelContractArgs) -> Self {
         Self::CancelContract {
             organization_id: args.organization_id,
+            company_id: args.company_id,
             contract_id: args.contract_id,
         }
     }
@@ -35,8 +37,13 @@ pub trait cancel_contract {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`cancel_contract:cancel_contract_then`] to run a callback after the reducer completes.
-    fn cancel_contract(&self, organization_id: u64, contract_id: u64) -> __sdk::Result<()> {
-        self.cancel_contract_then(organization_id, contract_id, |_, _| {})
+    fn cancel_contract(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        contract_id: u64,
+    ) -> __sdk::Result<()> {
+        self.cancel_contract_then(organization_id, company_id, contract_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `cancel_contract` to run as soon as possible,
@@ -48,6 +55,7 @@ pub trait cancel_contract {
     fn cancel_contract_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         contract_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -60,6 +68,7 @@ impl cancel_contract for super::RemoteReducers {
     fn cancel_contract_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         contract_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -69,6 +78,7 @@ impl cancel_contract for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             CancelContractArgs {
                 organization_id,
+                company_id,
                 contract_id,
             },
             callback,

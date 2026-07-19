@@ -183,6 +183,7 @@ async fn handle_realtime_socket(
         company_ids: company_ids_slice,
         identity_hex,
         role_names: None,
+        manager_employee_id: None,
         field_access: session.field_access.as_ref(),
     };
 

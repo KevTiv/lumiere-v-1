@@ -23,6 +23,10 @@ pub struct HrPayslip {
     pub gross_wage: f64,
     pub net_wage: f64,
     pub state: PayslipState,
+    pub calculation_source: Option<String>,
+    pub calculation_metadata: Option<String>,
+    pub account_move_id: Option<u64>,
+    pub export_intent_id: Option<u64>,
     pub notes: Option<String>,
     pub created_at: __sdk::Timestamp,
 }
@@ -49,6 +53,10 @@ pub struct HrPayslipCols {
     pub gross_wage: __sdk::__query_builder::Col<HrPayslip, f64>,
     pub net_wage: __sdk::__query_builder::Col<HrPayslip, f64>,
     pub state: __sdk::__query_builder::Col<HrPayslip, PayslipState>,
+    pub calculation_source: __sdk::__query_builder::Col<HrPayslip, Option<String>>,
+    pub calculation_metadata: __sdk::__query_builder::Col<HrPayslip, Option<String>>,
+    pub account_move_id: __sdk::__query_builder::Col<HrPayslip, Option<u64>>,
+    pub export_intent_id: __sdk::__query_builder::Col<HrPayslip, Option<u64>>,
     pub notes: __sdk::__query_builder::Col<HrPayslip, Option<String>>,
     pub created_at: __sdk::__query_builder::Col<HrPayslip, __sdk::Timestamp>,
 }
@@ -71,6 +79,13 @@ impl __sdk::__query_builder::HasCols for HrPayslip {
             gross_wage: __sdk::__query_builder::Col::new(table_name, "gross_wage"),
             net_wage: __sdk::__query_builder::Col::new(table_name, "net_wage"),
             state: __sdk::__query_builder::Col::new(table_name, "state"),
+            calculation_source: __sdk::__query_builder::Col::new(table_name, "calculation_source"),
+            calculation_metadata: __sdk::__query_builder::Col::new(
+                table_name,
+                "calculation_metadata",
+            ),
+            account_move_id: __sdk::__query_builder::Col::new(table_name, "account_move_id"),
+            export_intent_id: __sdk::__query_builder::Col::new(table_name, "export_intent_id"),
             notes: __sdk::__query_builder::Col::new(table_name, "notes"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
         }

@@ -10,9 +10,10 @@ pub use erp_subscriptions::{
     subscription_resource_keys_vec, SubscriptionQueryContext,
 };
 pub use field_policy::{
-    assert_safe_sql_identifiers, identity_sql_literal, resolve_http_sql_columns,
-    select_casbin_rules_in_subjects_sql, select_company_scoped_sql, select_org_scoped_sql,
-    select_roles_active_sql, select_user_organization_for_identity_sql,
+    assert_safe_sql_identifiers, apply_hr_field_policy, hr_fields_require_read_audit,
+    identity_sql_literal, is_hr_pii_resource, purpose_for_hr_resource,
+    resolve_http_sql_columns, select_casbin_rules_in_subjects_sql, select_company_scoped_sql,
+    select_org_scoped_sql, select_roles_active_sql, select_user_organization_for_identity_sql,
     select_user_profile_by_identity_sql, select_user_role_assignments_for_identity_sql,
     sql_column_list_for_generated_type, CasbinRuleLike, FieldAccessContext,
     company_ids_dual_field_or_clause, company_ids_equality_or_clause,

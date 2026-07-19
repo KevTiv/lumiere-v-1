@@ -1,11 +1,14 @@
-/// HR Leaves — HrLeaveType & HrLeave
+/// HR Leaves — HrLeaveType, HrLeave, HrLeaveAllocation
 ///
-/// Manages leave types (vacation, sick, etc.) and employee leave requests.
+/// Manages leave types (vacation, sick, etc.), employee leave requests, and balances.
+use chrono::{DateTime, Datelike, Utc};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::hr::employees::hr_employee;
 use crate::projects::capacity::on_leave_approved;
 use crate::types::HrLeaveState;
+use crate::workflow::approval_gate::gate_action_with_approval;
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +32,27 @@ pub struct HrLeaveType {
     pub validity_stop: Option<Timestamp>,
     pub max_leaves: f64, // Maximum days allowed per year
     pub is_active: bool,
+    pub created_at: Timestamp,
+}
+
+/// Per-employee leave balance for a leave type and calendar year.
+#[spacetimedb::table(
+    accessor = hr_leave_allocation,
+    public,
+    index(accessor = leave_allocation_by_org, btree(columns = [organization_id])),
+    index(accessor = leave_allocation_by_employee, btree(columns = [employee_id]))
+)]
+pub struct HrLeaveAllocation {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub employee_id: u64,
+    pub leave_type_id: u64,
+    pub period_year: u32,
+    pub allocated_days: f64,
+    pub used_days: f64,
     pub created_at: Timestamp,
 }
 
@@ -92,6 +116,133 @@ pub struct CreateLeaveRequestParams {
     pub notes: Option<String>,
     pub name: Option<String>,
     pub manager_id: Option<u64>,
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+fn period_year_from_timestamp(ts: Timestamp) -> u32 {
+    let micros = ts
+        .to_duration_since_unix_epoch()
+        .unwrap_or_default()
+        .as_micros() as i64;
+    let secs = micros / 1_000_000;
+    let nanos = ((micros % 1_000_000) * 1000) as u32;
+    DateTime::<Utc>::from_timestamp(secs, nanos)
+        .map(|dt| dt.year() as u32)
+        .unwrap_or(1970)
+}
+
+fn find_leave_allocation(
+    ctx: &ReducerContext,
+    employee_id: u64,
+    leave_type_id: u64,
+    period_year: u32,
+) -> Option<HrLeaveAllocation> {
+    ctx.db
+        .hr_leave_allocation()
+        .leave_allocation_by_employee()
+        .filter(&employee_id)
+        .find(|row| row.leave_type_id == leave_type_id && row.period_year == period_year)
+}
+
+fn ensure_leave_allocation(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    employee_id: u64,
+    leave_type_id: u64,
+    period_year: u32,
+) -> Result<Option<HrLeaveAllocation>, String> {
+    if let Some(existing) = find_leave_allocation(ctx, employee_id, leave_type_id, period_year) {
+        return Ok(Some(existing));
+    }
+
+    let leave_type = ctx
+        .db
+        .hr_leave_type()
+        .id()
+        .find(&leave_type_id)
+        .ok_or("Leave type not found")?;
+    if leave_type.allocation_type == "no" {
+        return Ok(None);
+    }
+
+    let row = ctx.db.hr_leave_allocation().insert(HrLeaveAllocation {
+        id: 0,
+        organization_id,
+        company_id,
+        employee_id,
+        leave_type_id,
+        period_year,
+        allocated_days: leave_type.max_leaves,
+        used_days: 0.0,
+        created_at: ctx.timestamp,
+    });
+    Ok(Some(row))
+}
+
+fn consume_leave_days(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    employee_id: u64,
+    leave_type_id: u64,
+    period_year: u32,
+    days: f64,
+) -> Result<f64, String> {
+    let Some(alloc) = ensure_leave_allocation(
+        ctx,
+        organization_id,
+        company_id,
+        employee_id,
+        leave_type_id,
+        period_year,
+    )?
+    else {
+        return Ok(0.0);
+    };
+
+    let remaining = alloc.allocated_days - alloc.used_days;
+    if days > remaining + f64::EPSILON {
+        return Err(format!(
+            "insufficient leave balance: requested {days:.2} days, remaining {remaining:.2}"
+        ));
+    }
+
+    let new_used = alloc.used_days + days;
+    ctx.db.hr_leave_allocation().id().update(HrLeaveAllocation {
+        used_days: new_used,
+        ..alloc
+    });
+    Ok(days)
+}
+
+fn leave_requester_identity(ctx: &ReducerContext, leave: &HrLeave) -> Option<Identity> {
+    ctx.db
+        .hr_employee()
+        .id()
+        .find(leave.employee_id)
+        .and_then(|emp| emp.user_id)
+}
+
+fn assert_not_self_approve(ctx: &ReducerContext, leave: &HrLeave) -> Result<(), String> {
+    if let Some(requester) = leave_requester_identity(ctx, leave) {
+        if requester == ctx.sender() {
+            return Err("cannot approve your own leave request".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn requires_dual_approval(leave: &HrLeave) -> bool {
+    leave.number_of_days > 5.0
+}
+
+fn guard_leave_company(leave: &HrLeave, company_id: u64) -> Result<(), String> {
+    if leave.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+    Ok(())
 }
 
 // ── Reducers: Leave Types ─────────────────────────────────────────────────────
@@ -222,8 +373,14 @@ pub fn create_leave_request(
             record_id: leave.id,
             action: "CREATE",
             old_values: None,
-            new_values: None,
-            changed_fields: vec![],
+            new_values: Some(
+                serde_json::json!({
+                    "state": "Draft",
+                    "number_of_days": params.number_of_days,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["state".to_string(), "number_of_days".to_string()],
             metadata: None,
         },
     );
@@ -231,92 +388,10 @@ pub fn create_leave_request(
 }
 
 #[reducer]
-pub fn approve_leave(
+pub fn submit_leave(
     ctx: &ReducerContext,
     organization_id: u64,
-    leave_id: u64,
-) -> Result<(), String> {
-    check_permission(ctx, organization_id, "hr_leave", "approve")?;
-    let leave = ctx
-        .db
-        .hr_leave()
-        .id()
-        .find(&leave_id)
-        .ok_or("Leave request not found")?;
-    if leave.organization_id != organization_id {
-        return Err("Leave request belongs to a different organization".to_string());
-    }
-    if leave.state == HrLeaveState::Validated {
-        return Err("Leave is already approved".to_string());
-    }
-    let company_id = leave.company_id;
-    let employee_id = leave.employee_id;
-    ctx.db.hr_leave().id().update(HrLeave {
-        state: HrLeaveState::Validated,
-        first_approver_id: Some(ctx.sender()),
-        ..leave
-    });
-    // Same txn: reduce remaining capacity projection for this employee.
-    on_leave_approved(ctx, organization_id, company_id, employee_id);
-    write_audit_log_v2(
-        ctx,
-        organization_id,
-        AuditLogParams {
-            company_id: Some(company_id),
-            table_name: "hr_leave",
-            record_id: leave_id,
-            action: "UPDATE",
-            old_values: None,
-            new_values: None,
-            changed_fields: vec!["state".to_string(), "first_approver_id".to_string()],
-            metadata: None,
-        },
-    );
-    Ok(())
-}
-
-#[reducer]
-pub fn refuse_leave(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    leave_id: u64,
-) -> Result<(), String> {
-    check_permission(ctx, organization_id, "hr_leave", "approve")?;
-    let leave = ctx
-        .db
-        .hr_leave()
-        .id()
-        .find(&leave_id)
-        .ok_or("Leave request not found")?;
-    if leave.organization_id != organization_id {
-        return Err("Leave request belongs to a different organization".to_string());
-    }
-    let company_id = leave.company_id;
-    ctx.db.hr_leave().id().update(HrLeave {
-        state: HrLeaveState::Refused,
-        ..leave
-    });
-    write_audit_log_v2(
-        ctx,
-        organization_id,
-        AuditLogParams {
-            company_id: Some(company_id),
-            table_name: "hr_leave",
-            record_id: leave_id,
-            action: "UPDATE",
-            old_values: None,
-            new_values: None,
-            changed_fields: vec!["state".to_string()],
-            metadata: None,
-        },
-    );
-    Ok(())
-}
-
-#[reducer]
-pub fn reset_leave_to_draft(
-    ctx: &ReducerContext,
-    organization_id: u64,
+    company_id: u64,
     leave_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_leave", "update")?;
@@ -329,7 +404,286 @@ pub fn reset_leave_to_draft(
     if leave.organization_id != organization_id {
         return Err("Leave request belongs to a different organization".to_string());
     }
-    let company_id = leave.company_id;
+    guard_leave_company(&leave, company_id)?;
+    if leave.state != HrLeaveState::Draft {
+        return Err("Leave can only be submitted from Draft state".to_string());
+    }
+
+    let period_year = period_year_from_timestamp(leave.date_from);
+    ensure_leave_allocation(
+        ctx,
+        organization_id,
+        company_id,
+        leave.employee_id,
+        leave.leave_type_id,
+        period_year,
+    )?;
+
+    let old_state = format!("{:?}", leave.state);
+    ctx.db.hr_leave().id().update(HrLeave {
+        state: HrLeaveState::Confirm,
+        ..leave
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_leave",
+            record_id: leave_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Confirm" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+#[reducer]
+pub fn approve_leave(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    leave_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "hr_leave", "approve")?;
+    let leave = ctx
+        .db
+        .hr_leave()
+        .id()
+        .find(&leave_id)
+        .ok_or("Leave request not found")?;
+    if leave.organization_id != organization_id {
+        return Err("Leave request belongs to a different organization".to_string());
+    }
+    guard_leave_company(&leave, company_id)?;
+
+    match leave.state {
+        HrLeaveState::Confirm | HrLeaveState::ValidatedOne => {}
+        HrLeaveState::Validated => return Err("Leave is already approved".to_string()),
+        HrLeaveState::Refused => return Err("Refused leave cannot be approved".to_string()),
+        HrLeaveState::Draft => {
+            return Err("Leave must be submitted before approval".to_string());
+        }
+    }
+
+    assert_not_self_approve(ctx, &leave)?;
+
+    let params_json = serde_json::json!({
+        "organization_id": organization_id,
+        "company_id": company_id,
+        "leave_id": leave_id,
+    })
+    .to_string();
+    let context_json = serde_json::json!({
+        "number_of_days": leave.number_of_days,
+        "employee_id": leave.employee_id,
+    })
+    .to_string();
+    let summary = format!(
+        "Approve leave request {} ({:.2} days)",
+        leave_id, leave.number_of_days
+    );
+
+    if let Some(_request_id) = gate_action_with_approval(
+        ctx,
+        organization_id,
+        company_id,
+        "hr_leave",
+        leave_id,
+        "approve_leave",
+        leave.number_of_days,
+        &summary,
+        &params_json,
+        Some(context_json),
+    )? {
+        return Err(format!(
+            "Leave request requires workflow approval ({:.2} days)",
+            leave.number_of_days
+        ));
+    }
+
+    let old_state = format!("{:?}", leave.state);
+    let period_year = period_year_from_timestamp(leave.date_from);
+    let employee_id = leave.employee_id;
+    let number_of_days = leave.number_of_days;
+
+    let (updated, days_consumed, changed_fields) = match leave.state {
+        HrLeaveState::Confirm if requires_dual_approval(&leave) => (
+            HrLeave {
+                state: HrLeaveState::ValidatedOne,
+                first_approver_id: Some(ctx.sender()),
+                ..leave
+            },
+            0.0,
+            vec!["state".to_string(), "first_approver_id".to_string()],
+        ),
+        HrLeaveState::Confirm => {
+            let days_consumed = consume_leave_days(
+                ctx,
+                organization_id,
+                company_id,
+                employee_id,
+                leave.leave_type_id,
+                period_year,
+                number_of_days,
+            )?;
+            (
+                HrLeave {
+                    state: HrLeaveState::Validated,
+                    first_approver_id: Some(ctx.sender()),
+                    ..leave
+                },
+                days_consumed,
+                vec!["state".to_string(), "first_approver_id".to_string()],
+            )
+        }
+        HrLeaveState::ValidatedOne => {
+            let days_consumed = consume_leave_days(
+                ctx,
+                organization_id,
+                company_id,
+                employee_id,
+                leave.leave_type_id,
+                period_year,
+                number_of_days,
+            )?;
+            (
+                HrLeave {
+                    state: HrLeaveState::Validated,
+                    second_approver_id: Some(ctx.sender()),
+                    ..leave
+                },
+                days_consumed,
+                vec!["state".to_string(), "second_approver_id".to_string()],
+            )
+        }
+        _ => unreachable!(),
+    };
+
+    let new_state = updated.state.clone();
+    let first_approver_id = updated.first_approver_id;
+    let second_approver_id = updated.second_approver_id;
+    ctx.db.hr_leave().id().update(updated);
+
+    if new_state == HrLeaveState::Validated {
+        on_leave_approved(ctx, organization_id, company_id, employee_id);
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_leave",
+            record_id: leave_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "state": old_state,
+                    "number_of_days": number_of_days,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "state": format!("{new_state:?}"),
+                    "days_consumed": days_consumed,
+                    "first_approver_id": first_approver_id.map(|id| id.to_hex().to_string()),
+                    "second_approver_id": second_approver_id.map(|id| id.to_hex().to_string()),
+                })
+                .to_string(),
+            ),
+            changed_fields,
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+#[reducer]
+pub fn refuse_leave(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    leave_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "hr_leave", "approve")?;
+    let leave = ctx
+        .db
+        .hr_leave()
+        .id()
+        .find(&leave_id)
+        .ok_or("Leave request not found")?;
+    if leave.organization_id != organization_id {
+        return Err("Leave request belongs to a different organization".to_string());
+    }
+    guard_leave_company(&leave, company_id)?;
+
+    match leave.state {
+        HrLeaveState::Confirm | HrLeaveState::ValidatedOne => {}
+        HrLeaveState::Validated => {
+            return Err("Validated leave cannot be refused; use a reverse workflow".to_string());
+        }
+        HrLeaveState::Refused => return Err("Leave is already refused".to_string()),
+        HrLeaveState::Draft => {
+            return Err("Leave must be submitted before it can be refused".to_string());
+        }
+    }
+
+    let old_state = format!("{:?}", leave.state);
+    ctx.db.hr_leave().id().update(HrLeave {
+        state: HrLeaveState::Refused,
+        ..leave
+    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "hr_leave",
+            record_id: leave_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Refused" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+#[reducer]
+pub fn reset_leave_to_draft(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    leave_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "hr_leave", "update")?;
+    let leave = ctx
+        .db
+        .hr_leave()
+        .id()
+        .find(&leave_id)
+        .ok_or("Leave request not found")?;
+    if leave.organization_id != organization_id {
+        return Err("Leave request belongs to a different organization".to_string());
+    }
+    guard_leave_company(&leave, company_id)?;
+
+    match leave.state {
+        HrLeaveState::Refused | HrLeaveState::Confirm | HrLeaveState::ValidatedOne => {}
+        HrLeaveState::Validated => {
+            return Err("Validated leave cannot be reset to draft".to_string());
+        }
+        HrLeaveState::Draft => return Err("Leave is already in Draft state".to_string()),
+    }
+
+    let old_state = format!("{:?}", leave.state);
     ctx.db.hr_leave().id().update(HrLeave {
         state: HrLeaveState::Draft,
         first_approver_id: None,
@@ -344,8 +698,8 @@ pub fn reset_leave_to_draft(
             table_name: "hr_leave",
             record_id: leave_id,
             action: "UPDATE",
-            old_values: None,
-            new_values: None,
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Draft" }).to_string()),
             changed_fields: vec![
                 "state".to_string(),
                 "first_approver_id".to_string(),

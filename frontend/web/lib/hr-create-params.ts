@@ -217,3 +217,24 @@ export function toCreateSalaryRuleParams(
     isActive: formData.isActive !== false && formData.is_active !== false,
   }
 }
+
+export function toCreateAttendancePunchParams(
+  formData: Record<string, unknown>,
+): {
+  employeeId: bigint
+  checkIn: Timestamp
+  checkOut?: Timestamp
+  source: string
+} | null {
+  const employeeId = optionalBigIntU64(formData.employeeId)
+  const checkIn = requiredTimestamp(formData.checkIn)
+  if (employeeId === undefined || checkIn === null) return null
+  const source = optionalString(formData.source) ?? "manual"
+  const checkOut = optionalTimestamp(formData.checkOut)
+  return {
+    employeeId,
+    checkIn,
+    checkOut,
+    source,
+  }
+}

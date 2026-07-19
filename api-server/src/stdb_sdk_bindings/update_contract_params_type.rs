@@ -14,6 +14,8 @@ pub struct UpdateContractParams {
     pub job_id: Option<u64>,
     pub department_id: Option<u64>,
     pub notes: Option<String>,
+    pub wage_change_reason: Option<String>,
+    pub wage_effective_from: Option<__sdk::Timestamp>,
 }
 
 impl __sdk::InModule for UpdateContractParams {

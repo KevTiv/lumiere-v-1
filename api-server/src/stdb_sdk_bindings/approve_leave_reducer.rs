@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub(super) struct ApproveLeaveArgs {
     pub organization_id: u64,
+    pub company_id: u64,
     pub leave_id: u64,
 }
 
@@ -15,6 +16,7 @@ impl From<ApproveLeaveArgs> for super::Reducer {
     fn from(args: ApproveLeaveArgs) -> Self {
         Self::ApproveLeave {
             organization_id: args.organization_id,
+            company_id: args.company_id,
             leave_id: args.leave_id,
         }
     }
@@ -35,8 +37,13 @@ pub trait approve_leave {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`approve_leave:approve_leave_then`] to run a callback after the reducer completes.
-    fn approve_leave(&self, organization_id: u64, leave_id: u64) -> __sdk::Result<()> {
-        self.approve_leave_then(organization_id, leave_id, |_, _| {})
+    fn approve_leave(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        leave_id: u64,
+    ) -> __sdk::Result<()> {
+        self.approve_leave_then(organization_id, company_id, leave_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `approve_leave` to run as soon as possible,
@@ -48,6 +55,7 @@ pub trait approve_leave {
     fn approve_leave_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         leave_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -60,6 +68,7 @@ impl approve_leave for super::RemoteReducers {
     fn approve_leave_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         leave_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -69,6 +78,7 @@ impl approve_leave for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             ApproveLeaveArgs {
                 organization_id,
+                company_id,
                 leave_id,
             },
             callback,

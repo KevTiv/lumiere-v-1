@@ -68,6 +68,8 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_purchasing_bill_balanced_test \
 	run_helpdesk_ticket_test \
 	run_hr_leave_type_test \
+	run_hr_wave_a_test \
+	run_all_hr_tests \
 	run_manufacturing_workcenter_test \
 	run_documents_folder_test \
 	run_workflow_definition_test \

@@ -5,7 +5,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::contracts::{hr_contract, HrContract};
 use crate::hr::employees::{
     hr_department, hr_employee, hr_job_position, hr_resource, HrDepartment, HrEmployee,
@@ -466,13 +466,19 @@ pub fn import_hr_leave_csv(
         }
 
         let company_id = parse_u64(col(&headers, row, "company_id"));
-        let state = match col(&headers, row, "state") {
-            "confirm" => HrLeaveState::Confirm,
-            "refused" => HrLeaveState::Refused,
-            "validated" => HrLeaveState::Validated,
-            "validated1" | "validated_one" => HrLeaveState::ValidatedOne,
-            _ => HrLeaveState::Draft,
-        };
+        let state_raw = col(&headers, row, "state").trim().to_lowercase();
+        if !state_raw.is_empty() && state_raw != "draft" {
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("state"),
+                Some(&state_raw),
+                "CSV import creates Draft leave only — omit state or use draft",
+            );
+            errors += 1;
+            continue;
+        }
 
         ctx.db.hr_leave().insert(HrLeave {
             id: 0,
@@ -481,7 +487,7 @@ pub fn import_hr_leave_csv(
             employee_id,
             leave_type_id,
             name: opt_str(col(&headers, row, "name")),
-            state,
+            state: HrLeaveState::Draft,
             date_from: opt_timestamp(col(&headers, row, "date_from")).unwrap_or(ctx.timestamp),
             date_to: opt_timestamp(col(&headers, row, "date_to")).unwrap_or(ctx.timestamp),
             number_of_days: parse_f64(col(&headers, row, "number_of_days")),
@@ -495,7 +501,29 @@ pub fn import_hr_leave_csv(
         imported += 1;
     }
 
+    let job_id = job.id;
     finish_import_job(ctx, job, imported, errors);
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "hr_leave",
+            record_id: job_id,
+            action: "IMPORT",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "imported": imported,
+                    "errors": errors,
+                    "policy": "draft_only",
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["csv".to_string()],
+            metadata: Some(format!(r#"{{"import_job_id":{job_id}}}"#)),
+        },
+    );
     log::info!("Import hr_leave: imported={}, errors={}", imported, errors);
     Ok(())
 }
@@ -716,12 +744,19 @@ pub fn import_hr_payslip_csv(
             }
         };
         let basic_wage = parse_f64(col(&headers, row, "basic_wage"));
-        let state = match col(&headers, row, "state") {
-            "verify" => PayslipState::Verify,
-            "done" => PayslipState::Done,
-            "cancelled" => PayslipState::Cancelled,
-            _ => PayslipState::Draft,
-        };
+        let state_raw = col(&headers, row, "state").trim().to_lowercase();
+        if !state_raw.is_empty() && state_raw != "draft" {
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("state"),
+                Some(&state_raw),
+                "CSV import creates Draft payslip only — omit state or use draft",
+            );
+            errors += 1;
+            continue;
+        }
 
         ctx.db.hr_payslip().insert(HrPayslip {
             id: 0,
@@ -751,14 +786,40 @@ pub fn import_hr_payslip_csv(
                     n
                 }
             },
-            state,
+            state: PayslipState::Draft,
+            calculation_source: opt_str(col(&headers, row, "calculation_source")),
+            calculation_metadata: opt_str(col(&headers, row, "calculation_metadata")),
+            account_move_id: None,
+            export_intent_id: None,
             notes: opt_str(col(&headers, row, "notes")),
             created_at: ctx.timestamp,
         });
         imported += 1;
     }
 
+    let job_id = job.id;
     finish_import_job(ctx, job, imported, errors);
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "hr_payslip",
+            record_id: job_id,
+            action: "IMPORT",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "imported": imported,
+                    "errors": errors,
+                    "policy": "draft_only",
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["csv".to_string()],
+            metadata: Some(format!(r#"{{"import_job_id":{job_id}}}"#)),
+        },
+    );
     log::info!(
         "Import hr_payslip: imported={}, errors={}",
         imported,

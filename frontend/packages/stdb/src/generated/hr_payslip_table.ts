@@ -31,6 +31,10 @@ export default __t.row({
   get state() {
     return PayslipState;
   },
+  calculationSource: __t.option(__t.string()).name("calculation_source"),
+  calculationMetadata: __t.option(__t.string()).name("calculation_metadata"),
+  accountMoveId: __t.option(__t.u64()).name("account_move_id"),
+  exportIntentId: __t.option(__t.u64()).name("export_intent_id"),
   notes: __t.option(__t.string()),
   createdAt: __t.timestamp().name("created_at"),
 });

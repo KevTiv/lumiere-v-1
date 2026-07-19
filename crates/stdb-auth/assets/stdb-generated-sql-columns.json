@@ -723,6 +723,15 @@
     "is_default",
     "metadata"
   ],
+  "AddPerformanceGoalParams": [
+    "employee_id",
+    "title",
+    "description",
+    "target_value",
+    "weight",
+    "state",
+    "reviewer_employee_id"
+  ],
   "AddPurchaseOrderLineParams": [
     "product_id",
     "quantity",
@@ -1352,6 +1361,16 @@
     "write_date",
     "metadata"
   ],
+  "ArchiveEmployeeParams": [
+    "termination_date",
+    "override_incomplete_checklist",
+    "override_reason"
+  ],
+  "AssignBenefitEnrollmentParams": [
+    "plan_id",
+    "employee_id",
+    "effective_from"
+  ],
   "AssignContactRoleParams": [
     "contact_id",
     "company_id",
@@ -1359,6 +1378,9 @@
     "active_from",
     "active_until",
     "metadata"
+  ],
+  "AssignOnboardingTemplateParams": [
+    "template_id"
   ],
   "AssignRoleParams": [
     "expires_at_micros",
@@ -1804,10 +1826,23 @@
     "cost",
     "error_message"
   ],
+  "CompleteOffboardingItemParams": [
+    "item",
+    "notes"
+  ],
+  "CompleteOnboardingItemParams": [
+    "template_item_id",
+    "notes"
+  ],
+  "CompletePerformanceReviewParams": [
+    "manager_rating",
+    "summary"
+  ],
   "ConfirmPayslipParams": [
     "company_id",
     "gross_wage",
-    "net_wage"
+    "net_wage",
+    "calculation_source"
   ],
   "ConsignmentAgreement": [
     "id",
@@ -2636,6 +2671,12 @@
     "is_active",
     "metadata"
   ],
+  "CreateAttendancePunchParams": [
+    "employee_id",
+    "check_in",
+    "check_out",
+    "source"
+  ],
   "CreateAuditRuleParams": [
     "table_name",
     "log_reads",
@@ -2674,6 +2715,12 @@
     "alias",
     "is_active",
     "metadata"
+  ],
+  "CreateBenefitPlanParams": [
+    "name",
+    "description",
+    "plan_type",
+    "active"
   ],
   "CreateBillFromPurchaseOrderParams": [
     "journal_id",
@@ -3358,6 +3405,22 @@
     "description",
     "is_active"
   ],
+  "CreateHrApplicantParams": [
+    "company_id",
+    "job_position_id",
+    "name",
+    "email",
+    "stage",
+    "notes"
+  ],
+  "CreateHrEmployeeDocumentParams": [
+    "doc_type",
+    "attachment_id",
+    "purpose",
+    "title",
+    "notes",
+    "active"
+  ],
   "CreateHrEmployeeSkillParams": [
     "employee_id",
     "skill_id",
@@ -3365,6 +3428,39 @@
     "notes",
     "active",
     "metadata"
+  ],
+  "CreateHrGlobalAssignmentParams": [
+    "employee_id",
+    "home_company_id",
+    "host_company_id",
+    "date_from",
+    "date_to",
+    "status",
+    "notes"
+  ],
+  "CreateHrIntegrationIntentParams": [
+    "company_id",
+    "intent_kind",
+    "idempotency_key",
+    "payslip_id",
+    "export_intent_id",
+    "payload",
+    "metadata"
+  ],
+  "CreateHrLaborCostSnapshotParams": [
+    "employee_id",
+    "period_start",
+    "period_end",
+    "total_labor_cost",
+    "currency_code",
+    "status",
+    "metadata"
+  ],
+  "CreateHrShiftOptJobParams": [
+    "scope",
+    "status",
+    "metadata",
+    "result_summary"
   ],
   "CreateHrSkillParams": [
     "name",
@@ -3647,6 +3743,18 @@
     "responsible_user_id",
     "metadata"
   ],
+  "CreateOnboardingTemplateItemParams": [
+    "title",
+    "description",
+    "sequence",
+    "required"
+  ],
+  "CreateOnboardingTemplateParams": [
+    "name",
+    "description",
+    "active",
+    "items"
+  ],
   "CreateOperationalMessageParams": [
     "company_id",
     "template_id",
@@ -3837,6 +3945,12 @@
     "evidence_document_ids",
     "metadata"
   ],
+  "CreatePayrollExportIntentParams": [
+    "pack_key",
+    "idempotency_key",
+    "payload",
+    "metadata"
+  ],
   "CreatePayrollStructureParams": [
     "name",
     "type",
@@ -3851,6 +3965,14 @@
     "basic_wage",
     "contract_id",
     "notes"
+  ],
+  "CreatePerformanceCycleParams": [
+    "name",
+    "description",
+    "start_date",
+    "end_date",
+    "state",
+    "active"
   ],
   "CreatePickingBatchParams": [
     "company_id",
@@ -4636,6 +4758,12 @@
     "is_active",
     "metadata"
   ],
+  "CreateStatutoryIdParams": [
+    "employee_id",
+    "id_kind",
+    "value",
+    "metadata"
+  ],
   "CreateStockInventoryLineParams": [
     "product_id",
     "product_variant_id",
@@ -5356,6 +5484,12 @@
     "media_provider",
     "metadata"
   ],
+  "CreateWorkScheduleParams": [
+    "employee_id",
+    "name",
+    "work_hours_per_week",
+    "is_active"
+  ],
   "CreateWorkcenterParams": [
     "company_id",
     "name",
@@ -5669,6 +5803,9 @@
   ],
   "DeleteAccountMoveLineParams": [
     "company_id"
+  ],
+  "DeleteHrEmployeeDocumentParams": [
+    "reason"
   ],
   "DeliveryCarrier": [
     "id",
@@ -6269,6 +6406,84 @@
     "created_at",
     "deleted_at"
   ],
+  "HrApplicant": [
+    "id",
+    "organization_id",
+    "company_id",
+    "job_position_id",
+    "name",
+    "email",
+    "stage",
+    "notes",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "HrAttendance": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "check_in",
+    "check_out",
+    "source",
+    "created_at"
+  ],
+  "HrBenefitEnrollment": [
+    "id",
+    "organization_id",
+    "company_id",
+    "plan_id",
+    "employee_id",
+    "state",
+    "effective_from",
+    "effective_to",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "HrBenefitPlan": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "description",
+    "plan_type",
+    "active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "HrCapacityForecast": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "period_start",
+    "period_end",
+    "scheduled_hours",
+    "leave_hours",
+    "attendance_hours",
+    "available_hours",
+    "metadata",
+    "write_uid",
+    "write_date"
+  ],
+  "HrCompensationEvent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "contract_id",
+    "wage",
+    "currency_id",
+    "effective_from",
+    "reason",
+    "created_at"
+  ],
   "HrContract": [
     "id",
     "organization_id",
@@ -6284,6 +6499,16 @@
     "state",
     "notes",
     "created_at"
+  ],
+  "HrCountryPackLeaveDefault": [
+    "id",
+    "pack_key",
+    "name",
+    "code",
+    "max_leaves",
+    "allocation_type",
+    "sort_order",
+    "metadata"
   ],
   "HrDepartment": [
     "id",
@@ -6332,6 +6557,22 @@
     "created_at",
     "deleted_at",
     "metadata"
+  ],
+  "HrEmployeeDocument": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "doc_type",
+    "attachment_id",
+    "purpose",
+    "title",
+    "notes",
+    "active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
   ],
   "HrEmployeeSkill": [
     "id",
@@ -6500,6 +6741,44 @@
     "metadata",
     "created_at"
   ],
+  "HrGlobalAssignment": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "home_company_id",
+    "host_company_id",
+    "date_from",
+    "date_to",
+    "status",
+    "notes",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "HrIntegrationIntent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "intent_kind",
+    "status",
+    "idempotency_key",
+    "payslip_id",
+    "export_intent_id",
+    "payload",
+    "result_ref",
+    "external_ref",
+    "payload_hash",
+    "last_error",
+    "attempt_count",
+    "applied_at",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
   "HrJobPosition": [
     "id",
     "organization_id",
@@ -6512,6 +6791,19 @@
     "requirements",
     "state",
     "is_active",
+    "created_at"
+  ],
+  "HrLaborCostSnapshot": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "period_start",
+    "period_end",
+    "total_labor_cost",
+    "currency_code",
+    "status",
+    "metadata",
     "created_at"
   ],
   "HrLeave": [
@@ -6532,6 +6824,17 @@
     "created_at",
     "deleted_at"
   ],
+  "HrLeaveAllocation": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "leave_type_id",
+    "period_year",
+    "allocated_days",
+    "used_days",
+    "created_at"
+  ],
   "HrLeaveType": [
     "id",
     "organization_id",
@@ -6545,6 +6848,84 @@
     "max_leaves",
     "is_active",
     "created_at"
+  ],
+  "HrOffboardingChecklist": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "status",
+    "assets_returned",
+    "access_revoked",
+    "docs_collected",
+    "assets_notes",
+    "access_notes",
+    "docs_notes",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "HrOnboardingProgress": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "template_id",
+    "template_item_id",
+    "status",
+    "completed_at",
+    "notes",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "HrOnboardingTemplate": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "description",
+    "active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "HrOnboardingTemplateItem": [
+    "id",
+    "organization_id",
+    "company_id",
+    "template_id",
+    "title",
+    "description",
+    "sequence",
+    "required",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "HrPayrollExportIntent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "payslip_id",
+    "pack_key",
+    "status",
+    "idempotency_key",
+    "payload",
+    "payload_hash",
+    "external_ref",
+    "last_error",
+    "attempt_count",
+    "applied_at",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
   ],
   "HrPayrollStructure": [
     "id",
@@ -6569,8 +6950,74 @@
     "gross_wage",
     "net_wage",
     "state",
+    "calculation_source",
+    "calculation_metadata",
+    "account_move_id",
+    "export_intent_id",
     "notes",
     "created_at"
+  ],
+  "HrPerformanceCycle": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "description",
+    "start_date",
+    "end_date",
+    "state",
+    "active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "HrPerformanceGoal": [
+    "id",
+    "organization_id",
+    "company_id",
+    "cycle_id",
+    "employee_id",
+    "title",
+    "description",
+    "target_value",
+    "weight",
+    "state",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "HrPerformanceReview": [
+    "id",
+    "organization_id",
+    "company_id",
+    "cycle_id",
+    "employee_id",
+    "reviewer_employee_id",
+    "state",
+    "self_rating",
+    "manager_rating",
+    "summary",
+    "submitted_at",
+    "completed_at",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "HrPiiAccessLog": [
+    "id",
+    "organization_id",
+    "company_id",
+    "actor_identity",
+    "purpose",
+    "resource_key",
+    "table_name",
+    "record_id",
+    "fields_accessed",
+    "row_count",
+    "accessed_at"
   ],
   "HrResource": [
     "id",
@@ -6596,6 +7043,17 @@
     "sequence",
     "is_active"
   ],
+  "HrShiftOptJob": [
+    "id",
+    "organization_id",
+    "company_id",
+    "status",
+    "scope",
+    "metadata",
+    "result_summary",
+    "created_at",
+    "updated_at"
+  ],
   "HrSkill": [
     "id",
     "organization_id",
@@ -6610,6 +7068,29 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "HrStatutoryId": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "id_kind",
+    "value",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "HrWorkSchedule": [
+    "id",
+    "organization_id",
+    "company_id",
+    "employee_id",
+    "name",
+    "work_hours_per_week",
+    "is_active",
+    "created_at"
   ],
   "ImportJob": [
     "id",
@@ -7211,6 +7692,15 @@
     "ip_address",
     "user_agent",
     "metadata"
+  ],
+  "LogHrPiiReadParams": [
+    "company_id",
+    "purpose",
+    "resource_key",
+    "table_name",
+    "record_id",
+    "fields_accessed",
+    "row_count"
   ],
   "LogTimesheetParams": [
     "company_id",
@@ -8268,6 +8758,13 @@
     "fx_fee_amount",
     "accounting_date",
     "client_request_id"
+  ],
+  "PostPayslipParams": [
+    "journal_id",
+    "expense_account_id",
+    "payable_account_id",
+    "tax_withholding_account_id",
+    "accounting_date"
   ],
   "PostRealizedFxParams": [
     "payment_id",
@@ -9554,6 +10051,17 @@
     "correlation_id",
     "metadata"
   ],
+  "RecordHrIntegrationResultParams": [
+    "status",
+    "external_ref",
+    "payload_hash",
+    "result_ref",
+    "last_error",
+    "metadata",
+    "gross_wage",
+    "net_wage",
+    "calculation_metadata"
+  ],
   "RecordInventoryIntegrationResultParams": [
     "status",
     "external_reference",
@@ -9562,6 +10070,13 @@
     "location_id",
     "quantity",
     "cost",
+    "metadata"
+  ],
+  "RecordPayrollExportResultParams": [
+    "status",
+    "external_ref",
+    "payload_hash",
+    "last_error",
     "metadata"
   ],
   "RecordPrivacyConsentParams": [
@@ -9604,6 +10119,11 @@
     "period_start",
     "period_end",
     "metadata"
+  ],
+  "RefreshHrCapacityForecastParams": [
+    "employee_id",
+    "period_start",
+    "period_end"
   ],
   "RefreshInventoryExceptionsParams": [
     "upsert_only",
@@ -10307,6 +10827,11 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "SeedHrCountryPackOverlaysParams": [
+    "pack_keys",
+    "seed_holidays",
+    "materialize_leave_types"
   ],
   "SeedPackHolidaysParams": [
     "pack_keys",
@@ -11106,6 +11631,10 @@
     "created_by",
     "created_at",
     "metadata"
+  ],
+  "SubmitPerformanceReviewParams": [
+    "self_rating",
+    "summary"
   ],
   "SubmitSupplierIntakeParams": [
     "company_name",
@@ -12057,7 +12586,9 @@
     "date_end",
     "job_id",
     "department_id",
-    "notes"
+    "notes",
+    "wage_change_reason",
+    "wage_effective_from"
   ],
   "UpdateCrmConversationParams": [
     "status",
@@ -12188,11 +12719,24 @@
     "show_in_list",
     "width"
   ],
+  "UpdateHrApplicantParams": [
+    "stage",
+    "email",
+    "notes"
+  ],
   "UpdateHrEmployeeSkillParams": [
     "level",
     "notes",
     "active",
     "metadata"
+  ],
+  "UpdateHrGlobalAssignmentParams": [
+    "home_company_id",
+    "host_company_id",
+    "date_from",
+    "date_to",
+    "status",
+    "notes"
   ],
   "UpdateHrSkillParams": [
     "name",
@@ -12683,6 +13227,11 @@
     "permission_b",
     "description",
     "is_active",
+    "metadata"
+  ],
+  "UpdateStatutoryIdParams": [
+    "id_kind",
+    "value",
     "metadata"
   ],
   "UpdateStockLocationParams": [
