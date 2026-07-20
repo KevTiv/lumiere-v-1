@@ -23,6 +23,16 @@ fn domain_test_reducers_are_wasm_linked() {
     let _ = stringify!(run_core_sod_test);
     let _ = stringify!(run_tenant_isolation_tests);
     let _ = stringify!(run_country_pack_test);
+    let _ = stringify!(run_all_workflow_foundation_tests);
+    let _ = stringify!(run_all_workflow_deterministic_core_tests);
+    let _ = stringify!(run_workflow_evaluator_simulation_tests);
+    let _ = stringify!(run_workflow_runtime_tests);
+    let _ = stringify!(run_workflow_authorization_tests);
+    let _ = stringify!(run_workflow_human_task_tests);
+    let _ = stringify!(run_workflow_action_registry_tests);
+    let _ = stringify!(run_workflow_delivery_tests);
+    let _ = stringify!(run_all_workflow_human_effect_tests);
+    let _ = stringify!(run_queue_foundation_tests);
     let _ = stringify!(run_accounting_ic_consolidation_test);
     let _ = stringify!(run_accounting_fx_revaluation_test);
     let _ = stringify!(run_crm_contact_identity_test);
@@ -44,6 +54,16 @@ fn run_core_operational_messaging_test() {}
 fn run_core_sod_test() {}
 fn run_tenant_isolation_tests() {}
 fn run_country_pack_test() {}
+fn run_all_workflow_foundation_tests() {}
+fn run_all_workflow_deterministic_core_tests() {}
+fn run_workflow_evaluator_simulation_tests() {}
+fn run_workflow_runtime_tests() {}
+fn run_workflow_authorization_tests() {}
+fn run_workflow_human_task_tests() {}
+fn run_workflow_action_registry_tests() {}
+fn run_workflow_delivery_tests() {}
+fn run_all_workflow_human_effect_tests() {}
+fn run_queue_foundation_tests() {}
 fn run_accounting_ic_consolidation_test() {}
 fn run_accounting_fx_revaluation_test() {}
 fn run_crm_contact_identity_test() {}

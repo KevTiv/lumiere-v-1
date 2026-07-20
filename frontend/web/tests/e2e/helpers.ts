@@ -1948,21 +1948,12 @@ export async function gotoApprovals(page: Page) {
 }
 
 export async function createApprovalRuleViaUi(
-  page: Page,
-  options: { name: string; threshold: string },
+  _page: Page,
+  _options: { name: string; threshold: string },
 ) {
-  await gotoApprovals(page)
-  await page.getByTestId("approval-rule-create").click()
-  await page.getByTestId("approval-rule-name").fill(options.name)
-  await page.getByTestId("approval-rule-threshold").fill(options.threshold)
-  const [res] = await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().includes("/api/call/create_approval_rule") && r.ok(),
-      { timeout: 30_000 },
-    ),
-    page.getByTestId("approval-rule-submit").click(),
-  ])
-  expect(res.ok()).toBe(true)
+  throw new Error(
+    "createApprovalRuleViaUi removed: approval rules are published workflow versions — use /workflows",
+  )
 }
 
 export async function waitForPendingApprovalRequest(
@@ -1972,29 +1963,54 @@ export async function waitForPendingApprovalRequest(
 ): Promise<number> {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
-    const res = await page.request.get("/api/query/approval-requests-inbox")
+    const res = await page.request.get("/api/query/workflow-human-tasks-inbox")
     if (res.ok()) {
       const json = (await res.json()) as {
         data?: Array<{
           id?: unknown
+          subjectModel?: string
+          subject_model?: string
           model?: string
+          subjectId?: unknown
+          subject_id?: unknown
           resId?: unknown
           res_id?: unknown
-          status?: string
+          status?: string | { tag?: string }
+          summary?: { subjectModel?: unknown; subjectId?: unknown }
         }>
       }
       const row = (json.data ?? []).find((r) => {
-        if (String(r.model ?? "") !== model) return false
-        const rid = scalarQueryId(r.resId ?? r.res_id)
+        const subjectModel =
+          r.subjectModel ??
+          r.subject_model ??
+          (typeof r.summary?.subjectModel === "string" ? r.summary.subjectModel : undefined) ??
+          r.model ??
+          ""
+        if (String(subjectModel) !== model) return false
+        const rid = scalarQueryId(
+          r.subjectId ??
+            r.subject_id ??
+            r.summary?.subjectId ??
+            r.resId ??
+            r.res_id,
+        )
         if (rid !== resId) return false
-        return String(r.status ?? "pending").toLowerCase() === "pending"
+        const status =
+          typeof r.status === "string"
+            ? r.status
+            : r.status && typeof r.status === "object" && "tag" in r.status
+              ? String(r.status.tag ?? "")
+              : r.status && typeof r.status === "object"
+                ? Object.keys(r.status)[0] ?? ""
+                : ""
+        return status === "Open" || status === "Claimed"
       })
       const id = scalarQueryId(row?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
   }
-  throw new Error(`pending approval not found for ${model}#${resId}`)
+  throw new Error(`pending human task not found for ${model}#${resId}`)
 }
 
 export async function rejectApprovalRequestViaUi(
@@ -2009,7 +2025,7 @@ export async function rejectApprovalRequestViaUi(
   await page.getByTestId(`approval-reject-reason-${requestId}`).fill(reason)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/reject_approval_request") && r.ok(),
+      (r) => r.url().includes("/api/call/decide_workflow_human_task") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId(`approval-reject-confirm-${requestId}`).click(),

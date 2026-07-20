@@ -276,6 +276,7 @@
     "write_date",
     "metadata"
   ],
+  "AccrueSaleCommissionParams": [],
   "Activity": [
     "note",
     "date_deadline",
@@ -353,6 +354,10 @@
     "propagate_cancel",
     "metadata"
   ],
+  "AddPurchaseRfqLineParams": [
+    "name",
+    "sequence"
+  ],
   "AddUserToOrganizationParams": [
     "company_id",
     "job_title",
@@ -360,26 +365,7 @@
     "employee_id",
     "metadata"
   ],
-  "AddWorkflowActivityParams": [
-    "action",
-    "action_id",
-    "trigger_model",
-    "trigger_expr_id",
-    "signal_send",
-    "subflow_id",
-    "state_from",
-    "state_to",
-    "description",
-    "metadata"
-  ],
-  "AddWorkflowTransitionParams": [
-    "signal",
-    "condition",
-    "trigger_model",
-    "trigger_expr_id",
-    "group_id",
-    "metadata"
-  ],
+  "AddWorkflowHumanTaskCommentParams": [],
   "AdjustmentReason": [
     "description",
     "metadata"
@@ -511,6 +497,9 @@
     "duration_ms",
     "metadata"
   ],
+  "ApplyExpenseAdvanceParams": [
+    "metadata"
+  ],
   "AssignRoleParams": [
     "expires_at_micros",
     "metadata"
@@ -611,6 +600,9 @@
     "rrule_type",
     "metadata"
   ],
+  "CancelWorkflowParams": [
+    "causation_id"
+  ],
   "CartonizationResult": [
     "metadata"
   ],
@@ -630,6 +622,9 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "ClaimWorkflowHumanTaskParams": [
+    "acting_for"
   ],
   "CloseSubscriptionParams": [
     "close_reason_id",
@@ -999,11 +994,6 @@
     "target_period",
     "metadata"
   ],
-  "CreateApprovalRuleParams": [
-    "description",
-    "approver_role_id",
-    "metadata"
-  ],
   "CreateAuditRuleParams": [
     "metadata"
   ],
@@ -1014,6 +1004,9 @@
   "CreateBarcodeRuleParams": [
     "description",
     "alias",
+    "metadata"
+  ],
+  "CreateBillFromPurchaseOrderParams": [
     "metadata"
   ],
   "CreateBomParams": [
@@ -1118,6 +1111,12 @@
     "official_name",
     "currency_code",
     "metadata"
+  ],
+  "CreateCreditNoteFromReturnOrderParams": [
+    "metadata"
+  ],
+  "CreateCreditNoteParams": [
+    "reason"
   ],
   "CreateCrossoveredBudgetLineParams": [
     "analytic_account_id",
@@ -1241,6 +1240,21 @@
     "color",
     "metadata"
   ],
+  "CreateExpenseAdvanceParams": [
+    "company_id",
+    "client_request_id",
+    "metadata"
+  ],
+  "CreateExpenseCardStatementLineParams": [
+    "company_id",
+    "merchant_key",
+    "metadata"
+  ],
+  "CreateExpenseIntegrationIntentParams": [
+    "company_id",
+    "device_id",
+    "metadata"
+  ],
   "CreateExpenseParams": [
     "company_id",
     "product_id",
@@ -1256,10 +1270,21 @@
     "merchant_key",
     "policy_exception_reason"
   ],
-  "CreateExpenseCardStatementLineParams": [
+  "CreateExpenseProjectRebillParams": [
+    "partner_id",
+    "fiscal_position_id",
+    "client_request_id"
+  ],
+  "CreateExpenseReceiptParams": [
     "company_id",
-    "merchant_key",
-    "metadata"
+    "file_name",
+    "mime_type",
+    "content_hash",
+    "client_request_id"
+  ],
+  "CreateExpenseReimbursementParams": [
+    "amount",
+    "client_request_id"
   ],
   "CreateExpenseSheetParams": [
     "company_id",
@@ -1281,11 +1306,6 @@
   "CreateFormConfigParams": [
     "description"
   ],
-  "CreateSavedReportParams": [
-    "column_dimension",
-    "filter_json",
-    "metadata"
-  ],
   "CreateFormFieldParams": [
     "description",
     "placeholder",
@@ -1300,6 +1320,12 @@
   ],
   "CreateHelpdeskTeamParams": [
     "description"
+  ],
+  "CreateHrIntegrationIntentParams": [
+    "company_id",
+    "payslip_id",
+    "export_intent_id",
+    "metadata"
   ],
   "CreateIntercompanyRuleParams": [
     "journal_id",
@@ -1319,17 +1345,21 @@
     "reason_notes",
     "metadata"
   ],
-  "CreateBillFromPurchaseOrderParams": [
+  "CreateInventoryCloseParams": [
+    "as_of",
+    "journal_id",
+    "inventory_account_id",
+    "valuation_account_id",
+    "metadata"
+  ],
+  "CreateInventoryIntegrationIntentParams": [
+    "warehouse_id",
+    "picking_id",
+    "request_payload",
     "metadata"
   ],
   "CreateInvoiceFromSaleOrderParams": [
     "metadata"
-  ],
-  "CreateCreditNoteFromReturnOrderParams": [
-    "metadata"
-  ],
-  "CreateCreditNoteParams": [
-    "reason"
   ],
   "CreateJobPositionParams": [
     "company_id",
@@ -1416,6 +1446,10 @@
     "responsible_user_id",
     "metadata"
   ],
+  "CreateOpportunityLineParams": [
+    "name",
+    "metadata"
+  ],
   "CreateOpportunityParams": [
     "lead_id",
     "partner_id",
@@ -1438,10 +1472,6 @@
     "description",
     "metadata"
   ],
-  "CreateOpportunityLineParams": [
-    "name",
-    "metadata"
-  ],
   "CreateOrganizationParams": [
     "description",
     "logo_url",
@@ -1449,6 +1479,10 @@
     "email",
     "phone",
     "currency_id",
+    "metadata"
+  ],
+  "CreatePackagingMaterialParams": [
+    "barcode",
     "metadata"
   ],
   "CreatePartnerBankParams": [
@@ -1645,6 +1679,25 @@
     "vendor_id",
     "metadata"
   ],
+  "CreatePurchaseReturnLineParams": [
+    "purchase_order_line_id"
+  ],
+  "CreatePurchaseReturnParams": [
+    "purchase_order_id",
+    "return_reason"
+  ],
+  "CreatePurchaseRfqBidParams": [
+    "notes"
+  ],
+  "CreatePurchaseRfqLineParams": [
+    "name",
+    "sequence"
+  ],
+  "CreatePurchaseRfqParams": [
+    "requisition_id",
+    "notes",
+    "metadata"
+  ],
   "CreateQualityAlertParams": [
     "product_id",
     "product_variant_id",
@@ -1769,6 +1822,11 @@
     "activity_ids",
     "metadata"
   ],
+  "CreateSavedReportParams": [
+    "column_dimension",
+    "filter_json",
+    "metadata"
+  ],
   "CreateScheduledReportParams": [
     "description",
     "domain",
@@ -1845,6 +1903,13 @@
     "owner_id",
     "package_level_id",
     "product_type",
+    "metadata"
+  ],
+  "CreateStockPackageParams": [
+    "packaging_material_id",
+    "picking_id",
+    "location_id",
+    "location_dest_id",
     "metadata"
   ],
   "CreateStockPickingParams": [
@@ -2045,6 +2110,9 @@
     "device_info",
     "metadata"
   ],
+  "CreateVendorCreditFromPurchaseReturnParams": [
+    "metadata"
+  ],
   "CreateWarehouseParams": [
     "partner_id",
     "wh_input_stock_loc_id",
@@ -2057,6 +2125,10 @@
     "view_location_id",
     "mto_pull_id",
     "buy_pull_id",
+    "metadata"
+  ],
+  "CreateWarehouseSyncIntentParams": [
+    "deviceId",
     "metadata"
   ],
   "CreateWarehouseTaskParams": [
@@ -2095,6 +2167,10 @@
   "CreateWorkcenterProductivityParams": [
     "description",
     "metadata"
+  ],
+  "CreateWorkflowDelegationParams": [
+    "role_id",
+    "reason"
   ],
   "CreateWorkflowParams": [
     "description",
@@ -2159,6 +2235,11 @@
   "DataClassificationRule": [
     "column_name",
     "metadata"
+  ],
+  "DecideWorkflowHumanTaskParams": [
+    "acting_for",
+    "comment",
+    "causation_id"
   ],
   "DeferredRevenueLine": [
     "move_id",
@@ -2226,6 +2307,20 @@
   ],
   "EnqueueJobParams": [
     "scheduled_at_micros",
+    "metadata"
+  ],
+  "ExecuteCrossDockParams": [
+    "location_dest_id",
+    "metadata"
+  ],
+  "ExecuteDirectedPutawayParams": [
+    "dest_location_id",
+    "metadata"
+  ],
+  "FailExpenseIntegrationIntentParams": [
+    "metadata"
+  ],
+  "FailWarehouseSyncIntentParams": [
     "metadata"
   ],
   "FieldOption": [
@@ -2415,6 +2510,7 @@
     "approved_at",
     "metadata"
   ],
+  "InvalidateWorkflowHumanTaskParams": [],
   "InventoryAdjustment": [
     "inventory_id",
     "lot_id",
@@ -2565,6 +2661,9 @@
     "subtype",
     "parent_id"
   ],
+  "MatchExpenseCardStatementLineParams": [
+    "metadata"
+  ],
   "MoveStockQuantParams": [
     "company_id"
   ],
@@ -2680,6 +2779,14 @@
     "integration_keys",
     "metadata"
   ],
+  "PackMovesIntoPackageParams": [
+    "metadata"
+  ],
+  "PackStockPickingParams": [
+    "packaging_material_id",
+    "name",
+    "metadata"
+  ],
   "PackagingMaterial": [
     "barcode",
     "metadata"
@@ -2787,6 +2894,14 @@
     "currency_id",
     "company_id",
     "metadata"
+  ],
+  "PostExpenseSheetParams": [
+    "default_tax_account_id",
+    "card_liability_account_id",
+    "advance_account_id",
+    "fx_fee_account_id",
+    "fx_fee_amount",
+    "client_request_id"
   ],
   "PrivacyConsent": [
     "granted_at",
@@ -3087,6 +3202,10 @@
   "QueueWorker": [
     "metadata"
   ],
+  "ReceiveConsignmentStockParams": [
+    "location_id",
+    "metadata"
+  ],
   "RecordBarcodeScanParams": [
     "context_type",
     "context_id",
@@ -3101,6 +3220,25 @@
     "notes",
     "metadata"
   ],
+  "RecordHrIntegrationResultParams": [
+    "external_ref",
+    "payload_hash",
+    "result_ref",
+    "last_error",
+    "metadata",
+    "gross_wage",
+    "net_wage",
+    "calculation_metadata"
+  ],
+  "RecordInventoryIntegrationResultParams": [
+    "external_reference",
+    "last_error",
+    "product_id",
+    "location_id",
+    "quantity",
+    "cost",
+    "metadata"
+  ],
   "RecordPrivacyConsentParams": [
     "ip_address",
     "user_agent",
@@ -3108,6 +3246,12 @@
   ],
   "RecordTelemetryParams": [
     "raw_value"
+  ],
+  "RefreshInventoryExceptionsParams": [
+    "metadata"
+  ],
+  "RefuseExpenseSheetParams": [
+    "reason"
   ],
   "RegisterDeviceParams": [
     "metadata"
@@ -3118,6 +3262,9 @@
     "metadata"
   ],
   "RegisterQueueWorkerParams": [
+    "metadata"
+  ],
+  "RejectExpensePolicyExceptionParams": [
     "metadata"
   ],
   "ReplenishmentRule": [
@@ -3137,6 +3284,9 @@
     "company_id",
     "metadata"
   ],
+  "RequestExpensePolicyExceptionParams": [
+    "metadata"
+  ],
   "ResPartnerBank": [
     "sanitized_acc_number",
     "acc_holder_name",
@@ -3152,6 +3302,16 @@
   "Role": [
     "description",
     "parent_id",
+    "metadata"
+  ],
+  "RunCartonizationParams": [
+    "packaging_material_id",
+    "metadata"
+  ],
+  "RunInventoryCloseParams": [
+    "journal_id",
+    "inventory_account_id",
+    "valuation_account_id",
     "metadata"
   ],
   "SaleOrder": [
@@ -3253,8 +3413,19 @@
   "SetConsolidationCompanyRateParams": [
     "metadata"
   ],
+  "SetExpenseFraudHoldParams": [
+    "fraud_reason",
+    "metadata"
+  ],
+  "SettleSaleCommissionsParams": [
+    "reference",
+    "metadata"
+  ],
   "ShippingMethod": [
     "metadata"
+  ],
+  "SignalWorkflowParams": [
+    "causation_id"
   ],
   "StartTimesheetTimerParams": [
     "company_id",
@@ -3267,6 +3438,10 @@
     "department_id",
     "manager_id",
     "metadata"
+  ],
+  "StartWorkflowParams": [
+    "singleton_trigger_key",
+    "causation_id"
   ],
   "StockCountSheet": [
     "lot_id",
@@ -3626,6 +3801,9 @@
     "create_date",
     "write_uid",
     "write_date",
+    "metadata"
+  ],
+  "UnmatchExpenseCardStatementLineParams": [
     "metadata"
   ],
   "Uom": [
@@ -4664,6 +4842,24 @@
     "dataset_specs",
     "metadata"
   ],
+  "UpsertExpenseMileageRateParams": [
+    "company_id",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "UpsertExpensePerDiemRateParams": [
+    "company_id",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "UpsertExpensePolicyParams": [
+    "company_id",
+    "max_line_amount",
+    "max_sheet_amount",
+    "metadata"
+  ],
   "UpsertOrganizationSettingsParams": [
     "module_config",
     "integration_keys",
@@ -4764,232 +4960,23 @@
     "metadata"
   ],
   "Workflow": [
-    "description",
-    "company_id",
-    "metadata"
-  ],
-  "WorkflowActivity": [
-    "description",
-    "action",
-    "action_id",
-    "trigger_model",
-    "trigger_expr_id",
-    "signal_send",
-    "subflow_id",
-    "state_from",
-    "state_to",
-    "metadata"
+    "company_id"
   ],
   "WorkflowInstance": [
-    "metadata"
+    "singleton_scope_key",
+    "completed_at",
+    "cancelled_by",
+    "cancelled_at",
+    "causation_id"
   ],
-  "WorkflowTransition": [
-    "signal",
-    "condition",
-    "trigger_model",
-    "trigger_expr_id",
-    "group_id",
-    "metadata"
-  ],
-  "WorkflowWorkitem": [
-    "wkf_evaled_condition",
-    "metadata"
-  ],
-  "SettleSaleCommissionsParams": [
-    "reference",
-    "metadata"
-  ],
-  "AccrueSaleCommissionParams": [],
-  "CreatePurchaseRfqParams": [
-    "requisition_id",
-    "notes",
-    "metadata"
-  ],
-  "CreatePurchaseRfqLineParams": [
-    "name",
-    "sequence"
-  ],
-  "AddPurchaseRfqLineParams": [
-    "name",
-    "sequence"
-  ],
-  "CreatePurchaseRfqBidParams": [
-    "notes"
-  ],
-  "CreatePurchaseReturnParams": [
-    "purchase_order_id",
-    "return_reason"
-  ],
-  "CreatePurchaseReturnLineParams": [
-    "purchase_order_line_id"
-  ],
-  "CreateVendorCreditFromPurchaseReturnParams": [
-    "metadata"
-  ],
-  "CreateInventoryCloseParams": [
-    "as_of",
-    "journal_id",
-    "inventory_account_id",
-    "valuation_account_id",
-    "metadata"
-  ],
-  "RunInventoryCloseParams": [
-    "journal_id",
-    "inventory_account_id",
-    "valuation_account_id",
-    "metadata"
-  ],
-  "ExecuteDirectedPutawayParams": [
-    "dest_location_id",
-    "metadata"
-  ],
-  "ReceiveConsignmentStockParams": [
-    "location_id",
-    "metadata"
-  ],
-  "RunCartonizationParams": [
-    "packaging_material_id",
-    "metadata"
-  ],
-  "ExecuteCrossDockParams": [
-    "location_dest_id",
-    "metadata"
-  ],
-  "CreatePackagingMaterialParams": [
-    "barcode",
-    "metadata"
-  ],
-  "CreateInventoryIntegrationIntentParams": [
-    "warehouse_id",
-    "picking_id",
-    "request_payload",
-    "metadata"
-  ],
-  "RecordInventoryIntegrationResultParams": [
-    "external_reference",
-    "last_error",
-    "product_id",
-    "location_id",
-    "quantity",
-    "cost",
-    "metadata"
-  ],
-  "CreateStockPackageParams": [
-    "packaging_material_id",
-    "picking_id",
-    "location_id",
-    "location_dest_id",
-    "metadata"
-  ],
-  "PackMovesIntoPackageParams": [
-    "metadata"
-  ],
-  "PackStockPickingParams": [
-    "packaging_material_id",
-    "name",
-    "metadata"
-  ],
-  "RefreshInventoryExceptionsParams": [
-    "metadata"
-  ],
-  "CreateWarehouseSyncIntentParams": [
-    "deviceId",
-    "metadata"
-  ],
-  "FailWarehouseSyncIntentParams": [
-    "metadata"
-  ],
-  "MatchExpenseCardStatementLineParams": [
-    "metadata"
-  ],
-  "UnmatchExpenseCardStatementLineParams": [
-    "metadata"
-  ],
-  "ApplyExpenseAdvanceParams": [
-    "metadata"
-  ],
-  "CreateExpenseAdvanceParams": [
+  "WorkflowVersion": [
     "company_id",
-    "client_request_id",
-    "metadata"
-  ],
-  "CreateExpenseIntegrationIntentParams": [
-    "company_id",
-    "device_id",
-    "metadata"
-  ],
-  "CreateHrIntegrationIntentParams": [
-    "company_id",
-    "payslip_id",
-    "export_intent_id",
-    "metadata"
-  ],
-  "RecordHrIntegrationResultParams": [
-    "external_ref",
-    "payload_hash",
-    "result_ref",
-    "last_error",
-    "metadata",
-    "gross_wage",
-    "net_wage",
-    "calculation_metadata"
-  ],
-  "CreateExpenseProjectRebillParams": [
-    "partner_id",
-    "fiscal_position_id",
-    "client_request_id"
-  ],
-  "CreateExpenseReceiptParams": [
-    "company_id",
-    "file_name",
-    "mime_type",
+    "description",
     "content_hash",
-    "client_request_id"
-  ],
-  "CreateExpenseReimbursementParams": [
-    "amount",
-    "client_request_id"
-  ],
-  "FailExpenseIntegrationIntentParams": [
-    "metadata"
-  ],
-  "PostExpenseSheetParams": [
-    "default_tax_account_id",
-    "card_liability_account_id",
-    "advance_account_id",
-    "fx_fee_account_id",
-    "fx_fee_amount",
-    "client_request_id"
-  ],
-  "RefuseExpenseSheetParams": [
-    "reason"
-  ],
-  "RejectExpensePolicyExceptionParams": [
-    "metadata"
-  ],
-  "RequestExpensePolicyExceptionParams": [
-    "metadata"
-  ],
-  "SetExpenseFraudHoldParams": [
-    "fraud_reason",
-    "metadata"
-  ],
-  "UpsertExpenseMileageRateParams": [
-    "company_id",
-    "effective_from",
-    "effective_to",
-    "metadata"
-  ],
-  "UpsertExpensePerDiemRateParams": [
-    "company_id",
-    "effective_from",
-    "effective_to",
-    "metadata"
-  ],
-  "UpsertExpensePolicyParams": [
-    "company_id",
-    "max_line_amount",
-    "max_sheet_amount",
+    "published_uid",
+    "published_date",
+    "retired_uid",
+    "retired_date",
     "metadata"
   ]
 }

@@ -4,11 +4,14 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::claim_queue_job_params_type::ClaimQueueJobParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct ClaimQueueJobArgs {
     pub organization_id: u64,
     pub job_id: u64,
+    pub params: ClaimQueueJobParams,
 }
 
 impl From<ClaimQueueJobArgs> for super::Reducer {
@@ -16,6 +19,7 @@ impl From<ClaimQueueJobArgs> for super::Reducer {
         Self::ClaimQueueJob {
             organization_id: args.organization_id,
             job_id: args.job_id,
+            params: args.params,
         }
     }
 }
@@ -35,8 +39,13 @@ pub trait claim_queue_job {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`claim_queue_job:claim_queue_job_then`] to run a callback after the reducer completes.
-    fn claim_queue_job(&self, organization_id: u64, job_id: u64) -> __sdk::Result<()> {
-        self.claim_queue_job_then(organization_id, job_id, |_, _| {})
+    fn claim_queue_job(
+        &self,
+        organization_id: u64,
+        job_id: u64,
+        params: ClaimQueueJobParams,
+    ) -> __sdk::Result<()> {
+        self.claim_queue_job_then(organization_id, job_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `claim_queue_job` to run as soon as possible,
@@ -49,6 +58,7 @@ pub trait claim_queue_job {
         &self,
         organization_id: u64,
         job_id: u64,
+        params: ClaimQueueJobParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -61,6 +71,7 @@ impl claim_queue_job for super::RemoteReducers {
         &self,
         organization_id: u64,
         job_id: u64,
+        params: ClaimQueueJobParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -70,6 +81,7 @@ impl claim_queue_job for super::RemoteReducers {
             ClaimQueueJobArgs {
                 organization_id,
                 job_id,
+                params,
             },
             callback,
         )

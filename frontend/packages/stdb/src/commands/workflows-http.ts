@@ -3,31 +3,46 @@ import { stringifyReducerCallBody } from "@lumiere/api-client";
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Workflows mutations via Next.js BFF `POST /api/call/:reducer`.
- * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` workflows hooks.
+ * Versioned workflow definition + runtime mutations via BFF `POST /api/call/:reducer`.
  */
 export const WORKFLOWS_BFF_REDUCERS = [
-  "add_workflow_activity",
-  "add_workflow_transition",
-  "cancel_workflow_instance",
   "create_workflow",
-  "import_workflow_csv",
-  "set_workflow_active",
-  "set_workitem_exception",
-  "signal_workflow",
+  "update_workflow_draft",
+  "upsert_workflow_node",
+  "upsert_workflow_edge",
+  "delete_workflow_node",
+  "delete_workflow_edge",
+  "publish_workflow_version",
+  "clone_workflow_version_to_draft",
+  "retire_workflow_version",
   "start_workflow",
+  "signal_workflow",
+  "cancel_workflow",
+  "simulate_workflow",
+  "import_workflow_csv",
 ] as const;
 
 export type WorkflowsBffReducerKey = (typeof WORKFLOWS_BFF_REDUCERS)[number];
 
-const WITH_COMPANY_QUERY = new Set<WorkflowsBffReducerKey>();
+const WITH_COMPANY_QUERY = new Set<WorkflowsBffReducerKey>([
+  "create_workflow",
+  "update_workflow_draft",
+  "upsert_workflow_node",
+  "upsert_workflow_edge",
+  "delete_workflow_node",
+  "delete_workflow_edge",
+  "publish_workflow_version",
+  "clone_workflow_version_to_draft",
+  "retire_workflow_version",
+]);
 
 const WORKFLOW_RESOURCE_KEYS = [
   "workflows",
-  "workflow-activities",
+  "workflow-versions",
+  "workflow-nodes",
+  "workflow-edges",
   "workflow-instances",
-  "workflow-transitions",
-  "workflow-workitems",
+  "workflow-human-tasks-inbox",
 ] as const;
 
 /** Same-origin path used by `apiFetch` in the web app. */
@@ -53,15 +68,20 @@ export function workflowsBffPost(
 const WORKFLOWS_HINT_OVERRIDES: Partial<
   Record<WorkflowsBffReducerKey, readonly string[]>
 > = {
-  add_workflow_activity: WORKFLOW_RESOURCE_KEYS,
-  add_workflow_transition: WORKFLOW_RESOURCE_KEYS,
-  cancel_workflow_instance: WORKFLOW_RESOURCE_KEYS,
   create_workflow: WORKFLOW_RESOURCE_KEYS,
-  import_workflow_csv: WORKFLOW_RESOURCE_KEYS,
-  set_workflow_active: WORKFLOW_RESOURCE_KEYS,
-  set_workitem_exception: WORKFLOW_RESOURCE_KEYS,
-  signal_workflow: WORKFLOW_RESOURCE_KEYS,
+  update_workflow_draft: WORKFLOW_RESOURCE_KEYS,
+  upsert_workflow_node: WORKFLOW_RESOURCE_KEYS,
+  upsert_workflow_edge: WORKFLOW_RESOURCE_KEYS,
+  delete_workflow_node: WORKFLOW_RESOURCE_KEYS,
+  delete_workflow_edge: WORKFLOW_RESOURCE_KEYS,
+  publish_workflow_version: WORKFLOW_RESOURCE_KEYS,
+  clone_workflow_version_to_draft: WORKFLOW_RESOURCE_KEYS,
+  retire_workflow_version: WORKFLOW_RESOURCE_KEYS,
   start_workflow: WORKFLOW_RESOURCE_KEYS,
+  signal_workflow: WORKFLOW_RESOURCE_KEYS,
+  cancel_workflow: WORKFLOW_RESOURCE_KEYS,
+  simulate_workflow: WORKFLOW_RESOURCE_KEYS,
+  import_workflow_csv: WORKFLOW_RESOURCE_KEYS,
 };
 
 function workflowsReducerHints(): Record<
@@ -85,10 +105,16 @@ export function workflowsCommandContract(
 ): ReducerCommandContractMeta {
   return {
     reducerName: reducer,
-    description: `Workflows reducer ${reducer} (HTTP BFF).`,
+    description: `Workflow engine reducer ${reducer} (HTTP BFF).`,
     requiredSubscriptionResources: WORKFLOWS_COMMAND_SUBSCRIPTION_HINTS[reducer],
-    affectedTables: [],
+    affectedTables: [
+      "workflow",
+      "workflow_version",
+      "workflow_node",
+      "workflow_edge",
+      "workflow_instance",
+    ],
     expectations:
-      "Authenticated api-server session with organization scope; args must match SpacetimeDB u64 JSON rules (see stringifyReducerCallBody).",
+      "Definition reducers require company scope; runtime reducers pass Start/Signal/Cancel params with revisions.",
   };
 }

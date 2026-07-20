@@ -1,10 +1,11 @@
-/// Workflow CSV Imports — Workflow
-use spacetimedb::{ReducerContext, Table};
+//! Validated workflow draft CSV import.
+
+use spacetimedb::ReducerContext;
 
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
 use crate::helpers::check_permission;
-use crate::workflow::definitions::{workflow, Workflow};
+use crate::workflow::definitions::{create_workflow, CreateWorkflowParams, WorkflowTrigger};
 
 // ── Workflow ──────────────────────────────────────────────────────────────────
 
@@ -22,54 +23,69 @@ pub fn import_workflow_csv(
 
     for (i, row) in rows.iter().enumerate() {
         let row_num = (i + 2) as u32;
+        let workflow_key = col(&headers, row, "workflow_key").to_string();
         let name = col(&headers, row, "name").to_string();
         let model = col(&headers, row, "model").to_string();
 
-        if name.is_empty() || model.is_empty() {
+        if workflow_key.is_empty() || name.is_empty() || model.is_empty() {
             record_import_error(
                 ctx,
                 job.id,
                 row_num,
-                Some("name"),
+                Some("workflow_key"),
                 None,
-                "name and model are required",
+                "workflow_key, name and model are required",
             );
             errors += 1;
             continue;
         }
 
-        let state_field = {
-            let v = col(&headers, row, "state_field");
-            if v.is_empty() {
-                "state".to_string()
-            } else {
-                v.to_string()
+        let trigger = match parse_trigger(col(&headers, row, "trigger")) {
+            Ok(trigger) => trigger,
+            Err(message) => {
+                record_import_error(ctx, job.id, row_num, Some("trigger"), None, &message);
+                errors += 1;
+                continue;
             }
         };
+        let schema_version = col(&headers, row, "schema_version")
+            .parse::<u32>()
+            .unwrap_or(1);
 
-        ctx.db.workflow().insert(Workflow {
-            id: 0,
+        match create_workflow(
+            ctx,
             organization_id,
-            name,
-            description: opt_str(col(&headers, row, "description")),
-            model,
-            state_field,
-            on_create: parse_bool(col(&headers, row, "on_create")),
-            is_active: true,
-            activity_ids: vec![],
-            transition_ids: vec![],
-            transition_count: 0,
-            company_id: opt_u64(col(&headers, row, "company_id")),
-            create_uid: ctx.sender(),
-            create_date: ctx.timestamp,
-            write_uid: ctx.sender(),
-            write_date: ctx.timestamp,
-            metadata: opt_str(col(&headers, row, "metadata")),
-        });
-        imported += 1;
+            opt_u64(col(&headers, row, "company_id")),
+            CreateWorkflowParams {
+                workflow_key,
+                model,
+                name,
+                description: opt_str(col(&headers, row, "description")),
+                trigger,
+                schema_version,
+                snapshot_fields: Vec::new(),
+                metadata: opt_str(col(&headers, row, "metadata")),
+            },
+        ) {
+            Ok(()) => imported += 1,
+            Err(message) => {
+                record_import_error(ctx, job.id, row_num, None, None, &message);
+                errors += 1;
+            }
+        }
     }
 
     finish_import_job(ctx, job, imported, errors);
     log::info!("Import workflow: imported={}, errors={}", imported, errors);
     Ok(())
+}
+
+fn parse_trigger(value: &str) -> Result<WorkflowTrigger, String> {
+    match value {
+        "" | "manual" => Ok(WorkflowTrigger::Manual),
+        "record_created" => Ok(WorkflowTrigger::RecordCreated),
+        "record_changed" => Ok(WorkflowTrigger::RecordChanged),
+        "signal" => Ok(WorkflowTrigger::Signal),
+        _ => Err("trigger must be manual, record_created, record_changed or signal".to_string()),
+    }
 }

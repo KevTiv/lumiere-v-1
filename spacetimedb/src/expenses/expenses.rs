@@ -15,9 +15,6 @@ use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::country_pack::pack_expense_evidence_rules;
 use crate::core::organization::{company, company_id_from_scope};
 use crate::core::reference::{currency_rate, legacy_currency_code_for_id};
-use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
-use crate::hr::employees::hr_employee;
-use crate::inventory::product::product;
 use crate::expenses::expense_depth::{
     allocations_for_expense, hr_expense_mileage_rate, hr_expense_per_diem_rate,
 };
@@ -26,12 +23,20 @@ use crate::expenses::expense_wave_d::{
     has_approved_policy_exception, has_pending_policy_exception, hr_expense_policy_exception,
 };
 use crate::expenses::expense_wave_e::sheet_matched_fx_fee_total;
+use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::hr::employees::hr_employee;
+use crate::inventory::product::product;
 use crate::projects::projects::project_project;
 use crate::types::{
     AccountMoveState, ExpenseLineKind, ExpensePaymentMode, ExpenseSheetState, ExpenseState,
     MoveType, PaymentState, TaxAmountType, TaxTypeUse,
 };
-use crate::workflow::approval_gate::gate_action_with_approval;
+use crate::workflow::action_registry::{
+    GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
+};
+use crate::workflow::approval_gate::{
+    request_guarded_action, GuardedActionGateOutcome, RequestGuardedActionParams,
+};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -660,8 +665,7 @@ fn compute_tax_recovery_for_line(
                 tax.name
             ));
         }
-        let account_id =
-            tax_recoverable_account(ctx, tax.tax_group_id, default_tax_account_id)?;
+        let account_id = tax_recoverable_account(ctx, tax.tax_group_id, default_tax_account_id)?;
         validate_account(ctx, company_id, account_id, "Tax recoverable")?;
 
         let (tax_amt, reduce_base) = match tax.amount_type {
@@ -711,14 +715,24 @@ fn employee_remittance_partner(ctx: &ReducerContext, employee_id: u64) -> Option
         .and_then(|e| e.work_contact_partner_id)
 }
 
-fn empty_line_params(account_id: u64, name: String, debit: f64, credit: f64, sequence: u32) -> AddAccountMoveLineParams {
+fn empty_line_params(
+    account_id: u64,
+    name: String,
+    debit: f64,
+    credit: f64,
+    sequence: u32,
+) -> AddAccountMoveLineParams {
     AddAccountMoveLineParams {
         account_id,
         name,
         debit,
         credit,
         sequence,
-        quantity: if debit > 0.0 || credit > 0.0 { 1.0 } else { 0.0 },
+        quantity: if debit > 0.0 || credit > 0.0 {
+            1.0
+        } else {
+            0.0
+        },
         price_unit: debit.max(credit),
         discount: 0.0,
         tax_ids: vec![],
@@ -750,7 +764,12 @@ fn empty_line_params(account_id: u64, name: String, debit: f64, credit: f64, seq
     }
 }
 
-fn validate_account(ctx: &ReducerContext, company_id: u64, account_id: u64, label: &str) -> Result<(), String> {
+fn validate_account(
+    ctx: &ReducerContext,
+    company_id: u64,
+    account_id: u64,
+    label: &str,
+) -> Result<(), String> {
     let account = ctx
         .db
         .account_account()
@@ -936,16 +955,17 @@ pub fn create_expense(
     // AU pack: entertainment / FBT category products get a soft policy hold.
     let pack_rules = pack_expense_evidence_rules(ctx, organization_id, company_id);
     let fbt_hold = if pack_rules.fbt_entertainment {
-        params.product_id.and_then(|pid| ctx.db.product().id().find(&pid)).is_some_and(
-            |prod| {
+        params
+            .product_id
+            .and_then(|pid| ctx.db.product().id().find(&pid))
+            .is_some_and(|prod| {
                 let fbt_meta = prod.metadata.as_deref().is_some_and(|m| {
                     m.contains("\"expense_fbt_category\":true")
                         || m.contains("\"expense_fbt_category\": true")
                 });
                 let p = prod.expense_policy.to_ascii_lowercase();
                 fbt_meta || p.contains("fbt") || p.contains("entertainment")
-            },
-        )
+            })
     } else {
         false
     };
@@ -1024,9 +1044,8 @@ pub fn create_expense(
                 "Over policy cap".into()
             }
         });
-        ctx.db
-            .hr_expense_policy_exception()
-            .insert(crate::expenses::expense_wave_d::HrExpensePolicyException {
+        ctx.db.hr_expense_policy_exception().insert(
+            crate::expenses::expense_wave_d::HrExpensePolicyException {
                 id: 0,
                 organization_id,
                 company_id,
@@ -1038,7 +1057,8 @@ pub fn create_expense(
                 created_at: ctx.timestamp,
                 resolved_at: None,
                 metadata: None,
-            });
+            },
+        );
     }
     write_audit_log_v2(
         ctx,
@@ -1511,8 +1531,7 @@ pub fn submit_expense_sheet(
     if lines.is_empty() {
         return Err("Cannot submit an empty expense sheet".to_string());
     }
-    let pack_rules =
-        pack_expense_evidence_rules(ctx, organization_id, sheet.company_id);
+    let pack_rules = pack_expense_evidence_rules(ctx, organization_id, sheet.company_id);
     for line in &lines {
         let is_standard = matches!(line.line_kind, ExpenseLineKind::Standard);
         // Wave A baseline: Standard lines need receipts. Pack flag can only tighten.
@@ -1668,37 +1687,23 @@ pub fn approve_expense_sheet_impl(
                 return Err("Submitter cannot approve their own expense sheet (SoD)".to_string());
             }
         }
-        let amount_total = sheet.total_amount;
-        let params_json = serde_json::json!({
-            "organization_id": organization_id,
-            "sheet_id": sheet_id,
-        })
-        .to_string();
-        let context_json = serde_json::json!({
-            "amount_total": amount_total,
-            "name": sheet.name,
-        })
-        .to_string();
-        let summary = format!(
-            "Approve expense sheet {} (total {:.2})",
-            sheet.name, amount_total
-        );
-        if let Some(_request_id) = gate_action_with_approval(
-            ctx,
-            organization_id,
-            sheet.company_id,
-            "hr_expense_sheet",
-            sheet_id,
-            "approve_expense_sheet",
-            amount_total,
-            &summary,
-            &params_json,
-            Some(context_json),
-        )? {
-            return Err(format!(
-                "Expense sheet requires approval before confirmation (amount {:.2})",
-                amount_total
-            ));
+        if matches!(
+            request_guarded_action(
+                ctx,
+                organization_id,
+                RequestGuardedActionParams {
+                    company_id: sheet.company_id,
+                    action: GuardedActionKey::ApproveExpenseSheet,
+                    action_version: GUARDED_ACTION_SCHEMA_VERSION,
+                    input: GuardedActionInput::ApproveExpenseSheet { sheet_id },
+                    idempotency_key: format!("approve-expense-sheet:{sheet_id}"),
+                    correlation_id: format!("expense-sheet:{sheet_id}:approve"),
+                    causation_id: None,
+                },
+            )?,
+            GuardedActionGateOutcome::HumanTaskCreated { .. }
+        ) {
+            return Ok(());
         }
     }
 
@@ -1823,7 +1828,12 @@ pub fn post_expense_sheet(
         return Err("Expense and payable accounts must differ".to_string());
     }
     validate_account(ctx, company_id, params.payable_account_id, "Payable")?;
-    validate_account(ctx, company_id, params.default_expense_account_id, "Expense")?;
+    validate_account(
+        ctx,
+        company_id,
+        params.default_expense_account_id,
+        "Expense",
+    )?;
     if let Some(tax_acct) = params.default_tax_account_id {
         validate_account(ctx, company_id, tax_acct, "Tax recoverable")?;
         if tax_acct == params.payable_account_id {
@@ -1832,8 +1842,7 @@ pub fn post_expense_sheet(
     }
     if let Some(card_acct) = params.card_liability_account_id {
         validate_account(ctx, company_id, card_acct, "Card liability")?;
-        if card_acct == params.payable_account_id
-            || card_acct == params.default_expense_account_id
+        if card_acct == params.payable_account_id || card_acct == params.default_expense_account_id
         {
             return Err("Card liability account must differ from expense/payable".to_string());
         }
@@ -1891,8 +1900,16 @@ pub fn post_expense_sheet(
     let mut tax_company = 0.0;
     let mut out_of_pocket_company = 0.0;
     let mut card_company = 0.0;
-    let mut prepared_expense_lines: Vec<(u64, String, f64, Option<u64>, Option<u64>, Vec<u64>, f64, f64)> =
-        Vec::new();
+    let mut prepared_expense_lines: Vec<(
+        u64,
+        String,
+        f64,
+        Option<u64>,
+        Option<u64>,
+        Vec<u64>,
+        f64,
+        f64,
+    )> = Vec::new();
     let mut prepared_tax_lines: Vec<TaxRecoveryLine> = Vec::new();
 
     for line in &lines {
@@ -2099,8 +2116,7 @@ pub fn post_expense_sheet(
         price_unit,
     ) in prepared_expense_lines
     {
-        let mut line_params =
-            empty_line_params(account_id, line_name, expense_debit, 0.0, seq);
+        let mut line_params = empty_line_params(account_id, line_name, expense_debit, 0.0, seq);
         line_params.product_id = product_id;
         line_params.analytic_account_id = analytic_account_id;
         line_params.tax_ids = tax_ids;
@@ -2183,11 +2199,18 @@ pub fn post_expense_sheet(
     assert_move_lines_balanced(ctx, move_record.id)?;
 
     // Mark move posted in-txn (Entry path — amounts already set).
-    for ml in ctx.db.account_move_line().iter().filter(|l| l.move_id == move_record.id) {
-        ctx.db.account_move_line().id().update(crate::accounting::journal_entries::AccountMoveLine {
-            parent_state: AccountMoveState::Posted,
-            ..ml
-        });
+    for ml in ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|l| l.move_id == move_record.id)
+    {
+        ctx.db.account_move_line().id().update(
+            crate::accounting::journal_entries::AccountMoveLine {
+                parent_state: AccountMoveState::Posted,
+                ..ml
+            },
+        );
     }
     ctx.db.account_move().id().update(AccountMove {
         state: AccountMoveState::Posted,
@@ -2431,11 +2454,18 @@ pub fn create_expense_reimbursement_payment(
     liquidity.partner_id = partner_id;
     insert_draft_account_move_line(ctx, &reimb_move, liquidity)?;
 
-    for ml in ctx.db.account_move_line().iter().filter(|l| l.move_id == reimb_move.id) {
-        ctx.db.account_move_line().id().update(crate::accounting::journal_entries::AccountMoveLine {
-            parent_state: AccountMoveState::Posted,
-            ..ml
-        });
+    for ml in ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|l| l.move_id == reimb_move.id)
+    {
+        ctx.db.account_move_line().id().update(
+            crate::accounting::journal_entries::AccountMoveLine {
+                parent_state: AccountMoveState::Posted,
+                ..ml
+            },
+        );
     }
     ctx.db.account_move().id().update(AccountMove {
         state: AccountMoveState::Posted,
@@ -2502,10 +2532,7 @@ pub fn create_expense_reimbursement_payment(
                 })
                 .to_string(),
             ),
-            changed_fields: vec![
-                "state".to_string(),
-                "reimbursement_move_id".to_string(),
-            ],
+            changed_fields: vec!["state".to_string(), "reimbursement_move_id".to_string()],
             metadata: None,
         },
     );

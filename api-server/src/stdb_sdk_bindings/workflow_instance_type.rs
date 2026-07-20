@@ -4,23 +4,31 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::instance_state_type::InstanceState;
+use super::workflow_instance_state_type::WorkflowInstanceState;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct WorkflowInstance {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub workflow_id: u64,
-    pub res_id: u64,
-    pub res_type: String,
-    pub state: InstanceState,
-    pub activity_ids: Vec<u64>,
-    pub create_uid: __sdk::Identity,
-    pub create_date: __sdk::Timestamp,
-    pub write_uid: __sdk::Identity,
-    pub write_date: __sdk::Timestamp,
-    pub metadata: Option<String>,
+    pub workflow_version_id: u64,
+    pub definition_hash: String,
+    pub subject_model: String,
+    pub subject_id: u64,
+    pub subject_revision_hash: String,
+    pub state: WorkflowInstanceState,
+    pub revision: u64,
+    pub active_token_count: u32,
+    pub singleton_scope_key: Option<String>,
+    pub started_by: __sdk::Identity,
+    pub started_at: __sdk::Timestamp,
+    pub completed_at: Option<__sdk::Timestamp>,
+    pub cancelled_by: Option<__sdk::Identity>,
+    pub cancelled_at: Option<__sdk::Timestamp>,
+    pub correlation_id: String,
+    pub causation_id: Option<String>,
 }
 
 impl __sdk::InModule for WorkflowInstance {
@@ -33,16 +41,24 @@ impl __sdk::InModule for WorkflowInstance {
 pub struct WorkflowInstanceCols {
     pub id: __sdk::__query_builder::Col<WorkflowInstance, u64>,
     pub organization_id: __sdk::__query_builder::Col<WorkflowInstance, u64>,
+    pub company_id: __sdk::__query_builder::Col<WorkflowInstance, u64>,
     pub workflow_id: __sdk::__query_builder::Col<WorkflowInstance, u64>,
-    pub res_id: __sdk::__query_builder::Col<WorkflowInstance, u64>,
-    pub res_type: __sdk::__query_builder::Col<WorkflowInstance, String>,
-    pub state: __sdk::__query_builder::Col<WorkflowInstance, InstanceState>,
-    pub activity_ids: __sdk::__query_builder::Col<WorkflowInstance, Vec<u64>>,
-    pub create_uid: __sdk::__query_builder::Col<WorkflowInstance, __sdk::Identity>,
-    pub create_date: __sdk::__query_builder::Col<WorkflowInstance, __sdk::Timestamp>,
-    pub write_uid: __sdk::__query_builder::Col<WorkflowInstance, __sdk::Identity>,
-    pub write_date: __sdk::__query_builder::Col<WorkflowInstance, __sdk::Timestamp>,
-    pub metadata: __sdk::__query_builder::Col<WorkflowInstance, Option<String>>,
+    pub workflow_version_id: __sdk::__query_builder::Col<WorkflowInstance, u64>,
+    pub definition_hash: __sdk::__query_builder::Col<WorkflowInstance, String>,
+    pub subject_model: __sdk::__query_builder::Col<WorkflowInstance, String>,
+    pub subject_id: __sdk::__query_builder::Col<WorkflowInstance, u64>,
+    pub subject_revision_hash: __sdk::__query_builder::Col<WorkflowInstance, String>,
+    pub state: __sdk::__query_builder::Col<WorkflowInstance, WorkflowInstanceState>,
+    pub revision: __sdk::__query_builder::Col<WorkflowInstance, u64>,
+    pub active_token_count: __sdk::__query_builder::Col<WorkflowInstance, u32>,
+    pub singleton_scope_key: __sdk::__query_builder::Col<WorkflowInstance, Option<String>>,
+    pub started_by: __sdk::__query_builder::Col<WorkflowInstance, __sdk::Identity>,
+    pub started_at: __sdk::__query_builder::Col<WorkflowInstance, __sdk::Timestamp>,
+    pub completed_at: __sdk::__query_builder::Col<WorkflowInstance, Option<__sdk::Timestamp>>,
+    pub cancelled_by: __sdk::__query_builder::Col<WorkflowInstance, Option<__sdk::Identity>>,
+    pub cancelled_at: __sdk::__query_builder::Col<WorkflowInstance, Option<__sdk::Timestamp>>,
+    pub correlation_id: __sdk::__query_builder::Col<WorkflowInstance, String>,
+    pub causation_id: __sdk::__query_builder::Col<WorkflowInstance, Option<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for WorkflowInstance {
@@ -51,16 +67,33 @@ impl __sdk::__query_builder::HasCols for WorkflowInstance {
         WorkflowInstanceCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             workflow_id: __sdk::__query_builder::Col::new(table_name, "workflow_id"),
-            res_id: __sdk::__query_builder::Col::new(table_name, "res_id"),
-            res_type: __sdk::__query_builder::Col::new(table_name, "res_type"),
+            workflow_version_id: __sdk::__query_builder::Col::new(
+                table_name,
+                "workflow_version_id",
+            ),
+            definition_hash: __sdk::__query_builder::Col::new(table_name, "definition_hash"),
+            subject_model: __sdk::__query_builder::Col::new(table_name, "subject_model"),
+            subject_id: __sdk::__query_builder::Col::new(table_name, "subject_id"),
+            subject_revision_hash: __sdk::__query_builder::Col::new(
+                table_name,
+                "subject_revision_hash",
+            ),
             state: __sdk::__query_builder::Col::new(table_name, "state"),
-            activity_ids: __sdk::__query_builder::Col::new(table_name, "activity_ids"),
-            create_uid: __sdk::__query_builder::Col::new(table_name, "create_uid"),
-            create_date: __sdk::__query_builder::Col::new(table_name, "create_date"),
-            write_uid: __sdk::__query_builder::Col::new(table_name, "write_uid"),
-            write_date: __sdk::__query_builder::Col::new(table_name, "write_date"),
-            metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
+            revision: __sdk::__query_builder::Col::new(table_name, "revision"),
+            active_token_count: __sdk::__query_builder::Col::new(table_name, "active_token_count"),
+            singleton_scope_key: __sdk::__query_builder::Col::new(
+                table_name,
+                "singleton_scope_key",
+            ),
+            started_by: __sdk::__query_builder::Col::new(table_name, "started_by"),
+            started_at: __sdk::__query_builder::Col::new(table_name, "started_at"),
+            completed_at: __sdk::__query_builder::Col::new(table_name, "completed_at"),
+            cancelled_by: __sdk::__query_builder::Col::new(table_name, "cancelled_by"),
+            cancelled_at: __sdk::__query_builder::Col::new(table_name, "cancelled_at"),
+            correlation_id: __sdk::__query_builder::Col::new(table_name, "correlation_id"),
+            causation_id: __sdk::__query_builder::Col::new(table_name, "causation_id"),
         }
     }
 }
@@ -69,20 +102,27 @@ impl __sdk::__query_builder::HasCols for WorkflowInstance {
 ///
 /// Provides typed access to indexed columns for query building.
 pub struct WorkflowInstanceIxCols {
+    pub company_id: __sdk::__query_builder::IxCol<WorkflowInstance, u64>,
     pub id: __sdk::__query_builder::IxCol<WorkflowInstance, u64>,
     pub organization_id: __sdk::__query_builder::IxCol<WorkflowInstance, u64>,
-    pub res_id: __sdk::__query_builder::IxCol<WorkflowInstance, u64>,
+    pub subject_id: __sdk::__query_builder::IxCol<WorkflowInstance, u64>,
     pub workflow_id: __sdk::__query_builder::IxCol<WorkflowInstance, u64>,
+    pub workflow_version_id: __sdk::__query_builder::IxCol<WorkflowInstance, u64>,
 }
 
 impl __sdk::__query_builder::HasIxCols for WorkflowInstance {
     type IxCols = WorkflowInstanceIxCols;
     fn ix_cols(table_name: &'static str) -> Self::IxCols {
         WorkflowInstanceIxCols {
+            company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
-            res_id: __sdk::__query_builder::IxCol::new(table_name, "res_id"),
+            subject_id: __sdk::__query_builder::IxCol::new(table_name, "subject_id"),
             workflow_id: __sdk::__query_builder::IxCol::new(table_name, "workflow_id"),
+            workflow_version_id: __sdk::__query_builder::IxCol::new(
+                table_name,
+                "workflow_version_id",
+            ),
         }
     }
 }

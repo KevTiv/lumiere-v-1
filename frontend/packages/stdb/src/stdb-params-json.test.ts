@@ -336,27 +336,24 @@ describe("encodeReducerCallArgs create_saved_report", () => {
   })
 })
 
-describe("encodeReducerCallArgs create_approval_rule", () => {
-  it("emits explicit none for missing Option approval-rule fields", () => {
-    const encoded = encodeReducerCallArgs("create_approval_rule", [
+describe("encodeReducerCallArgs claim_workflow_human_task", () => {
+  it("emits explicit none for optional acting_for", () => {
+    const encoded = encodeReducerCallArgs("claim_workflow_human_task", [
       1,
-      null,
       {
-        name: "PO confirm over 100",
-        model: "purchase_order",
-        action: "confirm_purchase_order",
-        ruleType: "amount_threshold",
-        threshold: 100,
-        isActive: true,
+        companyId: 2,
+        taskId: 10,
+        expectedRevision: 1,
+        actingFor: null,
+        idempotencyKey: "claim-1",
+        correlationId: "corr-1",
       },
     ])
     assert.equal(encoded[0], 1)
-    const params = encoded[2] as Record<string, unknown>
-    assert.equal(params.name, "PO confirm over 100")
-    assert.equal(params.threshold, 100)
-    assert.deepEqual(params.description, { none: [] })
-    assert.deepEqual(params.approver_role_id, { none: [] })
-    assert.deepEqual(params.metadata, { none: [] })
+    const params = encoded[1] as Record<string, unknown>
+    assert.equal(params.task_id, 10)
+    assert.equal(params.expected_revision, 1)
+    assert.deepEqual(params.acting_for, { none: [] })
   })
 })
 

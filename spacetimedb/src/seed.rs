@@ -24,7 +24,7 @@ use crate::core::privacy::{
     data_classification, data_classification_rule, privacy_consent, DataClassification,
     DataClassificationRule, PrivacyConsent,
 };
-use crate::core::queue::{queue_job, queue_worker, QueueJob, QueueWorker};
+use crate::core::queue::{enqueue_job_internal, queue_worker, EnqueueJobParams, QueueWorker};
 use crate::core::reference::{
     country, currency, currency_rate, document_sequence, uom, uom_cat, uom_conversion, Country,
     Currency, CurrencyRate, DocumentSequence, UOMCategory, UOMConversion, UOM,
@@ -160,8 +160,8 @@ use crate::helpdesk::tickets::{
 use crate::types::{
     AccountInternalGroup, AccountMoveState, AccountTypeInternal, AssetState, AssetType,
     BankStatementState, BomType, BudgetState, CardState, ConsolidationState, ContractState,
-    DepreciationMethod, EmploymentType, ExpenseLineKind, ExpenseSheetState, ExpenseState, FiscalYearState,
-    HelpdeskTicketState, HrLeaveState, InsightSeverity, InstanceState, IntakeState,
+    DepreciationMethod, EmploymentType, ExpenseLineKind, ExpenseSheetState, ExpenseState,
+    FiscalYearState, HelpdeskTicketState, HrLeaveState, InsightSeverity, IntakeState,
     IntegrationStatus, IntercompanyState, InvoiceStatus, JobStatus, JournalType, LandedCostState,
     LineInvoiceStatus, LineState, MailMessageType, MoState, MoveType, PartnerType,
     PaymentDirection, PaymentFeeBearer, PaymentMethodType, PaymentProviderCode, PaymentState,
@@ -169,7 +169,7 @@ use crate::types::{
     PeriodState, PoInvoiceStatus, PoState, PosOrderState, ReportState, ReportType,
     RequisitionState, RuleType, SaleState, SessionState, SplitMethod, SyncStatus, TaskState,
     TaxAmountType, TaxDeadlineStatus, TaxDeadlineType, TaxTypeUse, TicketPriority, WidgetType,
-    WorkitemState, WorkorderState,
+    WorkorderState,
 };
 
 // ── Manufacturing ─────────────────────────────────────────────────────────────
@@ -249,13 +249,16 @@ use crate::ai::skill_registry::{
 use crate::ai::skills::{
     ai_skill, ai_skill_config, ai_team_member_skill, AiSkill, AiSkillConfig, AiTeamMemberSkill,
 };
+use crate::workflow::calendar::activate_foundation_calendar_packs;
 use crate::workflow::definitions::{
-    workflow, workflow_activity, workflow_transition, Workflow, WorkflowActivity,
-    WorkflowTransition,
+    create_workflow, publish_workflow_version, upsert_workflow_edge, upsert_workflow_node,
+    workflow, workflow_version, ConditionFieldDefinition, ConditionValueType, CreateWorkflowParams,
+    UpsertWorkflowEdgeParams, UpsertWorkflowNodeParams, WorkflowActionReference,
+    WorkflowBranchKind, WorkflowHumanTaskKind, WorkflowNodeKind, WorkflowTaskAssignment,
+    WorkflowTaskPolicy, WorkflowTrigger, WorkflowVersionStatus,
 };
-use crate::workflow::runtime::{
-    workflow_instance, workflow_workitem, WorkflowInstance, WorkflowWorkitem,
-};
+use crate::workflow::evaluator::{canonical_condition_snapshot_hash, ConditionSnapshot};
+use crate::workflow::runtime::{start_workflow, StartWorkflowParams};
 
 fn require_dev_reducers_enabled() -> Result<(), String> {
     let enabled = option_env!("LUMIERE_ENABLE_DEV_REDUCERS")
@@ -276,6 +279,131 @@ fn ensure_document_sequence(ctx: &ReducerContext, doc_type: &str, next_number: u
             next_number,
         });
     }
+}
+
+fn seed_published_workflow(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    workflow_key: &str,
+    model: &str,
+    name: &str,
+    description: &str,
+    snapshot_fields: Vec<ConditionFieldDefinition>,
+    action_key: &str,
+    candidate_role_id: u64,
+) -> Result<u64, String> {
+    create_workflow(
+        ctx,
+        organization_id,
+        Some(company_id),
+        CreateWorkflowParams {
+            workflow_key: workflow_key.to_string(),
+            model: model.to_string(),
+            name: name.to_string(),
+            description: Some(description.to_string()),
+            trigger: WorkflowTrigger::Manual,
+            schema_version: 1,
+            snapshot_fields,
+            metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
+        },
+    )?;
+    let workflow = ctx
+        .db
+        .workflow()
+        .workflow_by_org()
+        .filter(&organization_id)
+        .find(|row| row.company_id == Some(company_id) && row.workflow_key.as_str() == workflow_key)
+        .ok_or("seed workflow missing after create")?;
+    let version = ctx
+        .db
+        .workflow_version()
+        .workflow_version_by_workflow()
+        .filter(&workflow.id)
+        .find(|row| row.status == WorkflowVersionStatus::Draft)
+        .ok_or("seed workflow draft missing")?;
+
+    for (expected_revision, node_key, node_name, kind, sequence) in [
+        (1_u64, "start", "Start", WorkflowNodeKind::Start, 1_u32),
+        (
+            2_u64,
+            "approval",
+            "Approval",
+            WorkflowNodeKind::HumanTask,
+            2_u32,
+        ),
+        (3_u64, "action", "Action", WorkflowNodeKind::Action, 3_u32),
+        (4_u64, "approved", "Approved", WorkflowNodeKind::End, 4_u32),
+        (5_u64, "rejected", "Rejected", WorkflowNodeKind::End, 5_u32),
+    ] {
+        upsert_workflow_node(
+            ctx,
+            organization_id,
+            version.id,
+            expected_revision,
+            UpsertWorkflowNodeParams {
+                node_key: node_key.to_string(),
+                name: node_name.to_string(),
+                kind: kind.clone(),
+                sequence,
+                split_kind: WorkflowBranchKind::None,
+                join_kind: WorkflowBranchKind::None,
+                action: (kind == WorkflowNodeKind::Action).then(|| WorkflowActionReference {
+                    action_key: action_key.to_string(),
+                    input_schema_version: 1,
+                    input: Vec::new(),
+                }),
+                task_policy: (kind == WorkflowNodeKind::HumanTask).then(|| WorkflowTaskPolicy {
+                    kind: WorkflowHumanTaskKind::ApproveReject,
+                    assignment: WorkflowTaskAssignment::AnyCandidate,
+                    candidate_role_ids: vec![candidate_role_id],
+                    candidate_group_ids: Vec::new(),
+                    candidate_unit_ids: Vec::new(),
+                    require_comment_on_reject: true,
+                }),
+                timer_policy: None,
+                retry_policy: None,
+                subflow: None,
+                metadata: Some("{\"seed\":true}".to_string()),
+            },
+        )?;
+    }
+    for (index, edge_key, from, to, signal) in [
+        (0_u32, "start-approval", "start", "approval", None),
+        (
+            1_u32,
+            "approval-action",
+            "approval",
+            "action",
+            Some("approved"),
+        ),
+        (
+            2_u32,
+            "approval-rejected",
+            "approval",
+            "rejected",
+            Some("rejected"),
+        ),
+        (3_u32, "action-approved", "action", "approved", None),
+    ] {
+        upsert_workflow_edge(
+            ctx,
+            organization_id,
+            version.id,
+            u64::from(index) + 6,
+            UpsertWorkflowEdgeParams {
+                edge_key: edge_key.to_string(),
+                from_node_key: from.to_string(),
+                to_node_key: to.to_string(),
+                sequence: index + 1,
+                signal_key: signal.map(str::to_string),
+                condition: None,
+                metadata: Some("{\"seed\":true}".to_string()),
+            },
+        )?;
+    }
+    publish_workflow_version(ctx, organization_id, version.id, 10)?;
+    Ok(workflow.id)
 }
 
 fn seed_system_skill(
@@ -7636,6 +7764,7 @@ Prioritize high-severity findings and cite related records."#,
     let queue_worker = ctx.db.queue_worker().insert(QueueWorker {
         id: 0,
         organization_id: org_id,
+        company_id: Some(company_id),
         name: "seed-worker".to_string(),
         queues: vec!["default".to_string(), "sync".to_string()],
         is_active: true,
@@ -7643,27 +7772,26 @@ Prioritize high-severity findings and cite related records."#,
         started_at: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
-    let queue_job = ctx.db.queue_job().insert(QueueJob {
-        id: 0,
-        organization_id: org_id,
-        queue_name: "default".to_string(),
-        job_type: "seed-demo".to_string(),
-        payload: "{\"kind\":\"coverage\"}".to_string(),
-        priority: 5,
-        attempts: 0,
-        max_attempts: 3,
-        status: JobStatus::Pending,
-        scheduled_at: None,
-        started_at: None,
-        completed_at: None,
-        error_message: None,
-        created_by: seeder,
-        created_at: ctx.timestamp,
-        metadata: Some(format!(
-            "{{\"seed\":true,\"coverage\":true,\"worker_id\":{}}}",
-            queue_worker.id
-        )),
-    });
+    let queue_job = enqueue_job_internal(
+        ctx,
+        org_id,
+        EnqueueJobParams {
+            company_id: Some(company_id),
+            queue_name: "default".to_string(),
+            job_type: "seed-demo".to_string(),
+            payload: "{\"kind\":\"coverage\"}".to_string(),
+            semantic_key: "seed:coverage:default".to_string(),
+            priority: 5,
+            max_attempts: 3,
+            available_at_micros: None,
+            correlation_id: "seed:coverage".to_string(),
+            causation_id: None,
+            metadata: Some(format!(
+                "{{\"seed\":true,\"coverage\":true,\"worker_id\":{}}}",
+                queue_worker.id
+            )),
+        },
+    )?;
 
     let classification = ctx.db.data_classification().insert(DataClassification {
         id: 0,
@@ -7992,280 +8120,79 @@ Prioritize high-severity findings and cite related records."#,
         write_date: ctx.timestamp,
     });
 
-    let workflow = ctx.db.workflow().insert(Workflow {
-        id: 0,
-        organization_id: org_id,
-        name: "Seed Sales Approval".to_string(),
-        description: Some("Coverage workflow for sale orders".to_string()),
-        model: "sale_order".to_string(),
-        state_field: "state".to_string(),
-        on_create: false,
-        is_active: true,
-        activity_ids: vec![],
-        transition_ids: vec![],
-        transition_count: 0,
-        company_id: Some(company_id),
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-    let wf_start = ctx.db.workflow_activity().insert(WorkflowActivity {
-        id: 0,
-        organization_id: org_id,
-        name: "Draft Review".to_string(),
-        description: Some("Initial approval step".to_string()),
-        workflow_id: workflow.id,
-        sequence: 1,
-        kind: "Function".to_string(),
-        action: Some("review_sale_order".to_string()),
-        action_id: None,
-        trigger_model: Some("sale_order".to_string()),
-        trigger_expr_id: None,
-        split_mode: "XOR".to_string(),
-        join_mode: "XOR".to_string(),
-        signal_send: Some("approve".to_string()),
-        subflow_id: None,
-        outgoing_transition_ids: vec![],
-        incoming_transition_ids: vec![],
-        flow_start: true,
-        flow_stop: false,
-        state_from: Some("draft".to_string()),
-        state_to: Some("review".to_string()),
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-    let wf_stop = ctx.db.workflow_activity().insert(WorkflowActivity {
-        id: 0,
-        organization_id: org_id,
-        name: "Approved".to_string(),
-        description: Some("Terminal approval node".to_string()),
-        workflow_id: workflow.id,
-        sequence: 2,
-        kind: "Stopall".to_string(),
-        action: None,
-        action_id: None,
-        trigger_model: Some("sale_order".to_string()),
-        trigger_expr_id: None,
-        split_mode: "XOR".to_string(),
-        join_mode: "XOR".to_string(),
-        signal_send: None,
-        subflow_id: None,
-        outgoing_transition_ids: vec![],
-        incoming_transition_ids: vec![],
-        flow_start: false,
-        flow_stop: true,
-        state_from: Some("review".to_string()),
-        state_to: Some("sale".to_string()),
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-    let workflow_transition = ctx.db.workflow_transition().insert(WorkflowTransition {
-        id: 0,
-        organization_id: org_id,
-        activity_from: wf_start.id,
-        activity_to: wf_stop.id,
-        sequence: 1,
-        signal: Some("approve".to_string()),
-        condition: Some("amount < 50000".to_string()),
-        trigger_model: Some("sale_order".to_string()),
-        trigger_expr_id: None,
-        group_id: None,
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-    ctx.db.workflow_activity().id().update(WorkflowActivity {
-        outgoing_transition_ids: vec![workflow_transition.id],
-        ..wf_start.clone()
-    });
-    ctx.db.workflow_activity().id().update(WorkflowActivity {
-        incoming_transition_ids: vec![workflow_transition.id],
-        ..wf_stop.clone()
-    });
-    ctx.db.workflow().id().update(Workflow {
-        activity_ids: vec![wf_start.id, wf_stop.id],
-        transition_ids: vec![workflow_transition.id],
-        transition_count: 1,
-        ..workflow.clone()
-    });
-    let workflow_instance = ctx.db.workflow_instance().insert(WorkflowInstance {
-        id: 0,
-        organization_id: org_id,
-        workflow_id: workflow.id,
-        res_id: so1.id,
-        res_type: "sale_order".to_string(),
-        state: InstanceState::Active,
-        activity_ids: vec![wf_start.id],
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-    ctx.db.workflow_workitem().insert(WorkflowWorkitem {
-        id: 0,
-        organization_id: org_id,
-        instance_id: workflow_instance.id,
-        act_id: wf_start.id,
-        wkf_evaled_condition: Some("true".to_string()),
-        state: WorkitemState::Active,
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
+    let sales_workflow_id = seed_published_workflow(
+        ctx,
+        org_id,
+        company_id,
+        "seed.sales-approval",
+        "sale_order",
+        "Seed Sales Approval",
+        "Coverage workflow for sale orders",
+        Vec::new(),
+        "confirm_sales_order",
+        owner_role.id,
+    )?;
+    let sales_workflow_version = ctx
+        .db
+        .workflow_version()
+        .workflow_version_by_workflow()
+        .filter(&sales_workflow_id)
+        .filter(|row| row.status == WorkflowVersionStatus::Published)
+        .max_by_key(|row| row.version)
+        .ok_or("seed sales workflow published version missing")?;
+    let mut sales_snapshot = ConditionSnapshot {
+        subject_model: "sale_order".to_string(),
+        subject_id: so1.id,
+        subject_revision_hash: String::new(),
+        fields: Vec::new(),
+    };
+    sales_snapshot.subject_revision_hash = canonical_condition_snapshot_hash(&sales_snapshot)
+        .map_err(|error| format!("cannot hash seed sales snapshot: {error}"))?;
+    start_workflow(
+        ctx,
+        org_id,
+        StartWorkflowParams {
+            company_id,
+            workflow_id: sales_workflow_id,
+            workflow_version_id: sales_workflow_version.id,
+            subject_model: "sale_order".to_string(),
+            subject_id: so1.id,
+            subject_revision_hash: sales_snapshot.subject_revision_hash,
+            singleton_trigger_key: None,
+            idempotency_key: format!("seed:sale-order:{}:start", so1.id),
+            correlation_id: format!("seed:sale-order:{}", so1.id),
+            causation_id: None,
+        },
+    )?;
 
-    let ai_wf = ctx.db.workflow().insert(Workflow {
-        id: 0,
-        organization_id: org_id,
-        name: "AI Action Approval".to_string(),
-        description: Some("Human approval workflow for AI-proposed ERP mutations".to_string()),
-        model: "ai_action_draft".to_string(),
-        state_field: "status".to_string(),
-        on_create: false,
-        is_active: true,
-        activity_ids: vec![],
-        transition_ids: vec![],
-        transition_count: 0,
-        company_id: Some(company_id),
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-    let ai_wf_start = ctx.db.workflow_activity().insert(WorkflowActivity {
-        id: 0,
-        organization_id: org_id,
-        name: "Pending Review".to_string(),
-        description: Some("Awaiting human approval".to_string()),
-        workflow_id: ai_wf.id,
-        sequence: 1,
-        kind: "Function".to_string(),
-        action: Some("review_ai_action_draft".to_string()),
-        action_id: None,
-        trigger_model: Some("ai_action_draft".to_string()),
-        trigger_expr_id: None,
-        split_mode: "XOR".to_string(),
-        join_mode: "XOR".to_string(),
-        signal_send: Some("approve".to_string()),
-        subflow_id: None,
-        outgoing_transition_ids: vec![],
-        incoming_transition_ids: vec![],
-        flow_start: true,
-        flow_stop: false,
-        state_from: Some("pending".to_string()),
-        state_to: Some("approved".to_string()),
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-    let ai_wf_stop = ctx.db.workflow_activity().insert(WorkflowActivity {
-        id: 0,
-        organization_id: org_id,
-        name: "Closed".to_string(),
-        description: Some("Draft review completed".to_string()),
-        workflow_id: ai_wf.id,
-        sequence: 2,
-        kind: "Stopall".to_string(),
-        action: None,
-        action_id: None,
-        trigger_model: Some("ai_action_draft".to_string()),
-        trigger_expr_id: None,
-        split_mode: "XOR".to_string(),
-        join_mode: "XOR".to_string(),
-        signal_send: None,
-        subflow_id: None,
-        outgoing_transition_ids: vec![],
-        incoming_transition_ids: vec![],
-        flow_start: false,
-        flow_stop: true,
-        state_from: None,
-        state_to: None,
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-    let ai_wf_approve = ctx.db.workflow_transition().insert(WorkflowTransition {
-        id: 0,
-        organization_id: org_id,
-        activity_from: ai_wf_start.id,
-        activity_to: ai_wf_stop.id,
-        sequence: 1,
-        signal: Some("approve".to_string()),
-        condition: None,
-        trigger_model: Some("ai_action_draft".to_string()),
-        trigger_expr_id: None,
-        group_id: None,
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-    let ai_wf_reject = ctx.db.workflow_transition().insert(WorkflowTransition {
-        id: 0,
-        organization_id: org_id,
-        activity_from: ai_wf_start.id,
-        activity_to: ai_wf_stop.id,
-        sequence: 2,
-        signal: Some("reject".to_string()),
-        condition: None,
-        trigger_model: Some("ai_action_draft".to_string()),
-        trigger_expr_id: None,
-        group_id: None,
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-    let ai_wf_expire = ctx.db.workflow_transition().insert(WorkflowTransition {
-        id: 0,
-        organization_id: org_id,
-        activity_from: ai_wf_start.id,
-        activity_to: ai_wf_stop.id,
-        sequence: 3,
-        signal: Some("expire".to_string()),
-        condition: None,
-        trigger_model: Some("ai_action_draft".to_string()),
-        trigger_expr_id: None,
-        group_id: None,
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-    ctx.db.workflow_activity().id().update(WorkflowActivity {
-        outgoing_transition_ids: vec![ai_wf_approve.id, ai_wf_reject.id, ai_wf_expire.id],
-        ..ai_wf_start.clone()
-    });
-    ctx.db.workflow_activity().id().update(WorkflowActivity {
-        incoming_transition_ids: vec![ai_wf_approve.id, ai_wf_reject.id, ai_wf_expire.id],
-        ..ai_wf_stop.clone()
-    });
-    ctx.db.workflow().id().update(Workflow {
-        activity_ids: vec![ai_wf_start.id, ai_wf_stop.id],
-        transition_ids: vec![ai_wf_approve.id, ai_wf_reject.id, ai_wf_expire.id],
-        transition_count: 3,
-        ..ai_wf.clone()
-    });
+    seed_published_workflow(
+        ctx,
+        org_id,
+        company_id,
+        "seed.ai-action-approval",
+        "ai_action_draft",
+        "AI Action Approval",
+        "Human approval workflow for AI-proposed ERP mutations",
+        vec![
+            ConditionFieldDefinition {
+                field_key: "params_json".to_string(),
+                value_type: ConditionValueType::Text,
+                nullable: false,
+            },
+            ConditionFieldDefinition {
+                field_key: "reducer_name".to_string(),
+                value_type: ConditionValueType::Code,
+                nullable: false,
+            },
+            ConditionFieldDefinition {
+                field_key: "summary".to_string(),
+                value_type: ConditionValueType::Text,
+                nullable: false,
+            },
+        ],
+        "approve_ai_action_draft",
+        owner_role.id,
+    )?;
 
     // ── 15.3 Reporting / knowledge / AI / fleet ──────────────────────────────
     let report_template = ctx.db.report_template().insert(ReportTemplate {
@@ -10309,6 +10236,8 @@ Prioritize high-severity findings and cite related records."#,
         is_active: true,
         created_at: ctx.timestamp,
     });
+
+    activate_foundation_calendar_packs(ctx)?;
 
     log::info!(
         "[seed] Complete. org_id={} company_id={} products=3 contacts=5 leads=5 opportunities=3 tickets=3 \

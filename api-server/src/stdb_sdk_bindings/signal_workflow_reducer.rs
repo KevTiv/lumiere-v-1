@@ -4,20 +4,20 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::signal_workflow_params_type::SignalWorkflowParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct SignalWorkflowArgs {
     pub organization_id: u64,
-    pub instance_id: u64,
-    pub signal: String,
+    pub params: SignalWorkflowParams,
 }
 
 impl From<SignalWorkflowArgs> for super::Reducer {
     fn from(args: SignalWorkflowArgs) -> Self {
         Self::SignalWorkflow {
             organization_id: args.organization_id,
-            instance_id: args.instance_id,
-            signal: args.signal,
+            params: args.params,
         }
     }
 }
@@ -40,10 +40,9 @@ pub trait signal_workflow {
     fn signal_workflow(
         &self,
         organization_id: u64,
-        instance_id: u64,
-        signal: String,
+        params: SignalWorkflowParams,
     ) -> __sdk::Result<()> {
-        self.signal_workflow_then(organization_id, instance_id, signal, |_, _| {})
+        self.signal_workflow_then(organization_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `signal_workflow` to run as soon as possible,
@@ -55,8 +54,7 @@ pub trait signal_workflow {
     fn signal_workflow_then(
         &self,
         organization_id: u64,
-        instance_id: u64,
-        signal: String,
+        params: SignalWorkflowParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -68,8 +66,7 @@ impl signal_workflow for super::RemoteReducers {
     fn signal_workflow_then(
         &self,
         organization_id: u64,
-        instance_id: u64,
-        signal: String,
+        params: SignalWorkflowParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -78,8 +75,7 @@ impl signal_workflow for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             SignalWorkflowArgs {
                 organization_id,
-                instance_id,
-                signal,
+                params,
             },
             callback,
         )

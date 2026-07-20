@@ -3,6 +3,11 @@ use spacetimedb::{Identity, ReducerContext, Table};
 use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
+use crate::ai::intelligence::{
+    ai_document_processing_job, approve_document_processing_job, complete_document_processing_job,
+    create_document_processing_job, CompleteDocumentProcessingJobParams,
+    CreateDocumentProcessingJobParams,
+};
 use crate::core::country_pack::{
     country_pack_definition, set_company_country_pack, SetCompanyCountryPackParams,
 };
@@ -11,14 +16,6 @@ use crate::documents::documents::{
     document, document_version, lock_document, restore_document, update_document,
     update_document_folder, CreateDocumentFolderParams, CreateDocumentParams, Document,
     DocumentFolder, UpdateDocumentFolderParams, UpdateDocumentParams,
-};
-use crate::documents::pack_locale::{
-    document_search_analyzer_for_company, document_search_language_for_company,
-};
-use crate::ai::intelligence::{
-    ai_document_processing_job, approve_document_processing_job, complete_document_processing_job,
-    create_document_processing_job, CompleteDocumentProcessingJobParams,
-    CreateDocumentProcessingJobParams,
 };
 use crate::documents::drive_sync::{
     document_external_ref, set_google_drive_conflict_policy, sync_external_file_to_document,
@@ -33,15 +30,15 @@ use crate::documents::legal_hold::{
     apply_document_legal_hold, document_legal_hold, release_document_legal_hold,
     ApplyDocumentLegalHoldParams, ReleaseDocumentLegalHoldParams,
 };
+use crate::documents::pack_locale::{
+    document_search_analyzer_for_company, document_search_language_for_company,
+};
 use crate::documents::presence::{
     clear_document_presence, document_presence, update_document_presence,
 };
 use crate::documents::regional::{
     purge_expired_documents, set_document_index_content, set_document_retention,
     SetDocumentIndexContentParams, SetDocumentRetentionParams,
-};
-use crate::integrations::google_drive::{
-    create_google_drive_connection, google_drive_connection, DriveConflictPolicy, SyncDirection,
 };
 use crate::helpdesk::tickets::{
     create_helpdesk_stage, create_helpdesk_team, create_ticket, helpdesk_stage, helpdesk_team,
@@ -52,6 +49,9 @@ use crate::hr::leaves::{
     create_leave_type, hr_leave_type, update_leave_type, CreateLeaveTypeParams,
     UpdateLeaveTypeParams,
 };
+use crate::integrations::google_drive::{
+    create_google_drive_connection, google_drive_connection, DriveConflictPolicy, SyncDirection,
+};
 use crate::manufacturing::work_centers::{
     create_workcenter, mrp_workcenter, CreateWorkcenterParams,
 };
@@ -59,7 +59,10 @@ use crate::subscriptions::reducers::{create_subscription_plan, CreateSubscriptio
 use crate::subscriptions::tables::subscription_plan;
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{JournalType, TicketPriority};
-use crate::workflow::definitions::{create_workflow, workflow, CreateWorkflowParams};
+use crate::workflow::definitions::{
+    create_workflow, workflow, workflow_version, CreateWorkflowParams, WorkflowTrigger,
+    WorkflowVersionStatus,
+};
 
 pub fn test_helpdesk_ticket_create(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -581,9 +584,7 @@ pub fn test_documents_company_isolation(ctx: &ReducerContext) -> Result<(), Stri
         .db
         .doc_folder()
         .iter()
-        .find(|f| {
-            f.organization_id == fixture_a.organization_id && f.name == "Company A Folder"
-        })
+        .find(|f| f.organization_id == fixture_a.organization_id && f.name == "Company A Folder")
         .ok_or("folder a missing")?;
 
     let company_mismatch = create_document(
@@ -615,7 +616,9 @@ pub fn test_documents_company_isolation(ctx: &ReducerContext) -> Result<(), Stri
     .err()
     .ok_or("expected company mismatch to fail")?;
     if !company_mismatch.contains("company") {
-        return Err(format!("expected company isolation, got: {company_mismatch}"));
+        return Err(format!(
+            "expected company isolation, got: {company_mismatch}"
+        ));
     }
 
     let org_mismatch = create_document(
@@ -662,12 +665,13 @@ pub fn test_workflow_definition_create(ctx: &ReducerContext) -> Result<(), Strin
         org_id,
         Some(fixture.company_id),
         CreateWorkflowParams {
+            workflow_key: "harness.sale-approval".to_string(),
             name: "Harness Approval".to_string(),
             model: "sale.order".to_string(),
-            state_field: "state".to_string(),
-            on_create: false,
-            is_active: true,
             description: Some("Domain test workflow".to_string()),
+            trigger: WorkflowTrigger::Manual,
+            schema_version: 1,
+            snapshot_fields: Vec::new(),
             metadata: Some(r#"{"test":"workflow"}"#.to_string()),
         },
     )?;
@@ -676,11 +680,22 @@ pub fn test_workflow_definition_create(ctx: &ReducerContext) -> Result<(), Strin
         .db
         .workflow()
         .iter()
-        .find(|w| w.organization_id == org_id && w.name == "Harness Approval")
+        .find(|w| w.organization_id == org_id && w.workflow_key == "harness.sale-approval")
         .ok_or("Workflow not found after create")?;
 
     if wf.model != "sale.order" {
         return Err("Workflow model mismatch".to_string());
+    }
+
+    let draft = ctx
+        .db
+        .workflow_version()
+        .workflow_version_by_workflow()
+        .filter(&wf.id)
+        .find(|version| version.status == WorkflowVersionStatus::Draft)
+        .ok_or("Workflow draft not found after create")?;
+    if draft.name != "Harness Approval" || draft.draft_revision != 1 {
+        return Err("Workflow draft header mismatch".to_string());
     }
 
     Ok(())

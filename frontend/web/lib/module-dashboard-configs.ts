@@ -213,6 +213,7 @@ import {
   newHelpdeskStageForm,
   newHelpdeskSlaForm,
   workflowsTableConfig,
+  workflowVersionsTableConfig,
   workflowInstancesTableConfig,
   newWorkflowForm,
   mailMessagesTableConfig,
@@ -3038,6 +3039,12 @@ export const workflowsModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newWorkflowForm(t),
       createLabel: "New Workflow",
       createAction: "createWorkflow",
+    },
+    {
+      id: "versions",
+      label: "Versions",
+      type: "entity",
+      entityConfig: workflowVersionsTableConfig(t),
     },
     {
       id: "instances",

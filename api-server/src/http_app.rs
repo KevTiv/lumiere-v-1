@@ -103,7 +103,13 @@ async fn get_query(
         }
     }
 
-    let client = state.client_with_token(&session.stdb_token);
+    // Private workflow tables are not readable with the user JWT; use the module
+    // owner token and enforce identity/company filters in `workflow_reads`.
+    let client = if crate::workflow_reads::is_private_workflow_resource(&resource) {
+        state.stdb.clone()
+    } else {
+        state.client_with_token(&session.stdb_token)
+    };
     let data = execute_resource_query(
         &client,
         &resource,

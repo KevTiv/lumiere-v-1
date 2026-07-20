@@ -14,7 +14,12 @@ use crate::types::{
     AccountMoveState, MoveType, PartnerType, PaymentDirection, PaymentFeeBearer,
     PaymentProviderCode, PaymentState, PaymentTransactionStatus, PaymentType,
 };
-use crate::workflow::approval_gate::gate_action_with_approval;
+
+fn reject_unregistered_payment_action(action_key: &str) -> Result<(), String> {
+    Err(format!(
+        "{action_key} is unavailable until it is added to the guarded action registry"
+    ))
+}
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -282,7 +287,11 @@ fn normalize_reference(raw: &Option<String>) -> (Option<String>, Option<String>)
         Some(r) => {
             let normalized = r.trim().to_lowercase().replace([' ', '-', '_'], "");
             let masked = if normalized.len() > 4 {
-                format!("{}****{}", &normalized[..2], &normalized[normalized.len() - 2..])
+                format!(
+                    "{}****{}",
+                    &normalized[..2],
+                    &normalized[normalized.len() - 2..]
+                )
             } else {
                 "****".to_string()
             };
@@ -435,7 +444,11 @@ fn post_ledger_payment(
             action: "POST",
             old_values: None,
             new_values: None,
-            changed_fields: vec!["state".to_string(), "name".to_string(), "move_id".to_string()],
+            changed_fields: vec![
+                "state".to_string(),
+                "name".to_string(),
+                "move_id".to_string(),
+            ],
             metadata: None,
         },
     );
@@ -464,7 +477,8 @@ pub fn create_payment_account(
         return Err("Journal belongs to a different organization or company".to_string());
     }
 
-    if matches!(params.provider_code, PaymentProviderCode::Other) && params.provider_label.is_none() {
+    if matches!(params.provider_code, PaymentProviderCode::Other) && params.provider_label.is_none()
+    {
         return Err("provider_label is required when provider_code is Other".to_string());
     }
 
@@ -535,7 +549,10 @@ pub fn update_payment_account(
     let (reference_normalized, reference_masked) = if params.reference_raw.is_some() {
         normalize_reference(&params.reference_raw)
     } else {
-        (account.reference_normalized.clone(), account.reference_masked.clone())
+        (
+            account.reference_normalized.clone(),
+            account.reference_masked.clone(),
+        )
     };
 
     ctx.db.payment_account().id().update(PaymentAccount {
@@ -654,15 +671,11 @@ pub fn create_payment_transaction(
 
     // Duplicate reference guard within company + account + fingerprint scope.
     if !reference_fingerprint.is_empty() {
-        let duplicate = ctx
-            .db
-            .payment_transaction()
-            .iter()
-            .any(|t| {
-                t.company_id == params.company_id
-                    && t.payment_account_id == params.payment_account_id
-                    && t.reference_fingerprint == reference_fingerprint
-            });
+        let duplicate = ctx.db.payment_transaction().iter().any(|t| {
+            t.company_id == params.company_id
+                && t.payment_account_id == params.payment_account_id
+                && t.reference_fingerprint == reference_fingerprint
+        });
         if duplicate {
             return Err(format!(
                 "Duplicate external reference for this payment account: {}",
@@ -738,20 +751,20 @@ pub fn update_payment_transaction(
         return Err("Only draft transactions can be updated".to_string());
     }
 
-    let external_reference = params.external_reference.or(transaction.external_reference.clone());
+    let external_reference = params
+        .external_reference
+        .or(transaction.external_reference.clone());
     let reference_fingerprint = fingerprint_reference(&external_reference);
 
     // Re-check duplicate guard if reference changed.
-    if reference_fingerprint != transaction.reference_fingerprint && !reference_fingerprint.is_empty() {
-        let duplicate = ctx
-            .db
-            .payment_transaction()
-            .iter()
-            .any(|t| {
-                t.company_id == transaction.company_id
-                    && t.payment_account_id == transaction.payment_account_id
-                    && t.reference_fingerprint == reference_fingerprint
-            });
+    if reference_fingerprint != transaction.reference_fingerprint
+        && !reference_fingerprint.is_empty()
+    {
+        let duplicate = ctx.db.payment_transaction().iter().any(|t| {
+            t.company_id == transaction.company_id
+                && t.payment_account_id == transaction.payment_account_id
+                && t.reference_fingerprint == reference_fingerprint
+        });
         if duplicate {
             return Err(format!(
                 "Duplicate external reference for this payment account: {}",
@@ -760,9 +773,15 @@ pub fn update_payment_transaction(
         }
     }
 
-    let gross = params.gross_external_amount.unwrap_or(transaction.gross_external_amount);
-    let settlement = params.settlement_amount.unwrap_or(transaction.settlement_amount);
-    let net = params.net_account_amount.unwrap_or(transaction.net_account_amount);
+    let gross = params
+        .gross_external_amount
+        .unwrap_or(transaction.gross_external_amount);
+    let settlement = params
+        .settlement_amount
+        .unwrap_or(transaction.settlement_amount);
+    let net = params
+        .net_account_amount
+        .unwrap_or(transaction.net_account_amount);
 
     if gross <= 0.0 {
         return Err("gross_external_amount must be positive".to_string());
@@ -774,19 +793,24 @@ pub fn update_payment_transaction(
         return Err("net_account_amount must be non-negative".to_string());
     }
 
-    ctx.db.payment_transaction().id().update(PaymentTransaction {
-        external_reference,
-        reference_fingerprint,
-        gross_external_amount: gross,
-        settlement_amount: settlement,
-        net_account_amount: net,
-        occurred_at: params.occurred_at.unwrap_or(transaction.occurred_at),
-        evidence_document_ids: params.evidence_document_ids.unwrap_or(transaction.evidence_document_ids),
-        updated_at: ctx.timestamp,
-        updated_by: ctx.sender(),
-        metadata: params.metadata.or(transaction.metadata),
-        ..transaction
-    });
+    ctx.db
+        .payment_transaction()
+        .id()
+        .update(PaymentTransaction {
+            external_reference,
+            reference_fingerprint,
+            gross_external_amount: gross,
+            settlement_amount: settlement,
+            net_account_amount: net,
+            occurred_at: params.occurred_at.unwrap_or(transaction.occurred_at),
+            evidence_document_ids: params
+                .evidence_document_ids
+                .unwrap_or(transaction.evidence_document_ids),
+            updated_at: ctx.timestamp,
+            updated_by: ctx.sender(),
+            metadata: params.metadata.or(transaction.metadata),
+            ..transaction
+        });
 
     write_audit_log_v2(
         ctx,
@@ -846,37 +870,7 @@ pub fn post_payment_transaction(
         &fees,
     )?;
 
-    // Approval gate.
-    let amount = transaction.settlement_amount;
-    let params_json = serde_json::json!({
-        "organization_id": organization_id,
-        "transaction_id": transaction_id,
-    })
-    .to_string();
-    let context_json = serde_json::json!({
-        "amount": amount,
-        "direction": format!("{:?}", transaction.direction),
-        "provider": format!("{:?}", account.provider_code),
-    })
-    .to_string();
-    let summary = format!("Post payment transaction (amount {:.2})", amount);
-    if let Some(_request_id) = gate_action_with_approval(
-        ctx,
-        organization_id,
-        transaction.company_id,
-        "payment_transaction",
-        transaction_id,
-        "post_payment_transaction",
-        amount,
-        &summary,
-        &params_json,
-        Some(context_json),
-    )? {
-        return Err(format!(
-            "Payment transaction requires approval before posting (amount {:.2})",
-            amount
-        ));
-    }
+    reject_unregistered_payment_action("post_payment_transaction")?;
 
     let account_payment_id = post_ledger_payment(
         ctx,
@@ -886,13 +880,16 @@ pub fn post_payment_transaction(
         &transaction,
     )?;
 
-    ctx.db.payment_transaction().id().update(PaymentTransaction {
-        status: PaymentTransactionStatus::Posted,
-        account_payment_id: Some(account_payment_id),
-        updated_at: ctx.timestamp,
-        updated_by: ctx.sender(),
-        ..transaction
-    });
+    ctx.db
+        .payment_transaction()
+        .id()
+        .update(PaymentTransaction {
+            status: PaymentTransactionStatus::Posted,
+            account_payment_id: Some(account_payment_id),
+            updated_at: ctx.timestamp,
+            updated_by: ctx.sender(),
+            ..transaction
+        });
 
     write_audit_log_v2(
         ctx,
@@ -932,13 +929,16 @@ pub fn void_payment_transaction(
         return Err("Only draft transactions can be voided".to_string());
     }
 
-    ctx.db.payment_transaction().id().update(PaymentTransaction {
-        status: PaymentTransactionStatus::Voided,
-        voided_at: Some(ctx.timestamp),
-        updated_at: ctx.timestamp,
-        updated_by: ctx.sender(),
-        ..transaction
-    });
+    ctx.db
+        .payment_transaction()
+        .id()
+        .update(PaymentTransaction {
+            status: PaymentTransactionStatus::Voided,
+            voided_at: Some(ctx.timestamp),
+            updated_at: ctx.timestamp,
+            updated_by: ctx.sender(),
+            ..transaction
+        });
 
     write_audit_log_v2(
         ctx,
@@ -973,8 +973,11 @@ pub fn create_payment_fee(
         .id()
         .find(&params.payment_transaction_id)
         .ok_or("Payment transaction not found")?;
-    if transaction.organization_id != organization_id || transaction.company_id != params.company_id {
-        return Err("Payment transaction belongs to a different organization or company".to_string());
+    if transaction.organization_id != organization_id || transaction.company_id != params.company_id
+    {
+        return Err(
+            "Payment transaction belongs to a different organization or company".to_string(),
+        );
     }
     if transaction.status != PaymentTransactionStatus::Draft {
         return Err("Fees can only be added to draft transactions".to_string());
@@ -1033,8 +1036,11 @@ pub fn allocate_payment_transaction(
         .id()
         .find(&params.payment_transaction_id)
         .ok_or("Payment transaction not found")?;
-    if transaction.organization_id != organization_id || transaction.company_id != params.company_id {
-        return Err("Payment transaction belongs to a different organization or company".to_string());
+    if transaction.organization_id != organization_id || transaction.company_id != params.company_id
+    {
+        return Err(
+            "Payment transaction belongs to a different organization or company".to_string(),
+        );
     }
     if transaction.status != PaymentTransactionStatus::Posted {
         return Err("Only posted transactions can be allocated".to_string());
@@ -1064,7 +1070,8 @@ pub fn allocate_payment_transaction(
         .iter()
         .filter(|r| r.payment_transaction_id == params.payment_transaction_id)
         .collect();
-    let allocated_total: f64 = existing.iter().map(|r| r.allocated_amount).sum::<f64>() + params.allocated_amount;
+    let allocated_total: f64 =
+        existing.iter().map(|r| r.allocated_amount).sum::<f64>() + params.allocated_amount;
     if allocated_total > transaction.settlement_amount + 1e-6 {
         return Err(format!(
             "Total allocations {:.2} exceed settlement amount {:.2}",
@@ -1075,25 +1082,28 @@ pub fn allocate_payment_transaction(
     let residual_before = move_line.amount_residual;
     let residual_after = residual_before - params.allocated_amount;
 
-    let reconciliation = ctx.db.payment_reconciliation().insert(PaymentReconciliation {
-        id: 0,
-        organization_id,
-        company_id: params.company_id,
-        payment_transaction_id: params.payment_transaction_id,
-        account_payment_id,
-        allocated_move_line_id: params.allocated_move_line_id,
-        allocated_amount: params.allocated_amount,
-        currency_id: params.currency_id,
-        residual_before,
-        residual_after,
-        write_off_amount: params.write_off_amount,
-        write_off_account_id: params.write_off_account_id,
-        is_reversal: false,
-        reversed_reconciliation_id: None,
-        created_at: ctx.timestamp,
-        created_by: ctx.sender(),
-        metadata: params.metadata,
-    });
+    let reconciliation = ctx
+        .db
+        .payment_reconciliation()
+        .insert(PaymentReconciliation {
+            id: 0,
+            organization_id,
+            company_id: params.company_id,
+            payment_transaction_id: params.payment_transaction_id,
+            account_payment_id,
+            allocated_move_line_id: params.allocated_move_line_id,
+            allocated_amount: params.allocated_amount,
+            currency_id: params.currency_id,
+            residual_before,
+            residual_after,
+            write_off_amount: params.write_off_amount,
+            write_off_account_id: params.write_off_account_id,
+            is_reversal: false,
+            reversed_reconciliation_id: None,
+            created_at: ctx.timestamp,
+            created_by: ctx.sender(),
+            metadata: params.metadata,
+        });
 
     write_audit_log_v2(
         ctx,
@@ -1131,7 +1141,9 @@ pub fn reverse_payment_transaction(
         .find(&transaction_id)
         .ok_or("Payment transaction not found")?;
     if original.organization_id != organization_id || original.company_id != params.company_id {
-        return Err("Payment transaction belongs to a different organization or company".to_string());
+        return Err(
+            "Payment transaction belongs to a different organization or company".to_string(),
+        );
     }
     if original.status != PaymentTransactionStatus::Posted {
         return Err("Only posted transactions can be reversed".to_string());
@@ -1147,37 +1159,7 @@ pub fn reverse_payment_transaction(
         .find(&original.payment_account_id)
         .ok_or("Payment account not found")?;
 
-    // Approval gate.
-    let amount = original.settlement_amount;
-    let params_json = serde_json::json!({
-        "organization_id": organization_id,
-        "transaction_id": transaction_id,
-    })
-    .to_string();
-    let context_json = serde_json::json!({
-        "amount": amount,
-        "direction": format!("{:?}", original.direction),
-        "original_transaction_id": transaction_id,
-    })
-    .to_string();
-    let summary = format!("Reverse payment transaction (amount {:.2})", amount);
-    if let Some(_request_id) = gate_action_with_approval(
-        ctx,
-        organization_id,
-        params.company_id,
-        "payment_transaction",
-        transaction_id,
-        "reverse_payment_transaction",
-        amount,
-        &summary,
-        &params_json,
-        Some(context_json),
-    )? {
-        return Err(format!(
-            "Payment reversal requires approval before posting (amount {:.2})",
-            amount
-        ));
-    }
+    reject_unregistered_payment_action("reverse_payment_transaction")?;
 
     // Compensating transaction with inverted direction.
     let correcting_direction = match original.direction {
@@ -1193,7 +1175,10 @@ pub fn reverse_payment_transaction(
         direction: correcting_direction,
         partner_type: original.partner_type.clone(),
         partner_id: original.partner_id,
-        external_reference: original.external_reference.clone().map(|r| format!("REV:{}", r)),
+        external_reference: original
+            .external_reference
+            .clone()
+            .map(|r| format!("REV:{}", r)),
         reference_fingerprint: String::new(),
         gross_external_amount: original.gross_external_amount,
         settlement_amount: original.settlement_amount,
@@ -1221,18 +1206,24 @@ pub fn reverse_payment_transaction(
         &correcting,
     )?;
 
-    ctx.db.payment_transaction().id().update(PaymentTransaction {
-        account_payment_id: Some(correcting_account_payment_id),
-        ..correcting
-    });
+    ctx.db
+        .payment_transaction()
+        .id()
+        .update(PaymentTransaction {
+            account_payment_id: Some(correcting_account_payment_id),
+            ..correcting
+        });
 
     // Mark original as reversed.
-    ctx.db.payment_transaction().id().update(PaymentTransaction {
-        status: PaymentTransactionStatus::Reversed,
-        updated_at: ctx.timestamp,
-        updated_by: ctx.sender(),
-        ..original
-    });
+    ctx.db
+        .payment_transaction()
+        .id()
+        .update(PaymentTransaction {
+            status: PaymentTransactionStatus::Reversed,
+            updated_at: ctx.timestamp,
+            updated_by: ctx.sender(),
+            ..original
+        });
 
     let reversal = ctx.db.payment_reversal().insert(PaymentReversal {
         id: 0,

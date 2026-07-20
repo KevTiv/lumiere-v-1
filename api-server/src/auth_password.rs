@@ -112,7 +112,7 @@ fn value_as_str(v: &Value) -> Option<String> {
 }
 
 /// Match SpacetimeDB 2.x SATS-SQL shapes (see `stdb-auth-server.ts` `normalizeIdentitySqlValue`).
-fn identity_cell_to_hex(v: &Value) -> Option<String> {
+pub fn identity_cell_to_hex(v: &Value) -> Option<String> {
     if let Some(s) = v.as_str() {
         let s = s
             .trim()

@@ -4,22 +4,20 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::start_workflow_params_type::StartWorkflowParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct StartWorkflowArgs {
     pub organization_id: u64,
-    pub workflow_id: u64,
-    pub res_id: u64,
-    pub res_type: String,
+    pub params: StartWorkflowParams,
 }
 
 impl From<StartWorkflowArgs> for super::Reducer {
     fn from(args: StartWorkflowArgs) -> Self {
         Self::StartWorkflow {
             organization_id: args.organization_id,
-            workflow_id: args.workflow_id,
-            res_id: args.res_id,
-            res_type: args.res_type,
+            params: args.params,
         }
     }
 }
@@ -42,11 +40,9 @@ pub trait start_workflow {
     fn start_workflow(
         &self,
         organization_id: u64,
-        workflow_id: u64,
-        res_id: u64,
-        res_type: String,
+        params: StartWorkflowParams,
     ) -> __sdk::Result<()> {
-        self.start_workflow_then(organization_id, workflow_id, res_id, res_type, |_, _| {})
+        self.start_workflow_then(organization_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `start_workflow` to run as soon as possible,
@@ -58,9 +54,7 @@ pub trait start_workflow {
     fn start_workflow_then(
         &self,
         organization_id: u64,
-        workflow_id: u64,
-        res_id: u64,
-        res_type: String,
+        params: StartWorkflowParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -72,9 +66,7 @@ impl start_workflow for super::RemoteReducers {
     fn start_workflow_then(
         &self,
         organization_id: u64,
-        workflow_id: u64,
-        res_id: u64,
-        res_type: String,
+        params: StartWorkflowParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -83,9 +75,7 @@ impl start_workflow for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             StartWorkflowArgs {
                 organization_id,
-                workflow_id,
-                res_id,
-                res_type,
+                params,
             },
             callback,
         )

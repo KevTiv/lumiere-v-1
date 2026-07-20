@@ -1618,41 +1618,6 @@
   },
   {
     "extra_where": "",
-    "mapKey": "workflows",
-    "order_by": "",
-    "resource_key": "workflows",
-    "table": "workflow"
-  },
-  {
-    "extra_where": "",
-    "mapKey": "workflow-activities",
-    "order_by": " ORDER BY workflow_id ASC, sequence ASC",
-    "resource_key": "workflow-activities",
-    "table": "workflow_activity"
-  },
-  {
-    "extra_where": "",
-    "mapKey": "workflow-instances",
-    "order_by": "",
-    "resource_key": "workflow-instances",
-    "table": "workflow_instance"
-  },
-  {
-    "extra_where": "",
-    "mapKey": "workflow-transitions",
-    "order_by": " ORDER BY id ASC",
-    "resource_key": "workflow-transitions",
-    "table": "workflow_transition"
-  },
-  {
-    "extra_where": "",
-    "mapKey": "workflow-workitems",
-    "order_by": " ORDER BY instance_id ASC, id ASC",
-    "resource_key": "workflow-workitems",
-    "table": "workflow_workitem"
-  },
-  {
-    "extra_where": "",
     "mapKey": "proposals",
     "order_by": "",
     "resource_key": "proposals",

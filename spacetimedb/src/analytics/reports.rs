@@ -12,11 +12,11 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::messaging::{mail_message, MailMessage};
 use crate::core::organization::{organization, require_company_in_organization};
-use crate::core::queue::{queue_job, QueueJob};
+use crate::core::queue::{enqueue_job_internal, EnqueueJobParams};
 use crate::core::users::user_organization;
 use crate::documents::documents::{document, document_version, Document, DocumentVersion};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::{JobStatus, MailMessageType};
+use crate::types::MailMessageType;
 
 // ============================================================================
 // PARAMS TYPES
@@ -557,24 +557,27 @@ fn enqueue_owner_report_run(
         "timezone": timezone,
     })
     .to_string();
-    let job = ctx.db.queue_job().insert(QueueJob {
-        id: 0,
-        organization_id: report.organization_id,
-        queue_name: "owner_report".to_string(),
-        job_type: "owner_report.generate".to_string(),
-        payload,
-        priority: 0,
-        attempts: 0,
-        max_attempts: 3,
-        status: JobStatus::Pending,
-        scheduled_at: None,
-        started_at: None,
-        completed_at: None,
-        error_message: None,
-        created_by: ctx.sender(),
-        created_at: ctx.timestamp,
-        metadata: Some(serde_json::json!({ "scheduled_report_run_id": run.id }).to_string()),
-    });
+    let job = enqueue_job_internal(
+        ctx,
+        report.organization_id,
+        EnqueueJobParams {
+            company_id: report.company_id,
+            queue_name: "owner_report".to_string(),
+            job_type: "owner_report.generate".to_string(),
+            payload,
+            semantic_key: format!(
+                "owner_report:{}:{}",
+                report.id,
+                period.to_micros_since_unix_epoch()
+            ),
+            priority: 0,
+            max_attempts: 3,
+            available_at_micros: None,
+            correlation_id: format!("scheduled-report-run:{}", run.id),
+            causation_id: Some(format!("scheduled-report:{}", report.id)),
+            metadata: Some(serde_json::json!({ "scheduled_report_run_id": run.id }).to_string()),
+        },
+    )?;
     ctx.db
         .scheduled_report_run()
         .id()

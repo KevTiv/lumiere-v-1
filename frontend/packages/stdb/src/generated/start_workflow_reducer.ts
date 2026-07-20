@@ -10,9 +10,13 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  StartWorkflowParams,
+} from "./types";
+
 export default {
   organizationId: __t.u64(),
-  workflowId: __t.u64(),
-  resId: __t.u64(),
-  resType: __t.string(),
+  get params() {
+    return StartWorkflowParams;
+  },
 };

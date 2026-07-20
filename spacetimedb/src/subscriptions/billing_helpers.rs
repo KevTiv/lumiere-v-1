@@ -5,13 +5,11 @@ use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, create_account_move,
-    insert_draft_account_move_line, post_account_move_impl, post_invoice,
-    reconcile_payment_with_invoice, AccountMove, AccountMoveLine, AddAccountMoveLineParams,
-    CreateAccountMoveParams,
+    insert_draft_account_move_line, post_invoice, reconcile_payment_with_invoice, AccountMove,
+    AccountMoveLine, AddAccountMoveLineParams, CreateAccountMoveParams,
 };
 use crate::accounting::payments::{
-    account_payment, create_payment, post_payment_impl, register_payment_on_invoice,
-    CreatePaymentParams,
+    account_payment, create_payment, register_payment_on_invoice, CreatePaymentParams,
 };
 use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::organization::company;
@@ -26,6 +24,10 @@ use crate::subscriptions::tables::{
     SubscriptionLine,
 };
 use crate::types::{AccountMoveState, MoveType, PartnerType, PaymentState, PaymentType};
+use crate::workflow::action_registry::{
+    execute_guarded_action, snapshot_guarded_action, ExecuteGuardedActionParams,
+    GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
+};
 
 /// Canonical calculator cadence: `daily` | `weekly` | `monthly` | `yearly`.
 pub fn normalize_rule_type(raw: &str) -> Result<String, String> {
@@ -235,12 +237,7 @@ fn find_recognition_rule(
     company_id: u64,
     product_id: u64,
 ) -> Option<RevenueRecognitionRule> {
-    let categ_id = ctx
-        .db
-        .product()
-        .id()
-        .find(&product_id)
-        .map(|p| p.categ_id);
+    let categ_id = ctx.db.product().id().find(&product_id).map(|p| p.categ_id);
 
     let mut rules: Vec<RevenueRecognitionRule> = ctx
         .db
@@ -402,11 +399,7 @@ pub fn auto_create_deferred_schedules_for_invoice(
 }
 
 /// Recompute MRR KPIs from lines + invoice untaxed totals + deferred remaining.
-pub fn refresh_subscription_kpis(
-    ctx: &ReducerContext,
-    subscription: Subscription,
-    fx_rate: f64,
-) {
+pub fn refresh_subscription_kpis(ctx: &ReducerContext, subscription: Subscription, fx_rate: f64) {
     let lines: Vec<SubscriptionLine> = ctx
         .db
         .subscription_line()
@@ -464,7 +457,8 @@ pub fn refresh_subscription_kpis(
         kpi_12months_mrr: mrr_local * 12.0,
         metadata: {
             let mut meta = serde_json::Map::new();
-            if let Ok(existing) = serde_json::from_str::<serde_json::Value>(&subscription.metadata) {
+            if let Ok(existing) = serde_json::from_str::<serde_json::Value>(&subscription.metadata)
+            {
                 if let Some(obj) = existing.as_object() {
                     meta = obj.clone();
                 }
@@ -688,7 +682,9 @@ pub fn create_subscription_ar_invoice(
         income.partner_id = Some(subscription.partner_invoice_id);
         income.product_id = Some(line.product_id);
         income.product_uom_id = Some(line.product_uom);
-        income.analytic_account_id = line.analytic_account_id.or(subscription.analytic_account_id);
+        income.analytic_account_id = line
+            .analytic_account_id
+            .or(subscription.analytic_account_id);
         income.analytic_tag_ids = line.analytic_tag_ids.clone();
         insert_draft_account_move_line(ctx, &move_record, income)?;
         amount_untaxed += subtotal;
@@ -909,7 +905,9 @@ pub fn apply_subscription_invoice_payment(
         .filter(&invoice_move_id)
         .find(|l| l.account_id == receivable_account_id || l.debit > 0.0)
     {
-        let residual = (ar_line.debit - ar_line.credit).abs().max(ar_line.amount_residual.abs());
+        let residual = (ar_line.debit - ar_line.credit)
+            .abs()
+            .max(ar_line.amount_residual.abs());
         ctx.db.account_move_line().id().update(AccountMoveLine {
             account_internal_type: Some("receivable".to_string()),
             amount_residual: residual,
@@ -920,18 +918,15 @@ pub fn apply_subscription_invoice_payment(
 
     let pay_amount = amount.unwrap_or(invoice.amount_residual).max(0.0);
     if pay_amount <= 0.0 {
-        return Err("Payment amount must be positive (invoice residual may already be zero)".to_string());
+        return Err(
+            "Payment amount must be positive (invoice residual may already be zero)".to_string(),
+        );
     }
     let date = payment_date.unwrap_or(ctx.timestamp);
     ensure_accounting_period_open_for_date(ctx, company_id, date)?;
 
-    let payment_ref = ref_.unwrap_or_else(|| {
-        format!(
-            "SUB{}-PAY-{}",
-            subscription.id,
-            invoice_move_id
-        )
-    });
+    let payment_ref =
+        ref_.unwrap_or_else(|| format!("SUB{}-PAY-{}", subscription.id, invoice_move_id));
 
     create_account_move(
         ctx,
@@ -987,32 +982,22 @@ pub fn apply_subscription_invoice_payment(
         .map(|m| m.id)
         .ok_or("Payment move not found after create")?;
 
-    add_account_move_line(
-        ctx,
-        organization_id,
-        payment_move_id,
-        {
-            let mut line = blank_line(bank_account_id, "Bank".to_string());
-            line.debit = pay_amount;
-            line.sequence = 1;
-            line.price_unit = pay_amount;
-            line.partner_id = Some(subscription.partner_invoice_id);
-            line
-        },
-    )?;
-    add_account_move_line(
-        ctx,
-        organization_id,
-        payment_move_id,
-        {
-            let mut line = blank_line(receivable_account_id, "Accounts Receivable".to_string());
-            line.credit = pay_amount;
-            line.sequence = 2;
-            line.price_unit = pay_amount;
-            line.partner_id = Some(subscription.partner_invoice_id);
-            line
-        },
-    )?;
+    add_account_move_line(ctx, organization_id, payment_move_id, {
+        let mut line = blank_line(bank_account_id, "Bank".to_string());
+        line.debit = pay_amount;
+        line.sequence = 1;
+        line.price_unit = pay_amount;
+        line.partner_id = Some(subscription.partner_invoice_id);
+        line
+    })?;
+    add_account_move_line(ctx, organization_id, payment_move_id, {
+        let mut line = blank_line(receivable_account_id, "Accounts Receivable".to_string());
+        line.credit = pay_amount;
+        line.sequence = 2;
+        line.price_unit = pay_amount;
+        line.partner_id = Some(subscription.partner_invoice_id);
+        line
+    })?;
 
     if let Some(ar_line) = ctx
         .db
@@ -1029,7 +1014,29 @@ pub fn apply_subscription_invoice_payment(
         });
     }
 
-    post_account_move_impl(ctx, organization_id, payment_move_id, true)?;
+    let move_input = GuardedActionInput::PostAccountMove {
+        move_id: payment_move_id,
+    };
+    let move_snapshot = snapshot_guarded_action(
+        ctx,
+        organization_id,
+        company_id,
+        GuardedActionKey::PostAccountMove,
+        GUARDED_ACTION_SCHEMA_VERSION,
+        move_input.clone(),
+    )?;
+    execute_guarded_action(
+        ctx,
+        ExecuteGuardedActionParams {
+            organization_id,
+            company_id,
+            action: GuardedActionKey::PostAccountMove,
+            action_version: GUARDED_ACTION_SCHEMA_VERSION,
+            input: move_input,
+            expected_subject_revision_hash: move_snapshot.subject_revision_hash,
+            idempotency_key: format!("subscription-payment-move:{payment_move_id}"),
+        },
+    )?;
 
     create_payment(
         ctx,
@@ -1060,8 +1067,34 @@ pub fn apply_subscription_invoice_payment(
         .map(|p| p.id)
         .ok_or("Payment not found after create")?;
 
-    post_payment_impl(ctx, organization_id, payment_id, true)?;
-    register_payment_on_invoice(ctx, organization_id, payment_id, vec![invoice_move_id], false)?;
+    let payment_input = GuardedActionInput::PostPayment { payment_id };
+    let payment_snapshot = snapshot_guarded_action(
+        ctx,
+        organization_id,
+        company_id,
+        GuardedActionKey::PostPayment,
+        GUARDED_ACTION_SCHEMA_VERSION,
+        payment_input.clone(),
+    )?;
+    execute_guarded_action(
+        ctx,
+        ExecuteGuardedActionParams {
+            organization_id,
+            company_id,
+            action: GuardedActionKey::PostPayment,
+            action_version: GUARDED_ACTION_SCHEMA_VERSION,
+            input: payment_input,
+            expected_subject_revision_hash: payment_snapshot.subject_revision_hash,
+            idempotency_key: format!("subscription-payment:{payment_id}"),
+        },
+    )?;
+    register_payment_on_invoice(
+        ctx,
+        organization_id,
+        payment_id,
+        vec![invoice_move_id],
+        false,
+    )?;
     reconcile_payment_with_invoice(ctx, organization_id, payment_move_id, invoice_move_id)?;
 
     Ok(SubscriptionPaymentResult {

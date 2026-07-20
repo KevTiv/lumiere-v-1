@@ -247,11 +247,6 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "deferred-revenue-schedules",
   "deferred-revenue-lines",
   "revenue-recognition-rules",
-  "workflows",
-  "workflow-activities",
-  "workflow-instances",
-  "workflow-transitions",
-  "workflow-workitems",
   "proposals",
   "proposal-sections",
   "proposal-line-items",
@@ -1483,42 +1478,6 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       fa,
       "",
       " ORDER BY priority DESC, id DESC",
-    ),
-  workflows: (id, fa) => selectOrgScopedSql("workflows", "workflow", id, fa, ""),
-  "workflow-activities": (id, fa) =>
-    selectOrgScopedSql(
-      "workflow-activities",
-      "workflow_activity",
-      id,
-      fa,
-      "",
-      " ORDER BY workflow_id ASC, sequence ASC",
-    ),
-  "workflow-instances": (id, fa) =>
-    selectOrgScopedSql(
-      "workflow-instances",
-      "workflow_instance",
-      id,
-      fa,
-      "",
-    ),
-  "workflow-transitions": (id, fa) =>
-    selectOrgScopedSql(
-      "workflow-transitions",
-      "workflow_transition",
-      id,
-      fa,
-      "",
-      " ORDER BY id ASC",
-    ),
-  "workflow-workitems": (id, fa) =>
-    selectOrgScopedSql(
-      "workflow-workitems",
-      "workflow_workitem",
-      id,
-      fa,
-      "",
-      " ORDER BY instance_id ASC, id ASC",
     ),
   proposals: (id, fa) => selectOrgScopedSql("proposals", "proposal", id, fa, ""),
   "proposal-sections": (id, fa) =>

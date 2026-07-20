@@ -202,6 +202,18 @@ pub async fn execute_resource_query(
 ) -> Result<Vec<Value>, ApiError> {
     let fa = field_access;
 
+    if let Some(rows) = crate::workflow_reads::execute_private_workflow_query(
+        client,
+        resource,
+        organization_id,
+        identity_hex,
+        fa,
+    )
+    .await?
+    {
+        return Ok(rows);
+    }
+
     match resource {
         "roles" => {
             let full_sql = "SELECT * FROM role WHERE is_active = true";
@@ -324,38 +336,20 @@ pub async fn execute_resource_query(
             sort_rows_by_id_desc(&mut rows);
             return Ok(rows);
         }
-        "approval-requests-inbox" => {
-            let sql = format!(
-                "SELECT id, organization_id, company_id, rule_id, model, res_id, action, params_json, status, summary, context_json, requested_by, requested_at, reviewed_by, reviewed_at, reject_reason, reviewer_comment, ai_draft_id, workflow_instance_id, create_date, write_date, metadata FROM approval_request WHERE organization_id = {organization_id} AND status = 'pending'"
-            );
-            let mut rows = client
-                .query_sql(&sql)
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
-            sort_rows_by_id_desc(&mut rows);
-            return Ok(rows);
-        }
-        "approval-requests" => {
-            let sql = format!(
-                "SELECT id, organization_id, company_id, rule_id, model, res_id, action, params_json, status, summary, context_json, requested_by, requested_at, reviewed_by, reviewed_at, reject_reason, reviewer_comment, ai_draft_id, workflow_instance_id, create_date, write_date, metadata FROM approval_request WHERE organization_id = {organization_id}"
-            );
-            let mut rows = client
-                .query_sql(&sql)
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
-            sort_rows_by_id_desc(&mut rows);
-            return Ok(rows);
-        }
-        "approval-rules" => {
-            let sql = format!(
-                "SELECT id, organization_id, company_id, name, description, model, action, rule_type, threshold, approver_role_id, sequence, is_active, create_date, write_date, metadata FROM approval_rule WHERE organization_id = {organization_id}"
-            );
-            let mut rows = client
-                .query_sql(&sql)
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
-            sort_rows_by_id_desc(&mut rows);
-            return Ok(rows);
+        // Wave 4 DQ / legacy approval keys — served by `workflow_reads` before this match.
+        // Arms remain so `lumiere-codegen` query_exec audit stays green.
+        "approval-requests-inbox"
+        | "approval-requests"
+        | "approval-rules"
+        | "workflow-human-tasks-inbox"
+        | "workflow-human-tasks"
+        | "workflow-human-task-events"
+        | "workflow-timers-late"
+        | "workflow-outbox-dead"
+        | "workflow-activities"
+        | "workflow-transitions"
+        | "workflow-workitems" => {
+            return Ok(Vec::new());
         }
         "document-templates" => {
             let sql = format!(

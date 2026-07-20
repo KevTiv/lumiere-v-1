@@ -4,9 +4,17 @@ use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::core::messaging::{mail_message, MailMessage};
 use crate::core::users::user_organization;
-use crate::types::{InstanceState, MailMessageType, WorkitemState};
-use crate::workflow::definitions::{workflow, workflow_activity, workflow_transition};
-use crate::workflow::runtime::{workflow_instance, workflow_workitem, WorkflowInstance, WorkflowWorkitem};
+use crate::types::MailMessageType;
+use crate::workflow::definitions::{
+    workflow, workflow_version, ConditionValue, WorkflowVersionStatus,
+};
+use crate::workflow::evaluator::{
+    canonical_condition_snapshot_hash, ConditionSnapshot, ConditionSnapshotField,
+};
+use crate::workflow::runtime::{
+    signal_workflow, start_workflow, workflow_instance, SignalWorkflowParams, StartWorkflowParams,
+    WorkflowInstanceState,
+};
 
 use super::action_drafts::{ai_action_draft, AiActionDraft};
 
@@ -38,7 +46,9 @@ pub fn on_draft_approved(ctx: &ReducerContext, draft: &AiActionDraft, record_id:
 
 pub fn on_draft_rejected(ctx: &ReducerContext, draft: &AiActionDraft, reason: Option<&str>) {
     advance_draft_workflow(ctx, draft, "reject");
-    let reason_text = reason.filter(|value| !value.is_empty()).unwrap_or("No reason provided");
+    let reason_text = reason
+        .filter(|value| !value.is_empty())
+        .unwrap_or("No reason provided");
     let body = format!(
         "AI action draft #{} was rejected: {}",
         draft.id, reason_text
@@ -62,55 +72,45 @@ fn try_attach_approval_workflow(ctx: &ReducerContext, draft: &AiActionDraft) -> 
         .workflow_by_org()
         .filter(&draft.organization_id)
         .find(|row| {
-            row.is_active
-                && row.model == "ai_action_draft"
-                && row.company_id.map_or(true, |company_id| company_id == draft.company_id)
+            row.model == "ai_action_draft"
+                && row
+                    .company_id
+                    .map_or(true, |company_id| company_id == draft.company_id)
         })?;
-
-    let start_act = ctx
+    let workflow_version = ctx
         .db
-        .workflow_activity()
-        .activity_by_workflow()
+        .workflow_version()
+        .workflow_version_by_workflow()
         .filter(&workflow_def.id)
-        .find(|activity| activity.flow_start)?;
+        .filter(|row| row.status == WorkflowVersionStatus::Published)
+        .max_by_key(|row| row.version)?;
+    let snapshot = ai_action_draft_snapshot(draft).ok()?;
 
-    let instance = ctx.db.workflow_instance().insert(WorkflowInstance {
-        id: 0,
-        organization_id: draft.organization_id,
-        workflow_id: workflow_def.id,
-        res_id: draft.id,
-        res_type: "ai_action_draft".to_string(),
-        state: InstanceState::Active,
-        activity_ids: vec![start_act.id],
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: Some(
-            serde_json::json!({
-                "source": "ai_action_draft",
-                "draft_id": draft.id,
-                "elevated": draft.elevated,
-            })
-            .to_string(),
-        ),
-    });
+    start_workflow(
+        ctx,
+        draft.organization_id,
+        StartWorkflowParams {
+            company_id: draft.company_id,
+            workflow_id: workflow_def.id,
+            workflow_version_id: workflow_version.id,
+            subject_model: "ai_action_draft".to_string(),
+            subject_id: draft.id,
+            subject_revision_hash: snapshot.subject_revision_hash,
+            singleton_trigger_key: None,
+            idempotency_key: format!("ai-action-draft:{}:start", draft.id),
+            correlation_id: format!("ai-action-draft:{}", draft.id),
+            causation_id: None,
+        },
+    )
+    .ok()?;
 
-    ctx.db.workflow_workitem().insert(WorkflowWorkitem {
-        id: 0,
-        organization_id: draft.organization_id,
-        instance_id: instance.id,
-        act_id: start_act.id,
-        wkf_evaled_condition: None,
-        state: WorkitemState::Active,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: None,
-    });
-
-    Some(instance.id)
+    ctx.db
+        .workflow_instance()
+        .instance_by_org()
+        .filter(&draft.organization_id)
+        .filter(|row| row.subject_model == "ai_action_draft" && row.subject_id == draft.id)
+        .max_by_key(|row| row.id)
+        .map(|row| row.id)
 }
 
 fn advance_draft_workflow(ctx: &ReducerContext, draft: &AiActionDraft, signal: &str) {
@@ -119,96 +119,69 @@ fn advance_draft_workflow(ctx: &ReducerContext, draft: &AiActionDraft, signal: &
         .workflow_instance()
         .instance_by_org()
         .filter(&draft.organization_id)
-        .filter(|row| row.res_type == "ai_action_draft" && row.res_id == draft.id)
-        .filter(|row| row.state == InstanceState::Active)
+        .filter(|row| row.subject_model == "ai_action_draft" && row.subject_id == draft.id)
+        .filter(|row| row.state == WorkflowInstanceState::Active)
         .max_by_key(|row| row.id)
     else {
         return;
     };
 
-    let active_items: Vec<WorkflowWorkitem> = ctx
-        .db
-        .workflow_workitem()
-        .workitem_by_instance()
-        .filter(&instance.id)
-        .filter(|item| item.state == WorkitemState::Active)
-        .collect();
-
-    let mut new_activity_ids = instance.activity_ids.clone();
-    let mut completed = false;
-
-    for item in active_items {
-        let matching: Vec<_> = ctx
-            .db
-            .workflow_transition()
-            .transition_by_from()
-            .filter(&item.act_id)
-            .filter(|transition| transition.signal.as_deref() == Some(signal))
-            .collect();
-
-        for transition in matching {
-            let Some(target_act) = ctx
-                .db
-                .workflow_activity()
-                .id()
-                .find(&transition.activity_to)
-            else {
-                continue;
-            };
-
-            ctx.db.workflow_workitem().id().update(WorkflowWorkitem {
-                state: WorkitemState::Complete,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..item.clone()
-            });
-
-            new_activity_ids.retain(|activity_id| *activity_id != item.act_id);
-            new_activity_ids.push(target_act.id);
-
-            if target_act.flow_stop {
-                ctx.db.workflow_instance().id().update(WorkflowInstance {
-                    state: InstanceState::Complete,
-                    activity_ids: new_activity_ids.clone(),
-                    write_uid: ctx.sender(),
-                    write_date: ctx.timestamp,
-                    ..instance.clone()
-                });
-                completed = true;
-                break;
-            }
-
-            ctx.db.workflow_workitem().insert(WorkflowWorkitem {
-                id: 0,
-                organization_id: draft.organization_id,
-                instance_id: instance.id,
-                act_id: target_act.id,
-                wkf_evaled_condition: None,
-                state: WorkitemState::Active,
-                create_uid: ctx.sender(),
-                create_date: ctx.timestamp,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                metadata: None,
-            });
-            completed = true;
-        }
+    if let Err(error) = signal_workflow(
+        ctx,
+        draft.organization_id,
+        SignalWorkflowParams {
+            company_id: draft.company_id,
+            instance_id: instance.id,
+            expected_revision: instance.revision,
+            signal_key: signal.to_string(),
+            snapshot: match ai_action_draft_snapshot(draft) {
+                Ok(snapshot) => snapshot,
+                Err(error) => {
+                    log::warn!(
+                        "AI action draft snapshot failed: draft_id={}, error={}",
+                        draft.id,
+                        error
+                    );
+                    return;
+                }
+            },
+            idempotency_key: format!("ai-action-draft:{}:signal:{signal}", draft.id),
+            correlation_id: instance.correlation_id.clone(),
+            causation_id: Some(format!("ai-action-draft:{}:{signal}", draft.id)),
+        },
+    ) {
+        log::warn!(
+            "AI action draft workflow signal failed: draft_id={}, signal={}, error={}",
+            draft.id,
+            signal,
+            error
+        );
     }
+}
 
-    if completed {
-        return;
-    }
-
-    if let Some(latest) = ctx.db.workflow_instance().id().find(&instance.id) {
-        if latest.state == InstanceState::Active {
-            ctx.db.workflow_instance().id().update(WorkflowInstance {
-                activity_ids: new_activity_ids,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..latest
-            });
-        }
-    }
+fn ai_action_draft_snapshot(draft: &AiActionDraft) -> Result<ConditionSnapshot, String> {
+    let mut snapshot = ConditionSnapshot {
+        subject_model: "ai_action_draft".to_string(),
+        subject_id: draft.id,
+        subject_revision_hash: String::new(),
+        fields: vec![
+            ConditionSnapshotField {
+                field_key: "params_json".to_string(),
+                value: ConditionValue::Text(draft.params_json.clone()),
+            },
+            ConditionSnapshotField {
+                field_key: "reducer_name".to_string(),
+                value: ConditionValue::Code(draft.reducer_name.clone()),
+            },
+            ConditionSnapshotField {
+                field_key: "summary".to_string(),
+                value: ConditionValue::Text(draft.summary.clone()),
+            },
+        ],
+    };
+    snapshot.subject_revision_hash = canonical_condition_snapshot_hash(&snapshot)
+        .map_err(|error| format!("cannot hash AI action draft snapshot: {error}"))?;
+    Ok(snapshot)
 }
 
 fn update_draft_metadata(ctx: &ReducerContext, draft: &AiActionDraft, workflow_instance_id: u64) {

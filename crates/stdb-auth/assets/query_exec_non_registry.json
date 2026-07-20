@@ -16,5 +16,13 @@
   "import-mapping-templates",
   "org-permissions",
   "policy-snapshots",
-  "queued-mail-messages"
+  "queued-mail-messages",
+  "workflow-activities",
+  "workflow-human-task-events",
+  "workflow-human-tasks",
+  "workflow-human-tasks-inbox",
+  "workflow-outbox-dead",
+  "workflow-timers-late",
+  "workflow-transitions",
+  "workflow-workitems"
 ]

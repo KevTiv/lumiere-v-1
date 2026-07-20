@@ -32,10 +32,6 @@ use crate::types::{
     AccountInternalGroup, EmploymentType, ExpenseLineKind, ExpensePaymentMode, ExpenseSheetState,
     ExpenseState, JournalType, PeriodState,
 };
-use crate::workflow::approval_gate::find_pending_request;
-use crate::workflow::approvals::{
-    approval_request, create_approval_rule, ApprovalRequest, CreateApprovalRuleParams,
-};
 
 struct ExpenseAccounts {
     journal_id: u64,
@@ -393,7 +389,7 @@ fn spoof_submitter_as_other(ctx: &ReducerContext, sheet_id: u64) -> Result<(), S
 }
 
 /// Gate-enabled SoD: self-approve fails; approver B path uses public reducer (`skip=false`).
-/// Deferred rule path is asserted then completed via approved request + re-approve.
+/// The versioned human-task deferral path is covered by the focused workflow suite.
 pub fn test_gate_enabled_sod_approve(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
@@ -432,68 +428,6 @@ pub fn test_gate_enabled_sod_approve(ctx: &ReducerContext) -> Result<(), String>
         return Err("approver_id should be current sender".into());
     }
 
-    // Deferred path: new sheet + amount_threshold rule → gate creates request.
-    let sheet2 = create_draft_sheet(ctx, &fixture, employee_id, "WF Gate Defer")?;
-    let line2 = create_line_with_receipt(ctx, &fixture, employee_id, "WF Gate Defer Line", 150.0)?;
-    submit_expense(ctx, fixture.organization_id, line2, sheet2)?;
-    submit_expense_sheet(ctx, fixture.organization_id, sheet2)?;
-    spoof_submitter_as_other(ctx, sheet2)?;
-
-    create_approval_rule(
-        ctx,
-        fixture.organization_id,
-        Some(fixture.company_id),
-        CreateApprovalRuleParams {
-            name: format!("WF expense approve {sheet2}"),
-            description: Some("Wave F gate defer".into()),
-            model: "hr_expense_sheet".into(),
-            action: "approve_expense_sheet".into(),
-            rule_type: "amount_threshold".into(),
-            threshold: 0.0,
-            approver_role_id: None,
-            sequence: 10,
-            is_active: true,
-            metadata: None,
-        },
-    )?;
-
-    let deferred = approve_expense_sheet(ctx, fixture.organization_id, sheet2);
-    match deferred {
-        Ok(()) => return Err("gate should defer when matching rule exists".into()),
-        Err(msg) if msg.contains("requires approval") => {}
-        Err(msg) => return Err(format!("expected deferral error, got: {msg}")),
-    }
-    let pending = find_pending_request(
-        ctx,
-        fixture.organization_id,
-        "hr_expense_sheet",
-        sheet2,
-        "approve_expense_sheet",
-    )
-    .ok_or("pending approval_request missing after defer")?;
-
-    // Complete deferred path: mark request approved (execute_approved_action has no expense
-    // handler; has_approved_request then lets public approve proceed).
-    ctx.db.approval_request().id().update(ApprovalRequest {
-        status: "approved".into(),
-        reviewed_by: Some(ctx.sender()),
-        reviewed_at: Some(ctx.timestamp),
-        write_date: ctx.timestamp,
-        ..pending
-    });
-    approve_expense_sheet(ctx, fixture.organization_id, sheet2)?;
-    let sheet2_row = ctx
-        .db
-        .expense_sheet()
-        .id()
-        .find(&sheet2)
-        .ok_or("sheet2 after deferred approve")?;
-    if sheet2_row.state != ExpenseSheetState::Approved {
-        return Err(format!(
-            "expected Approved after deferred gate path, got {:?}",
-            sheet2_row.state
-        ));
-    }
     Ok(())
 }
 
@@ -702,12 +636,7 @@ pub fn test_locked_period_rejects_post(ctx: &ReducerContext) -> Result<(), Strin
         .find(|p| p.state == PeriodState::Open)
         .map(|p| p.id)
         .ok_or("open period missing")?;
-    close_account_period(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        period_id,
-    )?;
+    close_account_period(ctx, fixture.organization_id, fixture.company_id, period_id)?;
 
     let result = post_expense_sheet(
         ctx,
@@ -729,8 +658,7 @@ pub fn test_locked_period_rejects_post(ctx: &ReducerContext) -> Result<(), Strin
     match result {
         Ok(()) => Err("post should fail when accounting period is closed".into()),
         Err(msg)
-            if msg.to_lowercase().contains("closed")
-                || msg.to_lowercase().contains("period") =>
+            if msg.to_lowercase().contains("closed") || msg.to_lowercase().contains("period") =>
         {
             Ok(())
         }

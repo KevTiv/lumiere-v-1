@@ -274,6 +274,38 @@ pub enum JobStatus {
     Scheduled,
 }
 
+/// Durable lifecycle for a leased queue job.
+///
+/// This is intentionally separate from [`JobStatus`], which is also used by
+/// non-queue document-processing records.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum QueueJobStatus {
+    Pending,
+    Leased,
+    Completed,
+    DeadLettered,
+    Cancelled,
+}
+
+/// Immutable event recorded for a queue delivery attempt.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum QueueAttemptOutcome {
+    Leased,
+    LeaseRenewed,
+    LeaseExpired,
+    Succeeded,
+    RetryScheduled,
+    DeadLettered,
+    Cancelled,
+}
+
+/// Explicit worker result used to complete a leased queue job.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum QueueCompletionOutcome {
+    Succeeded,
+    Failed,
+}
+
 // Integration-related enums used across multiple integration providers
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]

@@ -9,21 +9,11 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct Workflow {
     pub id: u64,
     pub organization_id: u64,
-    pub name: String,
-    pub description: Option<String>,
-    pub model: String,
-    pub state_field: String,
-    pub on_create: bool,
-    pub is_active: bool,
-    pub activity_ids: Vec<u64>,
-    pub transition_ids: Vec<u64>,
-    pub transition_count: u32,
     pub company_id: Option<u64>,
+    pub workflow_key: String,
+    pub model: String,
     pub create_uid: __sdk::Identity,
     pub create_date: __sdk::Timestamp,
-    pub write_uid: __sdk::Identity,
-    pub write_date: __sdk::Timestamp,
-    pub metadata: Option<String>,
 }
 
 impl __sdk::InModule for Workflow {
@@ -36,21 +26,11 @@ impl __sdk::InModule for Workflow {
 pub struct WorkflowCols {
     pub id: __sdk::__query_builder::Col<Workflow, u64>,
     pub organization_id: __sdk::__query_builder::Col<Workflow, u64>,
-    pub name: __sdk::__query_builder::Col<Workflow, String>,
-    pub description: __sdk::__query_builder::Col<Workflow, Option<String>>,
-    pub model: __sdk::__query_builder::Col<Workflow, String>,
-    pub state_field: __sdk::__query_builder::Col<Workflow, String>,
-    pub on_create: __sdk::__query_builder::Col<Workflow, bool>,
-    pub is_active: __sdk::__query_builder::Col<Workflow, bool>,
-    pub activity_ids: __sdk::__query_builder::Col<Workflow, Vec<u64>>,
-    pub transition_ids: __sdk::__query_builder::Col<Workflow, Vec<u64>>,
-    pub transition_count: __sdk::__query_builder::Col<Workflow, u32>,
     pub company_id: __sdk::__query_builder::Col<Workflow, Option<u64>>,
+    pub workflow_key: __sdk::__query_builder::Col<Workflow, String>,
+    pub model: __sdk::__query_builder::Col<Workflow, String>,
     pub create_uid: __sdk::__query_builder::Col<Workflow, __sdk::Identity>,
     pub create_date: __sdk::__query_builder::Col<Workflow, __sdk::Timestamp>,
-    pub write_uid: __sdk::__query_builder::Col<Workflow, __sdk::Identity>,
-    pub write_date: __sdk::__query_builder::Col<Workflow, __sdk::Timestamp>,
-    pub metadata: __sdk::__query_builder::Col<Workflow, Option<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for Workflow {
@@ -59,21 +39,11 @@ impl __sdk::__query_builder::HasCols for Workflow {
         WorkflowCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
-            name: __sdk::__query_builder::Col::new(table_name, "name"),
-            description: __sdk::__query_builder::Col::new(table_name, "description"),
-            model: __sdk::__query_builder::Col::new(table_name, "model"),
-            state_field: __sdk::__query_builder::Col::new(table_name, "state_field"),
-            on_create: __sdk::__query_builder::Col::new(table_name, "on_create"),
-            is_active: __sdk::__query_builder::Col::new(table_name, "is_active"),
-            activity_ids: __sdk::__query_builder::Col::new(table_name, "activity_ids"),
-            transition_ids: __sdk::__query_builder::Col::new(table_name, "transition_ids"),
-            transition_count: __sdk::__query_builder::Col::new(table_name, "transition_count"),
             company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
+            workflow_key: __sdk::__query_builder::Col::new(table_name, "workflow_key"),
+            model: __sdk::__query_builder::Col::new(table_name, "model"),
             create_uid: __sdk::__query_builder::Col::new(table_name, "create_uid"),
             create_date: __sdk::__query_builder::Col::new(table_name, "create_date"),
-            write_uid: __sdk::__query_builder::Col::new(table_name, "write_uid"),
-            write_date: __sdk::__query_builder::Col::new(table_name, "write_date"),
-            metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
         }
     }
 }
@@ -86,6 +56,7 @@ pub struct WorkflowIxCols {
     pub id: __sdk::__query_builder::IxCol<Workflow, u64>,
     pub model: __sdk::__query_builder::IxCol<Workflow, String>,
     pub organization_id: __sdk::__query_builder::IxCol<Workflow, u64>,
+    pub workflow_key: __sdk::__query_builder::IxCol<Workflow, String>,
 }
 
 impl __sdk::__query_builder::HasIxCols for Workflow {
@@ -96,6 +67,7 @@ impl __sdk::__query_builder::HasIxCols for Workflow {
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             model: __sdk::__query_builder::IxCol::new(table_name, "model"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
+            workflow_key: __sdk::__query_builder::IxCol::new(table_name, "workflow_key"),
         }
     }
 }

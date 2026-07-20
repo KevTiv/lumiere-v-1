@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct QueueWorker {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: Option<u64>,
     pub name: String,
     pub queues: Vec<String>,
     pub is_active: bool,
@@ -27,6 +28,7 @@ impl __sdk::InModule for QueueWorker {
 pub struct QueueWorkerCols {
     pub id: __sdk::__query_builder::Col<QueueWorker, u64>,
     pub organization_id: __sdk::__query_builder::Col<QueueWorker, u64>,
+    pub company_id: __sdk::__query_builder::Col<QueueWorker, Option<u64>>,
     pub name: __sdk::__query_builder::Col<QueueWorker, String>,
     pub queues: __sdk::__query_builder::Col<QueueWorker, Vec<String>>,
     pub is_active: __sdk::__query_builder::Col<QueueWorker, bool>,
@@ -41,6 +43,7 @@ impl __sdk::__query_builder::HasCols for QueueWorker {
         QueueWorkerCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             queues: __sdk::__query_builder::Col::new(table_name, "queues"),
             is_active: __sdk::__query_builder::Col::new(table_name, "is_active"),
@@ -55,6 +58,7 @@ impl __sdk::__query_builder::HasCols for QueueWorker {
 ///
 /// Provides typed access to indexed columns for query building.
 pub struct QueueWorkerIxCols {
+    pub company_id: __sdk::__query_builder::IxCol<QueueWorker, Option<u64>>,
     pub id: __sdk::__query_builder::IxCol<QueueWorker, u64>,
     pub organization_id: __sdk::__query_builder::IxCol<QueueWorker, u64>,
 }
@@ -63,6 +67,7 @@ impl __sdk::__query_builder::HasIxCols for QueueWorker {
     type IxCols = QueueWorkerIxCols;
     fn ix_cols(table_name: &'static str) -> Self::IxCols {
         QueueWorkerIxCols {
+            company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
         }

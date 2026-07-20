@@ -783,33 +783,13 @@
     "is_default",
     "metadata"
   ],
-  "AddWorkflowActivityParams": [
-    "name",
-    "kind",
-    "split_mode",
-    "join_mode",
-    "flow_start",
-    "flow_stop",
-    "sequence",
-    "action",
-    "action_id",
-    "trigger_model",
-    "trigger_expr_id",
-    "signal_send",
-    "subflow_id",
-    "state_from",
-    "state_to",
-    "description",
-    "metadata"
-  ],
-  "AddWorkflowTransitionParams": [
-    "sequence",
-    "signal",
-    "condition",
-    "trigger_model",
-    "trigger_expr_id",
-    "group_id",
-    "metadata"
+  "AddWorkflowHumanTaskCommentParams": [
+    "company_id",
+    "task_id",
+    "expected_revision",
+    "comment",
+    "idempotency_key",
+    "correlation_id"
   ],
   "AdjustmentReason": [
     "id",
@@ -1325,49 +1305,6 @@
     "ref",
     "memo"
   ],
-  "ApprovalRequest": [
-    "id",
-    "organization_id",
-    "company_id",
-    "rule_id",
-    "model",
-    "res_id",
-    "action",
-    "params_json",
-    "status",
-    "summary",
-    "context_json",
-    "requested_by",
-    "requested_at",
-    "reviewed_by",
-    "reviewed_at",
-    "reject_reason",
-    "reviewer_comment",
-    "ai_draft_id",
-    "workflow_instance_id",
-    "create_date",
-    "write_date",
-    "metadata"
-  ],
-  "ApprovalRule": [
-    "id",
-    "organization_id",
-    "company_id",
-    "name",
-    "description",
-    "model",
-    "action",
-    "rule_type",
-    "threshold",
-    "approver_role_id",
-    "sequence",
-    "is_active",
-    "create_uid",
-    "create_date",
-    "write_uid",
-    "write_date",
-    "metadata"
-  ],
   "ArchiveEmployeeParams": [
     "termination_date",
     "override_incomplete_checklist",
@@ -1677,6 +1614,10 @@
   "CancelIntercompanyTransactionParams": [
     "reason"
   ],
+  "CancelQueueJobParams": [
+    "expected_revision",
+    "reason"
+  ],
   "CancelSubscriptionParams": [
     "close_reason_id",
     "notes",
@@ -1686,6 +1627,30 @@
     "journal_id",
     "income_account_id",
     "receivable_account_id"
+  ],
+  "CancelWorkflowOutboxParams": [
+    "company_id",
+    "outbox_id",
+    "expected_outbox_revision",
+    "expected_queue_revision",
+    "idempotency_key",
+    "reason"
+  ],
+  "CancelWorkflowParams": [
+    "company_id",
+    "instance_id",
+    "expected_revision",
+    "reason",
+    "idempotency_key",
+    "correlation_id",
+    "causation_id"
+  ],
+  "CancelWorkflowTimerParams": [
+    "company_id",
+    "timer_id",
+    "expected_timer_revision",
+    "idempotency_key",
+    "reason"
   ],
   "CapacityForecastSnapshot": [
     "id",
@@ -1750,6 +1715,20 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "ClaimQueueJobParams": [
+    "expected_revision",
+    "worker_id",
+    "lease_token",
+    "lease_expires_at_micros"
+  ],
+  "ClaimWorkflowHumanTaskParams": [
+    "company_id",
+    "task_id",
+    "expected_revision",
+    "acting_for",
+    "idempotency_key",
+    "correlation_id"
   ],
   "CloseSubscriptionParams": [
     "close_reason_id",
@@ -1853,6 +1832,33 @@
   "CompletePerformanceReviewParams": [
     "manager_rating",
     "summary"
+  ],
+  "CompleteQueueJobParams": [
+    "expected_revision",
+    "worker_id",
+    "lease_token",
+    "outcome",
+    "error_summary",
+    "response_fingerprint",
+    "retry_jitter_micros"
+  ],
+  "ConditionFieldDefinition": [
+    "field_key",
+    "value_type",
+    "nullable"
+  ],
+  "ConditionProgram": [
+    "instructions"
+  ],
+  "ConditionSnapshot": [
+    "subject_model",
+    "subject_id",
+    "subject_revision_hash",
+    "fields"
+  ],
+  "ConditionSnapshotField": [
+    "field_key",
+    "value"
   ],
   "ConfirmPayslipParams": [
     "company_id",
@@ -2662,18 +2668,6 @@
     "domain",
     "target_value",
     "target_period",
-    "metadata"
-  ],
-  "CreateApprovalRuleParams": [
-    "name",
-    "description",
-    "model",
-    "action",
-    "rule_type",
-    "threshold",
-    "approver_role_id",
-    "sequence",
-    "is_active",
     "metadata"
   ],
   "CreateAssignmentRuleParams": [
@@ -5560,13 +5554,22 @@
     "duration",
     "metadata"
   ],
+  "CreateWorkflowDelegationParams": [
+    "delegator_identity",
+    "delegatee_identity",
+    "role_id",
+    "valid_from",
+    "valid_until",
+    "reason"
+  ],
   "CreateWorkflowParams": [
-    "name",
+    "workflow_key",
     "model",
-    "state_field",
-    "on_create",
-    "is_active",
+    "name",
     "description",
+    "trigger",
+    "schema_version",
+    "snapshot_fields",
     "metadata"
   ],
   "CreateWorkingCalendarParams": [
@@ -5777,6 +5780,18 @@
     "applies_to",
     "created_at",
     "metadata"
+  ],
+  "DecideWorkflowHumanTaskParams": [
+    "company_id",
+    "task_id",
+    "expected_task_revision",
+    "expected_instance_revision",
+    "decision",
+    "acting_for",
+    "comment",
+    "idempotency_key",
+    "correlation_id",
+    "causation_id"
   ],
   "DeferredRevenueLine": [
     "id",
@@ -6127,12 +6142,16 @@
     "reason"
   ],
   "EnqueueJobParams": [
+    "company_id",
     "queue_name",
     "job_type",
     "payload",
+    "semantic_key",
     "priority",
     "max_attempts",
-    "scheduled_at_micros",
+    "available_at_micros",
+    "correlation_id",
+    "causation_id",
     "metadata"
   ],
   "ErrorIntercompanyTransactionParams": [
@@ -6291,6 +6310,19 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "FireWorkflowTimerParams": [
+    "company_id",
+    "timer_id",
+    "expected_timer_revision",
+    "expected_instance_revision",
+    "idempotency_key",
+    "correlation_id",
+    "causation_id"
+  ],
+  "FixedPointDecimal": [
+    "coefficient",
+    "scale"
   ],
   "FleetVehicle": [
     "id",
@@ -6461,6 +6493,22 @@
     "feature_code",
     "product_id",
     "metadata"
+  ],
+  "GuardedActionReceipt": [
+    "id",
+    "organization_id",
+    "company_id",
+    "subject_kind",
+    "subject_id",
+    "action",
+    "action_version",
+    "input_hash",
+    "expected_subject_revision_hash",
+    "result_subject_revision_hash",
+    "invocation_hash",
+    "effect_hash",
+    "idempotency_key",
+    "executed_at"
   ],
   "HelpdeskSla": [
     "id",
@@ -7298,6 +7346,15 @@
     "approved_at",
     "metadata"
   ],
+  "InvalidateWorkflowHumanTaskParams": [
+    "company_id",
+    "task_id",
+    "expected_revision",
+    "observed_subject_revision_hash",
+    "reason",
+    "idempotency_key",
+    "correlation_id"
+  ],
   "InventoryAdjustment": [
     "id",
     "organization_id",
@@ -7953,6 +8010,10 @@
     "tax_regime",
     "cash_control",
     "auto_validate_terminal_payment"
+  ],
+  "MoneyValue": [
+    "minor_units",
+    "currency"
   ],
   "MoveStockQuantParams": [
     "company_id",
@@ -10044,20 +10105,66 @@
     "updated_at",
     "metadata"
   ],
+  "QueueAttempt": [
+    "id",
+    "organization_id",
+    "company_id",
+    "job_id",
+    "attempt_number",
+    "worker_id",
+    "lease_token",
+    "outcome",
+    "lease_expires_at",
+    "available_at",
+    "error_summary",
+    "recorded_by",
+    "recorded_at"
+  ],
+  "QueueEffectReceipt": [
+    "scope_key",
+    "organization_id",
+    "company_id",
+    "job_id",
+    "semantic_key",
+    "input_hash",
+    "worker_id",
+    "lease_token",
+    "response_fingerprint",
+    "correlation_id",
+    "causation_id",
+    "completed_at"
+  ],
   "QueueJob": [
     "id",
     "organization_id",
+    "company_id",
     "queue_name",
     "job_type",
     "payload",
+    "semantic_key",
+    "input_hash",
     "priority",
-    "attempts",
+    "attempt_count",
     "max_attempts",
     "status",
-    "scheduled_at",
-    "started_at",
+    "available_at",
+    "lease_worker_id",
+    "lease_token",
+    "lease_expires_at",
+    "revision",
+    "correlation_id",
+    "causation_id",
     "completed_at",
-    "error_message",
+    "last_error_summary",
+    "dead_lettered_at",
+    "dead_lettered_by",
+    "dead_letter_reason",
+    "last_retried_at",
+    "last_retried_by",
+    "last_retry_reason",
+    "cancelled_at",
+    "cancelled_by",
+    "cancellation_reason",
     "created_by",
     "created_at",
     "metadata"
@@ -10072,6 +10179,7 @@
   "QueueWorker": [
     "id",
     "organization_id",
+    "company_id",
     "name",
     "queues",
     "is_active",
@@ -10229,6 +10337,21 @@
   "RecordWhatsAppHealthCheckParams": [
     "is_healthy"
   ],
+  "RecordWorkflowOutboxResultParams": [
+    "company_id",
+    "outbox_id",
+    "expected_outbox_revision",
+    "expected_instance_revision",
+    "queue_job_id",
+    "worker_id",
+    "lease_token",
+    "result",
+    "response_fingerprint",
+    "error_summary",
+    "idempotency_key",
+    "correlation_id",
+    "causation_id"
+  ],
   "RefreshCapacityForecastParams": [
     "employee_id",
     "period_start",
@@ -10274,13 +10397,10 @@
     "metadata"
   ],
   "RegisterQueueWorkerParams": [
+    "company_id",
     "name",
     "queues",
     "metadata"
-  ],
-  "RejectApprovalRequestParams": [
-    "reason",
-    "comment"
   ],
   "RejectExpensePolicyExceptionParams": [
     "reason",
@@ -10298,6 +10418,12 @@
   ],
   "ReleaseDocumentLegalHoldParams": [
     "metadata"
+  ],
+  "RenewQueueLeaseParams": [
+    "expected_revision",
+    "worker_id",
+    "lease_token",
+    "lease_expires_at_micros"
   ],
   "RenewSubscriptionParams": [
     "intervals",
@@ -10444,6 +10570,12 @@
   "ResumeSubscriptionParams": [
     "notes",
     "recurring_next_date"
+  ],
+  "RetryDeadLetterJobParams": [
+    "expected_revision",
+    "available_at_micros",
+    "additional_attempts",
+    "reason"
   ],
   "ReturnOrder": [
     "id",
@@ -11075,6 +11207,11 @@
     "reason",
     "metadata"
   ],
+  "SetWorkflowCandidateGroupMemberParams": [
+    "group_id",
+    "member_identity",
+    "is_active"
+  ],
   "SettleSaleCommissionsParams": [
     "commission_ids",
     "journal_id",
@@ -11109,6 +11246,21 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "SignalWorkflowParams": [
+    "company_id",
+    "instance_id",
+    "expected_revision",
+    "signal_key",
+    "snapshot",
+    "idempotency_key",
+    "correlation_id",
+    "causation_id"
+  ],
+  "SimulateWorkflowParams": [
+    "simulation_key",
+    "signal_key",
+    "snapshot"
   ],
   "SodConflictRule": [
     "id",
@@ -11151,6 +11303,18 @@
     "department_id",
     "manager_id",
     "metadata"
+  ],
+  "StartWorkflowParams": [
+    "company_id",
+    "workflow_id",
+    "workflow_version_id",
+    "subject_model",
+    "subject_id",
+    "subject_revision_hash",
+    "singleton_trigger_key",
+    "idempotency_key",
+    "correlation_id",
+    "causation_id"
   ],
   "StockCountSheet": [
     "id",
@@ -12547,16 +12711,6 @@
     "tag_ids",
     "metadata"
   ],
-  "UpdateApprovalRuleParams": [
-    "name",
-    "description",
-    "rule_type",
-    "threshold",
-    "approver_role_id",
-    "sequence",
-    "is_active",
-    "metadata"
-  ],
   "UpdateAssignmentRuleParams": [
     "name",
     "model",
@@ -13695,6 +13849,14 @@
     "sequence",
     "metadata"
   ],
+  "UpdateWorkflowDraftParams": [
+    "name",
+    "description",
+    "trigger",
+    "schema_version",
+    "snapshot_fields",
+    "metadata"
+  ],
   "UpdateWorkingCalendarParams": [
     "name",
     "pack_key",
@@ -13798,6 +13960,29 @@
     "partner_id",
     "otif_score",
     "quality_score",
+    "metadata"
+  ],
+  "UpsertWorkflowEdgeParams": [
+    "edge_key",
+    "from_node_key",
+    "to_node_key",
+    "sequence",
+    "signal_key",
+    "condition",
+    "metadata"
+  ],
+  "UpsertWorkflowNodeParams": [
+    "node_key",
+    "name",
+    "kind",
+    "sequence",
+    "split_kind",
+    "join_kind",
+    "action",
+    "task_policy",
+    "timer_policy",
+    "retry_policy",
+    "subflow",
     "metadata"
   ],
   "UserCredential": [
@@ -14150,92 +14335,466 @@
   "Workflow": [
     "id",
     "organization_id",
-    "name",
-    "description",
-    "model",
-    "state_field",
-    "on_create",
-    "is_active",
-    "activity_ids",
-    "transition_ids",
-    "transition_count",
     "company_id",
+    "workflow_key",
+    "model",
+    "create_uid",
+    "create_date"
+  ],
+  "WorkflowActionInput": [
+    "name",
+    "value"
+  ],
+  "WorkflowActionReference": [
+    "action_key",
+    "input_schema_version",
+    "input"
+  ],
+  "WorkflowCalendar": [
+    "id",
+    "calendar_key",
+    "name",
+    "market",
+    "scope",
+    "organization_id",
+    "company_id",
+    "created_at"
+  ],
+  "WorkflowCalendarException": [
+    "id",
+    "calendar_version_id",
+    "local_date_days",
+    "name",
+    "category",
+    "scope",
+    "subdivision",
+    "locality",
+    "is_working_day",
+    "workday_start_minute",
+    "cutoff_minute",
+    "effective_year",
+    "source_authority",
+    "source_title",
+    "source_url",
+    "source_published_on",
+    "source_retrieved_on"
+  ],
+  "WorkflowCalendarVersion": [
+    "id",
+    "calendar_id",
+    "version_number",
+    "locale",
+    "subdivision",
+    "locality",
+    "iana_timezone",
+    "weekday_mask",
+    "workday_start_minute",
+    "cutoff_minute",
+    "dst_overlap_policy",
+    "effective_from_year",
+    "effective_through_year",
+    "content_hash",
+    "source_authority",
+    "source_title",
+    "source_url",
+    "source_published_on",
+    "source_retrieved_on",
+    "activated_at"
+  ],
+  "WorkflowCandidateGroupMember": [
+    "id",
+    "organization_id",
+    "company_id",
+    "group_id",
+    "member_identity",
+    "is_active",
+    "created_by",
+    "created_at",
+    "revoked_by",
+    "revoked_at"
+  ],
+  "WorkflowCommandReceipt": [
+    "scope_key",
+    "organization_id",
+    "company_id",
+    "command_kind",
+    "idempotency_key",
+    "input_hash",
+    "result_instance_id",
+    "result_instance_revision",
+    "result_instance_state",
+    "result_token_ids",
+    "correlation_id",
+    "causation_id",
+    "created_by",
+    "created_at"
+  ],
+  "WorkflowDecisionEvent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "workflow_id",
+    "workflow_version_id",
+    "instance_id",
+    "token_id",
+    "result_token_id",
+    "prior_node_key",
+    "next_node_key",
+    "command_kind",
+    "prior_instance_state",
+    "next_instance_state",
+    "prior_token_state",
+    "next_token_state",
+    "actor",
+    "acting_for",
+    "matched_role_id",
+    "delegation_id",
+    "authorization_outcome",
+    "condition_result",
+    "subject_model",
+    "subject_id",
+    "subject_revision_hash",
+    "action_key",
+    "prior_revision",
+    "next_revision",
+    "idempotency_key",
+    "input_hash",
+    "domain_receipt",
+    "reason",
+    "correlation_id",
+    "causation_id",
+    "recorded_at"
+  ],
+  "WorkflowDelegation": [
+    "id",
+    "organization_id",
+    "company_id",
+    "delegator_identity",
+    "delegatee_identity",
+    "role_id",
+    "valid_from",
+    "valid_until",
+    "is_active",
+    "created_by",
+    "created_at",
+    "revoked_by",
+    "revoked_at",
+    "reason"
+  ],
+  "WorkflowDeliveryAttempt": [
+    "id",
+    "organization_id",
+    "company_id",
+    "object_kind",
+    "object_id",
+    "attempt_kind",
+    "object_revision",
+    "queue_job_id",
+    "worker_id",
+    "lease_token",
+    "input_hash",
+    "response_fingerprint",
+    "error_summary",
+    "runtime_revision",
+    "recorded_by",
+    "recorded_at"
+  ],
+  "WorkflowDeliveryReceipt": [
+    "scope_key",
+    "organization_id",
+    "company_id",
+    "kind",
+    "object_kind",
+    "object_id",
+    "idempotency_key",
+    "input_hash",
+    "object_revision",
+    "runtime_revision",
+    "queue_job_id",
+    "queue_effect_receipt_key",
+    "created_by",
+    "created_at"
+  ],
+  "WorkflowEdge": [
+    "id",
+    "organization_id",
+    "company_id",
+    "workflow_id",
+    "workflow_version_id",
+    "edge_key",
+    "from_node_key",
+    "to_node_key",
+    "sequence",
+    "signal_key",
+    "condition",
     "create_uid",
     "create_date",
     "write_uid",
     "write_date",
     "metadata"
   ],
-  "WorkflowActivity": [
+  "WorkflowHumanTask": [
     "id",
     "organization_id",
-    "name",
-    "description",
+    "company_id",
     "workflow_id",
-    "sequence",
+    "workflow_version_id",
+    "workflow_instance_id",
+    "token_id",
+    "node_id",
+    "node_key",
     "kind",
-    "action",
-    "action_id",
-    "trigger_model",
-    "trigger_expr_id",
-    "split_mode",
-    "join_mode",
-    "signal_send",
-    "subflow_id",
-    "outgoing_transition_ids",
-    "incoming_transition_ids",
-    "flow_start",
-    "flow_stop",
-    "state_from",
-    "state_to",
-    "create_uid",
-    "create_date",
-    "write_uid",
-    "write_date",
-    "metadata"
+    "assignment",
+    "candidate_role_ids",
+    "candidate_group_ids",
+    "candidate_unit_ids",
+    "require_comment_on_reject",
+    "subject_model",
+    "subject_id",
+    "condition_revision_hash",
+    "subject_revision_hash",
+    "guarded_action",
+    "status",
+    "revision",
+    "requested_by",
+    "requested_at",
+    "claimed_by",
+    "claimed_at",
+    "decided_by",
+    "acting_for",
+    "decided_at",
+    "decision",
+    "decision_comment",
+    "invalidated_by",
+    "invalidated_at",
+    "invalidation_reason",
+    "correlation_id",
+    "created_at",
+    "updated_at"
+  ],
+  "WorkflowHumanTaskEvent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "workflow_version_id",
+    "workflow_instance_id",
+    "task_id",
+    "command_kind",
+    "prior_status",
+    "next_status",
+    "decision",
+    "actor",
+    "acting_for",
+    "matched_role_id",
+    "delegation_id",
+    "prior_revision",
+    "next_revision",
+    "idempotency_key",
+    "input_hash",
+    "subject_revision_hash",
+    "comment",
+    "domain_receipt",
+    "correlation_id",
+    "recorded_at"
+  ],
+  "WorkflowHumanTaskReceipt": [
+    "scope_key",
+    "organization_id",
+    "company_id",
+    "task_id",
+    "command_kind",
+    "idempotency_key",
+    "input_hash",
+    "result_status",
+    "result_revision",
+    "domain_receipt",
+    "created_by",
+    "created_at"
   ],
   "WorkflowInstance": [
     "id",
     "organization_id",
+    "company_id",
     "workflow_id",
-    "res_id",
-    "res_type",
+    "workflow_version_id",
+    "definition_hash",
+    "subject_model",
+    "subject_id",
+    "subject_revision_hash",
     "state",
-    "activity_ids",
-    "create_uid",
-    "create_date",
-    "write_uid",
-    "write_date",
-    "metadata"
+    "revision",
+    "active_token_count",
+    "singleton_scope_key",
+    "started_by",
+    "started_at",
+    "completed_at",
+    "cancelled_by",
+    "cancelled_at",
+    "correlation_id",
+    "causation_id"
   ],
-  "WorkflowTransition": [
+  "WorkflowNode": [
     "id",
     "organization_id",
-    "activity_from",
-    "activity_to",
+    "company_id",
+    "workflow_id",
+    "workflow_version_id",
+    "node_key",
+    "name",
+    "kind",
     "sequence",
-    "signal",
-    "condition",
-    "trigger_model",
-    "trigger_expr_id",
-    "group_id",
+    "split_kind",
+    "join_kind",
+    "action",
+    "task_policy",
+    "timer_policy",
+    "retry_policy",
+    "subflow",
     "create_uid",
     "create_date",
     "write_uid",
     "write_date",
     "metadata"
   ],
-  "WorkflowWorkitem": [
+  "WorkflowOutbox": [
     "id",
     "organization_id",
+    "company_id",
     "instance_id",
-    "act_id",
-    "wkf_evaled_condition",
+    "token_id",
+    "expected_token_revision",
+    "edge_id",
+    "action_key",
+    "payload",
+    "semantic_key",
+    "input_hash",
+    "delivery_guarantee",
+    "queue_job_id",
+    "status",
+    "revision",
+    "response_fingerprint",
+    "error_summary",
+    "completed_at",
+    "correlation_id",
+    "causation_id",
+    "created_by",
+    "created_at"
+  ],
+  "WorkflowRetryPolicy": [
+    "kind",
+    "max_attempts",
+    "initial_delay_seconds",
+    "max_delay_seconds"
+  ],
+  "WorkflowSimulationResult": [
+    "id",
+    "organization_id",
+    "company_id",
+    "workflow_id",
+    "workflow_version_id",
+    "simulation_key",
+    "definition_hash",
+    "subject_model",
+    "subject_id",
+    "subject_revision_hash",
+    "trace_hash",
+    "step_count",
+    "create_uid",
+    "create_date"
+  ],
+  "WorkflowSimulationStep": [
+    "id",
+    "organization_id",
+    "company_id",
+    "simulation_result_id",
+    "sequence",
+    "kind",
+    "node_key",
+    "edge_key",
+    "outcome",
+    "detail"
+  ],
+  "WorkflowSubflowReference": [
+    "workflow_id",
+    "workflow_version_id"
+  ],
+  "WorkflowTaskGuardedAction": [
+    "key",
+    "schema_version"
+  ],
+  "WorkflowTaskPolicy": [
+    "kind",
+    "assignment",
+    "candidate_role_ids",
+    "candidate_group_ids",
+    "candidate_unit_ids",
+    "require_comment_on_reject"
+  ],
+  "WorkflowTimer": [
+    "id",
+    "organization_id",
+    "company_id",
+    "instance_id",
+    "token_id",
+    "expected_token_revision",
+    "edge_id",
+    "due_at",
+    "semantic_key",
+    "input_hash",
+    "status",
+    "revision",
+    "fired_by",
+    "fired_at",
+    "cancelled_by",
+    "cancelled_at",
+    "cancellation_reason",
+    "correlation_id",
+    "causation_id",
+    "created_by",
+    "created_at"
+  ],
+  "WorkflowTimerPolicy": [
+    "kind",
+    "delay_seconds",
+    "calendar_key"
+  ],
+  "WorkflowToken": [
+    "id",
+    "organization_id",
+    "company_id",
+    "instance_id",
+    "workflow_version_id",
+    "node_id",
+    "node_key",
     "state",
+    "revision",
+    "parent_token_id",
+    "fork_id",
+    "branch_key",
+    "lineage",
+    "created_at",
+    "consumed_at"
+  ],
+  "WorkflowVersion": [
+    "id",
+    "organization_id",
+    "company_id",
+    "workflow_id",
+    "version",
+    "status",
+    "schema_version",
+    "draft_revision",
+    "name",
+    "description",
+    "trigger",
+    "snapshot_fields",
+    "content_hash",
     "create_uid",
     "create_date",
-    "write_uid",
-    "write_date",
+    "published_uid",
+    "published_date",
+    "retired_uid",
+    "retired_date",
     "metadata"
   ],
   "WorkingCalendar": [

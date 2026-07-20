@@ -4,15 +4,19 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::condition_field_definition_type::ConditionFieldDefinition;
+use super::workflow_trigger_type::WorkflowTrigger;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateWorkflowParams {
-    pub name: String,
+    pub workflow_key: String,
     pub model: String,
-    pub state_field: String,
-    pub on_create: bool,
-    pub is_active: bool,
+    pub name: String,
     pub description: Option<String>,
+    pub trigger: WorkflowTrigger,
+    pub schema_version: u32,
+    pub snapshot_fields: Vec<ConditionFieldDefinition>,
     pub metadata: Option<String>,
 }
 

@@ -8,22 +8,19 @@ import { workflowsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useWorkflowsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useWorkflows,
+  useWorkflowVersions,
   useWorkflowInstances,
-  useWorkflowActivities,
-  useWorkflowWorkitems,
   useCreateWorkflow,
-  useSetWorkflowActive,
-  useAddWorkflowActivity,
-  useAddWorkflowTransition,
+  usePublishWorkflowVersion,
+  useCloneWorkflowVersionToDraft,
+  useRetireWorkflowVersion,
   useImportWorkflowCsv,
-  useStartWorkflow,
-  useSignalWorkflow,
-  useCancelWorkflowInstance,
-  useSetWorkitemException,
+  useCancelWorkflow,
 } from "@lumiere/query-hooks/hooks/workflows"
-import type { CreateWorkflowParams } from "@lumiere/query-hooks/hooks/workflows"
+import { toCreateWorkflowParams } from "@lumiere/erp-shared/workflows-create-params"
+import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
-import { instanceStateTag } from "@/lib/workflow-enum"
+import { instanceStateTag, versionStatusTag } from "@/lib/workflow-enum"
 import { WorkflowsRowDialog } from "./workflows-row-dialog"
 
 interface WorkflowsClientProps {
@@ -48,50 +45,63 @@ export function WorkflowsClient(props: WorkflowsClientProps) {
 function WorkflowsClientLoaded({
   initialWorkflows,
   initialInstances,
-  initialActivities,
-  initialWorkitems,
   organizationId,
 }: WorkflowsClientLoadedProps) {
   useWorkflowsModuleSubscription()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => workflowsModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
-  const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(
-    null,
-  )
+  const operatingCompanyId = useOperatingCompanyId(organizationId)
+  const [quickActionForm, setQuickActionForm] = useState<{
+    form: FormConfig
+    action: string
+  } | null>(null)
   const [rowDialog, setRowDialog] = useState<{
-    tabId: "workflows" | "instances"
+    tabId: "workflows" | "versions" | "instances"
     row: Record<string, unknown>
   } | null>(null)
 
   const { data: workflows = [] } = useWorkflows(orgId, initialWorkflows)
+  const { data: versionsRaw = [] } = useWorkflowVersions(orgId)
   const { data: instancesRaw = [] } = useWorkflowInstances(orgId, initialInstances)
-  const { data: activities = [] } = useWorkflowActivities(orgId, initialActivities)
-  const { data: workitems = [] } = useWorkflowWorkitems(orgId, initialWorkitems)
+
+  const versions = useMemo(
+    () =>
+      versionsRaw.map((row) => ({
+        ...row,
+        statusTag: versionStatusTag(row.status),
+        draftRevision: row.draftRevision ?? row.draft_revision,
+        schemaVersion: row.schemaVersion ?? row.schema_version,
+        workflowId: row.workflowId ?? row.workflow_id,
+      })),
+    [versionsRaw],
+  )
 
   const instances = useMemo(
     () =>
       instancesRaw.map((row) => ({
         ...row,
         stateTag: instanceStateTag(row.state),
+        subjectModel: row.subjectModel ?? row.subject_model,
+        subjectId: row.subjectId ?? row.subject_id,
+        workflowVersionId: row.workflowVersionId ?? row.workflow_version_id,
+        startedAt: row.startedAt ?? row.started_at,
       })),
     [instancesRaw],
   )
 
-  const createWorkflow = useCreateWorkflow(orgId)
-  const setWorkflowActive = useSetWorkflowActive(orgId)
-  const addWorkflowActivity = useAddWorkflowActivity(orgId)
-  const addWorkflowTransition = useAddWorkflowTransition(orgId)
+  const createWorkflow = useCreateWorkflow(orgId, operatingCompanyId)
+  const publishVersion = usePublishWorkflowVersion(orgId, operatingCompanyId)
+  const cloneVersion = useCloneWorkflowVersionToDraft(orgId, operatingCompanyId)
+  const retireVersion = useRetireWorkflowVersion(orgId, operatingCompanyId)
   const importWorkflowCsv = useImportWorkflowCsv(orgId)
-  const startWorkflow = useStartWorkflow(orgId)
-  const signalWorkflow = useSignalWorkflow(orgId)
-  const cancelWorkflowInstance = useCancelWorkflowInstance(orgId)
-  const setWorkitemException = useSetWorkitemException(orgId)
+  const cancelWorkflow = useCancelWorkflow(orgId)
 
   const liveSections = useMemo(() => {
-    const activeDefs = workflows.filter((w) => w.isActive).length
+    const published = versions.filter((v) => v.statusTag === "Published").length
     const activeInst = instances.filter((i) => i.stateTag === "Active").length
-    const completeInst = instances.filter((i) => i.stateTag === "Complete").length
+    const completeInst = instances.filter((i) => i.stateTag === "Completed").length
+    const cancelledInst = instances.filter((i) => i.stateTag === "Cancelled").length
 
     const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
     if (!dashboardTab?.sections) return []
@@ -110,8 +120,8 @@ function WorkflowsClientLoaded({
                   icon: "GitBranch",
                 },
                 {
-                  label: t("workflows.dashboard.active"),
-                  value: String(activeDefs),
+                  label: t("workflows.dashboard.active", { defaultValue: "Published versions" }),
+                  value: String(published),
                   icon: "CheckCircle",
                 },
                 {
@@ -121,7 +131,7 @@ function WorkflowsClientLoaded({
                 },
                 {
                   label: t("workflows.dashboard.completed"),
-                  value: String(completeInst),
+                  value: String(completeInst + cancelledInst),
                   icon: "Flag",
                 },
               ],
@@ -130,7 +140,8 @@ function WorkflowsClientLoaded({
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            new_workflow: () => setQuickActionForm({ form: newWorkflowForm(t), action: "createWorkflow" }),
+            new_workflow: () =>
+              setQuickActionForm({ form: newWorkflowForm(t), action: "createWorkflow" }),
             import_workflow_csv: () =>
               setQuickActionForm({
                 form: {
@@ -172,7 +183,7 @@ function WorkflowsClientLoaded({
         return w
       }),
     }))
-  }, [workflows, instances, moduleConfig, t])
+  }, [workflows, versions, instances, moduleConfig, t])
 
   const config = useMemo(
     () => ({
@@ -187,26 +198,16 @@ function WorkflowsClientLoaded({
   const data = useMemo(
     () => ({
       workflows: workflows as unknown as Record<string, unknown>[],
+      versions: versions as unknown as Record<string, unknown>[],
       instances: instances as unknown as Record<string, unknown>[],
     }),
-    [workflows, instances],
+    [workflows, versions, instances],
   )
 
   const handleFormSubmit = (_tabId: string, action: string, formData: Record<string, unknown>) => {
     if (action === "createWorkflow") {
-      const name = String(formData.name ?? "").trim()
-      const model = String(formData.model ?? "").trim()
-      const stateField = String(formData.stateField ?? "").trim()
-      if (!name || !model || !stateField) return
-      const payload: CreateWorkflowParams = {
-        name,
-        model,
-        stateField,
-        onCreate: Boolean(formData.onCreate),
-        isActive: formData.isActive !== false,
-        description: formData.description ? String(formData.description) : undefined,
-        metadata: undefined,
-      }
+      const payload = toCreateWorkflowParams(formData)
+      if (!payload) return
       createWorkflow.mutate(payload)
       return
     }
@@ -224,7 +225,7 @@ function WorkflowsClientLoaded({
         data={data}
         onFormSubmit={handleFormSubmit}
         onRowClick={(tabId, row) => {
-          if (tabId === "workflows" || tabId === "instances") {
+          if (tabId === "workflows" || tabId === "versions" || tabId === "instances") {
             setRowDialog({ tabId, row })
           }
         }}
@@ -245,18 +246,12 @@ function WorkflowsClientLoaded({
         onOpenChange={(open) => !open && setRowDialog(null)}
         tabId={rowDialog?.tabId ?? null}
         row={rowDialog?.row ?? null}
-        activities={activities}
-        workitems={workitems}
         t={t}
         mutations={{
-          setWorkflowActive,
-          addWorkflowActivity,
-          addWorkflowTransition,
-          importWorkflowCsv,
-          startWorkflow,
-          signalWorkflow,
-          cancelWorkflowInstance,
-          setWorkitemException,
+          publishVersion,
+          cloneVersion,
+          retireVersion,
+          cancelWorkflow,
         }}
       />
     </>

@@ -2,7 +2,7 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use super::job_status_type::JobStatus;
+use super::queue_job_status_type::QueueJobStatus;
 use super::queue_job_type::QueueJob;
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 

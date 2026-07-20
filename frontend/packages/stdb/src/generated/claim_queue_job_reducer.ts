@@ -10,7 +10,14 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  ClaimQueueJobParams,
+} from "./types";
+
 export default {
   organizationId: __t.u64(),
   jobId: __t.u64(),
+  get params() {
+    return ClaimQueueJobParams;
+  },
 };

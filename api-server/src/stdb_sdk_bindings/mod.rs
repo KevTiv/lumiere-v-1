@@ -53,8 +53,7 @@ pub mod add_purchase_requisition_line_params_type;
 pub mod add_purchase_rfq_line_params_type;
 pub mod add_subscription_bundle_item_params_type;
 pub mod add_user_to_organization_params_type;
-pub mod add_workflow_activity_params_type;
-pub mod add_workflow_transition_params_type;
+pub mod add_workflow_human_task_comment_params_type;
 pub mod adjustment_reason_type;
 pub mod advance_subscription_dunning_params_type;
 pub mod ai_action_draft_type;
@@ -93,8 +92,6 @@ pub mod apply_project_change_order_params_type;
 pub mod apply_sale_promotion_params_type;
 pub mod apply_subscription_bundle_params_type;
 pub mod apply_subscription_invoice_payment_params_type;
-pub mod approval_request_type;
-pub mod approval_rule_type;
 pub mod archive_employee_params_type;
 pub mod asset_state_type;
 pub mod asset_type_type;
@@ -126,13 +123,21 @@ pub mod bootstrap_new_tenant_params_type;
 pub mod budget_post_type;
 pub mod budget_state_type;
 pub mod calendar_event_type;
+pub mod calendar_exception_category_type;
+pub mod calendar_exception_scope_type;
 pub mod cancel_intercompany_transaction_params_type;
+pub mod cancel_queue_job_params_type;
 pub mod cancel_subscription_params_type;
+pub mod cancel_workflow_outbox_params_type;
+pub mod cancel_workflow_params_type;
+pub mod cancel_workflow_timer_params_type;
 pub mod capacity_forecast_snapshot_type;
 pub mod card_state_type;
 pub mod cartonization_result_type;
 pub mod casbin_rule_type;
 pub mod cash_flow_line_type;
+pub mod claim_queue_job_params_type;
+pub mod claim_workflow_human_task_params_type;
 pub mod close_subscription_params_type;
 pub mod commodity_price_index_type;
 pub mod company_type;
@@ -145,7 +150,16 @@ pub mod complete_document_signature_request_params_type;
 pub mod complete_offboarding_item_params_type;
 pub mod complete_onboarding_item_params_type;
 pub mod complete_performance_review_params_type;
+pub mod complete_queue_job_params_type;
 pub mod compute_price_type;
+pub mod condition_comparison_type;
+pub mod condition_field_definition_type;
+pub mod condition_instruction_type;
+pub mod condition_program_type;
+pub mod condition_snapshot_type;
+pub mod condition_snapshot_field_type;
+pub mod condition_value_type;
+pub mod condition_value_type_type;
 pub mod confirm_payslip_params_type;
 pub mod consignment_agreement_type;
 pub mod consolidation_account_type;
@@ -204,7 +218,6 @@ pub mod create_analytic_account_params_type;
 pub mod create_analytic_distribution_model_params_type;
 pub mod create_analytic_line_params_type;
 pub mod create_analytics_metric_params_type;
-pub mod create_approval_rule_params_type;
 pub mod create_assignment_rule_params_type;
 pub mod create_attendance_punch_params_type;
 pub mod create_audit_rule_params_type;
@@ -423,6 +436,7 @@ pub mod create_whats_app_business_account_params_type;
 pub mod create_work_schedule_params_type;
 pub mod create_workcenter_params_type;
 pub mod create_workcenter_productivity_params_type;
+pub mod create_workflow_delegation_params_type;
 pub mod create_workflow_params_type;
 pub mod create_working_calendar_params_type;
 pub mod create_workorder_params_type;
@@ -437,6 +451,7 @@ pub mod dashboard_type;
 pub mod dashboard_widget_type;
 pub mod data_classification_type;
 pub mod data_classification_rule_type;
+pub mod decide_workflow_human_task_params_type;
 pub mod deferred_revenue_line_type;
 pub mod deferred_revenue_schedule_type;
 pub mod delegated_admin_scope_type;
@@ -461,6 +476,7 @@ pub mod document_template_type;
 pub mod document_version_type;
 pub mod done_stock_move_params_type;
 pub mod drive_conflict_policy_type;
+pub mod dst_overlap_policy_type;
 pub mod employment_type_type;
 pub mod end_contact_role_params_type;
 pub mod enqueue_job_params_type;
@@ -487,7 +503,9 @@ pub mod field_validation_type;
 pub mod field_width_type;
 pub mod finalize_import_assistant_job_params_type;
 pub mod financial_report_type;
+pub mod fire_workflow_timer_params_type;
 pub mod fiscal_year_state_type;
+pub mod fixed_point_decimal_type;
 pub mod fleet_vehicle_type;
 pub mod form_config_type;
 pub mod form_config_field_type;
@@ -501,6 +519,9 @@ pub mod google_drive_connection_type;
 pub mod grant_delegated_admin_scope_params_type;
 pub mod grant_org_permission_params_type;
 pub mod grant_subscription_entitlement_params_type;
+pub mod guarded_action_key_type;
+pub mod guarded_action_receipt_type;
+pub mod guarded_action_subject_kind_type;
 pub mod helpdesk_sla_type;
 pub mod helpdesk_stage_type;
 pub mod helpdesk_team_type;
@@ -559,13 +580,13 @@ pub mod import_job_record_type;
 pub mod import_mapping_template_type;
 pub mod ingest_subscription_usage_event_params_type;
 pub mod insight_severity_type;
-pub mod instance_state_type;
 pub mod intake_state_type;
 pub mod integration_status_type;
 pub mod integration_type_type;
 pub mod intercompany_rule_type;
 pub mod intercompany_state_type;
 pub mod intercompany_transaction_type;
+pub mod invalidate_workflow_human_task_params_type;
 pub mod inventory_adjustment_type;
 pub mod inventory_close_type;
 pub mod inventory_close_line_type;
@@ -610,6 +631,7 @@ pub mod message_template_type;
 pub mod message_template_variable_type;
 pub mod mo_state_type;
 pub mod module_config_input_type;
+pub mod money_value_type;
 pub mod move_stock_quant_params_type;
 pub mod move_type_type;
 pub mod mrp_bom_type;
@@ -732,7 +754,12 @@ pub mod quality_alert_reason_type;
 pub mod quality_check_type;
 pub mod quality_point_type;
 pub mod quality_team_type;
+pub mod queue_attempt_type;
+pub mod queue_attempt_outcome_type;
+pub mod queue_completion_outcome_type;
+pub mod queue_effect_receipt_type;
 pub mod queue_job_type;
+pub mod queue_job_status_type;
 pub mod queue_mail_from_template_params_type;
 pub mod queue_worker_type;
 pub mod rate_subscription_usage_events_params_type;
@@ -757,6 +784,7 @@ pub mod record_sales_integration_result_params_type;
 pub mod record_subscription_payment_failure_params_type;
 pub mod record_telemetry_params_type;
 pub mod record_whats_app_health_check_params_type;
+pub mod record_workflow_outbox_result_params_type;
 pub mod refresh_capacity_forecast_params_type;
 pub mod refresh_hr_capacity_forecast_params_type;
 pub mod refresh_inventory_exceptions_params_type;
@@ -767,11 +795,11 @@ pub mod refuse_expense_sheet_params_type;
 pub mod register_device_params_type;
 pub mod register_hub_params_type;
 pub mod register_queue_worker_params_type;
-pub mod reject_approval_request_params_type;
 pub mod reject_expense_policy_exception_params_type;
 pub mod reject_timesheets_params_type;
 pub mod release_blanket_to_po_params_type;
 pub mod release_document_legal_hold_params_type;
+pub mod renew_queue_lease_params_type;
 pub mod renew_subscription_params_type;
 pub mod reopen_timesheets_params_type;
 pub mod replenishment_rule_type;
@@ -785,6 +813,7 @@ pub mod resource_allocation_type;
 pub mod resource_capacity_snapshot_type;
 pub mod resource_utilisation_snapshot_type;
 pub mod resume_subscription_params_type;
+pub mod retry_dead_letter_job_params_type;
 pub mod return_order_type;
 pub mod return_order_line_type;
 pub mod revenue_recognition_rule_type;
@@ -840,14 +869,18 @@ pub mod set_purchase_approval_delegate_params_type;
 pub mod set_record_custom_field_values_params_type;
 pub mod set_subscription_commitment_params_type;
 pub mod set_vendor_risk_flag_params_type;
+pub mod set_workflow_candidate_group_member_params_type;
 pub mod settle_sale_commissions_params_type;
 pub mod setup_fiscal_calendar_params_type;
 pub mod shipping_method_type;
+pub mod signal_workflow_params_type;
+pub mod simulate_workflow_params_type;
 pub mod sod_conflict_rule_type;
 pub mod split_method_type;
 pub mod stage_bank_statement_import_line_params_type;
 pub mod stage_bank_statement_import_params_type;
 pub mod start_timesheet_timer_params_type;
+pub mod start_workflow_params_type;
 pub mod stock_count_sheet_type;
 pub mod stock_cycle_count_type;
 pub mod stock_inventory_type;
@@ -927,7 +960,6 @@ pub mod update_ai_reducer_allowlist_params_type;
 pub mod update_analytic_account_params_type;
 pub mod update_analytic_distribution_model_params_type;
 pub mod update_analytic_line_params_type;
-pub mod update_approval_rule_params_type;
 pub mod update_assignment_rule_params_type;
 pub mod update_audit_rule_params_type;
 pub mod update_barcode_nomenclature_params_type;
@@ -1038,6 +1070,7 @@ pub mod update_whats_app_credentials_params_type;
 pub mod update_whats_app_verification_params_type;
 pub mod update_widget_layout_params_type;
 pub mod update_workcenter_params_type;
+pub mod update_workflow_draft_params_type;
 pub mod update_working_calendar_params_type;
 pub mod upsert_ai_skill_config_params_type;
 pub mod upsert_ai_skill_params_type;
@@ -1049,6 +1082,8 @@ pub mod upsert_partner_credit_control_params_type;
 pub mod upsert_search_embedding_params_type;
 pub mod upsert_subscription_price_index_params_type;
 pub mod upsert_vendor_scorecard_params_type;
+pub mod upsert_workflow_edge_params_type;
+pub mod upsert_workflow_node_params_type;
 pub mod user_credential_type;
 pub mod user_custom_field_type;
 pub mod user_invite_type;
@@ -1073,12 +1108,60 @@ pub mod warehouse_task_type;
 pub mod whats_app_business_account_type;
 pub mod widget_type_type;
 pub mod workflow_type;
-pub mod workflow_activity_type;
+pub mod workflow_action_input_type;
+pub mod workflow_action_reference_type;
+pub mod workflow_authorization_outcome_type;
+pub mod workflow_branch_kind_type;
+pub mod workflow_calendar_type;
+pub mod workflow_calendar_exception_type;
+pub mod workflow_calendar_market_type;
+pub mod workflow_calendar_scope_type;
+pub mod workflow_calendar_version_type;
+pub mod workflow_candidate_group_member_type;
+pub mod workflow_command_kind_type;
+pub mod workflow_command_receipt_type;
+pub mod workflow_decision_event_type;
+pub mod workflow_delegation_type;
+pub mod workflow_delivery_attempt_type;
+pub mod workflow_delivery_attempt_kind_type;
+pub mod workflow_delivery_guarantee_type;
+pub mod workflow_delivery_object_kind_type;
+pub mod workflow_delivery_receipt_type;
+pub mod workflow_delivery_receipt_kind_type;
+pub mod workflow_edge_type;
+pub mod workflow_human_task_type;
+pub mod workflow_human_task_command_kind_type;
+pub mod workflow_human_task_decision_type;
+pub mod workflow_human_task_event_type;
+pub mod workflow_human_task_kind_type;
+pub mod workflow_human_task_receipt_type;
+pub mod workflow_human_task_status_type;
 pub mod workflow_instance_type;
-pub mod workflow_transition_type;
-pub mod workflow_workitem_type;
+pub mod workflow_instance_state_type;
+pub mod workflow_node_type;
+pub mod workflow_node_kind_type;
+pub mod workflow_outbox_type;
+pub mod workflow_outbox_result_kind_type;
+pub mod workflow_outbox_status_type;
+pub mod workflow_retry_kind_type;
+pub mod workflow_retry_policy_type;
+pub mod workflow_simulation_result_type;
+pub mod workflow_simulation_step_type;
+pub mod workflow_simulation_step_kind_type;
+pub mod workflow_subflow_reference_type;
+pub mod workflow_task_assignment_type;
+pub mod workflow_task_guarded_action_type;
+pub mod workflow_task_policy_type;
+pub mod workflow_timer_type;
+pub mod workflow_timer_kind_type;
+pub mod workflow_timer_policy_type;
+pub mod workflow_timer_status_type;
+pub mod workflow_token_type;
+pub mod workflow_token_state_type;
+pub mod workflow_trigger_type;
+pub mod workflow_version_type;
+pub mod workflow_version_status_type;
 pub mod working_calendar_type;
-pub mod workitem_state_type;
 pub mod workorder_state_type;
 pub mod zone_display_type_type;
 pub mod accept_sale_order_quotation_reducer;
@@ -1112,8 +1195,7 @@ pub mod add_subscription_bundle_item_reducer;
 pub mod add_user_custom_field_reducer;
 pub mod add_user_to_organization_reducer;
 pub mod add_widget_to_dashboard_reducer;
-pub mod add_workflow_activity_reducer;
-pub mod add_workflow_transition_reducer;
+pub mod add_workflow_human_task_comment_reducer;
 pub mod advance_subscription_dunning_reducer;
 pub mod allocate_payment_transaction_reducer;
 pub mod amend_subscription_reducer;
@@ -1142,7 +1224,6 @@ pub mod apply_subscription_payment_intent_reducer;
 pub mod apply_subscription_tax_settle_intent_reducer;
 pub mod apply_warehouse_sync_intent_reducer;
 pub mod approve_ai_action_draft_reducer;
-pub mod approve_approval_request_reducer;
 pub mod approve_bank_statement_import_reducer;
 pub mod approve_document_processing_job_reducer;
 pub mod approve_expense_policy_exception_reducer;
@@ -1190,6 +1271,7 @@ pub mod cancel_picking_batch_reducer;
 pub mod cancel_purchase_order_reducer;
 pub mod cancel_purchase_requisition_reducer;
 pub mod cancel_quality_alert_reducer;
+pub mod cancel_queue_job_reducer;
 pub mod cancel_return_order_reducer;
 pub mod cancel_sale_commission_reducer;
 pub mod cancel_sale_order_reducer;
@@ -1197,14 +1279,18 @@ pub mod cancel_stock_move_reducer;
 pub mod cancel_stock_package_reducer;
 pub mod cancel_stock_picking_reducer;
 pub mod cancel_subscription_reducer;
-pub mod cancel_workflow_instance_reducer;
+pub mod cancel_workflow_reducer;
+pub mod cancel_workflow_outbox_reducer;
+pub mod cancel_workflow_timer_reducer;
 pub mod check_mo_availability_reducer;
 pub mod claim_hub_with_token_reducer;
 pub mod claim_queue_job_reducer;
+pub mod claim_workflow_human_task_reducer;
 pub mod clear_document_presence_reducer;
 pub mod clear_knowledge_article_presence_reducer;
 pub mod clear_opportunity_presence_reducer;
 pub mod clear_proposal_presence_reducer;
+pub mod clone_workflow_version_to_draft_reducer;
 pub mod close_account_asset_reducer;
 pub mod close_account_period_reducer;
 pub mod close_fiscal_year_reducer;
@@ -1278,7 +1364,6 @@ pub mod create_analytic_account_reducer;
 pub mod create_analytic_distribution_model_reducer;
 pub mod create_analytic_line_reducer;
 pub mod create_analytics_metric_reducer;
-pub mod create_approval_rule_reducer;
 pub mod create_assignment_rule_reducer;
 pub mod create_attendance_punch_reducer;
 pub mod create_audit_rule_reducer;
@@ -1496,11 +1581,13 @@ pub mod create_whatsapp_business_account_reducer;
 pub mod create_work_schedule_reducer;
 pub mod create_workcenter_reducer;
 pub mod create_workflow_reducer;
+pub mod create_workflow_delegation_reducer;
 pub mod create_working_calendar_reducer;
 pub mod create_workorder_reducer;
 pub mod deactivate_pos_config_reducer;
 pub mod deactivate_revenue_recognition_rule_reducer;
 pub mod deactivate_subscription_plan_reducer;
+pub mod decide_workflow_human_task_reducer;
 pub mod delete_account_asset_reducer;
 pub mod delete_account_bank_statement_reducer;
 pub mod delete_account_bank_statement_line_reducer;
@@ -1509,7 +1596,6 @@ pub mod delete_account_period_reducer;
 pub mod delete_account_reconciliation_widget_reducer;
 pub mod delete_ai_reducer_allowlist_reducer;
 pub mod delete_analytic_line_reducer;
-pub mod delete_approval_rule_reducer;
 pub mod delete_barcode_nomenclature_reducer;
 pub mod delete_barcode_rule_reducer;
 pub mod delete_bom_reducer;
@@ -1566,6 +1652,8 @@ pub mod delete_user_custom_field_reducer;
 pub mod delete_warehouse_reducer;
 pub mod delete_warehouse_3_d_zone_reducer;
 pub mod delete_whatsapp_business_account_reducer;
+pub mod delete_workflow_edge_reducer;
+pub mod delete_workflow_node_reducer;
 pub mod deprecate_account_account_reducer;
 pub mod dev_promote_caller_superuser_reducer;
 pub mod dismiss_insight_reducer;
@@ -1600,6 +1688,7 @@ pub mod finalize_import_assistant_job_reducer;
 pub mod find_duplicate_contacts_reducer;
 pub mod finish_manufacturing_order_reducer;
 pub mod finish_workorder_reducer;
+pub mod fire_workflow_timer_reducer;
 pub mod generate_eu_vat_report_reducer;
 pub mod generate_financial_report_reducer;
 pub mod generate_hub_pairing_token_reducer;
@@ -1672,6 +1761,7 @@ pub mod import_workcenter_csv_reducer;
 pub mod import_workflow_csv_reducer;
 pub mod ingest_subscription_usage_event_reducer;
 pub mod initialize_default_form_configs_reducer;
+pub mod invalidate_workflow_human_task_reducer;
 pub mod invoice_po_line_reducer;
 pub mod link_device_to_location_reducer;
 pub mod link_device_to_pos_reducer;
@@ -1728,6 +1818,7 @@ pub mod process_inventory_adjustment_reducer;
 pub mod process_pending_scans_reducer;
 pub mod produce_manufacturing_order_reducer;
 pub mod promote_ai_skill_version_reducer;
+pub mod publish_workflow_version_reducer;
 pub mod purge_expired_documents_reducer;
 pub mod queue_mail_from_template_reducer;
 pub mod rate_subscription_usage_events_reducer;
@@ -1763,6 +1854,7 @@ pub mod record_telemetry_reducer;
 pub mod record_telemetry_batch_reducer;
 pub mod record_whatsapp_health_check_reducer;
 pub mod record_whatsapp_message_sent_reducer;
+pub mod record_workflow_outbox_result_reducer;
 pub mod refresh_capacity_forecast_reducer;
 pub mod refresh_hr_capacity_forecast_reducer;
 pub mod refresh_inventory_exceptions_reducer;
@@ -1781,7 +1873,6 @@ pub mod register_iot_hub_reducer;
 pub mod register_payment_on_invoice_reducer;
 pub mod register_queue_worker_reducer;
 pub mod reject_ai_action_draft_reducer;
-pub mod reject_approval_request_reducer;
 pub mod reject_expense_policy_exception_reducer;
 pub mod reject_supplier_intake_reducer;
 pub mod reject_timesheets_reducer;
@@ -1795,6 +1886,7 @@ pub mod remove_member_from_quality_team_reducer;
 pub mod remove_purchase_order_line_reducer;
 pub mod remove_rule_from_nomenclature_reducer;
 pub mod remove_user_from_organization_reducer;
+pub mod renew_queue_job_lease_reducer;
 pub mod renew_subscription_reducer;
 pub mod reopen_inventory_close_reducer;
 pub mod reopen_ticket_reducer;
@@ -1811,6 +1903,8 @@ pub mod resolve_proposal_comment_reducer;
 pub mod restore_document_reducer;
 pub mod restore_product_category_reducer;
 pub mod resume_subscription_reducer;
+pub mod retire_workflow_version_reducer;
+pub mod retry_dead_letter_queue_job_reducer;
 pub mod retry_intercompany_transaction_reducer;
 pub mod retry_iot_action_reducer;
 pub mod reverse_payment_transaction_reducer;
@@ -1821,6 +1915,7 @@ pub mod revoke_delegated_admin_scope_reducer;
 pub mod revoke_permission_reducer;
 pub mod revoke_role_reducer;
 pub mod revoke_subscription_entitlement_reducer;
+pub mod revoke_workflow_delegation_reducer;
 pub mod rollback_ai_skill_release_reducer;
 pub mod rollback_import_job_reducer;
 pub mod run_accounting_fx_revaluation_test_reducer;
@@ -1845,6 +1940,9 @@ pub mod run_all_projects_tests_reducer;
 pub mod run_all_purchasing_tests_reducer;
 pub mod run_all_sales_tests_reducer;
 pub mod run_all_subscriptions_tests_reducer;
+pub mod run_all_workflow_deterministic_core_tests_reducer;
+pub mod run_all_workflow_foundation_tests_reducer;
+pub mod run_all_workflow_human_effect_tests_reducer;
 pub mod run_cartonization_reducer;
 pub mod run_core_operational_messaging_test_reducer;
 pub mod run_core_sod_test_reducer;
@@ -1915,6 +2013,7 @@ pub mod run_purchasing_company_isolation_test_reducer;
 pub mod run_purchasing_incoming_picking_test_reducer;
 pub mod run_purchasing_wave_c_smoke_test_reducer;
 pub mod run_purchasing_wave_e_test_reducer;
+pub mod run_queue_foundation_tests_reducer;
 pub mod run_sales_atp_shortfall_test_reducer;
 pub mod run_sales_backorder_test_reducer;
 pub mod run_sales_commission_accrue_test_reducer;
@@ -1943,7 +2042,13 @@ pub mod run_subscriptions_wave_d_test_reducer;
 pub mod run_subscriptions_wave_e_test_reducer;
 pub mod run_tenant_isolation_tests_reducer;
 pub mod run_traceability_report_reducer;
+pub mod run_workflow_action_registry_tests_reducer;
+pub mod run_workflow_authorization_tests_reducer;
 pub mod run_workflow_definition_test_reducer;
+pub mod run_workflow_delivery_tests_reducer;
+pub mod run_workflow_evaluator_simulation_tests_reducer;
+pub mod run_workflow_human_task_tests_reducer;
+pub mod run_workflow_runtime_tests_reducer;
 pub mod save_import_mapping_template_reducer;
 pub mod save_proposal_version_reducer;
 pub mod schedule_document_retention_purge_reducer;
@@ -1960,7 +2065,6 @@ pub mod set_ai_agent_active_reducer;
 pub mod set_ai_reducer_allowlist_enabled_reducer;
 pub mod set_ai_skill_active_reducer;
 pub mod set_analytic_account_active_reducer;
-pub mod set_approval_rule_active_reducer;
 pub mod set_article_published_reducer;
 pub mod set_asset_active_reducer;
 pub mod set_billing_status_reducer;
@@ -1985,12 +2089,12 @@ pub mod set_subscription_commitment_reducer;
 pub mod set_task_parent_reducer;
 pub mod set_vendor_risk_flag_reducer;
 pub mod set_whatsapp_primary_account_reducer;
-pub mod set_workflow_active_reducer;
-pub mod set_workitem_exception_reducer;
+pub mod set_workflow_candidate_group_member_reducer;
 pub mod settle_sale_commissions_reducer;
 pub mod setup_fiscal_calendar_reducer;
 pub mod share_dashboard_reducer;
 pub mod signal_workflow_reducer;
+pub mod simulate_workflow_reducer;
 pub mod solve_quality_alert_reducer;
 pub mod stage_bank_statement_import_reducer;
 pub mod start_cycle_count_session_reducer;
@@ -2014,6 +2118,9 @@ pub mod subscribe_to_record_reducer;
 pub mod sync_external_file_to_document_reducer;
 pub mod sync_hub_devices_reducer;
 pub mod test_iot_device_reducer;
+pub mod test_queue_job_edge_cases_reducer;
+pub mod test_queue_system_reducer;
+pub mod test_worker_edge_cases_reducer;
 pub mod toggle_project_favorite_reducer;
 pub mod unassign_team_member_skill_reducer;
 pub mod unblock_workcenter_reducer;
@@ -2047,7 +2154,6 @@ pub mod update_ai_reducer_allowlist_reducer;
 pub mod update_analytic_account_reducer;
 pub mod update_analytic_distribution_model_reducer;
 pub mod update_analytic_line_reducer;
-pub mod update_approval_rule_reducer;
 pub mod update_assignment_rule_reducer;
 pub mod update_audit_rule_reducer;
 pub mod update_barcode_nomenclature_reducer;
@@ -2185,6 +2291,7 @@ pub mod update_whatsapp_quality_score_reducer;
 pub mod update_whatsapp_verification_status_reducer;
 pub mod update_widget_layout_reducer;
 pub mod update_workcenter_reducer;
+pub mod update_workflow_draft_reducer;
 pub mod update_working_calendar_reducer;
 pub mod upsert_ai_skill_reducer;
 pub mod upsert_ai_skill_config_reducer;
@@ -2198,6 +2305,8 @@ pub mod upsert_search_embedding_reducer;
 pub mod upsert_subscription_price_index_reducer;
 pub mod upsert_vendor_scorecard_reducer;
 pub mod upsert_warehouse_geo_reducer;
+pub mod upsert_workflow_edge_reducer;
+pub mod upsert_workflow_node_reducer;
 pub mod use_serial_reducer;
 pub mod validate_budget_reducer;
 pub mod validate_consolidation_reducer;
@@ -2257,8 +2366,6 @@ pub mod ai_team_member_skill_table;
 pub mod amortization_line_table;
 pub mod amortization_schedule_table;
 pub mod analytics_metric_table;
-pub mod approval_request_table;
-pub mod approval_rule_table;
 pub mod assignment_rule_table;
 pub mod audit_log_table;
 pub mod audit_rule_table;
@@ -2598,11 +2705,6 @@ pub mod warehouse_geo_table;
 pub mod warehouse_sync_intent_table;
 pub mod warehouse_task_table;
 pub mod whatsapp_business_account_table;
-pub mod workflow_table;
-pub mod workflow_activity_table;
-pub mod workflow_instance_table;
-pub mod workflow_transition_table;
-pub mod workflow_workitem_table;
 pub mod working_calendar_table;
 
 pub use accept_sale_order_quotation_params_type::AcceptSaleOrderQuotationParams;
@@ -2647,8 +2749,7 @@ pub use add_purchase_requisition_line_params_type::AddPurchaseRequisitionLinePar
 pub use add_purchase_rfq_line_params_type::AddPurchaseRfqLineParams;
 pub use add_subscription_bundle_item_params_type::AddSubscriptionBundleItemParams;
 pub use add_user_to_organization_params_type::AddUserToOrganizationParams;
-pub use add_workflow_activity_params_type::AddWorkflowActivityParams;
-pub use add_workflow_transition_params_type::AddWorkflowTransitionParams;
+pub use add_workflow_human_task_comment_params_type::AddWorkflowHumanTaskCommentParams;
 pub use adjustment_reason_type::AdjustmentReason;
 pub use advance_subscription_dunning_params_type::AdvanceSubscriptionDunningParams;
 pub use ai_action_draft_type::AiActionDraft;
@@ -2687,8 +2788,6 @@ pub use apply_project_change_order_params_type::ApplyProjectChangeOrderParams;
 pub use apply_sale_promotion_params_type::ApplySalePromotionParams;
 pub use apply_subscription_bundle_params_type::ApplySubscriptionBundleParams;
 pub use apply_subscription_invoice_payment_params_type::ApplySubscriptionInvoicePaymentParams;
-pub use approval_request_type::ApprovalRequest;
-pub use approval_rule_type::ApprovalRule;
 pub use archive_employee_params_type::ArchiveEmployeeParams;
 pub use asset_state_type::AssetState;
 pub use asset_type_type::AssetType;
@@ -2720,13 +2819,21 @@ pub use bootstrap_new_tenant_params_type::BootstrapNewTenantParams;
 pub use budget_post_type::BudgetPost;
 pub use budget_state_type::BudgetState;
 pub use calendar_event_type::CalendarEvent;
+pub use calendar_exception_category_type::CalendarExceptionCategory;
+pub use calendar_exception_scope_type::CalendarExceptionScope;
 pub use cancel_intercompany_transaction_params_type::CancelIntercompanyTransactionParams;
+pub use cancel_queue_job_params_type::CancelQueueJobParams;
 pub use cancel_subscription_params_type::CancelSubscriptionParams;
+pub use cancel_workflow_outbox_params_type::CancelWorkflowOutboxParams;
+pub use cancel_workflow_params_type::CancelWorkflowParams;
+pub use cancel_workflow_timer_params_type::CancelWorkflowTimerParams;
 pub use capacity_forecast_snapshot_type::CapacityForecastSnapshot;
 pub use card_state_type::CardState;
 pub use cartonization_result_type::CartonizationResult;
 pub use casbin_rule_type::CasbinRule;
 pub use cash_flow_line_type::CashFlowLine;
+pub use claim_queue_job_params_type::ClaimQueueJobParams;
+pub use claim_workflow_human_task_params_type::ClaimWorkflowHumanTaskParams;
 pub use close_subscription_params_type::CloseSubscriptionParams;
 pub use commodity_price_index_type::CommodityPriceIndex;
 pub use company_type::Company;
@@ -2739,7 +2846,16 @@ pub use complete_document_signature_request_params_type::CompleteDocumentSignatu
 pub use complete_offboarding_item_params_type::CompleteOffboardingItemParams;
 pub use complete_onboarding_item_params_type::CompleteOnboardingItemParams;
 pub use complete_performance_review_params_type::CompletePerformanceReviewParams;
+pub use complete_queue_job_params_type::CompleteQueueJobParams;
 pub use compute_price_type::ComputePrice;
+pub use condition_comparison_type::ConditionComparison;
+pub use condition_field_definition_type::ConditionFieldDefinition;
+pub use condition_instruction_type::ConditionInstruction;
+pub use condition_program_type::ConditionProgram;
+pub use condition_snapshot_type::ConditionSnapshot;
+pub use condition_snapshot_field_type::ConditionSnapshotField;
+pub use condition_value_type::ConditionValue;
+pub use condition_value_type_type::ConditionValueType;
 pub use confirm_payslip_params_type::ConfirmPayslipParams;
 pub use consignment_agreement_type::ConsignmentAgreement;
 pub use consolidation_account_type::ConsolidationAccount;
@@ -2798,7 +2914,6 @@ pub use create_analytic_account_params_type::CreateAnalyticAccountParams;
 pub use create_analytic_distribution_model_params_type::CreateAnalyticDistributionModelParams;
 pub use create_analytic_line_params_type::CreateAnalyticLineParams;
 pub use create_analytics_metric_params_type::CreateAnalyticsMetricParams;
-pub use create_approval_rule_params_type::CreateApprovalRuleParams;
 pub use create_assignment_rule_params_type::CreateAssignmentRuleParams;
 pub use create_attendance_punch_params_type::CreateAttendancePunchParams;
 pub use create_audit_rule_params_type::CreateAuditRuleParams;
@@ -3017,6 +3132,7 @@ pub use create_whats_app_business_account_params_type::CreateWhatsAppBusinessAcc
 pub use create_work_schedule_params_type::CreateWorkScheduleParams;
 pub use create_workcenter_params_type::CreateWorkcenterParams;
 pub use create_workcenter_productivity_params_type::CreateWorkcenterProductivityParams;
+pub use create_workflow_delegation_params_type::CreateWorkflowDelegationParams;
 pub use create_workflow_params_type::CreateWorkflowParams;
 pub use create_working_calendar_params_type::CreateWorkingCalendarParams;
 pub use create_workorder_params_type::CreateWorkorderParams;
@@ -3031,6 +3147,7 @@ pub use dashboard_type::Dashboard;
 pub use dashboard_widget_type::DashboardWidget;
 pub use data_classification_type::DataClassification;
 pub use data_classification_rule_type::DataClassificationRule;
+pub use decide_workflow_human_task_params_type::DecideWorkflowHumanTaskParams;
 pub use deferred_revenue_line_type::DeferredRevenueLine;
 pub use deferred_revenue_schedule_type::DeferredRevenueSchedule;
 pub use delegated_admin_scope_type::DelegatedAdminScope;
@@ -3055,6 +3172,7 @@ pub use document_template_type::DocumentTemplate;
 pub use document_version_type::DocumentVersion;
 pub use done_stock_move_params_type::DoneStockMoveParams;
 pub use drive_conflict_policy_type::DriveConflictPolicy;
+pub use dst_overlap_policy_type::DstOverlapPolicy;
 pub use employment_type_type::EmploymentType;
 pub use end_contact_role_params_type::EndContactRoleParams;
 pub use enqueue_job_params_type::EnqueueJobParams;
@@ -3081,7 +3199,9 @@ pub use field_validation_type::FieldValidation;
 pub use field_width_type::FieldWidth;
 pub use finalize_import_assistant_job_params_type::FinalizeImportAssistantJobParams;
 pub use financial_report_type::FinancialReport;
+pub use fire_workflow_timer_params_type::FireWorkflowTimerParams;
 pub use fiscal_year_state_type::FiscalYearState;
+pub use fixed_point_decimal_type::FixedPointDecimal;
 pub use fleet_vehicle_type::FleetVehicle;
 pub use form_config_type::FormConfig;
 pub use form_config_field_type::FormConfigField;
@@ -3095,6 +3215,9 @@ pub use google_drive_connection_type::GoogleDriveConnection;
 pub use grant_delegated_admin_scope_params_type::GrantDelegatedAdminScopeParams;
 pub use grant_org_permission_params_type::GrantOrgPermissionParams;
 pub use grant_subscription_entitlement_params_type::GrantSubscriptionEntitlementParams;
+pub use guarded_action_key_type::GuardedActionKey;
+pub use guarded_action_receipt_type::GuardedActionReceipt;
+pub use guarded_action_subject_kind_type::GuardedActionSubjectKind;
 pub use helpdesk_sla_type::HelpdeskSla;
 pub use helpdesk_stage_type::HelpdeskStage;
 pub use helpdesk_team_type::HelpdeskTeam;
@@ -3153,13 +3276,13 @@ pub use import_job_record_type::ImportJobRecord;
 pub use import_mapping_template_type::ImportMappingTemplate;
 pub use ingest_subscription_usage_event_params_type::IngestSubscriptionUsageEventParams;
 pub use insight_severity_type::InsightSeverity;
-pub use instance_state_type::InstanceState;
 pub use intake_state_type::IntakeState;
 pub use integration_status_type::IntegrationStatus;
 pub use integration_type_type::IntegrationType;
 pub use intercompany_rule_type::IntercompanyRule;
 pub use intercompany_state_type::IntercompanyState;
 pub use intercompany_transaction_type::IntercompanyTransaction;
+pub use invalidate_workflow_human_task_params_type::InvalidateWorkflowHumanTaskParams;
 pub use inventory_adjustment_type::InventoryAdjustment;
 pub use inventory_close_type::InventoryClose;
 pub use inventory_close_line_type::InventoryCloseLine;
@@ -3204,6 +3327,7 @@ pub use message_template_type::MessageTemplate;
 pub use message_template_variable_type::MessageTemplateVariable;
 pub use mo_state_type::MoState;
 pub use module_config_input_type::ModuleConfigInput;
+pub use money_value_type::MoneyValue;
 pub use move_stock_quant_params_type::MoveStockQuantParams;
 pub use move_type_type::MoveType;
 pub use mrp_bom_type::MrpBom;
@@ -3326,7 +3450,12 @@ pub use quality_alert_reason_type::QualityAlertReason;
 pub use quality_check_type::QualityCheck;
 pub use quality_point_type::QualityPoint;
 pub use quality_team_type::QualityTeam;
+pub use queue_attempt_type::QueueAttempt;
+pub use queue_attempt_outcome_type::QueueAttemptOutcome;
+pub use queue_completion_outcome_type::QueueCompletionOutcome;
+pub use queue_effect_receipt_type::QueueEffectReceipt;
 pub use queue_job_type::QueueJob;
+pub use queue_job_status_type::QueueJobStatus;
 pub use queue_mail_from_template_params_type::QueueMailFromTemplateParams;
 pub use queue_worker_type::QueueWorker;
 pub use rate_subscription_usage_events_params_type::RateSubscriptionUsageEventsParams;
@@ -3351,6 +3480,7 @@ pub use record_sales_integration_result_params_type::RecordSalesIntegrationResul
 pub use record_subscription_payment_failure_params_type::RecordSubscriptionPaymentFailureParams;
 pub use record_telemetry_params_type::RecordTelemetryParams;
 pub use record_whats_app_health_check_params_type::RecordWhatsAppHealthCheckParams;
+pub use record_workflow_outbox_result_params_type::RecordWorkflowOutboxResultParams;
 pub use refresh_capacity_forecast_params_type::RefreshCapacityForecastParams;
 pub use refresh_hr_capacity_forecast_params_type::RefreshHrCapacityForecastParams;
 pub use refresh_inventory_exceptions_params_type::RefreshInventoryExceptionsParams;
@@ -3361,11 +3491,11 @@ pub use refuse_expense_sheet_params_type::RefuseExpenseSheetParams;
 pub use register_device_params_type::RegisterDeviceParams;
 pub use register_hub_params_type::RegisterHubParams;
 pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
-pub use reject_approval_request_params_type::RejectApprovalRequestParams;
 pub use reject_expense_policy_exception_params_type::RejectExpensePolicyExceptionParams;
 pub use reject_timesheets_params_type::RejectTimesheetsParams;
 pub use release_blanket_to_po_params_type::ReleaseBlanketToPoParams;
 pub use release_document_legal_hold_params_type::ReleaseDocumentLegalHoldParams;
+pub use renew_queue_lease_params_type::RenewQueueLeaseParams;
 pub use renew_subscription_params_type::RenewSubscriptionParams;
 pub use reopen_timesheets_params_type::ReopenTimesheetsParams;
 pub use replenishment_rule_type::ReplenishmentRule;
@@ -3379,6 +3509,7 @@ pub use resource_allocation_type::ResourceAllocation;
 pub use resource_capacity_snapshot_type::ResourceCapacitySnapshot;
 pub use resource_utilisation_snapshot_type::ResourceUtilisationSnapshot;
 pub use resume_subscription_params_type::ResumeSubscriptionParams;
+pub use retry_dead_letter_job_params_type::RetryDeadLetterJobParams;
 pub use return_order_type::ReturnOrder;
 pub use return_order_line_type::ReturnOrderLine;
 pub use revenue_recognition_rule_type::RevenueRecognitionRule;
@@ -3434,14 +3565,18 @@ pub use set_purchase_approval_delegate_params_type::SetPurchaseApprovalDelegateP
 pub use set_record_custom_field_values_params_type::SetRecordCustomFieldValuesParams;
 pub use set_subscription_commitment_params_type::SetSubscriptionCommitmentParams;
 pub use set_vendor_risk_flag_params_type::SetVendorRiskFlagParams;
+pub use set_workflow_candidate_group_member_params_type::SetWorkflowCandidateGroupMemberParams;
 pub use settle_sale_commissions_params_type::SettleSaleCommissionsParams;
 pub use setup_fiscal_calendar_params_type::SetupFiscalCalendarParams;
 pub use shipping_method_type::ShippingMethod;
+pub use signal_workflow_params_type::SignalWorkflowParams;
+pub use simulate_workflow_params_type::SimulateWorkflowParams;
 pub use sod_conflict_rule_type::SodConflictRule;
 pub use split_method_type::SplitMethod;
 pub use stage_bank_statement_import_line_params_type::StageBankStatementImportLineParams;
 pub use stage_bank_statement_import_params_type::StageBankStatementImportParams;
 pub use start_timesheet_timer_params_type::StartTimesheetTimerParams;
+pub use start_workflow_params_type::StartWorkflowParams;
 pub use stock_count_sheet_type::StockCountSheet;
 pub use stock_cycle_count_type::StockCycleCount;
 pub use stock_inventory_type::StockInventory;
@@ -3521,7 +3656,6 @@ pub use update_ai_reducer_allowlist_params_type::UpdateAiReducerAllowlistParams;
 pub use update_analytic_account_params_type::UpdateAnalyticAccountParams;
 pub use update_analytic_distribution_model_params_type::UpdateAnalyticDistributionModelParams;
 pub use update_analytic_line_params_type::UpdateAnalyticLineParams;
-pub use update_approval_rule_params_type::UpdateApprovalRuleParams;
 pub use update_assignment_rule_params_type::UpdateAssignmentRuleParams;
 pub use update_audit_rule_params_type::UpdateAuditRuleParams;
 pub use update_barcode_nomenclature_params_type::UpdateBarcodeNomenclatureParams;
@@ -3632,6 +3766,7 @@ pub use update_whats_app_credentials_params_type::UpdateWhatsAppCredentialsParam
 pub use update_whats_app_verification_params_type::UpdateWhatsAppVerificationParams;
 pub use update_widget_layout_params_type::UpdateWidgetLayoutParams;
 pub use update_workcenter_params_type::UpdateWorkcenterParams;
+pub use update_workflow_draft_params_type::UpdateWorkflowDraftParams;
 pub use update_working_calendar_params_type::UpdateWorkingCalendarParams;
 pub use upsert_ai_skill_config_params_type::UpsertAiSkillConfigParams;
 pub use upsert_ai_skill_params_type::UpsertAiSkillParams;
@@ -3643,6 +3778,8 @@ pub use upsert_partner_credit_control_params_type::UpsertPartnerCreditControlPar
 pub use upsert_search_embedding_params_type::UpsertSearchEmbeddingParams;
 pub use upsert_subscription_price_index_params_type::UpsertSubscriptionPriceIndexParams;
 pub use upsert_vendor_scorecard_params_type::UpsertVendorScorecardParams;
+pub use upsert_workflow_edge_params_type::UpsertWorkflowEdgeParams;
+pub use upsert_workflow_node_params_type::UpsertWorkflowNodeParams;
 pub use user_credential_type::UserCredential;
 pub use user_custom_field_type::UserCustomField;
 pub use user_invite_type::UserInvite;
@@ -3667,12 +3804,60 @@ pub use warehouse_task_type::WarehouseTask;
 pub use whats_app_business_account_type::WhatsAppBusinessAccount;
 pub use widget_type_type::WidgetType;
 pub use workflow_type::Workflow;
-pub use workflow_activity_type::WorkflowActivity;
+pub use workflow_action_input_type::WorkflowActionInput;
+pub use workflow_action_reference_type::WorkflowActionReference;
+pub use workflow_authorization_outcome_type::WorkflowAuthorizationOutcome;
+pub use workflow_branch_kind_type::WorkflowBranchKind;
+pub use workflow_calendar_type::WorkflowCalendar;
+pub use workflow_calendar_exception_type::WorkflowCalendarException;
+pub use workflow_calendar_market_type::WorkflowCalendarMarket;
+pub use workflow_calendar_scope_type::WorkflowCalendarScope;
+pub use workflow_calendar_version_type::WorkflowCalendarVersion;
+pub use workflow_candidate_group_member_type::WorkflowCandidateGroupMember;
+pub use workflow_command_kind_type::WorkflowCommandKind;
+pub use workflow_command_receipt_type::WorkflowCommandReceipt;
+pub use workflow_decision_event_type::WorkflowDecisionEvent;
+pub use workflow_delegation_type::WorkflowDelegation;
+pub use workflow_delivery_attempt_type::WorkflowDeliveryAttempt;
+pub use workflow_delivery_attempt_kind_type::WorkflowDeliveryAttemptKind;
+pub use workflow_delivery_guarantee_type::WorkflowDeliveryGuarantee;
+pub use workflow_delivery_object_kind_type::WorkflowDeliveryObjectKind;
+pub use workflow_delivery_receipt_type::WorkflowDeliveryReceipt;
+pub use workflow_delivery_receipt_kind_type::WorkflowDeliveryReceiptKind;
+pub use workflow_edge_type::WorkflowEdge;
+pub use workflow_human_task_type::WorkflowHumanTask;
+pub use workflow_human_task_command_kind_type::WorkflowHumanTaskCommandKind;
+pub use workflow_human_task_decision_type::WorkflowHumanTaskDecision;
+pub use workflow_human_task_event_type::WorkflowHumanTaskEvent;
+pub use workflow_human_task_kind_type::WorkflowHumanTaskKind;
+pub use workflow_human_task_receipt_type::WorkflowHumanTaskReceipt;
+pub use workflow_human_task_status_type::WorkflowHumanTaskStatus;
 pub use workflow_instance_type::WorkflowInstance;
-pub use workflow_transition_type::WorkflowTransition;
-pub use workflow_workitem_type::WorkflowWorkitem;
+pub use workflow_instance_state_type::WorkflowInstanceState;
+pub use workflow_node_type::WorkflowNode;
+pub use workflow_node_kind_type::WorkflowNodeKind;
+pub use workflow_outbox_type::WorkflowOutbox;
+pub use workflow_outbox_result_kind_type::WorkflowOutboxResultKind;
+pub use workflow_outbox_status_type::WorkflowOutboxStatus;
+pub use workflow_retry_kind_type::WorkflowRetryKind;
+pub use workflow_retry_policy_type::WorkflowRetryPolicy;
+pub use workflow_simulation_result_type::WorkflowSimulationResult;
+pub use workflow_simulation_step_type::WorkflowSimulationStep;
+pub use workflow_simulation_step_kind_type::WorkflowSimulationStepKind;
+pub use workflow_subflow_reference_type::WorkflowSubflowReference;
+pub use workflow_task_assignment_type::WorkflowTaskAssignment;
+pub use workflow_task_guarded_action_type::WorkflowTaskGuardedAction;
+pub use workflow_task_policy_type::WorkflowTaskPolicy;
+pub use workflow_timer_type::WorkflowTimer;
+pub use workflow_timer_kind_type::WorkflowTimerKind;
+pub use workflow_timer_policy_type::WorkflowTimerPolicy;
+pub use workflow_timer_status_type::WorkflowTimerStatus;
+pub use workflow_token_type::WorkflowToken;
+pub use workflow_token_state_type::WorkflowTokenState;
+pub use workflow_trigger_type::WorkflowTrigger;
+pub use workflow_version_type::WorkflowVersion;
+pub use workflow_version_status_type::WorkflowVersionStatus;
 pub use working_calendar_type::WorkingCalendar;
-pub use workitem_state_type::WorkitemState;
 pub use workorder_state_type::WorkorderState;
 pub use zone_display_type_type::ZoneDisplayType;
 pub use account_account_table::*;
@@ -3723,8 +3908,6 @@ pub use ai_team_member_skill_table::*;
 pub use amortization_line_table::*;
 pub use amortization_schedule_table::*;
 pub use analytics_metric_table::*;
-pub use approval_request_table::*;
-pub use approval_rule_table::*;
 pub use assignment_rule_table::*;
 pub use audit_log_table::*;
 pub use audit_rule_table::*;
@@ -4064,11 +4247,6 @@ pub use warehouse_geo_table::*;
 pub use warehouse_sync_intent_table::*;
 pub use warehouse_task_table::*;
 pub use whatsapp_business_account_table::*;
-pub use workflow_table::*;
-pub use workflow_activity_table::*;
-pub use workflow_instance_table::*;
-pub use workflow_transition_table::*;
-pub use workflow_workitem_table::*;
 pub use working_calendar_table::*;
 pub use accept_sale_order_quotation_reducer::accept_sale_order_quotation;
 pub use accrue_sale_commission_reducer::accrue_sale_commission;
@@ -4101,8 +4279,7 @@ pub use add_subscription_bundle_item_reducer::add_subscription_bundle_item;
 pub use add_user_custom_field_reducer::add_user_custom_field;
 pub use add_user_to_organization_reducer::add_user_to_organization;
 pub use add_widget_to_dashboard_reducer::add_widget_to_dashboard;
-pub use add_workflow_activity_reducer::add_workflow_activity;
-pub use add_workflow_transition_reducer::add_workflow_transition;
+pub use add_workflow_human_task_comment_reducer::add_workflow_human_task_comment;
 pub use advance_subscription_dunning_reducer::advance_subscription_dunning;
 pub use allocate_payment_transaction_reducer::allocate_payment_transaction;
 pub use amend_subscription_reducer::amend_subscription;
@@ -4131,7 +4308,6 @@ pub use apply_subscription_payment_intent_reducer::apply_subscription_payment_in
 pub use apply_subscription_tax_settle_intent_reducer::apply_subscription_tax_settle_intent;
 pub use apply_warehouse_sync_intent_reducer::apply_warehouse_sync_intent;
 pub use approve_ai_action_draft_reducer::approve_ai_action_draft;
-pub use approve_approval_request_reducer::approve_approval_request;
 pub use approve_bank_statement_import_reducer::approve_bank_statement_import;
 pub use approve_document_processing_job_reducer::approve_document_processing_job;
 pub use approve_expense_policy_exception_reducer::approve_expense_policy_exception;
@@ -4179,6 +4355,7 @@ pub use cancel_picking_batch_reducer::cancel_picking_batch;
 pub use cancel_purchase_order_reducer::cancel_purchase_order;
 pub use cancel_purchase_requisition_reducer::cancel_purchase_requisition;
 pub use cancel_quality_alert_reducer::cancel_quality_alert;
+pub use cancel_queue_job_reducer::cancel_queue_job;
 pub use cancel_return_order_reducer::cancel_return_order;
 pub use cancel_sale_commission_reducer::cancel_sale_commission;
 pub use cancel_sale_order_reducer::cancel_sale_order;
@@ -4186,14 +4363,18 @@ pub use cancel_stock_move_reducer::cancel_stock_move;
 pub use cancel_stock_package_reducer::cancel_stock_package;
 pub use cancel_stock_picking_reducer::cancel_stock_picking;
 pub use cancel_subscription_reducer::cancel_subscription;
-pub use cancel_workflow_instance_reducer::cancel_workflow_instance;
+pub use cancel_workflow_reducer::cancel_workflow;
+pub use cancel_workflow_outbox_reducer::cancel_workflow_outbox;
+pub use cancel_workflow_timer_reducer::cancel_workflow_timer;
 pub use check_mo_availability_reducer::check_mo_availability;
 pub use claim_hub_with_token_reducer::claim_hub_with_token;
 pub use claim_queue_job_reducer::claim_queue_job;
+pub use claim_workflow_human_task_reducer::claim_workflow_human_task;
 pub use clear_document_presence_reducer::clear_document_presence;
 pub use clear_knowledge_article_presence_reducer::clear_knowledge_article_presence;
 pub use clear_opportunity_presence_reducer::clear_opportunity_presence;
 pub use clear_proposal_presence_reducer::clear_proposal_presence;
+pub use clone_workflow_version_to_draft_reducer::clone_workflow_version_to_draft;
 pub use close_account_asset_reducer::close_account_asset;
 pub use close_account_period_reducer::close_account_period;
 pub use close_fiscal_year_reducer::close_fiscal_year;
@@ -4267,7 +4448,6 @@ pub use create_analytic_account_reducer::create_analytic_account;
 pub use create_analytic_distribution_model_reducer::create_analytic_distribution_model;
 pub use create_analytic_line_reducer::create_analytic_line;
 pub use create_analytics_metric_reducer::create_analytics_metric;
-pub use create_approval_rule_reducer::create_approval_rule;
 pub use create_assignment_rule_reducer::create_assignment_rule;
 pub use create_attendance_punch_reducer::create_attendance_punch;
 pub use create_audit_rule_reducer::create_audit_rule;
@@ -4485,11 +4665,13 @@ pub use create_whatsapp_business_account_reducer::create_whatsapp_business_accou
 pub use create_work_schedule_reducer::create_work_schedule;
 pub use create_workcenter_reducer::create_workcenter;
 pub use create_workflow_reducer::create_workflow;
+pub use create_workflow_delegation_reducer::create_workflow_delegation;
 pub use create_working_calendar_reducer::create_working_calendar;
 pub use create_workorder_reducer::create_workorder;
 pub use deactivate_pos_config_reducer::deactivate_pos_config;
 pub use deactivate_revenue_recognition_rule_reducer::deactivate_revenue_recognition_rule;
 pub use deactivate_subscription_plan_reducer::deactivate_subscription_plan;
+pub use decide_workflow_human_task_reducer::decide_workflow_human_task;
 pub use delete_account_asset_reducer::delete_account_asset;
 pub use delete_account_bank_statement_reducer::delete_account_bank_statement;
 pub use delete_account_bank_statement_line_reducer::delete_account_bank_statement_line;
@@ -4498,7 +4680,6 @@ pub use delete_account_period_reducer::delete_account_period;
 pub use delete_account_reconciliation_widget_reducer::delete_account_reconciliation_widget;
 pub use delete_ai_reducer_allowlist_reducer::delete_ai_reducer_allowlist;
 pub use delete_analytic_line_reducer::delete_analytic_line;
-pub use delete_approval_rule_reducer::delete_approval_rule;
 pub use delete_barcode_nomenclature_reducer::delete_barcode_nomenclature;
 pub use delete_barcode_rule_reducer::delete_barcode_rule;
 pub use delete_bom_reducer::delete_bom;
@@ -4555,6 +4736,8 @@ pub use delete_user_custom_field_reducer::delete_user_custom_field;
 pub use delete_warehouse_reducer::delete_warehouse;
 pub use delete_warehouse_3_d_zone_reducer::delete_warehouse_3_d_zone;
 pub use delete_whatsapp_business_account_reducer::delete_whatsapp_business_account;
+pub use delete_workflow_edge_reducer::delete_workflow_edge;
+pub use delete_workflow_node_reducer::delete_workflow_node;
 pub use deprecate_account_account_reducer::deprecate_account_account;
 pub use dev_promote_caller_superuser_reducer::dev_promote_caller_superuser;
 pub use dismiss_insight_reducer::dismiss_insight;
@@ -4589,6 +4772,7 @@ pub use finalize_import_assistant_job_reducer::finalize_import_assistant_job;
 pub use find_duplicate_contacts_reducer::find_duplicate_contacts;
 pub use finish_manufacturing_order_reducer::finish_manufacturing_order;
 pub use finish_workorder_reducer::finish_workorder;
+pub use fire_workflow_timer_reducer::fire_workflow_timer;
 pub use generate_eu_vat_report_reducer::generate_eu_vat_report;
 pub use generate_financial_report_reducer::generate_financial_report;
 pub use generate_hub_pairing_token_reducer::generate_hub_pairing_token;
@@ -4661,6 +4845,7 @@ pub use import_workcenter_csv_reducer::import_workcenter_csv;
 pub use import_workflow_csv_reducer::import_workflow_csv;
 pub use ingest_subscription_usage_event_reducer::ingest_subscription_usage_event;
 pub use initialize_default_form_configs_reducer::initialize_default_form_configs;
+pub use invalidate_workflow_human_task_reducer::invalidate_workflow_human_task;
 pub use invoice_po_line_reducer::invoice_po_line;
 pub use link_device_to_location_reducer::link_device_to_location;
 pub use link_device_to_pos_reducer::link_device_to_pos;
@@ -4717,6 +4902,7 @@ pub use process_inventory_adjustment_reducer::process_inventory_adjustment;
 pub use process_pending_scans_reducer::process_pending_scans;
 pub use produce_manufacturing_order_reducer::produce_manufacturing_order;
 pub use promote_ai_skill_version_reducer::promote_ai_skill_version;
+pub use publish_workflow_version_reducer::publish_workflow_version;
 pub use purge_expired_documents_reducer::purge_expired_documents;
 pub use queue_mail_from_template_reducer::queue_mail_from_template;
 pub use rate_subscription_usage_events_reducer::rate_subscription_usage_events;
@@ -4752,6 +4938,7 @@ pub use record_telemetry_reducer::record_telemetry;
 pub use record_telemetry_batch_reducer::record_telemetry_batch;
 pub use record_whatsapp_health_check_reducer::record_whatsapp_health_check;
 pub use record_whatsapp_message_sent_reducer::record_whatsapp_message_sent;
+pub use record_workflow_outbox_result_reducer::record_workflow_outbox_result;
 pub use refresh_capacity_forecast_reducer::refresh_capacity_forecast;
 pub use refresh_hr_capacity_forecast_reducer::refresh_hr_capacity_forecast;
 pub use refresh_inventory_exceptions_reducer::refresh_inventory_exceptions;
@@ -4770,7 +4957,6 @@ pub use register_iot_hub_reducer::register_iot_hub;
 pub use register_payment_on_invoice_reducer::register_payment_on_invoice;
 pub use register_queue_worker_reducer::register_queue_worker;
 pub use reject_ai_action_draft_reducer::reject_ai_action_draft;
-pub use reject_approval_request_reducer::reject_approval_request;
 pub use reject_expense_policy_exception_reducer::reject_expense_policy_exception;
 pub use reject_supplier_intake_reducer::reject_supplier_intake;
 pub use reject_timesheets_reducer::reject_timesheets;
@@ -4784,6 +4970,7 @@ pub use remove_member_from_quality_team_reducer::remove_member_from_quality_team
 pub use remove_purchase_order_line_reducer::remove_purchase_order_line;
 pub use remove_rule_from_nomenclature_reducer::remove_rule_from_nomenclature;
 pub use remove_user_from_organization_reducer::remove_user_from_organization;
+pub use renew_queue_job_lease_reducer::renew_queue_job_lease;
 pub use renew_subscription_reducer::renew_subscription;
 pub use reopen_inventory_close_reducer::reopen_inventory_close;
 pub use reopen_ticket_reducer::reopen_ticket;
@@ -4800,6 +4987,8 @@ pub use resolve_proposal_comment_reducer::resolve_proposal_comment;
 pub use restore_document_reducer::restore_document;
 pub use restore_product_category_reducer::restore_product_category;
 pub use resume_subscription_reducer::resume_subscription;
+pub use retire_workflow_version_reducer::retire_workflow_version;
+pub use retry_dead_letter_queue_job_reducer::retry_dead_letter_queue_job;
 pub use retry_intercompany_transaction_reducer::retry_intercompany_transaction;
 pub use retry_iot_action_reducer::retry_iot_action;
 pub use reverse_payment_transaction_reducer::reverse_payment_transaction;
@@ -4810,6 +4999,7 @@ pub use revoke_delegated_admin_scope_reducer::revoke_delegated_admin_scope;
 pub use revoke_permission_reducer::revoke_permission;
 pub use revoke_role_reducer::revoke_role;
 pub use revoke_subscription_entitlement_reducer::revoke_subscription_entitlement;
+pub use revoke_workflow_delegation_reducer::revoke_workflow_delegation;
 pub use rollback_ai_skill_release_reducer::rollback_ai_skill_release;
 pub use rollback_import_job_reducer::rollback_import_job;
 pub use run_accounting_fx_revaluation_test_reducer::run_accounting_fx_revaluation_test;
@@ -4834,6 +5024,9 @@ pub use run_all_projects_tests_reducer::run_all_projects_tests;
 pub use run_all_purchasing_tests_reducer::run_all_purchasing_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
 pub use run_all_subscriptions_tests_reducer::run_all_subscriptions_tests;
+pub use run_all_workflow_deterministic_core_tests_reducer::run_all_workflow_deterministic_core_tests;
+pub use run_all_workflow_foundation_tests_reducer::run_all_workflow_foundation_tests;
+pub use run_all_workflow_human_effect_tests_reducer::run_all_workflow_human_effect_tests;
 pub use run_cartonization_reducer::run_cartonization;
 pub use run_core_operational_messaging_test_reducer::run_core_operational_messaging_test;
 pub use run_core_sod_test_reducer::run_core_sod_test;
@@ -4904,6 +5097,7 @@ pub use run_purchasing_company_isolation_test_reducer::run_purchasing_company_is
 pub use run_purchasing_incoming_picking_test_reducer::run_purchasing_incoming_picking_test;
 pub use run_purchasing_wave_c_smoke_test_reducer::run_purchasing_wave_c_smoke_test;
 pub use run_purchasing_wave_e_test_reducer::run_purchasing_wave_e_test;
+pub use run_queue_foundation_tests_reducer::run_queue_foundation_tests;
 pub use run_sales_atp_shortfall_test_reducer::run_sales_atp_shortfall_test;
 pub use run_sales_backorder_test_reducer::run_sales_backorder_test;
 pub use run_sales_commission_accrue_test_reducer::run_sales_commission_accrue_test;
@@ -4932,7 +5126,13 @@ pub use run_subscriptions_wave_d_test_reducer::run_subscriptions_wave_d_test;
 pub use run_subscriptions_wave_e_test_reducer::run_subscriptions_wave_e_test;
 pub use run_tenant_isolation_tests_reducer::run_tenant_isolation_tests;
 pub use run_traceability_report_reducer::run_traceability_report;
+pub use run_workflow_action_registry_tests_reducer::run_workflow_action_registry_tests;
+pub use run_workflow_authorization_tests_reducer::run_workflow_authorization_tests;
 pub use run_workflow_definition_test_reducer::run_workflow_definition_test;
+pub use run_workflow_delivery_tests_reducer::run_workflow_delivery_tests;
+pub use run_workflow_evaluator_simulation_tests_reducer::run_workflow_evaluator_simulation_tests;
+pub use run_workflow_human_task_tests_reducer::run_workflow_human_task_tests;
+pub use run_workflow_runtime_tests_reducer::run_workflow_runtime_tests;
 pub use save_import_mapping_template_reducer::save_import_mapping_template;
 pub use save_proposal_version_reducer::save_proposal_version;
 pub use schedule_document_retention_purge_reducer::schedule_document_retention_purge;
@@ -4949,7 +5149,6 @@ pub use set_ai_agent_active_reducer::set_ai_agent_active;
 pub use set_ai_reducer_allowlist_enabled_reducer::set_ai_reducer_allowlist_enabled;
 pub use set_ai_skill_active_reducer::set_ai_skill_active;
 pub use set_analytic_account_active_reducer::set_analytic_account_active;
-pub use set_approval_rule_active_reducer::set_approval_rule_active;
 pub use set_article_published_reducer::set_article_published;
 pub use set_asset_active_reducer::set_asset_active;
 pub use set_billing_status_reducer::set_billing_status;
@@ -4974,12 +5173,12 @@ pub use set_subscription_commitment_reducer::set_subscription_commitment;
 pub use set_task_parent_reducer::set_task_parent;
 pub use set_vendor_risk_flag_reducer::set_vendor_risk_flag;
 pub use set_whatsapp_primary_account_reducer::set_whatsapp_primary_account;
-pub use set_workflow_active_reducer::set_workflow_active;
-pub use set_workitem_exception_reducer::set_workitem_exception;
+pub use set_workflow_candidate_group_member_reducer::set_workflow_candidate_group_member;
 pub use settle_sale_commissions_reducer::settle_sale_commissions;
 pub use setup_fiscal_calendar_reducer::setup_fiscal_calendar;
 pub use share_dashboard_reducer::share_dashboard;
 pub use signal_workflow_reducer::signal_workflow;
+pub use simulate_workflow_reducer::simulate_workflow;
 pub use solve_quality_alert_reducer::solve_quality_alert;
 pub use stage_bank_statement_import_reducer::stage_bank_statement_import;
 pub use start_cycle_count_session_reducer::start_cycle_count_session;
@@ -5003,6 +5202,9 @@ pub use subscribe_to_record_reducer::subscribe_to_record;
 pub use sync_external_file_to_document_reducer::sync_external_file_to_document;
 pub use sync_hub_devices_reducer::sync_hub_devices;
 pub use test_iot_device_reducer::test_iot_device;
+pub use test_queue_job_edge_cases_reducer::test_queue_job_edge_cases;
+pub use test_queue_system_reducer::test_queue_system;
+pub use test_worker_edge_cases_reducer::test_worker_edge_cases;
 pub use toggle_project_favorite_reducer::toggle_project_favorite;
 pub use unassign_team_member_skill_reducer::unassign_team_member_skill;
 pub use unblock_workcenter_reducer::unblock_workcenter;
@@ -5036,7 +5238,6 @@ pub use update_ai_reducer_allowlist_reducer::update_ai_reducer_allowlist;
 pub use update_analytic_account_reducer::update_analytic_account;
 pub use update_analytic_distribution_model_reducer::update_analytic_distribution_model;
 pub use update_analytic_line_reducer::update_analytic_line;
-pub use update_approval_rule_reducer::update_approval_rule;
 pub use update_assignment_rule_reducer::update_assignment_rule;
 pub use update_audit_rule_reducer::update_audit_rule;
 pub use update_barcode_nomenclature_reducer::update_barcode_nomenclature;
@@ -5174,6 +5375,7 @@ pub use update_whatsapp_quality_score_reducer::update_whatsapp_quality_score;
 pub use update_whatsapp_verification_status_reducer::update_whatsapp_verification_status;
 pub use update_widget_layout_reducer::update_widget_layout;
 pub use update_workcenter_reducer::update_workcenter;
+pub use update_workflow_draft_reducer::update_workflow_draft;
 pub use update_working_calendar_reducer::update_working_calendar;
 pub use upsert_ai_skill_reducer::upsert_ai_skill;
 pub use upsert_ai_skill_config_reducer::upsert_ai_skill_config;
@@ -5187,6 +5389,8 @@ pub use upsert_search_embedding_reducer::upsert_search_embedding;
 pub use upsert_subscription_price_index_reducer::upsert_subscription_price_index;
 pub use upsert_vendor_scorecard_reducer::upsert_vendor_scorecard;
 pub use upsert_warehouse_geo_reducer::upsert_warehouse_geo;
+pub use upsert_workflow_edge_reducer::upsert_workflow_edge;
+pub use upsert_workflow_node_reducer::upsert_workflow_node;
 pub use use_serial_reducer::use_serial;
 pub use validate_budget_reducer::validate_budget;
 pub use validate_consolidation_reducer::validate_consolidation;
@@ -5374,17 +5578,9 @@ pub enum Reducer {
         dashboard_id: u64,
         widget_id: u64,
 }    ,
-    AddWorkflowActivity {
+    AddWorkflowHumanTaskComment {
         organization_id: u64,
-        workflow_id: u64,
-        params: AddWorkflowActivityParams,
-}    ,
-    AddWorkflowTransition {
-        organization_id: u64,
-        workflow_id: u64,
-        activity_from: u64,
-        activity_to: u64,
-        params: AddWorkflowTransitionParams,
+        params: AddWorkflowHumanTaskCommentParams,
 }    ,
     AdvanceSubscriptionDunning {
         organization_id: u64,
@@ -5519,11 +5715,6 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         draft_id: u64,
-}    ,
-    ApproveApprovalRequest {
-        organization_id: u64,
-        company_id: u64,
-        request_id: u64,
 }    ,
     ApproveBankStatementImport {
         organization_id: u64,
@@ -5747,6 +5938,11 @@ pub enum Reducer {
         alert_id: u64,
         description: Option::<String>,
 }    ,
+    CancelQueueJob {
+        organization_id: u64,
+        job_id: u64,
+        params: CancelQueueJobParams,
+}    ,
     CancelReturnOrder {
         organization_id: u64,
         company_id: u64,
@@ -5783,9 +5979,17 @@ pub enum Reducer {
         subscription_id: u64,
         params: CancelSubscriptionParams,
 }    ,
-    CancelWorkflowInstance {
+    CancelWorkflow {
         organization_id: u64,
-        instance_id: u64,
+        params: CancelWorkflowParams,
+}    ,
+    CancelWorkflowOutbox {
+        organization_id: u64,
+        params: CancelWorkflowOutboxParams,
+}    ,
+    CancelWorkflowTimer {
+        organization_id: u64,
+        params: CancelWorkflowTimerParams,
 }    ,
     CheckMoAvailability {
         organization_id: u64,
@@ -5801,6 +6005,11 @@ pub enum Reducer {
     ClaimQueueJob {
         organization_id: u64,
         job_id: u64,
+        params: ClaimQueueJobParams,
+}    ,
+    ClaimWorkflowHumanTask {
+        organization_id: u64,
+        params: ClaimWorkflowHumanTaskParams,
 }    ,
     ClearDocumentPresence {
         document_id: u64,
@@ -5813,6 +6022,11 @@ pub enum Reducer {
 }    ,
     ClearProposalPresence {
         proposal_id: u64,
+}    ,
+    CloneWorkflowVersionToDraft {
+        organization_id: u64,
+        source_workflow_version_id: u64,
+        expected_revision: u64,
 }    ,
     CloseAccountAsset {
         organization_id: u64,
@@ -5909,7 +6123,7 @@ pub enum Reducer {
     CompleteQueueJob {
         organization_id: u64,
         job_id: u64,
-        error_message: Option::<String>,
+        params: CompleteQueueJobParams,
 }    ,
     CompleteScheduledOwnerReportRun {
         organization_id: u64,
@@ -6157,11 +6371,6 @@ pub enum Reducer {
         organization_id: u64,
         company_id: Option::<u64>,
         params: CreateAnalyticsMetricParams,
-}    ,
-    CreateApprovalRule {
-        organization_id: u64,
-        company_id: Option::<u64>,
-        params: CreateApprovalRuleParams,
 }    ,
     CreateAssignmentRule {
         organization_id: u64,
@@ -7178,6 +7387,11 @@ pub enum Reducer {
         company_id: Option::<u64>,
         params: CreateWorkflowParams,
 }    ,
+    CreateWorkflowDelegation {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateWorkflowDelegationParams,
+}    ,
     CreateWorkingCalendar {
         organization_id: u64,
         company_id: u64,
@@ -7200,6 +7414,10 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         plan_id: u64,
+}    ,
+    DecideWorkflowHumanTask {
+        organization_id: u64,
+        params: DecideWorkflowHumanTaskParams,
 }    ,
     DeleteAccountAsset {
         organization_id: u64,
@@ -7238,11 +7456,6 @@ pub enum Reducer {
     DeleteAnalyticLine {
         organization_id: u64,
         line_id: u64,
-}    ,
-    DeleteApprovalRule {
-        organization_id: u64,
-        company_id: Option::<u64>,
-        rule_id: u64,
 }    ,
     DeleteBarcodeNomenclature {
         organization_id: u64,
@@ -7485,6 +7698,18 @@ pub enum Reducer {
         organization_id: u64,
         account_id: u64,
 }    ,
+    DeleteWorkflowEdge {
+        organization_id: u64,
+        workflow_version_id: u64,
+        expected_revision: u64,
+        edge_key: String,
+}    ,
+    DeleteWorkflowNode {
+        organization_id: u64,
+        workflow_version_id: u64,
+        expected_revision: u64,
+        node_key: String,
+}    ,
     DeprecateAccountAccount {
         organization_id: u64,
         account_id: u64,
@@ -7641,6 +7866,10 @@ pub enum Reducer {
     FinishWorkorder {
         organization_id: u64,
         workorder_id: u64,
+}    ,
+    FireWorkflowTimer {
+        organization_id: u64,
+        params: FireWorkflowTimerParams,
 }    ,
     GenerateEuVatReport {
         organization_id: u64,
@@ -7964,6 +8193,10 @@ pub enum Reducer {
     InitializeDefaultFormConfigs {
         organization_id: u64,
 }    ,
+    InvalidateWorkflowHumanTask {
+        organization_id: u64,
+        params: InvalidateWorkflowHumanTaskParams,
+}    ,
     InvoicePoLine {
         organization_id: u64,
         line_id: u64,
@@ -8236,6 +8469,11 @@ pub enum Reducer {
         skill_version_id: u64,
         reason: Option::<String>,
 }    ,
+    PublishWorkflowVersion {
+        organization_id: u64,
+        workflow_version_id: u64,
+        expected_revision: u64,
+}    ,
     PurgeExpiredDocuments {
         organization_id: u64,
 }    ,
@@ -8415,6 +8653,10 @@ pub enum Reducer {
         organization_id: u64,
         account_id: u64,
 }    ,
+    RecordWorkflowOutboxResult {
+        organization_id: u64,
+        params: RecordWorkflowOutboxResultParams,
+}    ,
     RefreshCapacityForecast {
         organization_id: u64,
         company_id: u64,
@@ -8503,12 +8745,6 @@ pub enum Reducer {
         draft_id: u64,
         reason: String,
 }    ,
-    RejectApprovalRequest {
-        organization_id: u64,
-        company_id: u64,
-        request_id: u64,
-        params: RejectApprovalRequestParams,
-}    ,
     RejectExpensePolicyException {
         organization_id: u64,
         exception_id: u64,
@@ -8569,6 +8805,11 @@ pub enum Reducer {
     RemoveUserFromOrganization {
         user_identity: __sdk::Identity,
         organization_id: u64,
+}    ,
+    RenewQueueJobLease {
+        organization_id: u64,
+        job_id: u64,
+        params: RenewQueueLeaseParams,
 }    ,
     RenewSubscription {
         organization_id: u64,
@@ -8645,6 +8886,16 @@ pub enum Reducer {
         subscription_id: u64,
         params: ResumeSubscriptionParams,
 }    ,
+    RetireWorkflowVersion {
+        organization_id: u64,
+        workflow_version_id: u64,
+        expected_revision: u64,
+}    ,
+    RetryDeadLetterQueueJob {
+        organization_id: u64,
+        job_id: u64,
+        params: RetryDeadLetterJobParams,
+}    ,
     RetryIntercompanyTransaction {
         organization_id: u64,
         company_id: u64,
@@ -8691,6 +8942,10 @@ pub enum Reducer {
         company_id: u64,
         entitlement_id: u64,
 }    ,
+    RevokeWorkflowDelegation {
+        organization_id: u64,
+        delegation_id: u64,
+}    ,
     RollbackAiSkillRelease {
         organization_id: u64,
         skill_id: u64,
@@ -8723,6 +8978,9 @@ pub enum Reducer {
     RunAllPurchasingTests ,
     RunAllSalesTests ,
     RunAllSubscriptionsTests ,
+    RunAllWorkflowDeterministicCoreTests ,
+    RunAllWorkflowFoundationTests ,
+    RunAllWorkflowHumanEffectTests ,
     RunCartonization {
         organization_id: u64,
         company_id: u64,
@@ -8813,6 +9071,7 @@ pub enum Reducer {
     RunPurchasingIncomingPickingTest ,
     RunPurchasingWaveCSmokeTest ,
     RunPurchasingWaveETest ,
+    RunQueueFoundationTests ,
     RunSalesAtpShortfallTest ,
     RunSalesBackorderTest ,
     RunSalesCommissionAccrueTest ,
@@ -8844,7 +9103,13 @@ pub enum Reducer {
         organization_id: u64,
         report_id: u64,
 }    ,
+    RunWorkflowActionRegistryTests ,
+    RunWorkflowAuthorizationTests ,
     RunWorkflowDefinitionTest ,
+    RunWorkflowDeliveryTests ,
+    RunWorkflowEvaluatorSimulationTests ,
+    RunWorkflowHumanTaskTests ,
+    RunWorkflowRuntimeTests ,
     SaveImportMappingTemplate {
         organization_id: u64,
         template_id: Option::<u64>,
@@ -8911,12 +9176,6 @@ pub enum Reducer {
     SetAnalyticAccountActive {
         organization_id: u64,
         account_id: u64,
-        active: bool,
-}    ,
-    SetApprovalRuleActive {
-        organization_id: u64,
-        company_id: Option::<u64>,
-        rule_id: u64,
         active: bool,
 }    ,
     SetArticlePublished {
@@ -9044,14 +9303,10 @@ pub enum Reducer {
         organization_id: u64,
         account_id: u64,
 }    ,
-    SetWorkflowActive {
+    SetWorkflowCandidateGroupMember {
         organization_id: u64,
-        workflow_id: u64,
-        is_active: bool,
-}    ,
-    SetWorkitemException {
-        organization_id: u64,
-        workitem_id: u64,
+        company_id: u64,
+        params: SetWorkflowCandidateGroupMemberParams,
 }    ,
     SettleSaleCommissions {
         organization_id: u64,
@@ -9070,8 +9325,12 @@ pub enum Reducer {
 }    ,
     SignalWorkflow {
         organization_id: u64,
-        instance_id: u64,
-        signal: String,
+        params: SignalWorkflowParams,
+}    ,
+    SimulateWorkflow {
+        organization_id: u64,
+        workflow_version_id: u64,
+        params: SimulateWorkflowParams,
 }    ,
     SolveQualityAlert {
         organization_id: u64,
@@ -9115,9 +9374,7 @@ pub enum Reducer {
 }    ,
     StartWorkflow {
         organization_id: u64,
-        workflow_id: u64,
-        res_id: u64,
-        res_type: String,
+        params: StartWorkflowParams,
 }    ,
     StartWorkorder {
         organization_id: u64,
@@ -9187,6 +9444,9 @@ pub enum Reducer {
         organization_id: u64,
         device_id: u64,
 }    ,
+    TestQueueJobEdgeCases ,
+    TestQueueSystem ,
+    TestWorkerEdgeCases ,
     ToggleProjectFavorite {
         organization_id: u64,
         project_id: u64,
@@ -9352,12 +9612,6 @@ pub enum Reducer {
         organization_id: u64,
         line_id: u64,
         params: UpdateAnalyticLineParams,
-}    ,
-    UpdateApprovalRule {
-        organization_id: u64,
-        company_id: Option::<u64>,
-        rule_id: u64,
-        params: UpdateApprovalRuleParams,
 }    ,
     UpdateAssignmentRule {
         organization_id: u64,
@@ -10090,6 +10344,12 @@ pub enum Reducer {
         workcenter_id: u64,
         params: UpdateWorkcenterParams,
 }    ,
+    UpdateWorkflowDraft {
+        organization_id: u64,
+        workflow_version_id: u64,
+        expected_revision: u64,
+        params: UpdateWorkflowDraftParams,
+}    ,
     UpdateWorkingCalendar {
         organization_id: u64,
         company_id: u64,
@@ -10160,6 +10420,18 @@ pub enum Reducer {
         city: Option::<String>,
         country_code: Option::<String>,
         manager_name: Option::<String>,
+}    ,
+    UpsertWorkflowEdge {
+        organization_id: u64,
+        workflow_version_id: u64,
+        expected_revision: u64,
+        params: UpsertWorkflowEdgeParams,
+}    ,
+    UpsertWorkflowNode {
+        organization_id: u64,
+        workflow_version_id: u64,
+        expected_revision: u64,
+        params: UpsertWorkflowNodeParams,
 }    ,
     UseSerial {
         organization_id: u64,
@@ -10250,8 +10522,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AddUserCustomField { .. } => "add_user_custom_field",
             Reducer::AddUserToOrganization { .. } => "add_user_to_organization",
             Reducer::AddWidgetToDashboard { .. } => "add_widget_to_dashboard",
-            Reducer::AddWorkflowActivity { .. } => "add_workflow_activity",
-            Reducer::AddWorkflowTransition { .. } => "add_workflow_transition",
+            Reducer::AddWorkflowHumanTaskComment { .. } => "add_workflow_human_task_comment",
             Reducer::AdvanceSubscriptionDunning { .. } => "advance_subscription_dunning",
             Reducer::AllocatePaymentTransaction { .. } => "allocate_payment_transaction",
             Reducer::AmendSubscription { .. } => "amend_subscription",
@@ -10280,7 +10551,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApplySubscriptionTaxSettleIntent { .. } => "apply_subscription_tax_settle_intent",
             Reducer::ApplyWarehouseSyncIntent { .. } => "apply_warehouse_sync_intent",
             Reducer::ApproveAiActionDraft { .. } => "approve_ai_action_draft",
-            Reducer::ApproveApprovalRequest { .. } => "approve_approval_request",
             Reducer::ApproveBankStatementImport { .. } => "approve_bank_statement_import",
             Reducer::ApproveDocumentProcessingJob { .. } => "approve_document_processing_job",
             Reducer::ApproveExpensePolicyException { .. } => "approve_expense_policy_exception",
@@ -10328,6 +10598,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CancelPurchaseOrder { .. } => "cancel_purchase_order",
             Reducer::CancelPurchaseRequisition { .. } => "cancel_purchase_requisition",
             Reducer::CancelQualityAlert { .. } => "cancel_quality_alert",
+            Reducer::CancelQueueJob { .. } => "cancel_queue_job",
             Reducer::CancelReturnOrder { .. } => "cancel_return_order",
             Reducer::CancelSaleCommission { .. } => "cancel_sale_commission",
             Reducer::CancelSaleOrder { .. } => "cancel_sale_order",
@@ -10335,14 +10606,18 @@ impl __sdk::Reducer for Reducer {
             Reducer::CancelStockPackage { .. } => "cancel_stock_package",
             Reducer::CancelStockPicking { .. } => "cancel_stock_picking",
             Reducer::CancelSubscription { .. } => "cancel_subscription",
-            Reducer::CancelWorkflowInstance { .. } => "cancel_workflow_instance",
+            Reducer::CancelWorkflow { .. } => "cancel_workflow",
+            Reducer::CancelWorkflowOutbox { .. } => "cancel_workflow_outbox",
+            Reducer::CancelWorkflowTimer { .. } => "cancel_workflow_timer",
             Reducer::CheckMoAvailability { .. } => "check_mo_availability",
             Reducer::ClaimHubWithToken { .. } => "claim_hub_with_token",
             Reducer::ClaimQueueJob { .. } => "claim_queue_job",
+            Reducer::ClaimWorkflowHumanTask { .. } => "claim_workflow_human_task",
             Reducer::ClearDocumentPresence { .. } => "clear_document_presence",
             Reducer::ClearKnowledgeArticlePresence { .. } => "clear_knowledge_article_presence",
             Reducer::ClearOpportunityPresence { .. } => "clear_opportunity_presence",
             Reducer::ClearProposalPresence { .. } => "clear_proposal_presence",
+            Reducer::CloneWorkflowVersionToDraft { .. } => "clone_workflow_version_to_draft",
             Reducer::CloseAccountAsset { .. } => "close_account_asset",
             Reducer::CloseAccountPeriod { .. } => "close_account_period",
             Reducer::CloseFiscalYear { .. } => "close_fiscal_year",
@@ -10416,7 +10691,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateAnalyticDistributionModel { .. } => "create_analytic_distribution_model",
             Reducer::CreateAnalyticLine { .. } => "create_analytic_line",
             Reducer::CreateAnalyticsMetric { .. } => "create_analytics_metric",
-            Reducer::CreateApprovalRule { .. } => "create_approval_rule",
             Reducer::CreateAssignmentRule { .. } => "create_assignment_rule",
             Reducer::CreateAttendancePunch { .. } => "create_attendance_punch",
             Reducer::CreateAuditRule { .. } => "create_audit_rule",
@@ -10634,11 +10908,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateWorkSchedule { .. } => "create_work_schedule",
             Reducer::CreateWorkcenter { .. } => "create_workcenter",
             Reducer::CreateWorkflow { .. } => "create_workflow",
+            Reducer::CreateWorkflowDelegation { .. } => "create_workflow_delegation",
             Reducer::CreateWorkingCalendar { .. } => "create_working_calendar",
             Reducer::CreateWorkorder { .. } => "create_workorder",
             Reducer::DeactivatePosConfig { .. } => "deactivate_pos_config",
             Reducer::DeactivateRevenueRecognitionRule { .. } => "deactivate_revenue_recognition_rule",
             Reducer::DeactivateSubscriptionPlan { .. } => "deactivate_subscription_plan",
+            Reducer::DecideWorkflowHumanTask { .. } => "decide_workflow_human_task",
             Reducer::DeleteAccountAsset { .. } => "delete_account_asset",
             Reducer::DeleteAccountBankStatement { .. } => "delete_account_bank_statement",
             Reducer::DeleteAccountBankStatementLine { .. } => "delete_account_bank_statement_line",
@@ -10647,7 +10923,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeleteAccountReconciliationWidget { .. } => "delete_account_reconciliation_widget",
             Reducer::DeleteAiReducerAllowlist { .. } => "delete_ai_reducer_allowlist",
             Reducer::DeleteAnalyticLine { .. } => "delete_analytic_line",
-            Reducer::DeleteApprovalRule { .. } => "delete_approval_rule",
             Reducer::DeleteBarcodeNomenclature { .. } => "delete_barcode_nomenclature",
             Reducer::DeleteBarcodeRule { .. } => "delete_barcode_rule",
             Reducer::DeleteBom { .. } => "delete_bom",
@@ -10704,6 +10979,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::DeleteWarehouse { .. } => "delete_warehouse",
             Reducer::DeleteWarehouse3DZone { .. } => "delete_warehouse_3_d_zone",
             Reducer::DeleteWhatsappBusinessAccount { .. } => "delete_whatsapp_business_account",
+            Reducer::DeleteWorkflowEdge { .. } => "delete_workflow_edge",
+            Reducer::DeleteWorkflowNode { .. } => "delete_workflow_node",
             Reducer::DeprecateAccountAccount { .. } => "deprecate_account_account",
             Reducer::DevPromoteCallerSuperuser => "dev_promote_caller_superuser",
             Reducer::DismissInsight { .. } => "dismiss_insight",
@@ -10738,6 +11015,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::FindDuplicateContacts { .. } => "find_duplicate_contacts",
             Reducer::FinishManufacturingOrder { .. } => "finish_manufacturing_order",
             Reducer::FinishWorkorder { .. } => "finish_workorder",
+            Reducer::FireWorkflowTimer { .. } => "fire_workflow_timer",
             Reducer::GenerateEuVatReport { .. } => "generate_eu_vat_report",
             Reducer::GenerateFinancialReport { .. } => "generate_financial_report",
             Reducer::GenerateHubPairingToken { .. } => "generate_hub_pairing_token",
@@ -10810,6 +11088,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ImportWorkflowCsv { .. } => "import_workflow_csv",
             Reducer::IngestSubscriptionUsageEvent { .. } => "ingest_subscription_usage_event",
             Reducer::InitializeDefaultFormConfigs { .. } => "initialize_default_form_configs",
+            Reducer::InvalidateWorkflowHumanTask { .. } => "invalidate_workflow_human_task",
             Reducer::InvoicePoLine { .. } => "invoice_po_line",
             Reducer::LinkDeviceToLocation { .. } => "link_device_to_location",
             Reducer::LinkDeviceToPos { .. } => "link_device_to_pos",
@@ -10866,6 +11145,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ProcessPendingScans { .. } => "process_pending_scans",
             Reducer::ProduceManufacturingOrder { .. } => "produce_manufacturing_order",
             Reducer::PromoteAiSkillVersion { .. } => "promote_ai_skill_version",
+            Reducer::PublishWorkflowVersion { .. } => "publish_workflow_version",
             Reducer::PurgeExpiredDocuments { .. } => "purge_expired_documents",
             Reducer::QueueMailFromTemplate { .. } => "queue_mail_from_template",
             Reducer::RateSubscriptionUsageEvents { .. } => "rate_subscription_usage_events",
@@ -10901,6 +11181,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordTelemetryBatch { .. } => "record_telemetry_batch",
             Reducer::RecordWhatsappHealthCheck { .. } => "record_whatsapp_health_check",
             Reducer::RecordWhatsappMessageSent { .. } => "record_whatsapp_message_sent",
+            Reducer::RecordWorkflowOutboxResult { .. } => "record_workflow_outbox_result",
             Reducer::RefreshCapacityForecast { .. } => "refresh_capacity_forecast",
             Reducer::RefreshHrCapacityForecast { .. } => "refresh_hr_capacity_forecast",
             Reducer::RefreshInventoryExceptions { .. } => "refresh_inventory_exceptions",
@@ -10919,7 +11200,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::RegisterPaymentOnInvoice { .. } => "register_payment_on_invoice",
             Reducer::RegisterQueueWorker { .. } => "register_queue_worker",
             Reducer::RejectAiActionDraft { .. } => "reject_ai_action_draft",
-            Reducer::RejectApprovalRequest { .. } => "reject_approval_request",
             Reducer::RejectExpensePolicyException { .. } => "reject_expense_policy_exception",
             Reducer::RejectSupplierIntake { .. } => "reject_supplier_intake",
             Reducer::RejectTimesheets { .. } => "reject_timesheets",
@@ -10933,6 +11213,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RemovePurchaseOrderLine { .. } => "remove_purchase_order_line",
             Reducer::RemoveRuleFromNomenclature { .. } => "remove_rule_from_nomenclature",
             Reducer::RemoveUserFromOrganization { .. } => "remove_user_from_organization",
+            Reducer::RenewQueueJobLease { .. } => "renew_queue_job_lease",
             Reducer::RenewSubscription { .. } => "renew_subscription",
             Reducer::ReopenInventoryClose { .. } => "reopen_inventory_close",
             Reducer::ReopenTicket { .. } => "reopen_ticket",
@@ -10949,6 +11230,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::RestoreDocument { .. } => "restore_document",
             Reducer::RestoreProductCategory { .. } => "restore_product_category",
             Reducer::ResumeSubscription { .. } => "resume_subscription",
+            Reducer::RetireWorkflowVersion { .. } => "retire_workflow_version",
+            Reducer::RetryDeadLetterQueueJob { .. } => "retry_dead_letter_queue_job",
             Reducer::RetryIntercompanyTransaction { .. } => "retry_intercompany_transaction",
             Reducer::RetryIotAction { .. } => "retry_iot_action",
             Reducer::ReversePaymentTransaction { .. } => "reverse_payment_transaction",
@@ -10959,6 +11242,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RevokePermission { .. } => "revoke_permission",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::RevokeSubscriptionEntitlement { .. } => "revoke_subscription_entitlement",
+            Reducer::RevokeWorkflowDelegation { .. } => "revoke_workflow_delegation",
             Reducer::RollbackAiSkillRelease { .. } => "rollback_ai_skill_release",
             Reducer::RollbackImportJob { .. } => "rollback_import_job",
             Reducer::RunAccountingFxRevaluationTest => "run_accounting_fx_revaluation_test",
@@ -10983,6 +11267,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllPurchasingTests => "run_all_purchasing_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
             Reducer::RunAllSubscriptionsTests => "run_all_subscriptions_tests",
+            Reducer::RunAllWorkflowDeterministicCoreTests => "run_all_workflow_deterministic_core_tests",
+            Reducer::RunAllWorkflowFoundationTests => "run_all_workflow_foundation_tests",
+            Reducer::RunAllWorkflowHumanEffectTests => "run_all_workflow_human_effect_tests",
             Reducer::RunCartonization { .. } => "run_cartonization",
             Reducer::RunCoreOperationalMessagingTest => "run_core_operational_messaging_test",
             Reducer::RunCoreSodTest => "run_core_sod_test",
@@ -11053,6 +11340,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunPurchasingIncomingPickingTest => "run_purchasing_incoming_picking_test",
             Reducer::RunPurchasingWaveCSmokeTest => "run_purchasing_wave_c_smoke_test",
             Reducer::RunPurchasingWaveETest => "run_purchasing_wave_e_test",
+            Reducer::RunQueueFoundationTests => "run_queue_foundation_tests",
             Reducer::RunSalesAtpShortfallTest => "run_sales_atp_shortfall_test",
             Reducer::RunSalesBackorderTest => "run_sales_backorder_test",
             Reducer::RunSalesCommissionAccrueTest => "run_sales_commission_accrue_test",
@@ -11081,7 +11369,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunSubscriptionsWaveETest => "run_subscriptions_wave_e_test",
             Reducer::RunTenantIsolationTests => "run_tenant_isolation_tests",
             Reducer::RunTraceabilityReport { .. } => "run_traceability_report",
+            Reducer::RunWorkflowActionRegistryTests => "run_workflow_action_registry_tests",
+            Reducer::RunWorkflowAuthorizationTests => "run_workflow_authorization_tests",
             Reducer::RunWorkflowDefinitionTest => "run_workflow_definition_test",
+            Reducer::RunWorkflowDeliveryTests => "run_workflow_delivery_tests",
+            Reducer::RunWorkflowEvaluatorSimulationTests => "run_workflow_evaluator_simulation_tests",
+            Reducer::RunWorkflowHumanTaskTests => "run_workflow_human_task_tests",
+            Reducer::RunWorkflowRuntimeTests => "run_workflow_runtime_tests",
             Reducer::SaveImportMappingTemplate { .. } => "save_import_mapping_template",
             Reducer::SaveProposalVersion { .. } => "save_proposal_version",
             Reducer::ScheduleDocumentRetentionPurge { .. } => "schedule_document_retention_purge",
@@ -11098,7 +11392,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetAiReducerAllowlistEnabled { .. } => "set_ai_reducer_allowlist_enabled",
             Reducer::SetAiSkillActive { .. } => "set_ai_skill_active",
             Reducer::SetAnalyticAccountActive { .. } => "set_analytic_account_active",
-            Reducer::SetApprovalRuleActive { .. } => "set_approval_rule_active",
             Reducer::SetArticlePublished { .. } => "set_article_published",
             Reducer::SetAssetActive { .. } => "set_asset_active",
             Reducer::SetBillingStatus { .. } => "set_billing_status",
@@ -11123,12 +11416,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetTaskParent { .. } => "set_task_parent",
             Reducer::SetVendorRiskFlag { .. } => "set_vendor_risk_flag",
             Reducer::SetWhatsappPrimaryAccount { .. } => "set_whatsapp_primary_account",
-            Reducer::SetWorkflowActive { .. } => "set_workflow_active",
-            Reducer::SetWorkitemException { .. } => "set_workitem_exception",
+            Reducer::SetWorkflowCandidateGroupMember { .. } => "set_workflow_candidate_group_member",
             Reducer::SettleSaleCommissions { .. } => "settle_sale_commissions",
             Reducer::SetupFiscalCalendar { .. } => "setup_fiscal_calendar",
             Reducer::ShareDashboard { .. } => "share_dashboard",
             Reducer::SignalWorkflow { .. } => "signal_workflow",
+            Reducer::SimulateWorkflow { .. } => "simulate_workflow",
             Reducer::SolveQualityAlert { .. } => "solve_quality_alert",
             Reducer::StageBankStatementImport { .. } => "stage_bank_statement_import",
             Reducer::StartCycleCountSession { .. } => "start_cycle_count_session",
@@ -11152,6 +11445,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::SyncExternalFileToDocument { .. } => "sync_external_file_to_document",
             Reducer::SyncHubDevices { .. } => "sync_hub_devices",
             Reducer::TestIotDevice { .. } => "test_iot_device",
+            Reducer::TestQueueJobEdgeCases => "test_queue_job_edge_cases",
+            Reducer::TestQueueSystem => "test_queue_system",
+            Reducer::TestWorkerEdgeCases => "test_worker_edge_cases",
             Reducer::ToggleProjectFavorite { .. } => "toggle_project_favorite",
             Reducer::UnassignTeamMemberSkill { .. } => "unassign_team_member_skill",
             Reducer::UnblockWorkcenter { .. } => "unblock_workcenter",
@@ -11185,7 +11481,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateAnalyticAccount { .. } => "update_analytic_account",
             Reducer::UpdateAnalyticDistributionModel { .. } => "update_analytic_distribution_model",
             Reducer::UpdateAnalyticLine { .. } => "update_analytic_line",
-            Reducer::UpdateApprovalRule { .. } => "update_approval_rule",
             Reducer::UpdateAssignmentRule { .. } => "update_assignment_rule",
             Reducer::UpdateAuditRule { .. } => "update_audit_rule",
             Reducer::UpdateBarcodeNomenclature { .. } => "update_barcode_nomenclature",
@@ -11323,6 +11618,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateWhatsappVerificationStatus { .. } => "update_whatsapp_verification_status",
             Reducer::UpdateWidgetLayout { .. } => "update_widget_layout",
             Reducer::UpdateWorkcenter { .. } => "update_workcenter",
+            Reducer::UpdateWorkflowDraft { .. } => "update_workflow_draft",
             Reducer::UpdateWorkingCalendar { .. } => "update_working_calendar",
             Reducer::UpsertAiSkill { .. } => "upsert_ai_skill",
             Reducer::UpsertAiSkillConfig { .. } => "upsert_ai_skill_config",
@@ -11336,6 +11632,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpsertSubscriptionPriceIndex { .. } => "upsert_subscription_price_index",
             Reducer::UpsertVendorScorecard { .. } => "upsert_vendor_scorecard",
             Reducer::UpsertWarehouseGeo { .. } => "upsert_warehouse_geo",
+            Reducer::UpsertWorkflowEdge { .. } => "upsert_workflow_edge",
+            Reducer::UpsertWorkflowNode { .. } => "upsert_workflow_node",
             Reducer::UseSerial { .. } => "use_serial",
             Reducer::ValidateBudget { .. } => "validate_budget",
             Reducer::ValidateConsolidation { .. } => "validate_consolidation",
@@ -11656,26 +11954,11 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 dashboard_id: dashboard_id.clone(),
                 widget_id: widget_id.clone(),
 }),
-            Reducer::AddWorkflowActivity{
+            Reducer::AddWorkflowHumanTaskComment{
                 organization_id,
-                workflow_id,
                 params,
-}             => __sats::bsatn::to_vec(&add_workflow_activity_reducer::AddWorkflowActivityArgs {
+}             => __sats::bsatn::to_vec(&add_workflow_human_task_comment_reducer::AddWorkflowHumanTaskCommentArgs {
                 organization_id: organization_id.clone(),
-                workflow_id: workflow_id.clone(),
-                params: params.clone(),
-}),
-            Reducer::AddWorkflowTransition{
-                organization_id,
-                workflow_id,
-                activity_from,
-                activity_to,
-                params,
-}             => __sats::bsatn::to_vec(&add_workflow_transition_reducer::AddWorkflowTransitionArgs {
-                organization_id: organization_id.clone(),
-                workflow_id: workflow_id.clone(),
-                activity_from: activity_from.clone(),
-                activity_to: activity_to.clone(),
                 params: params.clone(),
 }),
             Reducer::AdvanceSubscriptionDunning{
@@ -11918,15 +12201,6 @@ Reducer::ApplyHrIntegrationIntent{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 draft_id: draft_id.clone(),
-}),
-            Reducer::ApproveApprovalRequest{
-                organization_id,
-                company_id,
-                request_id,
-}             => __sats::bsatn::to_vec(&approve_approval_request_reducer::ApproveApprovalRequestArgs {
-                organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
-                request_id: request_id.clone(),
 }),
             Reducer::ApproveBankStatementImport{
                 organization_id,
@@ -12326,6 +12600,15 @@ Reducer::BillProjectMilestone{
                 alert_id: alert_id.clone(),
                 description: description.clone(),
 }),
+            Reducer::CancelQueueJob{
+                organization_id,
+                job_id,
+                params,
+}             => __sats::bsatn::to_vec(&cancel_queue_job_reducer::CancelQueueJobArgs {
+                organization_id: organization_id.clone(),
+                job_id: job_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CancelReturnOrder{
                 organization_id,
                 company_id,
@@ -12391,12 +12674,26 @@ Reducer::BillProjectMilestone{
                 subscription_id: subscription_id.clone(),
                 params: params.clone(),
 }),
-            Reducer::CancelWorkflowInstance{
+            Reducer::CancelWorkflow{
                 organization_id,
-                instance_id,
-}             => __sats::bsatn::to_vec(&cancel_workflow_instance_reducer::CancelWorkflowInstanceArgs {
+                params,
+}             => __sats::bsatn::to_vec(&cancel_workflow_reducer::CancelWorkflowArgs {
                 organization_id: organization_id.clone(),
-                instance_id: instance_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CancelWorkflowOutbox{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&cancel_workflow_outbox_reducer::CancelWorkflowOutboxArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CancelWorkflowTimer{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&cancel_workflow_timer_reducer::CancelWorkflowTimerArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
 }),
             Reducer::CheckMoAvailability{
                 organization_id,
@@ -12421,9 +12718,18 @@ Reducer::BillProjectMilestone{
             Reducer::ClaimQueueJob{
                 organization_id,
                 job_id,
+                params,
 }             => __sats::bsatn::to_vec(&claim_queue_job_reducer::ClaimQueueJobArgs {
                 organization_id: organization_id.clone(),
                 job_id: job_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::ClaimWorkflowHumanTask{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&claim_workflow_human_task_reducer::ClaimWorkflowHumanTaskArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
 }),
             Reducer::ClearDocumentPresence{
                 document_id,
@@ -12444,6 +12750,15 @@ Reducer::BillProjectMilestone{
                 proposal_id,
 }             => __sats::bsatn::to_vec(&clear_proposal_presence_reducer::ClearProposalPresenceArgs {
                 proposal_id: proposal_id.clone(),
+}),
+            Reducer::CloneWorkflowVersionToDraft{
+                organization_id,
+                source_workflow_version_id,
+                expected_revision,
+}             => __sats::bsatn::to_vec(&clone_workflow_version_to_draft_reducer::CloneWorkflowVersionToDraftArgs {
+                organization_id: organization_id.clone(),
+                source_workflow_version_id: source_workflow_version_id.clone(),
+                expected_revision: expected_revision.clone(),
 }),
             Reducer::CloseAccountAsset{
                 organization_id,
@@ -12614,11 +12929,11 @@ Reducer::BillProjectMilestone{
             Reducer::CompleteQueueJob{
                 organization_id,
                 job_id,
-                error_message,
+                params,
 }             => __sats::bsatn::to_vec(&complete_queue_job_reducer::CompleteQueueJobArgs {
                 organization_id: organization_id.clone(),
                 job_id: job_id.clone(),
-                error_message: error_message.clone(),
+                params: params.clone(),
 }),
             Reducer::CompleteScheduledOwnerReportRun{
                 organization_id,
@@ -13056,15 +13371,6 @@ Reducer::BillProjectMilestone{
                 company_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_analytics_metric_reducer::CreateAnalyticsMetricArgs {
-                organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
-                params: params.clone(),
-}),
-            Reducer::CreateApprovalRule{
-                organization_id,
-                company_id,
-                params,
-}             => __sats::bsatn::to_vec(&create_approval_rule_reducer::CreateApprovalRuleArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 params: params.clone(),
@@ -14882,6 +15188,15 @@ Reducer::BillProjectMilestone{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateWorkflowDelegation{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_workflow_delegation_reducer::CreateWorkflowDelegationArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateWorkingCalendar{
                 organization_id,
                 company_id,
@@ -14922,6 +15237,13 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 plan_id: plan_id.clone(),
+}),
+            Reducer::DecideWorkflowHumanTask{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&decide_workflow_human_task_reducer::DecideWorkflowHumanTaskArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
 }),
             Reducer::DeleteAccountAsset{
                 organization_id,
@@ -14990,15 +15312,6 @@ Reducer::BillProjectMilestone{
 }             => __sats::bsatn::to_vec(&delete_analytic_line_reducer::DeleteAnalyticLineArgs {
                 organization_id: organization_id.clone(),
                 line_id: line_id.clone(),
-}),
-            Reducer::DeleteApprovalRule{
-                organization_id,
-                company_id,
-                rule_id,
-}             => __sats::bsatn::to_vec(&delete_approval_rule_reducer::DeleteApprovalRuleArgs {
-                organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
-                rule_id: rule_id.clone(),
 }),
             Reducer::DeleteBarcodeNomenclature{
                 organization_id,
@@ -15426,6 +15739,28 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 account_id: account_id.clone(),
 }),
+            Reducer::DeleteWorkflowEdge{
+                organization_id,
+                workflow_version_id,
+                expected_revision,
+                edge_key,
+}             => __sats::bsatn::to_vec(&delete_workflow_edge_reducer::DeleteWorkflowEdgeArgs {
+                organization_id: organization_id.clone(),
+                workflow_version_id: workflow_version_id.clone(),
+                expected_revision: expected_revision.clone(),
+                edge_key: edge_key.clone(),
+}),
+            Reducer::DeleteWorkflowNode{
+                organization_id,
+                workflow_version_id,
+                expected_revision,
+                node_key,
+}             => __sats::bsatn::to_vec(&delete_workflow_node_reducer::DeleteWorkflowNodeArgs {
+                organization_id: organization_id.clone(),
+                workflow_version_id: workflow_version_id.clone(),
+                expected_revision: expected_revision.clone(),
+                node_key: node_key.clone(),
+}),
             Reducer::DeprecateAccountAccount{
                 organization_id,
                 account_id,
@@ -15707,6 +16042,13 @@ Reducer::ErrorIntercompanyTransaction{
 }             => __sats::bsatn::to_vec(&finish_workorder_reducer::FinishWorkorderArgs {
                 organization_id: organization_id.clone(),
                 workorder_id: workorder_id.clone(),
+}),
+            Reducer::FireWorkflowTimer{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&fire_workflow_timer_reducer::FireWorkflowTimerArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
 }),
             Reducer::GenerateEuVatReport{
                 organization_id,
@@ -16280,6 +16622,13 @@ Reducer::ErrorIntercompanyTransaction{
 }             => __sats::bsatn::to_vec(&initialize_default_form_configs_reducer::InitializeDefaultFormConfigsArgs {
                 organization_id: organization_id.clone(),
 }),
+            Reducer::InvalidateWorkflowHumanTask{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&invalidate_workflow_human_task_reducer::InvalidateWorkflowHumanTaskArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::InvoicePoLine{
                 organization_id,
                 line_id,
@@ -16769,6 +17118,15 @@ Reducer::MoveStockQuant{
                 skill_version_id: skill_version_id.clone(),
                 reason: reason.clone(),
 }),
+            Reducer::PublishWorkflowVersion{
+                organization_id,
+                workflow_version_id,
+                expected_revision,
+}             => __sats::bsatn::to_vec(&publish_workflow_version_reducer::PublishWorkflowVersionArgs {
+                organization_id: organization_id.clone(),
+                workflow_version_id: workflow_version_id.clone(),
+                expected_revision: expected_revision.clone(),
+}),
             Reducer::PurgeExpiredDocuments{
                 organization_id,
 }             => __sats::bsatn::to_vec(&purge_expired_documents_reducer::PurgeExpiredDocumentsArgs {
@@ -17092,6 +17450,13 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 account_id: account_id.clone(),
 }),
+            Reducer::RecordWorkflowOutboxResult{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_workflow_outbox_result_reducer::RecordWorkflowOutboxResultArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RefreshCapacityForecast{
                 organization_id,
                 company_id,
@@ -17250,17 +17615,6 @@ Reducer::MoveStockQuant{
                 draft_id: draft_id.clone(),
                 reason: reason.clone(),
 }),
-            Reducer::RejectApprovalRequest{
-                organization_id,
-                company_id,
-                request_id,
-                params,
-}             => __sats::bsatn::to_vec(&reject_approval_request_reducer::RejectApprovalRequestArgs {
-                organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
-                request_id: request_id.clone(),
-                params: params.clone(),
-}),
             Reducer::RejectExpensePolicyException{
                 organization_id,
                 exception_id,
@@ -17369,6 +17723,15 @@ Reducer::MoveStockQuant{
 }             => __sats::bsatn::to_vec(&remove_user_from_organization_reducer::RemoveUserFromOrganizationArgs {
                 user_identity: user_identity.clone(),
                 organization_id: organization_id.clone(),
+}),
+            Reducer::RenewQueueJobLease{
+                organization_id,
+                job_id,
+                params,
+}             => __sats::bsatn::to_vec(&renew_queue_job_lease_reducer::RenewQueueJobLeaseArgs {
+                organization_id: organization_id.clone(),
+                job_id: job_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RenewSubscription{
                 organization_id,
@@ -17504,6 +17867,24 @@ Reducer::MoveStockQuant{
                 subscription_id: subscription_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::RetireWorkflowVersion{
+                organization_id,
+                workflow_version_id,
+                expected_revision,
+}             => __sats::bsatn::to_vec(&retire_workflow_version_reducer::RetireWorkflowVersionArgs {
+                organization_id: organization_id.clone(),
+                workflow_version_id: workflow_version_id.clone(),
+                expected_revision: expected_revision.clone(),
+}),
+            Reducer::RetryDeadLetterQueueJob{
+                organization_id,
+                job_id,
+                params,
+}             => __sats::bsatn::to_vec(&retry_dead_letter_queue_job_reducer::RetryDeadLetterQueueJobArgs {
+                organization_id: organization_id.clone(),
+                job_id: job_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RetryIntercompanyTransaction{
                 organization_id,
                 company_id,
@@ -17586,6 +17967,13 @@ Reducer::MoveStockQuant{
                 company_id: company_id.clone(),
                 entitlement_id: entitlement_id.clone(),
 }),
+            Reducer::RevokeWorkflowDelegation{
+                organization_id,
+                delegation_id,
+}             => __sats::bsatn::to_vec(&revoke_workflow_delegation_reducer::RevokeWorkflowDelegationArgs {
+                organization_id: organization_id.clone(),
+                delegation_id: delegation_id.clone(),
+}),
             Reducer::RollbackAiSkillRelease{
                 organization_id,
                 skill_id,
@@ -17647,6 +18035,12 @@ Reducer::RunAllPurchasingTests => __sats::bsatn::to_vec(&run_all_purchasing_test
 Reducer::RunAllSalesTests => __sats::bsatn::to_vec(&run_all_sales_tests_reducer::RunAllSalesTestsArgs {
                 }),
 Reducer::RunAllSubscriptionsTests => __sats::bsatn::to_vec(&run_all_subscriptions_tests_reducer::RunAllSubscriptionsTestsArgs {
+                }),
+Reducer::RunAllWorkflowDeterministicCoreTests => __sats::bsatn::to_vec(&run_all_workflow_deterministic_core_tests_reducer::RunAllWorkflowDeterministicCoreTestsArgs {
+                }),
+Reducer::RunAllWorkflowFoundationTests => __sats::bsatn::to_vec(&run_all_workflow_foundation_tests_reducer::RunAllWorkflowFoundationTestsArgs {
+                }),
+Reducer::RunAllWorkflowHumanEffectTests => __sats::bsatn::to_vec(&run_all_workflow_human_effect_tests_reducer::RunAllWorkflowHumanEffectTestsArgs {
                 }),
 Reducer::RunCartonization{
                 organization_id,
@@ -17823,6 +18217,8 @@ Reducer::RunPurchasingWaveCSmokeTest => __sats::bsatn::to_vec(&run_purchasing_wa
                 }),
 Reducer::RunPurchasingWaveETest => __sats::bsatn::to_vec(&run_purchasing_wave_e_test_reducer::RunPurchasingWaveETestArgs {
                 }),
+Reducer::RunQueueFoundationTests => __sats::bsatn::to_vec(&run_queue_foundation_tests_reducer::RunQueueFoundationTestsArgs {
+                }),
 Reducer::RunSalesAtpShortfallTest => __sats::bsatn::to_vec(&run_sales_atp_shortfall_test_reducer::RunSalesAtpShortfallTestArgs {
                 }),
 Reducer::RunSalesBackorderTest => __sats::bsatn::to_vec(&run_sales_backorder_test_reducer::RunSalesBackorderTestArgs {
@@ -17884,7 +18280,19 @@ Reducer::RunTraceabilityReport{
                 organization_id: organization_id.clone(),
                 report_id: report_id.clone(),
 }),
-            Reducer::RunWorkflowDefinitionTest => __sats::bsatn::to_vec(&run_workflow_definition_test_reducer::RunWorkflowDefinitionTestArgs {
+            Reducer::RunWorkflowActionRegistryTests => __sats::bsatn::to_vec(&run_workflow_action_registry_tests_reducer::RunWorkflowActionRegistryTestsArgs {
+                }),
+Reducer::RunWorkflowAuthorizationTests => __sats::bsatn::to_vec(&run_workflow_authorization_tests_reducer::RunWorkflowAuthorizationTestsArgs {
+                }),
+Reducer::RunWorkflowDefinitionTest => __sats::bsatn::to_vec(&run_workflow_definition_test_reducer::RunWorkflowDefinitionTestArgs {
+                }),
+Reducer::RunWorkflowDeliveryTests => __sats::bsatn::to_vec(&run_workflow_delivery_tests_reducer::RunWorkflowDeliveryTestsArgs {
+                }),
+Reducer::RunWorkflowEvaluatorSimulationTests => __sats::bsatn::to_vec(&run_workflow_evaluator_simulation_tests_reducer::RunWorkflowEvaluatorSimulationTestsArgs {
+                }),
+Reducer::RunWorkflowHumanTaskTests => __sats::bsatn::to_vec(&run_workflow_human_task_tests_reducer::RunWorkflowHumanTaskTestsArgs {
+                }),
+Reducer::RunWorkflowRuntimeTests => __sats::bsatn::to_vec(&run_workflow_runtime_tests_reducer::RunWorkflowRuntimeTestsArgs {
                 }),
 Reducer::SaveImportMappingTemplate{
                 organization_id,
@@ -18005,17 +18413,6 @@ Reducer::SeedHrCountryPackOverlays{
 }             => __sats::bsatn::to_vec(&set_analytic_account_active_reducer::SetAnalyticAccountActiveArgs {
                 organization_id: organization_id.clone(),
                 account_id: account_id.clone(),
-                active: active.clone(),
-}),
-            Reducer::SetApprovalRuleActive{
-                organization_id,
-                company_id,
-                rule_id,
-                active,
-}             => __sats::bsatn::to_vec(&set_approval_rule_active_reducer::SetApprovalRuleActiveArgs {
-                organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
-                rule_id: rule_id.clone(),
                 active: active.clone(),
 }),
             Reducer::SetArticlePublished{
@@ -18244,21 +18641,14 @@ Reducer::SeedHrCountryPackOverlays{
                 organization_id: organization_id.clone(),
                 account_id: account_id.clone(),
 }),
-            Reducer::SetWorkflowActive{
+            Reducer::SetWorkflowCandidateGroupMember{
                 organization_id,
-                workflow_id,
-                is_active,
-}             => __sats::bsatn::to_vec(&set_workflow_active_reducer::SetWorkflowActiveArgs {
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_workflow_candidate_group_member_reducer::SetWorkflowCandidateGroupMemberArgs {
                 organization_id: organization_id.clone(),
-                workflow_id: workflow_id.clone(),
-                is_active: is_active.clone(),
-}),
-            Reducer::SetWorkitemException{
-                organization_id,
-                workitem_id,
-}             => __sats::bsatn::to_vec(&set_workitem_exception_reducer::SetWorkitemExceptionArgs {
-                organization_id: organization_id.clone(),
-                workitem_id: workitem_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
 }),
             Reducer::SettleSaleCommissions{
                 organization_id,
@@ -18289,12 +18679,19 @@ Reducer::SeedHrCountryPackOverlays{
 }),
             Reducer::SignalWorkflow{
                 organization_id,
-                instance_id,
-                signal,
+                params,
 }             => __sats::bsatn::to_vec(&signal_workflow_reducer::SignalWorkflowArgs {
                 organization_id: organization_id.clone(),
-                instance_id: instance_id.clone(),
-                signal: signal.clone(),
+                params: params.clone(),
+}),
+            Reducer::SimulateWorkflow{
+                organization_id,
+                workflow_version_id,
+                params,
+}             => __sats::bsatn::to_vec(&simulate_workflow_reducer::SimulateWorkflowArgs {
+                organization_id: organization_id.clone(),
+                workflow_version_id: workflow_version_id.clone(),
+                params: params.clone(),
 }),
             Reducer::SolveQualityAlert{
                 organization_id,
@@ -18370,14 +18767,10 @@ Reducer::SeedHrCountryPackOverlays{
 }),
             Reducer::StartWorkflow{
                 organization_id,
-                workflow_id,
-                res_id,
-                res_type,
+                params,
 }             => __sats::bsatn::to_vec(&start_workflow_reducer::StartWorkflowArgs {
                 organization_id: organization_id.clone(),
-                workflow_id: workflow_id.clone(),
-                res_id: res_id.clone(),
-                res_type: res_type.clone(),
+                params: params.clone(),
 }),
             Reducer::StartWorkorder{
                 organization_id,
@@ -18501,7 +18894,13 @@ Reducer::SeedHrCountryPackOverlays{
                 organization_id: organization_id.clone(),
                 device_id: device_id.clone(),
 }),
-            Reducer::ToggleProjectFavorite{
+            Reducer::TestQueueJobEdgeCases => __sats::bsatn::to_vec(&test_queue_job_edge_cases_reducer::TestQueueJobEdgeCasesArgs {
+                }),
+Reducer::TestQueueSystem => __sats::bsatn::to_vec(&test_queue_system_reducer::TestQueueSystemArgs {
+                }),
+Reducer::TestWorkerEdgeCases => __sats::bsatn::to_vec(&test_worker_edge_cases_reducer::TestWorkerEdgeCasesArgs {
+                }),
+Reducer::ToggleProjectFavorite{
                 organization_id,
                 project_id,
 }             => __sats::bsatn::to_vec(&toggle_project_favorite_reducer::ToggleProjectFavoriteArgs {
@@ -18798,17 +19197,6 @@ Reducer::SeedHrCountryPackOverlays{
 }             => __sats::bsatn::to_vec(&update_analytic_line_reducer::UpdateAnalyticLineArgs {
                 organization_id: organization_id.clone(),
                 line_id: line_id.clone(),
-                params: params.clone(),
-}),
-            Reducer::UpdateApprovalRule{
-                organization_id,
-                company_id,
-                rule_id,
-                params,
-}             => __sats::bsatn::to_vec(&update_approval_rule_reducer::UpdateApprovalRuleArgs {
-                organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
-                rule_id: rule_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateAssignmentRule{
@@ -20136,6 +20524,17 @@ Reducer::SeedHrCountryPackOverlays{
                 workcenter_id: workcenter_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateWorkflowDraft{
+                organization_id,
+                workflow_version_id,
+                expected_revision,
+                params,
+}             => __sats::bsatn::to_vec(&update_workflow_draft_reducer::UpdateWorkflowDraftArgs {
+                organization_id: organization_id.clone(),
+                workflow_version_id: workflow_version_id.clone(),
+                expected_revision: expected_revision.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdateWorkingCalendar{
                 organization_id,
                 company_id,
@@ -20264,6 +20663,28 @@ Reducer::SeedHrCountryPackOverlays{
                 city: city.clone(),
                 country_code: country_code.clone(),
                 manager_name: manager_name.clone(),
+}),
+            Reducer::UpsertWorkflowEdge{
+                organization_id,
+                workflow_version_id,
+                expected_revision,
+                params,
+}             => __sats::bsatn::to_vec(&upsert_workflow_edge_reducer::UpsertWorkflowEdgeArgs {
+                organization_id: organization_id.clone(),
+                workflow_version_id: workflow_version_id.clone(),
+                expected_revision: expected_revision.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpsertWorkflowNode{
+                organization_id,
+                workflow_version_id,
+                expected_revision,
+                params,
+}             => __sats::bsatn::to_vec(&upsert_workflow_node_reducer::UpsertWorkflowNodeArgs {
+                organization_id: organization_id.clone(),
+                workflow_version_id: workflow_version_id.clone(),
+                expected_revision: expected_revision.clone(),
+                params: params.clone(),
 }),
             Reducer::UseSerial{
                 organization_id,
@@ -20407,8 +20828,6 @@ pub struct DbUpdate {
     amortization_line: __sdk::TableUpdate<AmortizationLine>,
     amortization_schedule: __sdk::TableUpdate<AmortizationSchedule>,
     analytics_metric: __sdk::TableUpdate<AnalyticsMetric>,
-    approval_request: __sdk::TableUpdate<ApprovalRequest>,
-    approval_rule: __sdk::TableUpdate<ApprovalRule>,
     assignment_rule: __sdk::TableUpdate<AssignmentRule>,
     audit_log: __sdk::TableUpdate<AuditLog>,
     audit_rule: __sdk::TableUpdate<AuditRule>,
@@ -20748,11 +21167,6 @@ pub struct DbUpdate {
     warehouse_sync_intent: __sdk::TableUpdate<WarehouseSyncIntent>,
     warehouse_task: __sdk::TableUpdate<WarehouseTask>,
     whatsapp_business_account: __sdk::TableUpdate<WhatsAppBusinessAccount>,
-    workflow: __sdk::TableUpdate<Workflow>,
-    workflow_activity: __sdk::TableUpdate<WorkflowActivity>,
-    workflow_instance: __sdk::TableUpdate<WorkflowInstance>,
-    workflow_transition: __sdk::TableUpdate<WorkflowTransition>,
-    workflow_workitem: __sdk::TableUpdate<WorkflowWorkitem>,
     working_calendar: __sdk::TableUpdate<WorkingCalendar>,
 }
 
@@ -20812,8 +21226,6 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "amortization_line" => db_update.amortization_line.append(amortization_line_table::parse_table_update(table_update)?),
     "amortization_schedule" => db_update.amortization_schedule.append(amortization_schedule_table::parse_table_update(table_update)?),
     "analytics_metric" => db_update.analytics_metric.append(analytics_metric_table::parse_table_update(table_update)?),
-    "approval_request" => db_update.approval_request.append(approval_request_table::parse_table_update(table_update)?),
-    "approval_rule" => db_update.approval_rule.append(approval_rule_table::parse_table_update(table_update)?),
     "assignment_rule" => db_update.assignment_rule.append(assignment_rule_table::parse_table_update(table_update)?),
     "audit_log" => db_update.audit_log.append(audit_log_table::parse_table_update(table_update)?),
     "audit_rule" => db_update.audit_rule.append(audit_rule_table::parse_table_update(table_update)?),
@@ -21153,11 +21565,6 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(warehouse_sync_intent_table::parse_table_update(table_update)?),
     "warehouse_task" => db_update.warehouse_task.append(warehouse_task_table::parse_table_update(table_update)?),
     "whatsapp_business_account" => db_update.whatsapp_business_account.append(whatsapp_business_account_table::parse_table_update(table_update)?),
-    "workflow" => db_update.workflow.append(workflow_table::parse_table_update(table_update)?),
-    "workflow_activity" => db_update.workflow_activity.append(workflow_activity_table::parse_table_update(table_update)?),
-    "workflow_instance" => db_update.workflow_instance.append(workflow_instance_table::parse_table_update(table_update)?),
-    "workflow_transition" => db_update.workflow_transition.append(workflow_transition_table::parse_table_update(table_update)?),
-    "workflow_workitem" => db_update.workflow_workitem.append(workflow_workitem_table::parse_table_update(table_update)?),
     "working_calendar" => db_update.working_calendar.append(working_calendar_table::parse_table_update(table_update)?),
 
                 unknown => {
@@ -21229,8 +21636,6 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.amortization_line = cache.apply_diff_to_table::<AmortizationLine>("amortization_line", &self.amortization_line).with_updates_by_pk(|row| &row.id);
         diff.amortization_schedule = cache.apply_diff_to_table::<AmortizationSchedule>("amortization_schedule", &self.amortization_schedule).with_updates_by_pk(|row| &row.id);
         diff.analytics_metric = cache.apply_diff_to_table::<AnalyticsMetric>("analytics_metric", &self.analytics_metric).with_updates_by_pk(|row| &row.id);
-        diff.approval_request = cache.apply_diff_to_table::<ApprovalRequest>("approval_request", &self.approval_request).with_updates_by_pk(|row| &row.id);
-        diff.approval_rule = cache.apply_diff_to_table::<ApprovalRule>("approval_rule", &self.approval_rule).with_updates_by_pk(|row| &row.id);
         diff.assignment_rule = cache.apply_diff_to_table::<AssignmentRule>("assignment_rule", &self.assignment_rule).with_updates_by_pk(|row| &row.id);
         diff.audit_log = cache.apply_diff_to_table::<AuditLog>("audit_log", &self.audit_log).with_updates_by_pk(|row| &row.id);
         diff.audit_rule = cache.apply_diff_to_table::<AuditRule>("audit_rule", &self.audit_rule).with_updates_by_pk(|row| &row.id);
@@ -21570,11 +21975,6 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.warehouse_sync_intent = cache.apply_diff_to_table::<WarehouseSyncIntent>("warehouse_sync_intent", &self.warehouse_sync_intent).with_updates_by_pk(|row| &row.id);
         diff.warehouse_task = cache.apply_diff_to_table::<WarehouseTask>("warehouse_task", &self.warehouse_task).with_updates_by_pk(|row| &row.id);
         diff.whatsapp_business_account = cache.apply_diff_to_table::<WhatsAppBusinessAccount>("whatsapp_business_account", &self.whatsapp_business_account).with_updates_by_pk(|row| &row.id);
-        diff.workflow = cache.apply_diff_to_table::<Workflow>("workflow", &self.workflow).with_updates_by_pk(|row| &row.id);
-        diff.workflow_activity = cache.apply_diff_to_table::<WorkflowActivity>("workflow_activity", &self.workflow_activity).with_updates_by_pk(|row| &row.id);
-        diff.workflow_instance = cache.apply_diff_to_table::<WorkflowInstance>("workflow_instance", &self.workflow_instance).with_updates_by_pk(|row| &row.id);
-        diff.workflow_transition = cache.apply_diff_to_table::<WorkflowTransition>("workflow_transition", &self.workflow_transition).with_updates_by_pk(|row| &row.id);
-        diff.workflow_workitem = cache.apply_diff_to_table::<WorkflowWorkitem>("workflow_workitem", &self.workflow_workitem).with_updates_by_pk(|row| &row.id);
         diff.working_calendar = cache.apply_diff_to_table::<WorkingCalendar>("working_calendar", &self.working_calendar).with_updates_by_pk(|row| &row.id);
 
                     diff
@@ -21631,8 +22031,6 @@ for table_rows in raw.tables {
                 "amortization_line" => db_update.amortization_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "amortization_schedule" => db_update.amortization_schedule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "analytics_metric" => db_update.analytics_metric.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "approval_request" => db_update.approval_request.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "approval_rule" => db_update.approval_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "assignment_rule" => db_update.assignment_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "audit_log" => db_update.audit_log.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "audit_rule" => db_update.audit_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -21972,11 +22370,6 @@ for table_rows in raw.tables {
                 "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "warehouse_task" => db_update.warehouse_task.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "whatsapp_business_account" => db_update.whatsapp_business_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "workflow" => db_update.workflow.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "workflow_activity" => db_update.workflow_activity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "workflow_instance" => db_update.workflow_instance.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "workflow_transition" => db_update.workflow_transition.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "workflow_workitem" => db_update.workflow_workitem.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "working_calendar" => db_update.working_calendar.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 unknown => { return Err(__sdk::InternalError::unknown_name("table", unknown, "QueryRows").into()); }
 }}        Ok(db_update)
@@ -22033,8 +22426,6 @@ for table_rows in raw.tables {
                 "amortization_line" => db_update.amortization_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "amortization_schedule" => db_update.amortization_schedule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "analytics_metric" => db_update.analytics_metric.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "approval_request" => db_update.approval_request.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "approval_rule" => db_update.approval_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "assignment_rule" => db_update.assignment_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "audit_log" => db_update.audit_log.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "audit_rule" => db_update.audit_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -22374,11 +22765,6 @@ for table_rows in raw.tables {
                 "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "warehouse_task" => db_update.warehouse_task.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "whatsapp_business_account" => db_update.whatsapp_business_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "workflow" => db_update.workflow.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "workflow_activity" => db_update.workflow_activity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "workflow_instance" => db_update.workflow_instance.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "workflow_transition" => db_update.workflow_transition.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "workflow_workitem" => db_update.workflow_workitem.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "working_calendar" => db_update.working_calendar.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 unknown => { return Err(__sdk::InternalError::unknown_name("table", unknown, "QueryRows").into()); }
 }}        Ok(db_update)
@@ -22437,8 +22823,6 @@ pub struct AppliedDiff<'r> {
     amortization_line: __sdk::TableAppliedDiff<'r, AmortizationLine>,
     amortization_schedule: __sdk::TableAppliedDiff<'r, AmortizationSchedule>,
     analytics_metric: __sdk::TableAppliedDiff<'r, AnalyticsMetric>,
-    approval_request: __sdk::TableAppliedDiff<'r, ApprovalRequest>,
-    approval_rule: __sdk::TableAppliedDiff<'r, ApprovalRule>,
     assignment_rule: __sdk::TableAppliedDiff<'r, AssignmentRule>,
     audit_log: __sdk::TableAppliedDiff<'r, AuditLog>,
     audit_rule: __sdk::TableAppliedDiff<'r, AuditRule>,
@@ -22778,11 +23162,6 @@ pub struct AppliedDiff<'r> {
     warehouse_sync_intent: __sdk::TableAppliedDiff<'r, WarehouseSyncIntent>,
     warehouse_task: __sdk::TableAppliedDiff<'r, WarehouseTask>,
     whatsapp_business_account: __sdk::TableAppliedDiff<'r, WhatsAppBusinessAccount>,
-    workflow: __sdk::TableAppliedDiff<'r, Workflow>,
-    workflow_activity: __sdk::TableAppliedDiff<'r, WorkflowActivity>,
-    workflow_instance: __sdk::TableAppliedDiff<'r, WorkflowInstance>,
-    workflow_transition: __sdk::TableAppliedDiff<'r, WorkflowTransition>,
-    workflow_workitem: __sdk::TableAppliedDiff<'r, WorkflowWorkitem>,
     working_calendar: __sdk::TableAppliedDiff<'r, WorkingCalendar>,
     __unused: std::marker::PhantomData<&'r ()>,
 }
@@ -22842,8 +23221,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<AmortizationLine>("amortization_line", &self.amortization_line, event);
         callbacks.invoke_table_row_callbacks::<AmortizationSchedule>("amortization_schedule", &self.amortization_schedule, event);
         callbacks.invoke_table_row_callbacks::<AnalyticsMetric>("analytics_metric", &self.analytics_metric, event);
-        callbacks.invoke_table_row_callbacks::<ApprovalRequest>("approval_request", &self.approval_request, event);
-        callbacks.invoke_table_row_callbacks::<ApprovalRule>("approval_rule", &self.approval_rule, event);
         callbacks.invoke_table_row_callbacks::<AssignmentRule>("assignment_rule", &self.assignment_rule, event);
         callbacks.invoke_table_row_callbacks::<AuditLog>("audit_log", &self.audit_log, event);
         callbacks.invoke_table_row_callbacks::<AuditRule>("audit_rule", &self.audit_rule, event);
@@ -23183,11 +23560,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<WarehouseSyncIntent>("warehouse_sync_intent", &self.warehouse_sync_intent, event);
         callbacks.invoke_table_row_callbacks::<WarehouseTask>("warehouse_task", &self.warehouse_task, event);
         callbacks.invoke_table_row_callbacks::<WhatsAppBusinessAccount>("whatsapp_business_account", &self.whatsapp_business_account, event);
-        callbacks.invoke_table_row_callbacks::<Workflow>("workflow", &self.workflow, event);
-        callbacks.invoke_table_row_callbacks::<WorkflowActivity>("workflow_activity", &self.workflow_activity, event);
-        callbacks.invoke_table_row_callbacks::<WorkflowInstance>("workflow_instance", &self.workflow_instance, event);
-        callbacks.invoke_table_row_callbacks::<WorkflowTransition>("workflow_transition", &self.workflow_transition, event);
-        callbacks.invoke_table_row_callbacks::<WorkflowWorkitem>("workflow_workitem", &self.workflow_workitem, event);
         callbacks.invoke_table_row_callbacks::<WorkingCalendar>("working_calendar", &self.working_calendar, event);
 }
 }
@@ -23878,8 +24250,6 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         amortization_line_table::register_table(client_cache);
         amortization_schedule_table::register_table(client_cache);
         analytics_metric_table::register_table(client_cache);
-        approval_request_table::register_table(client_cache);
-        approval_rule_table::register_table(client_cache);
         assignment_rule_table::register_table(client_cache);
         audit_log_table::register_table(client_cache);
         audit_rule_table::register_table(client_cache);
@@ -24219,11 +24589,6 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         warehouse_sync_intent_table::register_table(client_cache);
         warehouse_task_table::register_table(client_cache);
         whatsapp_business_account_table::register_table(client_cache);
-        workflow_table::register_table(client_cache);
-        workflow_activity_table::register_table(client_cache);
-        workflow_instance_table::register_table(client_cache);
-        workflow_transition_table::register_table(client_cache);
-        workflow_workitem_table::register_table(client_cache);
         working_calendar_table::register_table(client_cache);
 }
 const ALL_TABLE_NAMES: &'static [&'static str] = &[
@@ -24275,8 +24640,6 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "amortization_line",
         "amortization_schedule",
         "analytics_metric",
-        "approval_request",
-        "approval_rule",
         "assignment_rule",
         "audit_log",
         "audit_rule",
@@ -24616,11 +24979,6 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "warehouse_sync_intent",
         "warehouse_task",
         "whatsapp_business_account",
-        "workflow",
-        "workflow_activity",
-        "workflow_instance",
-        "workflow_transition",
-        "workflow_workitem",
         "working_calendar",
 ];
 }

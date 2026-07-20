@@ -10,26 +10,43 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 import {
-  JobStatus,
+  QueueJobStatus,
 } from "./types";
 
 
 export default __t.row({
   id: __t.u64().primaryKey(),
   organizationId: __t.u64().name("organization_id"),
+  companyId: __t.option(__t.u64()).name("company_id"),
   queueName: __t.string().name("queue_name"),
   jobType: __t.string().name("job_type"),
   payload: __t.string(),
+  semanticKey: __t.string().name("semantic_key"),
+  inputHash: __t.string().name("input_hash"),
   priority: __t.i32(),
-  attempts: __t.u32(),
+  attemptCount: __t.u32().name("attempt_count"),
   maxAttempts: __t.u32().name("max_attempts"),
   get status() {
-    return JobStatus;
+    return QueueJobStatus;
   },
-  scheduledAt: __t.option(__t.timestamp()).name("scheduled_at"),
-  startedAt: __t.option(__t.timestamp()).name("started_at"),
+  availableAt: __t.timestamp().name("available_at"),
+  leaseWorkerId: __t.option(__t.u64()).name("lease_worker_id"),
+  leaseToken: __t.option(__t.string()).name("lease_token"),
+  leaseExpiresAt: __t.option(__t.timestamp()).name("lease_expires_at"),
+  revision: __t.u64(),
+  correlationId: __t.string().name("correlation_id"),
+  causationId: __t.option(__t.string()).name("causation_id"),
   completedAt: __t.option(__t.timestamp()).name("completed_at"),
-  errorMessage: __t.option(__t.string()).name("error_message"),
+  lastErrorSummary: __t.option(__t.string()).name("last_error_summary"),
+  deadLetteredAt: __t.option(__t.timestamp()).name("dead_lettered_at"),
+  deadLetteredBy: __t.option(__t.identity()).name("dead_lettered_by"),
+  deadLetterReason: __t.option(__t.string()).name("dead_letter_reason"),
+  lastRetriedAt: __t.option(__t.timestamp()).name("last_retried_at"),
+  lastRetriedBy: __t.option(__t.identity()).name("last_retried_by"),
+  lastRetryReason: __t.option(__t.string()).name("last_retry_reason"),
+  cancelledAt: __t.option(__t.timestamp()).name("cancelled_at"),
+  cancelledBy: __t.option(__t.identity()).name("cancelled_by"),
+  cancellationReason: __t.option(__t.string()).name("cancellation_reason"),
   createdBy: __t.identity().name("created_by"),
   createdAt: __t.timestamp().name("created_at"),
   metadata: __t.option(__t.string()),

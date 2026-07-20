@@ -11,7 +11,12 @@ use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, Audi
 use crate::types::{
     AccountMoveState, MoveType, PartnerType, PaymentState, PaymentType, TaxAmountType, TaxTypeUse,
 };
-use crate::workflow::approval_gate::gate_action_with_approval;
+use crate::workflow::action_registry::{
+    GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
+};
+use crate::workflow::approval_gate::{
+    request_guarded_action, GuardedActionGateOutcome, RequestGuardedActionParams,
+};
 
 // ── Table ─────────────────────────────────────────────────────────────────────
 
@@ -196,35 +201,23 @@ pub fn post_payment_impl(
     }
 
     if !skip_approval_check {
-        let amount = payment.amount;
-        let params_json = serde_json::json!({
-            "organization_id": organization_id,
-            "payment_id": payment_id,
-        })
-        .to_string();
-        let context_json = serde_json::json!({
-            "amount": amount,
-            "payment_type": format!("{:?}", payment.payment_type),
-        })
-        .to_string();
-        let summary = format!("Post payment (amount {:.2})", amount);
-
-        if let Some(_request_id) = gate_action_with_approval(
-            ctx,
-            organization_id,
-            payment.company_id,
-            "account_payment",
-            payment_id,
-            "post_payment",
-            amount,
-            &summary,
-            &params_json,
-            Some(context_json),
-        )? {
-            return Err(format!(
-                "Payment requires approval before posting (amount {:.2})",
-                amount
-            ));
+        if matches!(
+            request_guarded_action(
+                ctx,
+                organization_id,
+                RequestGuardedActionParams {
+                    company_id: payment.company_id,
+                    action: GuardedActionKey::PostPayment,
+                    action_version: GUARDED_ACTION_SCHEMA_VERSION,
+                    input: GuardedActionInput::PostPayment { payment_id },
+                    idempotency_key: format!("post-payment:{payment_id}"),
+                    correlation_id: format!("account-payment:{payment_id}:post"),
+                    causation_id: None,
+                },
+            )?,
+            GuardedActionGateOutcome::HumanTaskCreated { .. }
+        ) {
+            return Ok(());
         }
     }
 

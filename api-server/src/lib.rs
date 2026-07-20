@@ -19,6 +19,7 @@ pub mod routes;
 pub mod session;
 pub mod state;
 pub mod web_session;
+pub mod workflow_reads;
 
 mod http_app;
 mod stdb_sdk_bindings;

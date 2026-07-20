@@ -123,6 +123,10 @@ pub mod projects_tests;
 #[path = "../tests/platform/mod.rs"]
 pub mod platform_tests;
 
+/// Workflow definition, queue-adjacent, and calendar foundation tests.
+#[path = "../tests/workflow/mod.rs"]
+pub mod workflow_tests;
+
 /// Core domain tests — call `run_all_core_tests` reducer to execute.
 #[path = "../tests/core/tests/mod.rs"]
 pub mod core_tests;
@@ -139,8 +143,7 @@ use crate::proposals::proposals::proposal_presence;
 /// `spacetime call <db> run_all_domain_tests`
 #[spacetimedb::reducer]
 pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
-    accounting_tests::run_all_accounting_tests(ctx)
-        .map_err(|e| format!("accounting: {e}"))?;
+    accounting_tests::run_all_accounting_tests(ctx).map_err(|e| format!("accounting: {e}"))?;
     inventory_tests::run_all_inventory_tests(ctx).map_err(|e| format!("inventory: {e}"))?;
     sales_tests::run_all_sales_tests(ctx).map_err(|e| format!("sales: {e}"))?;
     crm_tests::run_all_crm_tests(ctx).map_err(|e| format!("crm: {e}"))?;
@@ -152,6 +155,12 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("subscriptions: {e}"))?;
     projects_tests::run_all_projects_tests(ctx).map_err(|e| format!("projects: {e}"))?;
     platform_tests::run_all_platform_tests(ctx).map_err(|e| format!("platform: {e}"))?;
+    workflow_tests::run_all_workflow_foundation_tests(ctx)
+        .map_err(|e| format!("workflow foundations: {e}"))?;
+    workflow_tests::run_all_workflow_deterministic_core_tests(ctx)
+        .map_err(|e| format!("workflow deterministic core: {e}"))?;
+    workflow_tests::run_all_workflow_human_effect_tests(ctx)
+        .map_err(|e| format!("workflow human effects: {e}"))?;
     log::info!("✅ run_all_domain_tests complete");
     Ok(())
 }

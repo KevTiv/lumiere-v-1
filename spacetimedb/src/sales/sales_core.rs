@@ -12,11 +12,9 @@
 ///   - Audit logging for all mutations
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company_id_from_scope;
 use crate::core::organization::company;
-use crate::core::reference::{
-    currency_rate, legacy_currency_code_for_id,
-};
+use crate::core::organization::company_id_from_scope;
+use crate::core::reference::{currency_rate, legacy_currency_code_for_id};
 use crate::crm::contacts::contact;
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
@@ -27,7 +25,12 @@ use crate::sales::pricelists::product_pricelist;
 use crate::types::{
     InvoiceStatus, LineInvoiceStatus, LineState, PickingPolicy, SaleState, ShippingPolicy,
 };
-use crate::workflow::approval_gate::gate_action_with_approval;
+use crate::workflow::action_registry::{
+    GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
+};
+use crate::workflow::approval_gate::{
+    request_guarded_action, GuardedActionGateOutcome, RequestGuardedActionParams,
+};
 
 // ── Input Params ──────────────────────────────────────────────────────────────
 
@@ -438,10 +441,7 @@ fn merge_exchange_rate_metadata(
         .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
         .and_then(|parsed| parsed.as_object().cloned())
         .unwrap_or_default();
-    metadata.insert(
-        "exchange_rate".to_string(),
-        serde_json::json!(rate),
-    );
+    metadata.insert("exchange_rate".to_string(), serde_json::json!(rate));
     metadata.insert(
         "exchange_rate_from".to_string(),
         serde_json::Value::String(from.to_string()),
@@ -524,12 +524,8 @@ fn create_sale_order_line_internal(
         .find(&order_id)
         .map(|o| o.fiscal_position_id)
         .unwrap_or(None);
-    let tax_ids = remap_taxes_for_fiscal_position(
-        ctx,
-        organization_id,
-        order_fiscal,
-        &params.tax_ids,
-    )?;
+    let tax_ids =
+        remap_taxes_for_fiscal_position(ctx, organization_id, order_fiscal, &params.tax_ids)?;
     let price_tax = calculate_tax(ctx, &tax_ids, price_subtotal);
 
     let line = ctx.db.sale_order_line().insert(SaleOrderLine {
@@ -1280,57 +1276,23 @@ pub fn confirm_sales_order_impl(
     )?;
 
     if !skip_approval_check {
-        let max_discount = ctx
-            .db
-            .sale_order_line()
-            .order_line_by_order()
-            .filter(&order_id)
-            .filter(|line| line.display_type.is_none())
-            .map(|line| line.discount)
-            .fold(0.0_f64, f64::max);
-
-        let params_json = serde_json::json!({
-            "organization_id": organization_id,
-            "order_id": order_id,
-        })
-        .to_string();
-        let context_json = serde_json::json!({
-            "max_discount_percent": max_discount,
-            "amount_total": order.amount_total,
-        })
-        .to_string();
-        let so_label = order
-            .origin
-            .as_deref()
-            .or(order.client_order_ref.as_deref())
-            .unwrap_or("SO");
-        let summary = format!(
-            "Confirm sale order {} (max line discount {:.1}%)",
-            so_label, max_discount
-        );
-
-        if let Some(_request_id) = gate_action_with_approval(
-            ctx,
-            organization_id,
-            order.company_id,
-            "sale_order",
-            order_id,
-            "confirm_sales_order",
-            max_discount,
-            &summary,
-            &params_json,
-            Some(context_json),
-        )? {
-            ctx.db.sale_order().id().update(SaleOrder {
-                state: SaleState::ToApprove,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..order
-            });
-            return Err(format!(
-                "Sale order requires approval before confirmation (max discount {:.1}%)",
-                max_discount
-            ));
+        if matches!(
+            request_guarded_action(
+                ctx,
+                organization_id,
+                RequestGuardedActionParams {
+                    company_id: order.company_id,
+                    action: GuardedActionKey::ConfirmSalesOrder,
+                    action_version: GUARDED_ACTION_SCHEMA_VERSION,
+                    input: GuardedActionInput::ConfirmSalesOrder { order_id },
+                    idempotency_key: format!("confirm-sales-order:{order_id}"),
+                    correlation_id: format!("sales-order:{order_id}:confirm"),
+                    causation_id: None,
+                },
+            )?,
+            GuardedActionGateOutcome::HumanTaskCreated { .. }
+        ) {
+            return Ok(());
         }
     }
 
@@ -1489,7 +1451,9 @@ pub fn cancel_sale_order(
             .stock_move()
             .move_by_org()
             .filter(&organization_id)
-            .filter(|m| m.picking_id == Some(picking.id) && m.state != "done" && m.state != "cancel")
+            .filter(|m| {
+                m.picking_id == Some(picking.id) && m.state != "done" && m.state != "cancel"
+            })
         {
             if !order.is_dropship
                 && product_requires_stock(ctx, move_record.product_id)
@@ -2095,7 +2059,10 @@ pub fn update_sale_order_line(
     let uom_id = params.uom_id.unwrap_or(line.product_uom);
     let price_unit = params.price_unit.unwrap_or(line.price_unit);
     let discount = params.discount.unwrap_or(line.discount);
-    let tax_ids = params.tax_ids.clone().unwrap_or_else(|| line.tax_id.clone());
+    let tax_ids = params
+        .tax_ids
+        .clone()
+        .unwrap_or_else(|| line.tax_id.clone());
     if quantity <= 0.0 {
         return Err("Quantity must be greater than zero".to_string());
     }
@@ -2125,7 +2092,10 @@ pub fn update_sale_order_line(
         .clone()
         .unwrap_or_else(|| line.analytic_tag_ids.clone());
     let customer_lead = params.customer_lead.unwrap_or(line.customer_lead);
-    let display_type = params.display_type.clone().or_else(|| line.display_type.clone());
+    let display_type = params
+        .display_type
+        .clone()
+        .or_else(|| line.display_type.clone());
     let metadata = params.metadata.clone().or_else(|| line.metadata.clone());
     let order_id = line.order_id;
     let company_id = line.company_id;

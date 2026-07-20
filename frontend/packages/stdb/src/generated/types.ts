@@ -947,37 +947,15 @@ export const AddUserToOrganizationParams = __t.object("AddUserToOrganizationPara
 });
 export type AddUserToOrganizationParams = __Infer<typeof AddUserToOrganizationParams>;
 
-export const AddWorkflowActivityParams = __t.object("AddWorkflowActivityParams", {
-  name: __t.string(),
-  kind: __t.string(),
-  splitMode: __t.string(),
-  joinMode: __t.string(),
-  flowStart: __t.bool(),
-  flowStop: __t.bool(),
-  sequence: __t.u32(),
-  action: __t.option(__t.string()),
-  actionId: __t.option(__t.u64()),
-  triggerModel: __t.option(__t.string()),
-  triggerExprId: __t.option(__t.u64()),
-  signalSend: __t.option(__t.string()),
-  subflowId: __t.option(__t.u64()),
-  stateFrom: __t.option(__t.string()),
-  stateTo: __t.option(__t.string()),
-  description: __t.option(__t.string()),
-  metadata: __t.option(__t.string()),
+export const AddWorkflowHumanTaskCommentParams = __t.object("AddWorkflowHumanTaskCommentParams", {
+  companyId: __t.u64(),
+  taskId: __t.u64(),
+  expectedRevision: __t.u64(),
+  comment: __t.string(),
+  idempotencyKey: __t.string(),
+  correlationId: __t.string(),
 });
-export type AddWorkflowActivityParams = __Infer<typeof AddWorkflowActivityParams>;
-
-export const AddWorkflowTransitionParams = __t.object("AddWorkflowTransitionParams", {
-  sequence: __t.u32(),
-  signal: __t.option(__t.string()),
-  condition: __t.option(__t.string()),
-  triggerModel: __t.option(__t.string()),
-  triggerExprId: __t.option(__t.u64()),
-  groupId: __t.option(__t.u64()),
-  metadata: __t.option(__t.string()),
-});
-export type AddWorkflowTransitionParams = __Infer<typeof AddWorkflowTransitionParams>;
+export type AddWorkflowHumanTaskCommentParams = __Infer<typeof AddWorkflowHumanTaskCommentParams>;
 
 export const AdjustmentReason = __t.object("AdjustmentReason", {
   id: __t.u64(),
@@ -1590,53 +1568,6 @@ export const ApplySubscriptionInvoicePaymentParams = __t.object("ApplySubscripti
 });
 export type ApplySubscriptionInvoicePaymentParams = __Infer<typeof ApplySubscriptionInvoicePaymentParams>;
 
-export const ApprovalRequest = __t.object("ApprovalRequest", {
-  id: __t.u64(),
-  organizationId: __t.u64(),
-  companyId: __t.u64(),
-  ruleId: __t.u64(),
-  model: __t.string(),
-  resId: __t.u64(),
-  action: __t.string(),
-  paramsJson: __t.string(),
-  status: __t.string(),
-  summary: __t.string(),
-  contextJson: __t.option(__t.string()),
-  requestedBy: __t.identity(),
-  requestedAt: __t.timestamp(),
-  reviewedBy: __t.option(__t.identity()),
-  reviewedAt: __t.option(__t.timestamp()),
-  rejectReason: __t.option(__t.string()),
-  reviewerComment: __t.option(__t.string()),
-  aiDraftId: __t.option(__t.u64()),
-  workflowInstanceId: __t.option(__t.u64()),
-  createDate: __t.timestamp(),
-  writeDate: __t.timestamp(),
-  metadata: __t.option(__t.string()),
-});
-export type ApprovalRequest = __Infer<typeof ApprovalRequest>;
-
-export const ApprovalRule = __t.object("ApprovalRule", {
-  id: __t.u64(),
-  organizationId: __t.u64(),
-  companyId: __t.option(__t.u64()),
-  name: __t.string(),
-  description: __t.option(__t.string()),
-  model: __t.string(),
-  action: __t.string(),
-  ruleType: __t.string(),
-  threshold: __t.f64(),
-  approverRoleId: __t.option(__t.u64()),
-  sequence: __t.u32(),
-  isActive: __t.bool(),
-  createUid: __t.identity(),
-  createDate: __t.timestamp(),
-  writeUid: __t.identity(),
-  writeDate: __t.timestamp(),
-  metadata: __t.option(__t.string()),
-});
-export type ApprovalRule = __Infer<typeof ApprovalRule>;
-
 export const ArchiveEmployeeParams = __t.object("ArchiveEmployeeParams", {
   terminationDate: __t.option(__t.timestamp()),
   overrideIncompleteChecklist: __t.bool(),
@@ -2049,10 +1980,35 @@ export const CalendarEvent = __t.object("CalendarEvent", {
 });
 export type CalendarEvent = __Infer<typeof CalendarEvent>;
 
+// The tagged union or sum type for the algebraic type `CalendarExceptionCategory`.
+export const CalendarExceptionCategory = __t.enum("CalendarExceptionCategory", {
+  PublicHoliday: __t.unit(),
+  ObservedHoliday: __t.unit(),
+  CollectiveLeave: __t.unit(),
+  SpecialNonWorkingDay: __t.unit(),
+  CompanyClosure: __t.unit(),
+  WorkingDayOverride: __t.unit(),
+});
+export type CalendarExceptionCategory = __Infer<typeof CalendarExceptionCategory>;
+
+// The tagged union or sum type for the algebraic type `CalendarExceptionScope`.
+export const CalendarExceptionScope = __t.enum("CalendarExceptionScope", {
+  National: __t.unit(),
+  Subdivision: __t.unit(),
+  Locality: __t.unit(),
+});
+export type CalendarExceptionScope = __Infer<typeof CalendarExceptionScope>;
+
 export const CancelIntercompanyTransactionParams = __t.object("CancelIntercompanyTransactionParams", {
   reason: __t.string(),
 });
 export type CancelIntercompanyTransactionParams = __Infer<typeof CancelIntercompanyTransactionParams>;
+
+export const CancelQueueJobParams = __t.object("CancelQueueJobParams", {
+  expectedRevision: __t.u64(),
+  reason: __t.string(),
+});
+export type CancelQueueJobParams = __Infer<typeof CancelQueueJobParams>;
 
 export const CancelSubscriptionParams = __t.object("CancelSubscriptionParams", {
   closeReasonId: __t.option(__t.u64()),
@@ -2065,6 +2021,36 @@ export const CancelSubscriptionParams = __t.object("CancelSubscriptionParams", {
   receivableAccountId: __t.option(__t.u64()),
 });
 export type CancelSubscriptionParams = __Infer<typeof CancelSubscriptionParams>;
+
+export const CancelWorkflowOutboxParams = __t.object("CancelWorkflowOutboxParams", {
+  companyId: __t.u64(),
+  outboxId: __t.u64(),
+  expectedOutboxRevision: __t.u64(),
+  expectedQueueRevision: __t.u64(),
+  idempotencyKey: __t.string(),
+  reason: __t.string(),
+});
+export type CancelWorkflowOutboxParams = __Infer<typeof CancelWorkflowOutboxParams>;
+
+export const CancelWorkflowParams = __t.object("CancelWorkflowParams", {
+  companyId: __t.u64(),
+  instanceId: __t.u64(),
+  expectedRevision: __t.u64(),
+  reason: __t.string(),
+  idempotencyKey: __t.string(),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+});
+export type CancelWorkflowParams = __Infer<typeof CancelWorkflowParams>;
+
+export const CancelWorkflowTimerParams = __t.object("CancelWorkflowTimerParams", {
+  companyId: __t.u64(),
+  timerId: __t.u64(),
+  expectedTimerRevision: __t.u64(),
+  idempotencyKey: __t.string(),
+  reason: __t.string(),
+});
+export type CancelWorkflowTimerParams = __Infer<typeof CancelWorkflowTimerParams>;
 
 export const CapacityForecastSnapshot = __t.object("CapacityForecastSnapshot", {
   id: __t.u64(),
@@ -2146,6 +2132,24 @@ export const CashFlowLine = __t.object("CashFlowLine", {
   metadata: __t.option(__t.string()),
 });
 export type CashFlowLine = __Infer<typeof CashFlowLine>;
+
+export const ClaimQueueJobParams = __t.object("ClaimQueueJobParams", {
+  expectedRevision: __t.u64(),
+  workerId: __t.u64(),
+  leaseToken: __t.string(),
+  leaseExpiresAtMicros: __t.u64(),
+});
+export type ClaimQueueJobParams = __Infer<typeof ClaimQueueJobParams>;
+
+export const ClaimWorkflowHumanTaskParams = __t.object("ClaimWorkflowHumanTaskParams", {
+  companyId: __t.u64(),
+  taskId: __t.u64(),
+  expectedRevision: __t.u64(),
+  actingFor: __t.option(__t.identity()),
+  idempotencyKey: __t.string(),
+  correlationId: __t.string(),
+});
+export type ClaimWorkflowHumanTaskParams = __Infer<typeof ClaimWorkflowHumanTaskParams>;
 
 export const CloseSubscriptionParams = __t.object("CloseSubscriptionParams", {
   closeReasonId: __t.option(__t.u64()),
@@ -2274,6 +2278,19 @@ export const CompletePerformanceReviewParams = __t.object("CompletePerformanceRe
 });
 export type CompletePerformanceReviewParams = __Infer<typeof CompletePerformanceReviewParams>;
 
+export const CompleteQueueJobParams = __t.object("CompleteQueueJobParams", {
+  expectedRevision: __t.u64(),
+  workerId: __t.u64(),
+  leaseToken: __t.string(),
+  get outcome() {
+    return QueueCompletionOutcome;
+  },
+  errorSummary: __t.option(__t.string()),
+  responseFingerprint: __t.option(__t.string()),
+  retryJitterMicros: __t.u64(),
+});
+export type CompleteQueueJobParams = __Infer<typeof CompleteQueueJobParams>;
+
 // The tagged union or sum type for the algebraic type `ComputePrice`.
 export const ComputePrice = __t.enum("ComputePrice", {
   Fixed: __t.unit(),
@@ -2281,6 +2298,98 @@ export const ComputePrice = __t.enum("ComputePrice", {
   Formula: __t.unit(),
 });
 export type ComputePrice = __Infer<typeof ComputePrice>;
+
+// The tagged union or sum type for the algebraic type `ConditionComparison`.
+export const ConditionComparison = __t.enum("ConditionComparison", {
+  Equal: __t.unit(),
+  NotEqual: __t.unit(),
+  LessThan: __t.unit(),
+  LessThanOrEqual: __t.unit(),
+  GreaterThan: __t.unit(),
+  GreaterThanOrEqual: __t.unit(),
+});
+export type ConditionComparison = __Infer<typeof ConditionComparison>;
+
+export const ConditionFieldDefinition = __t.object("ConditionFieldDefinition", {
+  fieldKey: __t.string(),
+  get valueType() {
+    return ConditionValueType;
+  },
+  nullable: __t.bool(),
+});
+export type ConditionFieldDefinition = __Infer<typeof ConditionFieldDefinition>;
+
+// The tagged union or sum type for the algebraic type `ConditionInstruction`.
+export const ConditionInstruction = __t.enum("ConditionInstruction", {
+  get PushValue() {
+    return ConditionValue;
+  },
+  LoadField: __t.string(),
+  get Compare() {
+    return ConditionComparison;
+  },
+  And: __t.unit(),
+  Or: __t.unit(),
+  Not: __t.unit(),
+});
+export type ConditionInstruction = __Infer<typeof ConditionInstruction>;
+
+export const ConditionProgram = __t.object("ConditionProgram", {
+  get instructions() {
+    return __t.array(ConditionInstruction);
+  },
+});
+export type ConditionProgram = __Infer<typeof ConditionProgram>;
+
+export const ConditionSnapshot = __t.object("ConditionSnapshot", {
+  subjectModel: __t.string(),
+  subjectId: __t.u64(),
+  subjectRevisionHash: __t.string(),
+  get fields() {
+    return __t.array(ConditionSnapshotField);
+  },
+});
+export type ConditionSnapshot = __Infer<typeof ConditionSnapshot>;
+
+export const ConditionSnapshotField = __t.object("ConditionSnapshotField", {
+  fieldKey: __t.string(),
+  get value() {
+    return ConditionValue;
+  },
+});
+export type ConditionSnapshotField = __Infer<typeof ConditionSnapshotField>;
+
+// The tagged union or sum type for the algebraic type `ConditionValue`.
+export const ConditionValue = __t.enum("ConditionValue", {
+  Null: __t.unit(),
+  Boolean: __t.bool(),
+  Integer: __t.i64(),
+  get Decimal() {
+    return FixedPointDecimal;
+  },
+  get Money() {
+    return MoneyValue;
+  },
+  Text: __t.string(),
+  Date: __t.i32(),
+  Timestamp: __t.i64(),
+  Code: __t.string(),
+});
+export type ConditionValue = __Infer<typeof ConditionValue>;
+
+// The tagged union or sum type for the algebraic type `ConditionValueType`.
+export const ConditionValueType = __t.enum("ConditionValueType", {
+  Null: __t.unit(),
+  Boolean: __t.unit(),
+  Integer: __t.unit(),
+  Decimal: __t.unit(),
+  Money: __t.unit(),
+  Text: __t.unit(),
+  Date: __t.unit(),
+  Timestamp: __t.unit(),
+  Code: __t.unit(),
+});
+export type ConditionValueType = __Infer<typeof ConditionValueType>;
 
 export const ConfirmPayslipParams = __t.object("ConfirmPayslipParams", {
   companyId: __t.option(__t.u64()),
@@ -3271,20 +3380,6 @@ export const CreateAnalyticsMetricParams = __t.object("CreateAnalyticsMetricPara
   metadata: __t.option(__t.string()),
 });
 export type CreateAnalyticsMetricParams = __Infer<typeof CreateAnalyticsMetricParams>;
-
-export const CreateApprovalRuleParams = __t.object("CreateApprovalRuleParams", {
-  name: __t.string(),
-  description: __t.option(__t.string()),
-  model: __t.string(),
-  action: __t.string(),
-  ruleType: __t.string(),
-  threshold: __t.f64(),
-  approverRoleId: __t.option(__t.u64()),
-  sequence: __t.u32(),
-  isActive: __t.bool(),
-  metadata: __t.option(__t.string()),
-});
-export type CreateApprovalRuleParams = __Infer<typeof CreateApprovalRuleParams>;
 
 export const CreateAssignmentRuleParams = __t.object("CreateAssignmentRuleParams", {
   name: __t.string(),
@@ -6724,13 +6819,28 @@ export const CreateWorkcenterProductivityParams = __t.object("CreateWorkcenterPr
 });
 export type CreateWorkcenterProductivityParams = __Infer<typeof CreateWorkcenterProductivityParams>;
 
+export const CreateWorkflowDelegationParams = __t.object("CreateWorkflowDelegationParams", {
+  delegatorIdentity: __t.identity(),
+  delegateeIdentity: __t.identity(),
+  roleId: __t.option(__t.u64()),
+  validFrom: __t.timestamp(),
+  validUntil: __t.timestamp(),
+  reason: __t.option(__t.string()),
+});
+export type CreateWorkflowDelegationParams = __Infer<typeof CreateWorkflowDelegationParams>;
+
 export const CreateWorkflowParams = __t.object("CreateWorkflowParams", {
-  name: __t.string(),
+  workflowKey: __t.string(),
   model: __t.string(),
-  stateField: __t.string(),
-  onCreate: __t.bool(),
-  isActive: __t.bool(),
+  name: __t.string(),
   description: __t.option(__t.string()),
+  get trigger() {
+    return WorkflowTrigger;
+  },
+  schemaVersion: __t.u32(),
+  get snapshotFields() {
+    return __t.array(ConditionFieldDefinition);
+  },
   metadata: __t.option(__t.string()),
 });
 export type CreateWorkflowParams = __Infer<typeof CreateWorkflowParams>;
@@ -6977,6 +7087,22 @@ export const DataClassificationRule = __t.object("DataClassificationRule", {
   metadata: __t.option(__t.string()),
 });
 export type DataClassificationRule = __Infer<typeof DataClassificationRule>;
+
+export const DecideWorkflowHumanTaskParams = __t.object("DecideWorkflowHumanTaskParams", {
+  companyId: __t.u64(),
+  taskId: __t.u64(),
+  expectedTaskRevision: __t.u64(),
+  expectedInstanceRevision: __t.u64(),
+  get decision() {
+    return WorkflowHumanTaskDecision;
+  },
+  actingFor: __t.option(__t.identity()),
+  comment: __t.option(__t.string()),
+  idempotencyKey: __t.string(),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+});
+export type DecideWorkflowHumanTaskParams = __Infer<typeof DecideWorkflowHumanTaskParams>;
 
 export const DeferredRevenueLine = __t.object("DeferredRevenueLine", {
   id: __t.u64(),
@@ -7359,6 +7485,13 @@ export const DriveConflictPolicy = __t.enum("DriveConflictPolicy", {
 });
 export type DriveConflictPolicy = __Infer<typeof DriveConflictPolicy>;
 
+// The tagged union or sum type for the algebraic type `DstOverlapPolicy`.
+export const DstOverlapPolicy = __t.enum("DstOverlapPolicy", {
+  Earlier: __t.unit(),
+  Later: __t.unit(),
+});
+export type DstOverlapPolicy = __Infer<typeof DstOverlapPolicy>;
+
 // The tagged union or sum type for the algebraic type `EmploymentType`.
 export const EmploymentType = __t.enum("EmploymentType", {
   FullTime: __t.unit(),
@@ -7374,12 +7507,16 @@ export const EndContactRoleParams = __t.object("EndContactRoleParams", {
 export type EndContactRoleParams = __Infer<typeof EndContactRoleParams>;
 
 export const EnqueueJobParams = __t.object("EnqueueJobParams", {
+  companyId: __t.option(__t.u64()),
   queueName: __t.string(),
   jobType: __t.string(),
   payload: __t.string(),
+  semanticKey: __t.string(),
   priority: __t.i32(),
   maxAttempts: __t.u32(),
-  scheduledAtMicros: __t.option(__t.u64()),
+  availableAtMicros: __t.option(__t.u64()),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
 });
 export type EnqueueJobParams = __Infer<typeof EnqueueJobParams>;
@@ -7644,6 +7781,17 @@ export const FinancialReport = __t.object("FinancialReport", {
 });
 export type FinancialReport = __Infer<typeof FinancialReport>;
 
+export const FireWorkflowTimerParams = __t.object("FireWorkflowTimerParams", {
+  companyId: __t.u64(),
+  timerId: __t.u64(),
+  expectedTimerRevision: __t.u64(),
+  expectedInstanceRevision: __t.u64(),
+  idempotencyKey: __t.string(),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+});
+export type FireWorkflowTimerParams = __Infer<typeof FireWorkflowTimerParams>;
+
 // The tagged union or sum type for the algebraic type `FiscalYearState`.
 export const FiscalYearState = __t.enum("FiscalYearState", {
   Draft: __t.unit(),
@@ -7652,6 +7800,12 @@ export const FiscalYearState = __t.enum("FiscalYearState", {
   Locked: __t.unit(),
 });
 export type FiscalYearState = __Infer<typeof FiscalYearState>;
+
+export const FixedPointDecimal = __t.object("FixedPointDecimal", {
+  coefficient: __t.i64(),
+  scale: __t.u32(),
+});
+export type FixedPointDecimal = __Infer<typeof FixedPointDecimal>;
 
 export const FleetVehicle = __t.object("FleetVehicle", {
   id: __t.u64(),
@@ -7868,6 +8022,51 @@ export const GrantSubscriptionEntitlementParams = __t.object("GrantSubscriptionE
   metadata: __t.option(__t.string()),
 });
 export type GrantSubscriptionEntitlementParams = __Infer<typeof GrantSubscriptionEntitlementParams>;
+
+// The tagged union or sum type for the algebraic type `GuardedActionKey`.
+export const GuardedActionKey = __t.enum("GuardedActionKey", {
+  ConfirmPurchaseOrder: __t.unit(),
+  SendPurchaseOrder: __t.unit(),
+  ConfirmSalesOrder: __t.unit(),
+  PostAccountMove: __t.unit(),
+  PostPayment: __t.unit(),
+  ApproveExpenseSheet: __t.unit(),
+  ApproveAiActionDraft: __t.unit(),
+});
+export type GuardedActionKey = __Infer<typeof GuardedActionKey>;
+
+export const GuardedActionReceipt = __t.object("GuardedActionReceipt", {
+  id: __t.string(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  get subjectKind() {
+    return GuardedActionSubjectKind;
+  },
+  subjectId: __t.u64(),
+  get action() {
+    return GuardedActionKey;
+  },
+  actionVersion: __t.u32(),
+  inputHash: __t.string(),
+  expectedSubjectRevisionHash: __t.string(),
+  resultSubjectRevisionHash: __t.string(),
+  invocationHash: __t.string(),
+  effectHash: __t.string(),
+  idempotencyKey: __t.string(),
+  executedAt: __t.timestamp(),
+});
+export type GuardedActionReceipt = __Infer<typeof GuardedActionReceipt>;
+
+// The tagged union or sum type for the algebraic type `GuardedActionSubjectKind`.
+export const GuardedActionSubjectKind = __t.enum("GuardedActionSubjectKind", {
+  PurchaseOrder: __t.unit(),
+  SalesOrder: __t.unit(),
+  AccountMove: __t.unit(),
+  AccountPayment: __t.unit(),
+  ExpenseSheet: __t.unit(),
+  AiActionDraft: __t.unit(),
+});
+export type GuardedActionSubjectKind = __Infer<typeof GuardedActionSubjectKind>;
 
 export const HelpdeskSla = __t.object("HelpdeskSla", {
   id: __t.u64(),
@@ -8825,14 +9024,6 @@ export const InsightSeverity = __t.enum("InsightSeverity", {
 });
 export type InsightSeverity = __Infer<typeof InsightSeverity>;
 
-// The tagged union or sum type for the algebraic type `InstanceState`.
-export const InstanceState = __t.enum("InstanceState", {
-  Active: __t.unit(),
-  Complete: __t.unit(),
-  Exception: __t.unit(),
-});
-export type InstanceState = __Infer<typeof InstanceState>;
-
 // The tagged union or sum type for the algebraic type `IntakeState`.
 export const IntakeState = __t.enum("IntakeState", {
   Draft: __t.unit(),
@@ -8934,6 +9125,17 @@ export const IntercompanyTransaction = __t.object("IntercompanyTransaction", {
   metadata: __t.option(__t.string()),
 });
 export type IntercompanyTransaction = __Infer<typeof IntercompanyTransaction>;
+
+export const InvalidateWorkflowHumanTaskParams = __t.object("InvalidateWorkflowHumanTaskParams", {
+  companyId: __t.u64(),
+  taskId: __t.u64(),
+  expectedRevision: __t.u64(),
+  observedSubjectRevisionHash: __t.string(),
+  reason: __t.string(),
+  idempotencyKey: __t.string(),
+  correlationId: __t.string(),
+});
+export type InvalidateWorkflowHumanTaskParams = __Infer<typeof InvalidateWorkflowHumanTaskParams>;
 
 export const InventoryAdjustment = __t.object("InventoryAdjustment", {
   id: __t.u64(),
@@ -9657,6 +9859,12 @@ export const ModuleConfigInput = __t.object("ModuleConfigInput", {
   autoValidateTerminalPayment: __t.bool(),
 });
 export type ModuleConfigInput = __Infer<typeof ModuleConfigInput>;
+
+export const MoneyValue = __t.object("MoneyValue", {
+  minorUnits: __t.i64(),
+  currency: __t.string(),
+});
+export type MoneyValue = __Infer<typeof MoneyValue>;
 
 export const MoveStockQuantParams = __t.object("MoveStockQuantParams", {
   companyId: __t.option(__t.u64()),
@@ -12207,27 +12415,108 @@ export const QualityTeam = __t.object("QualityTeam", {
 });
 export type QualityTeam = __Infer<typeof QualityTeam>;
 
+export const QueueAttempt = __t.object("QueueAttempt", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  jobId: __t.u64(),
+  attemptNumber: __t.u32(),
+  workerId: __t.u64(),
+  leaseToken: __t.string(),
+  get outcome() {
+    return QueueAttemptOutcome;
+  },
+  leaseExpiresAt: __t.option(__t.timestamp()),
+  availableAt: __t.option(__t.timestamp()),
+  errorSummary: __t.option(__t.string()),
+  recordedBy: __t.identity(),
+  recordedAt: __t.timestamp(),
+});
+export type QueueAttempt = __Infer<typeof QueueAttempt>;
+
+// The tagged union or sum type for the algebraic type `QueueAttemptOutcome`.
+export const QueueAttemptOutcome = __t.enum("QueueAttemptOutcome", {
+  Leased: __t.unit(),
+  LeaseRenewed: __t.unit(),
+  LeaseExpired: __t.unit(),
+  Succeeded: __t.unit(),
+  RetryScheduled: __t.unit(),
+  DeadLettered: __t.unit(),
+  Cancelled: __t.unit(),
+});
+export type QueueAttemptOutcome = __Infer<typeof QueueAttemptOutcome>;
+
+// The tagged union or sum type for the algebraic type `QueueCompletionOutcome`.
+export const QueueCompletionOutcome = __t.enum("QueueCompletionOutcome", {
+  Succeeded: __t.unit(),
+  Failed: __t.unit(),
+});
+export type QueueCompletionOutcome = __Infer<typeof QueueCompletionOutcome>;
+
+export const QueueEffectReceipt = __t.object("QueueEffectReceipt", {
+  scopeKey: __t.string(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  jobId: __t.u64(),
+  semanticKey: __t.string(),
+  inputHash: __t.string(),
+  workerId: __t.u64(),
+  leaseToken: __t.string(),
+  responseFingerprint: __t.string(),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+  completedAt: __t.timestamp(),
+});
+export type QueueEffectReceipt = __Infer<typeof QueueEffectReceipt>;
+
 export const QueueJob = __t.object("QueueJob", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
   queueName: __t.string(),
   jobType: __t.string(),
   payload: __t.string(),
+  semanticKey: __t.string(),
+  inputHash: __t.string(),
   priority: __t.i32(),
-  attempts: __t.u32(),
+  attemptCount: __t.u32(),
   maxAttempts: __t.u32(),
   get status() {
-    return JobStatus;
+    return QueueJobStatus;
   },
-  scheduledAt: __t.option(__t.timestamp()),
-  startedAt: __t.option(__t.timestamp()),
+  availableAt: __t.timestamp(),
+  leaseWorkerId: __t.option(__t.u64()),
+  leaseToken: __t.option(__t.string()),
+  leaseExpiresAt: __t.option(__t.timestamp()),
+  revision: __t.u64(),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
   completedAt: __t.option(__t.timestamp()),
-  errorMessage: __t.option(__t.string()),
+  lastErrorSummary: __t.option(__t.string()),
+  deadLetteredAt: __t.option(__t.timestamp()),
+  deadLetteredBy: __t.option(__t.identity()),
+  deadLetterReason: __t.option(__t.string()),
+  lastRetriedAt: __t.option(__t.timestamp()),
+  lastRetriedBy: __t.option(__t.identity()),
+  lastRetryReason: __t.option(__t.string()),
+  cancelledAt: __t.option(__t.timestamp()),
+  cancelledBy: __t.option(__t.identity()),
+  cancellationReason: __t.option(__t.string()),
   createdBy: __t.identity(),
   createdAt: __t.timestamp(),
   metadata: __t.option(__t.string()),
 });
 export type QueueJob = __Infer<typeof QueueJob>;
+
+// The tagged union or sum type for the algebraic type `QueueJobStatus`.
+export const QueueJobStatus = __t.enum("QueueJobStatus", {
+  Pending: __t.unit(),
+  Leased: __t.unit(),
+  Completed: __t.unit(),
+  DeadLettered: __t.unit(),
+  Cancelled: __t.unit(),
+});
+export type QueueJobStatus = __Infer<typeof QueueJobStatus>;
 
 export const QueueMailFromTemplateParams = __t.object("QueueMailFromTemplateParams", {
   templateId: __t.u64(),
@@ -12241,6 +12530,7 @@ export type QueueMailFromTemplateParams = __Infer<typeof QueueMailFromTemplatePa
 export const QueueWorker = __t.object("QueueWorker", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   queues: __t.array(__t.string()),
   isActive: __t.bool(),
@@ -12444,6 +12734,25 @@ export const RecordWhatsAppHealthCheckParams = __t.object("RecordWhatsAppHealthC
 });
 export type RecordWhatsAppHealthCheckParams = __Infer<typeof RecordWhatsAppHealthCheckParams>;
 
+export const RecordWorkflowOutboxResultParams = __t.object("RecordWorkflowOutboxResultParams", {
+  companyId: __t.u64(),
+  outboxId: __t.u64(),
+  expectedOutboxRevision: __t.u64(),
+  expectedInstanceRevision: __t.u64(),
+  queueJobId: __t.u64(),
+  workerId: __t.u64(),
+  leaseToken: __t.string(),
+  get result() {
+    return WorkflowOutboxResultKind;
+  },
+  responseFingerprint: __t.option(__t.string()),
+  errorSummary: __t.option(__t.string()),
+  idempotencyKey: __t.string(),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+});
+export type RecordWorkflowOutboxResultParams = __Infer<typeof RecordWorkflowOutboxResultParams>;
+
 export const RefreshCapacityForecastParams = __t.object("RefreshCapacityForecastParams", {
   employeeId: __t.option(__t.u64()),
   periodStart: __t.option(__t.timestamp()),
@@ -12507,17 +12816,12 @@ export const RegisterHubParams = __t.object("RegisterHubParams", {
 export type RegisterHubParams = __Infer<typeof RegisterHubParams>;
 
 export const RegisterQueueWorkerParams = __t.object("RegisterQueueWorkerParams", {
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   queues: __t.array(__t.string()),
   metadata: __t.option(__t.string()),
 });
 export type RegisterQueueWorkerParams = __Infer<typeof RegisterQueueWorkerParams>;
-
-export const RejectApprovalRequestParams = __t.object("RejectApprovalRequestParams", {
-  reason: __t.string(),
-  comment: __t.option(__t.string()),
-});
-export type RejectApprovalRequestParams = __Infer<typeof RejectApprovalRequestParams>;
 
 export const RejectExpensePolicyExceptionParams = __t.object("RejectExpensePolicyExceptionParams", {
   reason: __t.string(),
@@ -12543,6 +12847,14 @@ export const ReleaseDocumentLegalHoldParams = __t.object("ReleaseDocumentLegalHo
   metadata: __t.option(__t.string()),
 });
 export type ReleaseDocumentLegalHoldParams = __Infer<typeof ReleaseDocumentLegalHoldParams>;
+
+export const RenewQueueLeaseParams = __t.object("RenewQueueLeaseParams", {
+  expectedRevision: __t.u64(),
+  workerId: __t.u64(),
+  leaseToken: __t.string(),
+  leaseExpiresAtMicros: __t.u64(),
+});
+export type RenewQueueLeaseParams = __Infer<typeof RenewQueueLeaseParams>;
 
 export const RenewSubscriptionParams = __t.object("RenewSubscriptionParams", {
   intervals: __t.u32(),
@@ -12743,6 +13055,14 @@ export const ResumeSubscriptionParams = __t.object("ResumeSubscriptionParams", {
   recurringNextDate: __t.option(__t.timestamp()),
 });
 export type ResumeSubscriptionParams = __Infer<typeof ResumeSubscriptionParams>;
+
+export const RetryDeadLetterJobParams = __t.object("RetryDeadLetterJobParams", {
+  expectedRevision: __t.u64(),
+  availableAtMicros: __t.option(__t.u64()),
+  additionalAttempts: __t.u32(),
+  reason: __t.string(),
+});
+export type RetryDeadLetterJobParams = __Infer<typeof RetryDeadLetterJobParams>;
 
 export const ReturnOrder = __t.object("ReturnOrder", {
   id: __t.u64(),
@@ -13555,6 +13875,13 @@ export const SetVendorRiskFlagParams = __t.object("SetVendorRiskFlagParams", {
 });
 export type SetVendorRiskFlagParams = __Infer<typeof SetVendorRiskFlagParams>;
 
+export const SetWorkflowCandidateGroupMemberParams = __t.object("SetWorkflowCandidateGroupMemberParams", {
+  groupId: __t.u64(),
+  memberIdentity: __t.identity(),
+  isActive: __t.bool(),
+});
+export type SetWorkflowCandidateGroupMemberParams = __Infer<typeof SetWorkflowCandidateGroupMemberParams>;
+
 export const SettleSaleCommissionsParams = __t.object("SettleSaleCommissionsParams", {
   commissionIds: __t.array(__t.u64()),
   journalId: __t.u64(),
@@ -13595,6 +13922,29 @@ export const ShippingMethod = __t.object("ShippingMethod", {
   metadata: __t.option(__t.string()),
 });
 export type ShippingMethod = __Infer<typeof ShippingMethod>;
+
+export const SignalWorkflowParams = __t.object("SignalWorkflowParams", {
+  companyId: __t.u64(),
+  instanceId: __t.u64(),
+  expectedRevision: __t.u64(),
+  signalKey: __t.string(),
+  get snapshot() {
+    return ConditionSnapshot;
+  },
+  idempotencyKey: __t.string(),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+});
+export type SignalWorkflowParams = __Infer<typeof SignalWorkflowParams>;
+
+export const SimulateWorkflowParams = __t.object("SimulateWorkflowParams", {
+  simulationKey: __t.string(),
+  signalKey: __t.option(__t.string()),
+  get snapshot() {
+    return ConditionSnapshot;
+  },
+});
+export type SimulateWorkflowParams = __Infer<typeof SimulateWorkflowParams>;
 
 export const SodConflictRule = __t.object("SodConflictRule", {
   id: __t.u64(),
@@ -13657,6 +14007,20 @@ export const StartTimesheetTimerParams = __t.object("StartTimesheetTimerParams",
   metadata: __t.option(__t.string()),
 });
 export type StartTimesheetTimerParams = __Infer<typeof StartTimesheetTimerParams>;
+
+export const StartWorkflowParams = __t.object("StartWorkflowParams", {
+  companyId: __t.u64(),
+  workflowId: __t.u64(),
+  workflowVersionId: __t.u64(),
+  subjectModel: __t.string(),
+  subjectId: __t.u64(),
+  subjectRevisionHash: __t.string(),
+  singletonTriggerKey: __t.option(__t.string()),
+  idempotencyKey: __t.string(),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+});
+export type StartWorkflowParams = __Infer<typeof StartWorkflowParams>;
 
 export const StockCountSheet = __t.object("StockCountSheet", {
   id: __t.u64(),
@@ -15285,18 +15649,6 @@ export const UpdateAnalyticLineParams = __t.object("UpdateAnalyticLineParams", {
 });
 export type UpdateAnalyticLineParams = __Infer<typeof UpdateAnalyticLineParams>;
 
-export const UpdateApprovalRuleParams = __t.object("UpdateApprovalRuleParams", {
-  name: __t.option(__t.string()),
-  description: __t.option(__t.string()),
-  ruleType: __t.option(__t.string()),
-  threshold: __t.option(__t.f64()),
-  approverRoleId: __t.option(__t.option(__t.u64())),
-  sequence: __t.option(__t.u32()),
-  isActive: __t.option(__t.bool()),
-  metadata: __t.option(__t.string()),
-});
-export type UpdateApprovalRuleParams = __Infer<typeof UpdateApprovalRuleParams>;
-
 export const UpdateAssignmentRuleParams = __t.object("UpdateAssignmentRuleParams", {
   name: __t.option(__t.string()),
   model: __t.option(__t.string()),
@@ -16675,6 +17027,20 @@ export const UpdateWorkcenterParams = __t.object("UpdateWorkcenterParams", {
 });
 export type UpdateWorkcenterParams = __Infer<typeof UpdateWorkcenterParams>;
 
+export const UpdateWorkflowDraftParams = __t.object("UpdateWorkflowDraftParams", {
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  get trigger() {
+    return WorkflowTrigger;
+  },
+  schemaVersion: __t.u32(),
+  get snapshotFields() {
+    return __t.array(ConditionFieldDefinition);
+  },
+  metadata: __t.option(__t.string()),
+});
+export type UpdateWorkflowDraftParams = __Infer<typeof UpdateWorkflowDraftParams>;
+
 export const UpdateWorkingCalendarParams = __t.object("UpdateWorkingCalendarParams", {
   name: __t.option(__t.string()),
   packKey: __t.option(__t.string()),
@@ -16801,6 +17167,51 @@ export const UpsertVendorScorecardParams = __t.object("UpsertVendorScorecardPara
   metadata: __t.option(__t.string()),
 });
 export type UpsertVendorScorecardParams = __Infer<typeof UpsertVendorScorecardParams>;
+
+export const UpsertWorkflowEdgeParams = __t.object("UpsertWorkflowEdgeParams", {
+  edgeKey: __t.string(),
+  fromNodeKey: __t.string(),
+  toNodeKey: __t.string(),
+  sequence: __t.u32(),
+  signalKey: __t.option(__t.string()),
+  get condition() {
+    return __t.option(ConditionProgram);
+  },
+  metadata: __t.option(__t.string()),
+});
+export type UpsertWorkflowEdgeParams = __Infer<typeof UpsertWorkflowEdgeParams>;
+
+export const UpsertWorkflowNodeParams = __t.object("UpsertWorkflowNodeParams", {
+  nodeKey: __t.string(),
+  name: __t.string(),
+  get kind() {
+    return WorkflowNodeKind;
+  },
+  sequence: __t.u32(),
+  get splitKind() {
+    return WorkflowBranchKind;
+  },
+  get joinKind() {
+    return WorkflowBranchKind;
+  },
+  get action() {
+    return __t.option(WorkflowActionReference);
+  },
+  get taskPolicy() {
+    return __t.option(WorkflowTaskPolicy);
+  },
+  get timerPolicy() {
+    return __t.option(WorkflowTimerPolicy);
+  },
+  get retryPolicy() {
+    return __t.option(WorkflowRetryPolicy);
+  },
+  get subflow() {
+    return __t.option(WorkflowSubflowReference);
+  },
+  metadata: __t.option(__t.string()),
+});
+export type UpsertWorkflowNodeParams = __Infer<typeof UpsertWorkflowNodeParams>;
 
 export const UserCredential = __t.object("UserCredential", {
   id: __t.u64(),
@@ -17196,99 +17607,571 @@ export type WidgetType = __Infer<typeof WidgetType>;
 export const Workflow = __t.object("Workflow", {
   id: __t.u64(),
   organizationId: __t.u64(),
-  name: __t.string(),
-  description: __t.option(__t.string()),
-  model: __t.string(),
-  stateField: __t.string(),
-  onCreate: __t.bool(),
-  isActive: __t.bool(),
-  activityIds: __t.array(__t.u64()),
-  transitionIds: __t.array(__t.u64()),
-  transitionCount: __t.u32(),
   companyId: __t.option(__t.u64()),
+  workflowKey: __t.string(),
+  model: __t.string(),
   createUid: __t.identity(),
   createDate: __t.timestamp(),
-  writeUid: __t.identity(),
-  writeDate: __t.timestamp(),
-  metadata: __t.option(__t.string()),
 });
 export type Workflow = __Infer<typeof Workflow>;
 
-export const WorkflowActivity = __t.object("WorkflowActivity", {
+export const WorkflowActionInput = __t.object("WorkflowActionInput", {
+  name: __t.string(),
+  get value() {
+    return ConditionValue;
+  },
+});
+export type WorkflowActionInput = __Infer<typeof WorkflowActionInput>;
+
+export const WorkflowActionReference = __t.object("WorkflowActionReference", {
+  actionKey: __t.string(),
+  inputSchemaVersion: __t.u32(),
+  get input() {
+    return __t.array(WorkflowActionInput);
+  },
+});
+export type WorkflowActionReference = __Infer<typeof WorkflowActionReference>;
+
+// The tagged union or sum type for the algebraic type `WorkflowAuthorizationOutcome`.
+export const WorkflowAuthorizationOutcome = __t.enum("WorkflowAuthorizationOutcome", {
+  NotApplicable: __t.unit(),
+  Allowed: __t.unit(),
+  Denied: __t.unit(),
+});
+export type WorkflowAuthorizationOutcome = __Infer<typeof WorkflowAuthorizationOutcome>;
+
+// The tagged union or sum type for the algebraic type `WorkflowBranchKind`.
+export const WorkflowBranchKind = __t.enum("WorkflowBranchKind", {
+  None: __t.unit(),
+  Xor: __t.unit(),
+  Or: __t.unit(),
+  And: __t.unit(),
+});
+export type WorkflowBranchKind = __Infer<typeof WorkflowBranchKind>;
+
+export const WorkflowCalendar = __t.object("WorkflowCalendar", {
+  id: __t.u64(),
+  calendarKey: __t.string(),
+  name: __t.string(),
+  get market() {
+    return WorkflowCalendarMarket;
+  },
+  get scope() {
+    return WorkflowCalendarScope;
+  },
+  organizationId: __t.option(__t.u64()),
+  companyId: __t.option(__t.u64()),
+  createdAt: __t.timestamp(),
+});
+export type WorkflowCalendar = __Infer<typeof WorkflowCalendar>;
+
+export const WorkflowCalendarException = __t.object("WorkflowCalendarException", {
+  id: __t.u64(),
+  calendarVersionId: __t.u64(),
+  localDateDays: __t.i32(),
+  name: __t.string(),
+  get category() {
+    return CalendarExceptionCategory;
+  },
+  get scope() {
+    return CalendarExceptionScope;
+  },
+  subdivision: __t.option(__t.string()),
+  locality: __t.option(__t.string()),
+  isWorkingDay: __t.bool(),
+  workdayStartMinute: __t.option(__t.u16()),
+  cutoffMinute: __t.option(__t.u16()),
+  effectiveYear: __t.u16(),
+  sourceAuthority: __t.string(),
+  sourceTitle: __t.string(),
+  sourceUrl: __t.string(),
+  sourcePublishedOn: __t.option(__t.string()),
+  sourceRetrievedOn: __t.string(),
+});
+export type WorkflowCalendarException = __Infer<typeof WorkflowCalendarException>;
+
+// The tagged union or sum type for the algebraic type `WorkflowCalendarMarket`.
+export const WorkflowCalendarMarket = __t.enum("WorkflowCalendarMarket", {
+  Au: __t.unit(),
+  Nz: __t.unit(),
+  Za: __t.unit(),
+  Br: __t.unit(),
+  Ar: __t.unit(),
+  Cl: __t.unit(),
+  Sg: __t.unit(),
+  My: __t.unit(),
+  Id: __t.unit(),
+  Ph: __t.unit(),
+});
+export type WorkflowCalendarMarket = __Infer<typeof WorkflowCalendarMarket>;
+
+// The tagged union or sum type for the algebraic type `WorkflowCalendarScope`.
+export const WorkflowCalendarScope = __t.enum("WorkflowCalendarScope", {
+  GlobalPack: __t.unit(),
+  Organization: __t.unit(),
+  Company: __t.unit(),
+});
+export type WorkflowCalendarScope = __Infer<typeof WorkflowCalendarScope>;
+
+export const WorkflowCalendarVersion = __t.object("WorkflowCalendarVersion", {
+  id: __t.u64(),
+  calendarId: __t.u64(),
+  versionNumber: __t.u32(),
+  locale: __t.string(),
+  subdivision: __t.option(__t.string()),
+  locality: __t.option(__t.string()),
+  ianaTimezone: __t.string(),
+  weekdayMask: __t.u8(),
+  workdayStartMinute: __t.u16(),
+  cutoffMinute: __t.u16(),
+  get dstOverlapPolicy() {
+    return DstOverlapPolicy;
+  },
+  effectiveFromYear: __t.u16(),
+  effectiveThroughYear: __t.u16(),
+  contentHash: __t.string(),
+  sourceAuthority: __t.string(),
+  sourceTitle: __t.string(),
+  sourceUrl: __t.string(),
+  sourcePublishedOn: __t.option(__t.string()),
+  sourceRetrievedOn: __t.string(),
+  activatedAt: __t.timestamp(),
+});
+export type WorkflowCalendarVersion = __Infer<typeof WorkflowCalendarVersion>;
+
+export const WorkflowCandidateGroupMember = __t.object("WorkflowCandidateGroupMember", {
   id: __t.u64(),
   organizationId: __t.u64(),
-  name: __t.string(),
-  description: __t.option(__t.string()),
+  companyId: __t.u64(),
+  groupId: __t.u64(),
+  memberIdentity: __t.identity(),
+  isActive: __t.bool(),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  revokedBy: __t.option(__t.identity()),
+  revokedAt: __t.option(__t.timestamp()),
+});
+export type WorkflowCandidateGroupMember = __Infer<typeof WorkflowCandidateGroupMember>;
+
+// The tagged union or sum type for the algebraic type `WorkflowCommandKind`.
+export const WorkflowCommandKind = __t.enum("WorkflowCommandKind", {
+  Start: __t.unit(),
+  Signal: __t.unit(),
+  Cancel: __t.unit(),
+  HumanDecision: __t.unit(),
+  Timer: __t.unit(),
+  ActionResult: __t.unit(),
+  Branch: __t.unit(),
+  Migration: __t.unit(),
+});
+export type WorkflowCommandKind = __Infer<typeof WorkflowCommandKind>;
+
+export const WorkflowCommandReceipt = __t.object("WorkflowCommandReceipt", {
+  scopeKey: __t.string(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  get commandKind() {
+    return WorkflowCommandKind;
+  },
+  idempotencyKey: __t.string(),
+  inputHash: __t.string(),
+  resultInstanceId: __t.u64(),
+  resultInstanceRevision: __t.u64(),
+  get resultInstanceState() {
+    return WorkflowInstanceState;
+  },
+  resultTokenIds: __t.array(__t.u64()),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+});
+export type WorkflowCommandReceipt = __Infer<typeof WorkflowCommandReceipt>;
+
+export const WorkflowDecisionEvent = __t.object("WorkflowDecisionEvent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
   workflowId: __t.u64(),
+  workflowVersionId: __t.u64(),
+  instanceId: __t.u64(),
+  tokenId: __t.option(__t.u64()),
+  resultTokenId: __t.option(__t.u64()),
+  priorNodeKey: __t.option(__t.string()),
+  nextNodeKey: __t.option(__t.string()),
+  get commandKind() {
+    return WorkflowCommandKind;
+  },
+  get priorInstanceState() {
+    return __t.option(WorkflowInstanceState);
+  },
+  get nextInstanceState() {
+    return WorkflowInstanceState;
+  },
+  get priorTokenState() {
+    return __t.option(WorkflowTokenState);
+  },
+  get nextTokenState() {
+    return __t.option(WorkflowTokenState);
+  },
+  actor: __t.identity(),
+  actingFor: __t.option(__t.identity()),
+  matchedRoleId: __t.option(__t.u64()),
+  delegationId: __t.option(__t.u64()),
+  get authorizationOutcome() {
+    return WorkflowAuthorizationOutcome;
+  },
+  conditionResult: __t.option(__t.bool()),
+  subjectModel: __t.string(),
+  subjectId: __t.u64(),
+  subjectRevisionHash: __t.string(),
+  actionKey: __t.option(__t.string()),
+  priorRevision: __t.u64(),
+  nextRevision: __t.u64(),
+  idempotencyKey: __t.string(),
+  inputHash: __t.string(),
+  domainReceipt: __t.option(__t.string()),
+  reason: __t.option(__t.string()),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+  recordedAt: __t.timestamp(),
+});
+export type WorkflowDecisionEvent = __Infer<typeof WorkflowDecisionEvent>;
+
+export const WorkflowDelegation = __t.object("WorkflowDelegation", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  delegatorIdentity: __t.identity(),
+  delegateeIdentity: __t.identity(),
+  roleId: __t.option(__t.u64()),
+  validFrom: __t.timestamp(),
+  validUntil: __t.timestamp(),
+  isActive: __t.bool(),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  revokedBy: __t.option(__t.identity()),
+  revokedAt: __t.option(__t.timestamp()),
+  reason: __t.option(__t.string()),
+});
+export type WorkflowDelegation = __Infer<typeof WorkflowDelegation>;
+
+export const WorkflowDeliveryAttempt = __t.object("WorkflowDeliveryAttempt", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  get objectKind() {
+    return WorkflowDeliveryObjectKind;
+  },
+  objectId: __t.u64(),
+  get attemptKind() {
+    return WorkflowDeliveryAttemptKind;
+  },
+  objectRevision: __t.u64(),
+  queueJobId: __t.option(__t.u64()),
+  workerId: __t.option(__t.u64()),
+  leaseToken: __t.option(__t.string()),
+  inputHash: __t.string(),
+  responseFingerprint: __t.option(__t.string()),
+  errorSummary: __t.option(__t.string()),
+  runtimeRevision: __t.option(__t.u64()),
+  recordedBy: __t.identity(),
+  recordedAt: __t.timestamp(),
+});
+export type WorkflowDeliveryAttempt = __Infer<typeof WorkflowDeliveryAttempt>;
+
+// The tagged union or sum type for the algebraic type `WorkflowDeliveryAttemptKind`.
+export const WorkflowDeliveryAttemptKind = __t.enum("WorkflowDeliveryAttemptKind", {
+  TimerFired: __t.unit(),
+  TimerCancelled: __t.unit(),
+  OutboxCompleted: __t.unit(),
+  OutboxRetryScheduled: __t.unit(),
+  OutboxDeadLettered: __t.unit(),
+  OutboxReconciliationRequired: __t.unit(),
+  OutboxCancelled: __t.unit(),
+});
+export type WorkflowDeliveryAttemptKind = __Infer<typeof WorkflowDeliveryAttemptKind>;
+
+// The tagged union or sum type for the algebraic type `WorkflowDeliveryGuarantee`.
+export const WorkflowDeliveryGuarantee = __t.enum("WorkflowDeliveryGuarantee", {
+  ExternallyIdempotent: __t.unit(),
+  NonIdempotent: __t.unit(),
+});
+export type WorkflowDeliveryGuarantee = __Infer<typeof WorkflowDeliveryGuarantee>;
+
+// The tagged union or sum type for the algebraic type `WorkflowDeliveryObjectKind`.
+export const WorkflowDeliveryObjectKind = __t.enum("WorkflowDeliveryObjectKind", {
+  Timer: __t.unit(),
+  Outbox: __t.unit(),
+});
+export type WorkflowDeliveryObjectKind = __Infer<typeof WorkflowDeliveryObjectKind>;
+
+export const WorkflowDeliveryReceipt = __t.object("WorkflowDeliveryReceipt", {
+  scopeKey: __t.string(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  get kind() {
+    return WorkflowDeliveryReceiptKind;
+  },
+  get objectKind() {
+    return WorkflowDeliveryObjectKind;
+  },
+  objectId: __t.u64(),
+  idempotencyKey: __t.string(),
+  inputHash: __t.string(),
+  objectRevision: __t.u64(),
+  runtimeRevision: __t.option(__t.u64()),
+  queueJobId: __t.option(__t.u64()),
+  queueEffectReceiptKey: __t.option(__t.string()),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+});
+export type WorkflowDeliveryReceipt = __Infer<typeof WorkflowDeliveryReceipt>;
+
+// The tagged union or sum type for the algebraic type `WorkflowDeliveryReceiptKind`.
+export const WorkflowDeliveryReceiptKind = __t.enum("WorkflowDeliveryReceiptKind", {
+  TimerCreated: __t.unit(),
+  TimerFired: __t.unit(),
+  TimerCancelled: __t.unit(),
+  OutboxCreated: __t.unit(),
+  OutboxResult: __t.unit(),
+  OutboxCancelled: __t.unit(),
+});
+export type WorkflowDeliveryReceiptKind = __Infer<typeof WorkflowDeliveryReceiptKind>;
+
+export const WorkflowEdge = __t.object("WorkflowEdge", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  workflowId: __t.u64(),
+  workflowVersionId: __t.u64(),
+  edgeKey: __t.string(),
+  fromNodeKey: __t.string(),
+  toNodeKey: __t.string(),
   sequence: __t.u32(),
-  kind: __t.string(),
-  action: __t.option(__t.string()),
-  actionId: __t.option(__t.u64()),
-  triggerModel: __t.option(__t.string()),
-  triggerExprId: __t.option(__t.u64()),
-  splitMode: __t.string(),
-  joinMode: __t.string(),
-  signalSend: __t.option(__t.string()),
-  subflowId: __t.option(__t.u64()),
-  outgoingTransitionIds: __t.array(__t.u64()),
-  incomingTransitionIds: __t.array(__t.u64()),
-  flowStart: __t.bool(),
-  flowStop: __t.bool(),
-  stateFrom: __t.option(__t.string()),
-  stateTo: __t.option(__t.string()),
+  signalKey: __t.option(__t.string()),
+  get condition() {
+    return __t.option(ConditionProgram);
+  },
   createUid: __t.identity(),
   createDate: __t.timestamp(),
   writeUid: __t.identity(),
   writeDate: __t.timestamp(),
   metadata: __t.option(__t.string()),
 });
-export type WorkflowActivity = __Infer<typeof WorkflowActivity>;
+export type WorkflowEdge = __Infer<typeof WorkflowEdge>;
+
+export const WorkflowHumanTask = __t.object("WorkflowHumanTask", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  workflowId: __t.u64(),
+  workflowVersionId: __t.u64(),
+  workflowInstanceId: __t.u64(),
+  tokenId: __t.u64(),
+  nodeId: __t.u64(),
+  nodeKey: __t.string(),
+  get kind() {
+    return WorkflowHumanTaskKind;
+  },
+  get assignment() {
+    return WorkflowTaskAssignment;
+  },
+  candidateRoleIds: __t.array(__t.u64()),
+  candidateGroupIds: __t.array(__t.u64()),
+  candidateUnitIds: __t.array(__t.u64()),
+  requireCommentOnReject: __t.bool(),
+  subjectModel: __t.string(),
+  subjectId: __t.u64(),
+  conditionRevisionHash: __t.string(),
+  subjectRevisionHash: __t.string(),
+  get guardedAction() {
+    return __t.option(WorkflowTaskGuardedAction);
+  },
+  get status() {
+    return WorkflowHumanTaskStatus;
+  },
+  revision: __t.u64(),
+  requestedBy: __t.identity(),
+  requestedAt: __t.timestamp(),
+  claimedBy: __t.option(__t.identity()),
+  claimedAt: __t.option(__t.timestamp()),
+  decidedBy: __t.option(__t.identity()),
+  actingFor: __t.option(__t.identity()),
+  decidedAt: __t.option(__t.timestamp()),
+  get decision() {
+    return __t.option(WorkflowHumanTaskDecision);
+  },
+  decisionComment: __t.option(__t.string()),
+  invalidatedBy: __t.option(__t.identity()),
+  invalidatedAt: __t.option(__t.timestamp()),
+  invalidationReason: __t.option(__t.string()),
+  correlationId: __t.string(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type WorkflowHumanTask = __Infer<typeof WorkflowHumanTask>;
+
+// The tagged union or sum type for the algebraic type `WorkflowHumanTaskCommandKind`.
+export const WorkflowHumanTaskCommandKind = __t.enum("WorkflowHumanTaskCommandKind", {
+  Create: __t.unit(),
+  Claim: __t.unit(),
+  Decision: __t.unit(),
+  Invalidate: __t.unit(),
+  Comment: __t.unit(),
+});
+export type WorkflowHumanTaskCommandKind = __Infer<typeof WorkflowHumanTaskCommandKind>;
+
+// The tagged union or sum type for the algebraic type `WorkflowHumanTaskDecision`.
+export const WorkflowHumanTaskDecision = __t.enum("WorkflowHumanTaskDecision", {
+  Approve: __t.unit(),
+  Reject: __t.unit(),
+  Complete: __t.unit(),
+});
+export type WorkflowHumanTaskDecision = __Infer<typeof WorkflowHumanTaskDecision>;
+
+export const WorkflowHumanTaskEvent = __t.object("WorkflowHumanTaskEvent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  workflowVersionId: __t.u64(),
+  workflowInstanceId: __t.u64(),
+  taskId: __t.u64(),
+  get commandKind() {
+    return WorkflowHumanTaskCommandKind;
+  },
+  get priorStatus() {
+    return __t.option(WorkflowHumanTaskStatus);
+  },
+  get nextStatus() {
+    return WorkflowHumanTaskStatus;
+  },
+  get decision() {
+    return __t.option(WorkflowHumanTaskDecision);
+  },
+  actor: __t.identity(),
+  actingFor: __t.option(__t.identity()),
+  matchedRoleId: __t.option(__t.u64()),
+  delegationId: __t.option(__t.u64()),
+  priorRevision: __t.u64(),
+  nextRevision: __t.u64(),
+  idempotencyKey: __t.string(),
+  inputHash: __t.string(),
+  subjectRevisionHash: __t.string(),
+  comment: __t.option(__t.string()),
+  domainReceipt: __t.option(__t.string()),
+  correlationId: __t.string(),
+  recordedAt: __t.timestamp(),
+});
+export type WorkflowHumanTaskEvent = __Infer<typeof WorkflowHumanTaskEvent>;
+
+// The tagged union or sum type for the algebraic type `WorkflowHumanTaskKind`.
+export const WorkflowHumanTaskKind = __t.enum("WorkflowHumanTaskKind", {
+  ApproveReject: __t.unit(),
+  Complete: __t.unit(),
+  EvidenceReview: __t.unit(),
+});
+export type WorkflowHumanTaskKind = __Infer<typeof WorkflowHumanTaskKind>;
+
+export const WorkflowHumanTaskReceipt = __t.object("WorkflowHumanTaskReceipt", {
+  scopeKey: __t.string(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  taskId: __t.u64(),
+  get commandKind() {
+    return WorkflowHumanTaskCommandKind;
+  },
+  idempotencyKey: __t.string(),
+  inputHash: __t.string(),
+  get resultStatus() {
+    return WorkflowHumanTaskStatus;
+  },
+  resultRevision: __t.u64(),
+  domainReceipt: __t.option(__t.string()),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+});
+export type WorkflowHumanTaskReceipt = __Infer<typeof WorkflowHumanTaskReceipt>;
+
+// The tagged union or sum type for the algebraic type `WorkflowHumanTaskStatus`.
+export const WorkflowHumanTaskStatus = __t.enum("WorkflowHumanTaskStatus", {
+  Open: __t.unit(),
+  Claimed: __t.unit(),
+  Approved: __t.unit(),
+  Rejected: __t.unit(),
+  Completed: __t.unit(),
+  Invalidated: __t.unit(),
+  Cancelled: __t.unit(),
+});
+export type WorkflowHumanTaskStatus = __Infer<typeof WorkflowHumanTaskStatus>;
 
 export const WorkflowInstance = __t.object("WorkflowInstance", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   workflowId: __t.u64(),
-  resId: __t.u64(),
-  resType: __t.string(),
+  workflowVersionId: __t.u64(),
+  definitionHash: __t.string(),
+  subjectModel: __t.string(),
+  subjectId: __t.u64(),
+  subjectRevisionHash: __t.string(),
   get state() {
-    return InstanceState;
+    return WorkflowInstanceState;
   },
-  activityIds: __t.array(__t.u64()),
-  createUid: __t.identity(),
-  createDate: __t.timestamp(),
-  writeUid: __t.identity(),
-  writeDate: __t.timestamp(),
-  metadata: __t.option(__t.string()),
+  revision: __t.u64(),
+  activeTokenCount: __t.u32(),
+  singletonScopeKey: __t.option(__t.string()),
+  startedBy: __t.identity(),
+  startedAt: __t.timestamp(),
+  completedAt: __t.option(__t.timestamp()),
+  cancelledBy: __t.option(__t.identity()),
+  cancelledAt: __t.option(__t.timestamp()),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
 });
 export type WorkflowInstance = __Infer<typeof WorkflowInstance>;
 
-export const WorkflowTransition = __t.object("WorkflowTransition", {
-  id: __t.u64(),
-  organizationId: __t.u64(),
-  activityFrom: __t.u64(),
-  activityTo: __t.u64(),
-  sequence: __t.u32(),
-  signal: __t.option(__t.string()),
-  condition: __t.option(__t.string()),
-  triggerModel: __t.option(__t.string()),
-  triggerExprId: __t.option(__t.u64()),
-  groupId: __t.option(__t.u64()),
-  createUid: __t.identity(),
-  createDate: __t.timestamp(),
-  writeUid: __t.identity(),
-  writeDate: __t.timestamp(),
-  metadata: __t.option(__t.string()),
+// The tagged union or sum type for the algebraic type `WorkflowInstanceState`.
+export const WorkflowInstanceState = __t.enum("WorkflowInstanceState", {
+  Active: __t.unit(),
+  Completed: __t.unit(),
+  Cancelled: __t.unit(),
+  Failed: __t.unit(),
 });
-export type WorkflowTransition = __Infer<typeof WorkflowTransition>;
+export type WorkflowInstanceState = __Infer<typeof WorkflowInstanceState>;
 
-export const WorkflowWorkitem = __t.object("WorkflowWorkitem", {
+export const WorkflowNode = __t.object("WorkflowNode", {
   id: __t.u64(),
   organizationId: __t.u64(),
-  instanceId: __t.u64(),
-  actId: __t.u64(),
-  wkfEvaledCondition: __t.option(__t.string()),
-  get state() {
-    return WorkitemState;
+  companyId: __t.option(__t.u64()),
+  workflowId: __t.u64(),
+  workflowVersionId: __t.u64(),
+  nodeKey: __t.string(),
+  name: __t.string(),
+  get kind() {
+    return WorkflowNodeKind;
+  },
+  sequence: __t.u32(),
+  get splitKind() {
+    return WorkflowBranchKind;
+  },
+  get joinKind() {
+    return WorkflowBranchKind;
+  },
+  get action() {
+    return __t.option(WorkflowActionReference);
+  },
+  get taskPolicy() {
+    return __t.option(WorkflowTaskPolicy);
+  },
+  get timerPolicy() {
+    return __t.option(WorkflowTimerPolicy);
+  },
+  get retryPolicy() {
+    return __t.option(WorkflowRetryPolicy);
+  },
+  get subflow() {
+    return __t.option(WorkflowSubflowReference);
   },
   createUid: __t.identity(),
   createDate: __t.timestamp(),
@@ -17296,7 +18179,300 @@ export const WorkflowWorkitem = __t.object("WorkflowWorkitem", {
   writeDate: __t.timestamp(),
   metadata: __t.option(__t.string()),
 });
-export type WorkflowWorkitem = __Infer<typeof WorkflowWorkitem>;
+export type WorkflowNode = __Infer<typeof WorkflowNode>;
+
+// The tagged union or sum type for the algebraic type `WorkflowNodeKind`.
+export const WorkflowNodeKind = __t.enum("WorkflowNodeKind", {
+  Start: __t.unit(),
+  End: __t.unit(),
+  Decision: __t.unit(),
+  HumanTask: __t.unit(),
+  Action: __t.unit(),
+  Timer: __t.unit(),
+  Fork: __t.unit(),
+  Join: __t.unit(),
+  Subflow: __t.unit(),
+});
+export type WorkflowNodeKind = __Infer<typeof WorkflowNodeKind>;
+
+export const WorkflowOutbox = __t.object("WorkflowOutbox", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  instanceId: __t.u64(),
+  tokenId: __t.u64(),
+  expectedTokenRevision: __t.u64(),
+  edgeId: __t.u64(),
+  actionKey: __t.string(),
+  payload: __t.string(),
+  semanticKey: __t.string(),
+  inputHash: __t.string(),
+  get deliveryGuarantee() {
+    return WorkflowDeliveryGuarantee;
+  },
+  queueJobId: __t.u64(),
+  get status() {
+    return WorkflowOutboxStatus;
+  },
+  revision: __t.u64(),
+  responseFingerprint: __t.option(__t.string()),
+  errorSummary: __t.option(__t.string()),
+  completedAt: __t.option(__t.timestamp()),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+});
+export type WorkflowOutbox = __Infer<typeof WorkflowOutbox>;
+
+// The tagged union or sum type for the algebraic type `WorkflowOutboxResultKind`.
+export const WorkflowOutboxResultKind = __t.enum("WorkflowOutboxResultKind", {
+  Succeeded: __t.unit(),
+  RetryableFailure: __t.unit(),
+  Ambiguous: __t.unit(),
+});
+export type WorkflowOutboxResultKind = __Infer<typeof WorkflowOutboxResultKind>;
+
+// The tagged union or sum type for the algebraic type `WorkflowOutboxStatus`.
+export const WorkflowOutboxStatus = __t.enum("WorkflowOutboxStatus", {
+  AwaitingDelivery: __t.unit(),
+  Completed: __t.unit(),
+  DeadLettered: __t.unit(),
+  ReconciliationRequired: __t.unit(),
+  Cancelled: __t.unit(),
+});
+export type WorkflowOutboxStatus = __Infer<typeof WorkflowOutboxStatus>;
+
+// The tagged union or sum type for the algebraic type `WorkflowRetryKind`.
+export const WorkflowRetryKind = __t.enum("WorkflowRetryKind", {
+  None: __t.unit(),
+  Fixed: __t.unit(),
+  Exponential: __t.unit(),
+});
+export type WorkflowRetryKind = __Infer<typeof WorkflowRetryKind>;
+
+export const WorkflowRetryPolicy = __t.object("WorkflowRetryPolicy", {
+  get kind() {
+    return WorkflowRetryKind;
+  },
+  maxAttempts: __t.u32(),
+  initialDelaySeconds: __t.u64(),
+  maxDelaySeconds: __t.u64(),
+});
+export type WorkflowRetryPolicy = __Infer<typeof WorkflowRetryPolicy>;
+
+export const WorkflowSimulationResult = __t.object("WorkflowSimulationResult", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  workflowId: __t.u64(),
+  workflowVersionId: __t.u64(),
+  simulationKey: __t.string(),
+  definitionHash: __t.string(),
+  subjectModel: __t.string(),
+  subjectId: __t.u64(),
+  subjectRevisionHash: __t.string(),
+  traceHash: __t.string(),
+  stepCount: __t.u32(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+});
+export type WorkflowSimulationResult = __Infer<typeof WorkflowSimulationResult>;
+
+export const WorkflowSimulationStep = __t.object("WorkflowSimulationStep", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  simulationResultId: __t.u64(),
+  sequence: __t.u32(),
+  get kind() {
+    return WorkflowSimulationStepKind;
+  },
+  nodeKey: __t.option(__t.string()),
+  edgeKey: __t.option(__t.string()),
+  outcome: __t.option(__t.bool()),
+  detail: __t.string(),
+});
+export type WorkflowSimulationStep = __Infer<typeof WorkflowSimulationStep>;
+
+// The tagged union or sum type for the algebraic type `WorkflowSimulationStepKind`.
+export const WorkflowSimulationStepKind = __t.enum("WorkflowSimulationStepKind", {
+  NodeEntered: __t.unit(),
+  EdgeEvaluated: __t.unit(),
+  EdgeTaken: __t.unit(),
+  HumanTaskProposed: __t.unit(),
+  ActionProposed: __t.unit(),
+  TimerProposed: __t.unit(),
+  SubflowProposed: __t.unit(),
+  EndReached: __t.unit(),
+});
+export type WorkflowSimulationStepKind = __Infer<typeof WorkflowSimulationStepKind>;
+
+export const WorkflowSubflowReference = __t.object("WorkflowSubflowReference", {
+  workflowId: __t.u64(),
+  workflowVersionId: __t.u64(),
+});
+export type WorkflowSubflowReference = __Infer<typeof WorkflowSubflowReference>;
+
+// The tagged union or sum type for the algebraic type `WorkflowTaskAssignment`.
+export const WorkflowTaskAssignment = __t.enum("WorkflowTaskAssignment", {
+  AnyCandidate: __t.unit(),
+  SingleCandidate: __t.unit(),
+  AllCandidates: __t.unit(),
+});
+export type WorkflowTaskAssignment = __Infer<typeof WorkflowTaskAssignment>;
+
+export const WorkflowTaskGuardedAction = __t.object("WorkflowTaskGuardedAction", {
+  get key() {
+    return GuardedActionKey;
+  },
+  schemaVersion: __t.u32(),
+});
+export type WorkflowTaskGuardedAction = __Infer<typeof WorkflowTaskGuardedAction>;
+
+export const WorkflowTaskPolicy = __t.object("WorkflowTaskPolicy", {
+  get kind() {
+    return WorkflowHumanTaskKind;
+  },
+  get assignment() {
+    return WorkflowTaskAssignment;
+  },
+  candidateRoleIds: __t.array(__t.u64()),
+  candidateGroupIds: __t.array(__t.u64()),
+  candidateUnitIds: __t.array(__t.u64()),
+  requireCommentOnReject: __t.bool(),
+});
+export type WorkflowTaskPolicy = __Infer<typeof WorkflowTaskPolicy>;
+
+export const WorkflowTimer = __t.object("WorkflowTimer", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  instanceId: __t.u64(),
+  tokenId: __t.u64(),
+  expectedTokenRevision: __t.u64(),
+  edgeId: __t.u64(),
+  dueAt: __t.timestamp(),
+  semanticKey: __t.string(),
+  inputHash: __t.string(),
+  get status() {
+    return WorkflowTimerStatus;
+  },
+  revision: __t.u64(),
+  firedBy: __t.option(__t.identity()),
+  firedAt: __t.option(__t.timestamp()),
+  cancelledBy: __t.option(__t.identity()),
+  cancelledAt: __t.option(__t.timestamp()),
+  cancellationReason: __t.option(__t.string()),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+});
+export type WorkflowTimer = __Infer<typeof WorkflowTimer>;
+
+// The tagged union or sum type for the algebraic type `WorkflowTimerKind`.
+export const WorkflowTimerKind = __t.enum("WorkflowTimerKind", {
+  Delay: __t.unit(),
+  Deadline: __t.unit(),
+  Escalation: __t.unit(),
+});
+export type WorkflowTimerKind = __Infer<typeof WorkflowTimerKind>;
+
+export const WorkflowTimerPolicy = __t.object("WorkflowTimerPolicy", {
+  get kind() {
+    return WorkflowTimerKind;
+  },
+  delaySeconds: __t.u64(),
+  calendarKey: __t.option(__t.string()),
+});
+export type WorkflowTimerPolicy = __Infer<typeof WorkflowTimerPolicy>;
+
+// The tagged union or sum type for the algebraic type `WorkflowTimerStatus`.
+export const WorkflowTimerStatus = __t.enum("WorkflowTimerStatus", {
+  Pending: __t.unit(),
+  Fired: __t.unit(),
+  Cancelled: __t.unit(),
+});
+export type WorkflowTimerStatus = __Infer<typeof WorkflowTimerStatus>;
+
+export const WorkflowToken = __t.object("WorkflowToken", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  instanceId: __t.u64(),
+  workflowVersionId: __t.u64(),
+  nodeId: __t.u64(),
+  nodeKey: __t.string(),
+  get state() {
+    return WorkflowTokenState;
+  },
+  revision: __t.u64(),
+  parentTokenId: __t.option(__t.u64()),
+  forkId: __t.option(__t.u64()),
+  branchKey: __t.option(__t.string()),
+  lineage: __t.array(__t.u64()),
+  createdAt: __t.timestamp(),
+  consumedAt: __t.option(__t.timestamp()),
+});
+export type WorkflowToken = __Infer<typeof WorkflowToken>;
+
+// The tagged union or sum type for the algebraic type `WorkflowTokenState`.
+export const WorkflowTokenState = __t.enum("WorkflowTokenState", {
+  Active: __t.unit(),
+  Consumed: __t.unit(),
+  Cancelled: __t.unit(),
+  Completed: __t.unit(),
+  Failed: __t.unit(),
+});
+export type WorkflowTokenState = __Infer<typeof WorkflowTokenState>;
+
+// The tagged union or sum type for the algebraic type `WorkflowTrigger`.
+export const WorkflowTrigger = __t.enum("WorkflowTrigger", {
+  Manual: __t.unit(),
+  RecordCreated: __t.unit(),
+  RecordChanged: __t.unit(),
+  Signal: __t.unit(),
+});
+export type WorkflowTrigger = __Infer<typeof WorkflowTrigger>;
+
+export const WorkflowVersion = __t.object("WorkflowVersion", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  workflowId: __t.u64(),
+  version: __t.u32(),
+  get status() {
+    return WorkflowVersionStatus;
+  },
+  schemaVersion: __t.u32(),
+  draftRevision: __t.u64(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  get trigger() {
+    return WorkflowTrigger;
+  },
+  get snapshotFields() {
+    return __t.array(ConditionFieldDefinition);
+  },
+  contentHash: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  publishedUid: __t.option(__t.identity()),
+  publishedDate: __t.option(__t.timestamp()),
+  retiredUid: __t.option(__t.identity()),
+  retiredDate: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type WorkflowVersion = __Infer<typeof WorkflowVersion>;
+
+// The tagged union or sum type for the algebraic type `WorkflowVersionStatus`.
+export const WorkflowVersionStatus = __t.enum("WorkflowVersionStatus", {
+  Draft: __t.unit(),
+  Published: __t.unit(),
+  Retired: __t.unit(),
+});
+export type WorkflowVersionStatus = __Infer<typeof WorkflowVersionStatus>;
 
 export const WorkingCalendar = __t.object("WorkingCalendar", {
   id: __t.u64(),
@@ -17320,15 +18496,6 @@ export const WorkingCalendar = __t.object("WorkingCalendar", {
   metadata: __t.option(__t.string()),
 });
 export type WorkingCalendar = __Infer<typeof WorkingCalendar>;
-
-// The tagged union or sum type for the algebraic type `WorkitemState`.
-export const WorkitemState = __t.enum("WorkitemState", {
-  Active: __t.unit(),
-  Complete: __t.unit(),
-  Exception: __t.unit(),
-  Dummy: __t.unit(),
-});
-export type WorkitemState = __Infer<typeof WorkitemState>;
 
 // The tagged union or sum type for the algebraic type `WorkorderState`.
 export const WorkorderState = __t.enum("WorkorderState", {

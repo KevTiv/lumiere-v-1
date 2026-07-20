@@ -9,11 +9,9 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
-use crate::core::queue::{queue_job, QueueJob};
+use crate::core::queue::{enqueue_job_internal, queue_payload_hash, EnqueueJobParams};
 use crate::documents::documents::{document, document_version, Document};
-use crate::documents::pack_locale::{
-    document_search_language_for_company, truncate_index_content,
-};
+use crate::documents::pack_locale::{document_search_language_for_company, truncate_index_content};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{InsightSeverity, JobStatus};
 
@@ -888,24 +886,24 @@ pub fn request_embedding_job(
         serde_json_escape(&text)
     );
 
-    ctx.db.queue_job().insert(QueueJob {
-        id: 0,
+    let input_hash = queue_payload_hash(&payload)?;
+    enqueue_job_internal(
+        ctx,
         organization_id,
-        queue_name: "embedding".to_string(),
-        job_type: "embed_content".to_string(),
-        payload,
-        priority: 5,
-        attempts: 0,
-        max_attempts: 3,
-        status: JobStatus::Pending,
-        scheduled_at: None,
-        started_at: None,
-        completed_at: None,
-        error_message: None,
-        created_by: ctx.sender(),
-        created_at: ctx.timestamp,
-        metadata: None,
-    });
+        EnqueueJobParams {
+            company_id: Some(operating_company_id),
+            queue_name: "embedding".to_string(),
+            job_type: "embed_content".to_string(),
+            payload,
+            semantic_key: format!("embedding:{content_type}:{content_id}:{input_hash}"),
+            priority: 5,
+            max_attempts: 3,
+            available_at_micros: None,
+            correlation_id: format!("embedding:{content_type}:{content_id}"),
+            causation_id: None,
+            metadata: None,
+        },
+    )?;
 
     log::info!(
         "Embedding job queued: content_type={}, content_id={}",

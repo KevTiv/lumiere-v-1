@@ -12,7 +12,7 @@ use crate::accounting::budgeting::{
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::tax_management::account_tax;
-use crate::core::organization::{company, company_id_from_scope};
+use crate::core::organization::{company, company_id_from_scope, require_company_in_organization};
 use crate::crm::contacts::contact;
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
@@ -34,7 +34,12 @@ use crate::types::{
     AccountMoveState, BudgetState, InvoiceStatus, LineInvoiceStatus, MoveType, PaymentState,
     PoInvoiceStatus, TaxTypeUse,
 };
-use crate::workflow::approval_gate::gate_action_with_approval;
+use crate::workflow::action_registry::{
+    GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
+};
+use crate::workflow::approval_gate::{
+    request_guarded_action, GuardedActionGateOutcome, RequestGuardedActionParams,
+};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -797,11 +802,7 @@ pub fn compute_invoice_totals(
 
 /// Mark all lines on a draft move as posted, re-loading each row by primary key so
 /// stale index snapshots cannot trigger WASM update panics.
-fn mark_move_lines_posted(
-    ctx: &ReducerContext,
-    move_id: u64,
-    name: &str,
-) -> Result<(), String> {
+fn mark_move_lines_posted(ctx: &ReducerContext, move_id: u64, name: &str) -> Result<(), String> {
     let line_ids: Vec<u64> = ctx
         .db
         .account_move_line()
@@ -1303,6 +1304,11 @@ pub fn post_account_move_impl(
         .find(&move_id)
         .ok_or("Move not found")?;
 
+    if move_record.organization_id != organization_id {
+        return Err("Move belongs to a different organization".to_string());
+    }
+    require_company_in_organization(ctx, organization_id, move_record.company_id)?;
+
     if move_record.state != AccountMoveState::Draft {
         return Err("Only draft moves can be posted".to_string());
     }
@@ -1313,44 +1319,23 @@ pub fn post_account_move_impl(
     );
 
     if !skip_approval_check && is_vendor_bill {
-        let amount_total = move_record.amount_total;
-        let params_json = serde_json::json!({
-            "organization_id": organization_id,
-            "move_id": move_id,
-        })
-        .to_string();
-        let context_json = serde_json::json!({
-            "amount_total": amount_total,
-            "move_type": format!("{:?}", move_record.move_type),
-            "name": move_record.name,
-        })
-        .to_string();
-        let summary = format!(
-            "Post vendor bill {} (total {:.2})",
-            if move_record.name.is_empty() {
-                format!("#{move_id}")
-            } else {
-                move_record.name.clone()
-            },
-            amount_total
-        );
-
-        if let Some(_request_id) = gate_action_with_approval(
-            ctx,
-            organization_id,
-            move_record.company_id,
-            "account_move",
-            move_id,
-            "post_account_move",
-            amount_total,
-            &summary,
-            &params_json,
-            Some(context_json),
-        )? {
-            return Err(format!(
-                "Vendor bill requires approval before posting (amount {:.2})",
-                amount_total
-            ));
+        if matches!(
+            request_guarded_action(
+                ctx,
+                organization_id,
+                RequestGuardedActionParams {
+                    company_id: move_record.company_id,
+                    action: GuardedActionKey::PostAccountMove,
+                    action_version: GUARDED_ACTION_SCHEMA_VERSION,
+                    input: GuardedActionInput::PostAccountMove { move_id },
+                    idempotency_key: format!("post-account-move:{move_id}"),
+                    correlation_id: format!("account-move:{move_id}:post"),
+                    causation_id: None,
+                },
+            )?,
+            GuardedActionGateOutcome::HumanTaskCreated { .. }
+        ) {
+            return Ok(());
         }
     }
 
@@ -1361,6 +1346,12 @@ pub fn post_account_move_impl(
         .move_line_by_move()
         .filter(&move_id)
         .collect();
+
+    if lines.iter().any(|line| {
+        line.organization_id != organization_id || line.company_id != move_record.company_id
+    }) {
+        return Err("Move lines do not match the move organization and company".to_string());
+    }
 
     let total_debit: f64 = lines.iter().map(|l| l.debit).sum();
     let total_credit: f64 = lines.iter().map(|l| l.credit).sum();
@@ -2821,9 +2812,7 @@ fn resolve_timesheet_bill_tax_ids(
         .tax_by_company()
         .filter(&company_id)
         .filter(|t| {
-            t.organization_id == organization_id
-                && t.active
-                && t.type_tax_use == TaxTypeUse::Sale
+            t.organization_id == organization_id && t.active && t.type_tax_use == TaxTypeUse::Sale
         })
         .collect();
     sale_taxes.sort_by_key(|t| t.sequence);
@@ -2901,12 +2890,7 @@ pub fn bill_timesheets(
         );
     }
 
-    let tax_ids = resolve_timesheet_bill_tax_ids(
-        ctx,
-        organization_id,
-        company_id,
-        &params.tax_ids,
-    );
+    let tax_ids = resolve_timesheet_bill_tax_ids(ctx, organization_id, company_id, &params.tax_ids);
 
     let company = ctx
         .db
@@ -3189,12 +3173,7 @@ pub fn bill_project_milestone(
     let inv_date = params.invoice_date.unwrap_or(ctx.timestamp);
     ensure_accounting_period_open_for_date(ctx, company_id, inv_date)?;
 
-    let tax_ids = resolve_timesheet_bill_tax_ids(
-        ctx,
-        organization_id,
-        company_id,
-        &params.tax_ids,
-    );
+    let tax_ids = resolve_timesheet_bill_tax_ids(ctx, organization_id, company_id, &params.tax_ids);
     let amount_tax = calculate_tax(ctx, &tax_ids, amount_untaxed);
     let amount_total = amount_untaxed + amount_tax;
 

@@ -4,12 +4,14 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::complete_queue_job_params_type::CompleteQueueJobParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct CompleteQueueJobArgs {
     pub organization_id: u64,
     pub job_id: u64,
-    pub error_message: Option<String>,
+    pub params: CompleteQueueJobParams,
 }
 
 impl From<CompleteQueueJobArgs> for super::Reducer {
@@ -17,7 +19,7 @@ impl From<CompleteQueueJobArgs> for super::Reducer {
         Self::CompleteQueueJob {
             organization_id: args.organization_id,
             job_id: args.job_id,
-            error_message: args.error_message,
+            params: args.params,
         }
     }
 }
@@ -41,9 +43,9 @@ pub trait complete_queue_job {
         &self,
         organization_id: u64,
         job_id: u64,
-        error_message: Option<String>,
+        params: CompleteQueueJobParams,
     ) -> __sdk::Result<()> {
-        self.complete_queue_job_then(organization_id, job_id, error_message, |_, _| {})
+        self.complete_queue_job_then(organization_id, job_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `complete_queue_job` to run as soon as possible,
@@ -56,7 +58,7 @@ pub trait complete_queue_job {
         &self,
         organization_id: u64,
         job_id: u64,
-        error_message: Option<String>,
+        params: CompleteQueueJobParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -69,7 +71,7 @@ impl complete_queue_job for super::RemoteReducers {
         &self,
         organization_id: u64,
         job_id: u64,
-        error_message: Option<String>,
+        params: CompleteQueueJobParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -79,7 +81,7 @@ impl complete_queue_job for super::RemoteReducers {
             CompleteQueueJobArgs {
                 organization_id,
                 job_id,
-                error_message,
+                params,
             },
             callback,
         )

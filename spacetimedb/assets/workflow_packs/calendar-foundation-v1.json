@@ -1,0 +1,409 @@
+{
+  "schema_version": 1,
+  "packs": [
+    {
+      "calendar_key": "workflow.au.nsw.2026",
+      "name": "Australia (New South Wales) workflow calendar foundation",
+      "market": "AU",
+      "locale": "en-AU",
+      "subdivision": "AU-NSW",
+      "locality": null,
+      "iana_timezone": "Australia/Sydney",
+      "weekday_mask": 31,
+      "workday_start_minute": 540,
+      "cutoff_minute": 1020,
+      "dst_overlap_policy": "earlier",
+      "effective_from_year": 2026,
+      "effective_through_year": 2026,
+      "content_hash": "sha256:b8ebba3d8eef6c93e6b617a3cd7ea3921e6e0228836cad2b345804ce908cd509",
+      "source": {
+        "authority": "Australian Government Fair Work Ombudsman",
+        "title": "2026 public holidays",
+        "url": "https://www.fairwork.gov.au/employment-conditions/public-holidays/2026-public-holidays",
+        "published_on": null,
+        "retrieved_on": "2026-07-19",
+        "effective_year": 2026
+      },
+      "exceptions": [
+        {
+          "local_date": "2026-08-12",
+          "name": "Royal Queensland Show (Brisbane area fixture)",
+          "category": "public_holiday",
+          "scope": "locality",
+          "subdivision": "AU-QLD",
+          "locality": "Brisbane",
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        },
+        {
+          "local_date": "2026-12-28",
+          "name": "Additional public holiday for Boxing Day",
+          "category": "observed_holiday",
+          "scope": "national",
+          "subdivision": null,
+          "locality": null,
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        }
+      ]
+    },
+    {
+      "calendar_key": "workflow.nz.chatham.2026",
+      "name": "New Zealand (Chatham Islands) workflow calendar foundation",
+      "market": "NZ",
+      "locale": "en-NZ",
+      "subdivision": "NZ-CIT",
+      "locality": null,
+      "iana_timezone": "Pacific/Chatham",
+      "weekday_mask": 31,
+      "workday_start_minute": 540,
+      "cutoff_minute": 1020,
+      "dst_overlap_policy": "earlier",
+      "effective_from_year": 2026,
+      "effective_through_year": 2026,
+      "content_hash": "sha256:9085f5fd01855f274ebf62a25934805d64a58a17f6408bdb4400464cce66af5c",
+      "source": {
+        "authority": "Employment New Zealand",
+        "title": "Public holidays and anniversary dates",
+        "url": "https://www.employment.govt.nz/leave-and-holidays/public-holidays/public-holidays-and-anniversary-dates",
+        "published_on": null,
+        "retrieved_on": "2026-07-19",
+        "effective_year": 2026
+      },
+      "exceptions": [
+        {
+          "local_date": "2026-11-30",
+          "name": "Chatham Islands Anniversary fixture",
+          "category": "public_holiday",
+          "scope": "subdivision",
+          "subdivision": "NZ-CIT",
+          "locality": null,
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        },
+        {
+          "local_date": "2026-04-27",
+          "name": "ANZAC Day observed",
+          "category": "observed_holiday",
+          "scope": "national",
+          "subdivision": null,
+          "locality": null,
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        }
+      ]
+    },
+    {
+      "calendar_key": "workflow.za.2026",
+      "name": "South Africa workflow calendar foundation",
+      "market": "ZA",
+      "locale": "en-ZA",
+      "subdivision": null,
+      "locality": null,
+      "iana_timezone": "Africa/Johannesburg",
+      "weekday_mask": 31,
+      "workday_start_minute": 540,
+      "cutoff_minute": 1020,
+      "dst_overlap_policy": "earlier",
+      "effective_from_year": 2026,
+      "effective_through_year": 2026,
+      "content_hash": "sha256:68bc391fa62dba0ba9e001734cbeaa0b88080e4c7e79f6236101c88cc250a039",
+      "source": {
+        "authority": "South African Government",
+        "title": "Public holidays in South Africa",
+        "url": "https://www.gov.za/about-sa/public-holidays",
+        "published_on": null,
+        "retrieved_on": "2026-07-19",
+        "effective_year": 2026
+      },
+      "exceptions": [
+        {
+          "local_date": "2026-08-10",
+          "name": "National Women's Day observed",
+          "category": "observed_holiday",
+          "scope": "national",
+          "subdivision": null,
+          "locality": null,
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        }
+      ]
+    },
+    {
+      "calendar_key": "workflow.br.sp.2026",
+      "name": "Brazil (Sao Paulo) workflow calendar foundation",
+      "market": "BR",
+      "locale": "pt-BR",
+      "subdivision": "BR-SP",
+      "locality": null,
+      "iana_timezone": "America/Sao_Paulo",
+      "weekday_mask": 31,
+      "workday_start_minute": 540,
+      "cutoff_minute": 1080,
+      "dst_overlap_policy": "earlier",
+      "effective_from_year": 2026,
+      "effective_through_year": 2026,
+      "content_hash": "sha256:98c00c1fd64a13c6e4fabd0f5e0a5edf0277b5d7bc6839a7cc0857920a558f13",
+      "source": {
+        "authority": "Ministerio da Gestao e da Inovacao em Servicos Publicos",
+        "title": "Portaria MGI 11.460/2025 - feriados e pontos facultativos de 2026",
+        "url": "https://legis.sigepe.gov.br/legis/detalhar/24765",
+        "published_on": "2025-12-30",
+        "retrieved_on": "2026-07-19",
+        "effective_year": 2026
+      },
+      "exceptions": [
+        {
+          "local_date": "2026-07-09",
+          "name": "Revolucao Constitucionalista (Sao Paulo fixture)",
+          "category": "public_holiday",
+          "scope": "subdivision",
+          "subdivision": "BR-SP",
+          "locality": null,
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        }
+      ]
+    },
+    {
+      "calendar_key": "workflow.ar.2026",
+      "name": "Argentina workflow calendar foundation",
+      "market": "AR",
+      "locale": "es-AR",
+      "subdivision": null,
+      "locality": null,
+      "iana_timezone": "America/Argentina/Buenos_Aires",
+      "weekday_mask": 31,
+      "workday_start_minute": 540,
+      "cutoff_minute": 1080,
+      "dst_overlap_policy": "earlier",
+      "effective_from_year": 2026,
+      "effective_through_year": 2026,
+      "content_hash": "sha256:18090faf52e12611643090f609ff8d7df15d4dcc19665f3785ecfc6bcd0f5228",
+      "source": {
+        "authority": "Argentina.gob.ar",
+        "title": "Feriados 2026",
+        "url": "https://www.argentina.gob.ar/feriados",
+        "published_on": null,
+        "retrieved_on": "2026-07-19",
+        "effective_year": 2026
+      },
+      "exceptions": [
+        {
+          "local_date": "2026-05-25",
+          "name": "Dia de la Revolucion de Mayo fixture",
+          "category": "public_holiday",
+          "scope": "national",
+          "subdivision": null,
+          "locality": null,
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        }
+      ]
+    },
+    {
+      "calendar_key": "workflow.cl.santiago.2026",
+      "name": "Chile (Santiago) workflow calendar foundation",
+      "market": "CL",
+      "locale": "es-CL",
+      "subdivision": "CL-RM",
+      "locality": "Santiago",
+      "iana_timezone": "America/Santiago",
+      "weekday_mask": 31,
+      "workday_start_minute": 540,
+      "cutoff_minute": 1080,
+      "dst_overlap_policy": "earlier",
+      "effective_from_year": 2026,
+      "effective_through_year": 2026,
+      "content_hash": "sha256:403dad422c7d7988f317a7f02465549f9546cd0b554b859900b6e4428ec68f4a",
+      "source": {
+        "authority": "Gobierno de Chile",
+        "title": "Feriados 2026",
+        "url": "https://www.gob.cl/noticias/feriados-2026-revisa-cuantos-habra-y-cuales-son-irrenunciables/",
+        "published_on": "2025-12-19",
+        "retrieved_on": "2026-07-19",
+        "effective_year": 2026
+      },
+      "exceptions": [
+        {
+          "local_date": "2026-06-07",
+          "name": "Asalto y Toma del Morro de Arica fixture",
+          "category": "public_holiday",
+          "scope": "subdivision",
+          "subdivision": "CL-AP",
+          "locality": null,
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        }
+      ]
+    },
+    {
+      "calendar_key": "workflow.sg.2026",
+      "name": "Singapore workflow calendar foundation",
+      "market": "SG",
+      "locale": "en-SG",
+      "subdivision": null,
+      "locality": null,
+      "iana_timezone": "Asia/Singapore",
+      "weekday_mask": 31,
+      "workday_start_minute": 540,
+      "cutoff_minute": 1080,
+      "dst_overlap_policy": "earlier",
+      "effective_from_year": 2026,
+      "effective_through_year": 2026,
+      "content_hash": "sha256:6ceafd4dba71978ca039dc6d2668f279d4c04738d62d407bbcba5fe2ee5977d2",
+      "source": {
+        "authority": "Singapore Ministry of Manpower",
+        "title": "Public Holidays for 2026",
+        "url": "https://www.mom.gov.sg/newsroom/press-releases/2025/0616-public-holidays-for-2026",
+        "published_on": "2025-06-16",
+        "retrieved_on": "2026-07-19",
+        "effective_year": 2026
+      },
+      "exceptions": [
+        {
+          "local_date": "2026-08-10",
+          "name": "National Day observed",
+          "category": "observed_holiday",
+          "scope": "national",
+          "subdivision": null,
+          "locality": null,
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        }
+      ]
+    },
+    {
+      "calendar_key": "workflow.my.kelantan.2026",
+      "name": "Malaysia (Kelantan Sunday-Thursday) workflow calendar foundation",
+      "market": "MY",
+      "locale": "ms-MY",
+      "subdivision": "MY-03",
+      "locality": null,
+      "iana_timezone": "Asia/Kuala_Lumpur",
+      "weekday_mask": 79,
+      "workday_start_minute": 480,
+      "cutoff_minute": 1020,
+      "dst_overlap_policy": "earlier",
+      "effective_from_year": 2026,
+      "effective_through_year": 2026,
+      "content_hash": "sha256:4d12dff073e1392bdebd00aa6c7e7a206fafcdf018ae9ce65a9c724d90f1eb9b",
+      "source": {
+        "authority": "Government of Malaysia",
+        "title": "Public Holidays and School Holidays",
+        "url": "https://www.malaysia.gov.my/en/government/cuti-umum--cuti-persekolahan/cuti-umum",
+        "published_on": null,
+        "retrieved_on": "2026-07-19",
+        "effective_year": 2026
+      },
+      "exceptions": [
+        {
+          "local_date": "2026-08-31",
+          "name": "Malaysia National Day fixture",
+          "category": "public_holiday",
+          "scope": "national",
+          "subdivision": null,
+          "locality": null,
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        }
+      ]
+    },
+    {
+      "calendar_key": "workflow.id.2026",
+      "name": "Indonesia workflow calendar foundation",
+      "market": "ID",
+      "locale": "id-ID",
+      "subdivision": null,
+      "locality": null,
+      "iana_timezone": "Asia/Jakarta",
+      "weekday_mask": 31,
+      "workday_start_minute": 480,
+      "cutoff_minute": 1020,
+      "dst_overlap_policy": "earlier",
+      "effective_from_year": 2026,
+      "effective_through_year": 2026,
+      "content_hash": "sha256:7d486a4095b782f2f2610e738c7c92fb474cdd0b91693f723588b3e3d655e4b2",
+      "source": {
+        "authority": "Sekretariat Negara Republik Indonesia",
+        "title": "SKB 3 Menteri Libur Nasional dan Cuti Bersama 2026",
+        "url": "https://setneg.go.id/baca/index/inilah_skb_3_menteri_libur_nasional_dan_cuti_bersama_2026",
+        "published_on": "2025-09-19",
+        "retrieved_on": "2026-07-19",
+        "effective_year": 2026
+      },
+      "exceptions": [
+        {
+          "local_date": "2026-03-20",
+          "name": "Cuti bersama Idulfitri classification fixture",
+          "category": "collective_leave",
+          "scope": "national",
+          "subdivision": null,
+          "locality": null,
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        }
+      ]
+    },
+    {
+      "calendar_key": "workflow.ph.2026",
+      "name": "Philippines workflow calendar foundation",
+      "market": "PH",
+      "locale": "en-PH",
+      "subdivision": null,
+      "locality": null,
+      "iana_timezone": "Asia/Manila",
+      "weekday_mask": 31,
+      "workday_start_minute": 480,
+      "cutoff_minute": 1020,
+      "dst_overlap_policy": "earlier",
+      "effective_from_year": 2026,
+      "effective_through_year": 2026,
+      "content_hash": "sha256:7c189799de42172cf6c263c3645bccd0830f7fa257e825e243b4afbccff235cc",
+      "source": {
+        "authority": "Presidential Communications Office, Philippines",
+        "title": "Proclamation No. 1006: 2026 regular holidays and special non-working days",
+        "url": "https://mirror.pco.gov.ph/news_releases/pbbm-issues-proclamation-declaring-regular-holidays-special-non-working-days-for-2026/",
+        "published_on": "2025-09-04",
+        "retrieved_on": "2026-07-19",
+        "effective_year": 2026
+      },
+      "exceptions": [
+        {
+          "local_date": "2026-11-02",
+          "name": "All Souls' Day fixture",
+          "category": "special_non_working_day",
+          "scope": "national",
+          "subdivision": null,
+          "locality": null,
+          "is_working_day": false,
+          "workday_start_minute": null,
+          "cutoff_minute": null,
+          "source": null
+        }
+      ]
+    }
+  ]
+}

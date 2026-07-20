@@ -4,6 +4,9 @@ import { useMemo, useState } from 'react'
 import { useErpSession } from '@lumiere/erp-session'
 import { useTranslation } from '@lumiere/i18n'
 import {
+  humanTaskSubjectId,
+  humanTaskSubjectModel,
+  taskStatusTag,
   useApprovalInbox,
   useApproveApprovalRequest,
   useRejectApprovalRequest,
@@ -314,10 +317,10 @@ export function SalesOpsPanel({
     if (!Number.isFinite(soId) || soId <= 0) return null
     return (
       (inboxQuery.data ?? []).find((row) => {
-        const status = row.status ?? 'pending'
-        if (status !== 'pending') return false
-        if ((row.model ?? '') !== 'sale_order') return false
-        const resId = Number(row.resId ?? row.res_id ?? 0)
+        const status = taskStatusTag(row)
+        if (status !== 'Open' && status !== 'Claimed') return false
+        if ((humanTaskSubjectModel(row) ?? row.model ?? '') !== 'sale_order') return false
+        const resId = humanTaskSubjectId(row) ?? Number(row.resId ?? row.res_id ?? 0)
         return resId === soId
       }) ?? null
     )

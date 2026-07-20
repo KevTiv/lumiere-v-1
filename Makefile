@@ -61,6 +61,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_accounting_payment_management_test \
 	run_core_operational_messaging_test \
 	run_core_sod_test \
+	run_queue_foundation_tests \
 	run_tenant_isolation_tests \
 	run_country_pack_test \
 	run_accounting_ic_consolidation_test \
@@ -77,6 +78,15 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_documents_wave_c_tests \
 	run_documents_wave_d_tests \
 	run_workflow_definition_test \
+	run_all_workflow_foundation_tests \
+	run_all_workflow_deterministic_core_tests \
+	run_workflow_evaluator_simulation_tests \
+	run_workflow_runtime_tests \
+	run_workflow_authorization_tests \
+	run_workflow_human_task_tests \
+	run_workflow_action_registry_tests \
+	run_workflow_delivery_tests \
+	run_all_workflow_human_effect_tests \
 	run_subscription_plan_test
 
 .PHONY: \

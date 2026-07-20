@@ -13,6 +13,7 @@ import {
 export default __t.row({
   id: __t.u64().primaryKey(),
   organizationId: __t.u64().name("organization_id"),
+  companyId: __t.option(__t.u64()).name("company_id"),
   name: __t.string(),
   queues: __t.array(__t.string()),
   isActive: __t.bool().name("is_active"),

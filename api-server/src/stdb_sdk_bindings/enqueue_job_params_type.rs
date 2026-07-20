@@ -7,12 +7,16 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct EnqueueJobParams {
+    pub company_id: Option<u64>,
     pub queue_name: String,
     pub job_type: String,
     pub payload: String,
+    pub semantic_key: String,
     pub priority: i32,
     pub max_attempts: u32,
-    pub scheduled_at_micros: Option<u64>,
+    pub available_at_micros: Option<u64>,
+    pub correlation_id: String,
+    pub causation_id: Option<String>,
     pub metadata: Option<String>,
 }
 

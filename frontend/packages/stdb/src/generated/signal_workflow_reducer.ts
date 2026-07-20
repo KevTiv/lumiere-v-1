@@ -10,8 +10,13 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  SignalWorkflowParams,
+} from "./types";
+
 export default {
   organizationId: __t.u64(),
-  instanceId: __t.u64(),
-  signal: __t.string(),
+  get params() {
+    return SignalWorkflowParams;
+  },
 };

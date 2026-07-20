@@ -21,7 +21,6 @@ import {
   SALES_WORKSPACE_RESOURCE_KEYS,
   SETTINGS_WORKSPACE_RESOURCE_KEYS,
   SUBSCRIPTIONS_WORKSPACE_RESOURCE_KEYS,
-  WORKFLOWS_WORKSPACE_RESOURCE_KEYS,
   AI_AGENTS_WORKSPACE_RESOURCE_KEYS,
   FLEET_WORKSPACE_RESOURCE_KEYS,
 } from "@lumiere/stdb/subscriptions"
@@ -104,7 +103,8 @@ export function useHelpdeskModuleSubscription(): void {
 }
 
 export function useWorkflowsModuleSubscription(): void {
-  useModuleSubscription(WORKFLOWS_WORKSPACE_RESOURCE_KEYS)
+  // Workflow engine tables are private; inbox/definition reads go through BFF HTTP
+  // (owner SQL + identity filters). React Query polling covers freshness.
 }
 
 export function useExpensesModuleSubscription(): void {

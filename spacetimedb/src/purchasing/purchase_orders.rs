@@ -17,7 +17,12 @@ use crate::inventory::product::product;
 use crate::types::{
     ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState,
 };
-use crate::workflow::approval_gate::gate_action_with_approval;
+use crate::workflow::action_registry::{
+    GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
+};
+use crate::workflow::approval_gate::{
+    request_guarded_action, GuardedActionGateOutcome, RequestGuardedActionParams,
+};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -394,17 +399,12 @@ fn resolve_requisition_line_price(
 ) -> f64 {
     use crate::inventory::product::product_supplier_info;
 
-    if let Some(info) = ctx
-        .db
-        .product_supplier_info()
-        .iter()
-        .find(|s| {
-            s.organization_id == organization_id
-                && s.partner_id == vendor_id
-                && s.is_active
-                && (s.product_id == Some(product_id) || s.product_tmpl_id == Some(product_id))
-        })
-    {
+    if let Some(info) = ctx.db.product_supplier_info().iter().find(|s| {
+        s.organization_id == organization_id
+            && s.partner_id == vendor_id
+            && s.is_active
+            && (s.product_id == Some(product_id) || s.product_tmpl_id == Some(product_id))
+    }) {
         return info.price;
     }
     ctx.db
@@ -678,45 +678,23 @@ pub fn send_purchase_order_impl(
     }
 
     if !skip_approval_check {
-        let amount_total = order.amount_total;
-        let params_json = serde_json::json!({
-            "organization_id": organization_id,
-            "order_id": order_id,
-        })
-        .to_string();
-        let context_json = serde_json::json!({
-            "amount_total": amount_total,
-            "name": order.name,
-        })
-        .to_string();
-        let po_label = order.name.as_deref().unwrap_or("PO");
-        let summary = format!(
-            "Send PO {} to vendor (total {:.2})",
-            po_label, amount_total
-        );
-
-        if let Some(_request_id) = gate_action_with_approval(
-            ctx,
-            organization_id,
-            order.company_id,
-            "purchase_order",
-            order_id,
-            "send_purchase_order",
-            amount_total,
-            &summary,
-            &params_json,
-            Some(context_json),
-        )? {
-            ctx.db.purchase_order().id().update(PurchaseOrder {
-                state: PoState::ToApprove,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..order
-            });
-            return Err(format!(
-                "Purchase order requires approval before sending (amount {:.2})",
-                amount_total
-            ));
+        if matches!(
+            request_guarded_action(
+                ctx,
+                organization_id,
+                RequestGuardedActionParams {
+                    company_id: order.company_id,
+                    action: GuardedActionKey::SendPurchaseOrder,
+                    action_version: GUARDED_ACTION_SCHEMA_VERSION,
+                    input: GuardedActionInput::SendPurchaseOrder { order_id },
+                    idempotency_key: format!("send-purchase-order:{order_id}"),
+                    correlation_id: format!("purchase-order:{order_id}:send"),
+                    causation_id: None,
+                },
+            )?,
+            GuardedActionGateOutcome::HumanTaskCreated { .. }
+        ) {
+            return Ok(());
         }
     }
 
@@ -776,45 +754,23 @@ pub fn confirm_purchase_order_impl(
     }
 
     if !skip_approval_check {
-        let amount_total = order.amount_total;
-        let params_json = serde_json::json!({
-            "organization_id": organization_id,
-            "order_id": order_id,
-        })
-        .to_string();
-        let context_json = serde_json::json!({
-            "amount_total": amount_total,
-            "name": order.name,
-        })
-        .to_string();
-        let po_label = order.name.as_deref().unwrap_or("PO");
-        let summary = format!(
-            "Confirm PO {} (total {:.2})",
-            po_label, amount_total
-        );
-
-        if let Some(_request_id) = gate_action_with_approval(
-            ctx,
-            organization_id,
-            order.company_id,
-            "purchase_order",
-            order_id,
-            "confirm_purchase_order",
-            amount_total,
-            &summary,
-            &params_json,
-            Some(context_json),
-        )? {
-            ctx.db.purchase_order().id().update(PurchaseOrder {
-                state: PoState::ToApprove,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..order
-            });
-            return Err(format!(
-                "Purchase order requires approval before confirmation (amount {:.2})",
-                amount_total
-            ));
+        if matches!(
+            request_guarded_action(
+                ctx,
+                organization_id,
+                RequestGuardedActionParams {
+                    company_id: order.company_id,
+                    action: GuardedActionKey::ConfirmPurchaseOrder,
+                    action_version: GUARDED_ACTION_SCHEMA_VERSION,
+                    input: GuardedActionInput::ConfirmPurchaseOrder { order_id },
+                    idempotency_key: format!("confirm-purchase-order:{order_id}"),
+                    correlation_id: format!("purchase-order:{order_id}:confirm"),
+                    causation_id: None,
+                },
+            )?,
+            GuardedActionGateOutcome::HumanTaskCreated { .. }
+        ) {
+            return Ok(());
         }
     }
 
@@ -871,9 +827,7 @@ pub fn confirm_purchase_order_impl(
                 "currency_rate".to_string(),
                 "metadata".to_string(),
             ],
-            metadata: Some(
-                serde_json::json!({ "encumbrance": amount_total }).to_string(),
-            ),
+            metadata: Some(serde_json::json!({ "encumbrance": amount_total }).to_string()),
         },
     );
 
@@ -935,9 +889,7 @@ fn create_incoming_pickings_for_confirmed_order(
         .db
         .warehouse()
         .iter()
-        .find(|w| {
-            w.organization_id == organization_id && w.company_id == company_id && w.active
-        })
+        .find(|w| w.organization_id == organization_id && w.company_id == company_id && w.active)
         .map(|w| w.id)
         .ok_or_else(|| {
             format!(
@@ -2011,13 +1963,16 @@ pub fn receive_po_line(
             ));
         }
         let target_done = mv.quantity_done + qty;
-        ctx.db.stock_move().id().update(crate::inventory::stock::StockMove {
-            quantity_done: target_done,
-            product_uom_qty_done: target_done,
-            write_uid: ctx.sender(),
-            write_date: ctx.timestamp,
-            ..mv
-        });
+        ctx.db
+            .stock_move()
+            .id()
+            .update(crate::inventory::stock::StockMove {
+                quantity_done: target_done,
+                product_uom_qty_done: target_done,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..mv
+            });
 
         // Validate with backorder so sibling lines / residual stay open.
         validate_stock_picking_backorder(ctx, organization_id, picking_id, scope)?;
@@ -2075,8 +2030,7 @@ pub fn receive_po_line(
         write_date: ctx.timestamp,
         ..line
     };
-    let match_state =
-        compute_line_match_state(&updated, qty_match_tolerance_for_order(&order));
+    let match_state = compute_line_match_state(&updated, qty_match_tolerance_for_order(&order));
     ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
         match_state: match_state.clone(),
         metadata: merge_match_state_metadata(&updated.metadata, &match_state),
@@ -2094,9 +2048,7 @@ pub fn receive_po_line(
             table_name: "purchase_order_line",
             record_id: line_id,
             action: "UPDATE",
-            old_values: Some(
-                serde_json::json!({ "qty_received_before": qty_before }).to_string(),
-            ),
+            old_values: Some(serde_json::json!({ "qty_received_before": qty_before }).to_string()),
             new_values: Some(
                 serde_json::json!({
                     "qty_received_after": new_qty_received,
@@ -2160,8 +2112,7 @@ pub fn invoice_po_line(
         write_date: ctx.timestamp,
         ..line
     };
-    let match_state =
-        compute_line_match_state(&updated, qty_match_tolerance_for_order(&order));
+    let match_state = compute_line_match_state(&updated, qty_match_tolerance_for_order(&order));
     ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
         match_state: match_state.clone(),
         metadata: merge_match_state_metadata(&updated.metadata, &match_state),
@@ -2270,25 +2221,31 @@ pub fn create_purchase_requisition(
 
     let mut line_ids = Vec::with_capacity(params.lines.len());
     for (idx, line) in params.lines.iter().enumerate() {
-        let row = ctx.db.purchase_requisition_line().insert(PurchaseRequisitionLine {
-            id: 0,
-            organization_id,
-            company_id,
-            requisition_id: requisition.id,
-            product_id: line.product_id,
-            product_uom: line.product_uom,
-            product_uom_qty: line.product_uom_qty,
-            name: line.name.clone(),
-            sequence: line.sequence.unwrap_or(((idx + 1) as u32) * 10),
-        });
+        let row = ctx
+            .db
+            .purchase_requisition_line()
+            .insert(PurchaseRequisitionLine {
+                id: 0,
+                organization_id,
+                company_id,
+                requisition_id: requisition.id,
+                product_id: line.product_id,
+                product_uom: line.product_uom,
+                product_uom_qty: line.product_uom_qty,
+                name: line.name.clone(),
+                sequence: line.sequence.unwrap_or(((idx + 1) as u32) * 10),
+            });
         line_ids.push(row.id);
     }
 
     let requisition_id = requisition.id;
-    ctx.db.purchase_requisition().id().update(PurchaseRequisition {
-        line_ids: line_ids.clone(),
-        ..requisition
-    });
+    ctx.db
+        .purchase_requisition()
+        .id()
+        .update(PurchaseRequisition {
+            line_ids: line_ids.clone(),
+            ..requisition
+        });
 
     write_audit_log_v2(
         ctx,
@@ -2360,28 +2317,34 @@ pub fn add_purchase_requisition_line(
         .sequence
         .unwrap_or_else(|| ((requisition.line_ids.len() + 1) as u32) * 10);
 
-    let row = ctx.db.purchase_requisition_line().insert(PurchaseRequisitionLine {
-        id: 0,
-        organization_id,
-        company_id,
-        requisition_id,
-        product_id: params.product_id,
-        product_uom: params.product_uom,
-        product_uom_qty: params.product_uom_qty,
-        name: params.name.clone(),
-        sequence,
-    });
+    let row = ctx
+        .db
+        .purchase_requisition_line()
+        .insert(PurchaseRequisitionLine {
+            id: 0,
+            organization_id,
+            company_id,
+            requisition_id,
+            product_id: params.product_id,
+            product_uom: params.product_uom,
+            product_uom_qty: params.product_uom_qty,
+            name: params.name.clone(),
+            sequence,
+        });
 
     let mut line_ids = requisition.line_ids.clone();
     line_ids.push(row.id);
     let multiple_product = line_ids.len() > 1;
-    ctx.db.purchase_requisition().id().update(PurchaseRequisition {
-        line_ids,
-        multiple_product,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..requisition
-    });
+    ctx.db
+        .purchase_requisition()
+        .id()
+        .update(PurchaseRequisition {
+            line_ids,
+            multiple_product,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..requisition
+        });
 
     write_audit_log_v2(
         ctx,
@@ -2653,9 +2616,7 @@ pub fn convert_purchase_requisition_to_po(
             table_name: "purchase_requisition",
             record_id: requisition_id,
             action: "UPDATE",
-            old_values: Some(
-                serde_json::json!({ "order_count": old_order_count }).to_string(),
-            ),
+            old_values: Some(serde_json::json!({ "order_count": old_order_count }).to_string()),
             new_values: Some(
                 serde_json::json!({
                     "purchase_order_id": po_id,
