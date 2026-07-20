@@ -10,11 +10,16 @@ use sha2::{Digest, Sha256};
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::{account_move, account_move_line, post_account_move_impl};
+use crate::accounting::payment_management::{
+    payment_transaction, post_payment_transaction_impl, reverse_payment_transaction_impl,
+    ReversePaymentTransactionParams,
+};
 use crate::accounting::payments::{account_payment, post_payment_impl};
 use crate::ai::action_drafts::{ai_action_draft, approve_ai_action_draft_core};
 use crate::core::organization::require_company_in_organization;
 use crate::core::reference::legacy_currency_code_for_id;
 use crate::expenses::expenses::{approve_expense_sheet_impl, expense_sheet, hr_expense};
+use crate::hr::leaves::{approve_leave_impl, hr_leave};
 use crate::purchasing::purchase_orders::{
     confirm_purchase_order_impl, purchase_order, purchase_order_line, send_purchase_order_impl,
 };
@@ -36,6 +41,9 @@ pub enum GuardedActionKey {
     PostPayment,
     ApproveExpenseSheet,
     ApproveAiActionDraft,
+    ApproveLeave,
+    PostPaymentTransaction,
+    ReversePaymentTransaction,
 }
 
 impl GuardedActionKey {
@@ -49,6 +57,9 @@ impl GuardedActionKey {
             Self::PostPayment => "post_payment",
             Self::ApproveExpenseSheet => "approve_expense_sheet",
             Self::ApproveAiActionDraft => "approve_ai_action_draft",
+            Self::ApproveLeave => "approve_leave",
+            Self::PostPaymentTransaction => "post_payment_transaction",
+            Self::ReversePaymentTransaction => "reverse_payment_transaction",
         }
     }
 }
@@ -63,6 +74,9 @@ pub enum GuardedActionInput {
     PostPayment { payment_id: u64 },
     ApproveExpenseSheet { sheet_id: u64 },
     ApproveAiActionDraft { draft_id: u64 },
+    ApproveLeave { leave_id: u64 },
+    PostPaymentTransaction { transaction_id: u64 },
+    ReversePaymentTransaction { transaction_id: u64 },
 }
 
 impl GuardedActionInput {
@@ -91,6 +105,15 @@ impl GuardedActionInput {
             GuardedActionKey::ApproveAiActionDraft => Self::ApproveAiActionDraft {
                 draft_id: subject_id,
             },
+            GuardedActionKey::ApproveLeave => Self::ApproveLeave {
+                leave_id: subject_id,
+            },
+            GuardedActionKey::PostPaymentTransaction => Self::PostPaymentTransaction {
+                transaction_id: subject_id,
+            },
+            GuardedActionKey::ReversePaymentTransaction => Self::ReversePaymentTransaction {
+                transaction_id: subject_id,
+            },
         }
     }
 }
@@ -103,6 +126,8 @@ pub enum GuardedActionSubjectKind {
     AccountPayment,
     ExpenseSheet,
     AiActionDraft,
+    HrLeave,
+    PaymentTransaction,
 }
 
 impl GuardedActionSubjectKind {
@@ -115,6 +140,8 @@ impl GuardedActionSubjectKind {
             Self::AccountPayment => "account_payment",
             Self::ExpenseSheet => "hr_expense_sheet",
             Self::AiActionDraft => "ai_action_draft",
+            Self::HrLeave => "hr_leave",
+            Self::PaymentTransaction => "payment_transaction",
         }
     }
 }
@@ -148,6 +175,8 @@ pub struct ExecuteGuardedActionParams {
     pub input: GuardedActionInput,
     pub expected_subject_revision_hash: String,
     pub idempotency_key: String,
+    /// Optional human-decision note forwarded into domain adapters that accept a reason.
+    pub execution_reason: Option<String>,
 }
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
@@ -200,6 +229,9 @@ pub fn resolve_guarded_action(key: &str, version: u32) -> Result<GuardedActionKe
         "post_payment" => Ok(GuardedActionKey::PostPayment),
         "approve_expense_sheet" => Ok(GuardedActionKey::ApproveExpenseSheet),
         "approve_ai_action_draft" => Ok(GuardedActionKey::ApproveAiActionDraft),
+        "approve_leave" => Ok(GuardedActionKey::ApproveLeave),
+        "post_payment_transaction" => Ok(GuardedActionKey::PostPaymentTransaction),
+        "reverse_payment_transaction" => Ok(GuardedActionKey::ReversePaymentTransaction),
         _ => Err(format!("unregistered guarded action: {key}")),
     }
 }
@@ -311,6 +343,7 @@ pub fn execute_guarded_action(
         params.organization_id,
         params.company_id,
         &params.input,
+        params.execution_reason.as_deref(),
     )?;
 
     let after = snapshot_guarded_action(
@@ -393,6 +426,17 @@ fn material_snapshot(
             GuardedActionKey::ApproveAiActionDraft,
             GuardedActionInput::ApproveAiActionDraft { draft_id },
         ) => ai_draft_snapshot(ctx, organization_id, company_id, *draft_id),
+        (GuardedActionKey::ApproveLeave, GuardedActionInput::ApproveLeave { leave_id }) => {
+            leave_snapshot(ctx, organization_id, company_id, *leave_id)
+        }
+        (
+            GuardedActionKey::PostPaymentTransaction,
+            GuardedActionInput::PostPaymentTransaction { transaction_id },
+        )
+        | (
+            GuardedActionKey::ReversePaymentTransaction,
+            GuardedActionInput::ReversePaymentTransaction { transaction_id },
+        ) => payment_transaction_snapshot(ctx, organization_id, company_id, *transaction_id),
         _ => Err("guarded action input does not match its registered action".to_string()),
     }
 }
@@ -857,11 +901,111 @@ fn ai_draft_snapshot(
     ))
 }
 
+fn leave_snapshot(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    leave_id: u64,
+) -> Result<MaterialSnapshot, String> {
+    let leave = ctx
+        .db
+        .hr_leave()
+        .id()
+        .find(&leave_id)
+        .ok_or("Leave request not found")?;
+    require_scope(
+        "Leave request",
+        leave.organization_id,
+        leave.company_id,
+        organization_id,
+        company_id,
+    )?;
+    let fields = vec![
+        field("id", leave.id),
+        field("organization_id", leave.organization_id),
+        field("company_id", leave.company_id),
+        field("employee_id", leave.employee_id),
+        field("leave_type_id", leave.leave_type_id),
+        debug_field("state", &leave.state),
+        field("date_from", leave.date_from.to_micros_since_unix_epoch()),
+        field("date_to", leave.date_to.to_micros_since_unix_epoch()),
+        float_field("number_of_days", leave.number_of_days),
+        field("manager_id", option_u64(leave.manager_id)),
+    ];
+    Ok(material(
+        GuardedActionSubjectKind::HrLeave,
+        leave.id,
+        fields,
+        None,
+        None,
+        vec![
+            condition_field(
+                "number_of_days",
+                ConditionValue::Decimal(fixed_decimal(leave.number_of_days, 4)?),
+            ),
+            condition_field("state", ConditionValue::Code(format!("{:?}", leave.state))),
+        ],
+    ))
+}
+
+fn payment_transaction_snapshot(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    transaction_id: u64,
+) -> Result<MaterialSnapshot, String> {
+    let transaction = ctx
+        .db
+        .payment_transaction()
+        .id()
+        .find(&transaction_id)
+        .ok_or("Payment transaction not found")?;
+    require_scope(
+        "Payment transaction",
+        transaction.organization_id,
+        transaction.company_id,
+        organization_id,
+        company_id,
+    )?;
+    let fields = vec![
+        field("id", transaction.id),
+        field("organization_id", transaction.organization_id),
+        field("company_id", transaction.company_id),
+        field("payment_account_id", transaction.payment_account_id),
+        debug_field("direction", &transaction.direction),
+        debug_field("status", &transaction.status),
+        float_field("gross_external_amount", transaction.gross_external_amount),
+        float_field("settlement_amount", transaction.settlement_amount),
+        float_field("net_account_amount", transaction.net_account_amount),
+        field("currency_id", transaction.currency_id),
+        field(
+            "account_payment_id",
+            option_u64(transaction.account_payment_id),
+        ),
+    ];
+    let amount = money_value(transaction.net_account_amount, transaction.currency_id)?;
+    Ok(material(
+        GuardedActionSubjectKind::PaymentTransaction,
+        transaction.id,
+        fields,
+        Some(amount.clone()),
+        None,
+        vec![
+            condition_field("amount_total", ConditionValue::Money(amount)),
+            condition_field(
+                "status",
+                ConditionValue::Code(format!("{:?}", transaction.status)),
+            ),
+        ],
+    ))
+}
+
 fn execute_adapter(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
     input: &GuardedActionInput,
+    execution_reason: Option<&str>,
 ) -> Result<(), String> {
     match input {
         GuardedActionInput::ConfirmPurchaseOrder { order_id } => {
@@ -884,6 +1028,36 @@ fn execute_adapter(
         }
         GuardedActionInput::ApproveAiActionDraft { draft_id } => {
             approve_ai_action_draft_core(ctx, organization_id, company_id, *draft_id)
+        }
+        GuardedActionInput::ApproveLeave { leave_id } => {
+            approve_leave_impl(ctx, organization_id, company_id, *leave_id, true)
+        }
+        GuardedActionInput::PostPaymentTransaction { transaction_id } => {
+            post_payment_transaction_impl(ctx, organization_id, *transaction_id, true)
+        }
+        GuardedActionInput::ReversePaymentTransaction { transaction_id } => {
+            let reason = execution_reason
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| value.to_string());
+            let metadata = reason.as_ref().map(|value| {
+                serde_json::json!({
+                    "source": "workflow_human_task_decision",
+                    "reason": value,
+                })
+                .to_string()
+            });
+            reverse_payment_transaction_impl(
+                ctx,
+                organization_id,
+                *transaction_id,
+                ReversePaymentTransactionParams {
+                    company_id,
+                    reason,
+                    metadata,
+                },
+                true,
+            )
         }
     }
 }
@@ -925,6 +1099,15 @@ fn validate_input_matches_action(
         ) | (
             GuardedActionKey::ApproveAiActionDraft,
             GuardedActionInput::ApproveAiActionDraft { .. }
+        ) | (
+            GuardedActionKey::ApproveLeave,
+            GuardedActionInput::ApproveLeave { .. }
+        ) | (
+            GuardedActionKey::PostPaymentTransaction,
+            GuardedActionInput::PostPaymentTransaction { .. }
+        ) | (
+            GuardedActionKey::ReversePaymentTransaction,
+            GuardedActionInput::ReversePaymentTransaction { .. }
         )
     );
     if matches {
@@ -954,6 +1137,13 @@ fn subject_for_input(input: &GuardedActionInput) -> (GuardedActionSubjectKind, u
         }
         GuardedActionInput::ApproveAiActionDraft { draft_id } => {
             (GuardedActionSubjectKind::AiActionDraft, *draft_id)
+        }
+        GuardedActionInput::ApproveLeave { leave_id } => {
+            (GuardedActionSubjectKind::HrLeave, *leave_id)
+        }
+        GuardedActionInput::PostPaymentTransaction { transaction_id }
+        | GuardedActionInput::ReversePaymentTransaction { transaction_id } => {
+            (GuardedActionSubjectKind::PaymentTransaction, *transaction_id)
         }
     }
 }
@@ -1201,10 +1391,13 @@ mod tests {
             "post_payment",
             "approve_expense_sheet",
             "approve_ai_action_draft",
+            "approve_leave",
+            "post_payment_transaction",
+            "reverse_payment_transaction",
         ] {
             assert!(resolve_guarded_action(key, 1).is_ok());
         }
-        assert!(resolve_guarded_action("approve_leave", 1).is_err());
+        assert!(resolve_guarded_action("arbitrary_reducer", 1).is_err());
         assert!(resolve_guarded_action("post_payment", 2).is_err());
     }
 

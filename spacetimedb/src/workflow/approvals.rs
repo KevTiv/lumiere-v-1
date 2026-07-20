@@ -7,6 +7,7 @@
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::permissions::user_role_assignment;
 use crate::core::users::user_organization;
 use crate::helpers::check_permission;
 
@@ -27,9 +28,11 @@ use super::runtime::{
     RuntimeTransition, WorkflowAuthorizationOutcome, WorkflowCommandKind, WorkflowInstance,
     WorkflowTokenState,
 };
+use std::collections::BTreeSet;
 
 const MAX_COMMAND_KEY_LEN: usize = 256;
 const MAX_COMMENT_LEN: usize = 8_192;
+const MAX_ALL_CANDIDATES: usize = 64;
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
 pub enum WorkflowHumanTaskStatus {
@@ -141,6 +144,27 @@ pub struct WorkflowCandidateGroupMember {
     pub created_at: Timestamp,
     pub revoked_by: Option<Identity>,
     pub revoked_at: Option<Timestamp>,
+}
+
+/// Bounded identity projection for [`WorkflowTaskAssignment::AllCandidates`].
+/// Materialized once at task open; N-of-N completion requires every row to approve.
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = workflow_human_task_candidate,
+    index(accessor = human_task_candidate_by_task, btree(columns = [task_id])),
+    index(accessor = human_task_candidate_by_identity, btree(columns = [candidate_identity]))
+)]
+pub struct WorkflowHumanTaskCandidate {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub task_id: u64,
+    pub candidate_identity: Identity,
+    pub decision: Option<WorkflowHumanTaskDecision>,
+    pub decided_at: Option<Timestamp>,
+    pub decided_by: Option<Identity>,
 }
 
 /// Append-only human-task evidence, including comments and invalidations.
@@ -327,6 +351,17 @@ pub(crate) fn create_workflow_human_task_internal(
         _ => {}
     }
 
+    let projected = if policy.assignment == WorkflowTaskAssignment::AllCandidates {
+        Some(project_all_candidates(
+            ctx,
+            organization_id,
+            company_id,
+            &policy,
+        )?)
+    } else {
+        None
+    };
+
     let task = ctx.db.workflow_human_task().insert(WorkflowHumanTask {
         id: 0,
         organization_id,
@@ -368,6 +403,22 @@ pub(crate) fn create_workflow_human_task_internal(
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
     });
+    if let Some(identities) = projected {
+        for identity in identities {
+            ctx.db
+                .workflow_human_task_candidate()
+                .insert(WorkflowHumanTaskCandidate {
+                    id: 0,
+                    organization_id,
+                    company_id,
+                    task_id: task.id,
+                    candidate_identity: identity,
+                    decision: None,
+                    decided_at: None,
+                    decided_by: None,
+                });
+        }
+    }
     append_event(
         ctx,
         &task,
@@ -427,6 +478,9 @@ pub(crate) fn claim_workflow_human_task_for_actor(
     }
     let task = require_task(ctx, organization_id, params.company_id, params.task_id)?;
     require_revision(&task, params.expected_revision)?;
+    if task.assignment == WorkflowTaskAssignment::AllCandidates {
+        return Err("AllCandidates tasks do not use exclusive claim".to_string());
+    }
     if task.status != WorkflowHumanTaskStatus::Open {
         return Err("only an open workflow task can be claimed".to_string());
     }
@@ -506,7 +560,9 @@ pub(crate) fn decide_workflow_human_task_for_actor(
     ) {
         return Err("workflow task is not open for a decision".to_string());
     }
-    if task.claimed_by.is_some_and(|claimer| claimer != actor) {
+    if task.assignment != WorkflowTaskAssignment::AllCandidates
+        && task.claimed_by.is_some_and(|claimer| claimer != actor)
+    {
         return Err("workflow task is claimed by another actor".to_string());
     }
     validate_decision(&task, &params.decision, comment.as_deref())?;
@@ -516,6 +572,26 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         WorkflowHumanTaskDecision::Complete => "workflow_task:complete",
     };
     let authorization = authorize_task_actor(ctx, actor, &task, params.acting_for, permission)?;
+    let principal = authorization
+        .acting_for_identity
+        .unwrap_or(actor);
+
+    if task.assignment == WorkflowTaskAssignment::AllCandidates {
+        if let Some(partial) = record_all_candidates_vote(
+            ctx,
+            organization_id,
+            actor,
+            principal,
+            &task,
+            &params,
+            &authorization,
+            &input_hash,
+            comment.clone(),
+        )? {
+            return Ok(partial);
+        }
+    }
+
     let instance = require_instance(
         ctx,
         organization_id,
@@ -537,7 +613,7 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         validate_guarded_action_target(ctx, &task, &edge)?;
     }
     let domain_receipt = if params.decision == WorkflowHumanTaskDecision::Approve {
-        execute_task_action(ctx, &task, &params.idempotency_key)?
+        execute_task_action(ctx, &task, &params.idempotency_key, comment.as_deref())?
     } else {
         None
     };
@@ -848,6 +924,7 @@ fn execute_task_action(
     ctx: &ReducerContext,
     task: &WorkflowHumanTask,
     decision_idempotency_key: &str,
+    decision_comment: Option<&str>,
 ) -> Result<Option<String>, String> {
     let Some(action) = task.guarded_action.clone() else {
         return Ok(None);
@@ -874,6 +951,10 @@ fn execute_task_action(
             input,
             expected_subject_revision_hash: task.subject_revision_hash.clone(),
             idempotency_key: format!("human-task:{}:{decision_idempotency_key}", task.id),
+            execution_reason: decision_comment
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| value.to_string()),
         },
     )?;
     Ok(Some(result.receipt_id))
@@ -887,12 +968,25 @@ fn authorize_task_actor(
     permission: &str,
 ) -> Result<WorkflowAuthorizationDecision, String> {
     let principal = acting_for.unwrap_or(actor);
-    let role_match = principal_has_candidate_role(ctx, task, principal);
-    let group_match = principal_has_candidate_group(ctx, task, principal);
-    let unit_match = principal_has_candidate_unit(ctx, task, principal);
-    if !role_match && !group_match && !unit_match {
-        return Err("workflow actor is outside the task candidate scopes".to_string());
+    if task.assignment == WorkflowTaskAssignment::AllCandidates {
+        let in_projection = ctx
+            .db
+            .workflow_human_task_candidate()
+            .human_task_candidate_by_task()
+            .filter(&task.id)
+            .any(|row| row.candidate_identity == principal);
+        if !in_projection {
+            return Err("workflow actor is outside the AllCandidates projection".to_string());
+        }
+    } else {
+        let role_match = principal_has_candidate_role(ctx, task, principal);
+        let group_match = principal_has_candidate_group(ctx, task, principal);
+        let unit_match = principal_has_candidate_unit(ctx, task, principal);
+        if !role_match && !group_match && !unit_match {
+            return Err("workflow actor is outside the task candidate scopes".to_string());
+        }
     }
+    let role_match = principal_has_candidate_role(ctx, task, principal);
     let candidate_role_ids = if role_match {
         task.candidate_role_ids.clone()
     } else {
@@ -1151,13 +1245,170 @@ fn validate_policy(policy: &WorkflowTaskPolicy) -> Result<(), String> {
     {
         return Err("human task has no candidate scope".to_string());
     }
-    if policy.assignment == WorkflowTaskAssignment::AllCandidates {
-        return Err(
-            "all-candidates assignment requires the Wave 4 bounded candidate projection"
-                .to_string(),
-        );
-    }
     Ok(())
+}
+
+fn project_all_candidates(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    policy: &WorkflowTaskPolicy,
+) -> Result<Vec<Identity>, String> {
+    let mut identities = BTreeSet::new();
+    if !policy.candidate_role_ids.is_empty() {
+        for assignment in ctx
+            .db
+            .user_role_assignment()
+            .role_assign_by_org()
+            .filter(&organization_id)
+        {
+            if assignment.is_active
+                && policy.candidate_role_ids.contains(&assignment.role_id)
+                && assignment
+                    .expires_at
+                    .is_none_or(|expires| expires > ctx.timestamp)
+            {
+                identities.insert(assignment.user_identity);
+            }
+        }
+    }
+    for group_id in &policy.candidate_group_ids {
+        for row in ctx
+            .db
+            .workflow_candidate_group_member()
+            .candidate_group_member_by_group()
+            .filter(group_id)
+        {
+            if row.organization_id == organization_id
+                && row.company_id == company_id
+                && row.is_active
+            {
+                identities.insert(row.member_identity);
+            }
+        }
+    }
+    if !policy.candidate_unit_ids.is_empty() {
+        for membership in ctx
+            .db
+            .user_organization()
+            .user_org_by_org()
+            .filter(&organization_id)
+        {
+            if membership.is_active
+                && membership
+                    .company_id
+                    .is_none_or(|id| id == company_id)
+                && membership
+                    .department_id
+                    .is_some_and(|unit_id| policy.candidate_unit_ids.contains(&unit_id))
+            {
+                identities.insert(membership.user_identity);
+            }
+        }
+    }
+    if identities.is_empty() {
+        return Err("AllCandidates projection resolved zero identities".to_string());
+    }
+    if identities.len() > MAX_ALL_CANDIDATES {
+        return Err(format!(
+            "AllCandidates projection exceeds bound of {MAX_ALL_CANDIDATES}"
+        ));
+    }
+    Ok(identities.into_iter().collect())
+}
+
+/// Records one AllCandidates vote. Returns `Some(task)` when the task stays open
+/// (partial approvals). Returns `None` when the final approving vote should finish
+/// the normal decide path, or when a reject should complete immediately (also None
+/// so the caller continues — wait, reject needs to continue to complete).
+///
+/// Returns:
+/// - `Ok(Some(task))` — partial approve recorded; caller should return
+/// - `Ok(None)` — proceed with full decide (final approve or any reject)
+fn record_all_candidates_vote(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    actor: Identity,
+    principal: Identity,
+    task: &WorkflowHumanTask,
+    params: &DecideWorkflowHumanTaskParams,
+    authorization: &WorkflowAuthorizationDecision,
+    input_hash: &str,
+    comment: Option<String>,
+) -> Result<Option<WorkflowHumanTask>, String> {
+    let mut candidate = ctx
+        .db
+        .workflow_human_task_candidate()
+        .human_task_candidate_by_task()
+        .filter(&task.id)
+        .find(|row| row.candidate_identity == principal)
+        .ok_or("workflow actor is not in the AllCandidates projection")?;
+    if candidate.decision.is_some() {
+        return Err("this AllCandidates actor has already decided".to_string());
+    }
+
+    candidate = ctx
+        .db
+        .workflow_human_task_candidate()
+        .id()
+        .update(WorkflowHumanTaskCandidate {
+            decision: Some(params.decision.clone()),
+            decided_at: Some(ctx.timestamp),
+            decided_by: Some(actor),
+            ..candidate
+        });
+
+    if params.decision == WorkflowHumanTaskDecision::Reject {
+        return Ok(None);
+    }
+
+    let outstanding = ctx
+        .db
+        .workflow_human_task_candidate()
+        .human_task_candidate_by_task()
+        .filter(&task.id)
+        .any(|row| {
+            !matches!(
+                row.decision,
+                Some(WorkflowHumanTaskDecision::Approve)
+                    | Some(WorkflowHumanTaskDecision::Complete)
+            )
+        });
+    if !outstanding {
+        return Ok(None);
+    }
+
+    let next_revision = next_revision(task.revision)?;
+    let updated = ctx.db.workflow_human_task().id().update(WorkflowHumanTask {
+        revision: next_revision,
+        correlation_id: params.correlation_id.clone(),
+        updated_at: ctx.timestamp,
+        ..task.clone()
+    });
+    append_authorized_event(
+        ctx,
+        task,
+        &updated,
+        WorkflowHumanTaskCommandKind::Decision,
+        Some(params.decision.clone()),
+        authorization,
+        &params.idempotency_key,
+        input_hash,
+        comment,
+        None,
+        &params.correlation_id,
+    );
+    insert_receipt(
+        ctx,
+        &updated,
+        WorkflowHumanTaskCommandKind::Decision,
+        params.idempotency_key.clone(),
+        input_hash.to_string(),
+        None,
+        actor,
+    );
+    let _ = (organization_id, candidate);
+    Ok(Some(updated))
 }
 
 fn require_task(

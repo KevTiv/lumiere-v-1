@@ -187,7 +187,7 @@ pub async fn execute_private_workflow_query(
                 .into_iter()
                 .filter(|r| {
                     row_company_allowed(r, &company_ids)
-                        && enum_tag(r, "status") == Some("Pending")
+                        && enum_tag(r, "status").as_deref() == Some("Pending")
                 })
                 .collect();
             sort_rows_by_id_desc(&mut rows);

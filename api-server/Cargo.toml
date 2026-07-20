@@ -26,6 +26,10 @@ path = "src/bin/project-integration-worker.rs"
 name = "hr-integration-worker"
 path = "src/bin/hr-integration-worker.rs"
 
+[[bin]]
+name = "workflow-worker"
+path = "src/bin/workflow-worker.rs"
+
 [dependencies]
 anyhow.workspace = true
 aes-gcm.workspace = true

@@ -1407,12 +1407,6 @@ fn validate_action(action: &WorkflowActionReference) -> Result<(), String> {
 }
 
 fn validate_task_policy(policy: &WorkflowTaskPolicy) -> Result<(), String> {
-    if policy.assignment == WorkflowTaskAssignment::AllCandidates {
-        return Err(
-            "AllCandidates requires the bounded candidate projection planned for Wave 4"
-                .to_string(),
-        );
-    }
     if policy.candidate_role_ids.is_empty()
         && policy.candidate_group_ids.is_empty()
         && policy.candidate_unit_ids.is_empty()

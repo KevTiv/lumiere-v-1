@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "template_kinds": [
+    {
+      "template_key": "procurement",
+      "model": "purchase_order",
+      "name": "Procurement approval",
+      "description": "Confirm purchase order via human approval with market calendar escalation"
+    },
+    {
+      "template_key": "expense",
+      "model": "hr_expense_sheet",
+      "name": "Expense sheet approval",
+      "description": "Approve submitted expense sheets with calendar-aware deadline"
+    },
+    {
+      "template_key": "finance_escalation",
+      "model": "account_move",
+      "name": "Finance escalation",
+      "description": "Escalate high-risk finance postings through dual human review"
+    },
+    {
+      "template_key": "evidence_review",
+      "model": "workflow_evidence",
+      "name": "Evidence review",
+      "description": "Complete evidence review before continuing the process"
+    }
+  ],
+  "markets": [
+    {
+      "market": "AU",
+      "locale": "en-AU",
+      "calendar_key": "workflow.au.nsw.2026",
+      "content_hash": "sha256:au-templates-foundation-v1",
+      "source": {
+        "authority": "Lumiere workflow template foundation",
+        "title": "AU procurement/expense/finance/evidence templates",
+        "url": "https://example.invalid/packs/au",
+        "retrieved_on": "2026-07-20",
+        "effective_year": 2026
+      }
+    },
+    {
+      "market": "NZ",
+      "locale": "en-NZ",
+      "calendar_key": "workflow.nz.chatham.2026",
+      "content_hash": "sha256:nz-templates-foundation-v1",
+      "source": {
+        "authority": "Lumiere workflow template foundation",
+        "title": "NZ procurement/expense/finance/evidence templates",
+        "url": "https://example.invalid/packs/nz",
+        "retrieved_on": "2026-07-20",
+        "effective_year": 2026
+      }
+    },
+    {
+      "market": "ZA",
+      "locale": "en-ZA",
+      "calendar_key": "workflow.za.2026",
+      "content_hash": "sha256:za-templates-foundation-v1",
+      "source": {
+        "authority": "Lumiere workflow template foundation",
+        "title": "ZA procurement/expense/finance/evidence templates",
+        "url": "https://example.invalid/packs/za",
+        "retrieved_on": "2026-07-20",
+        "effective_year": 2026
+      }
+    },
+    {
+      "market": "BR",
+      "locale": "pt-BR",
+      "calendar_key": "workflow.br.sp.2026",
+      "content_hash": "sha256:br-templates-foundation-v1",
+      "source": {
+        "authority": "Lumiere workflow template foundation",
+        "title": "BR procurement/expense/finance/evidence templates",
+        "url": "https://example.invalid/packs/br",
+        "retrieved_on": "2026-07-20",
+        "effective_year": 2026
+      }
+    },
+    {
+      "market": "AR",
+      "locale": "es-AR",
+      "calendar_key": "workflow.ar.2026",
+      "content_hash": "sha256:ar-templates-foundation-v1",
+      "source": {
+        "authority": "Lumiere workflow template foundation",
+        "title": "AR procurement/expense/finance/evidence templates",
+        "url": "https://example.invalid/packs/ar",
+        "retrieved_on": "2026-07-20",
+        "effective_year": 2026
+      }
+    },
+    {
+      "market": "CL",
+      "locale": "es-CL",
+      "calendar_key": "workflow.cl.santiago.2026",
+      "content_hash": "sha256:cl-templates-foundation-v1",
+      "source": {
+        "authority": "Lumiere workflow template foundation",
+        "title": "CL procurement/expense/finance/evidence templates",
+        "url": "https://example.invalid/packs/cl",
+        "retrieved_on": "2026-07-20",
+        "effective_year": 2026
+      }
+    },
+    {
+      "market": "SG",
+      "locale": "en-SG",
+      "calendar_key": "workflow.sg.2026",
+      "content_hash": "sha256:sg-templates-foundation-v1",
+      "source": {
+        "authority": "Lumiere workflow template foundation",
+        "title": "SG procurement/expense/finance/evidence templates",
+        "url": "https://example.invalid/packs/sg",
+        "retrieved_on": "2026-07-20",
+        "effective_year": 2026
+      }
+    },
+    {
+      "market": "MY",
+      "locale": "ms-MY",
+      "calendar_key": "workflow.my.kelantan.2026",
+      "content_hash": "sha256:my-templates-foundation-v1",
+      "source": {
+        "authority": "Lumiere workflow template foundation",
+        "title": "MY procurement/expense/finance/evidence templates",
+        "url": "https://example.invalid/packs/my",
+        "retrieved_on": "2026-07-20",
+        "effective_year": 2026
+      }
+    },
+    {
+      "market": "ID",
+      "locale": "id-ID",
+      "calendar_key": "workflow.id.2026",
+      "content_hash": "sha256:id-templates-foundation-v1",
+      "source": {
+        "authority": "Lumiere workflow template foundation",
+        "title": "ID procurement/expense/finance/evidence templates",
+        "url": "https://example.invalid/packs/id",
+        "retrieved_on": "2026-07-20",
+        "effective_year": 2026
+      }
+    },
+    {
+      "market": "PH",
+      "locale": "en-PH",
+      "calendar_key": "workflow.ph.2026",
+      "content_hash": "sha256:ph-templates-foundation-v1",
+      "source": {
+        "authority": "Lumiere workflow template foundation",
+        "title": "PH procurement/expense/finance/evidence templates",
+        "url": "https://example.invalid/packs/ph",
+        "retrieved_on": "2026-07-20",
+        "effective_year": 2026
+      }
+    }
+  ]
+}

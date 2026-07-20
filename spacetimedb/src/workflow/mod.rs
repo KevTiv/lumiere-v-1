@@ -21,6 +21,7 @@ pub mod calendar;
 pub mod definitions;
 pub mod delivery;
 pub mod evaluator;
+pub mod packs;
 pub mod runtime;
 pub mod simulation;
 
@@ -32,5 +33,6 @@ pub use calendar::*;
 pub use definitions::*;
 pub use delivery::*;
 pub use evaluator::*;
+pub use packs::*;
 pub use runtime::*;
 pub use simulation::*;

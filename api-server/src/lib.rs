@@ -20,6 +20,7 @@ pub mod session;
 pub mod state;
 pub mod web_session;
 pub mod workflow_reads;
+pub mod workflow_worker;
 
 mod http_app;
 mod stdb_sdk_bindings;
@@ -47,4 +48,9 @@ pub async fn run_project_integration_worker() -> anyhow::Result<()> {
 /// Run the standalone HR statutory/partner payroll integration worker service.
 pub async fn run_hr_integration_worker() -> anyhow::Result<()> {
     hr_integration_worker::serve().await
+}
+
+/// Run the standalone workflow timer/outbox worker service.
+pub async fn run_workflow_worker() -> anyhow::Result<()> {
+    workflow_worker::serve().await
 }

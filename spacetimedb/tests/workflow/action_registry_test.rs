@@ -42,16 +42,14 @@ fn rejects_unregistered_keys_and_versions() -> Result<(), String> {
         "post_payment",
         "approve_expense_sheet",
         "approve_ai_action_draft",
+        "approve_leave",
+        "post_payment_transaction",
+        "reverse_payment_transaction",
     ];
     for key in registered {
         resolve_guarded_action(key, GUARDED_ACTION_SCHEMA_VERSION)?;
     }
-    for key in [
-        "approve_leave",
-        "post_payment_transaction",
-        "reverse_payment_transaction",
-        "arbitrary_reducer",
-    ] {
+    for key in ["arbitrary_reducer", "unknown_action"] {
         if resolve_guarded_action(key, GUARDED_ACTION_SCHEMA_VERSION).is_ok() {
             return Err(format!(
                 "unregistered action '{key}' entered the closed registry"
@@ -163,6 +161,7 @@ fn replays_all_seven_actions_and_rejects_changed_revision(
                 input: input.clone(),
                 expected_subject_revision_hash: REVISION_A.to_string(),
                 idempotency_key: idempotency_key.clone(),
+                execution_reason: None,
             },
         )?;
         if !replay.replayed
@@ -186,6 +185,7 @@ fn replays_all_seven_actions_and_rejects_changed_revision(
                 input,
                 expected_subject_revision_hash: REVISION_B.to_string(),
                 idempotency_key,
+                execution_reason: None,
             },
         )
         .err()
@@ -413,6 +413,7 @@ fn execution_params(
         input,
         expected_subject_revision_hash: snapshot.subject_revision_hash.clone(),
         idempotency_key: idempotency_key.to_string(),
+        execution_reason: None,
     }
 }
 

@@ -120,6 +120,25 @@ services:
       - "8091"
     restart: unless-stopped
 
+  workflow-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.rust
+      args:
+        BIN: workflow-worker
+    environment:
+      NODE_ENV: production
+      STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
+      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
+      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
+      LUMIERE_WORKFLOW_WORKER_POLL_SECS: ${LUMIERE_WORKFLOW_WORKER_POLL_SECS:-15}
+      LUMIERE_WORKFLOW_WORKER_NAME: ${LUMIERE_WORKFLOW_WORKER_NAME:-workflow-worker-v1}
+      LUMIERE_WORKFLOW_WORKER_PORT: 8093
+      LUMIERE_WORKFLOW_EXTERNAL_DISPATCH_ENABLED: ${LUMIERE_WORKFLOW_EXTERNAL_DISPATCH_ENABLED:-false}
+    expose:
+      - "8093"
+    restart: unless-stopped
+
   ai-gateway:
     build:
       context: .

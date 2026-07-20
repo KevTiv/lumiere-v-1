@@ -1035,6 +1035,7 @@ pub fn apply_subscription_invoice_payment(
             input: move_input,
             expected_subject_revision_hash: move_snapshot.subject_revision_hash,
             idempotency_key: format!("subscription-payment-move:{payment_move_id}"),
+            execution_reason: None,
         },
     )?;
 
@@ -1086,6 +1087,7 @@ pub fn apply_subscription_invoice_payment(
             input: payment_input,
             expected_subject_revision_hash: payment_snapshot.subject_revision_hash,
             idempotency_key: format!("subscription-payment:{payment_id}"),
+            execution_reason: None,
         },
     )?;
     register_payment_on_invoice(

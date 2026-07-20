@@ -37,6 +37,15 @@ pub struct Config {
     pub owner_report_worker_name: String,
     /// Internal health listener for the standalone owner-report worker.
     pub owner_report_worker_port: u16,
+    /// Bounded polling interval for the workflow timer/outbox worker.
+    pub workflow_worker_poll_secs: u64,
+    pub workflow_worker_name: String,
+    pub workflow_worker_port: u16,
+    /// Organization shard for the worker; empty = discover from due timers.
+    pub workflow_worker_org_ids: Vec<u64>,
+    pub workflow_worker_lease_ttl_secs: u64,
+    /// When false (default), timers still fire but outbox jobs are not claimed.
+    pub workflow_external_dispatch_enabled: bool,
 }
 
 impl Config {
@@ -162,6 +171,32 @@ impl Config {
             .ok()
             .and_then(|value| value.parse::<u16>().ok())
             .unwrap_or(8091);
+        let workflow_worker_poll_secs = std::env::var("LUMIERE_WORKFLOW_WORKER_POLL_SECS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(15);
+        let workflow_worker_name = std::env::var("LUMIERE_WORKFLOW_WORKER_NAME")
+            .unwrap_or_else(|_| "workflow-worker-v1".to_string());
+        let workflow_worker_port = std::env::var("LUMIERE_WORKFLOW_WORKER_PORT")
+            .ok()
+            .and_then(|value| value.parse::<u16>().ok())
+            .unwrap_or(8093);
+        let workflow_worker_org_ids = std::env::var("LUMIERE_WORKFLOW_WORKER_ORG_IDS")
+            .unwrap_or_default()
+            .split(',')
+            .filter_map(|s| s.trim().parse::<u64>().ok())
+            .collect();
+        let workflow_worker_lease_ttl_secs =
+            std::env::var("LUMIERE_WORKFLOW_WORKER_LEASE_TTL_SECS")
+                .ok()
+                .and_then(|value| value.parse::<u64>().ok())
+                .filter(|value| *value > 0)
+                .unwrap_or(60);
+        let workflow_external_dispatch_enabled =
+            std::env::var("LUMIERE_WORKFLOW_EXTERNAL_DISPATCH_ENABLED")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false);
 
         Ok(Config {
             port,
@@ -183,6 +218,12 @@ impl Config {
             owner_report_worker_poll_secs,
             owner_report_worker_name,
             owner_report_worker_port,
+            workflow_worker_poll_secs,
+            workflow_worker_name,
+            workflow_worker_port,
+            workflow_worker_org_ids,
+            workflow_worker_lease_ttl_secs,
+            workflow_external_dispatch_enabled,
         })
     }
 }

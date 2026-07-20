@@ -26,6 +26,12 @@ fn test_config(server_token: Option<&str>, dev_mock_org_id: Option<u64>) -> Conf
         owner_report_worker_poll_secs: 15,
         owner_report_worker_name: "test-owner-report-worker".to_string(),
         owner_report_worker_port: 8091,
+        workflow_worker_poll_secs: 15,
+        workflow_worker_name: "test-workflow-worker".to_string(),
+        workflow_worker_port: 8093,
+        workflow_worker_org_ids: vec![],
+        workflow_worker_lease_ttl_secs: 60,
+        workflow_external_dispatch_enabled: false,
     }
 }
 

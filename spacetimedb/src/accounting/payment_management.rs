@@ -14,12 +14,12 @@ use crate::types::{
     AccountMoveState, MoveType, PartnerType, PaymentDirection, PaymentFeeBearer,
     PaymentProviderCode, PaymentState, PaymentTransactionStatus, PaymentType,
 };
-
-fn reject_unregistered_payment_action(action_key: &str) -> Result<(), String> {
-    Err(format!(
-        "{action_key} is unavailable until it is added to the guarded action registry"
-    ))
-}
+use crate::workflow::action_registry::{
+    GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
+};
+use crate::workflow::approval_gate::{
+    request_guarded_action, GuardedActionGateOutcome, RequestGuardedActionParams,
+};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -836,6 +836,15 @@ pub fn post_payment_transaction(
     organization_id: u64,
     transaction_id: u64,
 ) -> Result<(), String> {
+    post_payment_transaction_impl(ctx, organization_id, transaction_id, false)
+}
+
+pub fn post_payment_transaction_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    transaction_id: u64,
+    skip_approval_check: bool,
+) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_transaction", "post")?;
     let transaction = ctx
         .db
@@ -870,7 +879,26 @@ pub fn post_payment_transaction(
         &fees,
     )?;
 
-    reject_unregistered_payment_action("post_payment_transaction")?;
+    if !skip_approval_check {
+        if matches!(
+            request_guarded_action(
+                ctx,
+                organization_id,
+                RequestGuardedActionParams {
+                    company_id: transaction.company_id,
+                    action: GuardedActionKey::PostPaymentTransaction,
+                    action_version: GUARDED_ACTION_SCHEMA_VERSION,
+                    input: GuardedActionInput::PostPaymentTransaction { transaction_id },
+                    idempotency_key: format!("post-payment-transaction:{transaction_id}"),
+                    correlation_id: format!("payment-transaction:{transaction_id}:post"),
+                    causation_id: None,
+                },
+            )?,
+            GuardedActionGateOutcome::HumanTaskCreated { .. }
+        ) {
+            return Ok(());
+        }
+    }
 
     let account_payment_id = post_ledger_payment(
         ctx,
@@ -1133,6 +1161,16 @@ pub fn reverse_payment_transaction(
     transaction_id: u64,
     params: ReversePaymentTransactionParams,
 ) -> Result<(), String> {
+    reverse_payment_transaction_impl(ctx, organization_id, transaction_id, params, false)
+}
+
+pub fn reverse_payment_transaction_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    transaction_id: u64,
+    params: ReversePaymentTransactionParams,
+    skip_approval_check: bool,
+) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_transaction", "reverse")?;
     let original = ctx
         .db
@@ -1159,7 +1197,26 @@ pub fn reverse_payment_transaction(
         .find(&original.payment_account_id)
         .ok_or("Payment account not found")?;
 
-    reject_unregistered_payment_action("reverse_payment_transaction")?;
+    if !skip_approval_check {
+        if matches!(
+            request_guarded_action(
+                ctx,
+                organization_id,
+                RequestGuardedActionParams {
+                    company_id: params.company_id,
+                    action: GuardedActionKey::ReversePaymentTransaction,
+                    action_version: GUARDED_ACTION_SCHEMA_VERSION,
+                    input: GuardedActionInput::ReversePaymentTransaction { transaction_id },
+                    idempotency_key: format!("reverse-payment-transaction:{transaction_id}"),
+                    correlation_id: format!("payment-transaction:{transaction_id}:reverse"),
+                    causation_id: None,
+                },
+            )?,
+            GuardedActionGateOutcome::HumanTaskCreated { .. }
+        ) {
+            return Ok(());
+        }
+    }
 
     // Compensating transaction with inverted direction.
     let correcting_direction = match original.direction {

@@ -250,6 +250,7 @@ use crate::ai::skills::{
     ai_skill, ai_skill_config, ai_team_member_skill, AiSkill, AiSkillConfig, AiTeamMemberSkill,
 };
 use crate::workflow::calendar::activate_foundation_calendar_packs;
+use crate::workflow::packs::activate_foundation_workflow_template_packs;
 use crate::workflow::definitions::{
     create_workflow, publish_workflow_version, upsert_workflow_edge, upsert_workflow_node,
     workflow, workflow_version, ConditionFieldDefinition, ConditionValueType, CreateWorkflowParams,
@@ -10238,6 +10239,7 @@ Prioritize high-severity findings and cite related records."#,
     });
 
     activate_foundation_calendar_packs(ctx)?;
+    activate_foundation_workflow_template_packs(ctx, org_id)?;
 
     log::info!(
         "[seed] Complete. org_id={} company_id={} products=3 contacts=5 leads=5 opportunities=3 tickets=3 \

@@ -8,6 +8,12 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::projects::capacity::on_leave_approved;
 use crate::types::HrLeaveState;
+use crate::workflow::action_registry::{
+    GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
+};
+use crate::workflow::approval_gate::{
+    request_guarded_action, GuardedActionGateOutcome, RequestGuardedActionParams,
+};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -448,6 +454,16 @@ pub fn approve_leave(
     company_id: u64,
     leave_id: u64,
 ) -> Result<(), String> {
+    approve_leave_impl(ctx, organization_id, company_id, leave_id, false)
+}
+
+pub fn approve_leave_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    leave_id: u64,
+    skip_approval_check: bool,
+) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_leave", "approve")?;
     let leave = ctx
         .db
@@ -471,7 +487,26 @@ pub fn approve_leave(
 
     assert_not_self_approve(ctx, &leave)?;
 
-    reject_unregistered_leave_approval()?;
+    if !skip_approval_check {
+        if matches!(
+            request_guarded_action(
+                ctx,
+                organization_id,
+                RequestGuardedActionParams {
+                    company_id,
+                    action: GuardedActionKey::ApproveLeave,
+                    action_version: GUARDED_ACTION_SCHEMA_VERSION,
+                    input: GuardedActionInput::ApproveLeave { leave_id },
+                    idempotency_key: format!("approve-leave:{leave_id}"),
+                    correlation_id: format!("hr-leave:{leave_id}:approve"),
+                    causation_id: None,
+                },
+            )?,
+            GuardedActionGateOutcome::HumanTaskCreated { .. }
+        ) {
+            return Ok(());
+        }
+    }
 
     let old_state = format!("{:?}", leave.state);
     let period_year = period_year_from_timestamp(leave.date_from);
@@ -569,10 +604,6 @@ pub fn approve_leave(
         },
     );
     Ok(())
-}
-
-fn reject_unregistered_leave_approval() -> Result<(), String> {
-    Err("approve_leave is unavailable until it is added to the guarded action registry".to_string())
 }
 
 #[reducer]
