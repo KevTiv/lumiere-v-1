@@ -882,7 +882,7 @@ export const newAttendancePunchForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "att-check-in",
-          type: "datetime-local",
+          type: "datetime",
           name: "checkIn",
           label: t("hr.forms.newAttendancePunch.fields.checkIn"),
           required: true,
@@ -890,7 +890,7 @@ export const newAttendancePunchForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "att-check-out",
-          type: "datetime-local",
+          type: "datetime",
           name: "checkOut",
           label: t("hr.forms.newAttendancePunch.fields.checkOut"),
           width: "1/2",

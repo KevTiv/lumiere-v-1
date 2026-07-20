@@ -30,7 +30,8 @@ import type {
 } from "@lumiere/stdb/types"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
-import type { Timestamp } from "spacetimedb"
+
+type Timestamp = ReturnType<typeof stbTimestampFromDate>
 import {
   finalizeCreateContractParams,
   finalizeCreateDepartmentParams,

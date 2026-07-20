@@ -162,10 +162,11 @@ const HR_CONTRACT_COMP = ['wage'] as const
 const HR_PAYSLIP_COMP = ['basic_wage', 'gross_wage', 'net_wage'] as const
 
 export function hasHrPermission(
-  fieldAccess: FieldAccessContext,
+  fieldAccess: FieldAccessContext | undefined,
   resource: string,
   action: string,
 ): boolean {
+  if (!fieldAccess) return false
   if (fieldAccess.isSuperuser) return true
   const perm = `${resource}:${action}`
   const wildcard = `${resource}:*`
