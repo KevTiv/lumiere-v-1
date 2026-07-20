@@ -8,7 +8,6 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::projects::capacity::on_leave_approved;
 use crate::types::HrLeaveState;
-use crate::workflow::approval_gate::gate_action_with_approval;
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -472,39 +471,7 @@ pub fn approve_leave(
 
     assert_not_self_approve(ctx, &leave)?;
 
-    let params_json = serde_json::json!({
-        "organization_id": organization_id,
-        "company_id": company_id,
-        "leave_id": leave_id,
-    })
-    .to_string();
-    let context_json = serde_json::json!({
-        "number_of_days": leave.number_of_days,
-        "employee_id": leave.employee_id,
-    })
-    .to_string();
-    let summary = format!(
-        "Approve leave request {} ({:.2} days)",
-        leave_id, leave.number_of_days
-    );
-
-    if let Some(_request_id) = gate_action_with_approval(
-        ctx,
-        organization_id,
-        company_id,
-        "hr_leave",
-        leave_id,
-        "approve_leave",
-        leave.number_of_days,
-        &summary,
-        &params_json,
-        Some(context_json),
-    )? {
-        return Err(format!(
-            "Leave request requires workflow approval ({:.2} days)",
-            leave.number_of_days
-        ));
-    }
+    reject_unregistered_leave_approval()?;
 
     let old_state = format!("{:?}", leave.state);
     let period_year = period_year_from_timestamp(leave.date_from);
@@ -602,6 +569,10 @@ pub fn approve_leave(
         },
     );
     Ok(())
+}
+
+fn reject_unregistered_leave_approval() -> Result<(), String> {
+    Err("approve_leave is unavailable until it is added to the guarded action registry".to_string())
 }
 
 #[reducer]
