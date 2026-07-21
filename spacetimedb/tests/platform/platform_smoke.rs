@@ -1597,3 +1597,153 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
 
     Ok(())
 }
+
+/// Forms platform: publish config, bind EAV values to defs, reject unknown keys.
+pub fn test_forms_custom_field_eav(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::forms::{
+        add_form_field, form_config, publish_form_configuration, record_custom_field_value,
+        set_record_custom_field_values, CreateFormFieldParams, FieldType, FieldValidation,
+        FieldWidth, PublishFormConfigurationParams, RecordCustomFieldEntry,
+        SetRecordCustomFieldValuesParams,
+    };
+
+    fn text_field(
+        field_id: &str,
+        label: &str,
+        order: u32,
+        is_system: bool,
+        validation: FieldValidation,
+        width: FieldWidth,
+        show_in_list: bool,
+    ) -> CreateFormFieldParams {
+        CreateFormFieldParams {
+            field_id: field_id.to_string(),
+            name: field_id.trim_start_matches("custom:").to_string(),
+            label: label.to_string(),
+            field_type: FieldType::Text,
+            description: None,
+            placeholder: None,
+            default_value: None,
+            options: vec![],
+            validation,
+            ai_suggestions: vec![],
+            order,
+            is_system,
+            is_enabled: true,
+            category: None,
+            show_in_list,
+            width,
+            section_id: None,
+            visibility_json: None,
+        }
+    }
+
+    fn set_eav(
+        ctx: &ReducerContext,
+        org_id: u64,
+        company_id: u64,
+        field_key: &str,
+        value_json: &str,
+    ) -> Result<(), String> {
+        set_record_custom_field_values(
+            ctx,
+            org_id,
+            company_id,
+            SetRecordCustomFieldValuesParams {
+                model: "lead".to_string(),
+                record_id: 42,
+                entries: vec![RecordCustomFieldEntry {
+                    field_key: field_key.to_string(),
+                    value_json: value_json.to_string(),
+                }],
+            },
+        )
+    }
+
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    publish_form_configuration(
+        ctx,
+        org_id,
+        PublishFormConfigurationParams {
+            module_id: "crm".to_string(),
+            form_id: "new-lead".to_string(),
+            name: "New Lead".to_string(),
+            description: Some("test".to_string()),
+            is_system_default: false,
+            fields: vec![text_field(
+                "name",
+                "Name",
+                1,
+                true,
+                FieldValidation {
+                    required: true,
+                    ..FieldValidation::default()
+                },
+                FieldWidth::Full,
+                true,
+            )],
+            role_configs: vec![],
+            expected_updated_at_micros: None,
+            replace_missing_fields: false,
+        },
+    )?;
+
+    let config = ctx
+        .db
+        .form_config()
+        .iter()
+        .find(|c| {
+            c.organization_id == org_id && c.module_id == "crm" && c.form_id == "new-lead"
+        })
+        .ok_or("published form_config missing")?;
+
+    add_form_field(
+        ctx,
+        org_id,
+        config.id,
+        text_field(
+            "custom:region_code",
+            "Region",
+            10,
+            false,
+            FieldValidation {
+                required: true,
+                min_length: Some(2),
+                ..FieldValidation::default()
+            },
+            FieldWidth::Half,
+            false,
+        ),
+    )?;
+
+    if set_eav(ctx, org_id, company_id, "custom:unknown", "\"x\"").is_ok() {
+        return Err("unknown custom field should be rejected".to_string());
+    }
+    if set_eav(ctx, org_id, company_id, "custom:region_code", "\"\"").is_ok() {
+        return Err("required custom field empty value should be rejected".to_string());
+    }
+
+    set_eav(ctx, org_id, company_id, "custom:region_code", "\"APAC\"")?;
+
+    let row = ctx
+        .db
+        .record_custom_field_value()
+        .iter()
+        .find(|r| {
+            r.organization_id == org_id
+                && r.company_id == company_id
+                && r.model == "lead"
+                && r.record_id == 42
+                && r.field_key == "custom:region_code"
+        })
+        .ok_or("EAV row missing after upsert")?;
+    if row.value_json != "\"APAC\"" {
+        return Err(format!("unexpected value_json {}", row.value_json));
+    }
+
+    Ok(())
+}

@@ -39,6 +39,7 @@ export default __t.row({
     return FieldWidth;
   },
   sectionId: __t.string().name("section_id"),
+  visibilityJson: __t.string().name("visibility_json"),
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
 });

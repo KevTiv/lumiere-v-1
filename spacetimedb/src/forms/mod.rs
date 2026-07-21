@@ -7,6 +7,7 @@
 //!
 //! - `FormConfig`: Base configuration for a form (one per organization per form type)
 //! - `FormConfigField`: Individual fields within a form configuration
+//! - `FormFieldLabel`: Localized label overrides for form fields
 //! - `FormRoleConfig`: Role-based field visibility and requirements
 //! - `UserCustomField`: User-specific custom fields extending base forms
 //!
@@ -17,9 +18,15 @@
 
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::journal_entries::account_move;
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::types::AccountMoveState;
 
 pub mod migrations;
+
+/// Max custom-field entries accepted in one EAV upsert (bounds WASM work).
+const MAX_CUSTOM_FIELD_ENTRIES: usize = 64;
 
 // ═════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -127,6 +134,8 @@ pub struct CreateFormFieldParams {
     pub show_in_list: bool,
     pub width: FieldWidth,
     pub section_id: Option<String>,
+    /// Role/condition visibility rules as JSON (empty or `"{}"` when unset).
+    pub visibility_json: Option<String>,
 }
 
 /// Parameters for updating a form field
@@ -143,6 +152,17 @@ pub struct UpdateFormFieldParams {
     pub is_enabled: Option<bool>,
     pub show_in_list: Option<bool>,
     pub width: Option<FieldWidth>,
+    /// Role/condition visibility rules as JSON.
+    pub visibility_json: Option<String>,
+    /// Optimistic concurrency — when set, must match `form_config_field.updated_at` micros.
+    pub expected_updated_at_micros: Option<i64>,
+}
+
+/// Parameters for upserting a localized field label
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct SetFormFieldLabelParams {
+    pub locale: String,
+    pub label: String,
 }
 
 /// Parameters for creating role configuration
@@ -186,6 +206,22 @@ pub struct CreateUserCustomFieldParams {
     pub width: FieldWidth,
 }
 
+/// Atomic publish of a form configuration (config + fields + roles) in one transaction.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct PublishFormConfigurationParams {
+    pub module_id: String,
+    pub form_id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub is_system_default: bool,
+    pub fields: Vec<CreateFormFieldParams>,
+    pub role_configs: Vec<CreateRoleConfigParams>,
+    /// When the form already exists, must match `form_config.updated_at` micros (CAS).
+    pub expected_updated_at_micros: Option<i64>,
+    /// When true, delete non-system fields whose ids are not in `fields`.
+    pub replace_missing_fields: bool,
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // TABLES
 // ═════════════════════════════════════════════════════════════════════════════
@@ -203,6 +239,8 @@ pub struct FormConfig {
     pub description: String,
     pub is_active: bool,
     pub is_system_default: bool,
+    /// Monotonic version bumped on publish / config-row updates.
+    pub config_version: u32,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
     pub created_by: Identity,
@@ -234,7 +272,22 @@ pub struct FormConfigField {
     pub show_in_list: bool,
     pub width: FieldWidth,
     pub section_id: String,
+    /// Role/condition visibility rules as JSON (empty string or `"{}"` default).
+    pub visibility_json: String,
     pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
+/// Localized label override for a form config field row
+#[spacetimedb::table(public, accessor = form_field_label)]
+pub struct FormFieldLabel {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    #[index(btree)]
+    pub field_row_id: u64, // form_config_field.id
+    pub locale: String,    // e.g. "en", "pt-BR"
+    pub label: String,
     pub updated_at: Timestamp,
 }
 
@@ -302,6 +355,273 @@ pub struct UserCustomField {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// HELPERS — EAV validation / posted guards / def resolution
+// ═════════════════════════════════════════════════════════════════════════════
+
+fn timestamp_micros(ts: Timestamp) -> i64 {
+    ts.to_micros_since_unix_epoch()
+}
+
+fn ensure_expected_updated_at(
+    actual: Timestamp,
+    expected_micros: Option<i64>,
+    label: &str,
+) -> Result<(), String> {
+    let Some(expected) = expected_micros else {
+        return Ok(());
+    };
+    let actual_micros = timestamp_micros(actual);
+    if actual_micros != expected {
+        return Err(format!(
+            "{label} was modified concurrently (expected updated_at {expected}, got {actual_micros})"
+        ));
+    }
+    Ok(())
+}
+
+fn parse_validation_json(raw: &str) -> FieldValidation {
+    serde_json::from_str(raw).unwrap_or_default()
+}
+
+fn looks_like_email(s: &str) -> bool {
+    s.contains('@') && s.contains('.')
+}
+
+fn resolve_enabled_custom_field_def(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    field_key: &str,
+) -> Result<(FieldType, FieldValidation), String> {
+    for field in ctx.db.form_config_field().iter() {
+        if field.field_id != field_key || !field.is_enabled {
+            continue;
+        }
+        let Some(config) = ctx.db.form_config().id().find(&field.configuration_id) else {
+            continue;
+        };
+        if config.organization_id != organization_id || !config.is_active {
+            continue;
+        }
+        return Ok((
+            field.field_type.clone(),
+            parse_validation_json(&field.validation_json),
+        ));
+    }
+
+    for ucf in ctx.db.user_custom_field().iter() {
+        if ucf.organization_id != organization_id
+            || ucf.user_id != ctx.sender()
+            || ucf.field_id != field_key
+        {
+            continue;
+        }
+        let parsed: serde_json::Value =
+            serde_json::from_str(&ucf.field_data_json).unwrap_or(serde_json::Value::Null);
+        let field_type = parsed
+            .get("type")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or(FieldType::Text);
+        let validation = parsed
+            .get("validation")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default();
+        return Ok((field_type, validation));
+    }
+
+    Err(format!(
+        "unknown or disabled custom field '{}': define it on the form configuration first",
+        field_key
+    ))
+}
+
+fn validate_custom_field_value(
+    field_key: &str,
+    field_type: &FieldType,
+    validation: &FieldValidation,
+    value_json: &str,
+) -> Result<(), String> {
+    let value: serde_json::Value = serde_json::from_str(value_json)
+        .map_err(|e| format!("invalid JSON for {field_key}: {e}"))?;
+
+    let is_empty = match &value {
+        serde_json::Value::Null => true,
+        serde_json::Value::String(s) => s.trim().is_empty(),
+        serde_json::Value::Array(a) => a.is_empty(),
+        _ => false,
+    };
+
+    if validation.required && is_empty {
+        return Err(validation
+            .message
+            .clone()
+            .unwrap_or_else(|| format!("{field_key} is required")));
+    }
+    if is_empty {
+        return Ok(());
+    }
+
+    if let Some(s) = value.as_str() {
+        let len = s.chars().count() as u32;
+        if let Some(min_length) = validation.min_length {
+            if len < min_length {
+                return Err(format!(
+                    "{field_key} must be at least {min_length} characters"
+                ));
+            }
+        }
+        if let Some(max_length) = validation.max_length {
+            if len > max_length {
+                return Err(format!(
+                    "{field_key} must be at most {max_length} characters"
+                ));
+            }
+        }
+        // No regex crate in WASM — lightweight FieldType / pattern checks only.
+        let needs_email = matches!(field_type, FieldType::Email)
+            || validation.pattern.as_deref() == Some("email");
+        if needs_email && !looks_like_email(s) {
+            return Err(if matches!(field_type, FieldType::Email) {
+                format!("{field_key} must be a valid email")
+            } else {
+                format!("{field_key} must match email pattern")
+            });
+        }
+    }
+
+    if let Some(n) = value
+        .as_f64()
+        .or_else(|| value.as_i64().map(|n| n as f64))
+        .or_else(|| value.as_u64().map(|n| n as f64))
+    {
+        if let Some(min) = validation.min {
+            if n < min {
+                return Err(format!("{field_key} must be >= {min}"));
+            }
+        }
+        if let Some(max) = validation.max {
+            if n > max {
+                return Err(format!("{field_key} must be <= {max}"));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn ensure_record_allows_custom_field_writes(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    model: &str,
+    record_id: u64,
+) -> Result<(), String> {
+    if model != "account_move" {
+        return Ok(());
+    }
+
+    let mv = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&record_id)
+        .ok_or_else(|| format!("account_move {record_id} not found"))?;
+    if mv.organization_id != organization_id {
+        return Err("Record does not belong to this organization".to_string());
+    }
+    if mv.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+    if mv.state == AccountMoveState::Posted || mv.posted_before {
+        return Err("cannot change custom fields on a posted accounting document".to_string());
+    }
+    Ok(())
+}
+
+fn form_field_json_payload(params: &CreateFormFieldParams) -> (String, String, String) {
+    (
+        serde_json::to_string(&params.options).unwrap_or_default(),
+        serde_json::to_string(&params.validation).unwrap_or_default(),
+        serde_json::to_string(&params.ai_suggestions).unwrap_or_default(),
+    )
+}
+
+fn insert_or_update_form_field_row(
+    ctx: &ReducerContext,
+    configuration_id: u64,
+    params: &CreateFormFieldParams,
+) -> Result<(), String> {
+    let existing = ctx
+        .db
+        .form_config_field()
+        .iter()
+        .find(|f| f.configuration_id == configuration_id && f.field_id == params.field_id);
+
+    let (options_json, validation_json, ai_suggestions_json) = form_field_json_payload(params);
+    let description = params.description.clone().unwrap_or_default();
+    let placeholder = params.placeholder.clone().unwrap_or_default();
+    let default_value = params.default_value.clone().unwrap_or_default();
+    let category = params.category.clone().unwrap_or_default();
+    let section_id = params.section_id.clone().unwrap_or_default();
+
+    match existing {
+        Some(field) => {
+            let visibility_json = params
+                .visibility_json
+                .clone()
+                .unwrap_or_else(|| field.visibility_json.clone());
+            ctx.db.form_config_field().id().update(FormConfigField {
+                name: params.name.clone(),
+                label: params.label.clone(),
+                field_type: params.field_type.clone(),
+                description,
+                placeholder,
+                default_value,
+                options_json,
+                validation_json,
+                ai_suggestions_json,
+                order: params.order,
+                is_system: params.is_system,
+                is_enabled: params.is_enabled,
+                category,
+                show_in_list: params.show_in_list,
+                width: params.width.clone(),
+                section_id,
+                visibility_json,
+                updated_at: ctx.timestamp,
+                ..field
+            });
+        }
+        None => {
+            ctx.db.form_config_field().insert(FormConfigField {
+                id: 0,
+                configuration_id,
+                field_id: params.field_id.clone(),
+                name: params.name.clone(),
+                label: params.label.clone(),
+                field_type: params.field_type.clone(),
+                description,
+                placeholder,
+                default_value,
+                options_json,
+                validation_json,
+                ai_suggestions_json,
+                order: params.order,
+                is_system: params.is_system,
+                is_enabled: params.is_enabled,
+                category,
+                show_in_list: params.show_in_list,
+                width: params.width.clone(),
+                section_id,
+                visibility_json: params.visibility_json.clone().unwrap_or_default(),
+                created_at: ctx.timestamp,
+                updated_at: ctx.timestamp,
+            });
+        }
+    }
+    Ok(())
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // REDUCERS — Form Configuration Management
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -342,6 +662,7 @@ pub fn create_form_configuration(
         description: params.description.unwrap_or_default(),
         is_active: true,
         is_system_default: params.is_system_default,
+        config_version: 1,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         created_by: ctx.sender(),
@@ -430,6 +751,7 @@ pub fn add_form_field(
         show_in_list: params.show_in_list,
         width: params.width,
         section_id: params.section_id.unwrap_or_default(),
+        visibility_json: params.visibility_json.unwrap_or_default(),
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
     };
@@ -491,6 +813,12 @@ pub fn update_form_field(
         return Err("Configuration does not belong to organization".to_string());
     }
 
+    ensure_expected_updated_at(
+        field.updated_at,
+        params.expected_updated_at_micros,
+        "form field",
+    )?;
+
     let updated = FormConfigField {
         label: params.label.unwrap_or(field.label),
         description: params.description.unwrap_or(field.description),
@@ -512,6 +840,7 @@ pub fn update_form_field(
         is_enabled: params.is_enabled.unwrap_or(field.is_enabled),
         show_in_list: params.show_in_list.unwrap_or(field.show_in_list),
         width: params.width.unwrap_or(field.width),
+        visibility_json: params.visibility_json.unwrap_or(field.visibility_json),
         updated_at: ctx.timestamp,
         ..field
     };
@@ -576,6 +905,17 @@ pub fn delete_form_field(
         return Err("Configuration does not belong to organization".to_string());
     }
 
+    let label_ids: Vec<_> = ctx
+        .db
+        .form_field_label()
+        .iter()
+        .filter(|l| l.field_row_id == field.id)
+        .map(|l| l.id)
+        .collect();
+    for label_id in label_ids {
+        ctx.db.form_field_label().id().delete(&label_id);
+    }
+
     ctx.db.form_config_field().id().delete(&field.id);
 
     // Update configuration timestamp
@@ -613,7 +953,6 @@ pub fn set_form_role_config(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "form_configuration", "update")?;
 
-    // Verify configuration exists and belongs to organization
     let config = ctx
         .db
         .form_config()
@@ -625,43 +964,8 @@ pub fn set_form_role_config(
         return Err("Configuration does not belong to organization".to_string());
     }
 
-    // Check if role config already exists
-    let existing = ctx
-        .db
-        .form_role_config()
-        .iter()
-        .find(|r| r.configuration_id == configuration_id && r.role_id == params.role_id);
+    upsert_form_role_config_row(ctx, configuration_id, &params);
 
-    if let Some(existing_config) = existing {
-        // Update existing
-        ctx.db.form_role_config().id().update(FormRoleConfig {
-            enabled_fields_json: serde_json::to_string(&params.enabled_fields).unwrap_or_default(),
-            required_fields_json: serde_json::to_string(&params.required_fields)
-                .unwrap_or_default(),
-            default_prompts_json: serde_json::to_string(&params.default_prompts)
-                .unwrap_or_default(),
-            updated_at: ctx.timestamp,
-            ..existing_config
-        });
-    } else {
-        // Create new
-        let role_config = FormRoleConfig {
-            id: 0,
-            configuration_id,
-            role_id: params.role_id.clone(),
-            enabled_fields_json: serde_json::to_string(&params.enabled_fields).unwrap_or_default(),
-            required_fields_json: serde_json::to_string(&params.required_fields)
-                .unwrap_or_default(),
-            default_prompts_json: serde_json::to_string(&params.default_prompts)
-                .unwrap_or_default(),
-            is_active: true,
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
-        };
-        ctx.db.form_role_config().insert(role_config);
-    }
-
-    // Update configuration timestamp
     ctx.db.form_config().id().update(FormConfig {
         updated_at: ctx.timestamp,
         updated_by: ctx.sender(),
@@ -680,6 +984,90 @@ pub fn set_form_role_config(
             new_values: None,
             changed_fields: vec![],
             metadata: Some(format!("Set role config for: {}", params.role_id)),
+        },
+    );
+
+    Ok(())
+}
+
+/// Upsert a localized label for a form config field row
+#[spacetimedb::reducer]
+pub fn set_form_field_label(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    field_row_id: u64,
+    params: SetFormFieldLabelParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "form_configuration", "update")?;
+
+    if params.locale.trim().is_empty() {
+        return Err("locale is required".to_string());
+    }
+
+    let field = ctx
+        .db
+        .form_config_field()
+        .id()
+        .find(&field_row_id)
+        .ok_or("Field not found")?;
+
+    let config = ctx
+        .db
+        .form_config()
+        .id()
+        .find(&field.configuration_id)
+        .ok_or("Configuration not found")?;
+
+    if config.organization_id != organization_id {
+        return Err("Field does not belong to organization".to_string());
+    }
+
+    let existing = ctx
+        .db
+        .form_field_label()
+        .iter()
+        .find(|l| l.field_row_id == field_row_id && l.locale == params.locale);
+
+    let record_id = if let Some(row) = existing {
+        let id = row.id;
+        ctx.db.form_field_label().id().update(FormFieldLabel {
+            label: params.label.clone(),
+            updated_at: ctx.timestamp,
+            ..row
+        });
+        id
+    } else {
+        ctx.db
+            .form_field_label()
+            .insert(FormFieldLabel {
+                id: 0,
+                field_row_id,
+                locale: params.locale.clone(),
+                label: params.label.clone(),
+                updated_at: ctx.timestamp,
+            })
+            .id
+    };
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "form_field_label",
+            record_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "field_row_id": field_row_id,
+                    "locale": params.locale,
+                    "label": params.label,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["label".to_string()],
+            metadata: None,
         },
     );
 
@@ -820,6 +1208,7 @@ pub fn delete_user_custom_field(
 }
 
 /// Upsert custom field values on a business record (keys must start with `custom:`).
+/// Validates against enabled field definitions; blocks writes on posted `account_move` rows.
 #[spacetimedb::reducer]
 pub fn set_record_custom_field_values(
     ctx: &ReducerContext,
@@ -828,6 +1217,7 @@ pub fn set_record_custom_field_values(
     params: SetRecordCustomFieldValuesParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, &params.model, "write")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     if params.model.trim().is_empty() {
         return Err("model is required".to_string());
@@ -835,6 +1225,19 @@ pub fn set_record_custom_field_values(
     if params.record_id == 0 {
         return Err("record_id is required".to_string());
     }
+    if params.entries.len() > MAX_CUSTOM_FIELD_ENTRIES {
+        return Err(format!(
+            "too many custom field entries (max {MAX_CUSTOM_FIELD_ENTRIES})"
+        ));
+    }
+
+    ensure_record_allows_custom_field_writes(
+        ctx,
+        organization_id,
+        company_id,
+        &params.model,
+        params.record_id,
+    )?;
 
     for entry in &params.entries {
         if !entry.field_key.starts_with("custom:") {
@@ -843,6 +1246,14 @@ pub fn set_record_custom_field_values(
                 entry.field_key
             ));
         }
+        let (field_type, validation) =
+            resolve_enabled_custom_field_def(ctx, organization_id, &entry.field_key)?;
+        validate_custom_field_value(
+            &entry.field_key,
+            &field_type,
+            &validation,
+            &entry.value_json,
+        )?;
     }
 
     let existing_for_record: Vec<_> = ctx
@@ -861,39 +1272,61 @@ pub fn set_record_custom_field_values(
     let model = params.model.clone();
     let record_id = params.record_id;
     let mut last_id = 0u64;
+    let mut old_snapshot = serde_json::Map::new();
+    let mut new_snapshot = serde_json::Map::new();
+
     for entry in &params.entries {
-        if let Some(row) = existing_for_record
+        new_snapshot.insert(
+            entry.field_key.clone(),
+            serde_json::Value::String(entry.value_json.clone()),
+        );
+
+        if let Some(existing_row) = existing_for_record
             .iter()
             .find(|r| r.field_key == entry.field_key)
         {
-            ctx.db.record_custom_field_value().id().update(RecordCustomFieldValue {
-                id: row.id,
-                organization_id: row.organization_id,
-                company_id: row.company_id,
-                model: row.model.clone(),
-                record_id: row.record_id,
-                field_key: row.field_key.clone(),
-                value_json: entry.value_json.clone(),
-                create_uid: row.create_uid,
-                write_uid: Some(ctx.sender()),
-                create_date: row.create_date,
-                write_date: Some(ctx.timestamp),
-            });
-            last_id = row.id;
+            old_snapshot.insert(
+                entry.field_key.clone(),
+                serde_json::Value::String(existing_row.value_json.clone()),
+            );
+            last_id = existing_row.id;
+            let row = ctx
+                .db
+                .record_custom_field_value()
+                .id()
+                .find(&existing_row.id)
+                .ok_or_else(|| {
+                    format!(
+                        "record_custom_field_value {} vanished during update",
+                        existing_row.id
+                    )
+                })?;
+            ctx.db
+                .record_custom_field_value()
+                .id()
+                .update(RecordCustomFieldValue {
+                    value_json: entry.value_json.clone(),
+                    write_uid: Some(ctx.sender()),
+                    write_date: Some(ctx.timestamp),
+                    ..row
+                });
         } else {
-            let inserted = ctx.db.record_custom_field_value().insert(RecordCustomFieldValue {
-                id: 0,
-                organization_id,
-                company_id,
-                model: model.clone(),
-                record_id,
-                field_key: entry.field_key.clone(),
-                value_json: entry.value_json.clone(),
-                create_uid: Some(ctx.sender()),
-                write_uid: Some(ctx.sender()),
-                create_date: Some(ctx.timestamp),
-                write_date: Some(ctx.timestamp),
-            });
+            let inserted = ctx
+                .db
+                .record_custom_field_value()
+                .insert(RecordCustomFieldValue {
+                    id: 0,
+                    organization_id,
+                    company_id,
+                    model: model.clone(),
+                    record_id,
+                    field_key: entry.field_key.clone(),
+                    value_json: entry.value_json.clone(),
+                    create_uid: Some(ctx.sender()),
+                    write_uid: Some(ctx.sender()),
+                    create_date: Some(ctx.timestamp),
+                    write_date: Some(ctx.timestamp),
+                });
             last_id = inserted.id;
         }
     }
@@ -906,12 +1339,12 @@ pub fn set_record_custom_field_values(
             table_name: "record_custom_field_value",
             record_id: last_id,
             action: "UPDATE",
-            old_values: None,
+            old_values: Some(serde_json::Value::Object(old_snapshot).to_string()),
             new_values: Some(
                 serde_json::json!({
                     "model": model,
                     "record_id": record_id,
-                    "field_count": changed_keys.len(),
+                    "values": serde_json::Value::Object(new_snapshot),
                 })
                 .to_string(),
             ),
@@ -933,6 +1366,14 @@ pub fn delete_record_custom_field_values(
     record_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, &model, "write")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    ensure_record_allows_custom_field_writes(
+        ctx,
+        organization_id,
+        company_id,
+        &model,
+        record_id,
+    )?;
 
     let rows: Vec<_> = ctx
         .db
@@ -946,7 +1387,7 @@ pub fn delete_record_custom_field_values(
         })
         .collect();
 
-    for row in rows {
+    for row in &rows {
         ctx.db.record_custom_field_value().id().delete(&row.id);
     }
 
@@ -958,10 +1399,205 @@ pub fn delete_record_custom_field_values(
             table_name: "record_custom_field_value",
             record_id,
             action: "DELETE",
-            old_values: None,
+            old_values: Some(
+                serde_json::json!({
+                    "model": model,
+                    "cleared_count": rows.len(),
+                })
+                .to_string(),
+            ),
             new_values: None,
             changed_fields: vec![],
             metadata: Some(format!("Cleared custom fields for {}:{}", model, record_id)),
+        },
+    );
+
+    Ok(())
+}
+
+fn upsert_form_role_config_row(
+    ctx: &ReducerContext,
+    configuration_id: u64,
+    params: &CreateRoleConfigParams,
+) {
+    let enabled_fields_json = serde_json::to_string(&params.enabled_fields).unwrap_or_default();
+    let required_fields_json = serde_json::to_string(&params.required_fields).unwrap_or_default();
+    let default_prompts_json = serde_json::to_string(&params.default_prompts).unwrap_or_default();
+
+    let existing = ctx
+        .db
+        .form_role_config()
+        .iter()
+        .find(|r| r.configuration_id == configuration_id && r.role_id == params.role_id);
+
+    if let Some(existing_config) = existing {
+        ctx.db.form_role_config().id().update(FormRoleConfig {
+            enabled_fields_json,
+            required_fields_json,
+            default_prompts_json,
+            updated_at: ctx.timestamp,
+            ..existing_config
+        });
+    } else {
+        ctx.db.form_role_config().insert(FormRoleConfig {
+            id: 0,
+            configuration_id,
+            role_id: params.role_id.clone(),
+            enabled_fields_json,
+            required_fields_json,
+            default_prompts_json,
+            is_active: true,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+        });
+    }
+}
+
+/// Publish a full form configuration (identity + fields + roles) in one transaction.
+#[spacetimedb::reducer]
+pub fn publish_form_configuration(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: PublishFormConfigurationParams,
+) -> Result<(), String> {
+    if params.module_id.trim().is_empty() || params.form_id.trim().is_empty() {
+        return Err("module_id and form_id are required".to_string());
+    }
+    if params.name.trim().is_empty() {
+        return Err("name is required".to_string());
+    }
+
+    let existing = ctx.db.form_config().iter().find(|c| {
+        c.organization_id == organization_id
+            && c.module_id == params.module_id
+            && c.form_id == params.form_id
+    });
+
+    let permission_action = if existing.is_some() {
+        "update"
+    } else {
+        "create"
+    };
+    check_permission(ctx, organization_id, "form_configuration", permission_action)?;
+
+    let configuration_id = match existing {
+        Some(config) => {
+            ensure_expected_updated_at(
+                config.updated_at,
+                params.expected_updated_at_micros,
+                "form configuration",
+            )?;
+            let id = config.id;
+            ctx.db.form_config().id().update(FormConfig {
+                name: params.name.clone(),
+                description: params.description.clone().unwrap_or_default(),
+                is_system_default: params.is_system_default,
+                is_active: true,
+                config_version: config.config_version.saturating_add(1),
+                updated_at: ctx.timestamp,
+                updated_by: ctx.sender(),
+                ..config
+            });
+            id
+        }
+        None => {
+            if params.expected_updated_at_micros.is_some() {
+                return Err(
+                    "form configuration does not exist yet; omit expected_updated_at_micros"
+                        .to_string(),
+                );
+            }
+            ctx.db
+                .form_config()
+                .insert(FormConfig {
+                    id: 0,
+                    organization_id,
+                    module_id: params.module_id.clone(),
+                    form_id: params.form_id.clone(),
+                    name: params.name.clone(),
+                    description: params.description.clone().unwrap_or_default(),
+                    is_active: true,
+                    is_system_default: params.is_system_default,
+                    config_version: 1,
+                    created_at: ctx.timestamp,
+                    updated_at: ctx.timestamp,
+                    created_by: ctx.sender(),
+                    updated_by: ctx.sender(),
+                })
+                .id
+        }
+    };
+
+    let published_ids: std::collections::HashSet<&str> =
+        params.fields.iter().map(|f| f.field_id.as_str()).collect();
+
+    for field in &params.fields {
+        insert_or_update_form_field_row(ctx, configuration_id, field)?;
+    }
+
+    if params.replace_missing_fields {
+        let to_delete: Vec<_> = ctx
+            .db
+            .form_config_field()
+            .iter()
+            .filter(|f| {
+                f.configuration_id == configuration_id
+                    && !f.is_system
+                    && !published_ids.contains(f.field_id.as_str())
+            })
+            .map(|f| f.id)
+            .collect();
+        for id in to_delete {
+            let label_ids: Vec<_> = ctx
+                .db
+                .form_field_label()
+                .iter()
+                .filter(|l| l.field_row_id == id)
+                .map(|l| l.id)
+                .collect();
+            for label_id in label_ids {
+                ctx.db.form_field_label().id().delete(&label_id);
+            }
+            ctx.db.form_config_field().id().delete(&id);
+        }
+    }
+
+    for role in &params.role_configs {
+        upsert_form_role_config_row(ctx, configuration_id, role);
+    }
+
+    if let Some(config) = ctx.db.form_config().id().find(&configuration_id) {
+        ctx.db.form_config().id().update(FormConfig {
+            updated_at: ctx.timestamp,
+            updated_by: ctx.sender(),
+            ..config
+        });
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "form_config",
+            record_id: configuration_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "module_id": params.module_id,
+                    "form_id": params.form_id,
+                    "field_count": params.fields.len(),
+                    "role_count": params.role_configs.len(),
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "fields".to_string(),
+                "role_configs".to_string(),
+                "name".to_string(),
+            ],
+            metadata: Some("publish_form_configuration".to_string()),
         },
     );
 
@@ -1084,6 +1720,7 @@ fn init_journal_form_config(ctx: &ReducerContext, organization_id: u64) -> Resul
         description: "Daily work journal for tracking progress and reflections".to_string(),
         is_active: true,
         is_system_default: true,
+        config_version: 1,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         created_by: ctx.sender(),
@@ -1163,6 +1800,7 @@ fn init_journal_form_config(ctx: &ReducerContext, organization_id: u64) -> Resul
             show_in_list: false,
             width: FieldWidth::Full,
             section_id: String::new(),
+            visibility_json: String::new(),
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
         };
@@ -1249,6 +1887,7 @@ fn init_forensic_form_config(ctx: &ReducerContext, organization_id: u64) -> Resu
         description: "Forensic incident report for tracking and analyzing issues".to_string(),
         is_active: true,
         is_system_default: true,
+        config_version: 1,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         created_by: ctx.sender(),
@@ -1350,6 +1989,7 @@ fn init_forensic_form_config(ctx: &ReducerContext, organization_id: u64) -> Resu
                 FieldWidth::Half
             },
             section_id: String::new(),
+            visibility_json: String::new(),
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
         };

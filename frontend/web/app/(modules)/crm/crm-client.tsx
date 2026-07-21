@@ -2058,6 +2058,10 @@ function CrmClientLoaded({
         dashboardTimeRange={dashboardTimeRange}
         onDashboardTimeRangeChange={setDashboardTimeRange}
         urlFilters={urlFilters}
+        runtimeForms={{
+          organizationId,
+          roleId: runtimeRoleId,
+        }}
       />
       <RuntimeFormModal
         open={quickActionForm !== null}
@@ -2066,6 +2070,7 @@ function CrmClientLoaded({
         moduleId="crm"
         organizationId={organizationId}
         roleId={runtimeRoleId}
+        preferStdbVisibility
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {
@@ -2082,6 +2087,7 @@ function CrmClientLoaded({
         moduleId="crm"
         organizationId={organizationId}
         roleId={runtimeRoleId}
+        preferStdbVisibility
         isPending={isFormMutationPending}
         onSubmit={(formData) => {
           return handleWorkflowSubmit(formData)

@@ -190,6 +190,7 @@ fn seed_journal_form(ctx: &ReducerContext, organization_id: u64) -> Result<(), S
             show_in_list: field_id == "tags",
             width: FieldWidth::Full,
             section_id: None,
+            visibility_json: None,
         };
 
         add_form_field(ctx, organization_id, config.id, field_params)?;

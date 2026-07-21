@@ -157,6 +157,57 @@ function rowBoolOrDefault(
   return defaultValue
 }
 
+/** Prefer exact locale, then language-only (e.g. `en` for `en-US`). */
+function buildLocalizedLabelMap(
+  labelRows: Record<string, unknown>[],
+  locale: string,
+): Map<number, string> {
+  const language = locale.split("-")[0]
+  const byFieldRowId = new Map<number, string>()
+  for (const row of labelRows) {
+    const fieldRowId = rowNum(row, "fieldRowId", "field_row_id")
+    const rowLocale = rowStr(row, "locale", "locale")
+    if (rowLocale !== locale && rowLocale !== language) continue
+    const label = rowStr(row, "label", "label")
+    if (!label) continue
+    if (rowLocale === locale || !byFieldRowId.has(fieldRowId)) {
+      byFieldRowId.set(fieldRowId, label)
+    }
+  }
+  return byFieldRowId
+}
+
+function parseUserCustomFieldRow(cf: UserCustomField): ParsedFormField {
+  const data = JSON.parse(cf.fieldDataJson) as Record<string, unknown>
+  return parseFormField({
+    id: cf.id,
+    configurationId: cf.configurationId,
+    fieldId: String(data.fieldId ?? ""),
+    name: String(data.name ?? ""),
+    label: String(data.label ?? ""),
+    fieldType: (data.type as FieldType) ?? "Text",
+    description: String(data.description ?? ""),
+    placeholder: String(data.placeholder ?? ""),
+    defaultValue:
+      typeof data.defaultValue === "string"
+        ? data.defaultValue
+        : JSON.stringify(data.defaultValue ?? ""),
+    optionsJson: JSON.stringify(data.options || []),
+    validationJson: JSON.stringify(data.validation || { required: false }),
+    aiSuggestionsJson: JSON.stringify(data.aiSuggestions || []),
+    order: Number(data.order ?? 0),
+    isSystem: false,
+    isEnabled: true,
+    category: "",
+    showInList: false,
+    width: (data.width as FieldWidth) || "Full",
+    sectionId: String(data.sectionId ?? ""),
+    visibilityJson: String(data.visibilityJson ?? ""),
+    createdAt: cf.createdAt,
+    updatedAt: cf.updatedAt,
+  } as FormConfigField)
+}
+
 function mapStdbFormConfigRow(row: {
   id: bigint
   organizationId: bigint
@@ -209,6 +260,7 @@ function mapStdbFormConfigFieldRow(row: {
   showInList: boolean
   width: unknown
   sectionId: string
+  visibilityJson: string
   createdAt: unknown
   updatedAt: unknown
 }): FormConfigField {
@@ -232,6 +284,7 @@ function mapStdbFormConfigFieldRow(row: {
     showInList: row.showInList,
     width: enumTag(row.width) as FieldWidth,
     sectionId: row.sectionId,
+    visibilityJson: row.visibilityJson ?? "",
     createdAt: ts(row.createdAt),
     updatedAt: ts(row.updatedAt),
   }
@@ -324,6 +377,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
     forAdminSettings = false,
   } = options
   const { identity } = useErpSession()
+  const { i18n } = useTranslation()
   const [state, dispatch] = useReducer(formConfigReducer, initialState)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -373,6 +427,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
           showInList: field.showInList,
           width: field.width,
           sectionId: field.sectionId || "",
+          visibilityJson: field.visibilityJson || "",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }))
@@ -414,11 +469,12 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
     let cancelled = false
     ;(async () => {
       try {
-        const [configRows, fieldRows, roleRows, allCustomRows] = await Promise.all([
+        const [configRows, fieldRows, roleRows, allCustomRows, labelRows] = await Promise.all([
           stdbBrowserQuery("form-configs"),
           stdbBrowserQuery("form-config-fields"),
           stdbBrowserQuery("form-role-configs"),
           stdbBrowserQuery("user-custom-fields"),
+          stdbBrowserQuery("form-field-labels").catch(() => [] as Record<string, unknown>[]),
         ])
         if (cancelled) return
 
@@ -439,11 +495,15 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
         const cfg = configs[0] as Record<string, unknown>
         const configurationId = Number(cfg.id)
 
+        const locale = (i18n.language || "en").replace("_", "-")
+        const labelByFieldRowId = buildLocalizedLabelMap(labelRows, locale)
+
         const fields = fieldRows
           .filter(f => rowNum(f, "configurationId", "configuration_id") === configurationId)
-          .map(f =>
-            mapStdbFormConfigFieldRow({
-              id: n64(f.id),
+          .map(f => {
+            const id = n64(f.id)
+            const mapped = mapStdbFormConfigFieldRow({
+              id,
               configurationId: n64(f.configurationId ?? f.configuration_id),
               fieldId: rowStr(f, "fieldId", "field_id"),
               name: rowStr(f, "name", "name"),
@@ -462,10 +522,13 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
               showInList: rowBool(f, "showInList", "show_in_list"),
               width: f.width,
               sectionId: rowStr(f, "sectionId", "section_id"),
+              visibilityJson: rowStr(f, "visibilityJson", "visibility_json"),
               createdAt: f.createdAt ?? f.create_date,
               updatedAt: f.updatedAt ?? f.write_date,
-            }),
-          )
+            })
+            const localized = labelByFieldRowId.get(Number(id))
+            return localized ? { ...mapped, label: localized } : mapped
+          })
 
         const roleConfigs = roleRows
           .filter(r => rowNum(r, "configurationId", "configuration_id") === configurationId)
@@ -551,6 +614,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
     refreshKey,
     userId,
     identity,
+    i18n.language,
   ])
 
   const mergedConfig = useMemo<MergedFormConfiguration | null>(() => {
@@ -559,32 +623,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
     const parsedFields = state.fields.map(parseFormField)
     const parsedRoleConfig = roleId ? state.roleConfigs.find(rc => rc.roleId === roleId) : undefined
 
-    const parsedCustomFields = state.customFields.map(cf => {
-      const data = JSON.parse(cf.fieldDataJson) as Record<string, unknown>
-      return parseFormField({
-        id: cf.id,
-        configurationId: cf.configurationId,
-        fieldId: String(data.fieldId ?? ""),
-        name: String(data.name ?? ""),
-        label: String(data.label ?? ""),
-        fieldType: (data.type as FieldType) ?? "Text",
-        description: String(data.description ?? ""),
-        placeholder: String(data.placeholder ?? ""),
-        defaultValue: typeof data.defaultValue === "string" ? data.defaultValue : JSON.stringify(data.defaultValue ?? ""),
-        optionsJson: JSON.stringify(data.options || []),
-        validationJson: JSON.stringify(data.validation || { required: false }),
-        aiSuggestionsJson: JSON.stringify(data.aiSuggestions || []),
-        order: Number(data.order ?? 0),
-        isSystem: false,
-        isEnabled: true,
-        category: "",
-        showInList: false,
-        width: (data.width as FieldWidth) || "Full",
-        sectionId: String(data.sectionId ?? ""),
-        createdAt: cf.createdAt,
-        updatedAt: cf.updatedAt,
-      } as FormConfigField)
-    })
+    const parsedCustomFields = state.customFields.map(parseUserCustomFieldRow)
 
     let roleFields: ParsedFormField[]
     if (forAdminSettings) {
@@ -601,6 +640,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
     return {
       config: state.config,
       fields: allFields,
+      sourceFields: parsedFields,
       roleConfig: parsedRoleConfig ? parseRoleConfig(parsedRoleConfig) : undefined,
       customFields: parsedCustomFields,
     }
@@ -753,33 +793,7 @@ export function useUserCustomFields(
               updatedAt: cf.updatedAt,
             }),
           )
-          .map(cf => {
-            const data = JSON.parse(cf.fieldDataJson) as Record<string, unknown>
-            return parseFormField({
-              id: cf.id,
-              configurationId: cf.configurationId,
-              fieldId: String(data.fieldId ?? ""),
-              name: String(data.name ?? ""),
-              label: String(data.label ?? ""),
-              fieldType: (data.type as FieldType) ?? "Text",
-              description: String(data.description ?? ""),
-              placeholder: String(data.placeholder ?? ""),
-              defaultValue:
-                typeof data.defaultValue === "string" ? data.defaultValue : JSON.stringify(data.defaultValue ?? ""),
-              optionsJson: JSON.stringify(data.options || []),
-              validationJson: JSON.stringify(data.validation || { required: false }),
-              aiSuggestionsJson: JSON.stringify(data.aiSuggestions || []),
-              order: Number(data.order ?? 0),
-              isSystem: false,
-              isEnabled: true,
-              category: "",
-              showInList: false,
-              width: (data.width as FieldWidth) || "Full",
-              sectionId: String(data.sectionId ?? ""),
-              createdAt: cf.createdAt,
-              updatedAt: cf.updatedAt,
-            } as FormConfigField)
-          })
+          .map(parseUserCustomFieldRow)
         setCustomFields(parsed)
       } catch {
         if (!cancelled) setCustomFields([])

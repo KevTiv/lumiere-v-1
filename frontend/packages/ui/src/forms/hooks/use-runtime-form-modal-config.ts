@@ -13,6 +13,11 @@ export interface UseRuntimeFormModalConfigOptions {
   organizationId: number
   roleId?: string
   userId?: string
+  /**
+   * When true, pass preferStdbVisibility into merge (CRM/sales dual-path collapse).
+   * Labels/disabled state from STDB win on matched fields; custom fields are appended.
+   */
+  preferStdbVisibility?: boolean
 }
 
 /**
@@ -24,11 +29,20 @@ export function useRuntimeFormModalConfig(options: UseRuntimeFormModalConfigOpti
   isLoading: boolean
   error: string | null
   customFieldIds: string[]
+  /** True when a SpacetimeDB form_config row exists (id > 0). */
+  runtimeFromDatabase: boolean
 } {
-  const { staticConfig, moduleId, organizationId, roleId, userId } = options
+  const {
+    staticConfig,
+    moduleId,
+    organizationId,
+    roleId,
+    userId,
+    preferStdbVisibility = false,
+  } = options
   const formId = options.formId ?? staticConfig.id
 
-  const { config: runtime, isLoading, error } = useFormConfiguration({
+  const { config: runtime, isLoading, error, dbConfigurationId } = useFormConfiguration({
     moduleId,
     formId,
     organizationId,
@@ -37,9 +51,15 @@ export function useRuntimeFormModalConfig(options: UseRuntimeFormModalConfigOpti
     useDefaultIfMissing: true,
   })
 
+  const runtimeFromDatabase = dbConfigurationId > 0
+
   const merged = useMemo(
-    () => mergeRuntimeFormConfig(staticConfig, runtime),
-    [staticConfig, runtime],
+    () =>
+      mergeRuntimeFormConfig(staticConfig, runtime, {
+        preferStdbVisibility,
+        runtimeFromDatabase,
+      }),
+    [staticConfig, runtime, preferStdbVisibility, runtimeFromDatabase],
   )
 
   return {
@@ -47,5 +67,6 @@ export function useRuntimeFormModalConfig(options: UseRuntimeFormModalConfigOpti
     isLoading,
     error,
     customFieldIds: merged.customFieldIds,
+    runtimeFromDatabase,
   }
 }

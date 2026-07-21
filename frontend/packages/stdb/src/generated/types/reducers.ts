@@ -677,6 +677,7 @@ import ProcessInventoryAdjustmentReducer from "../process_inventory_adjustment_r
 import ProcessPendingScansReducer from "../process_pending_scans_reducer";
 import ProduceManufacturingOrderReducer from "../produce_manufacturing_order_reducer";
 import PromoteAiSkillVersionReducer from "../promote_ai_skill_version_reducer";
+import PublishFormConfigurationReducer from "../publish_form_configuration_reducer";
 import PublishWorkflowVersionReducer from "../publish_workflow_version_reducer";
 import PurgeExpiredDocumentsReducer from "../purge_expired_documents_reducer";
 import QueueMailFromTemplateReducer from "../queue_mail_from_template_reducer";
@@ -830,6 +831,7 @@ import RunExpensesWaveDTestReducer from "../run_expenses_wave_d_test_reducer";
 import RunExpensesWaveETestReducer from "../run_expenses_wave_e_test_reducer";
 import RunExpensesWaveFTestReducer from "../run_expenses_wave_f_test_reducer";
 import RunFleetWaveATestReducer from "../run_fleet_wave_a_test_reducer";
+import RunFormsCustomFieldTestReducer from "../run_forms_custom_field_test_reducer";
 import RunFxRevaluationReducer from "../run_fx_revaluation_reducer";
 import RunFxRevaluationBatchReducer from "../run_fx_revaluation_batch_reducer";
 import RunHelpdeskTicketTestReducer from "../run_helpdesk_ticket_test_reducer";
@@ -947,6 +949,7 @@ import SetDocumentIndexContentReducer from "../set_document_index_content_reduce
 import SetDocumentRetentionReducer from "../set_document_retention_reducer";
 import SetExpenseAllocationsReducer from "../set_expense_allocations_reducer";
 import SetExpenseFraudHoldReducer from "../set_expense_fraud_hold_reducer";
+import SetFormFieldLabelReducer from "../set_form_field_label_reducer";
 import SetFormRoleConfigReducer from "../set_form_role_config_reducer";
 import SetGoogleDriveConflictPolicyReducer from "../set_google_drive_conflict_policy_reducer";
 import SetIntercompanyRuleActiveReducer from "../set_intercompany_rule_active_reducer";
@@ -1862,6 +1865,7 @@ export type ProcessInventoryAdjustmentParams = __Infer<typeof ProcessInventoryAd
 export type ProcessPendingScansParams = __Infer<typeof ProcessPendingScansReducer>;
 export type ProduceManufacturingOrderParams = __Infer<typeof ProduceManufacturingOrderReducer>;
 export type PromoteAiSkillVersionParams = __Infer<typeof PromoteAiSkillVersionReducer>;
+export type PublishFormConfigurationParams = __Infer<typeof PublishFormConfigurationReducer>;
 export type PublishWorkflowVersionParams = __Infer<typeof PublishWorkflowVersionReducer>;
 export type PurgeExpiredDocumentsParams = __Infer<typeof PurgeExpiredDocumentsReducer>;
 export type QueueMailFromTemplateParams = __Infer<typeof QueueMailFromTemplateReducer>;
@@ -2015,6 +2019,7 @@ export type RunExpensesWaveDTestParams = __Infer<typeof RunExpensesWaveDTestRedu
 export type RunExpensesWaveETestParams = __Infer<typeof RunExpensesWaveETestReducer>;
 export type RunExpensesWaveFTestParams = __Infer<typeof RunExpensesWaveFTestReducer>;
 export type RunFleetWaveATestParams = __Infer<typeof RunFleetWaveATestReducer>;
+export type RunFormsCustomFieldTestParams = __Infer<typeof RunFormsCustomFieldTestReducer>;
 export type RunFxRevaluationParams = __Infer<typeof RunFxRevaluationReducer>;
 export type RunFxRevaluationBatchParams = __Infer<typeof RunFxRevaluationBatchReducer>;
 export type RunHelpdeskTicketTestParams = __Infer<typeof RunHelpdeskTicketTestReducer>;
@@ -2132,6 +2137,7 @@ export type SetDocumentIndexContentParams = __Infer<typeof SetDocumentIndexConte
 export type SetDocumentRetentionParams = __Infer<typeof SetDocumentRetentionReducer>;
 export type SetExpenseAllocationsParams = __Infer<typeof SetExpenseAllocationsReducer>;
 export type SetExpenseFraudHoldParams = __Infer<typeof SetExpenseFraudHoldReducer>;
+export type SetFormFieldLabelParams = __Infer<typeof SetFormFieldLabelReducer>;
 export type SetFormRoleConfigParams = __Infer<typeof SetFormRoleConfigReducer>;
 export type SetGoogleDriveConflictPolicyParams = __Infer<typeof SetGoogleDriveConflictPolicyReducer>;
 export type SetIntercompanyRuleActiveParams = __Infer<typeof SetIntercompanyRuleActiveReducer>;

@@ -1,10 +1,8 @@
-import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import { toCreateRoleConfigParams } from "@lumiere/erp-shared/forms-create-params"
 import {
-  addFormField,
-  createFormConfiguration,
-  setFormRoleConfig,
+  publishFormConfiguration,
   type CreateFormFieldParams as StdbCreateFormFieldParams,
+  type PublishFormConfigurationParams,
 } from "@lumiere/stdb/client-ui-bridge"
 import type {
   FieldType as StdbFieldType,
@@ -16,14 +14,7 @@ import type {
 } from "../config/types"
 import { formOptionsToStdb, formValidationToStdb } from "./stdb-field-params"
 
-function rowNum(row: Record<string, unknown>, camel: string, snake: string): number {
-  return Number(row[camel] ?? row[snake] ?? 0)
-}
-
-function rowStr(row: Record<string, unknown>, camel: string, snake: string): string {
-  return String(row[camel] ?? row[snake] ?? "")
-}
-
+/** SpacetimeDB unit enum encoding: `{ text: [] }` for tag `Text`. */
 function satsUnitVariant(tag: string): Record<string, unknown> {
   const key = tag.charAt(0).toLowerCase() + tag.slice(1)
   return { [key]: [] }
@@ -48,51 +39,42 @@ export function registryFieldToStdbParams(field: RegistryFieldParams): StdbCreat
     showInList: field.showInList,
     width: satsUnitVariant(field.width) as StdbFieldWidth,
     sectionId: field.sectionId,
+    visibilityJson: field.visibilityJson ?? undefined,
   }
 }
 
 /**
- * Creates the form_config row and all fields + role configs from the in-app registry default.
- * Use when the org has no DB row yet (registry-only fallback).
+ * Publishes the in-app registry default as form_config + fields + roles in one
+ * SpacetimeDB transaction (avoids partial client-side create/field loops).
  */
 export async function pushRegistryFormToDatabase(
   organizationId: number,
   formEntry: FormRegistryEntry,
 ): Promise<void> {
   const def = formEntry.defaultConfig()
-  await createFormConfiguration(BigInt(organizationId), {
+
+  const roleConfigs = Object.values(def.roleConfigs ?? {})
+    .map((rc) =>
+      toCreateRoleConfigParams({
+        roleId: rc.roleId,
+        enabledFields: rc.enabledFields,
+        requiredFields: rc.requiredFields,
+        defaultPrompts: rc.defaultPrompts,
+      }),
+    )
+    .filter((p): p is NonNullable<typeof p> => p != null)
+
+  const params: PublishFormConfigurationParams = {
     moduleId: def.moduleId,
     formId: def.formId,
     name: def.name,
     description: def.description,
     isSystemDefault: def.isSystemDefault,
-  })
-
-  const rows = await stdbBrowserQuery("form-configs")
-  const row = rows.find(
-    c =>
-      rowNum(c, "organizationId", "organization_id") === organizationId &&
-      rowStr(c, "moduleId", "module_id") === def.moduleId &&
-      rowStr(c, "formId", "form_id") === def.formId,
-  )
-  if (!row?.id) throw new Error("Form configuration not found after create")
-
-  const configurationId = BigInt(String(row.id))
-
-  for (const field of def.fields) {
-    await addFormField(BigInt(organizationId), configurationId, registryFieldToStdbParams(field))
+    fields: def.fields.map(registryFieldToStdbParams),
+    roleConfigs,
+    expectedUpdatedAtMicros: undefined,
+    replaceMissingFields: false,
   }
 
-  if (def.roleConfigs) {
-    for (const rc of Object.values(def.roleConfigs)) {
-      const params = toCreateRoleConfigParams({
-        roleId: rc.roleId,
-        enabledFields: rc.enabledFields,
-        requiredFields: rc.requiredFields,
-        defaultPrompts: rc.defaultPrompts,
-      })
-      if (!params) continue
-      await setFormRoleConfig(BigInt(organizationId), configurationId, params)
-    }
-  }
+  await publishFormConfiguration(BigInt(organizationId), params)
 }

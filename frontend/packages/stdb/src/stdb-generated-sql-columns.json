@@ -3449,7 +3449,8 @@
     "category",
     "show_in_list",
     "width",
-    "section_id"
+    "section_id",
+    "visibility_json"
   ],
   "CreateHelpdeskSlaParams": [
     "name",
@@ -6457,6 +6458,7 @@
     "description",
     "is_active",
     "is_system_default",
+    "config_version",
     "created_at",
     "updated_at",
     "created_by",
@@ -6482,7 +6484,15 @@
     "show_in_list",
     "width",
     "section_id",
+    "visibility_json",
     "created_at",
+    "updated_at"
+  ],
+  "FormFieldLabel": [
+    "id",
+    "field_row_id",
+    "locale",
+    "label",
     "updated_at"
   ],
   "FormRoleConfig": [
@@ -9968,6 +9978,17 @@
     "write_date",
     "metadata"
   ],
+  "PublishFormConfigurationParams": [
+    "module_id",
+    "form_id",
+    "name",
+    "description",
+    "is_system_default",
+    "fields",
+    "role_configs",
+    "expected_updated_at_micros",
+    "replace_missing_fields"
+  ],
   "PurchaseApprovalDelegate": [
     "id",
     "organization_id",
@@ -11454,6 +11475,10 @@
     "fraud_hold",
     "fraud_reason",
     "metadata"
+  ],
+  "SetFormFieldLabelParams": [
+    "locale",
+    "label"
   ],
   "SetPurchaseApprovalDelegateParams": [
     "principal_identity",
@@ -13303,7 +13328,9 @@
     "order",
     "is_enabled",
     "show_in_list",
-    "width"
+    "width",
+    "visibility_json",
+    "expected_updated_at_micros"
   ],
   "UpdateHrApplicantParams": [
     "stage",

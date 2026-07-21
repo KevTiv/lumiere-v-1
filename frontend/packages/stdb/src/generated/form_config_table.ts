@@ -19,6 +19,7 @@ export default __t.row({
   description: __t.string(),
   isActive: __t.bool().name("is_active"),
   isSystemDefault: __t.bool().name("is_system_default"),
+  configVersion: __t.u32().name("config_version"),
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
   createdBy: __t.identity().name("created_by"),

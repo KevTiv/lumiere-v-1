@@ -4341,6 +4341,7 @@ export const CreateFormFieldParams = __t.object("CreateFormFieldParams", {
     return FieldWidth;
   },
   sectionId: __t.option(__t.string()),
+  visibilityJson: __t.option(__t.string()),
 });
 export type CreateFormFieldParams = __Infer<typeof CreateFormFieldParams>;
 
@@ -7986,6 +7987,7 @@ export const FormConfig = __t.object("FormConfig", {
   description: __t.string(),
   isActive: __t.bool(),
   isSystemDefault: __t.bool(),
+  configVersion: __t.u32(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
   createdBy: __t.identity(),
@@ -8017,10 +8019,20 @@ export const FormConfigField = __t.object("FormConfigField", {
     return FieldWidth;
   },
   sectionId: __t.string(),
+  visibilityJson: __t.string(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
 });
 export type FormConfigField = __Infer<typeof FormConfigField>;
+
+export const FormFieldLabel = __t.object("FormFieldLabel", {
+  id: __t.u64(),
+  fieldRowId: __t.u64(),
+  locale: __t.string(),
+  label: __t.string(),
+  updatedAt: __t.timestamp(),
+});
+export type FormFieldLabel = __Infer<typeof FormFieldLabel>;
 
 export const FormRoleConfig = __t.object("FormRoleConfig", {
   id: __t.u64(),
@@ -12305,6 +12317,23 @@ export const PublicHoliday = __t.object("PublicHoliday", {
 });
 export type PublicHoliday = __Infer<typeof PublicHoliday>;
 
+export const PublishFormConfigurationParams = __t.object("PublishFormConfigurationParams", {
+  moduleId: __t.string(),
+  formId: __t.string(),
+  name: __t.string(),
+  description: __t.option(__t.string()),
+  isSystemDefault: __t.bool(),
+  get fields() {
+    return __t.array(CreateFormFieldParams);
+  },
+  get roleConfigs() {
+    return __t.array(CreateRoleConfigParams);
+  },
+  expectedUpdatedAtMicros: __t.option(__t.i64()),
+  replaceMissingFields: __t.bool(),
+});
+export type PublishFormConfigurationParams = __Infer<typeof PublishFormConfigurationParams>;
+
 export const PurchaseApprovalDelegate = __t.object("PurchaseApprovalDelegate", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -14187,6 +14216,12 @@ export const SetExpenseFraudHoldParams = __t.object("SetExpenseFraudHoldParams",
   metadata: __t.option(__t.string()),
 });
 export type SetExpenseFraudHoldParams = __Infer<typeof SetExpenseFraudHoldParams>;
+
+export const SetFormFieldLabelParams = __t.object("SetFormFieldLabelParams", {
+  locale: __t.string(),
+  label: __t.string(),
+});
+export type SetFormFieldLabelParams = __Infer<typeof SetFormFieldLabelParams>;
 
 export const SetPurchaseApprovalDelegateParams = __t.object("SetPurchaseApprovalDelegateParams", {
   principalIdentity: __t.identity(),
@@ -16391,6 +16426,8 @@ export const UpdateFormFieldParams = __t.object("UpdateFormFieldParams", {
   get width() {
     return __t.option(FieldWidth);
   },
+  visibilityJson: __t.option(__t.string()),
+  expectedUpdatedAtMicros: __t.option(__t.i64()),
 });
 export type UpdateFormFieldParams = __Infer<typeof UpdateFormFieldParams>;
 

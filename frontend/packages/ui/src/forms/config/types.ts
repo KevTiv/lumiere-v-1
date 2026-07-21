@@ -33,6 +33,9 @@ export type FieldType =
 
 export type FieldWidth = "Full" | "Half" | "Third" | "TwoThirds" | "Quarter"
 
+/** Conditional visibility: show when another field's value matches `equals`. */
+export type FieldVisibilityRule = { field: string; equals: string }
+
 // ═════════════════════════════════════════════════════════════════════════════
 // BASE TYPES
 // ═════════════════════════════════════════════════════════════════════════════
@@ -68,6 +71,7 @@ export interface FormConfig {
   description: string
   isActive: boolean
   isSystemDefault: boolean
+  configVersion?: number
   createdAt: string
   updatedAt: string
   createdBy: string
@@ -94,6 +98,8 @@ export interface FormConfigField {
   showInList: boolean
   width: FieldWidth
   sectionId: string
+  /** JSON visibility rule, e.g. `{"visibleWhen":{"field":"status","equals":"open"}}`. */
+  visibilityJson: string
   createdAt: string
   updatedAt: string
 }
@@ -144,6 +150,8 @@ export interface ParsedFormField {
   showInList: boolean
   width: FieldWidth
   sectionId?: string
+  /** Conditional visibility: show when another field matches. */
+  visibleWhen?: FieldVisibilityRule
 }
 
 export interface ParsedRoleConfig {
@@ -154,7 +162,10 @@ export interface ParsedRoleConfig {
 
 export interface MergedFormConfiguration {
   config: FormConfig
+  /** Role-filtered enabled fields (+ user custom fields). */
   fields: ParsedFormField[]
+  /** All org form fields from STDB before role filtering (for preferStdbVisibility). */
+  sourceFields: ParsedFormField[]
   roleConfig?: ParsedRoleConfig
   customFields: ParsedFormField[]
 }
@@ -213,6 +224,7 @@ export interface CreateFormFieldParams {
   showInList: boolean
   width: FieldWidth
   sectionId?: string
+  visibilityJson?: string
 }
 
 export interface UpdateFormFieldParams {
@@ -227,6 +239,9 @@ export interface UpdateFormFieldParams {
   isEnabled?: boolean
   showInList?: boolean
   width?: FieldWidth
+  visibilityJson?: string
+  /** Optimistic concurrency — micros of form_config_field.updated_at */
+  expectedUpdatedAtMicros?: number
 }
 
 export interface CreateRoleConfigParams {
@@ -268,6 +283,25 @@ export interface FormModuleMetadata {
 // HELPER FUNCTIONS
 // ═════════════════════════════════════════════════════════════════════════════
 
+export function parseVisibilityJson(
+  raw: string | undefined | null,
+): FieldVisibilityRule | undefined {
+  if (!raw?.trim()) return undefined
+  try {
+    const parsed = JSON.parse(raw) as {
+      visibleWhen?: { field?: unknown; equals?: unknown }
+      field?: unknown
+      equals?: unknown
+    }
+    const rule = parsed.visibleWhen ?? parsed
+    const field = typeof rule.field === "string" ? rule.field.trim() : ""
+    if (!field) return undefined
+    return { field, equals: rule.equals != null ? String(rule.equals) : "" }
+  } catch {
+    return undefined
+  }
+}
+
 export function parseFormField(dbField: FormConfigField): ParsedFormField {
   return {
     id: dbField.id,
@@ -288,6 +322,7 @@ export function parseFormField(dbField: FormConfigField): ParsedFormField {
     showInList: dbField.showInList,
     width: dbField.width,
     sectionId: dbField.sectionId || undefined,
+    visibleWhen: parseVisibilityJson(dbField.visibilityJson),
   }
 }
 

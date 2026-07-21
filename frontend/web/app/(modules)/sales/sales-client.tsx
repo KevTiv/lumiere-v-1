@@ -2730,6 +2730,10 @@ function SalesClientLoaded({
         dashboardTimeRange={dashboardTimeRange}
         onDashboardTimeRangeChange={setDashboardTimeRange}
         urlFilters={urlFilters}
+        runtimeForms={{
+          organizationId,
+          roleId: runtimeRoleId,
+        }}
         onRowClick={(tabId, row) => {
           const target = chatterTargetFromRow('sales', tabId, row);
           if (target) setChatterTarget(target);
@@ -2765,6 +2769,7 @@ function SalesClientLoaded({
         moduleId="sales"
         organizationId={organizationId}
         roleId={runtimeRoleId}
+        preferStdbVisibility
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {
@@ -2840,6 +2845,7 @@ function SalesClientLoaded({
           formId="create-invoice-from-sale-order"
           organizationId={organizationId}
           roleId={runtimeRoleId}
+          preferStdbVisibility
           foldCustomFieldsIntoMetadata={false}
           closeOnSubmit={false}
           submitError={invoiceOrderError}
@@ -2954,7 +2960,7 @@ function SalesClientLoaded({
         />
       ) : null}
       {editSaleOrderTarget != null ? (
-        <FormModal
+        <RuntimeFormModal
           key={`edit-sale-order-${String(editSaleOrderTarget.id)}`}
           open
           onOpenChange={(o) => {
@@ -2963,22 +2969,30 @@ function SalesClientLoaded({
               setEditSaleOrderError(null);
             }
           }}
-          config={mergeFieldDefaultValues(editSaleOrderForm(t), {
-            clientOrderRef: String(
-              editSaleOrderTarget.clientOrderRef ??
-                editSaleOrderTarget.client_order_ref ??
-                '',
-            ),
-            note: String(editSaleOrderTarget.note ?? ''),
-            incoterm: String(editSaleOrderTarget.incoterm ?? ''),
-            incotermLocation: String(
-              editSaleOrderTarget.incotermLocation ??
-                editSaleOrderTarget.incoterm_location ??
-                '',
-            ),
-            commissionRatePercent:
-              parseCommissionRatePercent(editSaleOrderTarget) || '',
-          })}
+          staticConfig={editSaleOrderForm(t)}
+          moduleId="sales"
+          formId="edit-sale-order"
+          organizationId={organizationId}
+          roleId={runtimeRoleId}
+          preferStdbVisibility
+          transformConfig={(cfg) =>
+            mergeFieldDefaultValues(cfg, {
+              clientOrderRef: String(
+                editSaleOrderTarget.clientOrderRef ??
+                  editSaleOrderTarget.client_order_ref ??
+                  '',
+              ),
+              note: String(editSaleOrderTarget.note ?? ''),
+              incoterm: String(editSaleOrderTarget.incoterm ?? ''),
+              incotermLocation: String(
+                editSaleOrderTarget.incotermLocation ??
+                  editSaleOrderTarget.incoterm_location ??
+                  '',
+              ),
+              commissionRatePercent:
+                parseCommissionRatePercent(editSaleOrderTarget) || '',
+            })
+          }
           closeOnSubmit={false}
           submitError={editSaleOrderError}
           isPending={updateSaleOrder.isPending}
@@ -2996,6 +3010,24 @@ function SalesClientLoaded({
                 editSaleOrderTarget.metadata,
                 rate != null && Number.isFinite(rate) ? rate : null,
               );
+              let mergedMeta = metadata;
+              try {
+                const customRaw = formData.metadata;
+                const customObj =
+                  typeof customRaw === 'string'
+                    ? (JSON.parse(customRaw) as Record<string, unknown>)
+                    : customRaw != null && typeof customRaw === 'object'
+                      ? (customRaw as Record<string, unknown>)
+                      : null;
+                const baseObj = metadata
+                  ? (JSON.parse(metadata) as Record<string, unknown>)
+                  : {};
+                if (customObj) {
+                  mergedMeta = JSON.stringify({ ...baseObj, ...customObj });
+                }
+              } catch {
+                mergedMeta = metadata;
+              }
               await updateSaleOrder.mutateAsync({
                 orderId: id as string | number | bigint,
                 params: {
@@ -3010,9 +3042,22 @@ function SalesClientLoaded({
                     typeof formData.incotermLocation === 'string'
                       ? formData.incotermLocation
                       : undefined,
-                  metadata,
+                  metadata: mergedMeta,
                 },
               });
+              if (
+                operatingCompanyId &&
+                operatingCompanyId !== 0n &&
+                customFieldEntriesFromMetadata(mergedMeta).length > 0
+              ) {
+                await persistCustomFieldsToEav({
+                  organizationId,
+                  companyId: operatingCompanyId,
+                  model: 'sale_order',
+                  recordId: BigInt(String(id)),
+                  metadata: mergedMeta,
+                });
+              }
               setEditSaleOrderTarget(null);
             } catch (e) {
               setEditSaleOrderError(e instanceof Error ? e.message : String(e));
@@ -3047,6 +3092,7 @@ function SalesClientLoaded({
           formId="create-invoice-from-sale-order"
           organizationId={organizationId}
           roleId={runtimeRoleId}
+          preferStdbVisibility
           foldCustomFieldsIntoMetadata={false}
           closeOnSubmit={false}
           submitError={creditReturnOrderError}

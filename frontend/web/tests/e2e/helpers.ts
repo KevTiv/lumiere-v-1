@@ -2228,6 +2228,7 @@ export async function addCustomFormFieldViaSettings(
         is_enabled: true,
         show_in_list: false,
         width: { full: [] },
+        visibility_json: null,
       },
     ])
     await openFormConfigLeadForm(page)

@@ -16,6 +16,8 @@ export interface RuntimeFormModalProps {
   organizationId: number
   roleId?: string
   userId?: string
+  /** Prefer STDB labels/visibility on matched fields (CRM/sales dual-path collapse). */
+  preferStdbVisibility?: boolean
   /** Applied after runtime merge (e.g. select options, default values). */
   transformConfig?: (config: FormConfig) => FormConfig
   onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
@@ -28,6 +30,7 @@ export interface RuntimeFormModalProps {
   isPending?: boolean
   /** When true, `custom:*` keys are folded into a `metadata` JSON string on submit. */
   foldCustomFieldsIntoMetadata?: boolean
+  aiAssist?: React.ComponentProps<typeof FormModal>["aiAssist"]
 }
 
 export function RuntimeFormModal({
@@ -39,6 +42,7 @@ export function RuntimeFormModal({
   organizationId,
   roleId,
   userId,
+  preferStdbVisibility = false,
   transformConfig,
   onSubmit,
   foldCustomFieldsIntoMetadata = true,
@@ -51,11 +55,11 @@ export function RuntimeFormModal({
     organizationId,
     roleId,
     userId,
+    preferStdbVisibility,
   })
 
   const resolvedConfig = React.useMemo(() => {
-    const base = transformConfig ? transformConfig(config) : config
-    return base
+    return transformConfig ? transformConfig(config) : config
   }, [config, transformConfig])
 
   const handleSubmit = React.useCallback(
@@ -86,24 +90,14 @@ export function RuntimeFormModal({
     )
   }
 
-  if (open && error) {
-    return (
-      <FormModal
-        open={open}
-        onOpenChange={onOpenChange}
-        config={staticConfig}
-        onSubmit={onSubmit}
-        {...rest}
-      />
-    )
-  }
-
+  // On STDB query error, still render the merged/static scaffold so create is not blocked,
+  // but keep custom-field folding when ids were already known from a prior successful load.
   return (
     <FormModal
       open={open}
       onOpenChange={onOpenChange}
-      config={resolvedConfig}
-      onSubmit={handleSubmit}
+      config={error ? staticConfig : resolvedConfig}
+      onSubmit={error ? onSubmit : handleSubmit}
       {...rest}
     />
   )

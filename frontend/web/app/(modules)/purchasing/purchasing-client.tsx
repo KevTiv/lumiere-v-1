@@ -2857,6 +2857,10 @@ function PurchasingClientLoaded({
         dashboardTimeRange={dashboardTimeRange}
         onDashboardTimeRangeChange={setDashboardTimeRange}
         isPending={isFormMutationPending}
+        runtimeForms={{
+          organizationId,
+          roleId: runtimeRoleId,
+        }}
         onRowClick={(tabId, row) => {
           const target = chatterTargetFromRow("purchasing", tabId, row)
           if (target) setChatterTarget(target)
@@ -2893,6 +2897,7 @@ function PurchasingClientLoaded({
         moduleId="purchasing"
         organizationId={organizationId}
         roleId={runtimeRoleId}
+        preferStdbVisibility
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {
@@ -2945,6 +2950,7 @@ function PurchasingClientLoaded({
           formId="create-bill-from-purchase-order"
           organizationId={organizationId}
           roleId={runtimeRoleId}
+          preferStdbVisibility
           foldCustomFieldsIntoMetadata={false}
           closeOnSubmit={false}
           submitError={billOrderError}

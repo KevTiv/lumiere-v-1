@@ -34,6 +34,8 @@ export interface BaseField {
   width?: FieldWidth
   className?: string
   defaultValue?: unknown
+  /** When set, field is shown only if `values[field] === equals` (string compare). */
+  visibleWhen?: { field: string; equals: string }
   validation?: {
     min?: number
     max?: number

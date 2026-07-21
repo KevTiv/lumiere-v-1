@@ -5,7 +5,9 @@ import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
+  RuntimeFormModal,
   EntityView,
+  useRBAC,
   newJournalEntryForm,
   newTaxForm,
   newFiscalYearForm,
@@ -323,6 +325,12 @@ import {
   type AccountAccount,
 } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { fetchQueryList } from "@lumiere/query-hooks/http"
+import {
+  customFieldEntriesFromMetadata,
+  findNewestRowByField,
+  persistCustomFieldsToEav,
+} from "@/lib/persist-record-custom-fields"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
@@ -601,10 +609,42 @@ function AccountingClientLoaded({
   useAccountingModuleSubscription()
   const { t } = useTranslation()
   const { toast } = useToast()
+  const { currentUser } = useRBAC()
+  const runtimeRoleId = currentUser?.roles[0]
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   /** BigInt organization id for `useStdbQuery` cache keys (not SpacetimeDB `company_id` reducers). */
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+
+  async function persistAccountMoveCustomFieldsAfterCreate(metadata: unknown, displayName: string) {
+    if (operatingCompanyId === 0n) return
+    if (customFieldEntriesFromMetadata(metadata).length === 0) return
+    let row: Record<string, unknown> | undefined
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const rows = await fetchQueryList(
+        "/api/query/account-moves",
+        "Failed to fetch account moves",
+      )
+      row = findNewestRowByField(rows, "invoicePartnerDisplayName", displayName)
+      if (row?.id) break
+      await new Promise((r) => setTimeout(r, 250 * (attempt + 1)))
+    }
+    if (!row?.id) {
+      toast({
+        variant: "destructive",
+        title: t("common.error.title"),
+        description: "Invoice saved, but custom fields could not be linked yet. Retry from the record.",
+      })
+      return
+    }
+    await persistCustomFieldsToEav({
+      organizationId,
+      companyId: operatingCompanyId,
+      model: "account_move",
+      recordId: BigInt(String(row.id)),
+      metadata,
+    })
+  }
 
   // Quick-action form modal (dashboard tab)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
@@ -3730,6 +3770,10 @@ function AccountingClientLoaded({
         onActiveTabChange={setAccountingActiveTab}
         dashboardTimeRange={dashboardTimeRange}
         onDashboardTimeRangeChange={setDashboardTimeRange}
+        runtimeForms={{
+          organizationId,
+          roleId: runtimeRoleId,
+        }}
       />
 
       {/* Invoice / bill record sheet (row click on invoices/bills tabs) */}
@@ -3964,8 +4008,9 @@ function AccountingClientLoaded({
       <CreateInvoiceModal
         open={showCreateInvoice}
         onClose={() => setShowCreateInvoice(false)}
+        organizationId={organizationId}
         journalOptions={journalRowsAsSelectOptions}
-        onSave={(params) => {
+        onSave={async (params) => {
           if (journals.length === 0) {
             toast({
               variant: "destructive",
@@ -3989,7 +4034,16 @@ function AccountingClientLoaded({
             jid,
             "Customer Invoice",
           )
-          createMove.mutate([organizationId, accountingParamsToJson(p, "CreateAccountMoveParams")])
+          await createMove.mutateAsync([
+            organizationId,
+            accountingParamsToJson(p, "CreateAccountMoveParams"),
+          ])
+          if (p.metadata && p.invoicePartnerDisplayName) {
+            await persistAccountMoveCustomFieldsAfterCreate(
+              p.metadata,
+              p.invoicePartnerDisplayName,
+            )
+          }
         }}
       />
 
@@ -3997,8 +4051,9 @@ function AccountingClientLoaded({
       <CreateInvoiceModal
         open={showCreateBill}
         onClose={() => setShowCreateBill(false)}
+        organizationId={organizationId}
         journalOptions={journalRowsAsSelectOptions}
-        onSave={(params) => {
+        onSave={async (params) => {
           if (journals.length === 0) {
             toast({
               variant: "destructive",
@@ -4022,15 +4077,28 @@ function AccountingClientLoaded({
             jid,
             "Vendor Bill",
           )
-          createMove.mutate([organizationId, accountingParamsToJson(p, "CreateAccountMoveParams")])
+          await createMove.mutateAsync([
+            organizationId,
+            accountingParamsToJson(p, "CreateAccountMoveParams"),
+          ])
+          if (p.metadata && p.invoicePartnerDisplayName) {
+            await persistAccountMoveCustomFieldsAfterCreate(
+              p.metadata,
+              p.invoicePartnerDisplayName,
+            )
+          }
         }}
       />
 
       {/* Dashboard quick-action form modal */}
-      <FormModal
+      <RuntimeFormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? journalEntryFormConfig}
+        staticConfig={quickActionForm?.form ?? journalEntryFormConfig}
+        moduleId="accounting"
+        organizationId={organizationId}
+        roleId={runtimeRoleId}
+        preferStdbVisibility
         onSubmit={async (formData) => {
           if (!quickActionForm) return
           try {

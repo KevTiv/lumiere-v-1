@@ -705,6 +705,7 @@ import ProcessInventoryAdjustmentReducer from "./process_inventory_adjustment_re
 import ProcessPendingScansReducer from "./process_pending_scans_reducer";
 import ProduceManufacturingOrderReducer from "./produce_manufacturing_order_reducer";
 import PromoteAiSkillVersionReducer from "./promote_ai_skill_version_reducer";
+import PublishFormConfigurationReducer from "./publish_form_configuration_reducer";
 import PublishWorkflowVersionReducer from "./publish_workflow_version_reducer";
 import PurgeExpiredDocumentsReducer from "./purge_expired_documents_reducer";
 import QueueMailFromTemplateReducer from "./queue_mail_from_template_reducer";
@@ -858,6 +859,7 @@ import RunExpensesWaveDTestReducer from "./run_expenses_wave_d_test_reducer";
 import RunExpensesWaveETestReducer from "./run_expenses_wave_e_test_reducer";
 import RunExpensesWaveFTestReducer from "./run_expenses_wave_f_test_reducer";
 import RunFleetWaveATestReducer from "./run_fleet_wave_a_test_reducer";
+import RunFormsCustomFieldTestReducer from "./run_forms_custom_field_test_reducer";
 import RunFxRevaluationReducer from "./run_fx_revaluation_reducer";
 import RunFxRevaluationBatchReducer from "./run_fx_revaluation_batch_reducer";
 import RunHelpdeskTicketTestReducer from "./run_helpdesk_ticket_test_reducer";
@@ -975,6 +977,7 @@ import SetDocumentIndexContentReducer from "./set_document_index_content_reducer
 import SetDocumentRetentionReducer from "./set_document_retention_reducer";
 import SetExpenseAllocationsReducer from "./set_expense_allocations_reducer";
 import SetExpenseFraudHoldReducer from "./set_expense_fraud_hold_reducer";
+import SetFormFieldLabelReducer from "./set_form_field_label_reducer";
 import SetFormRoleConfigReducer from "./set_form_role_config_reducer";
 import SetGoogleDriveConflictPolicyReducer from "./set_google_drive_conflict_policy_reducer";
 import SetIntercompanyRuleActiveReducer from "./set_intercompany_rule_active_reducer";
@@ -1345,6 +1348,7 @@ import FinancialReportRow from "./financial_report_table";
 import FleetVehicleRow from "./fleet_vehicle_table";
 import FormConfigRow from "./form_config_table";
 import FormConfigFieldRow from "./form_config_field_table";
+import FormFieldLabelRow from "./form_field_label_table";
 import FormRoleConfigRow from "./form_role_config_table";
 import FxRevaluationRunRow from "./fx_revaluation_run_table";
 import GeneratedOwnerReportRow from "./generated_owner_report_table";
@@ -3859,6 +3863,20 @@ const tablesSchema = __schema({
       { name: 'form_config_field_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, FormConfigFieldRow),
+  form_field_label: __table({
+    name: 'form_field_label',
+    indexes: [
+      { name: 'field_row_id', algorithm: 'btree', columns: [
+        'fieldRowId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'form_field_label_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FormFieldLabelRow),
   form_role_config: __table({
     name: 'form_role_config',
     indexes: [
@@ -9541,6 +9559,7 @@ const reducersSchema = __reducers(
   __reducerSchema("process_pending_scans", ProcessPendingScansReducer),
   __reducerSchema("produce_manufacturing_order", ProduceManufacturingOrderReducer),
   __reducerSchema("promote_ai_skill_version", PromoteAiSkillVersionReducer),
+  __reducerSchema("publish_form_configuration", PublishFormConfigurationReducer),
   __reducerSchema("publish_workflow_version", PublishWorkflowVersionReducer),
   __reducerSchema("purge_expired_documents", PurgeExpiredDocumentsReducer),
   __reducerSchema("queue_mail_from_template", QueueMailFromTemplateReducer),
@@ -9694,6 +9713,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_expenses_wave_e_test", RunExpensesWaveETestReducer),
   __reducerSchema("run_expenses_wave_f_test", RunExpensesWaveFTestReducer),
   __reducerSchema("run_fleet_wave_a_test", RunFleetWaveATestReducer),
+  __reducerSchema("run_forms_custom_field_test", RunFormsCustomFieldTestReducer),
   __reducerSchema("run_fx_revaluation", RunFxRevaluationReducer),
   __reducerSchema("run_fx_revaluation_batch", RunFxRevaluationBatchReducer),
   __reducerSchema("run_helpdesk_ticket_test", RunHelpdeskTicketTestReducer),
@@ -9811,6 +9831,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_document_retention", SetDocumentRetentionReducer),
   __reducerSchema("set_expense_allocations", SetExpenseAllocationsReducer),
   __reducerSchema("set_expense_fraud_hold", SetExpenseFraudHoldReducer),
+  __reducerSchema("set_form_field_label", SetFormFieldLabelReducer),
   __reducerSchema("set_form_role_config", SetFormRoleConfigReducer),
   __reducerSchema("set_google_drive_conflict_policy", SetGoogleDriveConflictPolicyReducer),
   __reducerSchema("set_intercompany_rule_active", SetIntercompanyRuleActiveReducer),

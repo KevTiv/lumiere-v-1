@@ -94,6 +94,9 @@ export function toCreateFormFieldParams(
     showInList: formData.showInList === true || formData.show_in_list === true,
     width: unitVariant(widthRaw) as FieldWidth,
     sectionId: optionalTrimmedString(formData.sectionId ?? formData.section_id),
+    visibilityJson: optionalTrimmedString(
+      formData.visibilityJson ?? formData.visibility_json,
+    ),
   }
 }
 

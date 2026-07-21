@@ -4,6 +4,7 @@ import type {
   CreateFormFieldParams,
   CreateRoleConfigParams,
   CreateUserCustomFieldParams,
+  PublishFormConfigurationParams,
   SetRecordCustomFieldValuesParams,
   UpdateFormFieldParams,
 } from "../generated/types"
@@ -13,6 +14,7 @@ export type {
   CreateFormFieldParams,
   CreateRoleConfigParams,
   CreateUserCustomFieldParams,
+  PublishFormConfigurationParams,
   SetRecordCustomFieldValuesParams,
   UpdateFormFieldParams,
 }
@@ -22,6 +24,13 @@ export function createFormConfiguration(
   params: CreateFormConfigParams,
 ) {
   return stdbBrowserCall("create_form_configuration", [organizationId.toString(), params])
+}
+
+export function publishFormConfiguration(
+  organizationId: bigint,
+  params: PublishFormConfigurationParams,
+) {
+  return stdbBrowserCall("publish_form_configuration", [organizationId.toString(), params])
 }
 
 export function getFormConfiguration(
@@ -90,6 +99,18 @@ export function setFormRoleConfig(
   return stdbBrowserCall("set_form_role_config", [
     organizationId.toString(),
     configurationId.toString(),
+    params,
+  ])
+}
+
+export function setFormFieldLabel(
+  organizationId: bigint,
+  fieldRowId: bigint,
+  params: { locale: string; label: string },
+) {
+  return stdbBrowserCall("set_form_field_label", [
+    organizationId.toString(),
+    fieldRowId.toString(),
     params,
   ])
 }

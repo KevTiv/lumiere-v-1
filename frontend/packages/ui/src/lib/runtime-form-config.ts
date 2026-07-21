@@ -11,8 +11,11 @@ const STATIC_FIELD_ALIASES: Record<string, readonly string[]> = {
   contactname: ["firstname", "first_name", "name"],
   emailfrom: ["email"],
   partnername: ["company", "companyname", "company_name"],
+  partnerid: ["customer", "partner_id", "partner"],
   expectedrevenue: ["expected_revenue", "revenue"],
   datedeadline: ["date_deadline", "deadline"],
+  clientorderref: ["client_order_ref", "order_number", "ordernumber"],
+  validitydate: ["validity_date", "delivery_date", "deliverydate"],
 }
 
 function stdbFieldKeys(field: ParsedFormField): string[] {
@@ -104,6 +107,7 @@ export function parsedFieldToModularField(field: ParsedFormField): FormField {
     required: field.validation.required,
     width: stdbWidthToModular(field.width),
     defaultValue: field.defaultValue,
+    visibleWhen: field.visibleWhen,
     validation: {
       min: field.validation.min,
       max: field.validation.max,
@@ -159,6 +163,7 @@ function applyStdbOverrides(staticField: FormField, stdbField: ParsedFormField):
     description: stdbField.description || staticField.description,
     required: stdbField.validation.required || staticField.required,
     width: stdbWidthToModular(stdbField.width) ?? staticField.width,
+    visibleWhen: stdbField.visibleWhen ?? staticField.visibleWhen,
   }
   if (stdbField.defaultValue !== undefined && staticField.defaultValue === undefined) {
     return { ...merged, defaultValue: stdbField.defaultValue } as FormField
@@ -169,44 +174,48 @@ function applyStdbOverrides(staticField: FormField, stdbField: ParsedFormField):
 /**
  * Merge a static module {@link FormConfig} with a STDB {@link MergedFormConfiguration}.
  * Static fields remain the source of reducer field names; STDB drives visibility, labels, and custom fields.
+ *
+ * `preferStdbVisibility`: when true and the runtime came from a DB row, hide static fields that
+ * exist in STDB but are disabled / not in the role-enabled set. Unmatched static fields are kept
+ * so reducer contracts survive incomplete registry seeds.
  */
 export function mergeRuntimeFormConfig(
   staticConfig: FormConfig,
   runtime: MergedFormConfiguration | null,
+  options?: {
+    preferStdbVisibility?: boolean
+    runtimeFromDatabase?: boolean
+  },
 ): { config: FormConfig; customFieldIds: string[] } {
   if (!runtime) {
     return { config: staticConfig, customFieldIds: [] }
   }
 
-  const enabledStdb = new Map<string, ParsedFormField>()
-  for (const f of runtime.fields) {
-    for (const k of stdbFieldKeys(f)) {
-      enabledStdb.set(k, f)
-    }
-  }
+  const preferStdb =
+    Boolean(options?.preferStdbVisibility) && Boolean(options?.runtimeFromDatabase)
+  const sourceFields = runtime.sourceFields?.length ? runtime.sourceFields : runtime.fields
 
   const matchedStdbIds = new Set<string>()
   const sections: FormSection[] = staticConfig.sections.map((section) => ({
     ...section,
     fields: section.fields
       .map((field) => {
-        const match = findMatchingStdbField(field, runtime.fields)
-        if (match) {
-          matchedStdbIds.add(match.fieldId)
-          const enabled = enabledStdb.has(normalizeFormFieldKey(match.fieldId))
-            || enabledStdb.has(normalizeFormFieldKey(match.name))
-          if (!enabled) return null
-          return applyStdbOverrides(field, match)
+        const inRoleOrEnabled = findMatchingStdbField(field, runtime.fields)
+        if (inRoleOrEnabled) {
+          matchedStdbIds.add(inRoleOrEnabled.fieldId)
+          return applyStdbOverrides(field, inRoleOrEnabled)
         }
-        // No STDB counterpart — keep static field (reducer contract).
+        if (preferStdb && findMatchingStdbField(field, sourceFields)) {
+          // Defined in STDB but not enabled for this role / is_enabled=false → hide
+          return null
+        }
         return field
       })
       .filter((f): f is FormField => f != null),
   }))
 
   const extraFields = runtime.fields
-    .filter((f) => !matchedStdbIds.has(f.fieldId))
-    .filter((f) => f.isEnabled)
+    .filter((f) => f.isEnabled && !matchedStdbIds.has(f.fieldId))
     .sort((a, b) => a.order - b.order)
     .map(parsedFieldToModularField)
 
@@ -218,12 +227,8 @@ export function mergeRuntimeFormConfig(
     })
   }
 
-  const customFieldIds = runtime.fields
-    .filter((f) => isCustomField(f.fieldId))
-    .map((f) => f.fieldId)
-
   return {
     config: { ...staticConfig, sections },
-    customFieldIds,
+    customFieldIds: runtime.fields.filter((f) => isCustomField(f.fieldId)).map((f) => f.fieldId),
   }
 }

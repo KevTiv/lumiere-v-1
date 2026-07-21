@@ -14,12 +14,20 @@ import { DashboardHeader, type TimeRangeValue } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
 import { EntityRecordSheet } from "../entity-views/entity-record-sheet"
 import { FormModal } from "../forms/form-modal"
+import { RuntimeFormModal } from "../forms/runtime-form-modal"
 import type { ModuleConfig } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
 import { isEntitySurfaceVisible } from "../lib/entity-view-types"
 import { getEntityRowKey } from "../lib/entity-row-utils"
 import { useRBAC } from "../lib/rbac-context"
 import { exportDashboardToPng } from "../lib/export-dashboard-png"
+
+/** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
+export interface ModuleViewRuntimeForms {
+  organizationId: number
+  roleId?: string
+  userId?: string
+}
 
 interface ModuleViewProps {
   config: ModuleConfig
@@ -47,6 +55,11 @@ interface ModuleViewProps {
   onDashboardTimeRangeChange?: (value: TimeRangeValue) => void
   /** URL filters applied to the active entity tab (chart drill-down). */
   urlFilters?: Record<string, string>
+  /**
+   * Prefer SpacetimeDB form configuration (labels, visibility, custom fields) for create modals.
+   * Static `createForm` remains the reducer field-name scaffold.
+   */
+  runtimeForms?: ModuleViewRuntimeForms
 }
 
 export function ModuleView({
@@ -62,12 +75,14 @@ export function ModuleView({
   dashboardTimeRange,
   onDashboardTimeRangeChange,
   urlFilters,
+  runtimeForms,
 }: ModuleViewProps) {
   const { checkPermission } = useRBAC()
   const { companyIds } = useErpSession()
   const aiReporter = useErpAiSelectionReporter()
   const aiSelection = useErpAiSelectionState()
   const defaultCompanyId = companyIds?.[0]
+  const useRuntimeCreate = runtimeForms != null && runtimeForms.organizationId > 0
   const defaultTab = config.defaultTab ?? config.tabs[0]?.id ?? ""
   const [internalTab, setInternalTab] = useState(defaultTab)
   const activeTab = activeTabProp ?? internalTab
@@ -190,31 +205,62 @@ export function ModuleView({
                   />
                 )}
 
-                {tab.createForm && (
-                  <FormModal
-                    open={openForm === tab.id}
-                    onOpenChange={(open) => !open && setOpenForm(null)}
-                    config={tab.createForm}
-                    isPending={isPending}
-                    aiAssist={
-                      defaultCompanyId && tab.entityConfig
-                        ? {
-                            companyId: defaultCompanyId,
-                            formId: tab.createForm.id,
-                            entityType:
-                              resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
-                          }
-                        : undefined
-                    }
-                    onSubmit={async (formData) => {
-                      await onFormSubmit?.(
-                        tab.id,
-                        tab.createAction ?? tab.id,
-                        formData,
-                      )
-                    }}
-                  />
-                )}
+                {tab.createForm &&
+                  (useRuntimeCreate && runtimeForms ? (
+                    <RuntimeFormModal
+                      open={openForm === tab.id}
+                      onOpenChange={(open) => !open && setOpenForm(null)}
+                      staticConfig={tab.createForm}
+                      moduleId={config.id}
+                      formId={tab.createForm.id}
+                      organizationId={runtimeForms.organizationId}
+                      roleId={runtimeForms.roleId}
+                      userId={runtimeForms.userId}
+                      isPending={isPending}
+                      preferStdbVisibility
+          aiAssist={
+                        defaultCompanyId && tab.entityConfig
+                          ? {
+                              companyId: defaultCompanyId,
+                              formId: tab.createForm.id,
+                              entityType:
+                                resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
+                            }
+                          : undefined
+                      }
+                      onSubmit={async (formData) => {
+                        await onFormSubmit?.(
+                          tab.id,
+                          tab.createAction ?? tab.id,
+                          formData,
+                        )
+                      }}
+                    />
+                  ) : (
+                    <FormModal
+                      open={openForm === tab.id}
+                      onOpenChange={(open) => !open && setOpenForm(null)}
+                      config={tab.createForm}
+                      isPending={isPending}
+                      aiAssist={
+                        defaultCompanyId && tab.entityConfig
+                          ? {
+                              companyId: defaultCompanyId,
+                              formId: tab.createForm.id,
+                              entityType:
+                                resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
+                            }
+                          : undefined
+                      }
+                      onSubmit={async (formData) => {
+                        await onFormSubmit?.(
+                          tab.id,
+                          tab.createAction ?? tab.id,
+                          formData,
+                        )
+                      }}
+                    />
+                  ))}
               </div>
             )}
           </TabsContent>

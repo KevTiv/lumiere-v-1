@@ -16,6 +16,19 @@ import { Check, Loader2, Sparkles } from "lucide-react"
 import * as Icons from "lucide-react"
 import { toast } from "sonner"
 
+function isFieldVisible(field: FormField, values: Record<string, unknown>): boolean {
+  const rule = field.visibleWhen
+  if (!rule?.field) return true
+  return String(values[rule.field] ?? "") === String(rule.equals ?? "")
+}
+
+function visibleSectionFields(
+  fields: FormField[],
+  values: Record<string, unknown>,
+): FormField[] {
+  return fields.filter((field) => isFieldVisible(field, values))
+}
+
 interface ModularFormProps {
   config: FormConfig
   onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
@@ -231,14 +244,12 @@ export function ModularForm({
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
-    config.sections.forEach((section) => {
-      section.fields.forEach((field) => {
+    for (const section of config.sections) {
+      for (const field of visibleSectionFields(section.fields, values)) {
         const error = validateField(field, values[field.name])
-        if (error) {
-          newErrors[field.name] = error
-        }
-      })
-    })
+        if (error) newErrors[field.name] = error
+      }
+    }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -387,7 +398,7 @@ export function ModularForm({
                 </div>
               )}
               <div className="grid grid-cols-12 gap-x-4 gap-y-5">
-                {section.fields.map((field) => (
+                {visibleSectionFields(section.fields, values).map((field) => (
                   <FormFieldRenderer
                     key={field.id}
                     field={field}

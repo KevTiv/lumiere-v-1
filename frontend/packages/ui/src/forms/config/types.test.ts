@@ -40,6 +40,7 @@ describe("Form Configuration Types", () => {
       showInList: false,
       width: "Full",
       sectionId: "section1",
+      visibilityJson: "",
       createdAt: "2024-01-01",
       updatedAt: "2024-01-01",
     }
