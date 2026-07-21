@@ -887,6 +887,7 @@ pub fn convert_opportunity_to_sale_order(
         fiscal_position_id: None,
         team_id: opp.team_id,
         opportunity_id: Some(opportunity_id),
+        proposal_id: None,
         note: opp.description.clone(),
         terms_and_conditions: None,
         validity_days: None,

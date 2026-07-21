@@ -10,12 +10,14 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  CreateProposalParams,
+} from "./types";
+
 export default {
   organizationId: __t.u64(),
-  title: __t.string(),
-  clientName: __t.string(),
-  value: __t.f64(),
-  deadline: __t.option(__t.timestamp()),
-  description: __t.option(__t.string()),
-  documentFolderId: __t.option(__t.u64()),
+  companyId: __t.u64(),
+  get params() {
+    return CreateProposalParams;
+  },
 };

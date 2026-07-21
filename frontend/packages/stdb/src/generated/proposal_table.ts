@@ -17,6 +17,8 @@ import {
 export default __t.row({
   id: __t.u64().primaryKey(),
   organizationId: __t.u64().name("organization_id"),
+  companyId: __t.u64().name("company_id"),
+  currencyId: __t.u64().name("currency_id"),
   title: __t.string(),
   clientName: __t.string().name("client_name"),
   get status() {
@@ -30,6 +32,10 @@ export default __t.row({
   templateId: __t.option(__t.u64()).name("template_id"),
   partnerId: __t.option(__t.u64()).name("partner_id"),
   documentFolderId: __t.option(__t.u64()).name("document_folder_id"),
+  awardApprovedAt: __t.option(__t.timestamp()).name("award_approved_at"),
+  awardApprovedBy: __t.option(__t.identity()).name("award_approved_by"),
+  saleOrderId: __t.option(__t.u64()).name("sale_order_id"),
+  projectId: __t.option(__t.u64()).name("project_id"),
   createUid: __t.identity().name("create_uid"),
   createDate: __t.timestamp().name("create_date"),
   writeUid: __t.identity().name("write_uid"),

@@ -11,6 +11,8 @@ use super::proposal_status_type::ProposalStatus;
 pub struct Proposal {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
+    pub currency_id: u64,
     pub title: String,
     pub client_name: String,
     pub status: ProposalStatus,
@@ -22,6 +24,10 @@ pub struct Proposal {
     pub template_id: Option<u64>,
     pub partner_id: Option<u64>,
     pub document_folder_id: Option<u64>,
+    pub award_approved_at: Option<__sdk::Timestamp>,
+    pub award_approved_by: Option<__sdk::Identity>,
+    pub sale_order_id: Option<u64>,
+    pub project_id: Option<u64>,
     pub create_uid: __sdk::Identity,
     pub create_date: __sdk::Timestamp,
     pub write_uid: __sdk::Identity,
@@ -39,6 +45,8 @@ impl __sdk::InModule for Proposal {
 pub struct ProposalCols {
     pub id: __sdk::__query_builder::Col<Proposal, u64>,
     pub organization_id: __sdk::__query_builder::Col<Proposal, u64>,
+    pub company_id: __sdk::__query_builder::Col<Proposal, u64>,
+    pub currency_id: __sdk::__query_builder::Col<Proposal, u64>,
     pub title: __sdk::__query_builder::Col<Proposal, String>,
     pub client_name: __sdk::__query_builder::Col<Proposal, String>,
     pub status: __sdk::__query_builder::Col<Proposal, ProposalStatus>,
@@ -50,6 +58,10 @@ pub struct ProposalCols {
     pub template_id: __sdk::__query_builder::Col<Proposal, Option<u64>>,
     pub partner_id: __sdk::__query_builder::Col<Proposal, Option<u64>>,
     pub document_folder_id: __sdk::__query_builder::Col<Proposal, Option<u64>>,
+    pub award_approved_at: __sdk::__query_builder::Col<Proposal, Option<__sdk::Timestamp>>,
+    pub award_approved_by: __sdk::__query_builder::Col<Proposal, Option<__sdk::Identity>>,
+    pub sale_order_id: __sdk::__query_builder::Col<Proposal, Option<u64>>,
+    pub project_id: __sdk::__query_builder::Col<Proposal, Option<u64>>,
     pub create_uid: __sdk::__query_builder::Col<Proposal, __sdk::Identity>,
     pub create_date: __sdk::__query_builder::Col<Proposal, __sdk::Timestamp>,
     pub write_uid: __sdk::__query_builder::Col<Proposal, __sdk::Identity>,
@@ -63,6 +75,8 @@ impl __sdk::__query_builder::HasCols for Proposal {
         ProposalCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
+            currency_id: __sdk::__query_builder::Col::new(table_name, "currency_id"),
             title: __sdk::__query_builder::Col::new(table_name, "title"),
             client_name: __sdk::__query_builder::Col::new(table_name, "client_name"),
             status: __sdk::__query_builder::Col::new(table_name, "status"),
@@ -74,6 +88,10 @@ impl __sdk::__query_builder::HasCols for Proposal {
             template_id: __sdk::__query_builder::Col::new(table_name, "template_id"),
             partner_id: __sdk::__query_builder::Col::new(table_name, "partner_id"),
             document_folder_id: __sdk::__query_builder::Col::new(table_name, "document_folder_id"),
+            award_approved_at: __sdk::__query_builder::Col::new(table_name, "award_approved_at"),
+            award_approved_by: __sdk::__query_builder::Col::new(table_name, "award_approved_by"),
+            sale_order_id: __sdk::__query_builder::Col::new(table_name, "sale_order_id"),
+            project_id: __sdk::__query_builder::Col::new(table_name, "project_id"),
             create_uid: __sdk::__query_builder::Col::new(table_name, "create_uid"),
             create_date: __sdk::__query_builder::Col::new(table_name, "create_date"),
             write_uid: __sdk::__query_builder::Col::new(table_name, "write_uid"),
@@ -87,6 +105,7 @@ impl __sdk::__query_builder::HasCols for Proposal {
 ///
 /// Provides typed access to indexed columns for query building.
 pub struct ProposalIxCols {
+    pub company_id: __sdk::__query_builder::IxCol<Proposal, u64>,
     pub id: __sdk::__query_builder::IxCol<Proposal, u64>,
     pub organization_id: __sdk::__query_builder::IxCol<Proposal, u64>,
     pub status: __sdk::__query_builder::IxCol<Proposal, ProposalStatus>,
@@ -96,6 +115,7 @@ impl __sdk::__query_builder::HasIxCols for Proposal {
     type IxCols = ProposalIxCols;
     fn ix_cols(table_name: &'static str) -> Self::IxCols {
         ProposalIxCols {
+            company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             status: __sdk::__query_builder::IxCol::new(table_name, "status"),

@@ -410,6 +410,7 @@ pub(crate) fn fire_workflow_timer_internal(
             reason: Some("workflow timer fired".to_string()),
             correlation_id: params.correlation_id,
             causation_id: params.causation_id,
+            condition_snapshot: None,
         },
         RuntimeMutation::Transitions(vec![RuntimeTransition {
             token_id: timer.token_id,
@@ -856,6 +857,7 @@ fn record_successful_outbox_result(
             reason: None,
             correlation_id: params.correlation_id,
             causation_id: params.causation_id,
+            condition_snapshot: None,
         },
         RuntimeMutation::Transitions(vec![RuntimeTransition {
             token_id: outbox.token_id,

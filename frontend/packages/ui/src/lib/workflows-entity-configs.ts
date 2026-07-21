@@ -165,3 +165,122 @@ export const workflowInstancesTableConfig = (t: TFunction): EntityViewConfig => 
     emptyMessage: t("workflows.instances.emptyMessage"),
   },
 })
+
+export const workflowTimersLateTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "workflow-timers-late-table",
+  title: t("workflows.operations.timersTitle", { defaultValue: "Pending timers" }),
+  description: t("workflows.operations.timersDescription", {
+    defaultValue: "Pending workflow timers awaiting fire or cancel",
+  }),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["instanceId", "instance_id", "semanticKey", "semantic_key"],
+    columns: [
+      { key: "id", label: "Timer", width: "min-w-24" },
+      { key: "instanceId", label: "Instance", width: "min-w-28" },
+      { key: "dueAt", label: "Due", type: "date", width: "min-w-36" },
+      { key: "revision", label: "Rev", type: "number", align: "right" },
+      { key: "semanticKey", label: "Key", width: "min-w-40" },
+    ],
+    emptyMessage: t("workflows.operations.timersEmpty", {
+      defaultValue: "No pending timers",
+    }),
+  },
+})
+
+export const workflowOutboxDeadTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "workflow-outbox-dead-table",
+  title: t("workflows.operations.outboxTitle", { defaultValue: "Dead-letter outbox" }),
+  description: t("workflows.operations.outboxDescription", {
+    defaultValue: "Failed or ambiguous external deliveries needing operator action",
+  }),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["actionKey", "action_key", "instanceId", "instance_id"],
+    columns: [
+      { key: "id", label: "Outbox", width: "min-w-24" },
+      { key: "instanceId", label: "Instance", width: "min-w-28" },
+      { key: "actionKey", label: "Action", width: "min-w-40" },
+      { key: "status", label: "Status", width: "min-w-32" },
+      { key: "errorSummary", label: "Error", width: "min-w-48" },
+      { key: "revision", label: "Rev", type: "number", align: "right" },
+    ],
+    emptyMessage: t("workflows.operations.outboxEmpty", {
+      defaultValue: "No dead-letter outbox rows",
+    }),
+  },
+})
+
+export const workflowMigrationPlansTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "workflow-migration-plans-table",
+  title: t("workflows.migration.plansTitle", { defaultValue: "Migration plans" }),
+  description: t("workflows.migration.plansDescription", {
+    defaultValue: "Version-to-version mappings for active instance cutover",
+  }),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["workflowId", "workflow_id"],
+    columns: [
+      { key: "id", label: "Plan", width: "min-w-24" },
+      { key: "workflowId", label: "Workflow", width: "min-w-28" },
+      {
+        key: "sourceWorkflowVersionId",
+        label: "From version",
+        width: "min-w-28",
+      },
+      {
+        key: "targetWorkflowVersionId",
+        label: "To version",
+        width: "min-w-28",
+      },
+      { key: "compatibilityTag", label: "Compatibility", width: "min-w-32" },
+      { key: "active", label: "Active", width: "min-w-20" },
+      { key: "revision", label: "Rev", type: "number", align: "right" },
+    ],
+    emptyMessage: t("workflows.migration.plansEmpty", {
+      defaultValue: "No migration plans yet",
+    }),
+  },
+})
+
+export const workflowMigrationResultsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "workflow-migration-results-table",
+  title: t("workflows.migration.resultsTitle", { defaultValue: "Migration results" }),
+  description: t("workflows.migration.resultsDescription", {
+    defaultValue: "Per-instance migration outcomes",
+  }),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["instanceId", "instance_id", "planId", "plan_id"],
+    columns: [
+      { key: "id", label: "Result", width: "min-w-24" },
+      { key: "planId", label: "Plan", width: "min-w-24" },
+      { key: "instanceId", label: "Instance", width: "min-w-28" },
+      { key: "outcomeTag", label: "Outcome", width: "min-w-28" },
+      { key: "reason", label: "Reason", width: "min-w-40" },
+      {
+        key: "priorInstanceRevision",
+        label: "Prior rev",
+        type: "number",
+        align: "right",
+      },
+      {
+        key: "nextInstanceRevision",
+        label: "Next rev",
+        type: "number",
+        align: "right",
+      },
+    ],
+    emptyMessage: t("workflows.migration.resultsEmpty", {
+      defaultValue: "No migration results yet",
+    }),
+  },
+})

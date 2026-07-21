@@ -41,6 +41,7 @@ export default __t.row({
   teamId: __t.option(__t.u64()).name("team_id"),
   originSoId: __t.option(__t.u64()).name("origin_so_id"),
   opportunityId: __t.option(__t.u64()).name("opportunity_id"),
+  proposalId: __t.option(__t.u64()).name("proposal_id"),
   campaignId: __t.option(__t.u64()).name("campaign_id"),
   mediumId: __t.option(__t.u64()).name("medium_id"),
   sourceId: __t.option(__t.u64()).name("source_id"),

@@ -647,6 +647,7 @@ pub(crate) fn decide_workflow_human_task_for_actor(
             reason: comment.clone(),
             correlation_id: params.correlation_id.clone(),
             causation_id: params.causation_id.clone(),
+            condition_snapshot: None,
         },
         RuntimeMutation::Transitions(vec![RuntimeTransition {
             token_id: token.id,
@@ -1205,6 +1206,7 @@ fn complete_guarded_action_node(
             reason: None,
             correlation_id: params.correlation_id.clone(),
             causation_id: params.causation_id.clone(),
+            condition_snapshot: None,
         },
         RuntimeMutation::Transitions(vec![RuntimeTransition {
             token_id: token.id,

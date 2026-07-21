@@ -733,6 +733,17 @@
     "state",
     "reviewer_employee_id"
   ],
+  "AddProposalLineItemParams": [
+    "section_id",
+    "product_id",
+    "product_name",
+    "product_variant_id",
+    "description",
+    "quantity",
+    "price_unit",
+    "discount",
+    "notes"
+  ],
   "AddPurchaseOrderLineParams": [
     "product_id",
     "quantity",
@@ -1237,6 +1248,9 @@
     "write_date",
     "metadata"
   ],
+  "AnswerProposalClarificationParams": [
+    "answer"
+  ],
   "AppendAiAgentRunStepParams": [
     "step_no",
     "tool_name",
@@ -1286,6 +1300,16 @@
   ],
   "ApplyProjectChangeOrderParams": [
     "metadata"
+  ],
+  "ApplyProposalAnalysisParams": [
+    "source",
+    "is_mock",
+    "findings_json",
+    "requirements_json",
+    "evaluation_criteria_json",
+    "suggested_sections_json",
+    "score_json",
+    "materialize_compliance"
   ],
   "ApplySalePromotionParams": [
     "promotion_code"
@@ -1833,6 +1857,10 @@
     "manager_rating",
     "summary"
   ],
+  "CompleteProposalIntegrationIntentParams": [
+    "result_document_id",
+    "metadata"
+  ],
   "CompleteQueueJobParams": [
     "expected_revision",
     "worker_id",
@@ -2169,6 +2197,14 @@
   "ConvertOpportunityParams": [
     "pricelist_id",
     "warehouse_id"
+  ],
+  "ConvertProposalToProjectParams": [
+    "bill_type",
+    "pricing_type"
+  ],
+  "ConvertProposalToSaleOrderParams": [
+    "warehouse_id",
+    "pricelist_id"
   ],
   "Country": [
     "code",
@@ -3382,6 +3418,13 @@
     "notes",
     "metadata"
   ],
+  "CreateFleetVehicleParams": [
+    "name",
+    "vehicle_type",
+    "license_plate",
+    "driver_name",
+    "metadata"
+  ],
   "CreateFormConfigParams": [
     "module_id",
     "form_id",
@@ -4321,6 +4364,49 @@
     "income_account_id",
     "metadata"
   ],
+  "CreateProposalClarificationParams": [
+    "author_name",
+    "author_email",
+    "is_portal_principal",
+    "question"
+  ],
+  "CreateProposalClauseParams": [
+    "clause_key",
+    "title",
+    "body",
+    "locale",
+    "country_pack_key",
+    "is_active",
+    "metadata"
+  ],
+  "CreateProposalIntegrationIntentParams": [
+    "proposal_version_id",
+    "intent_type",
+    "idempotency_key",
+    "payload",
+    "metadata"
+  ],
+  "CreateProposalParams": [
+    "title",
+    "client_name",
+    "currency_id",
+    "value",
+    "deadline",
+    "description",
+    "template_id",
+    "partner_id",
+    "document_folder_id",
+    "metadata"
+  ],
+  "CreateProposalTemplateParams": [
+    "name",
+    "category",
+    "locale",
+    "country_pack_key",
+    "sections_json",
+    "is_active",
+    "metadata"
+  ],
   "CreatePublicHolidayParams": [
     "calendar_id",
     "pack_key",
@@ -4683,6 +4769,7 @@
     "fiscal_position_id",
     "team_id",
     "opportunity_id",
+    "proposal_id",
     "note",
     "terms_and_conditions",
     "validity_days",
@@ -5562,6 +5649,16 @@
     "valid_until",
     "reason"
   ],
+  "CreateWorkflowMigrationPlanParams": [
+    "company_id",
+    "workflow_id",
+    "source_workflow_version_id",
+    "target_workflow_version_id",
+    "node_mappings",
+    "fork_mappings",
+    "edge_mappings",
+    "active"
+  ],
   "CreateWorkflowParams": [
     "workflow_key",
     "model",
@@ -6251,6 +6348,10 @@
     "last_error",
     "metadata"
   ],
+  "FailProposalIntegrationIntentParams": [
+    "last_error",
+    "metadata"
+  ],
   "FailSubscriptionPaymentIntentParams": [
     "last_error",
     "record_dunning_failure"
@@ -6327,6 +6428,7 @@
   "FleetVehicle": [
     "id",
     "organization_id",
+    "company_id",
     "name",
     "license_plate",
     "driver_name",
@@ -6340,7 +6442,6 @@
     "fuel_level",
     "odometer_km",
     "vehicle_type",
-    "company_id",
     "create_uid",
     "create_date",
     "write_uid",
@@ -7839,6 +7940,14 @@
     "is_active",
     "metadata"
   ],
+  "LinkProposalVersionEsignParams": [
+    "document_id",
+    "proposal_version_id",
+    "provider",
+    "external_envelope_id",
+    "signers_json",
+    "metadata"
+  ],
   "LinkSubcontractorCostParams": [
     "project_id",
     "purchase_order_id",
@@ -7986,6 +8095,16 @@
   "MessageTemplateVariable": [
     "key",
     "value"
+  ],
+  "MigrateWorkflowInstanceParams": [
+    "company_id",
+    "plan_id",
+    "instance_id",
+    "expected_instance_revision",
+    "reason",
+    "idempotency_key",
+    "correlation_id",
+    "causation_id"
   ],
   "ModuleConfigInput": [
     "module_account",
@@ -8955,6 +9074,11 @@
     "reference",
     "metadata"
   ],
+  "PreflightWorkflowMigrationParams": [
+    "company_id",
+    "plan_id",
+    "instance_id"
+  ],
   "PrivacyConsent": [
     "id",
     "organization_id",
@@ -9596,6 +9720,8 @@
   "Proposal": [
     "id",
     "organization_id",
+    "company_id",
+    "currency_id",
     "title",
     "client_name",
     "status",
@@ -9607,6 +9733,68 @@
     "template_id",
     "partner_id",
     "document_folder_id",
+    "award_approved_at",
+    "award_approved_by",
+    "sale_order_id",
+    "project_id",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "ProposalAnalysis": [
+    "id",
+    "organization_id",
+    "company_id",
+    "proposal_id",
+    "source",
+    "is_mock",
+    "findings_json",
+    "requirements_json",
+    "evaluation_criteria_json",
+    "suggested_sections_json",
+    "score_json",
+    "create_uid",
+    "create_date"
+  ],
+  "ProposalBidDecision": [
+    "id",
+    "organization_id",
+    "company_id",
+    "proposal_id",
+    "decision",
+    "rationale",
+    "decided_by",
+    "decided_at"
+  ],
+  "ProposalClarification": [
+    "id",
+    "organization_id",
+    "company_id",
+    "proposal_id",
+    "author_name",
+    "author_email",
+    "is_portal_principal",
+    "question",
+    "answer",
+    "answered_by",
+    "answered_at",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "ProposalClause": [
+    "id",
+    "organization_id",
+    "company_id",
+    "clause_key",
+    "title",
+    "body",
+    "locale",
+    "country_pack_key",
+    "is_active",
     "create_uid",
     "create_date",
     "write_uid",
@@ -9626,6 +9814,45 @@
     "resolved_by",
     "create_date",
     "write_date"
+  ],
+  "ProposalComplianceRequirement": [
+    "id",
+    "organization_id",
+    "company_id",
+    "proposal_id",
+    "requirement_key",
+    "title",
+    "description",
+    "is_required",
+    "is_complete",
+    "is_waived",
+    "waiver_rationale",
+    "evidence_document_id",
+    "sequence",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
+  "ProposalIntegrationIntent": [
+    "id",
+    "organization_id",
+    "company_id",
+    "proposal_id",
+    "proposal_version_id",
+    "intent_type",
+    "status",
+    "idempotency_key",
+    "payload",
+    "result_document_id",
+    "last_error",
+    "attempt_count",
+    "applied_at",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
   ],
   "ProposalLineItem": [
     "id",
@@ -9657,6 +9884,21 @@
     "cursor_position",
     "last_seen"
   ],
+  "ProposalProcurementScore": [
+    "id",
+    "organization_id",
+    "company_id",
+    "proposal_id",
+    "country_pack_key",
+    "score_kind",
+    "score_value",
+    "max_value",
+    "notes",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date"
+  ],
   "ProposalSection": [
     "id",
     "organization_id",
@@ -9667,6 +9909,7 @@
     "ai_suggestion",
     "sequence",
     "word_count",
+    "revision",
     "create_uid",
     "create_date",
     "write_uid",
@@ -9680,8 +9923,25 @@
     "content",
     "doc_type",
     "word_count",
+    "document_id",
     "added_by",
     "added_at"
+  ],
+  "ProposalTemplate": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "category",
+    "locale",
+    "country_pack_key",
+    "sections_json",
+    "is_active",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
   ],
   "ProposalVersion": [
     "id",
@@ -10214,6 +10474,13 @@
     "reference",
     "metadata"
   ],
+  "RecomputeWorkflowTimersParams": [
+    "company_id",
+    "calendar_key",
+    "expected_pending_count",
+    "confirm",
+    "reason"
+  ],
   "ReconcileAccountBankStatementLineParams": [
     "move_ids",
     "amount_residual"
@@ -10309,6 +10576,10 @@
     "ip_address",
     "user_agent",
     "metadata"
+  ],
+  "RecordProposalBidDecisionParams": [
+    "decision",
+    "rationale"
   ],
   "RecordPurchasingIntegrationResultParams": [
     "status",
@@ -10775,6 +11046,7 @@
     "team_id",
     "origin_so_id",
     "opportunity_id",
+    "proposal_id",
     "campaign_id",
     "medium_id",
     "source_id",
@@ -13386,11 +13658,31 @@
     "effective_to",
     "metadata"
   ],
+  "UpdateProposalLineItemParams": [
+    "quantity",
+    "price_unit",
+    "discount",
+    "notes",
+    "description"
+  ],
+  "UpdateProposalParams": [
+    "title",
+    "client_name",
+    "currency_id",
+    "value",
+    "deadline",
+    "description",
+    "template_id",
+    "partner_id",
+    "document_folder_id",
+    "metadata"
+  ],
   "UpdateProposalSourceDocParams": [
     "name",
     "content",
     "doc_type",
-    "word_count"
+    "word_count",
+    "document_id"
   ],
   "UpdatePublicHolidayParams": [
     "calendar_id",
@@ -13775,6 +14067,13 @@
     "name",
     "is_active"
   ],
+  "UpdateVehiclePositionParams": [
+    "latitude",
+    "longitude",
+    "speed_kmh",
+    "heading",
+    "status"
+  ],
   "UpdateWarehouse3DZoneParams": [
     "display_type",
     "color",
@@ -13939,6 +14238,31 @@
     "payment_hold",
     "notes",
     "metadata"
+  ],
+  "UpsertProposalComplianceRequirementParams": [
+    "requirement_key",
+    "title",
+    "description",
+    "is_required",
+    "is_complete",
+    "is_waived",
+    "waiver_rationale",
+    "evidence_document_id",
+    "sequence"
+  ],
+  "UpsertProposalProcurementScoreParams": [
+    "country_pack_key",
+    "score_kind",
+    "score_value",
+    "max_value",
+    "notes"
+  ],
+  "UpsertProposalSectionParams": [
+    "title",
+    "content",
+    "status",
+    "sequence",
+    "ai_suggestion"
   ],
   "UpsertSearchEmbeddingParams": [
     "content_type",
@@ -14350,6 +14674,10 @@
     "input_schema_version",
     "input"
   ],
+  "WorkflowBranchKeyMigrationMapping": [
+    "from_branch_key",
+    "to_branch_key"
+  ],
   "WorkflowCalendar": [
     "id",
     "calendar_key",
@@ -14533,6 +14861,32 @@
     "write_date",
     "metadata"
   ],
+  "WorkflowEdgeMigrationMapping": [
+    "from_edge_key",
+    "to_edge_key"
+  ],
+  "WorkflowFork": [
+    "id",
+    "organization_id",
+    "company_id",
+    "instance_id",
+    "workflow_version_id",
+    "fork_node_key",
+    "join_node_key",
+    "split_kind",
+    "expected_branch_keys",
+    "emitted_branch_keys",
+    "open",
+    "revision",
+    "created_by",
+    "created_at",
+    "closed_at"
+  ],
+  "WorkflowForkMigrationMapping": [
+    "from_fork_node_key",
+    "to_fork_node_key",
+    "branch_key_mappings"
+  ],
   "WorkflowHumanTask": [
     "id",
     "organization_id",
@@ -14571,6 +14925,16 @@
     "correlation_id",
     "created_at",
     "updated_at"
+  ],
+  "WorkflowHumanTaskCandidate": [
+    "id",
+    "organization_id",
+    "company_id",
+    "task_id",
+    "candidate_identity",
+    "decision",
+    "decided_at",
+    "decided_by"
   ],
   "WorkflowHumanTaskEvent": [
     "id",
@@ -14633,6 +14997,68 @@
     "correlation_id",
     "causation_id"
   ],
+  "WorkflowJoinArrival": [
+    "id",
+    "organization_id",
+    "company_id",
+    "instance_id",
+    "fork_id",
+    "join_node_key",
+    "branch_key",
+    "arrival_token_id",
+    "recorded_by",
+    "recorded_at"
+  ],
+  "WorkflowMigrationInstanceResult": [
+    "id",
+    "organization_id",
+    "company_id",
+    "plan_id",
+    "instance_id",
+    "source_workflow_version_id",
+    "target_workflow_version_id",
+    "outcome",
+    "reason",
+    "mapping_fingerprint",
+    "idempotency_key",
+    "input_hash",
+    "prior_instance_revision",
+    "next_instance_revision",
+    "error_summary",
+    "recorded_by",
+    "recorded_at"
+  ],
+  "WorkflowMigrationPlan": [
+    "id",
+    "organization_id",
+    "company_id",
+    "workflow_id",
+    "source_workflow_version_id",
+    "target_workflow_version_id",
+    "node_mappings",
+    "fork_mappings",
+    "edge_mappings",
+    "compatibility",
+    "active",
+    "revision",
+    "created_by",
+    "created_at",
+    "updated_by",
+    "updated_at"
+  ],
+  "WorkflowMigrationPreflight": [
+    "id",
+    "organization_id",
+    "company_id",
+    "plan_id",
+    "instance_id",
+    "compatibility",
+    "compatible",
+    "errors",
+    "input_hash",
+    "recorded_by",
+    "recorded_at"
+  ],
   "WorkflowNode": [
     "id",
     "organization_id",
@@ -14655,6 +15081,10 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "WorkflowNodeMigrationMapping": [
+    "from_node_key",
+    "to_node_key"
   ],
   "WorkflowOutbox": [
     "id",

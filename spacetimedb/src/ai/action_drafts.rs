@@ -718,6 +718,7 @@ fn build_create_sale_order_params(
         fiscal_position_id: obj.get("fiscal_position_id").and_then(json_u64),
         team_id: obj.get("team_id").and_then(json_u64),
         opportunity_id: obj.get("opportunity_id").and_then(json_u64),
+        proposal_id: None,
         note: json_string(obj, "note"),
         terms_and_conditions: json_string(obj, "terms_and_conditions"),
         validity_days: obj

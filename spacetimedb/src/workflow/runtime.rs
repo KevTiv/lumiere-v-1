@@ -11,6 +11,10 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::require_company_in_organization;
 use crate::helpers::check_permission;
+use crate::workflow::branches::{
+    join_is_ready, paired_join_key, record_join_arrival, select_fork_edges, workflow_fork,
+    workflow_join_arrival, WorkflowFork,
+};
 use crate::workflow::definitions::{
     workflow, workflow_edge, workflow_node, workflow_version, WorkflowNodeKind,
     WorkflowVersionStatus,
@@ -285,6 +289,8 @@ pub(crate) struct RuntimeEventContext {
     pub reason: Option<String>,
     pub correlation_id: String,
     pub causation_id: Option<String>,
+    /// Optional snapshot for conditioned fork expansion (signal path).
+    pub condition_snapshot: Option<ConditionSnapshot>,
 }
 
 /// Apply a prevalidated runtime event atomically.
@@ -652,6 +658,7 @@ pub fn signal_workflow(
             reason: None,
             correlation_id: params.correlation_id.clone(),
             causation_id: params.causation_id.clone(),
+            condition_snapshot: Some(params.snapshot.clone()),
         },
         RuntimeMutation::Transitions(transitions),
     )?;
@@ -714,6 +721,7 @@ pub fn cancel_workflow(
             reason: Some(params.reason),
             correlation_id: params.correlation_id.clone(),
             causation_id: params.causation_id.clone(),
+            condition_snapshot: None,
         },
         RuntimeMutation::Cancel,
     )?;
@@ -741,7 +749,118 @@ struct ValidatedTransition {
     next_token_revision: u64,
     target_node_id: u64,
     target_node_key: String,
-    target_is_end: bool,
+    target_kind: WorkflowNodeKind,
+    edge_id: u64,
+}
+
+fn expand_fork_from_parent(
+    ctx: &ReducerContext,
+    instance: &WorkflowInstance,
+    parent: &WorkflowToken,
+    fork_node: &crate::workflow::definitions::WorkflowNode,
+    join_node_key: Option<String>,
+    snapshot: Option<&ConditionSnapshot>,
+) -> Result<(WorkflowFork, Vec<WorkflowToken>), String> {
+    let version = ctx
+        .db
+        .workflow_version()
+        .id()
+        .find(&instance.workflow_version_id)
+        .ok_or("workflow version not found")?;
+    let edges: Vec<_> = ctx
+        .db
+        .workflow_edge()
+        .workflow_edge_by_from()
+        .filter(&fork_node.node_key)
+        .filter(|edge| edge.workflow_version_id == instance.workflow_version_id)
+        .collect();
+    let edge_refs: Vec<_> = edges.iter().collect();
+    let selected = select_fork_edges(fork_node, &edge_refs, &version.snapshot_fields, snapshot)?;
+    let emitted: Vec<String> = selected.iter().map(|edge| edge.edge_key.clone()).collect();
+    let expected = emitted.clone();
+
+    let fork = ctx.db.workflow_fork().insert(WorkflowFork {
+        id: 0,
+        organization_id: instance.organization_id,
+        company_id: instance.company_id,
+        instance_id: instance.id,
+        workflow_version_id: instance.workflow_version_id,
+        fork_node_key: fork_node.node_key.clone(),
+        join_node_key,
+        split_kind: fork_node.split_kind.clone(),
+        expected_branch_keys: expected,
+        emitted_branch_keys: emitted,
+        open: true,
+        revision: 0,
+        created_by: ctx.sender(),
+        created_at: ctx.timestamp,
+        closed_at: None,
+    });
+
+    let mut children = Vec::with_capacity(selected.len());
+    for edge in selected {
+        let target = ctx
+            .db
+            .workflow_node()
+            .workflow_node_by_version()
+            .filter(&instance.workflow_version_id)
+            .find(|node| node.node_key == edge.to_node_key)
+            .ok_or("fork target node not found")?;
+        let mut lineage = parent.lineage.clone();
+        lineage.push(parent.id);
+        let child = ctx.db.workflow_token().insert(WorkflowToken {
+            id: 0,
+            organization_id: instance.organization_id,
+            company_id: instance.company_id,
+            instance_id: instance.id,
+            workflow_version_id: instance.workflow_version_id,
+            node_id: target.id,
+            node_key: target.node_key.clone(),
+            state: if target.kind == WorkflowNodeKind::End {
+                WorkflowTokenState::Completed
+            } else {
+                WorkflowTokenState::Active
+            },
+            revision: 1,
+            parent_token_id: Some(parent.id),
+            fork_id: Some(fork.id),
+            branch_key: Some(edge.edge_key.clone()),
+            lineage,
+            created_at: ctx.timestamp,
+            consumed_at: (target.kind == WorkflowNodeKind::End).then_some(ctx.timestamp),
+        });
+        children.push(child);
+    }
+    Ok((fork, children))
+}
+
+fn close_fork(ctx: &ReducerContext, fork: WorkflowFork) -> Result<WorkflowFork, String> {
+    if !fork.open {
+        return Ok(fork);
+    }
+    let siblings: Vec<_> = ctx
+        .db
+        .workflow_token()
+        .workflow_token_by_instance()
+        .filter(&fork.instance_id)
+        .filter(|token| {
+            token.fork_id == Some(fork.id) && token.state == WorkflowTokenState::Active
+        })
+        .collect();
+    for token in siblings {
+        ctx.db.workflow_token().id().update(WorkflowToken {
+            state: WorkflowTokenState::Cancelled,
+            revision: token.revision.saturating_add(1),
+            consumed_at: Some(ctx.timestamp),
+            ..token
+        });
+    }
+    Ok(ctx.db.workflow_fork().id().update(WorkflowFork {
+        open: false,
+        revision: fork.revision.saturating_add(1),
+        closed_at: Some(ctx.timestamp),
+        ..fork
+    }))
 }
 
 fn apply_transitions(
@@ -822,7 +941,8 @@ fn apply_transitions(
             next_token_revision,
             target_node_id: target.id,
             target_node_key: target.node_key,
-            target_is_end: target.kind == WorkflowNodeKind::End,
+            target_kind: target.kind,
+            edge_id: edge.id,
         });
     }
 
@@ -841,13 +961,6 @@ fn apply_transitions(
     if validated.len() > current_active {
         return Err("runtime transition count exceeds active token count".to_string());
     }
-    let created_active = validated.iter().filter(|item| !item.target_is_end).count();
-    let next_active = current_active - validated.len() + created_active;
-    let next_state = if next_active == 0 {
-        WorkflowInstanceState::Completed
-    } else {
-        WorkflowInstanceState::Active
-    };
     let next_revision = instance
         .revision
         .checked_add(1)
@@ -860,9 +973,162 @@ fn apply_transitions(
             consumed_at: Some(ctx.timestamp),
             ..item.token.clone()
         });
+
+        if item.target_kind == WorkflowNodeKind::Join {
+            let fork_id = consumed.fork_id.ok_or("join arrival requires a fork_id")?;
+            let branch_key = consumed
+                .branch_key
+                .clone()
+                .ok_or("join arrival requires a branch_key")?;
+            let fork = ctx
+                .db
+                .workflow_fork()
+                .id()
+                .find(&fork_id)
+                .ok_or("workflow fork not found")?;
+            if !fork.open || fork.instance_id != instance.id {
+                return Err("workflow fork is not open for this join".to_string());
+            }
+            let join_key = item.target_node_key.clone();
+            let (_arrival, newly_recorded) = record_join_arrival(
+                ctx,
+                instance.organization_id,
+                instance.company_id,
+                instance.id,
+                &fork,
+                &join_key,
+                &branch_key,
+                consumed.id,
+            )?;
+            if newly_recorded {
+                let arrival_count = ctx
+                    .db
+                    .workflow_join_arrival()
+                    .workflow_join_arrival_by_fork()
+                    .filter(&fork.id)
+                    .filter(|row| row.join_node_key == join_key)
+                    .count();
+                if join_is_ready(&fork, arrival_count) {
+                    let closed = close_fork(ctx, fork)?;
+                    let out_edge = ctx
+                        .db
+                        .workflow_edge()
+                        .workflow_edge_by_from()
+                        .filter(&join_key)
+                        .find(|edge| edge.workflow_version_id == instance.workflow_version_id)
+                        .ok_or("join node has no outgoing edge")?;
+                    let past = ctx
+                        .db
+                        .workflow_node()
+                        .workflow_node_by_version()
+                        .filter(&instance.workflow_version_id)
+                        .find(|node| node.node_key == out_edge.to_node_key)
+                        .ok_or("join outgoing target missing")?;
+                    let mut lineage = consumed.lineage.clone();
+                    lineage.push(consumed.id);
+                    let target_state = if past.kind == WorkflowNodeKind::End {
+                        WorkflowTokenState::Completed
+                    } else {
+                        WorkflowTokenState::Active
+                    };
+                    let target = ctx.db.workflow_token().insert(WorkflowToken {
+                        id: 0,
+                        organization_id: instance.organization_id,
+                        company_id: instance.company_id,
+                        instance_id: instance.id,
+                        workflow_version_id: instance.workflow_version_id,
+                        node_id: past.id,
+                        node_key: past.node_key.clone(),
+                        state: target_state.clone(),
+                        revision: 1,
+                        parent_token_id: Some(consumed.id),
+                        fork_id: None,
+                        branch_key: None,
+                        lineage,
+                        created_at: ctx.timestamp,
+                        consumed_at: (past.kind == WorkflowNodeKind::End).then_some(ctx.timestamp),
+                    });
+                    let _ = closed;
+                    record_event(
+                        ctx,
+                        instance,
+                        Some(&item.token),
+                        Some(&target),
+                        WorkflowCommandKind::Branch,
+                        Some(instance.state.clone()),
+                        WorkflowInstanceState::Active,
+                        Some(WorkflowTokenState::Active),
+                        Some(target.state.clone()),
+                        instance.revision,
+                        next_revision,
+                        &event.idempotency_key,
+                        &event.input_hash,
+                        event.action_key.as_deref(),
+                        event.condition_result,
+                        event.authorization_outcome.clone(),
+                        event.acting_for,
+                        event.matched_role_id,
+                        event.delegation_id,
+                        event.domain_receipt.as_deref(),
+                        event.reason.as_deref(),
+                        &event.correlation_id,
+                        event.causation_id.as_deref(),
+                    );
+                }
+            }
+            continue;
+        }
+
+        if item.target_kind == WorkflowNodeKind::Fork {
+            let fork_node = ctx
+                .db
+                .workflow_node()
+                .id()
+                .find(&item.target_node_id)
+                .ok_or("fork node not found")?;
+            let join_key = paired_join_key(ctx, instance.workflow_version_id, &fork_node.node_key)?;
+            let (_fork, children) = expand_fork_from_parent(
+                ctx,
+                instance,
+                &consumed,
+                &fork_node,
+                join_key,
+                event.condition_snapshot.as_ref(),
+            )?;
+            for child in &children {
+                record_event(
+                    ctx,
+                    instance,
+                    Some(&item.token),
+                    Some(child),
+                    WorkflowCommandKind::Branch,
+                    Some(instance.state.clone()),
+                    WorkflowInstanceState::Active,
+                    Some(WorkflowTokenState::Active),
+                    Some(child.state.clone()),
+                    instance.revision,
+                    next_revision,
+                    &event.idempotency_key,
+                    &event.input_hash,
+                    event.action_key.as_deref(),
+                    event.condition_result,
+                    event.authorization_outcome.clone(),
+                    event.acting_for,
+                    event.matched_role_id,
+                    event.delegation_id,
+                    event.domain_receipt.as_deref(),
+                    event.reason.as_deref(),
+                    &event.correlation_id,
+                    event.causation_id.as_deref(),
+                );
+            }
+            continue;
+        }
+
         let mut lineage = item.token.lineage.clone();
         lineage.push(item.token.id);
-        let target_state = if item.target_is_end {
+        let target_is_end = item.target_kind == WorkflowNodeKind::End;
+        let target_state = if target_is_end {
             WorkflowTokenState::Completed
         } else {
             WorkflowTokenState::Active
@@ -882,7 +1148,7 @@ fn apply_transitions(
             branch_key: consumed.branch_key.clone(),
             lineage,
             created_at: ctx.timestamp,
-            consumed_at: item.target_is_end.then_some(ctx.timestamp),
+            consumed_at: target_is_end.then_some(ctx.timestamp),
         });
         record_event(
             ctx,
@@ -891,7 +1157,7 @@ fn apply_transitions(
             Some(&target),
             event.command_kind.clone(),
             Some(instance.state.clone()),
-            next_state.clone(),
+            WorkflowInstanceState::Active,
             Some(WorkflowTokenState::Active),
             Some(target.state.clone()),
             instance.revision,
@@ -909,7 +1175,21 @@ fn apply_transitions(
             &event.correlation_id,
             event.causation_id.as_deref(),
         );
+        let _ = item.edge_id;
     }
+
+    let next_active = ctx
+        .db
+        .workflow_token()
+        .workflow_token_by_instance()
+        .filter(&instance.id)
+        .filter(|token| token.state == WorkflowTokenState::Active)
+        .count();
+    let next_state = if next_active == 0 {
+        WorkflowInstanceState::Completed
+    } else {
+        WorkflowInstanceState::Active
+    };
 
     let updated = ctx.db.workflow_instance().id().update(WorkflowInstance {
         state: next_state.clone(),

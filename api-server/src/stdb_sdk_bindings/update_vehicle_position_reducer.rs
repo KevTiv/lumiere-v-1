@@ -4,26 +4,24 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::update_vehicle_position_params_type::UpdateVehiclePositionParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct UpdateVehiclePositionArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub vehicle_id: u64,
-    pub latitude: f64,
-    pub longitude: f64,
-    pub speed_kmh: f64,
-    pub heading: f64,
-    pub status: String,
+    pub params: UpdateVehiclePositionParams,
 }
 
 impl From<UpdateVehiclePositionArgs> for super::Reducer {
     fn from(args: UpdateVehiclePositionArgs) -> Self {
         Self::UpdateVehiclePosition {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             vehicle_id: args.vehicle_id,
-            latitude: args.latitude,
-            longitude: args.longitude,
-            speed_kmh: args.speed_kmh,
-            heading: args.heading,
-            status: args.status,
+            params: args.params,
         }
     }
 }
@@ -45,20 +43,16 @@ pub trait update_vehicle_position {
     /// /// Use [`update_vehicle_position:update_vehicle_position_then`] to run a callback after the reducer completes.
     fn update_vehicle_position(
         &self,
+        organization_id: u64,
+        company_id: u64,
         vehicle_id: u64,
-        latitude: f64,
-        longitude: f64,
-        speed_kmh: f64,
-        heading: f64,
-        status: String,
+        params: UpdateVehiclePositionParams,
     ) -> __sdk::Result<()> {
         self.update_vehicle_position_then(
+            organization_id,
+            company_id,
             vehicle_id,
-            latitude,
-            longitude,
-            speed_kmh,
-            heading,
-            status,
+            params,
             |_, _| {},
         )
     }
@@ -71,12 +65,10 @@ pub trait update_vehicle_position {
     ///  and its status can be observed with the `callback`.
     fn update_vehicle_position_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         vehicle_id: u64,
-        latitude: f64,
-        longitude: f64,
-        speed_kmh: f64,
-        heading: f64,
-        status: String,
+        params: UpdateVehiclePositionParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -87,12 +79,10 @@ pub trait update_vehicle_position {
 impl update_vehicle_position for super::RemoteReducers {
     fn update_vehicle_position_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         vehicle_id: u64,
-        latitude: f64,
-        longitude: f64,
-        speed_kmh: f64,
-        heading: f64,
-        status: String,
+        params: UpdateVehiclePositionParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -100,12 +90,10 @@ impl update_vehicle_position for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             UpdateVehiclePositionArgs {
+                organization_id,
+                company_id,
                 vehicle_id,
-                latitude,
-                longitude,
-                speed_kmh,
-                heading,
-                status,
+                params,
             },
             callback,
         )

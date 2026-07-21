@@ -346,6 +346,10 @@ pub async fn execute_resource_query(
         | "workflow-human-task-events"
         | "workflow-timers-late"
         | "workflow-outbox-dead"
+        | "workflow-decision-events"
+        | "workflow-migration-plans"
+        | "workflow-migration-preflights"
+        | "workflow-migration-results"
         | "workflow-activities"
         | "workflow-transitions"
         | "workflow-workitems" => {

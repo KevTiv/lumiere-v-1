@@ -1,25 +1,188 @@
 "use client"
 
 /**
- * Proposals hooks — Phase 4 of API Gateway Refactor
- *
- * Wraps REST API calls with React Query for the Proposals module.
+ * Proposals hooks — SpacetimeDB API (org + company scoped mutators).
  */
 
 
 import { proposalsBffPost } from "@lumiere/stdb/commands"
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { encodeOptionalU64, stdbParamsToJson } from "@lumiere/stdb/stdb-params-json"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
-import {
-  encodeOptionalString,
-  encodeOptionalTimestamp,
-  encodeOptionalU64,
-  stdbParamsToJson,
-} from "@lumiere/erp-shared/stdb-params-json"
 
 function toScalarU64(v: bigint | number | string): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
+}
+
+/** Coerce optional id fields; empty string → null. */
+function optionalScalarU64(
+  v: bigint | number | string | null | undefined,
+): bigint | null {
+  if (v == null || String(v) === "") return null
+  return toScalarU64(v)
+}
+
+function requireCompany(companyId: bigint | undefined): bigint {
+  if (companyId == null || companyId <= 0n) {
+    throw new Error("Operating company is required for this proposal action")
+  }
+  return companyId
+}
+
+function deadlineToTimestamp(
+  deadline: Date | string | null | undefined,
+): { microsSinceUnixEpoch: bigint } | null {
+  if (deadline == null || deadline === "") return null
+  const d = deadline instanceof Date ? deadline : new Date(String(deadline))
+  if (Number.isNaN(d.getTime())) return null
+  return { microsSinceUnixEpoch: BigInt(d.getTime()) * 1000n }
+}
+
+function invalidateProposalQueries(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ["proposals"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-line-items"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-sections"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-comments"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-versions"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-source-docs"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-presence"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-bid-decisions"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-templates"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-clauses"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-compliance-requirements"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-analyses"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-procurement-scores"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-integration-intents"] })
+  void qc.invalidateQueries({ queryKey: ["proposal-clarifications"] })
+}
+
+// ── Local param types (generated reducer bindings may lag the new API) ───────
+
+export type CreateProposalParams = {
+  title: string
+  clientName: string
+  currencyId: bigint | number
+  value: number
+  deadline?: Date | string | null
+  description?: string | null
+  templateId?: bigint | number | string | null
+  partnerId?: bigint | number | string | null
+  documentFolderId?: bigint | number | string | null
+  metadata?: string | null
+}
+
+export type UpdateProposalParams = {
+  title?: string | null
+  clientName?: string | null
+  currencyId?: bigint | number | null
+  value?: number | null
+  deadline?: Date | string | null
+  description?: string | null
+  templateId?: bigint | number | string | null
+  partnerId?: bigint | number | string | null
+  documentFolderId?: bigint | number | string | null
+  metadata?: string | null
+}
+
+export type UpsertProposalSectionParams = {
+  title: string
+  content: string
+  status: string
+  sequence: number
+  aiSuggestion?: string | null
+}
+
+export type AddProposalLineItemParams = {
+  sectionId?: bigint | number | string | null
+  productId: bigint | number | string
+  productName: string
+  productVariantId?: bigint | number | string | null
+  description?: string | null
+  quantity: number
+  priceUnit: number
+  discount: number
+  notes?: string | null
+}
+
+export type UpdateProposalLineItemParams = {
+  quantity?: number | null
+  priceUnit?: number | null
+  discount?: number | null
+  notes?: string | null
+  description?: string | null
+}
+
+export type UpdateProposalSourceDocParams = {
+  name?: string | null
+  content?: string | null
+  docType?: string | null
+  wordCount?: number | null
+  documentId?: bigint | number | string | null
+}
+
+export type RecordProposalBidDecisionParams = {
+  decision: string
+  rationale: string
+}
+
+export type ConvertProposalToSaleOrderParams = {
+  warehouseId: bigint | number | string
+  pricelistId: bigint | number | string
+}
+
+export type ConvertProposalToProjectParams = {
+  billType: string
+  pricingType: string
+}
+
+export type CreateProposalTemplateParams = {
+  name: string
+  category: string
+  locale: string
+  countryPackKey?: string | null
+  sectionsJson: string
+  isActive: boolean
+  metadata?: string | null
+}
+
+export type UpsertProposalComplianceRequirementParams = {
+  requirementKey: string
+  title: string
+  description?: string | null
+  isRequired: boolean
+  isComplete: boolean
+  isWaived: boolean
+  waiverRationale?: string | null
+  evidenceDocumentId?: bigint | number | string | null
+  sequence: number
+}
+
+export type ApplyProposalAnalysisParams = {
+  source: string
+  isMock: boolean
+  findingsJson: string
+  requirementsJson: string
+  evaluationCriteriaJson: string
+  suggestedSectionsJson: string
+  scoreJson?: string | null
+  materializeCompliance: boolean
+}
+
+export type CreateProposalIntegrationIntentParams = {
+  proposalVersionId?: bigint | number | string | null
+  intentType: string
+  idempotencyKey: string
+  payload: string
+  metadata?: string | null
+}
+
+export type UpsertProposalProcurementScoreParams = {
+  countryPackKey: string
+  scoreKind: string
+  scoreValue: number
+  maxValue: number
+  notes?: string | null
 }
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
@@ -29,8 +192,8 @@ export function useProposals(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposals', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/proposals', 'Failed to fetch proposals'),
+    queryKey: ["proposals", rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList("/api/query/proposals", "Failed to fetch proposals"),
     staleTime: 30_000,
     initialData,
   })
@@ -41,8 +204,9 @@ export function useProposalSections(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-sections', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/proposal-sections', 'Failed to fetch proposal sections'),
+    queryKey: ["proposal-sections", rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList("/api/query/proposal-sections", "Failed to fetch proposal sections"),
     staleTime: 30_000,
     initialData,
   })
@@ -54,8 +218,9 @@ export function useProposalLineItems(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-line-items', rqBigIntKey(organizationId), proposalId?.toString()],
-    queryFn: () => fetchQueryList('/api/query/proposal-line-items', 'Failed to fetch proposal line items'),
+    queryKey: ["proposal-line-items", rqBigIntKey(organizationId), proposalId?.toString()],
+    queryFn: () =>
+      fetchQueryList("/api/query/proposal-line-items", "Failed to fetch proposal line items"),
     staleTime: 30_000,
     initialData,
   })
@@ -66,8 +231,9 @@ export function useProposalVersions(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-versions', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/proposal-versions', 'Failed to fetch proposal versions'),
+    queryKey: ["proposal-versions", rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList("/api/query/proposal-versions", "Failed to fetch proposal versions"),
     staleTime: 30_000,
     initialData,
   })
@@ -78,8 +244,9 @@ export function useProposalSourceDocs(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-source-docs', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/proposal-source-docs', 'Failed to fetch proposal source docs'),
+    queryKey: ["proposal-source-docs", rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList("/api/query/proposal-source-docs", "Failed to fetch proposal source docs"),
     staleTime: 30_000,
     initialData,
   })
@@ -91,8 +258,9 @@ export function useProposalPresence(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-presence', rqBigIntKey(organizationId), proposalId?.toString()],
-    queryFn: () => fetchQueryList('/api/query/proposal-presence', 'Failed to fetch proposal presence'),
+    queryKey: ["proposal-presence", rqBigIntKey(organizationId), proposalId?.toString()],
+    queryFn: () =>
+      fetchQueryList("/api/query/proposal-presence", "Failed to fetch proposal presence"),
     staleTime: 30_000,
     initialData,
   })
@@ -104,8 +272,102 @@ export function useProposalComments(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['proposal-comments', rqBigIntKey(organizationId), proposalId?.toString()],
-    queryFn: () => fetchQueryList('/api/query/proposal-comments', 'Failed to fetch proposal comments'),
+    queryKey: ["proposal-comments", rqBigIntKey(organizationId), proposalId?.toString()],
+    queryFn: () =>
+      fetchQueryList("/api/query/proposal-comments", "Failed to fetch proposal comments"),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProposalBidDecisions(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ["proposal-bid-decisions", rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        "/api/query/proposal-bid-decisions",
+        "Failed to fetch proposal bid decisions",
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProposalTemplates(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ["proposal-templates", rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList("/api/query/proposal-templates", "Failed to fetch proposal templates"),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProposalComplianceRequirements(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ["proposal-compliance-requirements", rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        "/api/query/proposal-compliance-requirements",
+        "Failed to fetch proposal compliance requirements",
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProposalClarifications(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ["proposal-clarifications", rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        "/api/query/proposal-clarifications",
+        "Failed to fetch proposal clarifications",
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProposalProcurementScores(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ["proposal-procurement-scores", rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        "/api/query/proposal-procurement-scores",
+        "Failed to fetch proposal procurement scores",
+      ),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useProposalIntegrationIntents(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ["proposal-integration-intents", rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        "/api/query/proposal-integration-intents",
+        "Failed to fetch proposal integration intents",
+      ),
     staleTime: 30_000,
     initialData,
   })
@@ -113,264 +375,373 @@ export function useProposalComments(
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-export function useUpsertProposalSection() {
+export function useUpsertProposalSection(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: {
       proposalId: bigint | number | string
       sectionId?: bigint | number | string | null
+      expectedRevision?: number
       title: string
       content: string
       status: string
       sequence?: number
       aiSuggestion?: string | null
     }) => {
+      const company = requireCompany(companyId)
+      const sectionId =
+        params.sectionId != null && String(params.sectionId) !== ""
+          ? toScalarU64(params.sectionId)
+          : 0n
       const { urlPath, init } = proposalsBffPost("upsert_proposal_section", [
-          Number(params.proposalId),
-          params.sectionId != null ? Number(params.sectionId) : 0,
-          params.title,
-          params.content,
-          params.status,
-          params.sequence ?? 0,
-          params.aiSuggestion ?? null,
-        ])
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        sectionId,
+        params.expectedRevision ?? 0,
+        stdbParamsToJson(
+          {
+            title: params.title,
+            content: params.content,
+            status: params.status,
+            sequence: params.sequence ?? 0,
+            aiSuggestion: params.aiSuggestion ?? null,
+          },
+          "UpsertProposalSectionParams",
+        ),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to upsert proposal section')
+      if (!r.ok) throw new Error("Failed to upsert proposal section")
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proposal-sections'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposal-sections"] }),
   })
 }
 
-export function useCreateProposal() {
-  const qc = useQueryClient()
-  return useMutation<void, Error, {
-    organizationId: bigint | number | string
-    title: string
-    clientName: string
-    type?: string
-    value: number
-    deadline?: Date | string | null
-    description?: string | null
-    documentFolderId?: bigint | number | string | null
-  }>({
-    mutationFn: async (params) => {
-      const deadline =
-        params.deadline instanceof Date
-          ? params.deadline
-          : params.deadline
-            ? new Date(String(params.deadline))
-            : null
-      const { urlPath, init } = proposalsBffPost("create_proposal", [
-          Number(params.organizationId),
-          params.title,
-          params.clientName,
-          params.value,
-          encodeOptionalTimestamp(deadline),
-          encodeOptionalString(params.description),
-          encodeOptionalU64(
-            params.documentFolderId != null ? Number(params.documentFolderId) : null,
-          ),
-        ])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create proposal')
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
-  })
-}
-
-export function useUpdateProposal() {
+export function useResolveProposalSectionConflict(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: {
       proposalId: bigint | number | string
+      sectionId: bigint | number | string
       title: string
-      clientName: string
-      value: number
-      deadline?: string | Date | null
-      description?: string | null
+      content: string
+      status: string
+      sequence?: number
+      aiSuggestion?: string | null
     }) => {
-      const deadline =
-        params.deadline instanceof Date
-          ? params.deadline.toISOString()
-          : params.deadline ?? null
-
-      const { urlPath, init } = proposalsBffPost("update_proposal", [
-          Number(params.proposalId),
-          params.title,
-          params.clientName,
-          params.value,
-          deadline,
-          params.description ?? null,
-        ])
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("resolve_proposal_section_conflict", [
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        toScalarU64(params.sectionId),
+        stdbParamsToJson(
+          {
+            title: params.title,
+            content: params.content,
+            status: params.status,
+            sequence: params.sequence ?? 0,
+            aiSuggestion: params.aiSuggestion ?? null,
+          },
+          "UpsertProposalSectionParams",
+        ),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update proposal')
+      if (!r.ok) throw new Error("Failed to resolve proposal section conflict")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposal-sections"] }),
   })
 }
 
-export function useUpdateProposalStatus() {
+export function useCreateProposal(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, CreateProposalParams>({
+    mutationFn: async (params) => {
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("create_proposal", [
+        organizationId,
+        company,
+        stdbParamsToJson(
+          {
+            title: params.title,
+            clientName: params.clientName,
+            currencyId: params.currencyId,
+            value: params.value,
+            deadline: deadlineToTimestamp(params.deadline),
+            description: params.description ?? null,
+            templateId:
+              params.templateId != null ? toScalarU64(params.templateId) : null,
+            partnerId: params.partnerId != null ? toScalarU64(params.partnerId) : null,
+            documentFolderId:
+              params.documentFolderId != null
+                ? toScalarU64(params.documentFolderId)
+                : null,
+            metadata: params.metadata ?? null,
+          },
+          "CreateProposalParams",
+        ),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create proposal")
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+export function useUpdateProposal(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      proposalId: bigint | number | string
+    } & UpdateProposalParams) => {
+      const company = requireCompany(companyId)
+      const { proposalId, ...fields } = params
+      const { urlPath, init } = proposalsBffPost("update_proposal", [
+        organizationId,
+        company,
+        toScalarU64(proposalId),
+        stdbParamsToJson(
+          {
+            title: fields.title ?? null,
+            clientName: fields.clientName ?? null,
+            currencyId: fields.currencyId ?? null,
+            value: fields.value ?? null,
+            deadline: deadlineToTimestamp(fields.deadline),
+            description: fields.description ?? null,
+            templateId:
+              fields.templateId != null ? toScalarU64(fields.templateId) : null,
+            partnerId: fields.partnerId != null ? toScalarU64(fields.partnerId) : null,
+            documentFolderId:
+              fields.documentFolderId != null
+                ? toScalarU64(fields.documentFolderId)
+                : null,
+            metadata: fields.metadata ?? null,
+          },
+          "UpdateProposalParams",
+        ),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update proposal")
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+export function useUpdateProposalStatus(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: {
       proposalId: bigint | number | string
       status: string
     }) => {
-      const { urlPath, init } = proposalsBffPost("update_proposal_status", [Number(params.proposalId), params.status])
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("update_proposal_status", [
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        params.status,
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update proposal status')
+      if (!r.ok) throw new Error("Failed to update proposal status")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 
-export function useAddProposalLineItem() {
+export function useApproveProposal(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (proposalId: bigint | number | string) => {
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("approve_proposal", [
+        organizationId,
+        company,
+        toScalarU64(proposalId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to approve proposal")
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+export function useRecordProposalBidDecision(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: {
       proposalId: bigint | number | string
-      sectionId?: bigint | number | string | null
-      productId: bigint | number | string
-      productName: string
-      quantity: number
-      priceUnit: number
-      discount: number
-      notes?: string | null
+      decision: string
+      rationale: string
     }) => {
-      const { urlPath, init } = proposalsBffPost("add_proposal_line_item", [
-          toScalarU64(params.proposalId),
-          params.sectionId != null ? toScalarU64(params.sectionId) : null,
-          toScalarU64(params.productId),
-          params.productName,
-          params.quantity,
-          params.priceUnit,
-          params.discount,
-          params.notes ?? null,
-        ])
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("record_proposal_bid_decision", [
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        stdbParamsToJson(
+          {
+            decision: params.decision,
+            rationale: params.rationale,
+          },
+          "RecordProposalBidDecisionParams",
+        ),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to add proposal line item')
+      if (!r.ok) throw new Error("Failed to record proposal bid decision")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 
-export function useUpdateProposalLineItem() {
+export function useAddProposalLineItem(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      proposalId: bigint | number | string
+    } & AddProposalLineItemParams) => {
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("add_proposal_line_item", [
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        stdbParamsToJson(
+          {
+            sectionId:
+              params.sectionId != null ? toScalarU64(params.sectionId) : null,
+            productId: toScalarU64(params.productId),
+            productName: params.productName,
+            productVariantId:
+              params.productVariantId != null
+                ? toScalarU64(params.productVariantId)
+                : null,
+            description: params.description ?? null,
+            quantity: params.quantity,
+            priceUnit: params.priceUnit,
+            discount: params.discount,
+            notes: params.notes ?? null,
+          },
+          "AddProposalLineItemParams",
+        ),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to add proposal line item")
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+export function useUpdateProposalLineItem(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: {
       lineItemId: bigint | number | string
-      quantity: number
-      priceUnit: number
-      discount: number
-      notes?: string | null
-    }) => {
+    } & UpdateProposalLineItemParams) => {
+      const company = requireCompany(companyId)
       const { urlPath, init } = proposalsBffPost("update_proposal_line_item", [
-          Number(params.lineItemId),
-          params.quantity,
-          params.priceUnit,
-          params.discount,
-          params.notes ?? null,
-        ])
+        organizationId,
+        company,
+        toScalarU64(params.lineItemId),
+        stdbParamsToJson(
+          {
+            quantity: params.quantity ?? null,
+            priceUnit: params.priceUnit ?? null,
+            discount: params.discount ?? null,
+            notes: params.notes ?? null,
+            description: params.description ?? null,
+          },
+          "UpdateProposalLineItemParams",
+        ),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update proposal line item')
+      if (!r.ok) throw new Error("Failed to update proposal line item")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 
-export function useDeleteProposalLineItem() {
+export function useDeleteProposalLineItem(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (lineItemId: bigint | number | string) => {
-      const { urlPath, init } = proposalsBffPost("delete_proposal_line_item", [Number(lineItemId)])
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("delete_proposal_line_item", [
+        organizationId,
+        company,
+        toScalarU64(lineItemId),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to delete proposal line item')
+      if (!r.ok) throw new Error("Failed to delete proposal line item")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 
-export function useDeleteProposalSection() {
+export function useDeleteProposalSection(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (sectionId: bigint | number | string) => {
-      const { urlPath, init } = proposalsBffPost("delete_proposal_section", [Number(sectionId)])
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("delete_proposal_section", [
+        organizationId,
+        company,
+        toScalarU64(sectionId),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to delete proposal section')
+      if (!r.ok) throw new Error("Failed to delete proposal section")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 
-export function useSaveProposalVersion() {
+export function useSaveProposalVersion(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: {
       proposalId: bigint | number | string
       message: string
-      sectionsJson: string
     }) => {
+      const company = requireCompany(companyId)
       const { urlPath, init } = proposalsBffPost("save_proposal_version", [
-          Number(params.proposalId),
-          params.message,
-          params.sectionsJson,
-        ])
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        params.message,
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to save proposal version')
+      if (!r.ok) throw new Error("Failed to save proposal version")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 
-export function useAddProposalSourceDoc() {
+export function useRestoreProposalVersion(organizationId: bigint, companyId?: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      proposalId: bigint | number | string
+      versionId: bigint | number | string
+    }) => {
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("restore_proposal_version", [
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        toScalarU64(params.versionId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to restore proposal version")
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+export function useAddProposalSourceDoc(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: {
@@ -379,99 +750,103 @@ export function useAddProposalSourceDoc() {
       content: string
       docType: string
       wordCount: number
+      documentId?: bigint | number | string | null
     }) => {
+      const company = requireCompany(companyId)
       const { urlPath, init } = proposalsBffPost("add_proposal_source_doc", [
-          Number(params.proposalId),
-          params.name,
-          params.content,
-          params.docType,
-          params.wordCount,
-        ])
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        params.name,
+        params.content,
+        params.docType,
+        params.wordCount,
+        encodeOptionalU64(
+          params.documentId != null ? toScalarU64(params.documentId) : null,
+        ),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to add proposal source document')
+      if (!r.ok) throw new Error("Failed to add proposal source document")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 
-export function useDeleteProposalSourceDoc() {
+export function useDeleteProposalSourceDoc(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (docId: bigint | number | string) => {
-      const { urlPath, init } = proposalsBffPost("delete_proposal_source_doc", [Number(docId)])
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("delete_proposal_source_doc", [
+        organizationId,
+        company,
+        toScalarU64(docId),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to delete proposal source document')
+      if (!r.ok) throw new Error("Failed to delete proposal source document")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 
-export function useUpdateProposalSourceDoc() {
+export function useUpdateProposalSourceDoc(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: {
       docId: bigint | number | string
-      name?: string
-      content?: string
-      docType?: string
-      wordCount?: number
-    }) => {
+    } & UpdateProposalSourceDocParams) => {
+      const company = requireCompany(companyId)
       const { urlPath, init } = proposalsBffPost("update_proposal_source_doc", [
-          Number(params.docId),
-          stdbParamsToJson({
+        organizationId,
+        company,
+        toScalarU64(params.docId),
+        stdbParamsToJson(
+          {
             name: params.name ?? null,
             content: params.content ?? null,
             docType: params.docType ?? null,
             wordCount: params.wordCount ?? null,
-          }),
-        ])
+            documentId:
+              params.documentId != null ? toScalarU64(params.documentId) : null,
+          },
+          "UpdateProposalSourceDocParams",
+        ),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update proposal source document')
+      if (!r.ok) throw new Error("Failed to update proposal source document")
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-source-docs'] })
+      void qc.invalidateQueries({ queryKey: ["proposals"] })
+      void qc.invalidateQueries({ queryKey: ["proposal-source-docs"] })
     },
   })
 }
 
-export function useReorderProposalLineItems() {
+export function useReorderProposalLineItems(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: {
       proposalId: bigint | number | string
       orderedIds: Array<bigint | number | string>
     }) => {
+      const company = requireCompany(companyId)
       const { urlPath, init } = proposalsBffPost("reorder_proposal_line_items", [
-          Number(params.proposalId),
-          params.orderedIds.map((id) => Number(id)),
-        ])
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        params.orderedIds.map((id) => toScalarU64(id)),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to reorder proposal line items')
+      if (!r.ok) throw new Error("Failed to reorder proposal line items")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 
-export function useUpdateProposalPresence() {
+export function useUpdateProposalPresence(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: {
@@ -479,43 +854,45 @@ export function useUpdateProposalPresence() {
       sectionId?: bigint | number | string | null
       userName: string
     }) => {
+      const company = requireCompany(companyId)
       const { urlPath, init } = proposalsBffPost("update_proposal_presence", [
-          Number(params.proposalId),
-          params.sectionId != null ? Number(params.sectionId) : null,
-          params.userName,
-        ])
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        encodeOptionalU64(
+          params.sectionId != null ? toScalarU64(params.sectionId) : null,
+        ),
+        params.userName,
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update proposal presence')
+      if (!r.ok) throw new Error("Failed to update proposal presence")
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+      void qc.invalidateQueries({ queryKey: ["proposal-presence"] })
     },
   })
 }
 
-export function useClearProposalPresence() {
+export function useClearProposalPresence(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (proposalId: bigint | number | string) => {
-      const { urlPath, init } = proposalsBffPost("clear_proposal_presence", [Number(proposalId)])
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("clear_proposal_presence", [
+        organizationId,
+        company,
+        toScalarU64(proposalId),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to clear proposal presence')
+      if (!r.ok) throw new Error("Failed to clear proposal presence")
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
+      void qc.invalidateQueries({ queryKey: ["proposal-presence"] })
     },
   })
 }
 
-export function useAddProposalComment() {
+export function useAddProposalComment(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: {
@@ -525,43 +902,322 @@ export function useAddProposalComment() {
       parentId?: bigint | number | string | null
       authorName: string
     }) => {
+      const company = requireCompany(companyId)
       const { urlPath, init } = proposalsBffPost("add_proposal_comment", [
-          toScalarU64(params.proposalId),
-          toScalarU64(params.sectionId),
-          params.content,
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        toScalarU64(params.sectionId),
+        params.content,
+        encodeOptionalU64(
           params.parentId != null ? toScalarU64(params.parentId) : null,
-          params.authorName,
-        ])
+        ),
+        params.authorName,
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to add proposal comment')
+      if (!r.ok) throw new Error("Failed to add proposal comment")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 
-export function useResolveProposalComment() {
+export function useResolveProposalComment(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (commentId: bigint | number | string) => {
-      const { urlPath, init } = proposalsBffPost("resolve_proposal_comment", [Number(commentId)])
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("resolve_proposal_comment", [
+        organizationId,
+        company,
+        toScalarU64(commentId),
+      ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to resolve proposal comment')
+      if (!r.ok) throw new Error("Failed to resolve proposal comment")
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['proposals'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-line-items'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-sections'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-comments'] })
-      void qc.invalidateQueries({ queryKey: ['proposal-versions'] })
-    },
+    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 
-// ── Types (re-exported so client components import from one place) ────────────
-export type { CreateProposalParams } from "@lumiere/stdb/types"
+export function useConvertProposalToSaleOrder(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      proposalId: bigint | number | string
+      warehouseId: bigint | number | string
+      pricelistId: bigint | number | string
+    }) => {
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("convert_proposal_to_sale_order", [
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        stdbParamsToJson(
+          {
+            warehouseId: toScalarU64(params.warehouseId),
+            pricelistId: toScalarU64(params.pricelistId),
+          },
+          "ConvertProposalToSaleOrderParams",
+        ),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to convert proposal to sale order")
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+export function useConvertProposalToProject(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      proposalId: bigint | number | string
+      billType: string
+      pricingType: string
+    }) => {
+      const company = requireCompany(companyId)
+      const { urlPath, init } = proposalsBffPost("convert_proposal_to_project", [
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+        stdbParamsToJson(
+          {
+            billType: params.billType,
+            pricingType: params.pricingType,
+          },
+          "ConvertProposalToProjectParams",
+        ),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to convert proposal to project")
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+async function postProposalReducer(
+  reducer: string,
+  args: unknown[],
+  errorMessage: string,
+): Promise<void> {
+  const { urlPath, init } = proposalsBffPost(reducer, args)
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw new Error(errorMessage)
+}
+
+export function useCreateProposalTemplate(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: CreateProposalTemplateParams) => {
+      await postProposalReducer(
+        "create_proposal_template",
+        [
+          organizationId,
+          requireCompany(companyId),
+          stdbParamsToJson(
+            {
+              name: params.name,
+              category: params.category,
+              locale: params.locale,
+              countryPackKey: params.countryPackKey ?? null,
+              sectionsJson: params.sectionsJson,
+              isActive: params.isActive,
+              metadata: params.metadata ?? null,
+            },
+            "CreateProposalTemplateParams",
+          ),
+        ],
+        "Failed to create proposal template",
+      )
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+export function useApplyProposalTemplate(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      proposalId: bigint | number | string
+      templateId: bigint | number | string
+    }) => {
+      await postProposalReducer(
+        "apply_proposal_template",
+        [
+          organizationId,
+          requireCompany(companyId),
+          toScalarU64(params.proposalId),
+          toScalarU64(params.templateId),
+        ],
+        "Failed to apply proposal template",
+      )
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+export function useUpsertProposalComplianceRequirement(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      proposalId: bigint | number | string
+      requirementId?: bigint | number | string | null
+      requirementKey: string
+      title: string
+      description?: string | null
+      isRequired: boolean
+      isComplete: boolean
+      isWaived: boolean
+      waiverRationale?: string | null
+      evidenceDocumentId?: bigint | number | string | null
+      sequence: number
+    }) => {
+      await postProposalReducer(
+        "upsert_proposal_compliance_requirement",
+        [
+          organizationId,
+          requireCompany(companyId),
+          toScalarU64(params.proposalId),
+          optionalScalarU64(params.requirementId) ?? 0n,
+          stdbParamsToJson(
+            {
+              requirementKey: params.requirementKey,
+              title: params.title,
+              description: params.description ?? null,
+              isRequired: params.isRequired,
+              isComplete: params.isComplete,
+              isWaived: params.isWaived,
+              waiverRationale: params.waiverRationale ?? null,
+              evidenceDocumentId: optionalScalarU64(params.evidenceDocumentId),
+              sequence: params.sequence,
+            },
+            "UpsertProposalComplianceRequirementParams",
+          ),
+        ],
+        "Failed to upsert compliance requirement",
+      )
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+export function useApplyProposalAnalysis(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      proposalId: bigint | number | string
+    } & ApplyProposalAnalysisParams) => {
+      await postProposalReducer(
+        "apply_proposal_analysis",
+        [
+          organizationId,
+          requireCompany(companyId),
+          toScalarU64(params.proposalId),
+          stdbParamsToJson(
+            {
+              source: params.source,
+              isMock: params.isMock,
+              findingsJson: params.findingsJson,
+              requirementsJson: params.requirementsJson,
+              evaluationCriteriaJson: params.evaluationCriteriaJson,
+              suggestedSectionsJson: params.suggestedSectionsJson,
+              scoreJson: params.scoreJson ?? null,
+              materializeCompliance: params.materializeCompliance,
+            },
+            "ApplyProposalAnalysisParams",
+          ),
+        ],
+        "Failed to apply proposal analysis",
+      )
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+export function useCreateProposalIntegrationIntent(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (
+      params: {
+        proposalId: bigint | number | string
+      } & CreateProposalIntegrationIntentParams,
+    ) => {
+      await postProposalReducer(
+        "create_proposal_integration_intent",
+        [
+          organizationId,
+          requireCompany(companyId),
+          toScalarU64(params.proposalId),
+          stdbParamsToJson(
+            {
+              proposalVersionId: optionalScalarU64(params.proposalVersionId),
+              intentType: params.intentType,
+              idempotencyKey: params.idempotencyKey,
+              payload: params.payload,
+              metadata: params.metadata ?? null,
+            },
+            "CreateProposalIntegrationIntentParams",
+          ),
+        ],
+        "Failed to create proposal integration intent",
+      )
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+
+export function useUpsertProposalProcurementScore(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (
+      params: {
+        proposalId: bigint | number | string
+      } & UpsertProposalProcurementScoreParams,
+    ) => {
+      await postProposalReducer(
+        "upsert_proposal_procurement_score",
+        [
+          organizationId,
+          requireCompany(companyId),
+          toScalarU64(params.proposalId),
+          stdbParamsToJson(
+            {
+              countryPackKey: params.countryPackKey,
+              scoreKind: params.scoreKind,
+              scoreValue: params.scoreValue,
+              maxValue: params.maxValue,
+              notes: params.notes ?? null,
+            },
+            "UpsertProposalProcurementScoreParams",
+          ),
+        ],
+        "Failed to upsert procurement score",
+      )
+    },
+    onSuccess: () => invalidateProposalQueries(qc),
+  })
+}
+

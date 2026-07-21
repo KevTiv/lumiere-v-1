@@ -11,6 +11,7 @@ use super::vehicle_status_type::VehicleStatus;
 pub struct FleetVehicle {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub name: String,
     pub license_plate: Option<String>,
     pub driver_name: Option<String>,
@@ -24,7 +25,6 @@ pub struct FleetVehicle {
     pub fuel_level: Option<f64>,
     pub odometer_km: Option<f64>,
     pub vehicle_type: String,
-    pub company_id: Option<u64>,
     pub create_uid: __sdk::Identity,
     pub create_date: __sdk::Timestamp,
     pub write_uid: __sdk::Identity,
@@ -42,6 +42,7 @@ impl __sdk::InModule for FleetVehicle {
 pub struct FleetVehicleCols {
     pub id: __sdk::__query_builder::Col<FleetVehicle, u64>,
     pub organization_id: __sdk::__query_builder::Col<FleetVehicle, u64>,
+    pub company_id: __sdk::__query_builder::Col<FleetVehicle, u64>,
     pub name: __sdk::__query_builder::Col<FleetVehicle, String>,
     pub license_plate: __sdk::__query_builder::Col<FleetVehicle, Option<String>>,
     pub driver_name: __sdk::__query_builder::Col<FleetVehicle, Option<String>>,
@@ -55,7 +56,6 @@ pub struct FleetVehicleCols {
     pub fuel_level: __sdk::__query_builder::Col<FleetVehicle, Option<f64>>,
     pub odometer_km: __sdk::__query_builder::Col<FleetVehicle, Option<f64>>,
     pub vehicle_type: __sdk::__query_builder::Col<FleetVehicle, String>,
-    pub company_id: __sdk::__query_builder::Col<FleetVehicle, Option<u64>>,
     pub create_uid: __sdk::__query_builder::Col<FleetVehicle, __sdk::Identity>,
     pub create_date: __sdk::__query_builder::Col<FleetVehicle, __sdk::Timestamp>,
     pub write_uid: __sdk::__query_builder::Col<FleetVehicle, __sdk::Identity>,
@@ -69,6 +69,7 @@ impl __sdk::__query_builder::HasCols for FleetVehicle {
         FleetVehicleCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             license_plate: __sdk::__query_builder::Col::new(table_name, "license_plate"),
             driver_name: __sdk::__query_builder::Col::new(table_name, "driver_name"),
@@ -82,7 +83,6 @@ impl __sdk::__query_builder::HasCols for FleetVehicle {
             fuel_level: __sdk::__query_builder::Col::new(table_name, "fuel_level"),
             odometer_km: __sdk::__query_builder::Col::new(table_name, "odometer_km"),
             vehicle_type: __sdk::__query_builder::Col::new(table_name, "vehicle_type"),
-            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             create_uid: __sdk::__query_builder::Col::new(table_name, "create_uid"),
             create_date: __sdk::__query_builder::Col::new(table_name, "create_date"),
             write_uid: __sdk::__query_builder::Col::new(table_name, "write_uid"),
@@ -96,6 +96,7 @@ impl __sdk::__query_builder::HasCols for FleetVehicle {
 ///
 /// Provides typed access to indexed columns for query building.
 pub struct FleetVehicleIxCols {
+    pub company_id: __sdk::__query_builder::IxCol<FleetVehicle, u64>,
     pub id: __sdk::__query_builder::IxCol<FleetVehicle, u64>,
     pub organization_id: __sdk::__query_builder::IxCol<FleetVehicle, u64>,
     pub status: __sdk::__query_builder::IxCol<FleetVehicle, VehicleStatus>,
@@ -105,6 +106,7 @@ impl __sdk::__query_builder::HasIxCols for FleetVehicle {
     type IxCols = FleetVehicleIxCols;
     fn ix_cols(table_name: &'static str) -> Self::IxCols {
         FleetVehicleIxCols {
+            company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             status: __sdk::__query_builder::IxCol::new(table_name, "status"),

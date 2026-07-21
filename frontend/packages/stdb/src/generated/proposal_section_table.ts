@@ -26,6 +26,7 @@ export default __t.row({
   aiSuggestion: __t.option(__t.string()).name("ai_suggestion"),
   sequence: __t.u32(),
   wordCount: __t.u32().name("word_count"),
+  revision: __t.u32(),
   createUid: __t.identity().name("create_uid"),
   createDate: __t.timestamp().name("create_date"),
   writeUid: __t.identity().name("write_uid"),

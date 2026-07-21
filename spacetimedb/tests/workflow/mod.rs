@@ -2,11 +2,13 @@
 
 mod action_registry_test;
 mod authorization_test;
+mod branches_test;
 mod calendar_test;
 mod definitions_test;
 mod delivery_test;
 mod evaluator_simulation_test;
 mod human_tasks_test;
+mod migration_test;
 mod runtime_test;
 
 use spacetimedb::ReducerContext;
@@ -18,6 +20,7 @@ pub fn run_all_workflow_foundation_tests(ctx: &ReducerContext) -> Result<(), Str
     calendar_test::test_dst_gap_overlap_and_quarter_hour_zone()?;
     calendar_test::test_deadline_uses_observed_and_local_overlays()?;
     calendar_test::test_foundation_activation_is_idempotent(ctx)?;
+    calendar_test::test_recompute_deadline_rewrites_due_at_evidence()?;
     log::info!("workflow foundation tests complete");
     Ok(())
 }
@@ -62,10 +65,17 @@ pub fn run_all_workflow_human_effect_tests(ctx: &ReducerContext) -> Result<(), S
 }
 
 #[spacetimedb::reducer]
+pub fn run_workflow_migration_tests(ctx: &ReducerContext) -> Result<(), String> {
+    migration_test::test_workflow_migration(ctx)
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_workflow_deterministic_core_tests(ctx: &ReducerContext) -> Result<(), String> {
     evaluator_simulation_test::test_workflow_evaluator_and_simulation(ctx)?;
     runtime_test::test_workflow_runtime(ctx)?;
     authorization_test::test_workflow_authorization(ctx)?;
+    branches_test::test_workflow_branches(ctx)?;
+    migration_test::test_workflow_migration(ctx)?;
     log::info!("workflow deterministic core tests complete");
     Ok(())
 }

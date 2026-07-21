@@ -234,14 +234,14 @@ stop:
 	spacetime stop
 
 publish:
-	spacetime publish $(DB) --module-path $(MODULE) --server local -y
+	LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish $(DB) --module-path $(MODULE) --server local -y
 
 
 generate-stdb-ts-sdk:
 	spacetime generate --lang typescript --out-dir "frontend/packages/stdb/src/generated" --module-path $(MODULE)
 
 publish-clear:
-	spacetime publish $(DB) --module-path $(MODULE) --server local --clear-database -y
+	LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish $(DB) --module-path $(MODULE) --server local --clear-database -y
 
 # A test target must terminate. Use `local-logs` separately when diagnosis is
 # needed; `logs` intentionally tails forever.

@@ -7,12 +7,16 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct ResolveProposalCommentArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub comment_id: u64,
 }
 
 impl From<ResolveProposalCommentArgs> for super::Reducer {
     fn from(args: ResolveProposalCommentArgs) -> Self {
         Self::ResolveProposalComment {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             comment_id: args.comment_id,
         }
     }
@@ -33,8 +37,13 @@ pub trait resolve_proposal_comment {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`resolve_proposal_comment:resolve_proposal_comment_then`] to run a callback after the reducer completes.
-    fn resolve_proposal_comment(&self, comment_id: u64) -> __sdk::Result<()> {
-        self.resolve_proposal_comment_then(comment_id, |_, _| {})
+    fn resolve_proposal_comment(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        comment_id: u64,
+    ) -> __sdk::Result<()> {
+        self.resolve_proposal_comment_then(organization_id, company_id, comment_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `resolve_proposal_comment` to run as soon as possible,
@@ -45,6 +54,8 @@ pub trait resolve_proposal_comment {
     ///  and its status can be observed with the `callback`.
     fn resolve_proposal_comment_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         comment_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -56,13 +67,21 @@ pub trait resolve_proposal_comment {
 impl resolve_proposal_comment for super::RemoteReducers {
     fn resolve_proposal_comment_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         comment_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
             + 'static,
     ) -> __sdk::Result<()> {
-        self.imp
-            .invoke_reducer_with_callback(ResolveProposalCommentArgs { comment_id }, callback)
+        self.imp.invoke_reducer_with_callback(
+            ResolveProposalCommentArgs {
+                organization_id,
+                company_id,
+                comment_id,
+            },
+            callback,
+        )
     }
 }

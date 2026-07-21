@@ -10,10 +10,15 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  UpdateProposalLineItemParams,
+} from "./types";
+
 export default {
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
   lineItemId: __t.u64(),
-  quantity: __t.f64(),
-  priceUnit: __t.f64(),
-  discount: __t.f64(),
-  notes: __t.option(__t.string()),
+  get params() {
+    return UpdateProposalLineItemParams;
+  },
 };

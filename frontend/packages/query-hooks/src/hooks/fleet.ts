@@ -7,9 +7,9 @@
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
-
 import { fleetBffPost } from "@lumiere/stdb/commands"
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { stdbParamsToJson } from "@lumiere/stdb/stdb-params-json"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 
@@ -20,8 +20,8 @@ export function useFleetVehicles(
   initialData?: QueryRows,
 ) {
   return useQuery<QueryRows>({
-    queryKey: ['fleet-vehicles', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/fleet-vehicles', 'Failed to fetch fleet vehicles'),
+    queryKey: ["fleet-vehicles", rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList("/api/query/fleet-vehicles", "Failed to fetch fleet vehicles"),
     staleTime: 30_000,
     initialData,
   })
@@ -30,7 +30,7 @@ export function useFleetVehicles(
 // ── Query invalidation helper ───────────────────────────────────────────────
 
 function invalidateFleetQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
-  return qc.invalidateQueries({ queryKey: ['fleet-vehicles', rqBigIntKey(organizationId)] })
+  return qc.invalidateQueries({ queryKey: ["fleet-vehicles", rqBigIntKey(organizationId)] })
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────
@@ -42,19 +42,31 @@ export type CreateFleetVehicleInput = {
   driverName: string | null
 }
 
-export function useCreateFleetVehicle(organizationId: bigint) {
+export function useCreateFleetVehicle(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateFleetVehicleInput>({
     mutationFn: async ({ name, vehicleType, licensePlate, driverName }) => {
+      if (companyId == null || companyId <= 0n) {
+        throw new Error("Operating company is required to create a fleet vehicle")
+      }
       const { urlPath, init } = fleetBffPost("create_fleet_vehicle", [
         organizationId,
-        name.trim(),
-        vehicleType.trim(),
-        licensePlate != null && licensePlate.trim() !== '' ? licensePlate.trim() : null,
-        driverName != null && driverName.trim() !== '' ? driverName.trim() : null,
+        companyId,
+        stdbParamsToJson(
+          {
+            name: name.trim(),
+            vehicleType: vehicleType.trim(),
+            licensePlate:
+              licensePlate != null && licensePlate.trim() !== "" ? licensePlate.trim() : null,
+            driverName:
+              driverName != null && driverName.trim() !== "" ? driverName.trim() : null,
+            metadata: null,
+          },
+          "CreateFleetVehicleParams",
+        ),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create fleet vehicle')
+      if (!r.ok) throw new Error("Failed to create fleet vehicle")
     },
     onSuccess: () => invalidateFleetQueries(qc, organizationId),
   })
@@ -69,20 +81,30 @@ export type UpdateVehiclePositionInput = {
   status: string
 }
 
-export function useUpdateVehiclePosition(organizationId: bigint) {
+export function useUpdateVehiclePosition(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, UpdateVehiclePositionInput>({
     mutationFn: async ({ vehicleId, latitude, longitude, speedKmh, heading, status }) => {
+      if (companyId == null || companyId <= 0n) {
+        throw new Error("Operating company is required to update vehicle position")
+      }
       const { urlPath, init } = fleetBffPost("update_vehicle_position", [
+        organizationId,
+        companyId,
         vehicleId,
-        latitude,
-        longitude,
-        speedKmh,
-        heading,
-        status,
+        stdbParamsToJson(
+          {
+            latitude,
+            longitude,
+            speedKmh,
+            heading,
+            status,
+          },
+          "UpdateVehiclePositionParams",
+        ),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update vehicle position')
+      if (!r.ok) throw new Error("Failed to update vehicle position")
     },
     onSuccess: () => invalidateFleetQueries(qc, organizationId),
   })

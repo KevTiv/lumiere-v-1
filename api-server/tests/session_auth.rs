@@ -32,6 +32,10 @@ fn test_config(server_token: Option<&str>, dev_mock_org_id: Option<u64>) -> Conf
         workflow_worker_org_ids: vec![],
         workflow_worker_lease_ttl_secs: 60,
         workflow_external_dispatch_enabled: false,
+        workflow_external_dispatch_company_ids: vec![],
+        workflow_external_dispatch_action_keys: vec![],
+        workflow_external_webhook_url: None,
+        workflow_external_webhook_timeout_ms: 10_000,
     }
 }
 

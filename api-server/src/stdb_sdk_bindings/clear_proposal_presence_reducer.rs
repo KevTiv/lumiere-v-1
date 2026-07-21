@@ -7,12 +7,16 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct ClearProposalPresenceArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub proposal_id: u64,
 }
 
 impl From<ClearProposalPresenceArgs> for super::Reducer {
     fn from(args: ClearProposalPresenceArgs) -> Self {
         Self::ClearProposalPresence {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             proposal_id: args.proposal_id,
         }
     }
@@ -33,8 +37,13 @@ pub trait clear_proposal_presence {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`clear_proposal_presence:clear_proposal_presence_then`] to run a callback after the reducer completes.
-    fn clear_proposal_presence(&self, proposal_id: u64) -> __sdk::Result<()> {
-        self.clear_proposal_presence_then(proposal_id, |_, _| {})
+    fn clear_proposal_presence(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+    ) -> __sdk::Result<()> {
+        self.clear_proposal_presence_then(organization_id, company_id, proposal_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `clear_proposal_presence` to run as soon as possible,
@@ -45,6 +54,8 @@ pub trait clear_proposal_presence {
     ///  and its status can be observed with the `callback`.
     fn clear_proposal_presence_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -56,13 +67,21 @@ pub trait clear_proposal_presence {
 impl clear_proposal_presence for super::RemoteReducers {
     fn clear_proposal_presence_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
             + 'static,
     ) -> __sdk::Result<()> {
-        self.imp
-            .invoke_reducer_with_callback(ClearProposalPresenceArgs { proposal_id }, callback)
+        self.imp.invoke_reducer_with_callback(
+            ClearProposalPresenceArgs {
+                organization_id,
+                company_id,
+                proposal_id,
+            },
+            callback,
+        )
     }
 }

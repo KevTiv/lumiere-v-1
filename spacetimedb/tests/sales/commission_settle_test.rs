@@ -86,6 +86,7 @@ fn create_draft_so_with_commission_meta(
             fiscal_position_id: None,
             team_id: None,
             opportunity_id: None,
+            proposal_id: None,
             note: None,
             terms_and_conditions: None,
             validity_days: None,

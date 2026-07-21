@@ -46,6 +46,16 @@ pub struct Config {
     pub workflow_worker_lease_ttl_secs: u64,
     /// When false (default), timers still fire but outbox jobs are not claimed.
     pub workflow_external_dispatch_enabled: bool,
+    /// When non-empty and dispatch is on, only these company IDs are claimed.
+    pub workflow_external_dispatch_company_ids: Vec<u64>,
+    /// When non-empty and dispatch is on, only these action keys are claimed.
+    /// Empty with a webhook URL configured rejects all HTTP claims (fail closed).
+    pub workflow_external_dispatch_action_keys: Vec<String>,
+    /// Optional webhook for real external adapters. When unset, a deterministic
+    /// fingerprint adapter is used (dev/test).
+    pub workflow_external_webhook_url: Option<String>,
+    /// HTTP timeout for the webhook adapter; must stay below lease TTL.
+    pub workflow_external_webhook_timeout_ms: u64,
 }
 
 impl Config {
@@ -197,6 +207,37 @@ impl Config {
             std::env::var("LUMIERE_WORKFLOW_EXTERNAL_DISPATCH_ENABLED")
                 .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
                 .unwrap_or(false);
+        let workflow_external_dispatch_company_ids: Vec<u64> =
+            std::env::var("LUMIERE_WORKFLOW_EXTERNAL_DISPATCH_COMPANY_IDS")
+                .unwrap_or_default()
+                .split(',')
+                .filter_map(|s| s.trim().parse::<u64>().ok())
+                .collect();
+        let workflow_external_dispatch_action_keys: Vec<String> =
+            std::env::var("LUMIERE_WORKFLOW_EXTERNAL_DISPATCH_ACTION_KEYS")
+                .unwrap_or_default()
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+        let workflow_external_webhook_url = std::env::var("LUMIERE_WORKFLOW_EXTERNAL_WEBHOOK_URL")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        let workflow_external_webhook_timeout_ms =
+            std::env::var("LUMIERE_WORKFLOW_EXTERNAL_WEBHOOK_TIMEOUT_MS")
+                .ok()
+                .and_then(|value| value.parse::<u64>().ok())
+                .filter(|value| *value > 0)
+                .unwrap_or(10_000);
+        if workflow_external_dispatch_enabled
+            && workflow_external_webhook_url.is_some()
+            && workflow_external_dispatch_action_keys.is_empty()
+        {
+            tracing::warn!(
+                "external webhook configured but action-key allowlist is empty; HTTP claims will be skipped"
+            );
+        }
 
         Ok(Config {
             port,
@@ -224,6 +265,10 @@ impl Config {
             workflow_worker_org_ids,
             workflow_worker_lease_ttl_secs,
             workflow_external_dispatch_enabled,
+            workflow_external_dispatch_company_ids,
+            workflow_external_dispatch_action_keys,
+            workflow_external_webhook_url,
+            workflow_external_webhook_timeout_ms,
         })
     }
 }

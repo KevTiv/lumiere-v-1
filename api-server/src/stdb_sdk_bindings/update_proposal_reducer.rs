@@ -4,26 +4,24 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::update_proposal_params_type::UpdateProposalParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct UpdateProposalArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub proposal_id: u64,
-    pub title: String,
-    pub client_name: String,
-    pub value: f64,
-    pub deadline: Option<__sdk::Timestamp>,
-    pub description: Option<String>,
+    pub params: UpdateProposalParams,
 }
 
 impl From<UpdateProposalArgs> for super::Reducer {
     fn from(args: UpdateProposalArgs) -> Self {
         Self::UpdateProposal {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             proposal_id: args.proposal_id,
-            title: args.title,
-            client_name: args.client_name,
-            value: args.value,
-            deadline: args.deadline,
-            description: args.description,
+            params: args.params,
         }
     }
 }
@@ -45,22 +43,12 @@ pub trait update_proposal {
     /// /// Use [`update_proposal:update_proposal_then`] to run a callback after the reducer completes.
     fn update_proposal(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
-        title: String,
-        client_name: String,
-        value: f64,
-        deadline: Option<__sdk::Timestamp>,
-        description: Option<String>,
+        params: UpdateProposalParams,
     ) -> __sdk::Result<()> {
-        self.update_proposal_then(
-            proposal_id,
-            title,
-            client_name,
-            value,
-            deadline,
-            description,
-            |_, _| {},
-        )
+        self.update_proposal_then(organization_id, company_id, proposal_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `update_proposal` to run as soon as possible,
@@ -71,12 +59,10 @@ pub trait update_proposal {
     ///  and its status can be observed with the `callback`.
     fn update_proposal_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
-        title: String,
-        client_name: String,
-        value: f64,
-        deadline: Option<__sdk::Timestamp>,
-        description: Option<String>,
+        params: UpdateProposalParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -87,12 +73,10 @@ pub trait update_proposal {
 impl update_proposal for super::RemoteReducers {
     fn update_proposal_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
-        title: String,
-        client_name: String,
-        value: f64,
-        deadline: Option<__sdk::Timestamp>,
-        description: Option<String>,
+        params: UpdateProposalParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -100,12 +84,10 @@ impl update_proposal for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             UpdateProposalArgs {
+                organization_id,
+                company_id,
                 proposal_id,
-                title,
-                client_name,
-                value,
-                deadline,
-                description,
+                params,
             },
             callback,
         )

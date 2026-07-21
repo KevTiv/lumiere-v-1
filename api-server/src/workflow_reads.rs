@@ -55,6 +55,24 @@ const OUTBOX_COLS: &str = "id, organization_id, company_id, instance_id, token_i
 expected_token_revision, edge_id, action_key, semantic_key, delivery_guarantee, queue_job_id, \
 status, revision, error_summary, completed_at, correlation_id, created_at";
 
+const DECISION_EVENT_COLS: &str = "id, organization_id, company_id, workflow_id, workflow_version_id, \
+instance_id, token_id, result_token_id, prior_node_key, next_node_key, command_kind, \
+prior_instance_state, next_instance_state, actor, authorization_outcome, action_key, \
+prior_revision, next_revision, idempotency_key, domain_receipt, reason, correlation_id, \
+recorded_at";
+
+const MIGRATION_PLAN_COLS: &str = "id, organization_id, company_id, workflow_id, \
+source_workflow_version_id, target_workflow_version_id, compatibility, active, revision, \
+created_by, created_at, updated_by, updated_at";
+
+const MIGRATION_PREFLIGHT_COLS: &str = "id, organization_id, company_id, plan_id, instance_id, \
+compatibility, compatible, errors, input_hash, recorded_by, recorded_at";
+
+const MIGRATION_RESULT_COLS: &str = "id, organization_id, company_id, plan_id, instance_id, \
+source_workflow_version_id, target_workflow_version_id, outcome, reason, mapping_fingerprint, \
+idempotency_key, prior_instance_revision, next_instance_revision, error_summary, recorded_by, \
+recorded_at";
+
 pub fn is_private_workflow_resource(resource: &str) -> bool {
     matches!(
         resource,
@@ -68,6 +86,10 @@ pub fn is_private_workflow_resource(resource: &str) -> bool {
             | "workflow-instances"
             | "workflow-timers-late"
             | "workflow-outbox-dead"
+            | "workflow-decision-events"
+            | "workflow-migration-plans"
+            | "workflow-migration-preflights"
+            | "workflow-migration-results"
             // Legacy keys: fail closed with empty/not-found via early arms below.
             | "approval-requests-inbox"
             | "approval-requests"
@@ -207,6 +229,74 @@ pub async fn execute_private_workflow_query(
                         )
                 })
                 .map(project_outbox)
+                .collect();
+            sort_rows_by_id_desc(&mut rows);
+            Ok(Some(rows))
+        }
+        "workflow-decision-events" => {
+            let rows = query_org_table(
+                owner,
+                "workflow_decision_event",
+                DECISION_EVENT_COLS,
+                organization_id,
+            )
+            .await?;
+            let company_ids = allowed_company_ids(owner, organization_id, field_access).await?;
+            let mut rows: Vec<Value> = rows
+                .into_iter()
+                .filter(|r| row_company_allowed(r, &company_ids))
+                .map(project_decision_event)
+                .collect();
+            sort_rows_by_id_desc(&mut rows);
+            Ok(Some(rows))
+        }
+        "workflow-migration-plans" => {
+            let rows = query_org_table(
+                owner,
+                "workflow_migration_plan",
+                MIGRATION_PLAN_COLS,
+                organization_id,
+            )
+            .await?;
+            let company_ids = allowed_company_ids(owner, organization_id, field_access).await?;
+            let mut rows: Vec<Value> = rows
+                .into_iter()
+                .filter(|r| row_company_allowed(r, &company_ids))
+                .map(project_migration_plan)
+                .collect();
+            sort_rows_by_id_desc(&mut rows);
+            Ok(Some(rows))
+        }
+        "workflow-migration-preflights" => {
+            let rows = query_org_table(
+                owner,
+                "workflow_migration_preflight",
+                MIGRATION_PREFLIGHT_COLS,
+                organization_id,
+            )
+            .await?;
+            let company_ids = allowed_company_ids(owner, organization_id, field_access).await?;
+            let mut rows: Vec<Value> = rows
+                .into_iter()
+                .filter(|r| row_company_allowed(r, &company_ids))
+                .map(project_migration_preflight)
+                .collect();
+            sort_rows_by_id_desc(&mut rows);
+            Ok(Some(rows))
+        }
+        "workflow-migration-results" => {
+            let rows = query_org_table(
+                owner,
+                "workflow_migration_instance_result",
+                MIGRATION_RESULT_COLS,
+                organization_id,
+            )
+            .await?;
+            let company_ids = allowed_company_ids(owner, organization_id, field_access).await?;
+            let mut rows: Vec<Value> = rows
+                .into_iter()
+                .filter(|r| row_company_allowed(r, &company_ids))
+                .map(project_migration_result)
                 .collect();
             sort_rows_by_id_desc(&mut rows);
             Ok(Some(rows))
@@ -519,6 +609,51 @@ fn project_workflow_version(mut row: Value) -> Value {
 fn project_outbox(mut row: Value) -> Value {
     if let Some(obj) = row.as_object_mut() {
         obj.remove("payload");
+    }
+    row
+}
+
+fn project_decision_event(mut row: Value) -> Value {
+    if let Some(tag) = enum_tag(&row, "command_kind") {
+        if let Some(obj) = row.as_object_mut() {
+            obj.insert("commandKindTag".into(), json!(tag));
+        }
+    }
+    row
+}
+
+fn project_migration_plan(mut row: Value) -> Value {
+    if let Some(tag) = enum_tag(&row, "compatibility") {
+        if let Some(obj) = row.as_object_mut() {
+            obj.insert("compatibilityTag".into(), json!(tag));
+        }
+    }
+    // Mapping vectors can be large; list view uses ids/status only.
+    if let Some(obj) = row.as_object_mut() {
+        obj.remove("nodeMappings");
+        obj.remove("node_mappings");
+        obj.remove("forkMappings");
+        obj.remove("fork_mappings");
+        obj.remove("edgeMappings");
+        obj.remove("edge_mappings");
+    }
+    row
+}
+
+fn project_migration_preflight(mut row: Value) -> Value {
+    if let Some(tag) = enum_tag(&row, "compatibility") {
+        if let Some(obj) = row.as_object_mut() {
+            obj.insert("compatibilityTag".into(), json!(tag));
+        }
+    }
+    row
+}
+
+fn project_migration_result(mut row: Value) -> Value {
+    if let Some(tag) = enum_tag(&row, "outcome") {
+        if let Some(obj) = row.as_object_mut() {
+            obj.insert("outcomeTag".into(), json!(tag));
+        }
     }
     row
 }

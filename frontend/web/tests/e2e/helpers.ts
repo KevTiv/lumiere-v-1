@@ -2524,3 +2524,207 @@ export async function fetchDraftCreditNoteMoveIdForReturnOrder(
   throw new Error(`draft credit note not found for return order ${returnOrderId}`)
 }
 
+// ── Workflow Gate UI helpers ─────────────────────────────────────────────────
+
+const WORKFLOW_SOME = <T,>(value: T) => ({ some: value })
+const WORKFLOW_NONE = { none: [] as [] }
+
+export async function fetchDefaultCompanyId(page: Page): Promise<number> {
+  const res = await page.request.get("/api/query/companies")
+  if (!res.ok()) throw new Error(`companies query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<{ id?: unknown }> }
+  const id = scalarQueryId(json.data?.[0]?.id)
+  if (id == null) throw new Error("no company in seed data")
+  return id
+}
+
+export async function fetchWorkflowIdByKey(page: Page, workflowKey: string): Promise<number> {
+  const key = workflowKey.trim().toLowerCase()
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/workflows")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{ id?: unknown; workflowKey?: string; workflow_key?: string }>
+      }
+      const row = (json.data ?? []).find(
+        (r) => String(r.workflowKey ?? r.workflow_key ?? "").toLowerCase() === key,
+      )
+      const id = scalarQueryId(row?.id)
+      if (id != null) return id
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`workflow not found for key ${workflowKey}`)
+}
+
+export async function fetchDraftWorkflowVersionId(
+  page: Page,
+  workflowId: number,
+): Promise<{ versionId: number; draftRevision: number }> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/workflow-versions")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{
+          id?: unknown
+          workflowId?: unknown
+          workflow_id?: unknown
+          status?: unknown
+          draftRevision?: unknown
+          draft_revision?: unknown
+        }>
+      }
+      const row = (json.data ?? []).find((r) => {
+        if (scalarQueryId(r.workflowId ?? r.workflow_id) !== workflowId) return false
+        const status =
+          typeof r.status === "string"
+            ? r.status
+            : r.status && typeof r.status === "object" && "tag" in r.status
+              ? String((r.status as { tag?: string }).tag ?? "")
+              : ""
+        return status === "Draft"
+      })
+      const versionId = scalarQueryId(row?.id)
+      if (versionId != null) {
+        return {
+          versionId,
+          draftRevision: Number(row?.draftRevision ?? row?.draft_revision ?? 1),
+        }
+      }
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`draft workflow version not found for workflow ${workflowId}`)
+}
+
+function versionStatusTag(status: unknown): string {
+  if (typeof status === "string") return status
+  if (status && typeof status === "object" && "tag" in status) {
+    return String((status as { tag?: string }).tag ?? "")
+  }
+  return ""
+}
+
+export async function waitForWorkflowVersionStatus(
+  page: Page,
+  versionId: number,
+  status: string,
+  timeoutMs = 30_000,
+) {
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get("/api/query/workflow-versions")
+        if (!res.ok()) return ""
+        const json = (await res.json()) as {
+          data?: Array<{ id?: unknown; status?: unknown }>
+        }
+        const row = (json.data ?? []).find((r) => scalarQueryId(r.id) === versionId)
+        return versionStatusTag(row?.status)
+      },
+      { timeout: timeoutMs },
+    )
+    .toBe(status)
+}
+
+/** Seed a minimal publishable linear draft (start → end) via BFF reducers. */
+export async function seedPublishableWorkflowDraft(
+  page: Page,
+  options?: { workflowKey?: string; model?: string; name?: string },
+): Promise<{
+  organizationId: number
+  companyId: number
+  workflowKey: string
+  workflowId: number
+  versionId: number
+  draftRevision: number
+}> {
+  const organizationId = await fetchSessionOrganizationId(page)
+  const companyId = await fetchDefaultCompanyId(page)
+  const workflowKey = (options?.workflowKey ?? smokeName("wf")).toLowerCase().replace(/-/g, "_")
+  const model = options?.model ?? "e2e.subject"
+  const name = options?.name ?? `E2E ${workflowKey}`
+
+  await callReducerBff(page, "create_workflow", [
+    organizationId,
+    WORKFLOW_SOME(companyId),
+    {
+      workflowKey,
+      model,
+      name,
+      description: WORKFLOW_NONE,
+      trigger: { tag: "Manual" },
+      schemaVersion: 1,
+      snapshotFields: [],
+      metadata: WORKFLOW_NONE,
+    },
+  ])
+
+  const workflowId = await fetchWorkflowIdByKey(page, workflowKey)
+  let { versionId, draftRevision: rev } = await fetchDraftWorkflowVersionId(page, workflowId)
+
+  for (const node of [
+    { nodeKey: "start", name: "Start", kind: { tag: "Start" }, sequence: 1 },
+    { nodeKey: "end", name: "End", kind: { tag: "End" }, sequence: 2 },
+  ]) {
+    await callReducerBff(page, "upsert_workflow_node", [
+      organizationId,
+      versionId,
+      rev,
+      {
+        ...node,
+        splitKind: { tag: "None" },
+        joinKind: { tag: "None" },
+        action: WORKFLOW_NONE,
+        taskPolicy: WORKFLOW_NONE,
+        timerPolicy: WORKFLOW_NONE,
+        retryPolicy: WORKFLOW_NONE,
+        subflow: WORKFLOW_NONE,
+        metadata: WORKFLOW_NONE,
+      },
+    ])
+    rev += 1
+  }
+
+  await callReducerBff(page, "upsert_workflow_edge", [
+    organizationId,
+    versionId,
+    rev,
+    {
+      edgeKey: "e_start_end",
+      fromNodeKey: "start",
+      toNodeKey: "end",
+      sequence: 1,
+      signalKey: WORKFLOW_NONE,
+      condition: WORKFLOW_NONE,
+      metadata: WORKFLOW_NONE,
+    },
+  ])
+  rev += 1
+
+  // BFF seed bypasses React Query mutations — hard reload clears the 30s stale cache.
+  await gotoModule(page, "/workflows", "workflows")
+  await page.reload({ waitUntil: "domcontentloaded" })
+  await expectAuthenticatedShell(page)
+
+  return {
+    organizationId,
+    companyId,
+    workflowKey,
+    workflowId,
+    versionId,
+    draftRevision: rev,
+  }
+}
+
+export async function openWorkflowVersionRow(page: Page, versionId: number) {
+  await gotoModule(page, "/workflows", "workflows")
+  await page.getByTestId("module-tab-workflows-versions").click()
+  const row = activeTabEntityTable(page).getByTestId(`entity-row-${versionId}`)
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  await row.click()
+  await expect(page.getByTestId("workflow-row-dialog-versions")).toBeVisible({ timeout: 15_000 })
+}
+

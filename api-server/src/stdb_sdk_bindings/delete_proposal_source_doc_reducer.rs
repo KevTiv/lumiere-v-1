@@ -7,12 +7,16 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct DeleteProposalSourceDocArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub doc_id: u64,
 }
 
 impl From<DeleteProposalSourceDocArgs> for super::Reducer {
     fn from(args: DeleteProposalSourceDocArgs) -> Self {
         Self::DeleteProposalSourceDoc {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             doc_id: args.doc_id,
         }
     }
@@ -33,8 +37,13 @@ pub trait delete_proposal_source_doc {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`delete_proposal_source_doc:delete_proposal_source_doc_then`] to run a callback after the reducer completes.
-    fn delete_proposal_source_doc(&self, doc_id: u64) -> __sdk::Result<()> {
-        self.delete_proposal_source_doc_then(doc_id, |_, _| {})
+    fn delete_proposal_source_doc(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        doc_id: u64,
+    ) -> __sdk::Result<()> {
+        self.delete_proposal_source_doc_then(organization_id, company_id, doc_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `delete_proposal_source_doc` to run as soon as possible,
@@ -45,6 +54,8 @@ pub trait delete_proposal_source_doc {
     ///  and its status can be observed with the `callback`.
     fn delete_proposal_source_doc_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         doc_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -56,13 +67,21 @@ pub trait delete_proposal_source_doc {
 impl delete_proposal_source_doc for super::RemoteReducers {
     fn delete_proposal_source_doc_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         doc_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
             + 'static,
     ) -> __sdk::Result<()> {
-        self.imp
-            .invoke_reducer_with_callback(DeleteProposalSourceDocArgs { doc_id }, callback)
+        self.imp.invoke_reducer_with_callback(
+            DeleteProposalSourceDocArgs {
+                organization_id,
+                company_id,
+                doc_id,
+            },
+            callback,
+        )
     }
 }

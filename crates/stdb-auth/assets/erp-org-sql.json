@@ -1667,10 +1667,73 @@
   },
   {
     "extra_where": "",
+    "mapKey": "proposal-bid-decisions",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "proposal-bid-decisions",
+    "table": "proposal_bid_decision"
+  },
+  {
+    "extra_where": " AND is_active = true",
+    "mapKey": "proposal-templates",
+    "order_by": " ORDER BY name ASC",
+    "resource_key": "proposal-templates",
+    "table": "proposal_template"
+  },
+  {
+    "extra_where": " AND is_active = true",
+    "mapKey": "proposal-clauses",
+    "order_by": " ORDER BY clause_key ASC",
+    "resource_key": "proposal-clauses",
+    "table": "proposal_clause"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "proposal-compliance-requirements",
+    "order_by": " ORDER BY sequence ASC",
+    "resource_key": "proposal-compliance-requirements",
+    "table": "proposal_compliance_requirement"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "proposal-analyses",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "proposal-analyses",
+    "table": "proposal_analysis"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "proposal-procurement-scores",
+    "order_by": "",
+    "resource_key": "proposal-procurement-scores",
+    "table": "proposal_procurement_score"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "proposal-integration-intents",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "proposal-integration-intents",
+    "table": "proposal_integration_intent"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "proposal-clarifications",
+    "order_by": " ORDER BY id DESC",
+    "resource_key": "proposal-clarifications",
+    "table": "proposal_clarification"
+  },
+  {
+    "extra_where": "",
     "mapKey": "fleet-vehicles",
     "order_by": " ORDER BY name ASC",
     "resource_key": "fleet-vehicles",
     "table": "fleet_vehicle"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "warehouse-geo",
+    "order_by": "",
+    "resource_key": "warehouse-geo",
+    "table": "warehouse_geo"
   },
   {
     "extra_where": "",

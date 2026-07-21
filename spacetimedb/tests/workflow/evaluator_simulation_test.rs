@@ -166,7 +166,8 @@ fn test_trace_is_byte_identical(ctx: &ReducerContext) -> Result<(), String> {
         step.kind == WorkflowSimulationStepKind::HumanTaskProposed
             && step.node_key.as_deref() == Some("approve")
     }) || !first.steps.iter().any(|step| {
-        step.kind == WorkflowSimulationStepKind::ActionProposed && step.detail == "purchase.confirm"
+        step.kind == WorkflowSimulationStepKind::ActionProposed
+            && step.detail == "confirm_purchase_order"
     }) {
         return Err("simulation did not trace proposed task and action effects".to_string());
     }

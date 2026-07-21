@@ -4,28 +4,28 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::upsert_proposal_section_params_type::UpsertProposalSectionParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct UpsertProposalSectionArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub proposal_id: u64,
     pub section_id: u64,
-    pub title: String,
-    pub content: String,
-    pub status: String,
-    pub sequence: u32,
-    pub ai_suggestion: Option<String>,
+    pub expected_revision: u32,
+    pub params: UpsertProposalSectionParams,
 }
 
 impl From<UpsertProposalSectionArgs> for super::Reducer {
     fn from(args: UpsertProposalSectionArgs) -> Self {
         Self::UpsertProposalSection {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             proposal_id: args.proposal_id,
             section_id: args.section_id,
-            title: args.title,
-            content: args.content,
-            status: args.status,
-            sequence: args.sequence,
-            ai_suggestion: args.ai_suggestion,
+            expected_revision: args.expected_revision,
+            params: args.params,
         }
     }
 }
@@ -47,22 +47,20 @@ pub trait upsert_proposal_section {
     /// /// Use [`upsert_proposal_section:upsert_proposal_section_then`] to run a callback after the reducer completes.
     fn upsert_proposal_section(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: u64,
-        title: String,
-        content: String,
-        status: String,
-        sequence: u32,
-        ai_suggestion: Option<String>,
+        expected_revision: u32,
+        params: UpsertProposalSectionParams,
     ) -> __sdk::Result<()> {
         self.upsert_proposal_section_then(
+            organization_id,
+            company_id,
             proposal_id,
             section_id,
-            title,
-            content,
-            status,
-            sequence,
-            ai_suggestion,
+            expected_revision,
+            params,
             |_, _| {},
         )
     }
@@ -75,13 +73,12 @@ pub trait upsert_proposal_section {
     ///  and its status can be observed with the `callback`.
     fn upsert_proposal_section_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: u64,
-        title: String,
-        content: String,
-        status: String,
-        sequence: u32,
-        ai_suggestion: Option<String>,
+        expected_revision: u32,
+        params: UpsertProposalSectionParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -92,13 +89,12 @@ pub trait upsert_proposal_section {
 impl upsert_proposal_section for super::RemoteReducers {
     fn upsert_proposal_section_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: u64,
-        title: String,
-        content: String,
-        status: String,
-        sequence: u32,
-        ai_suggestion: Option<String>,
+        expected_revision: u32,
+        params: UpsertProposalSectionParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -106,13 +102,12 @@ impl upsert_proposal_section for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             UpsertProposalSectionArgs {
+                organization_id,
+                company_id,
                 proposal_id,
                 section_id,
-                title,
-                content,
-                status,
-                sequence,
-                ai_suggestion,
+                expected_revision,
+                params,
             },
             callback,
         )

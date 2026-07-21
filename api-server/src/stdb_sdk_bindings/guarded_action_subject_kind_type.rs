@@ -19,6 +19,10 @@ pub enum GuardedActionSubjectKind {
     ExpenseSheet,
 
     AiActionDraft,
+
+    HrLeave,
+
+    PaymentTransaction,
 }
 
 impl __sdk::InModule for GuardedActionSubjectKind {

@@ -21,6 +21,12 @@ pub enum GuardedActionKey {
     ApproveExpenseSheet,
 
     ApproveAiActionDraft,
+
+    ApproveLeave,
+
+    PostPaymentTransaction,
+
+    ReversePaymentTransaction,
 }
 
 impl __sdk::InModule for GuardedActionKey {

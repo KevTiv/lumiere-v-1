@@ -7,8 +7,9 @@ use chrono_tz::Tz;
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::workflow::calendar::{
-    activate_foundation_calendar_packs, calculate_workflow_deadline, foundation_calendar_packs,
-    resolve_local_datetime, workflow_calendar_exception, workflow_calendar_version,
+    activate_foundation_calendar_packs, calculate_deadline_from_delay_seconds,
+    calculate_workflow_deadline, foundation_calendar_packs, resolve_local_datetime,
+    working_minutes_from_delay_seconds, workflow_calendar_exception, workflow_calendar_version,
     CalendarExceptionCategory, CalendarExceptionScope, DeadlineRequest, DstOverlapPolicy,
     DstResolution, WorkflowCalendarException, WorkflowCalendarMarket, WorkflowCalendarVersion,
 };
@@ -213,6 +214,49 @@ pub fn test_foundation_activation_is_idempotent(ctx: &ReducerContext) -> Result<
         || ctx.db.workflow_calendar_exception().iter().count() != exception_count
     {
         return Err("content-hash replay inserted duplicate calendar rows".to_string());
+    }
+    Ok(())
+}
+
+/// WF-18: recompute input must change due instants when calendar overlays shift work time.
+pub fn test_recompute_deadline_rewrites_due_at_evidence() -> Result<(), String> {
+    if working_minutes_from_delay_seconds(0) != 1
+        || working_minutes_from_delay_seconds(60) != 1
+        || working_minutes_from_delay_seconds(61) != 2
+        || working_minutes_from_delay_seconds(86_400) != 1_440
+    {
+        return Err("working_minutes_from_delay_seconds rounding is incorrect".to_string());
+    }
+
+    let version = fixture_version();
+    let observed_monday = fixture_exception(
+        version.id,
+        "2026-08-10",
+        CalendarExceptionCategory::ObservedHoliday,
+        CalendarExceptionScope::National,
+        None,
+        None,
+    )?;
+    let exceptions = [observed_monday];
+    let friday_start = utc_timestamp(2026, 8, 7, 6, 0)?;
+
+    let wall_clock_due = friday_start + std::time::Duration::from_secs(7_200);
+    let calendar_due = calculate_deadline_from_delay_seconds(
+        &version,
+        &exceptions,
+        friday_start,
+        7_200,
+    )?;
+    if calendar_due.utc_instant == wall_clock_due {
+        return Err(
+            "calendar-aware recompute must differ from naive wall-clock delay across a holiday"
+                .to_string(),
+        );
+    }
+    if calendar_due.requested_local_value != "2026-08-11 10:00:00" {
+        return Err(format!(
+            "recompute deadline evidence is incorrect: {calendar_due:?}"
+        ));
     }
     Ok(())
 }

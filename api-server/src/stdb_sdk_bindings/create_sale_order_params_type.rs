@@ -23,6 +23,7 @@ pub struct CreateSaleOrderParams {
     pub fiscal_position_id: Option<u64>,
     pub team_id: Option<u64>,
     pub opportunity_id: Option<u64>,
+    pub proposal_id: Option<u64>,
     pub note: Option<String>,
     pub terms_and_conditions: Option<String>,
     pub validity_days: Option<u32>,

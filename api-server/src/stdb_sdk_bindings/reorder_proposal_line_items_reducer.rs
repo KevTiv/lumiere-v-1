@@ -7,6 +7,8 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct ReorderProposalLineItemsArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub proposal_id: u64,
     pub ordered_ids: Vec<u64>,
 }
@@ -14,6 +16,8 @@ pub(super) struct ReorderProposalLineItemsArgs {
 impl From<ReorderProposalLineItemsArgs> for super::Reducer {
     fn from(args: ReorderProposalLineItemsArgs) -> Self {
         Self::ReorderProposalLineItems {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             proposal_id: args.proposal_id,
             ordered_ids: args.ordered_ids,
         }
@@ -37,10 +41,18 @@ pub trait reorder_proposal_line_items {
     /// /// Use [`reorder_proposal_line_items:reorder_proposal_line_items_then`] to run a callback after the reducer completes.
     fn reorder_proposal_line_items(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         ordered_ids: Vec<u64>,
     ) -> __sdk::Result<()> {
-        self.reorder_proposal_line_items_then(proposal_id, ordered_ids, |_, _| {})
+        self.reorder_proposal_line_items_then(
+            organization_id,
+            company_id,
+            proposal_id,
+            ordered_ids,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `reorder_proposal_line_items` to run as soon as possible,
@@ -51,6 +63,8 @@ pub trait reorder_proposal_line_items {
     ///  and its status can be observed with the `callback`.
     fn reorder_proposal_line_items_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         ordered_ids: Vec<u64>,
 
@@ -63,6 +77,8 @@ pub trait reorder_proposal_line_items {
 impl reorder_proposal_line_items for super::RemoteReducers {
     fn reorder_proposal_line_items_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         ordered_ids: Vec<u64>,
 
@@ -72,6 +88,8 @@ impl reorder_proposal_line_items for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             ReorderProposalLineItemsArgs {
+                organization_id,
+                company_id,
                 proposal_id,
                 ordered_ids,
             },

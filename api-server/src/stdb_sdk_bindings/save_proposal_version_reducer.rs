@@ -7,17 +7,19 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct SaveProposalVersionArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub proposal_id: u64,
     pub message: String,
-    pub sections_json: String,
 }
 
 impl From<SaveProposalVersionArgs> for super::Reducer {
     fn from(args: SaveProposalVersionArgs) -> Self {
         Self::SaveProposalVersion {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             proposal_id: args.proposal_id,
             message: args.message,
-            sections_json: args.sections_json,
         }
     }
 }
@@ -39,11 +41,18 @@ pub trait save_proposal_version {
     /// /// Use [`save_proposal_version:save_proposal_version_then`] to run a callback after the reducer completes.
     fn save_proposal_version(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         message: String,
-        sections_json: String,
     ) -> __sdk::Result<()> {
-        self.save_proposal_version_then(proposal_id, message, sections_json, |_, _| {})
+        self.save_proposal_version_then(
+            organization_id,
+            company_id,
+            proposal_id,
+            message,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `save_proposal_version` to run as soon as possible,
@@ -54,9 +63,10 @@ pub trait save_proposal_version {
     ///  and its status can be observed with the `callback`.
     fn save_proposal_version_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         message: String,
-        sections_json: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -67,9 +77,10 @@ pub trait save_proposal_version {
 impl save_proposal_version for super::RemoteReducers {
     fn save_proposal_version_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         message: String,
-        sections_json: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -77,9 +88,10 @@ impl save_proposal_version for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             SaveProposalVersionArgs {
+                organization_id,
+                company_id,
                 proposal_id,
                 message,
-                sections_json,
             },
             callback,
         )

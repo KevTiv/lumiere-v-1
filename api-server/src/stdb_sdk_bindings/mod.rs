@@ -48,6 +48,7 @@ pub mod add_document_version_params_type;
 pub mod add_landed_cost_line_params_type;
 pub mod add_org_member_params_type;
 pub mod add_performance_goal_params_type;
+pub mod add_proposal_line_item_params_type;
 pub mod add_purchase_order_line_params_type;
 pub mod add_purchase_requisition_line_params_type;
 pub mod add_purchase_rfq_line_params_type;
@@ -81,6 +82,7 @@ pub mod amend_subscription_params_type;
 pub mod amortization_line_type;
 pub mod amortization_schedule_type;
 pub mod analytics_metric_type;
+pub mod answer_proposal_clarification_params_type;
 pub mod append_ai_agent_run_step_params_type;
 pub mod append_ai_chat_message_params_type;
 pub mod append_crm_conversation_message_params_type;
@@ -89,6 +91,7 @@ pub mod apply_expense_advance_params_type;
 pub mod apply_index_linked_renewal_params_type;
 pub mod apply_omnichannel_allocation_params_type;
 pub mod apply_project_change_order_params_type;
+pub mod apply_proposal_analysis_params_type;
 pub mod apply_sale_promotion_params_type;
 pub mod apply_subscription_bundle_params_type;
 pub mod apply_subscription_invoice_payment_params_type;
@@ -113,6 +116,7 @@ pub mod barcode_nomenclature_type;
 pub mod barcode_rule_type;
 pub mod barcode_scan_type;
 pub mod batch_state_type;
+pub mod bid_decision_kind_type;
 pub mod bill_project_milestone_params_type;
 pub mod bill_timesheets_params_type;
 pub mod billing_account_type;
@@ -150,6 +154,7 @@ pub mod complete_document_signature_request_params_type;
 pub mod complete_offboarding_item_params_type;
 pub mod complete_onboarding_item_params_type;
 pub mod complete_performance_review_params_type;
+pub mod complete_proposal_integration_intent_params_type;
 pub mod complete_queue_job_params_type;
 pub mod compute_price_type;
 pub mod condition_comparison_type;
@@ -185,6 +190,8 @@ pub mod contact_verification_state_type;
 pub mod contract_state_type;
 pub mod convert_lead_params_type;
 pub mod convert_opportunity_params_type;
+pub mod convert_proposal_to_project_params_type;
+pub mod convert_proposal_to_sale_order_params_type;
 pub mod country_type;
 pub mod country_pack_definition_type;
 pub mod country_pack_tax_rule_type;
@@ -277,6 +284,7 @@ pub mod create_financial_report_params_type;
 pub mod create_fiscal_position_params_type;
 pub mod create_fiscal_position_tax_params_type;
 pub mod create_fiscal_year_params_type;
+pub mod create_fleet_vehicle_params_type;
 pub mod create_form_config_params_type;
 pub mod create_form_field_params_type;
 pub mod create_helpdesk_sla_params_type;
@@ -353,6 +361,11 @@ pub mod create_project_rate_card_line_params_type;
 pub mod create_project_rate_card_params_type;
 pub mod create_project_revenue_line_params_type;
 pub mod create_project_revenue_schedule_params_type;
+pub mod create_proposal_clarification_params_type;
+pub mod create_proposal_clause_params_type;
+pub mod create_proposal_integration_intent_params_type;
+pub mod create_proposal_params_type;
+pub mod create_proposal_template_params_type;
 pub mod create_public_holiday_params_type;
 pub mod create_purchase_blanket_order_params_type;
 pub mod create_purchase_contract_params_type;
@@ -437,6 +450,7 @@ pub mod create_work_schedule_params_type;
 pub mod create_workcenter_params_type;
 pub mod create_workcenter_productivity_params_type;
 pub mod create_workflow_delegation_params_type;
+pub mod create_workflow_migration_plan_params_type;
 pub mod create_workflow_params_type;
 pub mod create_working_calendar_params_type;
 pub mod create_workorder_params_type;
@@ -495,6 +509,7 @@ pub mod expense_state_type;
 pub mod export_financial_report_params_type;
 pub mod fail_expense_integration_intent_params_type;
 pub mod fail_project_integration_intent_params_type;
+pub mod fail_proposal_integration_intent_params_type;
 pub mod fail_subscription_payment_intent_params_type;
 pub mod fail_warehouse_sync_intent_params_type;
 pub mod field_option_type;
@@ -614,6 +629,7 @@ pub mod lead_score_factor_type;
 pub mod lead_source_type;
 pub mod line_invoice_status_type;
 pub mod line_state_type;
+pub mod link_proposal_version_esign_params_type;
 pub mod link_subcontractor_cost_params_type;
 pub mod log_audit_event_params_type;
 pub mod log_hr_pii_read_params_type;
@@ -629,6 +645,7 @@ pub mod message_batch_status_type;
 pub mod message_channel_type;
 pub mod message_template_type;
 pub mod message_template_variable_type;
+pub mod migrate_workflow_instance_params_type;
 pub mod mo_state_type;
 pub mod module_config_input_type;
 pub mod money_value_type;
@@ -698,6 +715,7 @@ pub mod pos_terminal_type;
 pub mod post_expense_sheet_params_type;
 pub mod post_payslip_params_type;
 pub mod post_realized_fx_params_type;
+pub mod preflight_workflow_migration_params_type;
 pub mod pricelist_applied_on_type;
 pub mod privacy_consent_type;
 pub mod process_intercompany_transaction_params_type;
@@ -728,12 +746,20 @@ pub mod project_task_type;
 pub mod project_timesheet_type;
 pub mod project_timesheet_approval_type;
 pub mod proposal_type;
+pub mod proposal_analysis_type;
+pub mod proposal_bid_decision_type;
+pub mod proposal_clarification_type;
+pub mod proposal_clause_type;
 pub mod proposal_comment_type;
+pub mod proposal_compliance_requirement_type;
+pub mod proposal_integration_intent_type;
 pub mod proposal_line_item_type;
 pub mod proposal_presence_type;
+pub mod proposal_procurement_score_type;
 pub mod proposal_section_type;
 pub mod proposal_source_doc_type;
 pub mod proposal_status_type;
+pub mod proposal_template_type;
 pub mod proposal_version_type;
 pub mod public_holiday_type;
 pub mod purchase_approval_delegate_type;
@@ -768,6 +794,7 @@ pub mod receive_consignment_stock_params_type;
 pub mod recognize_amortization_line_params_type;
 pub mod recognize_deferred_revenue_params_type;
 pub mod recognize_project_revenue_params_type;
+pub mod recompute_workflow_timers_params_type;
 pub mod reconcile_account_bank_statement_line_params_type;
 pub mod record_ai_skill_test_run_params_type;
 pub mod record_barcode_scan_params_type;
@@ -779,6 +806,7 @@ pub mod record_hr_integration_result_params_type;
 pub mod record_inventory_integration_result_params_type;
 pub mod record_payroll_export_result_params_type;
 pub mod record_privacy_consent_params_type;
+pub mod record_proposal_bid_decision_params_type;
 pub mod record_purchasing_integration_result_params_type;
 pub mod record_sales_integration_result_params_type;
 pub mod record_subscription_payment_failure_params_type;
@@ -1030,6 +1058,8 @@ pub mod update_project_milestone_params_type;
 pub mod update_project_params_type;
 pub mod update_project_rate_card_line_params_type;
 pub mod update_project_rate_card_params_type;
+pub mod update_proposal_line_item_params_type;
+pub mod update_proposal_params_type;
 pub mod update_proposal_source_doc_params_type;
 pub mod update_public_holiday_params_type;
 pub mod update_purchase_order_line_params_type;
@@ -1063,6 +1093,7 @@ pub mod update_user_profile_params_type;
 pub mod update_utm_campaign_params_type;
 pub mod update_utm_medium_params_type;
 pub mod update_utm_source_params_type;
+pub mod update_vehicle_position_params_type;
 pub mod update_warehouse_3_d_zone_params_type;
 pub mod update_warehouse_params_type;
 pub mod update_whats_app_business_account_params_type;
@@ -1079,6 +1110,9 @@ pub mod upsert_expense_per_diem_rate_params_type;
 pub mod upsert_expense_policy_params_type;
 pub mod upsert_organization_settings_params_type;
 pub mod upsert_partner_credit_control_params_type;
+pub mod upsert_proposal_compliance_requirement_params_type;
+pub mod upsert_proposal_procurement_score_params_type;
+pub mod upsert_proposal_section_params_type;
 pub mod upsert_search_embedding_params_type;
 pub mod upsert_subscription_price_index_params_type;
 pub mod upsert_vendor_scorecard_params_type;
@@ -1111,6 +1145,7 @@ pub mod workflow_type;
 pub mod workflow_action_input_type;
 pub mod workflow_action_reference_type;
 pub mod workflow_authorization_outcome_type;
+pub mod workflow_branch_key_migration_mapping_type;
 pub mod workflow_branch_kind_type;
 pub mod workflow_calendar_type;
 pub mod workflow_calendar_exception_type;
@@ -1129,7 +1164,11 @@ pub mod workflow_delivery_object_kind_type;
 pub mod workflow_delivery_receipt_type;
 pub mod workflow_delivery_receipt_kind_type;
 pub mod workflow_edge_type;
+pub mod workflow_edge_migration_mapping_type;
+pub mod workflow_fork_type;
+pub mod workflow_fork_migration_mapping_type;
 pub mod workflow_human_task_type;
+pub mod workflow_human_task_candidate_type;
 pub mod workflow_human_task_command_kind_type;
 pub mod workflow_human_task_decision_type;
 pub mod workflow_human_task_event_type;
@@ -1138,8 +1177,15 @@ pub mod workflow_human_task_receipt_type;
 pub mod workflow_human_task_status_type;
 pub mod workflow_instance_type;
 pub mod workflow_instance_state_type;
+pub mod workflow_join_arrival_type;
+pub mod workflow_migration_compatibility_type;
+pub mod workflow_migration_instance_result_type;
+pub mod workflow_migration_outcome_type;
+pub mod workflow_migration_plan_type;
+pub mod workflow_migration_preflight_type;
 pub mod workflow_node_type;
 pub mod workflow_node_kind_type;
+pub mod workflow_node_migration_mapping_type;
 pub mod workflow_outbox_type;
 pub mod workflow_outbox_result_kind_type;
 pub mod workflow_outbox_status_type;
@@ -1199,6 +1245,7 @@ pub mod add_workflow_human_task_comment_reducer;
 pub mod advance_subscription_dunning_reducer;
 pub mod allocate_payment_transaction_reducer;
 pub mod amend_subscription_reducer;
+pub mod answer_proposal_clarification_reducer;
 pub mod append_ai_agent_run_step_reducer;
 pub mod append_ai_chat_message_reducer;
 pub mod append_crm_conversation_message_reducer;
@@ -1216,6 +1263,8 @@ pub mod apply_pending_hr_integration_intents_reducer;
 pub mod apply_pending_project_integration_intents_reducer;
 pub mod apply_project_change_order_reducer;
 pub mod apply_project_integration_intent_reducer;
+pub mod apply_proposal_analysis_reducer;
+pub mod apply_proposal_template_reducer;
 pub mod apply_reconciliation_rules_reducer;
 pub mod apply_sale_order_options_reducer;
 pub mod apply_sale_promotion_to_order_reducer;
@@ -1230,6 +1279,7 @@ pub mod approve_expense_policy_exception_reducer;
 pub mod approve_expense_sheet_reducer;
 pub mod approve_intercompany_transaction_reducer;
 pub mod approve_leave_reducer;
+pub mod approve_proposal_reducer;
 pub mod approve_purchase_requisition_reducer;
 pub mod approve_supplier_intake_reducer;
 pub mod archive_ai_chat_session_reducer;
@@ -1286,6 +1336,7 @@ pub mod check_mo_availability_reducer;
 pub mod claim_hub_with_token_reducer;
 pub mod claim_queue_job_reducer;
 pub mod claim_workflow_human_task_reducer;
+pub mod cleanup_stale_proposal_presence_reducer;
 pub mod clear_document_presence_reducer;
 pub mod clear_knowledge_article_presence_reducer;
 pub mod clear_opportunity_presence_reducer;
@@ -1309,6 +1360,7 @@ pub mod complete_performance_review_reducer;
 pub mod complete_picking_batch_reducer;
 pub mod complete_picking_wave_reducer;
 pub mod complete_productivity_log_reducer;
+pub mod complete_proposal_integration_intent_reducer;
 pub mod complete_queue_job_reducer;
 pub mod complete_scheduled_owner_report_run_reducer;
 pub mod complete_tax_deadline_reducer;
@@ -1334,6 +1386,8 @@ pub mod confirm_stock_picking_reducer;
 pub mod consume_mo_materials_reducer;
 pub mod convert_lead_to_customer_reducer;
 pub mod convert_opportunity_to_sale_order_reducer;
+pub mod convert_proposal_to_project_reducer;
+pub mod convert_proposal_to_sale_order_reducer;
 pub mod convert_purchase_requisition_to_po_reducer;
 pub mod create_account_account_reducer;
 pub mod create_account_account_type_reducer;
@@ -1504,6 +1558,10 @@ pub mod create_project_rate_card_line_reducer;
 pub mod create_project_revenue_line_reducer;
 pub mod create_project_revenue_schedule_reducer;
 pub mod create_proposal_reducer;
+pub mod create_proposal_clarification_reducer;
+pub mod create_proposal_clause_reducer;
+pub mod create_proposal_integration_intent_reducer;
+pub mod create_proposal_template_reducer;
 pub mod create_public_holiday_reducer;
 pub mod create_purchase_blanket_order_reducer;
 pub mod create_purchase_contract_reducer;
@@ -1582,6 +1640,7 @@ pub mod create_work_schedule_reducer;
 pub mod create_workcenter_reducer;
 pub mod create_workflow_reducer;
 pub mod create_workflow_delegation_reducer;
+pub mod create_workflow_migration_plan_reducer;
 pub mod create_working_calendar_reducer;
 pub mod create_workorder_reducer;
 pub mod deactivate_pos_config_reducer;
@@ -1680,6 +1739,7 @@ pub mod export_financial_report_reducer;
 pub mod fail_expense_integration_intent_reducer;
 pub mod fail_iot_action_reducer;
 pub mod fail_project_integration_intent_reducer;
+pub mod fail_proposal_integration_intent_reducer;
 pub mod fail_quality_check_reducer;
 pub mod fail_scheduled_owner_report_run_reducer;
 pub mod fail_subscription_payment_intent_reducer;
@@ -1767,6 +1827,7 @@ pub mod link_device_to_location_reducer;
 pub mod link_device_to_pos_reducer;
 pub mod link_device_to_quality_check_reducer;
 pub mod link_device_to_workcenter_reducer;
+pub mod link_proposal_version_esign_reducer;
 pub mod link_subcontractor_cost_to_project_reducer;
 pub mod link_workos_user_reducer;
 pub mod lock_document_reducer;
@@ -1788,6 +1849,7 @@ pub mod match_elimination_entries_reducer;
 pub mod match_expense_card_statement_line_reducer;
 pub mod merge_contacts_reducer;
 pub mod migrate_all_organizations_reducer;
+pub mod migrate_workflow_instance_reducer;
 pub mod move_stock_quant_reducer;
 pub mod open_account_period_reducer;
 pub mod open_contract_reducer;
@@ -1812,6 +1874,7 @@ pub mod post_payment_reducer;
 pub mod post_payment_transaction_reducer;
 pub mod post_payslip_reducer;
 pub mod post_realized_fx_gain_loss_reducer;
+pub mod preflight_workflow_migration_reducer;
 pub mod process_consolidation_reducer;
 pub mod process_intercompany_transaction_reducer;
 pub mod process_inventory_adjustment_reducer;
@@ -1830,6 +1893,7 @@ pub mod recognize_deferred_revenue_reducer;
 pub mod recognize_project_revenue_reducer;
 pub mod recompute_lead_score_reducer;
 pub mod recompute_relationship_insights_reducer;
+pub mod recompute_workflow_timers_for_calendar_reducer;
 pub mod reconcile_account_bank_statement_line_reducer;
 pub mod reconcile_payment_with_invoice_reducer;
 pub mod record_ai_agent_run_policy_snapshot_reducer;
@@ -1846,6 +1910,7 @@ pub mod record_inventory_integration_result_reducer;
 pub mod record_message_copied_reducer;
 pub mod record_payroll_export_result_reducer;
 pub mod record_privacy_consent_reducer;
+pub mod record_proposal_bid_decision_reducer;
 pub mod record_purchasing_integration_result_reducer;
 pub mod record_report_run_reducer;
 pub mod record_sales_integration_result_reducer;
@@ -1900,8 +1965,10 @@ pub mod reset_leave_to_draft_reducer;
 pub mod resolve_inventory_exception_reducer;
 pub mod resolve_iot_alert_reducer;
 pub mod resolve_proposal_comment_reducer;
+pub mod resolve_proposal_section_conflict_reducer;
 pub mod restore_document_reducer;
 pub mod restore_product_category_reducer;
+pub mod restore_proposal_version_reducer;
 pub mod resume_subscription_reducer;
 pub mod retire_workflow_version_reducer;
 pub mod retry_dead_letter_queue_job_reducer;
@@ -1933,10 +2000,12 @@ pub mod run_all_core_tests_reducer;
 pub mod run_all_crm_tests_reducer;
 pub mod run_all_domain_tests_reducer;
 pub mod run_all_expenses_tests_reducer;
+pub mod run_all_fleet_tests_reducer;
 pub mod run_all_hr_tests_reducer;
 pub mod run_all_inventory_tests_reducer;
 pub mod run_all_platform_tests_reducer;
 pub mod run_all_projects_tests_reducer;
+pub mod run_all_proposals_tests_reducer;
 pub mod run_all_purchasing_tests_reducer;
 pub mod run_all_sales_tests_reducer;
 pub mod run_all_subscriptions_tests_reducer;
@@ -1964,6 +2033,7 @@ pub mod run_expenses_wave_c_test_reducer;
 pub mod run_expenses_wave_d_test_reducer;
 pub mod run_expenses_wave_e_test_reducer;
 pub mod run_expenses_wave_f_test_reducer;
+pub mod run_fleet_wave_a_test_reducer;
 pub mod run_fx_revaluation_reducer;
 pub mod run_fx_revaluation_batch_reducer;
 pub mod run_helpdesk_ticket_test_reducer;
@@ -2008,6 +2078,8 @@ pub mod run_projects_wave_a_test_reducer;
 pub mod run_projects_wave_c_test_reducer;
 pub mod run_projects_wave_d_test_reducer;
 pub mod run_projects_wave_e_test_reducer;
+pub mod run_proposals_wave_a_test_reducer;
+pub mod run_proposals_wave_d_test_reducer;
 pub mod run_purchasing_bill_balanced_test_reducer;
 pub mod run_purchasing_company_isolation_test_reducer;
 pub mod run_purchasing_incoming_picking_test_reducer;
@@ -2048,6 +2120,7 @@ pub mod run_workflow_definition_test_reducer;
 pub mod run_workflow_delivery_tests_reducer;
 pub mod run_workflow_evaluator_simulation_tests_reducer;
 pub mod run_workflow_human_task_tests_reducer;
+pub mod run_workflow_migration_tests_reducer;
 pub mod run_workflow_runtime_tests_reducer;
 pub mod save_import_mapping_template_reducer;
 pub mod save_proposal_version_reducer;
@@ -2090,6 +2163,7 @@ pub mod set_task_parent_reducer;
 pub mod set_vendor_risk_flag_reducer;
 pub mod set_whatsapp_primary_account_reducer;
 pub mod set_workflow_candidate_group_member_reducer;
+pub mod set_workflow_migration_plan_active_reducer;
 pub mod settle_sale_commissions_reducer;
 pub mod setup_fiscal_calendar_reducer;
 pub mod share_dashboard_reducer;
@@ -2300,6 +2374,8 @@ pub mod upsert_expense_per_diem_rate_reducer;
 pub mod upsert_expense_policy_reducer;
 pub mod upsert_organization_settings_reducer;
 pub mod upsert_partner_credit_control_reducer;
+pub mod upsert_proposal_compliance_requirement_reducer;
+pub mod upsert_proposal_procurement_score_reducer;
 pub mod upsert_proposal_section_reducer;
 pub mod upsert_search_embedding_reducer;
 pub mod upsert_subscription_price_index_reducer;
@@ -2588,11 +2664,19 @@ pub mod project_task_table;
 pub mod project_timesheet_table;
 pub mod project_timesheet_approval_table;
 pub mod proposal_table;
+pub mod proposal_analysis_table;
+pub mod proposal_bid_decision_table;
+pub mod proposal_clarification_table;
+pub mod proposal_clause_table;
 pub mod proposal_comment_table;
+pub mod proposal_compliance_requirement_table;
+pub mod proposal_integration_intent_table;
 pub mod proposal_line_item_table;
 pub mod proposal_presence_table;
+pub mod proposal_procurement_score_table;
 pub mod proposal_section_table;
 pub mod proposal_source_doc_table;
+pub mod proposal_template_table;
 pub mod proposal_version_table;
 pub mod public_holiday_table;
 pub mod purchase_approval_delegate_table;
@@ -2705,6 +2789,9 @@ pub mod warehouse_geo_table;
 pub mod warehouse_sync_intent_table;
 pub mod warehouse_task_table;
 pub mod whatsapp_business_account_table;
+pub mod workflow_migration_instance_result_table;
+pub mod workflow_migration_plan_table;
+pub mod workflow_migration_preflight_table;
 pub mod working_calendar_table;
 
 pub use accept_sale_order_quotation_params_type::AcceptSaleOrderQuotationParams;
@@ -2744,6 +2831,7 @@ pub use add_document_version_params_type::AddDocumentVersionParams;
 pub use add_landed_cost_line_params_type::AddLandedCostLineParams;
 pub use add_org_member_params_type::AddOrgMemberParams;
 pub use add_performance_goal_params_type::AddPerformanceGoalParams;
+pub use add_proposal_line_item_params_type::AddProposalLineItemParams;
 pub use add_purchase_order_line_params_type::AddPurchaseOrderLineParams;
 pub use add_purchase_requisition_line_params_type::AddPurchaseRequisitionLineParams;
 pub use add_purchase_rfq_line_params_type::AddPurchaseRfqLineParams;
@@ -2777,6 +2865,7 @@ pub use amend_subscription_params_type::AmendSubscriptionParams;
 pub use amortization_line_type::AmortizationLine;
 pub use amortization_schedule_type::AmortizationSchedule;
 pub use analytics_metric_type::AnalyticsMetric;
+pub use answer_proposal_clarification_params_type::AnswerProposalClarificationParams;
 pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
 pub use append_ai_chat_message_params_type::AppendAiChatMessageParams;
 pub use append_crm_conversation_message_params_type::AppendCrmConversationMessageParams;
@@ -2785,6 +2874,7 @@ pub use apply_expense_advance_params_type::ApplyExpenseAdvanceParams;
 pub use apply_index_linked_renewal_params_type::ApplyIndexLinkedRenewalParams;
 pub use apply_omnichannel_allocation_params_type::ApplyOmnichannelAllocationParams;
 pub use apply_project_change_order_params_type::ApplyProjectChangeOrderParams;
+pub use apply_proposal_analysis_params_type::ApplyProposalAnalysisParams;
 pub use apply_sale_promotion_params_type::ApplySalePromotionParams;
 pub use apply_subscription_bundle_params_type::ApplySubscriptionBundleParams;
 pub use apply_subscription_invoice_payment_params_type::ApplySubscriptionInvoicePaymentParams;
@@ -2809,6 +2899,7 @@ pub use barcode_nomenclature_type::BarcodeNomenclature;
 pub use barcode_rule_type::BarcodeRule;
 pub use barcode_scan_type::BarcodeScan;
 pub use batch_state_type::BatchState;
+pub use bid_decision_kind_type::BidDecisionKind;
 pub use bill_project_milestone_params_type::BillProjectMilestoneParams;
 pub use bill_timesheets_params_type::BillTimesheetsParams;
 pub use billing_account_type::BillingAccount;
@@ -2846,6 +2937,7 @@ pub use complete_document_signature_request_params_type::CompleteDocumentSignatu
 pub use complete_offboarding_item_params_type::CompleteOffboardingItemParams;
 pub use complete_onboarding_item_params_type::CompleteOnboardingItemParams;
 pub use complete_performance_review_params_type::CompletePerformanceReviewParams;
+pub use complete_proposal_integration_intent_params_type::CompleteProposalIntegrationIntentParams;
 pub use complete_queue_job_params_type::CompleteQueueJobParams;
 pub use compute_price_type::ComputePrice;
 pub use condition_comparison_type::ConditionComparison;
@@ -2881,6 +2973,8 @@ pub use contact_verification_state_type::ContactVerificationState;
 pub use contract_state_type::ContractState;
 pub use convert_lead_params_type::ConvertLeadParams;
 pub use convert_opportunity_params_type::ConvertOpportunityParams;
+pub use convert_proposal_to_project_params_type::ConvertProposalToProjectParams;
+pub use convert_proposal_to_sale_order_params_type::ConvertProposalToSaleOrderParams;
 pub use country_type::Country;
 pub use country_pack_definition_type::CountryPackDefinition;
 pub use country_pack_tax_rule_type::CountryPackTaxRule;
@@ -2973,6 +3067,7 @@ pub use create_financial_report_params_type::CreateFinancialReportParams;
 pub use create_fiscal_position_params_type::CreateFiscalPositionParams;
 pub use create_fiscal_position_tax_params_type::CreateFiscalPositionTaxParams;
 pub use create_fiscal_year_params_type::CreateFiscalYearParams;
+pub use create_fleet_vehicle_params_type::CreateFleetVehicleParams;
 pub use create_form_config_params_type::CreateFormConfigParams;
 pub use create_form_field_params_type::CreateFormFieldParams;
 pub use create_helpdesk_sla_params_type::CreateHelpdeskSlaParams;
@@ -3049,6 +3144,11 @@ pub use create_project_rate_card_line_params_type::CreateProjectRateCardLinePara
 pub use create_project_rate_card_params_type::CreateProjectRateCardParams;
 pub use create_project_revenue_line_params_type::CreateProjectRevenueLineParams;
 pub use create_project_revenue_schedule_params_type::CreateProjectRevenueScheduleParams;
+pub use create_proposal_clarification_params_type::CreateProposalClarificationParams;
+pub use create_proposal_clause_params_type::CreateProposalClauseParams;
+pub use create_proposal_integration_intent_params_type::CreateProposalIntegrationIntentParams;
+pub use create_proposal_params_type::CreateProposalParams;
+pub use create_proposal_template_params_type::CreateProposalTemplateParams;
 pub use create_public_holiday_params_type::CreatePublicHolidayParams;
 pub use create_purchase_blanket_order_params_type::CreatePurchaseBlanketOrderParams;
 pub use create_purchase_contract_params_type::CreatePurchaseContractParams;
@@ -3133,6 +3233,7 @@ pub use create_work_schedule_params_type::CreateWorkScheduleParams;
 pub use create_workcenter_params_type::CreateWorkcenterParams;
 pub use create_workcenter_productivity_params_type::CreateWorkcenterProductivityParams;
 pub use create_workflow_delegation_params_type::CreateWorkflowDelegationParams;
+pub use create_workflow_migration_plan_params_type::CreateWorkflowMigrationPlanParams;
 pub use create_workflow_params_type::CreateWorkflowParams;
 pub use create_working_calendar_params_type::CreateWorkingCalendarParams;
 pub use create_workorder_params_type::CreateWorkorderParams;
@@ -3191,6 +3292,7 @@ pub use expense_state_type::ExpenseState;
 pub use export_financial_report_params_type::ExportFinancialReportParams;
 pub use fail_expense_integration_intent_params_type::FailExpenseIntegrationIntentParams;
 pub use fail_project_integration_intent_params_type::FailProjectIntegrationIntentParams;
+pub use fail_proposal_integration_intent_params_type::FailProposalIntegrationIntentParams;
 pub use fail_subscription_payment_intent_params_type::FailSubscriptionPaymentIntentParams;
 pub use fail_warehouse_sync_intent_params_type::FailWarehouseSyncIntentParams;
 pub use field_option_type::FieldOption;
@@ -3310,6 +3412,7 @@ pub use lead_score_factor_type::LeadScoreFactor;
 pub use lead_source_type::LeadSource;
 pub use line_invoice_status_type::LineInvoiceStatus;
 pub use line_state_type::LineState;
+pub use link_proposal_version_esign_params_type::LinkProposalVersionEsignParams;
 pub use link_subcontractor_cost_params_type::LinkSubcontractorCostParams;
 pub use log_audit_event_params_type::LogAuditEventParams;
 pub use log_hr_pii_read_params_type::LogHrPiiReadParams;
@@ -3325,6 +3428,7 @@ pub use message_batch_status_type::MessageBatchStatus;
 pub use message_channel_type::MessageChannel;
 pub use message_template_type::MessageTemplate;
 pub use message_template_variable_type::MessageTemplateVariable;
+pub use migrate_workflow_instance_params_type::MigrateWorkflowInstanceParams;
 pub use mo_state_type::MoState;
 pub use module_config_input_type::ModuleConfigInput;
 pub use money_value_type::MoneyValue;
@@ -3394,6 +3498,7 @@ pub use pos_terminal_type::PosTerminal;
 pub use post_expense_sheet_params_type::PostExpenseSheetParams;
 pub use post_payslip_params_type::PostPayslipParams;
 pub use post_realized_fx_params_type::PostRealizedFxParams;
+pub use preflight_workflow_migration_params_type::PreflightWorkflowMigrationParams;
 pub use pricelist_applied_on_type::PricelistAppliedOn;
 pub use privacy_consent_type::PrivacyConsent;
 pub use process_intercompany_transaction_params_type::ProcessIntercompanyTransactionParams;
@@ -3424,12 +3529,20 @@ pub use project_task_type::ProjectTask;
 pub use project_timesheet_type::ProjectTimesheet;
 pub use project_timesheet_approval_type::ProjectTimesheetApproval;
 pub use proposal_type::Proposal;
+pub use proposal_analysis_type::ProposalAnalysis;
+pub use proposal_bid_decision_type::ProposalBidDecision;
+pub use proposal_clarification_type::ProposalClarification;
+pub use proposal_clause_type::ProposalClause;
 pub use proposal_comment_type::ProposalComment;
+pub use proposal_compliance_requirement_type::ProposalComplianceRequirement;
+pub use proposal_integration_intent_type::ProposalIntegrationIntent;
 pub use proposal_line_item_type::ProposalLineItem;
 pub use proposal_presence_type::ProposalPresence;
+pub use proposal_procurement_score_type::ProposalProcurementScore;
 pub use proposal_section_type::ProposalSection;
 pub use proposal_source_doc_type::ProposalSourceDoc;
 pub use proposal_status_type::ProposalStatus;
+pub use proposal_template_type::ProposalTemplate;
 pub use proposal_version_type::ProposalVersion;
 pub use public_holiday_type::PublicHoliday;
 pub use purchase_approval_delegate_type::PurchaseApprovalDelegate;
@@ -3464,6 +3577,7 @@ pub use receive_consignment_stock_params_type::ReceiveConsignmentStockParams;
 pub use recognize_amortization_line_params_type::RecognizeAmortizationLineParams;
 pub use recognize_deferred_revenue_params_type::RecognizeDeferredRevenueParams;
 pub use recognize_project_revenue_params_type::RecognizeProjectRevenueParams;
+pub use recompute_workflow_timers_params_type::RecomputeWorkflowTimersParams;
 pub use reconcile_account_bank_statement_line_params_type::ReconcileAccountBankStatementLineParams;
 pub use record_ai_skill_test_run_params_type::RecordAiSkillTestRunParams;
 pub use record_barcode_scan_params_type::RecordBarcodeScanParams;
@@ -3475,6 +3589,7 @@ pub use record_hr_integration_result_params_type::RecordHrIntegrationResultParam
 pub use record_inventory_integration_result_params_type::RecordInventoryIntegrationResultParams;
 pub use record_payroll_export_result_params_type::RecordPayrollExportResultParams;
 pub use record_privacy_consent_params_type::RecordPrivacyConsentParams;
+pub use record_proposal_bid_decision_params_type::RecordProposalBidDecisionParams;
 pub use record_purchasing_integration_result_params_type::RecordPurchasingIntegrationResultParams;
 pub use record_sales_integration_result_params_type::RecordSalesIntegrationResultParams;
 pub use record_subscription_payment_failure_params_type::RecordSubscriptionPaymentFailureParams;
@@ -3726,6 +3841,8 @@ pub use update_project_milestone_params_type::UpdateProjectMilestoneParams;
 pub use update_project_params_type::UpdateProjectParams;
 pub use update_project_rate_card_line_params_type::UpdateProjectRateCardLineParams;
 pub use update_project_rate_card_params_type::UpdateProjectRateCardParams;
+pub use update_proposal_line_item_params_type::UpdateProposalLineItemParams;
+pub use update_proposal_params_type::UpdateProposalParams;
 pub use update_proposal_source_doc_params_type::UpdateProposalSourceDocParams;
 pub use update_public_holiday_params_type::UpdatePublicHolidayParams;
 pub use update_purchase_order_line_params_type::UpdatePurchaseOrderLineParams;
@@ -3759,6 +3876,7 @@ pub use update_user_profile_params_type::UpdateUserProfileParams;
 pub use update_utm_campaign_params_type::UpdateUtmCampaignParams;
 pub use update_utm_medium_params_type::UpdateUtmMediumParams;
 pub use update_utm_source_params_type::UpdateUtmSourceParams;
+pub use update_vehicle_position_params_type::UpdateVehiclePositionParams;
 pub use update_warehouse_3_d_zone_params_type::UpdateWarehouse3DZoneParams;
 pub use update_warehouse_params_type::UpdateWarehouseParams;
 pub use update_whats_app_business_account_params_type::UpdateWhatsAppBusinessAccountParams;
@@ -3775,6 +3893,9 @@ pub use upsert_expense_per_diem_rate_params_type::UpsertExpensePerDiemRateParams
 pub use upsert_expense_policy_params_type::UpsertExpensePolicyParams;
 pub use upsert_organization_settings_params_type::UpsertOrganizationSettingsParams;
 pub use upsert_partner_credit_control_params_type::UpsertPartnerCreditControlParams;
+pub use upsert_proposal_compliance_requirement_params_type::UpsertProposalComplianceRequirementParams;
+pub use upsert_proposal_procurement_score_params_type::UpsertProposalProcurementScoreParams;
+pub use upsert_proposal_section_params_type::UpsertProposalSectionParams;
 pub use upsert_search_embedding_params_type::UpsertSearchEmbeddingParams;
 pub use upsert_subscription_price_index_params_type::UpsertSubscriptionPriceIndexParams;
 pub use upsert_vendor_scorecard_params_type::UpsertVendorScorecardParams;
@@ -3807,6 +3928,7 @@ pub use workflow_type::Workflow;
 pub use workflow_action_input_type::WorkflowActionInput;
 pub use workflow_action_reference_type::WorkflowActionReference;
 pub use workflow_authorization_outcome_type::WorkflowAuthorizationOutcome;
+pub use workflow_branch_key_migration_mapping_type::WorkflowBranchKeyMigrationMapping;
 pub use workflow_branch_kind_type::WorkflowBranchKind;
 pub use workflow_calendar_type::WorkflowCalendar;
 pub use workflow_calendar_exception_type::WorkflowCalendarException;
@@ -3825,7 +3947,11 @@ pub use workflow_delivery_object_kind_type::WorkflowDeliveryObjectKind;
 pub use workflow_delivery_receipt_type::WorkflowDeliveryReceipt;
 pub use workflow_delivery_receipt_kind_type::WorkflowDeliveryReceiptKind;
 pub use workflow_edge_type::WorkflowEdge;
+pub use workflow_edge_migration_mapping_type::WorkflowEdgeMigrationMapping;
+pub use workflow_fork_type::WorkflowFork;
+pub use workflow_fork_migration_mapping_type::WorkflowForkMigrationMapping;
 pub use workflow_human_task_type::WorkflowHumanTask;
+pub use workflow_human_task_candidate_type::WorkflowHumanTaskCandidate;
 pub use workflow_human_task_command_kind_type::WorkflowHumanTaskCommandKind;
 pub use workflow_human_task_decision_type::WorkflowHumanTaskDecision;
 pub use workflow_human_task_event_type::WorkflowHumanTaskEvent;
@@ -3834,8 +3960,15 @@ pub use workflow_human_task_receipt_type::WorkflowHumanTaskReceipt;
 pub use workflow_human_task_status_type::WorkflowHumanTaskStatus;
 pub use workflow_instance_type::WorkflowInstance;
 pub use workflow_instance_state_type::WorkflowInstanceState;
+pub use workflow_join_arrival_type::WorkflowJoinArrival;
+pub use workflow_migration_compatibility_type::WorkflowMigrationCompatibility;
+pub use workflow_migration_instance_result_type::WorkflowMigrationInstanceResult;
+pub use workflow_migration_outcome_type::WorkflowMigrationOutcome;
+pub use workflow_migration_plan_type::WorkflowMigrationPlan;
+pub use workflow_migration_preflight_type::WorkflowMigrationPreflight;
 pub use workflow_node_type::WorkflowNode;
 pub use workflow_node_kind_type::WorkflowNodeKind;
+pub use workflow_node_migration_mapping_type::WorkflowNodeMigrationMapping;
 pub use workflow_outbox_type::WorkflowOutbox;
 pub use workflow_outbox_result_kind_type::WorkflowOutboxResultKind;
 pub use workflow_outbox_status_type::WorkflowOutboxStatus;
@@ -4130,11 +4263,19 @@ pub use project_task_table::*;
 pub use project_timesheet_table::*;
 pub use project_timesheet_approval_table::*;
 pub use proposal_table::*;
+pub use proposal_analysis_table::*;
+pub use proposal_bid_decision_table::*;
+pub use proposal_clarification_table::*;
+pub use proposal_clause_table::*;
 pub use proposal_comment_table::*;
+pub use proposal_compliance_requirement_table::*;
+pub use proposal_integration_intent_table::*;
 pub use proposal_line_item_table::*;
 pub use proposal_presence_table::*;
+pub use proposal_procurement_score_table::*;
 pub use proposal_section_table::*;
 pub use proposal_source_doc_table::*;
+pub use proposal_template_table::*;
 pub use proposal_version_table::*;
 pub use public_holiday_table::*;
 pub use purchase_approval_delegate_table::*;
@@ -4247,6 +4388,9 @@ pub use warehouse_geo_table::*;
 pub use warehouse_sync_intent_table::*;
 pub use warehouse_task_table::*;
 pub use whatsapp_business_account_table::*;
+pub use workflow_migration_instance_result_table::*;
+pub use workflow_migration_plan_table::*;
+pub use workflow_migration_preflight_table::*;
 pub use working_calendar_table::*;
 pub use accept_sale_order_quotation_reducer::accept_sale_order_quotation;
 pub use accrue_sale_commission_reducer::accrue_sale_commission;
@@ -4283,6 +4427,7 @@ pub use add_workflow_human_task_comment_reducer::add_workflow_human_task_comment
 pub use advance_subscription_dunning_reducer::advance_subscription_dunning;
 pub use allocate_payment_transaction_reducer::allocate_payment_transaction;
 pub use amend_subscription_reducer::amend_subscription;
+pub use answer_proposal_clarification_reducer::answer_proposal_clarification;
 pub use append_ai_agent_run_step_reducer::append_ai_agent_run_step;
 pub use append_ai_chat_message_reducer::append_ai_chat_message;
 pub use append_crm_conversation_message_reducer::append_crm_conversation_message;
@@ -4300,6 +4445,8 @@ pub use apply_pending_hr_integration_intents_reducer::apply_pending_hr_integrati
 pub use apply_pending_project_integration_intents_reducer::apply_pending_project_integration_intents;
 pub use apply_project_change_order_reducer::apply_project_change_order;
 pub use apply_project_integration_intent_reducer::apply_project_integration_intent;
+pub use apply_proposal_analysis_reducer::apply_proposal_analysis;
+pub use apply_proposal_template_reducer::apply_proposal_template;
 pub use apply_reconciliation_rules_reducer::apply_reconciliation_rules;
 pub use apply_sale_order_options_reducer::apply_sale_order_options;
 pub use apply_sale_promotion_to_order_reducer::apply_sale_promotion_to_order;
@@ -4314,6 +4461,7 @@ pub use approve_expense_policy_exception_reducer::approve_expense_policy_excepti
 pub use approve_expense_sheet_reducer::approve_expense_sheet;
 pub use approve_intercompany_transaction_reducer::approve_intercompany_transaction;
 pub use approve_leave_reducer::approve_leave;
+pub use approve_proposal_reducer::approve_proposal;
 pub use approve_purchase_requisition_reducer::approve_purchase_requisition;
 pub use approve_supplier_intake_reducer::approve_supplier_intake;
 pub use archive_ai_chat_session_reducer::archive_ai_chat_session;
@@ -4370,6 +4518,7 @@ pub use check_mo_availability_reducer::check_mo_availability;
 pub use claim_hub_with_token_reducer::claim_hub_with_token;
 pub use claim_queue_job_reducer::claim_queue_job;
 pub use claim_workflow_human_task_reducer::claim_workflow_human_task;
+pub use cleanup_stale_proposal_presence_reducer::cleanup_stale_proposal_presence;
 pub use clear_document_presence_reducer::clear_document_presence;
 pub use clear_knowledge_article_presence_reducer::clear_knowledge_article_presence;
 pub use clear_opportunity_presence_reducer::clear_opportunity_presence;
@@ -4393,6 +4542,7 @@ pub use complete_performance_review_reducer::complete_performance_review;
 pub use complete_picking_batch_reducer::complete_picking_batch;
 pub use complete_picking_wave_reducer::complete_picking_wave;
 pub use complete_productivity_log_reducer::complete_productivity_log;
+pub use complete_proposal_integration_intent_reducer::complete_proposal_integration_intent;
 pub use complete_queue_job_reducer::complete_queue_job;
 pub use complete_scheduled_owner_report_run_reducer::complete_scheduled_owner_report_run;
 pub use complete_tax_deadline_reducer::complete_tax_deadline;
@@ -4418,6 +4568,8 @@ pub use confirm_stock_picking_reducer::confirm_stock_picking;
 pub use consume_mo_materials_reducer::consume_mo_materials;
 pub use convert_lead_to_customer_reducer::convert_lead_to_customer;
 pub use convert_opportunity_to_sale_order_reducer::convert_opportunity_to_sale_order;
+pub use convert_proposal_to_project_reducer::convert_proposal_to_project;
+pub use convert_proposal_to_sale_order_reducer::convert_proposal_to_sale_order;
 pub use convert_purchase_requisition_to_po_reducer::convert_purchase_requisition_to_po;
 pub use create_account_account_reducer::create_account_account;
 pub use create_account_account_type_reducer::create_account_account_type;
@@ -4588,6 +4740,10 @@ pub use create_project_rate_card_line_reducer::create_project_rate_card_line;
 pub use create_project_revenue_line_reducer::create_project_revenue_line;
 pub use create_project_revenue_schedule_reducer::create_project_revenue_schedule;
 pub use create_proposal_reducer::create_proposal;
+pub use create_proposal_clarification_reducer::create_proposal_clarification;
+pub use create_proposal_clause_reducer::create_proposal_clause;
+pub use create_proposal_integration_intent_reducer::create_proposal_integration_intent;
+pub use create_proposal_template_reducer::create_proposal_template;
 pub use create_public_holiday_reducer::create_public_holiday;
 pub use create_purchase_blanket_order_reducer::create_purchase_blanket_order;
 pub use create_purchase_contract_reducer::create_purchase_contract;
@@ -4666,6 +4822,7 @@ pub use create_work_schedule_reducer::create_work_schedule;
 pub use create_workcenter_reducer::create_workcenter;
 pub use create_workflow_reducer::create_workflow;
 pub use create_workflow_delegation_reducer::create_workflow_delegation;
+pub use create_workflow_migration_plan_reducer::create_workflow_migration_plan;
 pub use create_working_calendar_reducer::create_working_calendar;
 pub use create_workorder_reducer::create_workorder;
 pub use deactivate_pos_config_reducer::deactivate_pos_config;
@@ -4764,6 +4921,7 @@ pub use export_financial_report_reducer::export_financial_report;
 pub use fail_expense_integration_intent_reducer::fail_expense_integration_intent;
 pub use fail_iot_action_reducer::fail_iot_action;
 pub use fail_project_integration_intent_reducer::fail_project_integration_intent;
+pub use fail_proposal_integration_intent_reducer::fail_proposal_integration_intent;
 pub use fail_quality_check_reducer::fail_quality_check;
 pub use fail_scheduled_owner_report_run_reducer::fail_scheduled_owner_report_run;
 pub use fail_subscription_payment_intent_reducer::fail_subscription_payment_intent;
@@ -4851,6 +5009,7 @@ pub use link_device_to_location_reducer::link_device_to_location;
 pub use link_device_to_pos_reducer::link_device_to_pos;
 pub use link_device_to_quality_check_reducer::link_device_to_quality_check;
 pub use link_device_to_workcenter_reducer::link_device_to_workcenter;
+pub use link_proposal_version_esign_reducer::link_proposal_version_esign;
 pub use link_subcontractor_cost_to_project_reducer::link_subcontractor_cost_to_project;
 pub use link_workos_user_reducer::link_workos_user;
 pub use lock_document_reducer::lock_document;
@@ -4872,6 +5031,7 @@ pub use match_elimination_entries_reducer::match_elimination_entries;
 pub use match_expense_card_statement_line_reducer::match_expense_card_statement_line;
 pub use merge_contacts_reducer::merge_contacts;
 pub use migrate_all_organizations_reducer::migrate_all_organizations;
+pub use migrate_workflow_instance_reducer::migrate_workflow_instance;
 pub use move_stock_quant_reducer::move_stock_quant;
 pub use open_account_period_reducer::open_account_period;
 pub use open_contract_reducer::open_contract;
@@ -4896,6 +5056,7 @@ pub use post_payment_reducer::post_payment;
 pub use post_payment_transaction_reducer::post_payment_transaction;
 pub use post_payslip_reducer::post_payslip;
 pub use post_realized_fx_gain_loss_reducer::post_realized_fx_gain_loss;
+pub use preflight_workflow_migration_reducer::preflight_workflow_migration;
 pub use process_consolidation_reducer::process_consolidation;
 pub use process_intercompany_transaction_reducer::process_intercompany_transaction;
 pub use process_inventory_adjustment_reducer::process_inventory_adjustment;
@@ -4914,6 +5075,7 @@ pub use recognize_deferred_revenue_reducer::recognize_deferred_revenue;
 pub use recognize_project_revenue_reducer::recognize_project_revenue;
 pub use recompute_lead_score_reducer::recompute_lead_score;
 pub use recompute_relationship_insights_reducer::recompute_relationship_insights;
+pub use recompute_workflow_timers_for_calendar_reducer::recompute_workflow_timers_for_calendar;
 pub use reconcile_account_bank_statement_line_reducer::reconcile_account_bank_statement_line;
 pub use reconcile_payment_with_invoice_reducer::reconcile_payment_with_invoice;
 pub use record_ai_agent_run_policy_snapshot_reducer::record_ai_agent_run_policy_snapshot;
@@ -4930,6 +5092,7 @@ pub use record_inventory_integration_result_reducer::record_inventory_integratio
 pub use record_message_copied_reducer::record_message_copied;
 pub use record_payroll_export_result_reducer::record_payroll_export_result;
 pub use record_privacy_consent_reducer::record_privacy_consent;
+pub use record_proposal_bid_decision_reducer::record_proposal_bid_decision;
 pub use record_purchasing_integration_result_reducer::record_purchasing_integration_result;
 pub use record_report_run_reducer::record_report_run;
 pub use record_sales_integration_result_reducer::record_sales_integration_result;
@@ -4984,8 +5147,10 @@ pub use reset_leave_to_draft_reducer::reset_leave_to_draft;
 pub use resolve_inventory_exception_reducer::resolve_inventory_exception;
 pub use resolve_iot_alert_reducer::resolve_iot_alert;
 pub use resolve_proposal_comment_reducer::resolve_proposal_comment;
+pub use resolve_proposal_section_conflict_reducer::resolve_proposal_section_conflict;
 pub use restore_document_reducer::restore_document;
 pub use restore_product_category_reducer::restore_product_category;
+pub use restore_proposal_version_reducer::restore_proposal_version;
 pub use resume_subscription_reducer::resume_subscription;
 pub use retire_workflow_version_reducer::retire_workflow_version;
 pub use retry_dead_letter_queue_job_reducer::retry_dead_letter_queue_job;
@@ -5017,10 +5182,12 @@ pub use run_all_core_tests_reducer::run_all_core_tests;
 pub use run_all_crm_tests_reducer::run_all_crm_tests;
 pub use run_all_domain_tests_reducer::run_all_domain_tests;
 pub use run_all_expenses_tests_reducer::run_all_expenses_tests;
+pub use run_all_fleet_tests_reducer::run_all_fleet_tests;
 pub use run_all_hr_tests_reducer::run_all_hr_tests;
 pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
 pub use run_all_platform_tests_reducer::run_all_platform_tests;
 pub use run_all_projects_tests_reducer::run_all_projects_tests;
+pub use run_all_proposals_tests_reducer::run_all_proposals_tests;
 pub use run_all_purchasing_tests_reducer::run_all_purchasing_tests;
 pub use run_all_sales_tests_reducer::run_all_sales_tests;
 pub use run_all_subscriptions_tests_reducer::run_all_subscriptions_tests;
@@ -5048,6 +5215,7 @@ pub use run_expenses_wave_c_test_reducer::run_expenses_wave_c_test;
 pub use run_expenses_wave_d_test_reducer::run_expenses_wave_d_test;
 pub use run_expenses_wave_e_test_reducer::run_expenses_wave_e_test;
 pub use run_expenses_wave_f_test_reducer::run_expenses_wave_f_test;
+pub use run_fleet_wave_a_test_reducer::run_fleet_wave_a_test;
 pub use run_fx_revaluation_reducer::run_fx_revaluation;
 pub use run_fx_revaluation_batch_reducer::run_fx_revaluation_batch;
 pub use run_helpdesk_ticket_test_reducer::run_helpdesk_ticket_test;
@@ -5092,6 +5260,8 @@ pub use run_projects_wave_a_test_reducer::run_projects_wave_a_test;
 pub use run_projects_wave_c_test_reducer::run_projects_wave_c_test;
 pub use run_projects_wave_d_test_reducer::run_projects_wave_d_test;
 pub use run_projects_wave_e_test_reducer::run_projects_wave_e_test;
+pub use run_proposals_wave_a_test_reducer::run_proposals_wave_a_test;
+pub use run_proposals_wave_d_test_reducer::run_proposals_wave_d_test;
 pub use run_purchasing_bill_balanced_test_reducer::run_purchasing_bill_balanced_test;
 pub use run_purchasing_company_isolation_test_reducer::run_purchasing_company_isolation_test;
 pub use run_purchasing_incoming_picking_test_reducer::run_purchasing_incoming_picking_test;
@@ -5132,6 +5302,7 @@ pub use run_workflow_definition_test_reducer::run_workflow_definition_test;
 pub use run_workflow_delivery_tests_reducer::run_workflow_delivery_tests;
 pub use run_workflow_evaluator_simulation_tests_reducer::run_workflow_evaluator_simulation_tests;
 pub use run_workflow_human_task_tests_reducer::run_workflow_human_task_tests;
+pub use run_workflow_migration_tests_reducer::run_workflow_migration_tests;
 pub use run_workflow_runtime_tests_reducer::run_workflow_runtime_tests;
 pub use save_import_mapping_template_reducer::save_import_mapping_template;
 pub use save_proposal_version_reducer::save_proposal_version;
@@ -5174,6 +5345,7 @@ pub use set_task_parent_reducer::set_task_parent;
 pub use set_vendor_risk_flag_reducer::set_vendor_risk_flag;
 pub use set_whatsapp_primary_account_reducer::set_whatsapp_primary_account;
 pub use set_workflow_candidate_group_member_reducer::set_workflow_candidate_group_member;
+pub use set_workflow_migration_plan_active_reducer::set_workflow_migration_plan_active;
 pub use settle_sale_commissions_reducer::settle_sale_commissions;
 pub use setup_fiscal_calendar_reducer::setup_fiscal_calendar;
 pub use share_dashboard_reducer::share_dashboard;
@@ -5384,6 +5556,8 @@ pub use upsert_expense_per_diem_rate_reducer::upsert_expense_per_diem_rate;
 pub use upsert_expense_policy_reducer::upsert_expense_policy;
 pub use upsert_organization_settings_reducer::upsert_organization_settings;
 pub use upsert_partner_credit_control_reducer::upsert_partner_credit_control;
+pub use upsert_proposal_compliance_requirement_reducer::upsert_proposal_compliance_requirement;
+pub use upsert_proposal_procurement_score_reducer::upsert_proposal_procurement_score;
 pub use upsert_proposal_section_reducer::upsert_proposal_section;
 pub use upsert_search_embedding_reducer::upsert_search_embedding;
 pub use upsert_subscription_price_index_reducer::upsert_subscription_price_index;
@@ -5507,6 +5681,8 @@ pub enum Reducer {
         params: AddPerformanceGoalParams,
 }    ,
     AddProposalComment {
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: u64,
         content: String,
@@ -5514,21 +5690,20 @@ pub enum Reducer {
         author_name: String,
 }    ,
     AddProposalLineItem {
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
-        section_id: Option::<u64>,
-        product_id: u64,
-        product_name: String,
-        quantity: f64,
-        price_unit: f64,
-        discount: f64,
-        notes: Option::<String>,
+        params: AddProposalLineItemParams,
 }    ,
     AddProposalSourceDoc {
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         name: String,
         content: String,
         doc_type: String,
         word_count: u32,
+        document_id: Option::<u64>,
 }    ,
     AddPurchaseOrderLine {
         organization_id: u64,
@@ -5597,6 +5772,12 @@ pub enum Reducer {
         company_id: u64,
         subscription_id: u64,
         params: AmendSubscriptionParams,
+}    ,
+    AnswerProposalClarification {
+        organization_id: u64,
+        company_id: u64,
+        clarification_id: u64,
+        params: AnswerProposalClarificationParams,
 }    ,
     AppendAiAgentRunStep {
         organization_id: u64,
@@ -5676,6 +5857,18 @@ pub enum Reducer {
         organization_id: u64,
         intent_id: u64,
 }    ,
+    ApplyProposalAnalysis {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        params: ApplyProposalAnalysisParams,
+}    ,
+    ApplyProposalTemplate {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        template_id: u64,
+}    ,
     ApplyReconciliationRules {
         organization_id: u64,
         line_id: u64,
@@ -5742,6 +5935,11 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         leave_id: u64,
+}    ,
+    ApproveProposal {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
 }    ,
     ApprovePurchaseRequisition {
         organization_id: u64,
@@ -6011,6 +6209,10 @@ pub enum Reducer {
         organization_id: u64,
         params: ClaimWorkflowHumanTaskParams,
 }    ,
+    CleanupStaleProposalPresence {
+        organization_id: u64,
+        max_age_micros: u64,
+}    ,
     ClearDocumentPresence {
         document_id: u64,
 }    ,
@@ -6021,6 +6223,8 @@ pub enum Reducer {
         opportunity_id: u64,
 }    ,
     ClearProposalPresence {
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
 }    ,
     CloneWorkflowVersionToDraft {
@@ -6119,6 +6323,12 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         log_id: u64,
+}    ,
+    CompleteProposalIntegrationIntent {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
+        params: CompleteProposalIntegrationIntentParams,
 }    ,
     CompleteQueueJob {
         organization_id: u64,
@@ -6234,6 +6444,18 @@ pub enum Reducer {
         company_id: u64,
         opportunity_id: u64,
         params: ConvertOpportunityParams,
+}    ,
+    ConvertProposalToProject {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        params: ConvertProposalToProjectParams,
+}    ,
+    ConvertProposalToSaleOrder {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        params: ConvertProposalToSaleOrderParams,
 }    ,
     ConvertPurchaseRequisitionToPo {
         organization_id: u64,
@@ -6639,10 +6861,8 @@ pub enum Reducer {
 }    ,
     CreateFleetVehicle {
         organization_id: u64,
-        name: String,
-        vehicle_type: String,
-        license_plate: Option::<String>,
-        driver_name: Option::<String>,
+        company_id: u64,
+        params: CreateFleetVehicleParams,
 }    ,
     CreateForecastSnapshot {
         organization_id: u64,
@@ -7021,12 +7241,30 @@ pub enum Reducer {
 }    ,
     CreateProposal {
         organization_id: u64,
-        title: String,
-        client_name: String,
-        value: f64,
-        deadline: Option::<__sdk::Timestamp>,
-        description: Option::<String>,
-        document_folder_id: Option::<u64>,
+        company_id: u64,
+        params: CreateProposalParams,
+}    ,
+    CreateProposalClarification {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        params: CreateProposalClarificationParams,
+}    ,
+    CreateProposalClause {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateProposalClauseParams,
+}    ,
+    CreateProposalIntegrationIntent {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        params: CreateProposalIntegrationIntentParams,
+}    ,
+    CreateProposalTemplate {
+        organization_id: u64,
+        company_id: u64,
+        params: CreateProposalTemplateParams,
 }    ,
     CreatePublicHoliday {
         organization_id: u64,
@@ -7392,6 +7630,10 @@ pub enum Reducer {
         company_id: u64,
         params: CreateWorkflowDelegationParams,
 }    ,
+    CreateWorkflowMigrationPlan {
+        organization_id: u64,
+        params: CreateWorkflowMigrationPlanParams,
+}    ,
     CreateWorkingCalendar {
         organization_id: u64,
         company_id: u64,
@@ -7597,12 +7839,18 @@ pub enum Reducer {
         milestone_id: u64,
 }    ,
     DeleteProposalLineItem {
+        organization_id: u64,
+        company_id: u64,
         line_item_id: u64,
 }    ,
     DeleteProposalSection {
+        organization_id: u64,
+        company_id: u64,
         section_id: u64,
 }    ,
     DeleteProposalSourceDoc {
+        organization_id: u64,
+        company_id: u64,
         doc_id: u64,
 }    ,
     DeleteQualityAlertReason {
@@ -7823,6 +8071,12 @@ pub enum Reducer {
         organization_id: u64,
         intent_id: u64,
         params: FailProjectIntegrationIntentParams,
+}    ,
+    FailProposalIntegrationIntent {
+        organization_id: u64,
+        company_id: u64,
+        intent_id: u64,
+        params: FailProposalIntegrationIntentParams,
 }    ,
     FailQualityCheck {
         organization_id: u64,
@@ -8222,6 +8476,12 @@ pub enum Reducer {
         device_id: u64,
         workcenter_id: u64,
 }    ,
+    LinkProposalVersionEsign {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        params: LinkProposalVersionEsignParams,
+}    ,
     LinkSubcontractorCostToProject {
         organization_id: u64,
         company_id: u64,
@@ -8315,6 +8575,10 @@ pub enum Reducer {
         params: MergeContactsParams,
 }    ,
     MigrateAllOrganizations ,
+    MigrateWorkflowInstance {
+        organization_id: u64,
+        params: MigrateWorkflowInstanceParams,
+}    ,
     MoveStockQuant {
         organization_id: u64,
         quant_id: u64,
@@ -8442,6 +8706,10 @@ pub enum Reducer {
         company_id: u64,
         params: PostRealizedFxParams,
 }    ,
+    PreflightWorkflowMigration {
+        organization_id: u64,
+        params: PreflightWorkflowMigrationParams,
+}    ,
     ProcessConsolidation {
         organization_id: u64,
         journal_id: u64,
@@ -8530,6 +8798,10 @@ pub enum Reducer {
         organization_id: u64,
         contact_id: u64,
 }    ,
+    RecomputeWorkflowTimersForCalendar {
+        organization_id: u64,
+        params: RecomputeWorkflowTimersParams,
+}    ,
     ReconcileAccountBankStatementLine {
         organization_id: u64,
         company_id: u64,
@@ -8610,6 +8882,12 @@ pub enum Reducer {
     RecordPrivacyConsent {
         organization_id: u64,
         params: RecordPrivacyConsentParams,
+}    ,
+    RecordProposalBidDecision {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        params: RecordProposalBidDecisionParams,
 }    ,
     RecordPurchasingIntegrationResult {
         organization_id: u64,
@@ -8831,6 +9109,8 @@ pub enum Reducer {
         params: ReopenTimesheetsParams,
 }    ,
     ReorderProposalLineItems {
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         ordered_ids: Vec::<u64>,
 }    ,
@@ -8870,7 +9150,16 @@ pub enum Reducer {
         alert_id: u64,
 }    ,
     ResolveProposalComment {
+        organization_id: u64,
+        company_id: u64,
         comment_id: u64,
+}    ,
+    ResolveProposalSectionConflict {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        section_id: u64,
+        params: UpsertProposalSectionParams,
 }    ,
     RestoreDocument {
         organization_id: u64,
@@ -8879,6 +9168,12 @@ pub enum Reducer {
     RestoreProductCategory {
         organization_id: u64,
         category_id: u64,
+}    ,
+    RestoreProposalVersion {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        version_id: u64,
 }    ,
     ResumeSubscription {
         organization_id: u64,
@@ -8971,10 +9266,12 @@ pub enum Reducer {
     RunAllCrmTests ,
     RunAllDomainTests ,
     RunAllExpensesTests ,
+    RunAllFleetTests ,
     RunAllHrTests ,
     RunAllInventoryTests ,
     RunAllPlatformTests ,
     RunAllProjectsTests ,
+    RunAllProposalsTests ,
     RunAllPurchasingTests ,
     RunAllSalesTests ,
     RunAllSubscriptionsTests ,
@@ -9006,6 +9303,7 @@ pub enum Reducer {
     RunExpensesWaveDTest ,
     RunExpensesWaveETest ,
     RunExpensesWaveFTest ,
+    RunFleetWaveATest ,
     RunFxRevaluation {
         organization_id: u64,
         company_id: u64,
@@ -9066,6 +9364,8 @@ pub enum Reducer {
     RunProjectsWaveCTest ,
     RunProjectsWaveDTest ,
     RunProjectsWaveETest ,
+    RunProposalsWaveATest ,
+    RunProposalsWaveDTest ,
     RunPurchasingBillBalancedTest ,
     RunPurchasingCompanyIsolationTest ,
     RunPurchasingIncomingPickingTest ,
@@ -9109,6 +9409,7 @@ pub enum Reducer {
     RunWorkflowDeliveryTests ,
     RunWorkflowEvaluatorSimulationTests ,
     RunWorkflowHumanTaskTests ,
+    RunWorkflowMigrationTests ,
     RunWorkflowRuntimeTests ,
     SaveImportMappingTemplate {
         organization_id: u64,
@@ -9116,9 +9417,10 @@ pub enum Reducer {
         params: SaveImportMappingTemplateParams,
 }    ,
     SaveProposalVersion {
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         message: String,
-        sections_json: String,
 }    ,
     ScheduleDocumentRetentionPurge {
         organization_id: u64,
@@ -9307,6 +9609,12 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         params: SetWorkflowCandidateGroupMemberParams,
+}    ,
+    SetWorkflowMigrationPlanActive {
+        organization_id: u64,
+        company_id: u64,
+        plan_id: u64,
+        active: bool,
 }    ,
     SettleSaleCommissions {
         organization_id: u64,
@@ -10073,30 +10381,33 @@ pub enum Reducer {
         params: UpdateProjectRateCardLineParams,
 }    ,
     UpdateProposal {
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
-        title: String,
-        client_name: String,
-        value: f64,
-        deadline: Option::<__sdk::Timestamp>,
-        description: Option::<String>,
+        params: UpdateProposalParams,
 }    ,
     UpdateProposalLineItem {
+        organization_id: u64,
+        company_id: u64,
         line_item_id: u64,
-        quantity: f64,
-        price_unit: f64,
-        discount: f64,
-        notes: Option::<String>,
+        params: UpdateProposalLineItemParams,
 }    ,
     UpdateProposalPresence {
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: Option::<u64>,
         user_name: String,
 }    ,
     UpdateProposalSourceDoc {
+        organization_id: u64,
+        company_id: u64,
         doc_id: u64,
         params: UpdateProposalSourceDocParams,
 }    ,
     UpdateProposalStatus {
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         status: String,
 }    ,
@@ -10290,12 +10601,10 @@ pub enum Reducer {
         params: UpdateUtmSourceParams,
 }    ,
     UpdateVehiclePosition {
+        organization_id: u64,
+        company_id: u64,
         vehicle_id: u64,
-        latitude: f64,
-        longitude: f64,
-        speed_kmh: f64,
-        heading: f64,
-        status: String,
+        params: UpdateVehiclePositionParams,
 }    ,
     UpdateWarehouse {
         organization_id: u64,
@@ -10387,14 +10696,26 @@ pub enum Reducer {
         company_id: u64,
         params: UpsertPartnerCreditControlParams,
 }    ,
+    UpsertProposalComplianceRequirement {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        requirement_id: u64,
+        params: UpsertProposalComplianceRequirementParams,
+}    ,
+    UpsertProposalProcurementScore {
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        params: UpsertProposalProcurementScoreParams,
+}    ,
     UpsertProposalSection {
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: u64,
-        title: String,
-        content: String,
-        status: String,
-        sequence: u32,
-        ai_suggestion: Option::<String>,
+        expected_revision: u32,
+        params: UpsertProposalSectionParams,
 }    ,
     UpsertSearchEmbedding {
         organization_id: u64,
@@ -10526,6 +10847,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AdvanceSubscriptionDunning { .. } => "advance_subscription_dunning",
             Reducer::AllocatePaymentTransaction { .. } => "allocate_payment_transaction",
             Reducer::AmendSubscription { .. } => "amend_subscription",
+            Reducer::AnswerProposalClarification { .. } => "answer_proposal_clarification",
             Reducer::AppendAiAgentRunStep { .. } => "append_ai_agent_run_step",
             Reducer::AppendAiChatMessage { .. } => "append_ai_chat_message",
             Reducer::AppendCrmConversationMessage { .. } => "append_crm_conversation_message",
@@ -10543,6 +10865,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApplyPendingProjectIntegrationIntents { .. } => "apply_pending_project_integration_intents",
             Reducer::ApplyProjectChangeOrder { .. } => "apply_project_change_order",
             Reducer::ApplyProjectIntegrationIntent { .. } => "apply_project_integration_intent",
+            Reducer::ApplyProposalAnalysis { .. } => "apply_proposal_analysis",
+            Reducer::ApplyProposalTemplate { .. } => "apply_proposal_template",
             Reducer::ApplyReconciliationRules { .. } => "apply_reconciliation_rules",
             Reducer::ApplySaleOrderOptions { .. } => "apply_sale_order_options",
             Reducer::ApplySalePromotionToOrder { .. } => "apply_sale_promotion_to_order",
@@ -10557,6 +10881,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApproveExpenseSheet { .. } => "approve_expense_sheet",
             Reducer::ApproveIntercompanyTransaction { .. } => "approve_intercompany_transaction",
             Reducer::ApproveLeave { .. } => "approve_leave",
+            Reducer::ApproveProposal { .. } => "approve_proposal",
             Reducer::ApprovePurchaseRequisition { .. } => "approve_purchase_requisition",
             Reducer::ApproveSupplierIntake { .. } => "approve_supplier_intake",
             Reducer::ArchiveAiChatSession { .. } => "archive_ai_chat_session",
@@ -10613,6 +10938,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ClaimHubWithToken { .. } => "claim_hub_with_token",
             Reducer::ClaimQueueJob { .. } => "claim_queue_job",
             Reducer::ClaimWorkflowHumanTask { .. } => "claim_workflow_human_task",
+            Reducer::CleanupStaleProposalPresence { .. } => "cleanup_stale_proposal_presence",
             Reducer::ClearDocumentPresence { .. } => "clear_document_presence",
             Reducer::ClearKnowledgeArticlePresence { .. } => "clear_knowledge_article_presence",
             Reducer::ClearOpportunityPresence { .. } => "clear_opportunity_presence",
@@ -10636,6 +10962,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CompletePickingBatch { .. } => "complete_picking_batch",
             Reducer::CompletePickingWave { .. } => "complete_picking_wave",
             Reducer::CompleteProductivityLog { .. } => "complete_productivity_log",
+            Reducer::CompleteProposalIntegrationIntent { .. } => "complete_proposal_integration_intent",
             Reducer::CompleteQueueJob { .. } => "complete_queue_job",
             Reducer::CompleteScheduledOwnerReportRun { .. } => "complete_scheduled_owner_report_run",
             Reducer::CompleteTaxDeadline { .. } => "complete_tax_deadline",
@@ -10661,6 +10988,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::ConsumeMoMaterials { .. } => "consume_mo_materials",
             Reducer::ConvertLeadToCustomer { .. } => "convert_lead_to_customer",
             Reducer::ConvertOpportunityToSaleOrder { .. } => "convert_opportunity_to_sale_order",
+            Reducer::ConvertProposalToProject { .. } => "convert_proposal_to_project",
+            Reducer::ConvertProposalToSaleOrder { .. } => "convert_proposal_to_sale_order",
             Reducer::ConvertPurchaseRequisitionToPo { .. } => "convert_purchase_requisition_to_po",
             Reducer::CreateAccountAccount { .. } => "create_account_account",
             Reducer::CreateAccountAccountType { .. } => "create_account_account_type",
@@ -10831,6 +11160,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateProjectRevenueLine { .. } => "create_project_revenue_line",
             Reducer::CreateProjectRevenueSchedule { .. } => "create_project_revenue_schedule",
             Reducer::CreateProposal { .. } => "create_proposal",
+            Reducer::CreateProposalClarification { .. } => "create_proposal_clarification",
+            Reducer::CreateProposalClause { .. } => "create_proposal_clause",
+            Reducer::CreateProposalIntegrationIntent { .. } => "create_proposal_integration_intent",
+            Reducer::CreateProposalTemplate { .. } => "create_proposal_template",
             Reducer::CreatePublicHoliday { .. } => "create_public_holiday",
             Reducer::CreatePurchaseBlanketOrder { .. } => "create_purchase_blanket_order",
             Reducer::CreatePurchaseContract { .. } => "create_purchase_contract",
@@ -10909,6 +11242,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateWorkcenter { .. } => "create_workcenter",
             Reducer::CreateWorkflow { .. } => "create_workflow",
             Reducer::CreateWorkflowDelegation { .. } => "create_workflow_delegation",
+            Reducer::CreateWorkflowMigrationPlan { .. } => "create_workflow_migration_plan",
             Reducer::CreateWorkingCalendar { .. } => "create_working_calendar",
             Reducer::CreateWorkorder { .. } => "create_workorder",
             Reducer::DeactivatePosConfig { .. } => "deactivate_pos_config",
@@ -11007,6 +11341,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::FailExpenseIntegrationIntent { .. } => "fail_expense_integration_intent",
             Reducer::FailIotAction { .. } => "fail_iot_action",
             Reducer::FailProjectIntegrationIntent { .. } => "fail_project_integration_intent",
+            Reducer::FailProposalIntegrationIntent { .. } => "fail_proposal_integration_intent",
             Reducer::FailQualityCheck { .. } => "fail_quality_check",
             Reducer::FailScheduledOwnerReportRun { .. } => "fail_scheduled_owner_report_run",
             Reducer::FailSubscriptionPaymentIntent { .. } => "fail_subscription_payment_intent",
@@ -11094,6 +11429,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::LinkDeviceToPos { .. } => "link_device_to_pos",
             Reducer::LinkDeviceToQualityCheck { .. } => "link_device_to_quality_check",
             Reducer::LinkDeviceToWorkcenter { .. } => "link_device_to_workcenter",
+            Reducer::LinkProposalVersionEsign { .. } => "link_proposal_version_esign",
             Reducer::LinkSubcontractorCostToProject { .. } => "link_subcontractor_cost_to_project",
             Reducer::LinkWorkosUser { .. } => "link_workos_user",
             Reducer::LockDocument { .. } => "lock_document",
@@ -11115,6 +11451,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::MatchExpenseCardStatementLine { .. } => "match_expense_card_statement_line",
             Reducer::MergeContacts { .. } => "merge_contacts",
             Reducer::MigrateAllOrganizations => "migrate_all_organizations",
+            Reducer::MigrateWorkflowInstance { .. } => "migrate_workflow_instance",
             Reducer::MoveStockQuant { .. } => "move_stock_quant",
             Reducer::OpenAccountPeriod { .. } => "open_account_period",
             Reducer::OpenContract { .. } => "open_contract",
@@ -11139,6 +11476,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::PostPaymentTransaction { .. } => "post_payment_transaction",
             Reducer::PostPayslip { .. } => "post_payslip",
             Reducer::PostRealizedFxGainLoss { .. } => "post_realized_fx_gain_loss",
+            Reducer::PreflightWorkflowMigration { .. } => "preflight_workflow_migration",
             Reducer::ProcessConsolidation { .. } => "process_consolidation",
             Reducer::ProcessIntercompanyTransaction { .. } => "process_intercompany_transaction",
             Reducer::ProcessInventoryAdjustment { .. } => "process_inventory_adjustment",
@@ -11157,6 +11495,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecognizeProjectRevenue { .. } => "recognize_project_revenue",
             Reducer::RecomputeLeadScore { .. } => "recompute_lead_score",
             Reducer::RecomputeRelationshipInsights { .. } => "recompute_relationship_insights",
+            Reducer::RecomputeWorkflowTimersForCalendar { .. } => "recompute_workflow_timers_for_calendar",
             Reducer::ReconcileAccountBankStatementLine { .. } => "reconcile_account_bank_statement_line",
             Reducer::ReconcilePaymentWithInvoice { .. } => "reconcile_payment_with_invoice",
             Reducer::RecordAiAgentRunPolicySnapshot { .. } => "record_ai_agent_run_policy_snapshot",
@@ -11173,6 +11512,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordMessageCopied { .. } => "record_message_copied",
             Reducer::RecordPayrollExportResult { .. } => "record_payroll_export_result",
             Reducer::RecordPrivacyConsent { .. } => "record_privacy_consent",
+            Reducer::RecordProposalBidDecision { .. } => "record_proposal_bid_decision",
             Reducer::RecordPurchasingIntegrationResult { .. } => "record_purchasing_integration_result",
             Reducer::RecordReportRun { .. } => "record_report_run",
             Reducer::RecordSalesIntegrationResult { .. } => "record_sales_integration_result",
@@ -11227,8 +11567,10 @@ impl __sdk::Reducer for Reducer {
             Reducer::ResolveInventoryException { .. } => "resolve_inventory_exception",
             Reducer::ResolveIotAlert { .. } => "resolve_iot_alert",
             Reducer::ResolveProposalComment { .. } => "resolve_proposal_comment",
+            Reducer::ResolveProposalSectionConflict { .. } => "resolve_proposal_section_conflict",
             Reducer::RestoreDocument { .. } => "restore_document",
             Reducer::RestoreProductCategory { .. } => "restore_product_category",
+            Reducer::RestoreProposalVersion { .. } => "restore_proposal_version",
             Reducer::ResumeSubscription { .. } => "resume_subscription",
             Reducer::RetireWorkflowVersion { .. } => "retire_workflow_version",
             Reducer::RetryDeadLetterQueueJob { .. } => "retry_dead_letter_queue_job",
@@ -11260,10 +11602,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllCrmTests => "run_all_crm_tests",
             Reducer::RunAllDomainTests => "run_all_domain_tests",
             Reducer::RunAllExpensesTests => "run_all_expenses_tests",
+            Reducer::RunAllFleetTests => "run_all_fleet_tests",
             Reducer::RunAllHrTests => "run_all_hr_tests",
             Reducer::RunAllInventoryTests => "run_all_inventory_tests",
             Reducer::RunAllPlatformTests => "run_all_platform_tests",
             Reducer::RunAllProjectsTests => "run_all_projects_tests",
+            Reducer::RunAllProposalsTests => "run_all_proposals_tests",
             Reducer::RunAllPurchasingTests => "run_all_purchasing_tests",
             Reducer::RunAllSalesTests => "run_all_sales_tests",
             Reducer::RunAllSubscriptionsTests => "run_all_subscriptions_tests",
@@ -11291,6 +11635,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunExpensesWaveDTest => "run_expenses_wave_d_test",
             Reducer::RunExpensesWaveETest => "run_expenses_wave_e_test",
             Reducer::RunExpensesWaveFTest => "run_expenses_wave_f_test",
+            Reducer::RunFleetWaveATest => "run_fleet_wave_a_test",
             Reducer::RunFxRevaluation { .. } => "run_fx_revaluation",
             Reducer::RunFxRevaluationBatch { .. } => "run_fx_revaluation_batch",
             Reducer::RunHelpdeskTicketTest => "run_helpdesk_ticket_test",
@@ -11335,6 +11680,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunProjectsWaveCTest => "run_projects_wave_c_test",
             Reducer::RunProjectsWaveDTest => "run_projects_wave_d_test",
             Reducer::RunProjectsWaveETest => "run_projects_wave_e_test",
+            Reducer::RunProposalsWaveATest => "run_proposals_wave_a_test",
+            Reducer::RunProposalsWaveDTest => "run_proposals_wave_d_test",
             Reducer::RunPurchasingBillBalancedTest => "run_purchasing_bill_balanced_test",
             Reducer::RunPurchasingCompanyIsolationTest => "run_purchasing_company_isolation_test",
             Reducer::RunPurchasingIncomingPickingTest => "run_purchasing_incoming_picking_test",
@@ -11375,6 +11722,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunWorkflowDeliveryTests => "run_workflow_delivery_tests",
             Reducer::RunWorkflowEvaluatorSimulationTests => "run_workflow_evaluator_simulation_tests",
             Reducer::RunWorkflowHumanTaskTests => "run_workflow_human_task_tests",
+            Reducer::RunWorkflowMigrationTests => "run_workflow_migration_tests",
             Reducer::RunWorkflowRuntimeTests => "run_workflow_runtime_tests",
             Reducer::SaveImportMappingTemplate { .. } => "save_import_mapping_template",
             Reducer::SaveProposalVersion { .. } => "save_proposal_version",
@@ -11417,6 +11765,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetVendorRiskFlag { .. } => "set_vendor_risk_flag",
             Reducer::SetWhatsappPrimaryAccount { .. } => "set_whatsapp_primary_account",
             Reducer::SetWorkflowCandidateGroupMember { .. } => "set_workflow_candidate_group_member",
+            Reducer::SetWorkflowMigrationPlanActive { .. } => "set_workflow_migration_plan_active",
             Reducer::SettleSaleCommissions { .. } => "settle_sale_commissions",
             Reducer::SetupFiscalCalendar { .. } => "setup_fiscal_calendar",
             Reducer::ShareDashboard { .. } => "share_dashboard",
@@ -11627,6 +11976,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpsertExpensePolicy { .. } => "upsert_expense_policy",
             Reducer::UpsertOrganizationSettings { .. } => "upsert_organization_settings",
             Reducer::UpsertPartnerCreditControl { .. } => "upsert_partner_credit_control",
+            Reducer::UpsertProposalComplianceRequirement { .. } => "upsert_proposal_compliance_requirement",
+            Reducer::UpsertProposalProcurementScore { .. } => "upsert_proposal_procurement_score",
             Reducer::UpsertProposalSection { .. } => "upsert_proposal_section",
             Reducer::UpsertSearchEmbedding { .. } => "upsert_search_embedding",
             Reducer::UpsertSubscriptionPriceIndex { .. } => "upsert_subscription_price_index",
@@ -11823,12 +12174,16 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 params: params.clone(),
 }),
             Reducer::AddProposalComment{
+                organization_id,
+                company_id,
                 proposal_id,
                 section_id,
                 content,
                 parent_id,
                 author_name,
 }             => __sats::bsatn::to_vec(&add_proposal_comment_reducer::AddProposalCommentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
                 section_id: section_id.clone(),
                 content: content.clone(),
@@ -11836,36 +12191,34 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 author_name: author_name.clone(),
 }),
             Reducer::AddProposalLineItem{
+                organization_id,
+                company_id,
                 proposal_id,
-                section_id,
-                product_id,
-                product_name,
-                quantity,
-                price_unit,
-                discount,
-                notes,
+                params,
 }             => __sats::bsatn::to_vec(&add_proposal_line_item_reducer::AddProposalLineItemArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
-                section_id: section_id.clone(),
-                product_id: product_id.clone(),
-                product_name: product_name.clone(),
-                quantity: quantity.clone(),
-                price_unit: price_unit.clone(),
-                discount: discount.clone(),
-                notes: notes.clone(),
+                params: params.clone(),
 }),
             Reducer::AddProposalSourceDoc{
+                organization_id,
+                company_id,
                 proposal_id,
                 name,
                 content,
                 doc_type,
                 word_count,
+                document_id,
 }             => __sats::bsatn::to_vec(&add_proposal_source_doc_reducer::AddProposalSourceDocArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
                 name: name.clone(),
                 content: content.clone(),
                 doc_type: doc_type.clone(),
                 word_count: word_count.clone(),
+                document_id: document_id.clone(),
 }),
             Reducer::AddPurchaseOrderLine{
                 organization_id,
@@ -11988,6 +12341,17 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 subscription_id: subscription_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::AnswerProposalClarification{
+                organization_id,
+                company_id,
+                clarification_id,
+                params,
+}             => __sats::bsatn::to_vec(&answer_proposal_clarification_reducer::AnswerProposalClarificationArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                clarification_id: clarification_id.clone(),
                 params: params.clone(),
 }),
             Reducer::AppendAiAgentRunStep{
@@ -12130,6 +12494,28 @@ Reducer::ApplyHrIntegrationIntent{
                 organization_id: organization_id.clone(),
                 intent_id: intent_id.clone(),
 }),
+            Reducer::ApplyProposalAnalysis{
+                organization_id,
+                company_id,
+                proposal_id,
+                params,
+}             => __sats::bsatn::to_vec(&apply_proposal_analysis_reducer::ApplyProposalAnalysisArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::ApplyProposalTemplate{
+                organization_id,
+                company_id,
+                proposal_id,
+                template_id,
+}             => __sats::bsatn::to_vec(&apply_proposal_template_reducer::ApplyProposalTemplateArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
+                template_id: template_id.clone(),
+}),
             Reducer::ApplyReconciliationRules{
                 organization_id,
                 line_id,
@@ -12249,6 +12635,15 @@ Reducer::ApplyHrIntegrationIntent{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 leave_id: leave_id.clone(),
+}),
+            Reducer::ApproveProposal{
+                organization_id,
+                company_id,
+                proposal_id,
+}             => __sats::bsatn::to_vec(&approve_proposal_reducer::ApproveProposalArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
 }),
             Reducer::ApprovePurchaseRequisition{
                 organization_id,
@@ -12731,6 +13126,13 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CleanupStaleProposalPresence{
+                organization_id,
+                max_age_micros,
+}             => __sats::bsatn::to_vec(&cleanup_stale_proposal_presence_reducer::CleanupStaleProposalPresenceArgs {
+                organization_id: organization_id.clone(),
+                max_age_micros: max_age_micros.clone(),
+}),
             Reducer::ClearDocumentPresence{
                 document_id,
 }             => __sats::bsatn::to_vec(&clear_document_presence_reducer::ClearDocumentPresenceArgs {
@@ -12747,8 +13149,12 @@ Reducer::BillProjectMilestone{
                 opportunity_id: opportunity_id.clone(),
 }),
             Reducer::ClearProposalPresence{
+                organization_id,
+                company_id,
                 proposal_id,
 }             => __sats::bsatn::to_vec(&clear_proposal_presence_reducer::ClearProposalPresenceArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
 }),
             Reducer::CloneWorkflowVersionToDraft{
@@ -12925,6 +13331,17 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 log_id: log_id.clone(),
+}),
+            Reducer::CompleteProposalIntegrationIntent{
+                organization_id,
+                company_id,
+                intent_id,
+                params,
+}             => __sats::bsatn::to_vec(&complete_proposal_integration_intent_reducer::CompleteProposalIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                intent_id: intent_id.clone(),
+                params: params.clone(),
 }),
             Reducer::CompleteQueueJob{
                 organization_id,
@@ -13129,6 +13546,28 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 opportunity_id: opportunity_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::ConvertProposalToProject{
+                organization_id,
+                company_id,
+                proposal_id,
+                params,
+}             => __sats::bsatn::to_vec(&convert_proposal_to_project_reducer::ConvertProposalToProjectArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::ConvertProposalToSaleOrder{
+                organization_id,
+                company_id,
+                proposal_id,
+                params,
+}             => __sats::bsatn::to_vec(&convert_proposal_to_sale_order_reducer::ConvertProposalToSaleOrderArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
                 params: params.clone(),
 }),
             Reducer::ConvertPurchaseRequisitionToPo{
@@ -13848,16 +14287,12 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::CreateFleetVehicle{
                 organization_id,
-                name,
-                vehicle_type,
-                license_plate,
-                driver_name,
+                company_id,
+                params,
 }             => __sats::bsatn::to_vec(&create_fleet_vehicle_reducer::CreateFleetVehicleArgs {
                 organization_id: organization_id.clone(),
-                name: name.clone(),
-                vehicle_type: vehicle_type.clone(),
-                license_plate: license_plate.clone(),
-                driver_name: driver_name.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
 }),
             Reducer::CreateForecastSnapshot{
                 organization_id,
@@ -14532,20 +14967,52 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::CreateProposal{
                 organization_id,
-                title,
-                client_name,
-                value,
-                deadline,
-                description,
-                document_folder_id,
+                company_id,
+                params,
 }             => __sats::bsatn::to_vec(&create_proposal_reducer::CreateProposalArgs {
                 organization_id: organization_id.clone(),
-                title: title.clone(),
-                client_name: client_name.clone(),
-                value: value.clone(),
-                deadline: deadline.clone(),
-                description: description.clone(),
-                document_folder_id: document_folder_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateProposalClarification{
+                organization_id,
+                company_id,
+                proposal_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_proposal_clarification_reducer::CreateProposalClarificationArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateProposalClause{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_proposal_clause_reducer::CreateProposalClauseArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateProposalIntegrationIntent{
+                organization_id,
+                company_id,
+                proposal_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_proposal_integration_intent_reducer::CreateProposalIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateProposalTemplate{
+                organization_id,
+                company_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_proposal_template_reducer::CreateProposalTemplateArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                params: params.clone(),
 }),
             Reducer::CreatePublicHoliday{
                 organization_id,
@@ -15197,6 +15664,13 @@ Reducer::BillProjectMilestone{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateWorkflowMigrationPlan{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_workflow_migration_plan_reducer::CreateWorkflowMigrationPlanArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateWorkingCalendar{
                 organization_id,
                 company_id,
@@ -15560,18 +16034,30 @@ Reducer::BillProjectMilestone{
                 milestone_id: milestone_id.clone(),
 }),
             Reducer::DeleteProposalLineItem{
+                organization_id,
+                company_id,
                 line_item_id,
 }             => __sats::bsatn::to_vec(&delete_proposal_line_item_reducer::DeleteProposalLineItemArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 line_item_id: line_item_id.clone(),
 }),
             Reducer::DeleteProposalSection{
+                organization_id,
+                company_id,
                 section_id,
 }             => __sats::bsatn::to_vec(&delete_proposal_section_reducer::DeleteProposalSectionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 section_id: section_id.clone(),
 }),
             Reducer::DeleteProposalSourceDoc{
+                organization_id,
+                company_id,
                 doc_id,
 }             => __sats::bsatn::to_vec(&delete_proposal_source_doc_reducer::DeleteProposalSourceDocArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 doc_id: doc_id.clone(),
 }),
             Reducer::DeleteQualityAlertReason{
@@ -15962,6 +16448,17 @@ Reducer::ErrorIntercompanyTransaction{
                 params,
 }             => __sats::bsatn::to_vec(&fail_project_integration_intent_reducer::FailProjectIntegrationIntentArgs {
                 organization_id: organization_id.clone(),
+                intent_id: intent_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::FailProposalIntegrationIntent{
+                organization_id,
+                company_id,
+                intent_id,
+                params,
+}             => __sats::bsatn::to_vec(&fail_proposal_integration_intent_reducer::FailProposalIntegrationIntentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 intent_id: intent_id.clone(),
                 params: params.clone(),
 }),
@@ -16674,6 +17171,17 @@ Reducer::ErrorIntercompanyTransaction{
                 device_id: device_id.clone(),
                 workcenter_id: workcenter_id.clone(),
 }),
+            Reducer::LinkProposalVersionEsign{
+                organization_id,
+                company_id,
+                proposal_id,
+                params,
+}             => __sats::bsatn::to_vec(&link_proposal_version_esign_reducer::LinkProposalVersionEsignArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
+                params: params.clone(),
+}),
             Reducer::LinkSubcontractorCostToProject{
                 organization_id,
                 company_id,
@@ -16840,7 +17348,14 @@ Reducer::ErrorIntercompanyTransaction{
 }),
             Reducer::MigrateAllOrganizations => __sats::bsatn::to_vec(&migrate_all_organizations_reducer::MigrateAllOrganizationsArgs {
                 }),
-Reducer::MoveStockQuant{
+Reducer::MigrateWorkflowInstance{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&migrate_workflow_instance_reducer::MigrateWorkflowInstanceArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::MoveStockQuant{
                 organization_id,
                 quant_id,
                 params,
@@ -17070,6 +17585,13 @@ Reducer::MoveStockQuant{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::PreflightWorkflowMigration{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&preflight_workflow_migration_reducer::PreflightWorkflowMigrationArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ProcessConsolidation{
                 organization_id,
                 journal_id,
@@ -17228,6 +17750,13 @@ Reducer::MoveStockQuant{
                 organization_id: organization_id.clone(),
                 contact_id: contact_id.clone(),
 }),
+            Reducer::RecomputeWorkflowTimersForCalendar{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&recompute_workflow_timers_for_calendar_reducer::RecomputeWorkflowTimersForCalendarArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ReconcileAccountBankStatementLine{
                 organization_id,
                 company_id,
@@ -17372,6 +17901,17 @@ Reducer::MoveStockQuant{
                 params,
 }             => __sats::bsatn::to_vec(&record_privacy_consent_reducer::RecordPrivacyConsentArgs {
                 organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RecordProposalBidDecision{
+                organization_id,
+                company_id,
+                proposal_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_proposal_bid_decision_reducer::RecordProposalBidDecisionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
                 params: params.clone(),
 }),
             Reducer::RecordPurchasingIntegrationResult{
@@ -17768,9 +18308,13 @@ Reducer::MoveStockQuant{
                 params: params.clone(),
 }),
             Reducer::ReorderProposalLineItems{
+                organization_id,
+                company_id,
                 proposal_id,
                 ordered_ids,
 }             => __sats::bsatn::to_vec(&reorder_proposal_line_items_reducer::ReorderProposalLineItemsArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
                 ordered_ids: ordered_ids.clone(),
 }),
@@ -17838,9 +18382,26 @@ Reducer::MoveStockQuant{
                 alert_id: alert_id.clone(),
 }),
             Reducer::ResolveProposalComment{
+                organization_id,
+                company_id,
                 comment_id,
 }             => __sats::bsatn::to_vec(&resolve_proposal_comment_reducer::ResolveProposalCommentArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 comment_id: comment_id.clone(),
+}),
+            Reducer::ResolveProposalSectionConflict{
+                organization_id,
+                company_id,
+                proposal_id,
+                section_id,
+                params,
+}             => __sats::bsatn::to_vec(&resolve_proposal_section_conflict_reducer::ResolveProposalSectionConflictArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
+                section_id: section_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RestoreDocument{
                 organization_id,
@@ -17855,6 +18416,17 @@ Reducer::MoveStockQuant{
 }             => __sats::bsatn::to_vec(&restore_product_category_reducer::RestoreProductCategoryArgs {
                 organization_id: organization_id.clone(),
                 category_id: category_id.clone(),
+}),
+            Reducer::RestoreProposalVersion{
+                organization_id,
+                company_id,
+                proposal_id,
+                version_id,
+}             => __sats::bsatn::to_vec(&restore_proposal_version_reducer::RestoreProposalVersionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
+                version_id: version_id.clone(),
 }),
             Reducer::ResumeSubscription{
                 organization_id,
@@ -18022,6 +18594,8 @@ Reducer::RunAllDomainTests => __sats::bsatn::to_vec(&run_all_domain_tests_reduce
                 }),
 Reducer::RunAllExpensesTests => __sats::bsatn::to_vec(&run_all_expenses_tests_reducer::RunAllExpensesTestsArgs {
                 }),
+Reducer::RunAllFleetTests => __sats::bsatn::to_vec(&run_all_fleet_tests_reducer::RunAllFleetTestsArgs {
+                }),
 Reducer::RunAllHrTests => __sats::bsatn::to_vec(&run_all_hr_tests_reducer::RunAllHrTestsArgs {
                 }),
 Reducer::RunAllInventoryTests => __sats::bsatn::to_vec(&run_all_inventory_tests_reducer::RunAllInventoryTestsArgs {
@@ -18029,6 +18603,8 @@ Reducer::RunAllInventoryTests => __sats::bsatn::to_vec(&run_all_inventory_tests_
 Reducer::RunAllPlatformTests => __sats::bsatn::to_vec(&run_all_platform_tests_reducer::RunAllPlatformTestsArgs {
                 }),
 Reducer::RunAllProjectsTests => __sats::bsatn::to_vec(&run_all_projects_tests_reducer::RunAllProjectsTestsArgs {
+                }),
+Reducer::RunAllProposalsTests => __sats::bsatn::to_vec(&run_all_proposals_tests_reducer::RunAllProposalsTestsArgs {
                 }),
 Reducer::RunAllPurchasingTests => __sats::bsatn::to_vec(&run_all_purchasing_tests_reducer::RunAllPurchasingTestsArgs {
                 }),
@@ -18090,6 +18666,8 @@ Reducer::RunExpensesWaveDTest => __sats::bsatn::to_vec(&run_expenses_wave_d_test
 Reducer::RunExpensesWaveETest => __sats::bsatn::to_vec(&run_expenses_wave_e_test_reducer::RunExpensesWaveETestArgs {
                 }),
 Reducer::RunExpensesWaveFTest => __sats::bsatn::to_vec(&run_expenses_wave_f_test_reducer::RunExpensesWaveFTestArgs {
+                }),
+Reducer::RunFleetWaveATest => __sats::bsatn::to_vec(&run_fleet_wave_a_test_reducer::RunFleetWaveATestArgs {
                 }),
 Reducer::RunFxRevaluation{
                 organization_id,
@@ -18207,6 +18785,10 @@ Reducer::RunProjectsWaveDTest => __sats::bsatn::to_vec(&run_projects_wave_d_test
                 }),
 Reducer::RunProjectsWaveETest => __sats::bsatn::to_vec(&run_projects_wave_e_test_reducer::RunProjectsWaveETestArgs {
                 }),
+Reducer::RunProposalsWaveATest => __sats::bsatn::to_vec(&run_proposals_wave_a_test_reducer::RunProposalsWaveATestArgs {
+                }),
+Reducer::RunProposalsWaveDTest => __sats::bsatn::to_vec(&run_proposals_wave_d_test_reducer::RunProposalsWaveDTestArgs {
+                }),
 Reducer::RunPurchasingBillBalancedTest => __sats::bsatn::to_vec(&run_purchasing_bill_balanced_test_reducer::RunPurchasingBillBalancedTestArgs {
                 }),
 Reducer::RunPurchasingCompanyIsolationTest => __sats::bsatn::to_vec(&run_purchasing_company_isolation_test_reducer::RunPurchasingCompanyIsolationTestArgs {
@@ -18292,6 +18874,8 @@ Reducer::RunWorkflowEvaluatorSimulationTests => __sats::bsatn::to_vec(&run_workf
                 }),
 Reducer::RunWorkflowHumanTaskTests => __sats::bsatn::to_vec(&run_workflow_human_task_tests_reducer::RunWorkflowHumanTaskTestsArgs {
                 }),
+Reducer::RunWorkflowMigrationTests => __sats::bsatn::to_vec(&run_workflow_migration_tests_reducer::RunWorkflowMigrationTestsArgs {
+                }),
 Reducer::RunWorkflowRuntimeTests => __sats::bsatn::to_vec(&run_workflow_runtime_tests_reducer::RunWorkflowRuntimeTestsArgs {
                 }),
 Reducer::SaveImportMappingTemplate{
@@ -18304,13 +18888,15 @@ Reducer::SaveImportMappingTemplate{
                 params: params.clone(),
 }),
             Reducer::SaveProposalVersion{
+                organization_id,
+                company_id,
                 proposal_id,
                 message,
-                sections_json,
 }             => __sats::bsatn::to_vec(&save_proposal_version_reducer::SaveProposalVersionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
                 message: message.clone(),
-                sections_json: sections_json.clone(),
 }),
             Reducer::ScheduleDocumentRetentionPurge{
                 organization_id,
@@ -18649,6 +19235,17 @@ Reducer::SeedHrCountryPackOverlays{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::SetWorkflowMigrationPlanActive{
+                organization_id,
+                company_id,
+                plan_id,
+                active,
+}             => __sats::bsatn::to_vec(&set_workflow_migration_plan_active_reducer::SetWorkflowMigrationPlanActiveArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                plan_id: plan_id.clone(),
+                active: active.clone(),
 }),
             Reducer::SettleSaleCommissions{
                 organization_id,
@@ -20033,53 +20630,59 @@ Reducer::ToggleProjectFavorite{
                 params: params.clone(),
 }),
             Reducer::UpdateProposal{
+                organization_id,
+                company_id,
                 proposal_id,
-                title,
-                client_name,
-                value,
-                deadline,
-                description,
+                params,
 }             => __sats::bsatn::to_vec(&update_proposal_reducer::UpdateProposalArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
-                title: title.clone(),
-                client_name: client_name.clone(),
-                value: value.clone(),
-                deadline: deadline.clone(),
-                description: description.clone(),
+                params: params.clone(),
 }),
             Reducer::UpdateProposalLineItem{
+                organization_id,
+                company_id,
                 line_item_id,
-                quantity,
-                price_unit,
-                discount,
-                notes,
+                params,
 }             => __sats::bsatn::to_vec(&update_proposal_line_item_reducer::UpdateProposalLineItemArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 line_item_id: line_item_id.clone(),
-                quantity: quantity.clone(),
-                price_unit: price_unit.clone(),
-                discount: discount.clone(),
-                notes: notes.clone(),
+                params: params.clone(),
 }),
             Reducer::UpdateProposalPresence{
+                organization_id,
+                company_id,
                 proposal_id,
                 section_id,
                 user_name,
 }             => __sats::bsatn::to_vec(&update_proposal_presence_reducer::UpdateProposalPresenceArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
                 section_id: section_id.clone(),
                 user_name: user_name.clone(),
 }),
             Reducer::UpdateProposalSourceDoc{
+                organization_id,
+                company_id,
                 doc_id,
                 params,
 }             => __sats::bsatn::to_vec(&update_proposal_source_doc_reducer::UpdateProposalSourceDocArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 doc_id: doc_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateProposalStatus{
+                organization_id,
+                company_id,
                 proposal_id,
                 status,
 }             => __sats::bsatn::to_vec(&update_proposal_status_reducer::UpdateProposalStatusArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
                 status: status.clone(),
 }),
@@ -20425,19 +21028,15 @@ Reducer::ToggleProjectFavorite{
                 params: params.clone(),
 }),
             Reducer::UpdateVehiclePosition{
+                organization_id,
+                company_id,
                 vehicle_id,
-                latitude,
-                longitude,
-                speed_kmh,
-                heading,
-                status,
+                params,
 }             => __sats::bsatn::to_vec(&update_vehicle_position_reducer::UpdateVehiclePositionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 vehicle_id: vehicle_id.clone(),
-                latitude: latitude.clone(),
-                longitude: longitude.clone(),
-                speed_kmh: speed_kmh.clone(),
-                heading: heading.clone(),
-                status: status.clone(),
+                params: params.clone(),
 }),
             Reducer::UpdateWarehouse{
                 organization_id,
@@ -20601,22 +21200,44 @@ Reducer::ToggleProjectFavorite{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpsertProposalComplianceRequirement{
+                organization_id,
+                company_id,
+                proposal_id,
+                requirement_id,
+                params,
+}             => __sats::bsatn::to_vec(&upsert_proposal_compliance_requirement_reducer::UpsertProposalComplianceRequirementArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
+                requirement_id: requirement_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpsertProposalProcurementScore{
+                organization_id,
+                company_id,
+                proposal_id,
+                params,
+}             => __sats::bsatn::to_vec(&upsert_proposal_procurement_score_reducer::UpsertProposalProcurementScoreArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                proposal_id: proposal_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpsertProposalSection{
+                organization_id,
+                company_id,
                 proposal_id,
                 section_id,
-                title,
-                content,
-                status,
-                sequence,
-                ai_suggestion,
+                expected_revision,
+                params,
 }             => __sats::bsatn::to_vec(&upsert_proposal_section_reducer::UpsertProposalSectionArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
                 section_id: section_id.clone(),
-                title: title.clone(),
-                content: content.clone(),
-                status: status.clone(),
-                sequence: sequence.clone(),
-                ai_suggestion: ai_suggestion.clone(),
+                expected_revision: expected_revision.clone(),
+                params: params.clone(),
 }),
             Reducer::UpsertSearchEmbedding{
                 organization_id,
@@ -21050,11 +21671,19 @@ pub struct DbUpdate {
     project_timesheet: __sdk::TableUpdate<ProjectTimesheet>,
     project_timesheet_approval: __sdk::TableUpdate<ProjectTimesheetApproval>,
     proposal: __sdk::TableUpdate<Proposal>,
+    proposal_analysis: __sdk::TableUpdate<ProposalAnalysis>,
+    proposal_bid_decision: __sdk::TableUpdate<ProposalBidDecision>,
+    proposal_clarification: __sdk::TableUpdate<ProposalClarification>,
+    proposal_clause: __sdk::TableUpdate<ProposalClause>,
     proposal_comment: __sdk::TableUpdate<ProposalComment>,
+    proposal_compliance_requirement: __sdk::TableUpdate<ProposalComplianceRequirement>,
+    proposal_integration_intent: __sdk::TableUpdate<ProposalIntegrationIntent>,
     proposal_line_item: __sdk::TableUpdate<ProposalLineItem>,
     proposal_presence: __sdk::TableUpdate<ProposalPresence>,
+    proposal_procurement_score: __sdk::TableUpdate<ProposalProcurementScore>,
     proposal_section: __sdk::TableUpdate<ProposalSection>,
     proposal_source_doc: __sdk::TableUpdate<ProposalSourceDoc>,
+    proposal_template: __sdk::TableUpdate<ProposalTemplate>,
     proposal_version: __sdk::TableUpdate<ProposalVersion>,
     public_holiday: __sdk::TableUpdate<PublicHoliday>,
     purchase_approval_delegate: __sdk::TableUpdate<PurchaseApprovalDelegate>,
@@ -21167,6 +21796,9 @@ pub struct DbUpdate {
     warehouse_sync_intent: __sdk::TableUpdate<WarehouseSyncIntent>,
     warehouse_task: __sdk::TableUpdate<WarehouseTask>,
     whatsapp_business_account: __sdk::TableUpdate<WhatsAppBusinessAccount>,
+    workflow_migration_instance_result: __sdk::TableUpdate<WorkflowMigrationInstanceResult>,
+    workflow_migration_plan: __sdk::TableUpdate<WorkflowMigrationPlan>,
+    workflow_migration_preflight: __sdk::TableUpdate<WorkflowMigrationPreflight>,
     working_calendar: __sdk::TableUpdate<WorkingCalendar>,
 }
 
@@ -21448,11 +22080,19 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "project_timesheet" => db_update.project_timesheet.append(project_timesheet_table::parse_table_update(table_update)?),
     "project_timesheet_approval" => db_update.project_timesheet_approval.append(project_timesheet_approval_table::parse_table_update(table_update)?),
     "proposal" => db_update.proposal.append(proposal_table::parse_table_update(table_update)?),
+    "proposal_analysis" => db_update.proposal_analysis.append(proposal_analysis_table::parse_table_update(table_update)?),
+    "proposal_bid_decision" => db_update.proposal_bid_decision.append(proposal_bid_decision_table::parse_table_update(table_update)?),
+    "proposal_clarification" => db_update.proposal_clarification.append(proposal_clarification_table::parse_table_update(table_update)?),
+    "proposal_clause" => db_update.proposal_clause.append(proposal_clause_table::parse_table_update(table_update)?),
     "proposal_comment" => db_update.proposal_comment.append(proposal_comment_table::parse_table_update(table_update)?),
+    "proposal_compliance_requirement" => db_update.proposal_compliance_requirement.append(proposal_compliance_requirement_table::parse_table_update(table_update)?),
+    "proposal_integration_intent" => db_update.proposal_integration_intent.append(proposal_integration_intent_table::parse_table_update(table_update)?),
     "proposal_line_item" => db_update.proposal_line_item.append(proposal_line_item_table::parse_table_update(table_update)?),
     "proposal_presence" => db_update.proposal_presence.append(proposal_presence_table::parse_table_update(table_update)?),
+    "proposal_procurement_score" => db_update.proposal_procurement_score.append(proposal_procurement_score_table::parse_table_update(table_update)?),
     "proposal_section" => db_update.proposal_section.append(proposal_section_table::parse_table_update(table_update)?),
     "proposal_source_doc" => db_update.proposal_source_doc.append(proposal_source_doc_table::parse_table_update(table_update)?),
+    "proposal_template" => db_update.proposal_template.append(proposal_template_table::parse_table_update(table_update)?),
     "proposal_version" => db_update.proposal_version.append(proposal_version_table::parse_table_update(table_update)?),
     "public_holiday" => db_update.public_holiday.append(public_holiday_table::parse_table_update(table_update)?),
     "purchase_approval_delegate" => db_update.purchase_approval_delegate.append(purchase_approval_delegate_table::parse_table_update(table_update)?),
@@ -21565,6 +22205,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(warehouse_sync_intent_table::parse_table_update(table_update)?),
     "warehouse_task" => db_update.warehouse_task.append(warehouse_task_table::parse_table_update(table_update)?),
     "whatsapp_business_account" => db_update.whatsapp_business_account.append(whatsapp_business_account_table::parse_table_update(table_update)?),
+    "workflow_migration_instance_result" => db_update.workflow_migration_instance_result.append(workflow_migration_instance_result_table::parse_table_update(table_update)?),
+    "workflow_migration_plan" => db_update.workflow_migration_plan.append(workflow_migration_plan_table::parse_table_update(table_update)?),
+    "workflow_migration_preflight" => db_update.workflow_migration_preflight.append(workflow_migration_preflight_table::parse_table_update(table_update)?),
     "working_calendar" => db_update.working_calendar.append(working_calendar_table::parse_table_update(table_update)?),
 
                 unknown => {
@@ -21858,11 +22501,19 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.project_timesheet = cache.apply_diff_to_table::<ProjectTimesheet>("project_timesheet", &self.project_timesheet).with_updates_by_pk(|row| &row.id);
         diff.project_timesheet_approval = cache.apply_diff_to_table::<ProjectTimesheetApproval>("project_timesheet_approval", &self.project_timesheet_approval).with_updates_by_pk(|row| &row.id);
         diff.proposal = cache.apply_diff_to_table::<Proposal>("proposal", &self.proposal).with_updates_by_pk(|row| &row.id);
+        diff.proposal_analysis = cache.apply_diff_to_table::<ProposalAnalysis>("proposal_analysis", &self.proposal_analysis).with_updates_by_pk(|row| &row.id);
+        diff.proposal_bid_decision = cache.apply_diff_to_table::<ProposalBidDecision>("proposal_bid_decision", &self.proposal_bid_decision).with_updates_by_pk(|row| &row.id);
+        diff.proposal_clarification = cache.apply_diff_to_table::<ProposalClarification>("proposal_clarification", &self.proposal_clarification).with_updates_by_pk(|row| &row.id);
+        diff.proposal_clause = cache.apply_diff_to_table::<ProposalClause>("proposal_clause", &self.proposal_clause).with_updates_by_pk(|row| &row.id);
         diff.proposal_comment = cache.apply_diff_to_table::<ProposalComment>("proposal_comment", &self.proposal_comment).with_updates_by_pk(|row| &row.id);
+        diff.proposal_compliance_requirement = cache.apply_diff_to_table::<ProposalComplianceRequirement>("proposal_compliance_requirement", &self.proposal_compliance_requirement).with_updates_by_pk(|row| &row.id);
+        diff.proposal_integration_intent = cache.apply_diff_to_table::<ProposalIntegrationIntent>("proposal_integration_intent", &self.proposal_integration_intent).with_updates_by_pk(|row| &row.id);
         diff.proposal_line_item = cache.apply_diff_to_table::<ProposalLineItem>("proposal_line_item", &self.proposal_line_item).with_updates_by_pk(|row| &row.id);
         diff.proposal_presence = cache.apply_diff_to_table::<ProposalPresence>("proposal_presence", &self.proposal_presence).with_updates_by_pk(|row| &row.id);
+        diff.proposal_procurement_score = cache.apply_diff_to_table::<ProposalProcurementScore>("proposal_procurement_score", &self.proposal_procurement_score).with_updates_by_pk(|row| &row.id);
         diff.proposal_section = cache.apply_diff_to_table::<ProposalSection>("proposal_section", &self.proposal_section).with_updates_by_pk(|row| &row.id);
         diff.proposal_source_doc = cache.apply_diff_to_table::<ProposalSourceDoc>("proposal_source_doc", &self.proposal_source_doc).with_updates_by_pk(|row| &row.id);
+        diff.proposal_template = cache.apply_diff_to_table::<ProposalTemplate>("proposal_template", &self.proposal_template).with_updates_by_pk(|row| &row.id);
         diff.proposal_version = cache.apply_diff_to_table::<ProposalVersion>("proposal_version", &self.proposal_version).with_updates_by_pk(|row| &row.id);
         diff.public_holiday = cache.apply_diff_to_table::<PublicHoliday>("public_holiday", &self.public_holiday).with_updates_by_pk(|row| &row.id);
         diff.purchase_approval_delegate = cache.apply_diff_to_table::<PurchaseApprovalDelegate>("purchase_approval_delegate", &self.purchase_approval_delegate).with_updates_by_pk(|row| &row.id);
@@ -21975,6 +22626,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.warehouse_sync_intent = cache.apply_diff_to_table::<WarehouseSyncIntent>("warehouse_sync_intent", &self.warehouse_sync_intent).with_updates_by_pk(|row| &row.id);
         diff.warehouse_task = cache.apply_diff_to_table::<WarehouseTask>("warehouse_task", &self.warehouse_task).with_updates_by_pk(|row| &row.id);
         diff.whatsapp_business_account = cache.apply_diff_to_table::<WhatsAppBusinessAccount>("whatsapp_business_account", &self.whatsapp_business_account).with_updates_by_pk(|row| &row.id);
+        diff.workflow_migration_instance_result = cache.apply_diff_to_table::<WorkflowMigrationInstanceResult>("workflow_migration_instance_result", &self.workflow_migration_instance_result).with_updates_by_pk(|row| &row.id);
+        diff.workflow_migration_plan = cache.apply_diff_to_table::<WorkflowMigrationPlan>("workflow_migration_plan", &self.workflow_migration_plan).with_updates_by_pk(|row| &row.id);
+        diff.workflow_migration_preflight = cache.apply_diff_to_table::<WorkflowMigrationPreflight>("workflow_migration_preflight", &self.workflow_migration_preflight).with_updates_by_pk(|row| &row.id);
         diff.working_calendar = cache.apply_diff_to_table::<WorkingCalendar>("working_calendar", &self.working_calendar).with_updates_by_pk(|row| &row.id);
 
                     diff
@@ -22253,11 +22907,19 @@ for table_rows in raw.tables {
                 "project_timesheet" => db_update.project_timesheet.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "project_timesheet_approval" => db_update.project_timesheet_approval.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal" => db_update.proposal.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_analysis" => db_update.proposal_analysis.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_bid_decision" => db_update.proposal_bid_decision.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_clarification" => db_update.proposal_clarification.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_clause" => db_update.proposal_clause.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_comment" => db_update.proposal_comment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_compliance_requirement" => db_update.proposal_compliance_requirement.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_integration_intent" => db_update.proposal_integration_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_line_item" => db_update.proposal_line_item.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_presence" => db_update.proposal_presence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_procurement_score" => db_update.proposal_procurement_score.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_section" => db_update.proposal_section.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_source_doc" => db_update.proposal_source_doc.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "proposal_template" => db_update.proposal_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "proposal_version" => db_update.proposal_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "public_holiday" => db_update.public_holiday.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_approval_delegate" => db_update.purchase_approval_delegate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -22370,6 +23032,9 @@ for table_rows in raw.tables {
                 "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "warehouse_task" => db_update.warehouse_task.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "whatsapp_business_account" => db_update.whatsapp_business_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_migration_instance_result" => db_update.workflow_migration_instance_result.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_migration_plan" => db_update.workflow_migration_plan.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_migration_preflight" => db_update.workflow_migration_preflight.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "working_calendar" => db_update.working_calendar.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 unknown => { return Err(__sdk::InternalError::unknown_name("table", unknown, "QueryRows").into()); }
 }}        Ok(db_update)
@@ -22648,11 +23313,19 @@ for table_rows in raw.tables {
                 "project_timesheet" => db_update.project_timesheet.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "project_timesheet_approval" => db_update.project_timesheet_approval.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal" => db_update.proposal.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_analysis" => db_update.proposal_analysis.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_bid_decision" => db_update.proposal_bid_decision.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_clarification" => db_update.proposal_clarification.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_clause" => db_update.proposal_clause.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_comment" => db_update.proposal_comment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_compliance_requirement" => db_update.proposal_compliance_requirement.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_integration_intent" => db_update.proposal_integration_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_line_item" => db_update.proposal_line_item.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_presence" => db_update.proposal_presence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_procurement_score" => db_update.proposal_procurement_score.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_section" => db_update.proposal_section.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_source_doc" => db_update.proposal_source_doc.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "proposal_template" => db_update.proposal_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "proposal_version" => db_update.proposal_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "public_holiday" => db_update.public_holiday.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_approval_delegate" => db_update.purchase_approval_delegate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -22765,6 +23438,9 @@ for table_rows in raw.tables {
                 "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "warehouse_task" => db_update.warehouse_task.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "whatsapp_business_account" => db_update.whatsapp_business_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_migration_instance_result" => db_update.workflow_migration_instance_result.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_migration_plan" => db_update.workflow_migration_plan.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_migration_preflight" => db_update.workflow_migration_preflight.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "working_calendar" => db_update.working_calendar.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 unknown => { return Err(__sdk::InternalError::unknown_name("table", unknown, "QueryRows").into()); }
 }}        Ok(db_update)
@@ -23045,11 +23721,19 @@ pub struct AppliedDiff<'r> {
     project_timesheet: __sdk::TableAppliedDiff<'r, ProjectTimesheet>,
     project_timesheet_approval: __sdk::TableAppliedDiff<'r, ProjectTimesheetApproval>,
     proposal: __sdk::TableAppliedDiff<'r, Proposal>,
+    proposal_analysis: __sdk::TableAppliedDiff<'r, ProposalAnalysis>,
+    proposal_bid_decision: __sdk::TableAppliedDiff<'r, ProposalBidDecision>,
+    proposal_clarification: __sdk::TableAppliedDiff<'r, ProposalClarification>,
+    proposal_clause: __sdk::TableAppliedDiff<'r, ProposalClause>,
     proposal_comment: __sdk::TableAppliedDiff<'r, ProposalComment>,
+    proposal_compliance_requirement: __sdk::TableAppliedDiff<'r, ProposalComplianceRequirement>,
+    proposal_integration_intent: __sdk::TableAppliedDiff<'r, ProposalIntegrationIntent>,
     proposal_line_item: __sdk::TableAppliedDiff<'r, ProposalLineItem>,
     proposal_presence: __sdk::TableAppliedDiff<'r, ProposalPresence>,
+    proposal_procurement_score: __sdk::TableAppliedDiff<'r, ProposalProcurementScore>,
     proposal_section: __sdk::TableAppliedDiff<'r, ProposalSection>,
     proposal_source_doc: __sdk::TableAppliedDiff<'r, ProposalSourceDoc>,
+    proposal_template: __sdk::TableAppliedDiff<'r, ProposalTemplate>,
     proposal_version: __sdk::TableAppliedDiff<'r, ProposalVersion>,
     public_holiday: __sdk::TableAppliedDiff<'r, PublicHoliday>,
     purchase_approval_delegate: __sdk::TableAppliedDiff<'r, PurchaseApprovalDelegate>,
@@ -23162,6 +23846,9 @@ pub struct AppliedDiff<'r> {
     warehouse_sync_intent: __sdk::TableAppliedDiff<'r, WarehouseSyncIntent>,
     warehouse_task: __sdk::TableAppliedDiff<'r, WarehouseTask>,
     whatsapp_business_account: __sdk::TableAppliedDiff<'r, WhatsAppBusinessAccount>,
+    workflow_migration_instance_result: __sdk::TableAppliedDiff<'r, WorkflowMigrationInstanceResult>,
+    workflow_migration_plan: __sdk::TableAppliedDiff<'r, WorkflowMigrationPlan>,
+    workflow_migration_preflight: __sdk::TableAppliedDiff<'r, WorkflowMigrationPreflight>,
     working_calendar: __sdk::TableAppliedDiff<'r, WorkingCalendar>,
     __unused: std::marker::PhantomData<&'r ()>,
 }
@@ -23443,11 +24130,19 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<ProjectTimesheet>("project_timesheet", &self.project_timesheet, event);
         callbacks.invoke_table_row_callbacks::<ProjectTimesheetApproval>("project_timesheet_approval", &self.project_timesheet_approval, event);
         callbacks.invoke_table_row_callbacks::<Proposal>("proposal", &self.proposal, event);
+        callbacks.invoke_table_row_callbacks::<ProposalAnalysis>("proposal_analysis", &self.proposal_analysis, event);
+        callbacks.invoke_table_row_callbacks::<ProposalBidDecision>("proposal_bid_decision", &self.proposal_bid_decision, event);
+        callbacks.invoke_table_row_callbacks::<ProposalClarification>("proposal_clarification", &self.proposal_clarification, event);
+        callbacks.invoke_table_row_callbacks::<ProposalClause>("proposal_clause", &self.proposal_clause, event);
         callbacks.invoke_table_row_callbacks::<ProposalComment>("proposal_comment", &self.proposal_comment, event);
+        callbacks.invoke_table_row_callbacks::<ProposalComplianceRequirement>("proposal_compliance_requirement", &self.proposal_compliance_requirement, event);
+        callbacks.invoke_table_row_callbacks::<ProposalIntegrationIntent>("proposal_integration_intent", &self.proposal_integration_intent, event);
         callbacks.invoke_table_row_callbacks::<ProposalLineItem>("proposal_line_item", &self.proposal_line_item, event);
         callbacks.invoke_table_row_callbacks::<ProposalPresence>("proposal_presence", &self.proposal_presence, event);
+        callbacks.invoke_table_row_callbacks::<ProposalProcurementScore>("proposal_procurement_score", &self.proposal_procurement_score, event);
         callbacks.invoke_table_row_callbacks::<ProposalSection>("proposal_section", &self.proposal_section, event);
         callbacks.invoke_table_row_callbacks::<ProposalSourceDoc>("proposal_source_doc", &self.proposal_source_doc, event);
+        callbacks.invoke_table_row_callbacks::<ProposalTemplate>("proposal_template", &self.proposal_template, event);
         callbacks.invoke_table_row_callbacks::<ProposalVersion>("proposal_version", &self.proposal_version, event);
         callbacks.invoke_table_row_callbacks::<PublicHoliday>("public_holiday", &self.public_holiday, event);
         callbacks.invoke_table_row_callbacks::<PurchaseApprovalDelegate>("purchase_approval_delegate", &self.purchase_approval_delegate, event);
@@ -23560,6 +24255,9 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<WarehouseSyncIntent>("warehouse_sync_intent", &self.warehouse_sync_intent, event);
         callbacks.invoke_table_row_callbacks::<WarehouseTask>("warehouse_task", &self.warehouse_task, event);
         callbacks.invoke_table_row_callbacks::<WhatsAppBusinessAccount>("whatsapp_business_account", &self.whatsapp_business_account, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowMigrationInstanceResult>("workflow_migration_instance_result", &self.workflow_migration_instance_result, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowMigrationPlan>("workflow_migration_plan", &self.workflow_migration_plan, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowMigrationPreflight>("workflow_migration_preflight", &self.workflow_migration_preflight, event);
         callbacks.invoke_table_row_callbacks::<WorkingCalendar>("working_calendar", &self.working_calendar, event);
 }
 }
@@ -24472,11 +25170,19 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         project_timesheet_table::register_table(client_cache);
         project_timesheet_approval_table::register_table(client_cache);
         proposal_table::register_table(client_cache);
+        proposal_analysis_table::register_table(client_cache);
+        proposal_bid_decision_table::register_table(client_cache);
+        proposal_clarification_table::register_table(client_cache);
+        proposal_clause_table::register_table(client_cache);
         proposal_comment_table::register_table(client_cache);
+        proposal_compliance_requirement_table::register_table(client_cache);
+        proposal_integration_intent_table::register_table(client_cache);
         proposal_line_item_table::register_table(client_cache);
         proposal_presence_table::register_table(client_cache);
+        proposal_procurement_score_table::register_table(client_cache);
         proposal_section_table::register_table(client_cache);
         proposal_source_doc_table::register_table(client_cache);
+        proposal_template_table::register_table(client_cache);
         proposal_version_table::register_table(client_cache);
         public_holiday_table::register_table(client_cache);
         purchase_approval_delegate_table::register_table(client_cache);
@@ -24589,6 +25295,9 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         warehouse_sync_intent_table::register_table(client_cache);
         warehouse_task_table::register_table(client_cache);
         whatsapp_business_account_table::register_table(client_cache);
+        workflow_migration_instance_result_table::register_table(client_cache);
+        workflow_migration_plan_table::register_table(client_cache);
+        workflow_migration_preflight_table::register_table(client_cache);
         working_calendar_table::register_table(client_cache);
 }
 const ALL_TABLE_NAMES: &'static [&'static str] = &[
@@ -24862,11 +25571,19 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "project_timesheet",
         "project_timesheet_approval",
         "proposal",
+        "proposal_analysis",
+        "proposal_bid_decision",
+        "proposal_clarification",
+        "proposal_clause",
         "proposal_comment",
+        "proposal_compliance_requirement",
+        "proposal_integration_intent",
         "proposal_line_item",
         "proposal_presence",
+        "proposal_procurement_score",
         "proposal_section",
         "proposal_source_doc",
+        "proposal_template",
         "proposal_version",
         "public_holiday",
         "purchase_approval_delegate",
@@ -24979,6 +25696,9 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "warehouse_sync_intent",
         "warehouse_task",
         "whatsapp_business_account",
+        "workflow_migration_instance_result",
+        "workflow_migration_plan",
+        "workflow_migration_preflight",
         "working_calendar",
 ];
 }

@@ -43,7 +43,6 @@ const OVERVIEW_WORKSPACE_RESOURCE_KEYS = [
 const MAP_WORKSPACE_RESOURCE_KEYS = [
   ...FLEET_WORKSPACE_RESOURCE_KEYS,
   ...POS_WORKSPACE_RESOURCE_KEYS,
-  "warehouses",
 ] as const
 
 export function useCrmModuleSubscription(): void {

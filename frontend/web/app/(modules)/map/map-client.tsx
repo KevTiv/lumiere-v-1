@@ -19,6 +19,7 @@ import {
   useCreateFleetVehicle,
   useUpdateVehiclePosition,
 } from "@lumiere/query-hooks/hooks/fleet"
+import { useOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { fleetVehicleRowsToSelectOptions } from "@/lib/form-lookup"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useMapModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -29,33 +30,13 @@ const MapView = dynamic(
   { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading map…</div> }
 )
 
-// ── Demo fallback (used when no live data exists yet) ─────────────────────────
-const DEMO_PINS: MapPinData[] = [
-  { id: "wh-1", layerId: "warehouse", lat: 40.7128, lng: -74.006, label: "NYC Main Warehouse", data: { name: "NYC Main Warehouse", city: "New York, NY", total_products: 1842, stock_value: 2450000, manager: "Sarah Chen" } },
-  { id: "wh-2", layerId: "warehouse", lat: 34.0522, lng: -118.2437, label: "LA Distribution Center", data: { name: "LA Distribution Center", city: "Los Angeles, CA", total_products: 934, stock_value: 1120000, manager: "Marco Rivera" } },
-  { id: "wh-3", layerId: "warehouse", lat: 51.5074, lng: -0.1278, label: "London Hub", data: { name: "London Hub", city: "London, UK", total_products: 621, stock_value: 890000, manager: "James Whitfield" } },
-  { id: "wh-4", layerId: "warehouse", lat: 48.8566, lng: 2.3522, label: "Paris Depot", data: { name: "Paris Depot", city: "Paris, FR", total_products: 410, stock_value: 540000, manager: "Amélie Dubois" } },
-  { id: "wh-5", layerId: "warehouse", lat: 35.6762, lng: 139.6503, label: "Tokyo Fulfillment", data: { name: "Tokyo Fulfillment", city: "Tokyo, JP", total_products: 756, stock_value: 1340000, manager: "Kenji Tanaka" } },
-  { id: "veh-1", layerId: "vehicle", lat: 40.758, lng: -73.985, label: "Truck #101", data: { name: "Truck #101", driver: "Mike Johnson", status: "active", speed: 62, last_updated: "2 min ago" } },
-  { id: "veh-2", layerId: "vehicle", lat: 34.073, lng: -118.28, label: "Van #204", data: { name: "Van #204", driver: "Lisa Nguyen", status: "idle", speed: 0, last_updated: "8 min ago" } },
-  { id: "veh-3", layerId: "vehicle", lat: 51.52, lng: -0.09, label: "Truck #88", data: { name: "Truck #88", driver: "Tom Bradley", status: "active", speed: 48, last_updated: "1 min ago" } },
-  { id: "veh-4", layerId: "vehicle", lat: 48.87, lng: 2.38, label: "Van #312", data: { name: "Van #312", driver: "Claire Martin", status: "maintenance", speed: 0, last_updated: "45 min ago" } },
-  { id: "pos-1", layerId: "pos", lat: 40.752, lng: -73.978, label: "NYC Store — 5th Ave", data: { name: "NYC Store — 5th Ave", location: "5th Ave, New York", status: "open", daily_revenue: 18400, open_orders: 3 } },
-  { id: "pos-2", layerId: "pos", lat: 34.061, lng: -118.253, label: "LA Showroom", data: { name: "LA Showroom", location: "Downtown LA", status: "open", daily_revenue: 9200, open_orders: 1 } },
-  { id: "pos-3", layerId: "pos", lat: 51.513, lng: -0.135, label: "London Retail", data: { name: "London Retail", location: "Oxford St, London", status: "closed", daily_revenue: 14100, open_orders: 0 } },
-  { id: "pos-4", layerId: "pos", lat: 48.862, lng: 2.342, label: "Paris Boutique", data: { name: "Paris Boutique", location: "Champs-Élysées, Paris", status: "open", daily_revenue: 7800, open_orders: 2 } },
-  { id: "pos-5", layerId: "pos", lat: 35.682, lng: 139.762, label: "Tokyo Outlet", data: { name: "Tokyo Outlet", location: "Shibuya, Tokyo", status: "error", daily_revenue: 0, open_orders: 0 } },
-]
-
-// ── Stats sidebar ─────────────────────────────────────────────────────────────
+type FleetMapAction = "createVehicle" | "updatePosition"
 
 const STAT_ICONS: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   warehouse: Warehouse,
   vehicle: Truck,
   pos: Monitor,
 }
-
-type FleetMapAction = "createVehicle" | "updatePosition"
 
 const fleetMapFormIds = {
   createVehicle: "fleet-create-vehicle",
@@ -128,6 +109,7 @@ export function MapClient(props: MapClientProps) {
 function MapClientLoaded({ organizationId }: { organizationId: number }) {
   useMapModuleSubscription()
   const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useOperatingCompanyBigInt(organizationId)
   const [visibleLayers, setVisibleLayers] = useState<Set<string>>(
     () => new Set(defaultMapLayers.filter((l) => l.defaultVisible !== false).map((l) => l.id))
   )
@@ -135,8 +117,8 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
   const { data: vehicles = [] } = useFleetVehicles(orgId)
   const { data: posTerminals = [] } = usePosTerminals(orgId)
   const { data: warehouseGeos = [] } = useWarehouseGeo(orgId)
-  const createFleetVehicle = useCreateFleetVehicle(orgId)
-  const updateVehiclePosition = useUpdateVehiclePosition(orgId)
+  const createFleetVehicle = useCreateFleetVehicle(orgId, operatingCompanyId)
+  const updateVehiclePosition = useUpdateVehiclePosition(orgId, operatingCompanyId)
   const [fleetAction, setFleetAction] = useState<FleetMapAction | null>(null)
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null)
   const [vehicleError, setVehicleError] = useState<string | null>(null)
@@ -160,18 +142,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
     return base
   }, [fleetAction, t, vehicleOptions, selectedVehicleId])
 
-  const demoPinsByLayer = useMemo(() => {
-    const grouped = Object.fromEntries(defaultMapLayers.map((l) => [l.id, [] as MapPinData[]])) as Record<
-      string,
-      MapPinData[]
-    >
-    for (const pin of DEMO_PINS) {
-      grouped[pin.layerId]?.push(pin)
-    }
-    return grouped
-  }, [])
-
-  // Build live pins per layer; fall back to demo pins only for empty layers
+  // Live pins only — no Northern-Hemisphere demo contamination when empty.
   const livePins: MapPinData[] = useMemo(() => {
     const vehiclePins: MapPinData[] = vehicles
       .filter((v) => v.latitude != null && v.longitude != null)
@@ -207,34 +178,29 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
         },
       }))
 
-    const warehousePins: MapPinData[] = warehouseGeos.map((wg) => {
-      const fallback = t("map.warehouseFallback", { id: wg.warehouseId })
-      const cityStr = wg.city != null && String(wg.city) !== "" ? String(wg.city) : fallback
-      return {
-        id: `wh-${wg.warehouseId}`,
-        layerId: "warehouse",
-        lat: Number(wg.latitude),
-        lng: Number(wg.longitude),
-        label: cityStr,
-        data: {
-          name: cityStr,
-          city: wg.city != null && String(wg.city) !== "" ? String(wg.city) : "—",
-          manager: String(wg.managerName ?? "—"),
-          stock_value: 0,
-          total_products: 0,
-        },
-      }
-    })
+    const warehousePins: MapPinData[] = warehouseGeos
+      .filter((wg) => wg.latitude != null && wg.longitude != null)
+      .map((wg) => {
+        const fallback = t("map.warehouseFallback", { id: wg.warehouseId })
+        const cityStr = wg.city != null && String(wg.city) !== "" ? String(wg.city) : fallback
+        return {
+          id: `wh-${wg.warehouseId}`,
+          layerId: "warehouse",
+          lat: Number(wg.latitude),
+          lng: Number(wg.longitude),
+          label: cityStr,
+          data: {
+            name: cityStr,
+            city: wg.city != null && String(wg.city) !== "" ? String(wg.city) : "—",
+            manager: String(wg.managerName ?? "—"),
+            stock_value: 0,
+            total_products: 0,
+          },
+        }
+      })
 
-    const layerPins = (layerId: string, live: MapPinData[]) =>
-      live.length > 0 ? live : (demoPinsByLayer[layerId] ?? [])
-
-    return [
-      ...layerPins("vehicle", vehiclePins),
-      ...layerPins("pos", posPins),
-      ...layerPins("warehouse", warehousePins),
-    ]
-  }, [t, vehicles, posTerminals, warehouseGeos, demoPinsByLayer])
+    return [...vehiclePins, ...posPins, ...warehousePins]
+  }, [t, vehicles, posTerminals, warehouseGeos])
 
   const toggleLayer = (id: string) =>
     setVisibleLayers((prev) => {
@@ -267,11 +233,15 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
   )
 
   const isLiveData = vehicles.length > 0 || posTerminals.length > 0 || warehouseGeos.length > 0
+  const hasCompany = operatingCompanyId != null && operatingCompanyId > 0n
   const isFleetPending = createFleetVehicle.isPending || updateVehiclePosition.isPending
 
   const handleCreateFleetVehicle = async (data: Record<string, unknown>) => {
     setVehicleError(null)
     try {
+      if (!hasCompany) {
+        throw new Error(t("map.fleet.companyRequired"))
+      }
       await createFleetVehicle.mutateAsync({
         name: String(data.name ?? "Fleet Vehicle"),
         vehicleType: String(data.vehicleType ?? "truck"),
@@ -288,6 +258,9 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
   const handleUpdateVehiclePosition = async (data: Record<string, unknown>) => {
     setVehicleError(null)
     try {
+      if (!hasCompany) {
+        throw new Error(t("map.fleet.companyRequired"))
+      }
       const vehicleId = data.vehicleId ?? selectedVehicleId
       if (vehicleId == null || String(vehicleId).trim() === "") {
         throw new Error(t("map.fleet.selectVehicle"))
@@ -354,7 +327,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
             <button
               type="button"
               className="w-full rounded-md border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
-              disabled={isFleetPending}
+              disabled={isFleetPending || !hasCompany}
               onClick={() => setFleetAction("createVehicle")}
             >
               {t("map.fleet.create")}
@@ -362,7 +335,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
             <button
               type="button"
               className="w-full rounded-md border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
-              disabled={isFleetPending || vehicles.length === 0}
+              disabled={isFleetPending || !hasCompany || vehicles.length === 0}
               onClick={() => setFleetAction("updatePosition")}
             >
               {t("map.fleet.updatePosition")}
@@ -454,7 +427,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
           <div className="mt-auto rounded-md bg-muted/50 p-2.5 text-[10px] leading-relaxed text-muted-foreground">
             {isLiveData
               ? t("map.liveDataHint")
-              : t("map.demoDataHint")}
+              : t("map.emptyDataHint")}
           </div>
         </aside>
       </div>

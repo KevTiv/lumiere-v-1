@@ -18,6 +18,7 @@ export default __t.row({
   content: __t.string(),
   docType: __t.string().name("doc_type"),
   wordCount: __t.u32().name("word_count"),
+  documentId: __t.option(__t.u64()).name("document_id"),
   addedBy: __t.identity().name("added_by"),
   addedAt: __t.timestamp().name("added_at"),
 });

@@ -190,6 +190,7 @@ fn seed_active_subscription(
             fiscal_position_id: None,
             team_id: None,
             opportunity_id: None,
+            proposal_id: None,
             note: None,
             terms_and_conditions: None,
             validity_days: None,

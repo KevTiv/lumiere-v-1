@@ -53,6 +53,6 @@ export function fleetCommandContract(
     requiredSubscriptionResources: FLEET_COMMAND_SUBSCRIPTION_HINTS[reducer],
     affectedTables: [],
     expectations:
-      "Authenticated api-server session with organization scope; args must match SpacetimeDB u64 JSON rules (see stringifyReducerCallBody).",
+      "Authenticated api-server session with organization + company scope; trailing args must match CreateFleetVehicleParams / UpdateVehiclePositionParams (see stringifyReducerCallBody).",
   };
 }

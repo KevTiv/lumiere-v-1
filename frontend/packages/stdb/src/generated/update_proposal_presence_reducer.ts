@@ -11,6 +11,8 @@ import {
 } from "spacetimedb";
 
 export default {
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
   proposalId: __t.u64(),
   sectionId: __t.option(__t.u64()),
   userName: __t.string(),

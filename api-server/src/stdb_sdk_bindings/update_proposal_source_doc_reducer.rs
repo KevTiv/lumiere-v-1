@@ -9,6 +9,8 @@ use super::update_proposal_source_doc_params_type::UpdateProposalSourceDocParams
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct UpdateProposalSourceDocArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub doc_id: u64,
     pub params: UpdateProposalSourceDocParams,
 }
@@ -16,6 +18,8 @@ pub(super) struct UpdateProposalSourceDocArgs {
 impl From<UpdateProposalSourceDocArgs> for super::Reducer {
     fn from(args: UpdateProposalSourceDocArgs) -> Self {
         Self::UpdateProposalSourceDoc {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             doc_id: args.doc_id,
             params: args.params,
         }
@@ -39,10 +43,12 @@ pub trait update_proposal_source_doc {
     /// /// Use [`update_proposal_source_doc:update_proposal_source_doc_then`] to run a callback after the reducer completes.
     fn update_proposal_source_doc(
         &self,
+        organization_id: u64,
+        company_id: u64,
         doc_id: u64,
         params: UpdateProposalSourceDocParams,
     ) -> __sdk::Result<()> {
-        self.update_proposal_source_doc_then(doc_id, params, |_, _| {})
+        self.update_proposal_source_doc_then(organization_id, company_id, doc_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `update_proposal_source_doc` to run as soon as possible,
@@ -53,6 +59,8 @@ pub trait update_proposal_source_doc {
     ///  and its status can be observed with the `callback`.
     fn update_proposal_source_doc_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         doc_id: u64,
         params: UpdateProposalSourceDocParams,
 
@@ -65,6 +73,8 @@ pub trait update_proposal_source_doc {
 impl update_proposal_source_doc for super::RemoteReducers {
     fn update_proposal_source_doc_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         doc_id: u64,
         params: UpdateProposalSourceDocParams,
 
@@ -72,7 +82,14 @@ impl update_proposal_source_doc for super::RemoteReducers {
             + Send
             + 'static,
     ) -> __sdk::Result<()> {
-        self.imp
-            .invoke_reducer_with_callback(UpdateProposalSourceDocArgs { doc_id, params }, callback)
+        self.imp.invoke_reducer_with_callback(
+            UpdateProposalSourceDocArgs {
+                organization_id,
+                company_id,
+                doc_id,
+                params,
+            },
+            callback,
+        )
     }
 }

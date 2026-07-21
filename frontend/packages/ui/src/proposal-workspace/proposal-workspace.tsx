@@ -23,10 +23,11 @@ import { AIPanel } from "./ai-panel"
 import { VersionHistoryBar, SaveVersionButton } from "./version-history-bar"
 import { PresenceBar } from "./presence-bar"
 import { DocumentInputPanel } from "./document-input-panel"
+import { ComplianceChecklist } from "./compliance-checklist"
+import { rowBool, rowNumber, rowString } from "./row-field-utils"
 
 /** Stable fallback when query hooks return undefined — inline `= []` creates a new ref each render. */
 const EMPTY_QUERY_ROWS: Record<string, unknown>[] = []
-import { rowNumber, rowString } from "./row-field-utils"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,10 @@ function mapSourceDocRow(d: unknown): SourceDocument {
     wordCount: rowNumber(row.wordCount),
     addedAt: new Date(rowNumber(row.addedAt, 0) / 1000),
   }
+}
+
+function rowField(row: Record<string, unknown>, camel: string, snake: string): unknown {
+  return row[camel] ?? row[snake]
 }
 
 // Keep diff utilities for version history
@@ -124,6 +129,7 @@ export interface ProposalWorkspaceHooks {
   useUpsertProposalSection: () => MutationResult<{
     proposalId: bigint | number | string
     sectionId?: bigint | number | string | null
+    expectedRevision?: number
     title: string
     content: string
     status: string
@@ -145,11 +151,15 @@ export interface ProposalWorkspaceHooks {
     content?: string
     docType?: string
     wordCount?: number
+    documentId?: bigint | number | string | null
   }>
   useSaveProposalVersion: () => MutationResult<{
     proposalId: bigint | number | string
     message: string
-    sectionsJson: string
+  }>
+  useRestoreProposalVersion: () => MutationResult<{
+    proposalId: bigint | number | string
+    versionId: bigint | number | string
   }>
   useUpdateProposalStatus: () => MutationResult<{
     proposalId: bigint | number | string
@@ -187,6 +197,33 @@ export interface ProposalWorkspaceHooks {
     authorName: string
   }>
   useResolveProposalComment: () => MutationResult<bigint | number | string>
+  useProposalTemplates: UseQueryHook<unknown>
+  useProposalComplianceRequirements: UseQueryHook<unknown>
+  useApplyProposalTemplate: () => MutationResult<{
+    proposalId: bigint | number | string
+    templateId: bigint | number | string
+  }>
+  useUpsertProposalComplianceRequirement: () => MutationResult<{
+    proposalId: bigint | number | string
+    requirementId?: bigint | number | string | null
+    requirementKey: string
+    title: string
+    description?: string | null
+    isRequired: boolean
+    isComplete: boolean
+    isWaived: boolean
+    waiverRationale?: string | null
+    evidenceDocumentId?: bigint | number | string | null
+    sequence: number
+  }>
+  useCreateProposalIntegrationIntent: () => MutationResult<{
+    proposalId: bigint | number | string
+    proposalVersionId?: bigint | number | string | null
+    intentType: string
+    idempotencyKey: string
+    payload: string
+    metadata?: string | null
+  }>
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -195,6 +232,7 @@ interface ProposalWorkspaceProps {
   proposalId: string
   proposalTitle: string
   organizationId: bigint
+  companyId: bigint
   initialStatus?: ProposalStatus
   currentUserId?: string
   currentUserName?: string
@@ -208,6 +246,7 @@ export function ProposalWorkspace({
   proposalId,
   proposalTitle,
   organizationId,
+  companyId: _companyId,
   initialStatus = "draft",
   currentUserId,
   currentUserName,
@@ -253,6 +292,7 @@ export function ProposalWorkspace({
     useDeleteProposalSourceDoc,
     useUpdateProposalSourceDoc,
     useSaveProposalVersion,
+    useRestoreProposalVersion,
     useUpdateProposalStatus,
     useAddProposalLineItem,
     useUpdateProposalLineItem,
@@ -261,6 +301,11 @@ export function ProposalWorkspace({
     useClearProposalPresence,
     useAddProposalComment,
     useResolveProposalComment,
+    useProposalTemplates,
+    useProposalComplianceRequirements,
+    useApplyProposalTemplate,
+    useUpsertProposalComplianceRequirement,
+    useCreateProposalIntegrationIntent,
   } = hooks
 
   // ── Data queries ──────────────────────────────────────────────────────────────
@@ -271,6 +316,8 @@ export function ProposalWorkspace({
   const { data: presenceRows } = useProposalPresence(organizationId, proposalIdBig)
   const { data: comments } = useProposalComments(organizationId, proposalIdBig)
   const { data: products } = useProducts(organizationId)
+  const { data: templates } = useProposalTemplates(organizationId)
+  const { data: complianceRows } = useProposalComplianceRequirements(organizationId)
   const sectionsList = sections ?? EMPTY_QUERY_ROWS
   const sourceDocsList = sourceDocs ?? EMPTY_QUERY_ROWS
   const versionsList = versions ?? EMPTY_QUERY_ROWS
@@ -278,6 +325,8 @@ export function ProposalWorkspace({
   const commentsList = comments ?? EMPTY_QUERY_ROWS
   const productsList = products ?? EMPTY_QUERY_ROWS
   const lineItemsList = lineItems ?? EMPTY_QUERY_ROWS
+  const templatesList = templates ?? EMPTY_QUERY_ROWS
+  const complianceList = complianceRows ?? EMPTY_QUERY_ROWS
 
   // Filter to this proposal (memoized so effect/callback deps stay referentially
   // stable across renders — otherwise fresh arrays each render trigger setState
@@ -305,6 +354,18 @@ export function ProposalWorkspace({
   const proposalPresence = useMemo(
     () => presenceList.filter((p) => String((p as { proposalId?: unknown }).proposalId) === proposalId),
     [presenceList, proposalId],
+  )
+  const proposalCompliance = useMemo(
+    () =>
+      complianceList.filter(
+        (r) =>
+          String(
+            (r as { proposalId?: unknown }).proposalId ??
+              (r as { proposal_id?: unknown }).proposal_id ??
+              "",
+          ) === proposalId,
+      ),
+    [complianceList, proposalId],
   )
 
   const [draftSources, setDraftSources] = useState<SourceDocument[]>([])
@@ -359,6 +420,7 @@ export function ProposalWorkspace({
   const deleteSourceDoc = useDeleteProposalSourceDoc()
   const updateSourceDoc = useUpdateProposalSourceDoc()
   const saveVersion = useSaveProposalVersion()
+  const restoreVersion = useRestoreProposalVersion()
   const updateStatus = useUpdateProposalStatus()
   const addLineItem = useAddProposalLineItem()
   const updateLineItem = useUpdateProposalLineItem()
@@ -367,6 +429,23 @@ export function ProposalWorkspace({
   const clearPresence = useClearProposalPresence()
   const addComment = useAddProposalComment()
   const resolveComment = useResolveProposalComment()
+  const applyTemplate = useApplyProposalTemplate()
+  const upsertCompliance = useUpsertProposalComplianceRequirement()
+  const createIntent = useCreateProposalIntegrationIntent()
+
+  const libraryTemplates = useMemo(
+    () =>
+      templatesList
+        .filter((row) => {
+          const company = (row as { companyId?: unknown }).companyId
+          return company == null || String(company) === String(_companyId) || _companyId === 0n
+        })
+        .map((row) => ({
+          id: String((row as { id?: unknown }).id),
+          name: String((row as { name?: unknown }).name ?? "Template"),
+        })),
+    [templatesList, _companyId],
+  )
 
   const sourceDispatch = useCallback(
     (action: WorkspaceAction) => {
@@ -463,6 +542,7 @@ export function ProposalWorkspace({
     upsertSection.mutate({
       proposalId: proposalIdBig,
       sectionId: null,
+      expectedRevision: 0,
       title,
       content: "",
       status: "empty",
@@ -479,6 +559,7 @@ export function ProposalWorkspace({
       {
         proposalId: proposalIdBig,
         sectionId: effectiveActiveSectionId,
+        expectedRevision: (activeSection as { revision?: number })?.revision ?? 0,
         title: (activeSection as { title?: string })?.title ?? "",
         content,
         status: sectionStatus,
@@ -495,6 +576,7 @@ export function ProposalWorkspace({
     upsertSection.mutate({
       proposalId: proposalIdBig,
       sectionId: effectiveActiveSectionId,
+      expectedRevision: (activeSection as { revision?: number })?.revision ?? 0,
       title,
       content: (activeSection as { content?: string })?.content ?? "",
       status: ((activeSection as { status?: string })?.status as string)?.toLowerCase() ?? "draft",
@@ -512,6 +594,7 @@ export function ProposalWorkspace({
       upsertSection.mutate({
         proposalId: proposalIdBig,
         sectionId: null,
+        expectedRevision: 0,
         title,
         content: "",
         status: "empty",
@@ -542,18 +625,12 @@ export function ProposalWorkspace({
   }, [proposalIdBig, updateStatus])
 
   const handleSaveVersion = useCallback((message: string) => {
-    const sectionsJson = JSON.stringify(
-      proposalSections.map((s) => ({
-        id: String((s as { id?: unknown }).id),
-        title: (s as { title?: string }).title,
-        content: (s as { content?: string }).content,
-        status: (s as { status?: string }).status,
-        sequence: (s as { sequence?: number }).sequence,
-        wordCount: (s as { wordCount?: number }).wordCount,
-      }))
-    )
-    saveVersion.mutate({ proposalId: proposalIdBig, message, sectionsJson })
-  }, [proposalIdBig, proposalSections, saveVersion])
+    saveVersion.mutate({ proposalId: proposalIdBig, message })
+  }, [proposalIdBig, saveVersion])
+
+  const handleRestoreVersion = useCallback((versionId: string) => {
+    restoreVersion.mutate({ proposalId: proposalIdBig, versionId })
+  }, [proposalIdBig, restoreVersion])
 
   const handleExportMarkdown = () => {
     const md = proposalSections.map((s) => `## ${(s as { title?: string }).title}\n\n${(s as { content?: string }).content}`).join("\n\n---\n\n")
@@ -575,10 +652,50 @@ export function ProposalWorkspace({
     URL.revokeObjectURL(url)
   }
 
+  const handleRequestPdf = useCallback(() => {
+    const latestVersion = proposalVersions[0] as { id?: unknown } | undefined
+    createIntent.mutate({
+      proposalId: proposalIdBig,
+      proposalVersionId: latestVersion?.id != null ? String(latestVersion.id) : null,
+      intentType: "pdf_render",
+      idempotencyKey: `pdf-${proposalId}-${Date.now()}`,
+      payload: JSON.stringify({ format: "a4", title: proposalTitle }),
+    })
+  }, [createIntent, proposalId, proposalIdBig, proposalTitle, proposalVersions])
+
+  const handleToggleCompliance = useCallback(
+    (row: Record<string, unknown>, complete: boolean) => {
+      upsertCompliance.mutate({
+        proposalId: proposalIdBig,
+        requirementId: row.id != null ? String(row.id) : null,
+        requirementKey: rowString(rowField(row, "requirementKey", "requirement_key")),
+        title: rowString(row.title),
+        description: (rowField(row, "description", "description") as string | null | undefined) ?? null,
+        isRequired: rowBool(rowField(row, "isRequired", "is_required"), true),
+        isComplete: complete,
+        isWaived: rowBool(rowField(row, "isWaived", "is_waived")),
+        waiverRationale:
+          (rowField(row, "waiverRationale", "waiver_rationale") as string | null | undefined) ?? null,
+        evidenceDocumentId:
+          (rowField(row, "evidenceDocumentId", "evidence_document_id") as string | null | undefined) ??
+          null,
+        sequence: rowNumber(row.sequence),
+      })
+    },
+    [proposalIdBig, upsertCompliance],
+  )
+
   // Convert STDB versions to local version format for VersionHistoryBar
   const localVersions = proposalVersions.map((v) => {
     let parsedSections: TenderSection[] = []
-    try { parsedSections = JSON.parse((v as { sectionsJson?: string }).sectionsJson ?? "[]") } catch { /* ignore */ }
+    try {
+      const raw = JSON.parse((v as { sectionsJson?: string }).sectionsJson ?? "[]")
+      if (Array.isArray(raw)) {
+        parsedSections = raw
+      } else if (raw && typeof raw === "object" && Array.isArray(raw.sections)) {
+        parsedSections = raw.sections
+      }
+    } catch { /* ignore */ }
     return {
       id: String((v as { id?: unknown }).id),
       versionNumber: (v as { versionNumber?: number }).versionNumber ?? 0,
@@ -642,6 +759,14 @@ export function ProposalWorkspace({
               <Button variant="ghost" size="sm" onClick={handleExportText} title={t("proposalWorkspace.exportText")}>
                 <Download className="h-4 w-4" />
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRequestPdf}
+                title={t("proposalWorkspace.requestPdf", { defaultValue: "Queue PDF render" })}
+              >
+                PDF
+              </Button>
               <SaveVersionButton
                 onSave={handleSaveVersion}
                 isDirty={proposalSections.length > 0}
@@ -684,11 +809,22 @@ export function ProposalWorkspace({
             activeSectionId={effectiveActiveSectionId}
             presenceBySection={presenceBySection}
             totalValue={totalValue}
+            libraryTemplates={libraryTemplates}
             onSelectSection={handleSelectSection}
             onAddSection={handleAddSection}
+            onApplyLibraryTemplate={(templateId) =>
+              applyTemplate.mutate({ proposalId: proposalIdBig, templateId })
+            }
             onDeleteSection={(id) => deleteSection.mutate({ sectionId: id })}
             onAddSourceDoc={() => setShowDocInput(true)}
             onDeleteSourceDoc={(id) => deleteSourceDoc.mutate({ docId: id })}
+            complianceSlot={
+              <ComplianceChecklist
+                rows={proposalCompliance}
+                proposalId={proposalIdBig}
+                onToggleComplete={handleToggleCompliance}
+              />
+            }
           />
 
           <div className="flex-1 flex overflow-hidden">
@@ -798,6 +934,7 @@ export function ProposalWorkspace({
               versions={localVersions}
               activeVersionId={null}
               currentSections={proposalSections as unknown as TenderSection[]}
+              onRestoreVersion={handleRestoreVersion}
             />
           </div>
         </div>

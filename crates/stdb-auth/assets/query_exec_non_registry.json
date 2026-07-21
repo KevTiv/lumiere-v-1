@@ -23,6 +23,10 @@
   "workflow-human-tasks-inbox",
   "workflow-outbox-dead",
   "workflow-timers-late",
+  "workflow-decision-events",
+  "workflow-migration-plans",
+  "workflow-migration-preflights",
+  "workflow-migration-results",
   "workflow-transitions",
   "workflow-workitems"
 ]

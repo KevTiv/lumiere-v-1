@@ -442,6 +442,33 @@ pub(crate) fn activate_calendar_pack(
     })
 }
 
+/// Convert a wall-clock delay into working-time minutes for deadline math.
+///
+/// Escalation/timer policies store `delay_seconds`; calendars advance by working
+/// minutes. Sub-minute delays round up to one working minute.
+pub fn working_minutes_from_delay_seconds(delay_seconds: u64) -> u32 {
+    delay_seconds.saturating_add(59).saturating_div(60).max(1) as u32
+}
+
+/// Replay a timer policy against a calendar version (WF-18 recompute input).
+pub fn calculate_deadline_from_delay_seconds(
+    version: &WorkflowCalendarVersion,
+    exceptions: &[WorkflowCalendarException],
+    start_utc: Timestamp,
+    delay_seconds: u64,
+) -> Result<WorkflowDeadlineEvidence, String> {
+    calculate_workflow_deadline(
+        version,
+        exceptions,
+        &DeadlineRequest {
+            start_utc,
+            working_minutes: working_minutes_from_delay_seconds(delay_seconds),
+            subdivision: version.subdivision.clone(),
+            locality: version.locality.clone(),
+        },
+    )
+}
+
 /// Add working minutes using immutable rules and return local/UTC/DST evidence.
 pub fn calculate_workflow_deadline(
     version: &WorkflowCalendarVersion,

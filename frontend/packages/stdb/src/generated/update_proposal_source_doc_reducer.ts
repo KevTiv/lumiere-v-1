@@ -15,6 +15,8 @@ import {
 } from "./types";
 
 export default {
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
   docId: __t.u64(),
   get params() {
     return UpdateProposalSourceDocParams;

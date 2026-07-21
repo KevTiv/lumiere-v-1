@@ -4485,11 +4485,89 @@
     "message_ids",
     "metadata"
   ],
+  "CreateProposalParams": [
+    "deadline",
+    "description",
+    "template_id",
+    "partner_id",
+    "document_folder_id",
+    "metadata"
+  ],
+  "UpdateProposalParams": [
+    "title",
+    "client_name",
+    "currency_id",
+    "value",
+    "deadline",
+    "description",
+    "template_id",
+    "partner_id",
+    "document_folder_id",
+    "metadata"
+  ],
+  "UpsertProposalSectionParams": [
+    "ai_suggestion"
+  ],
+  "AddProposalLineItemParams": [
+    "section_id",
+    "product_variant_id",
+    "description",
+    "notes"
+  ],
+  "UpdateProposalLineItemParams": [
+    "quantity",
+    "price_unit",
+    "discount",
+    "notes",
+    "description"
+  ],
+  "RecordProposalBidDecisionParams": [],
+  "ConvertProposalToSaleOrderParams": [],
+  "ConvertProposalToProjectParams": [],
   "UpdateProposalSourceDocParams": [
     "name",
     "content",
     "doc_type",
-    "word_count"
+    "word_count",
+    "document_id"
+  ],
+  "CreateProposalTemplateParams": [
+    "country_pack_key",
+    "metadata"
+  ],
+  "CreateProposalClauseParams": [
+    "country_pack_key",
+    "metadata"
+  ],
+  "UpsertProposalComplianceRequirementParams": [
+    "description",
+    "waiver_rationale",
+    "evidence_document_id"
+  ],
+  "ApplyProposalAnalysisParams": [
+    "score_json"
+  ],
+  "UpsertProposalProcurementScoreParams": [
+    "notes"
+  ],
+  "CreateProposalIntegrationIntentParams": [
+    "proposal_version_id",
+    "metadata"
+  ],
+  "CompleteProposalIntegrationIntentParams": [
+    "result_document_id",
+    "metadata"
+  ],
+  "FailProposalIntegrationIntentParams": [
+    "metadata"
+  ],
+  "CreateProposalClarificationParams": [
+    "author_email"
+  ],
+  "AnswerProposalClarificationParams": [],
+  "LinkProposalVersionEsignParams": [
+    "signers_json",
+    "metadata"
   ],
   "UpdatePurchaseOrderLineParams": [
     "product_id",
@@ -4978,5 +5056,27 @@
     "retired_uid",
     "retired_date",
     "metadata"
-  ]
+  ],
+  "SimulateWorkflowParams": [
+    "signal_key"
+  ],
+  "UpsertWorkflowNodeParams": [
+    "action",
+    "task_policy",
+    "timer_policy",
+    "retry_policy",
+    "subflow",
+    "metadata"
+  ],
+  "UpsertWorkflowEdgeParams": [
+    "signal_key",
+    "condition",
+    "metadata"
+  ],
+  "CreateFleetVehicleParams": [
+    "license_plate",
+    "driver_name",
+    "metadata"
+  ],
+  "UpdateVehiclePositionParams": []
 }

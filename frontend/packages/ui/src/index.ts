@@ -256,8 +256,7 @@ export * from "./lib/map-pin-configs";
 // Proposal workspace
 export * from "./proposal-workspace/proposal-workspace";
 export * from "./proposal-workspace/document-input-panel";
-export * from "./proposal-workspace/ai-analysis-panel";
-export * from "./proposal-workspace/tender-editor-panel";
+export * from "./proposal-workspace/compliance-checklist";
 export * from "./proposal-workspace/version-history-bar";
 export * from "./proposal-workspace/version-diff-modal";
 

@@ -9252,13 +9252,14 @@
     "openPOS": "Open POS",
     "warehouseFallback": "Warehouse {{id}}",
     "liveDataHint": "Live data from SpacetimeDB. Use fleet reducers to update GPS positions.",
-    "demoDataHint": "Demo data — add fleet vehicles, POS terminals, and warehouse geo in SpacetimeDB to populate real coordinates.",
+    "emptyDataHint": "No live map pins yet — create fleet vehicles (with position), POS terminals, or warehouse geo to populate coordinates.",
     "fleet": {
       "title": "Fleet vehicles",
       "empty": "No vehicles yet.",
       "create": "Create vehicle",
       "updatePosition": "Update position",
-      "selectVehicle": "Select vehicle"
+      "selectVehicle": "Select vehicle",
+      "companyRequired": "Select an operating company before creating or updating fleet vehicles."
     }
   },
   "tasks": {

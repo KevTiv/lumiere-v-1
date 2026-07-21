@@ -4,28 +4,22 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::create_proposal_params_type::CreateProposalParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct CreateProposalArgs {
     pub organization_id: u64,
-    pub title: String,
-    pub client_name: String,
-    pub value: f64,
-    pub deadline: Option<__sdk::Timestamp>,
-    pub description: Option<String>,
-    pub document_folder_id: Option<u64>,
+    pub company_id: u64,
+    pub params: CreateProposalParams,
 }
 
 impl From<CreateProposalArgs> for super::Reducer {
     fn from(args: CreateProposalArgs) -> Self {
         Self::CreateProposal {
             organization_id: args.organization_id,
-            title: args.title,
-            client_name: args.client_name,
-            value: args.value,
-            deadline: args.deadline,
-            description: args.description,
-            document_folder_id: args.document_folder_id,
+            company_id: args.company_id,
+            params: args.params,
         }
     }
 }
@@ -48,23 +42,10 @@ pub trait create_proposal {
     fn create_proposal(
         &self,
         organization_id: u64,
-        title: String,
-        client_name: String,
-        value: f64,
-        deadline: Option<__sdk::Timestamp>,
-        description: Option<String>,
-        document_folder_id: Option<u64>,
+        company_id: u64,
+        params: CreateProposalParams,
     ) -> __sdk::Result<()> {
-        self.create_proposal_then(
-            organization_id,
-            title,
-            client_name,
-            value,
-            deadline,
-            description,
-            document_folder_id,
-            |_, _| {},
-        )
+        self.create_proposal_then(organization_id, company_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `create_proposal` to run as soon as possible,
@@ -76,12 +57,8 @@ pub trait create_proposal {
     fn create_proposal_then(
         &self,
         organization_id: u64,
-        title: String,
-        client_name: String,
-        value: f64,
-        deadline: Option<__sdk::Timestamp>,
-        description: Option<String>,
-        document_folder_id: Option<u64>,
+        company_id: u64,
+        params: CreateProposalParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -93,12 +70,8 @@ impl create_proposal for super::RemoteReducers {
     fn create_proposal_then(
         &self,
         organization_id: u64,
-        title: String,
-        client_name: String,
-        value: f64,
-        deadline: Option<__sdk::Timestamp>,
-        description: Option<String>,
-        document_folder_id: Option<u64>,
+        company_id: u64,
+        params: CreateProposalParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -107,12 +80,8 @@ impl create_proposal for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             CreateProposalArgs {
                 organization_id,
-                title,
-                client_name,
-                value,
-                deadline,
-                description,
-                document_folder_id,
+                company_id,
+                params,
             },
             callback,
         )

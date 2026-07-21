@@ -887,6 +887,19 @@ export const AddPerformanceGoalParams = __t.object("AddPerformanceGoalParams", {
 });
 export type AddPerformanceGoalParams = __Infer<typeof AddPerformanceGoalParams>;
 
+export const AddProposalLineItemParams = __t.object("AddProposalLineItemParams", {
+  sectionId: __t.option(__t.u64()),
+  productId: __t.u64(),
+  productName: __t.string(),
+  productVariantId: __t.option(__t.u64()),
+  description: __t.option(__t.string()),
+  quantity: __t.f64(),
+  priceUnit: __t.f64(),
+  discount: __t.f64(),
+  notes: __t.option(__t.string()),
+});
+export type AddProposalLineItemParams = __Infer<typeof AddProposalLineItemParams>;
+
 export const AddPurchaseOrderLineParams = __t.object("AddPurchaseOrderLineParams", {
   productId: __t.u64(),
   quantity: __t.f64(),
@@ -1478,6 +1491,11 @@ export const AnalyticsMetric = __t.object("AnalyticsMetric", {
 });
 export type AnalyticsMetric = __Infer<typeof AnalyticsMetric>;
 
+export const AnswerProposalClarificationParams = __t.object("AnswerProposalClarificationParams", {
+  answer: __t.string(),
+});
+export type AnswerProposalClarificationParams = __Infer<typeof AnswerProposalClarificationParams>;
+
 export const AppendAiAgentRunStepParams = __t.object("AppendAiAgentRunStepParams", {
   stepNo: __t.u32(),
   toolName: __t.string(),
@@ -1543,6 +1561,18 @@ export const ApplyProjectChangeOrderParams = __t.object("ApplyProjectChangeOrder
   metadata: __t.option(__t.string()),
 });
 export type ApplyProjectChangeOrderParams = __Infer<typeof ApplyProjectChangeOrderParams>;
+
+export const ApplyProposalAnalysisParams = __t.object("ApplyProposalAnalysisParams", {
+  source: __t.string(),
+  isMock: __t.bool(),
+  findingsJson: __t.string(),
+  requirementsJson: __t.string(),
+  evaluationCriteriaJson: __t.string(),
+  suggestedSectionsJson: __t.string(),
+  scoreJson: __t.option(__t.string()),
+  materializeCompliance: __t.bool(),
+});
+export type ApplyProposalAnalysisParams = __Infer<typeof ApplyProposalAnalysisParams>;
 
 export const ApplySalePromotionParams = __t.object("ApplySalePromotionParams", {
   promotionCode: __t.string(),
@@ -1828,6 +1858,14 @@ export const BatchState = __t.enum("BatchState", {
   Cancelled: __t.unit(),
 });
 export type BatchState = __Infer<typeof BatchState>;
+
+// The tagged union or sum type for the algebraic type `BidDecisionKind`.
+export const BidDecisionKind = __t.enum("BidDecisionKind", {
+  Undecided: __t.unit(),
+  Bid: __t.unit(),
+  NoBid: __t.unit(),
+});
+export type BidDecisionKind = __Infer<typeof BidDecisionKind>;
 
 export const BillProjectMilestoneParams = __t.object("BillProjectMilestoneParams", {
   amount: __t.option(__t.f64()),
@@ -2277,6 +2315,12 @@ export const CompletePerformanceReviewParams = __t.object("CompletePerformanceRe
   summary: __t.option(__t.string()),
 });
 export type CompletePerformanceReviewParams = __Infer<typeof CompletePerformanceReviewParams>;
+
+export const CompleteProposalIntegrationIntentParams = __t.object("CompleteProposalIntegrationIntentParams", {
+  resultDocumentId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type CompleteProposalIntegrationIntentParams = __Infer<typeof CompleteProposalIntegrationIntentParams>;
 
 export const CompleteQueueJobParams = __t.object("CompleteQueueJobParams", {
   expectedRevision: __t.u64(),
@@ -2790,6 +2834,18 @@ export const ConvertOpportunityParams = __t.object("ConvertOpportunityParams", {
   warehouseId: __t.u64(),
 });
 export type ConvertOpportunityParams = __Infer<typeof ConvertOpportunityParams>;
+
+export const ConvertProposalToProjectParams = __t.object("ConvertProposalToProjectParams", {
+  billType: __t.string(),
+  pricingType: __t.string(),
+});
+export type ConvertProposalToProjectParams = __Infer<typeof ConvertProposalToProjectParams>;
+
+export const ConvertProposalToSaleOrderParams = __t.object("ConvertProposalToSaleOrderParams", {
+  warehouseId: __t.u64(),
+  pricelistId: __t.u64(),
+});
+export type ConvertProposalToSaleOrderParams = __Infer<typeof ConvertProposalToSaleOrderParams>;
 
 export const Country = __t.object("Country", {
   code: __t.string(),
@@ -4241,6 +4297,15 @@ export const CreateFiscalYearParams = __t.object("CreateFiscalYearParams", {
 });
 export type CreateFiscalYearParams = __Infer<typeof CreateFiscalYearParams>;
 
+export const CreateFleetVehicleParams = __t.object("CreateFleetVehicleParams", {
+  name: __t.string(),
+  vehicleType: __t.string(),
+  licensePlate: __t.option(__t.string()),
+  driverName: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateFleetVehicleParams = __Infer<typeof CreateFleetVehicleParams>;
+
 export const CreateFormConfigParams = __t.object("CreateFormConfigParams", {
   moduleId: __t.string(),
   formId: __t.string(),
@@ -5394,6 +5459,59 @@ export const CreateProjectRevenueScheduleParams = __t.object("CreateProjectReven
 });
 export type CreateProjectRevenueScheduleParams = __Infer<typeof CreateProjectRevenueScheduleParams>;
 
+export const CreateProposalClarificationParams = __t.object("CreateProposalClarificationParams", {
+  authorName: __t.string(),
+  authorEmail: __t.option(__t.string()),
+  isPortalPrincipal: __t.bool(),
+  question: __t.string(),
+});
+export type CreateProposalClarificationParams = __Infer<typeof CreateProposalClarificationParams>;
+
+export const CreateProposalClauseParams = __t.object("CreateProposalClauseParams", {
+  clauseKey: __t.string(),
+  title: __t.string(),
+  body: __t.string(),
+  locale: __t.string(),
+  countryPackKey: __t.option(__t.string()),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateProposalClauseParams = __Infer<typeof CreateProposalClauseParams>;
+
+export const CreateProposalIntegrationIntentParams = __t.object("CreateProposalIntegrationIntentParams", {
+  proposalVersionId: __t.option(__t.u64()),
+  intentType: __t.string(),
+  idempotencyKey: __t.string(),
+  payload: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateProposalIntegrationIntentParams = __Infer<typeof CreateProposalIntegrationIntentParams>;
+
+export const CreateProposalParams = __t.object("CreateProposalParams", {
+  title: __t.string(),
+  clientName: __t.string(),
+  currencyId: __t.u64(),
+  value: __t.f64(),
+  deadline: __t.option(__t.timestamp()),
+  description: __t.option(__t.string()),
+  templateId: __t.option(__t.u64()),
+  partnerId: __t.option(__t.u64()),
+  documentFolderId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type CreateProposalParams = __Infer<typeof CreateProposalParams>;
+
+export const CreateProposalTemplateParams = __t.object("CreateProposalTemplateParams", {
+  name: __t.string(),
+  category: __t.string(),
+  locale: __t.string(),
+  countryPackKey: __t.option(__t.string()),
+  sectionsJson: __t.string(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateProposalTemplateParams = __Infer<typeof CreateProposalTemplateParams>;
+
 export const CreatePublicHolidayParams = __t.object("CreatePublicHolidayParams", {
   calendarId: __t.option(__t.u64()),
   packKey: __t.string(),
@@ -5832,6 +5950,7 @@ export const CreateSaleOrderParams = __t.object("CreateSaleOrderParams", {
   fiscalPositionId: __t.option(__t.u64()),
   teamId: __t.option(__t.u64()),
   opportunityId: __t.option(__t.u64()),
+  proposalId: __t.option(__t.u64()),
   note: __t.option(__t.string()),
   termsAndConditions: __t.option(__t.string()),
   validityDays: __t.option(__t.u32()),
@@ -6829,6 +6948,24 @@ export const CreateWorkflowDelegationParams = __t.object("CreateWorkflowDelegati
 });
 export type CreateWorkflowDelegationParams = __Infer<typeof CreateWorkflowDelegationParams>;
 
+export const CreateWorkflowMigrationPlanParams = __t.object("CreateWorkflowMigrationPlanParams", {
+  companyId: __t.u64(),
+  workflowId: __t.u64(),
+  sourceWorkflowVersionId: __t.u64(),
+  targetWorkflowVersionId: __t.u64(),
+  get nodeMappings() {
+    return __t.array(WorkflowNodeMigrationMapping);
+  },
+  get forkMappings() {
+    return __t.array(WorkflowForkMigrationMapping);
+  },
+  get edgeMappings() {
+    return __t.array(WorkflowEdgeMigrationMapping);
+  },
+  active: __t.bool(),
+});
+export type CreateWorkflowMigrationPlanParams = __Infer<typeof CreateWorkflowMigrationPlanParams>;
+
 export const CreateWorkflowParams = __t.object("CreateWorkflowParams", {
   workflowKey: __t.string(),
   model: __t.string(),
@@ -7668,6 +7805,12 @@ export const FailProjectIntegrationIntentParams = __t.object("FailProjectIntegra
 });
 export type FailProjectIntegrationIntentParams = __Infer<typeof FailProjectIntegrationIntentParams>;
 
+export const FailProposalIntegrationIntentParams = __t.object("FailProposalIntegrationIntentParams", {
+  lastError: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type FailProposalIntegrationIntentParams = __Infer<typeof FailProposalIntegrationIntentParams>;
+
 export const FailSubscriptionPaymentIntentParams = __t.object("FailSubscriptionPaymentIntentParams", {
   lastError: __t.string(),
   recordDunningFailure: __t.bool(),
@@ -7810,6 +7953,7 @@ export type FixedPointDecimal = __Infer<typeof FixedPointDecimal>;
 export const FleetVehicle = __t.object("FleetVehicle", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   name: __t.string(),
   licensePlate: __t.option(__t.string()),
   driverName: __t.option(__t.string()),
@@ -7825,7 +7969,6 @@ export const FleetVehicle = __t.object("FleetVehicle", {
   fuelLevel: __t.option(__t.f64()),
   odometerKm: __t.option(__t.f64()),
   vehicleType: __t.string(),
-  companyId: __t.option(__t.u64()),
   createUid: __t.identity(),
   createDate: __t.timestamp(),
   writeUid: __t.identity(),
@@ -8032,6 +8175,9 @@ export const GuardedActionKey = __t.enum("GuardedActionKey", {
   PostPayment: __t.unit(),
   ApproveExpenseSheet: __t.unit(),
   ApproveAiActionDraft: __t.unit(),
+  ApproveLeave: __t.unit(),
+  PostPaymentTransaction: __t.unit(),
+  ReversePaymentTransaction: __t.unit(),
 });
 export type GuardedActionKey = __Infer<typeof GuardedActionKey>;
 
@@ -8065,6 +8211,8 @@ export const GuardedActionSubjectKind = __t.enum("GuardedActionSubjectKind", {
   AccountPayment: __t.unit(),
   ExpenseSheet: __t.unit(),
   AiActionDraft: __t.unit(),
+  HrLeave: __t.unit(),
+  PaymentTransaction: __t.unit(),
 });
 export type GuardedActionSubjectKind = __Infer<typeof GuardedActionSubjectKind>;
 
@@ -9612,6 +9760,16 @@ export const LineState = __t.enum("LineState", {
 });
 export type LineState = __Infer<typeof LineState>;
 
+export const LinkProposalVersionEsignParams = __t.object("LinkProposalVersionEsignParams", {
+  documentId: __t.u64(),
+  proposalVersionId: __t.u64(),
+  provider: __t.string(),
+  externalEnvelopeId: __t.string(),
+  signersJson: __t.option(__t.string()),
+  metadata: __t.option(__t.string()),
+});
+export type LinkProposalVersionEsignParams = __Infer<typeof LinkProposalVersionEsignParams>;
+
 export const LinkSubcontractorCostParams = __t.object("LinkSubcontractorCostParams", {
   projectId: __t.u64(),
   purchaseOrderId: __t.option(__t.u64()),
@@ -9821,6 +9979,18 @@ export const MessageTemplateVariable = __t.object("MessageTemplateVariable", {
   value: __t.string(),
 });
 export type MessageTemplateVariable = __Infer<typeof MessageTemplateVariable>;
+
+export const MigrateWorkflowInstanceParams = __t.object("MigrateWorkflowInstanceParams", {
+  companyId: __t.u64(),
+  planId: __t.u64(),
+  instanceId: __t.u64(),
+  expectedInstanceRevision: __t.u64(),
+  reason: __t.string(),
+  idempotencyKey: __t.string(),
+  correlationId: __t.string(),
+  causationId: __t.option(__t.string()),
+});
+export type MigrateWorkflowInstanceParams = __Infer<typeof MigrateWorkflowInstanceParams>;
 
 // The tagged union or sum type for the algebraic type `MoState`.
 export const MoState = __t.enum("MoState", {
@@ -11118,6 +11288,13 @@ export const PostRealizedFxParams = __t.object("PostRealizedFxParams", {
 });
 export type PostRealizedFxParams = __Infer<typeof PostRealizedFxParams>;
 
+export const PreflightWorkflowMigrationParams = __t.object("PreflightWorkflowMigrationParams", {
+  companyId: __t.u64(),
+  planId: __t.u64(),
+  instanceId: __t.u64(),
+});
+export type PreflightWorkflowMigrationParams = __Infer<typeof PreflightWorkflowMigrationParams>;
+
 // The tagged union or sum type for the algebraic type `PricelistAppliedOn`.
 export const PricelistAppliedOn = __t.enum("PricelistAppliedOn", {
   AllProducts: __t.unit(),
@@ -11831,6 +12008,8 @@ export type ProjectTimesheetApproval = __Infer<typeof ProjectTimesheetApproval>;
 export const Proposal = __t.object("Proposal", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
+  currencyId: __t.u64(),
   title: __t.string(),
   clientName: __t.string(),
   get status() {
@@ -11844,6 +12023,10 @@ export const Proposal = __t.object("Proposal", {
   templateId: __t.option(__t.u64()),
   partnerId: __t.option(__t.u64()),
   documentFolderId: __t.option(__t.u64()),
+  awardApprovedAt: __t.option(__t.timestamp()),
+  awardApprovedBy: __t.option(__t.identity()),
+  saleOrderId: __t.option(__t.u64()),
+  projectId: __t.option(__t.u64()),
   createUid: __t.identity(),
   createDate: __t.timestamp(),
   writeUid: __t.identity(),
@@ -11851,6 +12034,74 @@ export const Proposal = __t.object("Proposal", {
   metadata: __t.option(__t.string()),
 });
 export type Proposal = __Infer<typeof Proposal>;
+
+export const ProposalAnalysis = __t.object("ProposalAnalysis", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  proposalId: __t.u64(),
+  source: __t.string(),
+  isMock: __t.bool(),
+  findingsJson: __t.string(),
+  requirementsJson: __t.string(),
+  evaluationCriteriaJson: __t.string(),
+  suggestedSectionsJson: __t.string(),
+  scoreJson: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+});
+export type ProposalAnalysis = __Infer<typeof ProposalAnalysis>;
+
+export const ProposalBidDecision = __t.object("ProposalBidDecision", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  proposalId: __t.u64(),
+  get decision() {
+    return BidDecisionKind;
+  },
+  rationale: __t.string(),
+  decidedBy: __t.identity(),
+  decidedAt: __t.timestamp(),
+});
+export type ProposalBidDecision = __Infer<typeof ProposalBidDecision>;
+
+export const ProposalClarification = __t.object("ProposalClarification", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  proposalId: __t.u64(),
+  authorName: __t.string(),
+  authorEmail: __t.option(__t.string()),
+  isPortalPrincipal: __t.bool(),
+  question: __t.string(),
+  answer: __t.option(__t.string()),
+  answeredBy: __t.option(__t.identity()),
+  answeredAt: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type ProposalClarification = __Infer<typeof ProposalClarification>;
+
+export const ProposalClause = __t.object("ProposalClause", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  clauseKey: __t.string(),
+  title: __t.string(),
+  body: __t.string(),
+  locale: __t.string(),
+  countryPackKey: __t.option(__t.string()),
+  isActive: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProposalClause = __Infer<typeof ProposalClause>;
 
 export const ProposalComment = __t.object("ProposalComment", {
   id: __t.u64(),
@@ -11867,6 +12118,49 @@ export const ProposalComment = __t.object("ProposalComment", {
   writeDate: __t.timestamp(),
 });
 export type ProposalComment = __Infer<typeof ProposalComment>;
+
+export const ProposalComplianceRequirement = __t.object("ProposalComplianceRequirement", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  proposalId: __t.u64(),
+  requirementKey: __t.string(),
+  title: __t.string(),
+  description: __t.option(__t.string()),
+  isRequired: __t.bool(),
+  isComplete: __t.bool(),
+  isWaived: __t.bool(),
+  waiverRationale: __t.option(__t.string()),
+  evidenceDocumentId: __t.option(__t.u64()),
+  sequence: __t.u32(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type ProposalComplianceRequirement = __Infer<typeof ProposalComplianceRequirement>;
+
+export const ProposalIntegrationIntent = __t.object("ProposalIntegrationIntent", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  proposalId: __t.u64(),
+  proposalVersionId: __t.option(__t.u64()),
+  intentType: __t.string(),
+  status: __t.string(),
+  idempotencyKey: __t.string(),
+  payload: __t.string(),
+  resultDocumentId: __t.option(__t.u64()),
+  lastError: __t.option(__t.string()),
+  attemptCount: __t.u32(),
+  appliedAt: __t.option(__t.timestamp()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProposalIntegrationIntent = __Infer<typeof ProposalIntegrationIntent>;
 
 export const ProposalLineItem = __t.object("ProposalLineItem", {
   id: __t.u64(),
@@ -11902,6 +12196,23 @@ export const ProposalPresence = __t.object("ProposalPresence", {
 });
 export type ProposalPresence = __Infer<typeof ProposalPresence>;
 
+export const ProposalProcurementScore = __t.object("ProposalProcurementScore", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  proposalId: __t.u64(),
+  countryPackKey: __t.string(),
+  scoreKind: __t.string(),
+  scoreValue: __t.f64(),
+  maxValue: __t.f64(),
+  notes: __t.option(__t.string()),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+});
+export type ProposalProcurementScore = __Infer<typeof ProposalProcurementScore>;
+
 export const ProposalSection = __t.object("ProposalSection", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -11914,6 +12225,7 @@ export const ProposalSection = __t.object("ProposalSection", {
   aiSuggestion: __t.option(__t.string()),
   sequence: __t.u32(),
   wordCount: __t.u32(),
+  revision: __t.u32(),
   createUid: __t.identity(),
   createDate: __t.timestamp(),
   writeUid: __t.identity(),
@@ -11929,6 +12241,7 @@ export const ProposalSourceDoc = __t.object("ProposalSourceDoc", {
   content: __t.string(),
   docType: __t.string(),
   wordCount: __t.u32(),
+  documentId: __t.option(__t.u64()),
   addedBy: __t.identity(),
   addedAt: __t.timestamp(),
 });
@@ -11944,6 +12257,24 @@ export const ProposalStatus = __t.enum("ProposalStatus", {
   Archived: __t.unit(),
 });
 export type ProposalStatus = __Infer<typeof ProposalStatus>;
+
+export const ProposalTemplate = __t.object("ProposalTemplate", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  category: __t.string(),
+  locale: __t.string(),
+  countryPackKey: __t.option(__t.string()),
+  sectionsJson: __t.string(),
+  isActive: __t.bool(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type ProposalTemplate = __Infer<typeof ProposalTemplate>;
 
 export const ProposalVersion = __t.object("ProposalVersion", {
   id: __t.u64(),
@@ -12579,6 +12910,15 @@ export const RecognizeProjectRevenueParams = __t.object("RecognizeProjectRevenue
 });
 export type RecognizeProjectRevenueParams = __Infer<typeof RecognizeProjectRevenueParams>;
 
+export const RecomputeWorkflowTimersParams = __t.object("RecomputeWorkflowTimersParams", {
+  companyId: __t.u64(),
+  calendarKey: __t.string(),
+  expectedPendingCount: __t.u64(),
+  confirm: __t.bool(),
+  reason: __t.string(),
+});
+export type RecomputeWorkflowTimersParams = __Infer<typeof RecomputeWorkflowTimersParams>;
+
 export const ReconcileAccountBankStatementLineParams = __t.object("ReconcileAccountBankStatementLineParams", {
   moveIds: __t.array(__t.u64()),
   amountResidual: __t.f64(),
@@ -12696,6 +13036,12 @@ export const RecordPrivacyConsentParams = __t.object("RecordPrivacyConsentParams
   metadata: __t.option(__t.string()),
 });
 export type RecordPrivacyConsentParams = __Infer<typeof RecordPrivacyConsentParams>;
+
+export const RecordProposalBidDecisionParams = __t.object("RecordProposalBidDecisionParams", {
+  decision: __t.string(),
+  rationale: __t.string(),
+});
+export type RecordProposalBidDecisionParams = __Infer<typeof RecordProposalBidDecisionParams>;
 
 export const RecordPurchasingIntegrationResultParams = __t.object("RecordPurchasingIntegrationResultParams", {
   status: __t.string(),
@@ -13305,6 +13651,7 @@ export const SaleOrder = __t.object("SaleOrder", {
   teamId: __t.option(__t.u64()),
   originSoId: __t.option(__t.u64()),
   opportunityId: __t.option(__t.u64()),
+  proposalId: __t.option(__t.u64()),
   campaignId: __t.option(__t.u64()),
   mediumId: __t.option(__t.u64()),
   sourceId: __t.option(__t.u64()),
@@ -16474,11 +16821,35 @@ export const UpdateProjectRateCardParams = __t.object("UpdateProjectRateCardPara
 });
 export type UpdateProjectRateCardParams = __Infer<typeof UpdateProjectRateCardParams>;
 
+export const UpdateProposalLineItemParams = __t.object("UpdateProposalLineItemParams", {
+  quantity: __t.option(__t.f64()),
+  priceUnit: __t.option(__t.f64()),
+  discount: __t.option(__t.f64()),
+  notes: __t.option(__t.string()),
+  description: __t.option(__t.string()),
+});
+export type UpdateProposalLineItemParams = __Infer<typeof UpdateProposalLineItemParams>;
+
+export const UpdateProposalParams = __t.object("UpdateProposalParams", {
+  title: __t.option(__t.string()),
+  clientName: __t.option(__t.string()),
+  currencyId: __t.option(__t.u64()),
+  value: __t.option(__t.f64()),
+  deadline: __t.option(__t.timestamp()),
+  description: __t.option(__t.string()),
+  templateId: __t.option(__t.u64()),
+  partnerId: __t.option(__t.u64()),
+  documentFolderId: __t.option(__t.u64()),
+  metadata: __t.option(__t.string()),
+});
+export type UpdateProposalParams = __Infer<typeof UpdateProposalParams>;
+
 export const UpdateProposalSourceDocParams = __t.object("UpdateProposalSourceDocParams", {
   name: __t.option(__t.string()),
   content: __t.option(__t.string()),
   docType: __t.option(__t.string()),
   wordCount: __t.option(__t.u32()),
+  documentId: __t.option(__t.u64()),
 });
 export type UpdateProposalSourceDocParams = __Infer<typeof UpdateProposalSourceDocParams>;
 
@@ -16933,6 +17304,15 @@ export const UpdateUtmSourceParams = __t.object("UpdateUtmSourceParams", {
 });
 export type UpdateUtmSourceParams = __Infer<typeof UpdateUtmSourceParams>;
 
+export const UpdateVehiclePositionParams = __t.object("UpdateVehiclePositionParams", {
+  latitude: __t.f64(),
+  longitude: __t.f64(),
+  speedKmh: __t.f64(),
+  heading: __t.f64(),
+  status: __t.string(),
+});
+export type UpdateVehiclePositionParams = __Infer<typeof UpdateVehiclePositionParams>;
+
 export const UpdateWarehouse3DZoneParams = __t.object("UpdateWarehouse3DZoneParams", {
   get displayType() {
     return __t.option(ZoneDisplayType);
@@ -17139,6 +17519,37 @@ export const UpsertPartnerCreditControlParams = __t.object("UpsertPartnerCreditC
   metadata: __t.option(__t.string()),
 });
 export type UpsertPartnerCreditControlParams = __Infer<typeof UpsertPartnerCreditControlParams>;
+
+export const UpsertProposalComplianceRequirementParams = __t.object("UpsertProposalComplianceRequirementParams", {
+  requirementKey: __t.string(),
+  title: __t.string(),
+  description: __t.option(__t.string()),
+  isRequired: __t.bool(),
+  isComplete: __t.bool(),
+  isWaived: __t.bool(),
+  waiverRationale: __t.option(__t.string()),
+  evidenceDocumentId: __t.option(__t.u64()),
+  sequence: __t.u32(),
+});
+export type UpsertProposalComplianceRequirementParams = __Infer<typeof UpsertProposalComplianceRequirementParams>;
+
+export const UpsertProposalProcurementScoreParams = __t.object("UpsertProposalProcurementScoreParams", {
+  countryPackKey: __t.string(),
+  scoreKind: __t.string(),
+  scoreValue: __t.f64(),
+  maxValue: __t.f64(),
+  notes: __t.option(__t.string()),
+});
+export type UpsertProposalProcurementScoreParams = __Infer<typeof UpsertProposalProcurementScoreParams>;
+
+export const UpsertProposalSectionParams = __t.object("UpsertProposalSectionParams", {
+  title: __t.string(),
+  content: __t.string(),
+  status: __t.string(),
+  sequence: __t.u32(),
+  aiSuggestion: __t.option(__t.string()),
+});
+export type UpsertProposalSectionParams = __Infer<typeof UpsertProposalSectionParams>;
 
 export const UpsertSearchEmbeddingParams = __t.object("UpsertSearchEmbeddingParams", {
   contentType: __t.string(),
@@ -17640,6 +18051,12 @@ export const WorkflowAuthorizationOutcome = __t.enum("WorkflowAuthorizationOutco
 });
 export type WorkflowAuthorizationOutcome = __Infer<typeof WorkflowAuthorizationOutcome>;
 
+export const WorkflowBranchKeyMigrationMapping = __t.object("WorkflowBranchKeyMigrationMapping", {
+  fromBranchKey: __t.string(),
+  toBranchKey: __t.string(),
+});
+export type WorkflowBranchKeyMigrationMapping = __Infer<typeof WorkflowBranchKeyMigrationMapping>;
+
 // The tagged union or sum type for the algebraic type `WorkflowBranchKind`.
 export const WorkflowBranchKind = __t.enum("WorkflowBranchKind", {
   None: __t.unit(),
@@ -17961,6 +18378,42 @@ export const WorkflowEdge = __t.object("WorkflowEdge", {
 });
 export type WorkflowEdge = __Infer<typeof WorkflowEdge>;
 
+export const WorkflowEdgeMigrationMapping = __t.object("WorkflowEdgeMigrationMapping", {
+  fromEdgeKey: __t.string(),
+  toEdgeKey: __t.string(),
+});
+export type WorkflowEdgeMigrationMapping = __Infer<typeof WorkflowEdgeMigrationMapping>;
+
+export const WorkflowFork = __t.object("WorkflowFork", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  instanceId: __t.u64(),
+  workflowVersionId: __t.u64(),
+  forkNodeKey: __t.string(),
+  joinNodeKey: __t.option(__t.string()),
+  get splitKind() {
+    return WorkflowBranchKind;
+  },
+  expectedBranchKeys: __t.array(__t.string()),
+  emittedBranchKeys: __t.array(__t.string()),
+  open: __t.bool(),
+  revision: __t.u64(),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  closedAt: __t.option(__t.timestamp()),
+});
+export type WorkflowFork = __Infer<typeof WorkflowFork>;
+
+export const WorkflowForkMigrationMapping = __t.object("WorkflowForkMigrationMapping", {
+  fromForkNodeKey: __t.string(),
+  toForkNodeKey: __t.string(),
+  get branchKeyMappings() {
+    return __t.array(WorkflowBranchKeyMigrationMapping);
+  },
+});
+export type WorkflowForkMigrationMapping = __Infer<typeof WorkflowForkMigrationMapping>;
+
 export const WorkflowHumanTask = __t.object("WorkflowHumanTask", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -18011,6 +18464,20 @@ export const WorkflowHumanTask = __t.object("WorkflowHumanTask", {
   updatedAt: __t.timestamp(),
 });
 export type WorkflowHumanTask = __Infer<typeof WorkflowHumanTask>;
+
+export const WorkflowHumanTaskCandidate = __t.object("WorkflowHumanTaskCandidate", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  taskId: __t.u64(),
+  candidateIdentity: __t.identity(),
+  get decision() {
+    return __t.option(WorkflowHumanTaskDecision);
+  },
+  decidedAt: __t.option(__t.timestamp()),
+  decidedBy: __t.option(__t.identity()),
+});
+export type WorkflowHumanTaskCandidate = __Infer<typeof WorkflowHumanTaskCandidate>;
 
 // The tagged union or sum type for the algebraic type `WorkflowHumanTaskCommandKind`.
 export const WorkflowHumanTaskCommandKind = __t.enum("WorkflowHumanTaskCommandKind", {
@@ -18140,6 +18607,103 @@ export const WorkflowInstanceState = __t.enum("WorkflowInstanceState", {
 });
 export type WorkflowInstanceState = __Infer<typeof WorkflowInstanceState>;
 
+export const WorkflowJoinArrival = __t.object("WorkflowJoinArrival", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  instanceId: __t.u64(),
+  forkId: __t.u64(),
+  joinNodeKey: __t.string(),
+  branchKey: __t.string(),
+  arrivalTokenId: __t.u64(),
+  recordedBy: __t.identity(),
+  recordedAt: __t.timestamp(),
+});
+export type WorkflowJoinArrival = __Infer<typeof WorkflowJoinArrival>;
+
+// The tagged union or sum type for the algebraic type `WorkflowMigrationCompatibility`.
+export const WorkflowMigrationCompatibility = __t.enum("WorkflowMigrationCompatibility", {
+  Exact: __t.unit(),
+  NodeMappingRequired: __t.unit(),
+  Incompatible: __t.unit(),
+});
+export type WorkflowMigrationCompatibility = __Infer<typeof WorkflowMigrationCompatibility>;
+
+export const WorkflowMigrationInstanceResult = __t.object("WorkflowMigrationInstanceResult", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  planId: __t.u64(),
+  instanceId: __t.u64(),
+  sourceWorkflowVersionId: __t.u64(),
+  targetWorkflowVersionId: __t.u64(),
+  get outcome() {
+    return WorkflowMigrationOutcome;
+  },
+  reason: __t.string(),
+  mappingFingerprint: __t.string(),
+  idempotencyKey: __t.string(),
+  inputHash: __t.string(),
+  priorInstanceRevision: __t.u64(),
+  nextInstanceRevision: __t.option(__t.u64()),
+  errorSummary: __t.option(__t.string()),
+  recordedBy: __t.identity(),
+  recordedAt: __t.timestamp(),
+});
+export type WorkflowMigrationInstanceResult = __Infer<typeof WorkflowMigrationInstanceResult>;
+
+// The tagged union or sum type for the algebraic type `WorkflowMigrationOutcome`.
+export const WorkflowMigrationOutcome = __t.enum("WorkflowMigrationOutcome", {
+  Succeeded: __t.unit(),
+  Rejected: __t.unit(),
+});
+export type WorkflowMigrationOutcome = __Infer<typeof WorkflowMigrationOutcome>;
+
+export const WorkflowMigrationPlan = __t.object("WorkflowMigrationPlan", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  workflowId: __t.u64(),
+  sourceWorkflowVersionId: __t.u64(),
+  targetWorkflowVersionId: __t.u64(),
+  get nodeMappings() {
+    return __t.array(WorkflowNodeMigrationMapping);
+  },
+  get forkMappings() {
+    return __t.array(WorkflowForkMigrationMapping);
+  },
+  get edgeMappings() {
+    return __t.array(WorkflowEdgeMigrationMapping);
+  },
+  get compatibility() {
+    return WorkflowMigrationCompatibility;
+  },
+  active: __t.bool(),
+  revision: __t.u64(),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  updatedBy: __t.identity(),
+  updatedAt: __t.timestamp(),
+});
+export type WorkflowMigrationPlan = __Infer<typeof WorkflowMigrationPlan>;
+
+export const WorkflowMigrationPreflight = __t.object("WorkflowMigrationPreflight", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  planId: __t.u64(),
+  instanceId: __t.u64(),
+  get compatibility() {
+    return WorkflowMigrationCompatibility;
+  },
+  compatible: __t.bool(),
+  errors: __t.array(__t.string()),
+  inputHash: __t.string(),
+  recordedBy: __t.identity(),
+  recordedAt: __t.timestamp(),
+});
+export type WorkflowMigrationPreflight = __Infer<typeof WorkflowMigrationPreflight>;
+
 export const WorkflowNode = __t.object("WorkflowNode", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -18194,6 +18758,12 @@ export const WorkflowNodeKind = __t.enum("WorkflowNodeKind", {
   Subflow: __t.unit(),
 });
 export type WorkflowNodeKind = __Infer<typeof WorkflowNodeKind>;
+
+export const WorkflowNodeMigrationMapping = __t.object("WorkflowNodeMigrationMapping", {
+  fromNodeKey: __t.string(),
+  toNodeKey: __t.string(),
+});
+export type WorkflowNodeMigrationMapping = __Infer<typeof WorkflowNodeMigrationMapping>;
 
 export const WorkflowOutbox = __t.object("WorkflowOutbox", {
   id: __t.u64(),

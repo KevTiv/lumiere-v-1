@@ -119,6 +119,14 @@ pub mod subscriptions_tests;
 #[path = "../tests/projects/mod.rs"]
 pub mod projects_tests;
 
+/// Fleet / field-assets domain tests — call `run_all_fleet_tests` reducer to execute.
+#[path = "../tests/fleet/mod.rs"]
+pub mod fleet_tests;
+
+/// Proposals / tenders domain tests — call `run_all_proposals_tests` reducer to execute.
+#[path = "../tests/proposals/mod.rs"]
+pub mod proposals_tests;
+
 /// Platform module smoke tests — helpdesk, HR, manufacturing, documents, workflow, subscriptions.
 #[path = "../tests/platform/mod.rs"]
 pub mod platform_tests;
@@ -154,6 +162,8 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
     subscriptions_tests::run_all_subscriptions_tests(ctx)
         .map_err(|e| format!("subscriptions: {e}"))?;
     projects_tests::run_all_projects_tests(ctx).map_err(|e| format!("projects: {e}"))?;
+    fleet_tests::run_all_fleet_tests(ctx).map_err(|e| format!("fleet: {e}"))?;
+    proposals_tests::run_all_proposals_tests(ctx).map_err(|e| format!("proposals: {e}"))?;
     platform_tests::run_all_platform_tests(ctx).map_err(|e| format!("platform: {e}"))?;
     workflow_tests::run_all_workflow_foundation_tests(ctx)
         .map_err(|e| format!("workflow foundations: {e}"))?;

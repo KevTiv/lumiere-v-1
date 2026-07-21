@@ -11,6 +11,10 @@ export const WORKFLOWS_WORKSPACE_RESOURCE_KEYS = [
   "workflow-instances",
   "workflow-timers-late",
   "workflow-outbox-dead",
+  "workflow-decision-events",
+  "workflow-migration-plans",
+  "workflow-migration-preflights",
+  "workflow-migration-results",
 ] as const;
 
 export type WorkflowsWorkspaceResourceKey =

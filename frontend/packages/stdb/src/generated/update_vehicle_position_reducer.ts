@@ -10,11 +10,15 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  UpdateVehiclePositionParams,
+} from "./types";
+
 export default {
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
   vehicleId: __t.u64(),
-  latitude: __t.f64(),
-  longitude: __t.f64(),
-  speedKmh: __t.f64(),
-  heading: __t.f64(),
-  status: __t.string(),
+  get params() {
+    return UpdateVehiclePositionParams;
+  },
 };

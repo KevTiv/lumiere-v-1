@@ -1032,10 +1032,129 @@ pub fn validate_workflow_graph(
         errors.push("graph contains a cycle".to_string());
     }
 
+    validate_fork_join_topology(nodes, edges, &mut errors);
+
     if errors.is_empty() {
         Ok(())
     } else {
         Err(errors)
+    }
+}
+
+/// Restrict OR/AND (and XOR) splits to paired, nested, non-crossing joins.
+pub fn validate_fork_join_topology(
+    nodes: &[WorkflowNode],
+    edges: &[WorkflowEdge],
+    errors: &mut Vec<String>,
+) {
+    let nodes_by_key: BTreeMap<&str, &WorkflowNode> = nodes
+        .iter()
+        .map(|node| (node.node_key.as_str(), node))
+        .collect();
+    let mut outgoing: BTreeMap<&str, Vec<&WorkflowEdge>> = BTreeMap::new();
+    let mut incoming: BTreeMap<&str, Vec<&WorkflowEdge>> = BTreeMap::new();
+    for edge in edges {
+        outgoing
+            .entry(edge.from_node_key.as_str())
+            .or_default()
+            .push(edge);
+        incoming
+            .entry(edge.to_node_key.as_str())
+            .or_default()
+            .push(edge);
+    }
+    for outs in outgoing.values_mut() {
+        outs.sort_by(|a, b| {
+            a.sequence
+                .cmp(&b.sequence)
+                .then_with(|| a.edge_key.cmp(&b.edge_key))
+        });
+    }
+
+    for node in nodes {
+        let outs = outgoing
+            .get(node.node_key.as_str())
+            .map(|rows| rows.len())
+            .unwrap_or(0);
+        let ins = incoming
+            .get(node.node_key.as_str())
+            .map(|rows| rows.len())
+            .unwrap_or(0);
+        match node.kind {
+            WorkflowNodeKind::Fork => {
+                if outs < 2 {
+                    errors.push(format!(
+                        "Fork '{}' must have at least two outgoing edges",
+                        node.node_key
+                    ));
+                }
+            }
+            WorkflowNodeKind::Join => {
+                if ins < 2 {
+                    errors.push(format!(
+                        "Join '{}' must have at least two incoming edges",
+                        node.node_key
+                    ));
+                }
+                if outs != 1 {
+                    errors.push(format!(
+                        "Join '{}' must have exactly one outgoing edge",
+                        node.node_key
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let Some(start) = nodes.iter().find(|node| node.kind == WorkflowNodeKind::Start) else {
+        return;
+    };
+    let mut stack: Vec<(&str, WorkflowBranchKind)> = Vec::new();
+    let mut visited = BTreeSet::new();
+    let mut queue = VecDeque::from([start.node_key.as_str()]);
+    while let Some(key) = queue.pop_front() {
+        if !visited.insert(key) {
+            continue;
+        }
+        let Some(node) = nodes_by_key.get(key) else {
+            continue;
+        };
+        match node.kind {
+            WorkflowNodeKind::Fork => {
+                stack.push((node.node_key.as_str(), node.split_kind.clone()));
+            }
+            WorkflowNodeKind::Join => match stack.pop() {
+                None => errors.push(format!(
+                    "Join '{}' has no matching open Fork (crossing or unpaired)",
+                    node.node_key
+                )),
+                Some((fork_key, split_kind)) => {
+                    if split_kind != node.join_kind {
+                        errors.push(format!(
+                            "Join '{}' kind {:?} does not match Fork '{}' split {:?}",
+                            node.node_key, node.join_kind, fork_key, split_kind
+                        ));
+                    }
+                }
+            },
+            _ => {}
+        }
+        if let Some(targets) = outgoing.get(key) {
+            for edge in targets {
+                queue.push_back(edge.to_node_key.as_str());
+            }
+        }
+    }
+    if !stack.is_empty() {
+        errors.push(format!(
+            "unclosed Fork region(s): {}",
+            stack
+                .iter()
+                .map(|(key, _)| *key)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
     }
 }
 

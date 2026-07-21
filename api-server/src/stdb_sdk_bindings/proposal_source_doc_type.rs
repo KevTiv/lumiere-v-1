@@ -14,6 +14,7 @@ pub struct ProposalSourceDoc {
     pub content: String,
     pub doc_type: String,
     pub word_count: u32,
+    pub document_id: Option<u64>,
     pub added_by: __sdk::Identity,
     pub added_at: __sdk::Timestamp,
 }
@@ -33,6 +34,7 @@ pub struct ProposalSourceDocCols {
     pub content: __sdk::__query_builder::Col<ProposalSourceDoc, String>,
     pub doc_type: __sdk::__query_builder::Col<ProposalSourceDoc, String>,
     pub word_count: __sdk::__query_builder::Col<ProposalSourceDoc, u32>,
+    pub document_id: __sdk::__query_builder::Col<ProposalSourceDoc, Option<u64>>,
     pub added_by: __sdk::__query_builder::Col<ProposalSourceDoc, __sdk::Identity>,
     pub added_at: __sdk::__query_builder::Col<ProposalSourceDoc, __sdk::Timestamp>,
 }
@@ -48,6 +50,7 @@ impl __sdk::__query_builder::HasCols for ProposalSourceDoc {
             content: __sdk::__query_builder::Col::new(table_name, "content"),
             doc_type: __sdk::__query_builder::Col::new(table_name, "doc_type"),
             word_count: __sdk::__query_builder::Col::new(table_name, "word_count"),
+            document_id: __sdk::__query_builder::Col::new(table_name, "document_id"),
             added_by: __sdk::__query_builder::Col::new(table_name, "added_by"),
             added_at: __sdk::__query_builder::Col::new(table_name, "added_at"),
         }

@@ -11,7 +11,8 @@ export function rowNumber(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback
 }
 
-export function rowBool(v: unknown): boolean {
+export function rowBool(v: unknown, fallback = false): boolean {
+  if (v == null) return fallback
   return Boolean(v)
 }
 

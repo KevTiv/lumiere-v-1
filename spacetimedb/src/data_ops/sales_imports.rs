@@ -66,6 +66,7 @@ pub fn import_sale_order_csv(
             team_id: None,
             origin_so_id: None,
             opportunity_id: None,
+            proposal_id: None,
             campaign_id: None,
             medium_id: None,
             source_id: None,

@@ -22,7 +22,9 @@ import {
   useCreateProposal,
   useUpdateProposal,
   useUpdateProposalStatus,
+  useApproveProposal,
 } from "@lumiere/query-hooks/hooks/proposals"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { fetchQueryList, rqBigIntKey } from "@lumiere/query-hooks/http"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
@@ -117,17 +119,22 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => proposalsModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [editRow, setEditRow] = useState<Record<string, unknown> | null>(null)
   const [activeTab, setActiveTab] = useState<string>("dashboard")
 
   const { data: proposals = [] } = useProposals(orgId, initialProposals)
-  const createProposal = useCreateProposal()
-  const updateProposal = useUpdateProposal()
-  const updateProposalStatus = useUpdateProposalStatus()
+  const createProposal = useCreateProposal(orgId, operatingCompanyId)
+  const updateProposal = useUpdateProposal(orgId, operatingCompanyId)
+  const updateProposalStatus = useUpdateProposalStatus(orgId, operatingCompanyId)
+  const approveProposal = useApproveProposal(orgId, operatingCompanyId)
 
   const isPending =
-    createProposal.isPending || updateProposal.isPending || updateProposalStatus.isPending
+    createProposal.isPending ||
+    updateProposal.isPending ||
+    updateProposalStatus.isPending ||
+    approveProposal.isPending
 
   const activeCount = proposals.filter((p) => {
     const s = normalizeProposalStatus(p.status)
@@ -141,6 +148,8 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
       return s !== "Rejected" && s !== "Archived"
     })
     .reduce((sum, p) => sum + Number(p.value ?? 0), 0)
+  const pipelineValueLabel =
+    pipelineValue > 0 ? `${(pipelineValue / 1000).toFixed(0)}k` : "…"
 
   const setStatus = useCallback(
     async (proposalId: string | number | bigint, status: string) => {
@@ -170,7 +179,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         onClick: (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Draft") return
-          void setStatus(row.id as string | number, "Review")
+          void setStatus(row.id as string | number, "review")
         },
       },
       {
@@ -182,7 +191,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         onClick: (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Review") return
-          void setStatus(row.id as string | number, "Submitted")
+          void setStatus(row.id as string | number, "submitted")
         },
       },
       {
@@ -194,7 +203,10 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         onClick: (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Submitted") return
-          void setStatus(row.id as string | number, "Awarded")
+          void (async () => {
+            await approveProposal.mutateAsync(row.id as string | number)
+            await setStatus(row.id as string | number, "awarded")
+          })()
         },
       },
       {
@@ -208,7 +220,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
           if (!row?.id) return
           const s = normalizeProposalStatus(row.status)
           if (s === "Rejected" || s === "Archived") return
-          void setStatus(row.id as string | number, "Rejected")
+          void setStatus(row.id as string | number, "rejected")
         },
       },
       {
@@ -223,11 +235,11 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
           const s = normalizeProposalStatus(row.status)
           if (s === "Archived") return
           if (s !== "Awarded" && s !== "Rejected") return
-          void setStatus(row.id as string | number, "Archived")
+          void setStatus(row.id as string | number, "archived")
         },
       },
     ]
-  }, [t, setStatus])
+  }, [t, setStatus, approveProposal])
 
   const editFormConfig = useMemo((): FormConfig | null => {
     if (!editRow) return null
@@ -258,7 +270,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
                 { label: "Awarded", value: String(awardedCount), icon: "Award" },
                 {
                   label: "Pipeline Value",
-                  value: `$${(pipelineValue / 1000).toFixed(0)}k`,
+                  value: pipelineValueLabel,
                   icon: "TrendingUp",
                 },
               ],
@@ -269,6 +281,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
           const handlers: Record<string, () => void> = {
             new_proposal: () => setQuickActionForm({ form: newProposalForm(t), action: "createProposal" }),
             use_template: () => setActiveTab("templates"),
+            // Label is "Import RFP (coming soon)" — still opens create form as a create-only shortcut
             import_rfp: () => setQuickActionForm({ form: newProposalForm(t), action: "createProposal" }),
             review_pending: () => {
               const pending = proposals.find((p) => normalizeProposalStatus(p.status) === "Review")
@@ -286,7 +299,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         return w
       }),
     }))
-  }, [activeCount, submittedCount, awardedCount, pipelineValue, proposals, router, moduleConfig, t])
+  }, [activeCount, submittedCount, awardedCount, pipelineValueLabel, proposals, router, moduleConfig, t])
 
   const config = useMemo(
     (): ModuleConfig => ({
@@ -325,14 +338,20 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
       const title = String(formData.title ?? "").trim()
       if (!title) return
       const descriptionRaw = formData.description != null ? String(formData.description).trim() : ""
+      const typeRaw = formData.type != null ? String(formData.type).trim() : ""
+      const partnerRaw = formData.partnerId ?? formData.partner_id
       await createProposal.mutateAsync({
-        organizationId: orgId,
         title,
         clientName: String(formData.clientName ?? "").trim(),
-        type: String(formData.type ?? ""),
+        currencyId: 1,
         value: Number(formData.value ?? 0),
         deadline: formData.deadline ? new Date(String(formData.deadline)) : undefined,
         description: descriptionRaw || undefined,
+        partnerId:
+          partnerRaw != null && String(partnerRaw).trim() !== ""
+            ? BigInt(String(partnerRaw))
+            : undefined,
+        metadata: typeRaw ? JSON.stringify({ type: typeRaw }) : undefined,
       })
 
       let created: Record<string, unknown> | undefined

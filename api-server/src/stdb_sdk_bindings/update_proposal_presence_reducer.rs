@@ -7,6 +7,8 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct UpdateProposalPresenceArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub proposal_id: u64,
     pub section_id: Option<u64>,
     pub user_name: String,
@@ -15,6 +17,8 @@ pub(super) struct UpdateProposalPresenceArgs {
 impl From<UpdateProposalPresenceArgs> for super::Reducer {
     fn from(args: UpdateProposalPresenceArgs) -> Self {
         Self::UpdateProposalPresence {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             proposal_id: args.proposal_id,
             section_id: args.section_id,
             user_name: args.user_name,
@@ -39,11 +43,20 @@ pub trait update_proposal_presence {
     /// /// Use [`update_proposal_presence:update_proposal_presence_then`] to run a callback after the reducer completes.
     fn update_proposal_presence(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: Option<u64>,
         user_name: String,
     ) -> __sdk::Result<()> {
-        self.update_proposal_presence_then(proposal_id, section_id, user_name, |_, _| {})
+        self.update_proposal_presence_then(
+            organization_id,
+            company_id,
+            proposal_id,
+            section_id,
+            user_name,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `update_proposal_presence` to run as soon as possible,
@@ -54,6 +67,8 @@ pub trait update_proposal_presence {
     ///  and its status can be observed with the `callback`.
     fn update_proposal_presence_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: Option<u64>,
         user_name: String,
@@ -67,6 +82,8 @@ pub trait update_proposal_presence {
 impl update_proposal_presence for super::RemoteReducers {
     fn update_proposal_presence_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: Option<u64>,
         user_name: String,
@@ -77,6 +94,8 @@ impl update_proposal_presence for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             UpdateProposalPresenceArgs {
+                organization_id,
+                company_id,
                 proposal_id,
                 section_id,
                 user_name,

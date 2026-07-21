@@ -174,19 +174,33 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.metadata, { none: [] })
   })
 
-  it("encodeReducerCallArgs SATS-encodes flat Option args for create_proposal", () => {
+  it("encodeReducerCallArgs encodes CreateProposalParams struct for create_proposal", () => {
     const encoded = encodeReducerCallArgs("create_proposal", [
       1,
-      "Title",
-      "Client",
-      5000,
-      null,
-      "",
-      null,
+      2,
+      {
+        title: "Title",
+        clientName: "Client",
+        currencyId: 1,
+        value: 5000,
+        deadline: null,
+        description: null,
+        templateId: null,
+        partnerId: null,
+        documentFolderId: null,
+        metadata: null,
+      },
     ])
-    assert.deepEqual(encoded[4], { none: [] })
-    assert.deepEqual(encoded[5], { none: [] })
-    assert.deepEqual(encoded[6], { none: [] })
+    const params = encoded[2] as Record<string, unknown>
+    assert.equal(params.title, "Title")
+    assert.equal(params.client_name, "Client")
+    assert.equal(params.currency_id, 1)
+    assert.deepEqual(params.deadline, { none: [] })
+    assert.deepEqual(params.description, { none: [] })
+    assert.deepEqual(params.template_id, { none: [] })
+    assert.deepEqual(params.partner_id, { none: [] })
+    assert.deepEqual(params.document_folder_id, { none: [] })
+    assert.deepEqual(params.metadata, { none: [] })
   })
 
   it("encodeReducerCallArgs SATS-encodes flat Option args for update_payment_term", () => {

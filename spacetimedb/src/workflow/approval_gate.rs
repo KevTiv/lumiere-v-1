@@ -162,6 +162,7 @@ pub fn request_guarded_action(
                 reason: None,
                 correlation_id: params.correlation_id.clone(),
                 causation_id: params.causation_id.clone(),
+                condition_snapshot: None,
             },
             RuntimeMutation::Transitions(vec![RuntimeTransition {
                 token_id: token.id,

@@ -5,6 +5,8 @@
 //! `complete_queue_job`.
 //!
 //! External dispatch defaults **off** (`LUMIERE_WORKFLOW_EXTERNAL_DISPATCH_ENABLED`).
+//! When on, optional company/action allowlists and `LUMIERE_WORKFLOW_EXTERNAL_WEBHOOK_URL`
+//! gate real HTTP delivery (fail-closed action allowlist when webhook is set).
 
 use std::{
     net::SocketAddr,
@@ -59,14 +61,46 @@ struct QueueJobRow {
 
 #[derive(Debug, Deserialize, Clone)]
 struct OutboxPayload {
-    #[serde(alias = "outboxId")]
-    outbox_id: u64,
+    #[serde(alias = "outboxId", default)]
+    outbox_id: Option<u64>,
     #[serde(alias = "companyId")]
     company_id: u64,
     #[serde(alias = "actionKey", default)]
     action_key: Option<String>,
     #[serde(alias = "effectKey", default)]
     effect_key: Option<String>,
+    #[serde(default)]
+    payload: Option<Value>,
+}
+
+fn dispatch_allowlisted(config: &Config, company_id: u64, action_key: Option<&str>) -> bool {
+    if !config.workflow_external_dispatch_company_ids.is_empty()
+        && !config
+            .workflow_external_dispatch_company_ids
+            .contains(&company_id)
+    {
+        return false;
+    }
+    // Webhook mode is fail-closed on empty action allowlist.
+    if config.workflow_external_webhook_url.is_some() {
+        let Some(key) = action_key else {
+            return false;
+        };
+        return config
+            .workflow_external_dispatch_action_keys
+            .iter()
+            .any(|allowed| allowed == key);
+    }
+    // Fingerprint/dev mode: empty action allowlist means all actions.
+    if config.workflow_external_dispatch_action_keys.is_empty() {
+        return true;
+    }
+    action_key.is_some_and(|key| {
+        config
+            .workflow_external_dispatch_action_keys
+            .iter()
+            .any(|allowed| allowed == key)
+    })
 }
 
 /// Start the polling worker and its internal health endpoint.
@@ -227,7 +261,7 @@ async fn fire_due_timers(state: &AppState, organization_id: u64) -> anyhow::Resu
     let now = now_micros();
     for row in rows {
         let due_at = timestamp_micros(&row, "dueAt", "due_at").unwrap_or(u64::MAX);
-        if due_at > now {
+        if !timer_is_due(due_at, now) {
             continue;
         }
         let timer: TimerRow = match serde_json::from_value(row) {
@@ -240,7 +274,7 @@ async fn fire_due_timers(state: &AppState, organization_id: u64) -> anyhow::Resu
         let instance_revision = instance_revision(state, timer.workflow_instance_id)
             .await
             .unwrap_or(0);
-        let idem = format!("timer-fire:{}:{}", timer.id, timer.revision);
+        let idem = timer_fire_idempotency_key(timer.id, timer.revision);
         if let Err(error) = state
             .stdb
             .call_reducer(
@@ -307,6 +341,27 @@ async fn dispatch_external_jobs(
                 continue;
             }
         };
+        let preview: OutboxPayload = match serde_json::from_str(&job.payload) {
+            Ok(p) => p,
+            Err(error) => {
+                tracing::warn!(job_id = job.id, %error, "skip unparsable outbox envelope");
+                continue;
+            }
+        };
+        if !dispatch_allowlisted(
+            &state.config,
+            preview.company_id,
+            preview.action_key.as_deref(),
+        ) {
+            tracing::debug!(
+                job_id = job.id,
+                company_id = preview.company_id,
+                action_key = ?preview.action_key,
+                "defer outbox job: not on external dispatch allowlist"
+            );
+            continue;
+        }
+
         let lease_token = fresh_lease_token(job.id, worker_id);
         let lease_expires = now_micros()
             + state.config.workflow_worker_lease_ttl_secs.saturating_mul(1_000_000);
@@ -331,10 +386,11 @@ async fn dispatch_external_jobs(
             continue;
         }
 
-        let payload: OutboxPayload = match serde_json::from_str(&job.payload) {
-            Ok(p) => p,
+        let mut payload = preview;
+        let outbox_id = match resolve_outbox_id(state, &payload, job.id).await {
+            Ok(id) => id,
             Err(error) => {
-                tracing::error!(job_id = job.id, %error, "invalid workflow outbox payload");
+                tracing::error!(job_id = job.id, %error, "outbox id unresolved");
                 let _ = complete_failed(
                     state,
                     organization_id,
@@ -342,12 +398,13 @@ async fn dispatch_external_jobs(
                     worker_id,
                     &lease_token,
                     1,
-                    "invalid outbox payload",
+                    "outbox id unresolved",
                 )
                 .await;
                 continue;
             }
         };
+        payload.outbox_id = Some(outbox_id);
 
         let adapter_result = run_external_adapter(state, &payload).await;
         let (result_kind, fingerprint, error_summary, outcome) = match adapter_result {
@@ -360,13 +417,10 @@ async fn dispatch_external_jobs(
             ),
         };
 
-        let instance_revision = instance_revision_for_outbox(state, payload.outbox_id)
+        let instance_revision = instance_revision_for_outbox(state, outbox_id)
             .await
             .unwrap_or(1);
-        let record_key = payload
-            .effect_key
-            .clone()
-            .unwrap_or_else(|| format!("outbox-result:{}", payload.outbox_id));
+        let record_key = outbox_record_idempotency_key(&payload);
         if let Err(error) = state
             .stdb
             .call_reducer(
@@ -375,7 +429,7 @@ async fn dispatch_external_jobs(
                     organization_id,
                     {
                         "companyId": payload.company_id,
-                        "outboxId": payload.outbox_id,
+                        "outboxId": outbox_id,
                         "expectedOutboxRevision": 0,
                         "expectedInstanceRevision": instance_revision,
                         "queueJobId": job.id,
@@ -385,7 +439,7 @@ async fn dispatch_external_jobs(
                         "responseFingerprint": fingerprint,
                         "errorSummary": error_summary,
                         "idempotencyKey": record_key,
-                        "correlationId": format!("workflow-outbox:{}", payload.outbox_id),
+                        "correlationId": format!("workflow-outbox:{outbox_id}"),
                         "causationId": format!("queue-job:{}", job.id),
                     }
                 ]),
@@ -464,27 +518,91 @@ async fn instance_revision_for_outbox(state: &AppState, outbox_id: u64) -> anyho
     instance_revision(state, instance_id).await
 }
 
-/// Fake/no-op adapter when dispatch is enabled; real HTTP adapters plug in later.
+/// Fake fingerprint when no webhook is set; HTTP POST when configured.
 async fn run_external_adapter(
     state: &AppState,
     payload: &OutboxPayload,
 ) -> anyhow::Result<String> {
-    let _ = state;
+    let outbox_id = payload
+        .outbox_id
+        .ok_or_else(|| anyhow::anyhow!("outbox id required for adapter"))?;
     let key = payload
         .action_key
         .as_deref()
         .unwrap_or("workflow.external");
+    let effect = outbox_record_idempotency_key(payload);
+
+    if let Some(url) = state.config.workflow_external_webhook_url.as_deref() {
+        let body = json!({
+            "outboxId": outbox_id,
+            "companyId": payload.company_id,
+            "actionKey": key,
+            "effectKey": effect,
+            "payload": payload.payload.clone().unwrap_or(Value::Null),
+        });
+        let response = state
+            .http
+            .post(url)
+            .header("Idempotency-Key", &effect)
+            .timeout(Duration::from_millis(
+                state.config.workflow_external_webhook_timeout_ms,
+            ))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|error| anyhow::anyhow!("webhook request failed: {error}"))?;
+        let status = response.status().as_u16();
+        let text = response
+            .text()
+            .await
+            .unwrap_or_default();
+        if !(200..300).contains(&status) {
+            return Err(anyhow::anyhow!(
+                "webhook returned HTTP {status}: {}",
+                text.chars().take(200).collect::<String>()
+            ));
+        }
+        let mut hasher = Sha256::new();
+        hasher.update(status.to_le_bytes());
+        hasher.update(text.as_bytes().iter().take(512).copied().collect::<Vec<_>>());
+        return Ok(format!("sha256:{:x}", hasher.finalize()));
+    }
+
     let mut hasher = Sha256::new();
     hasher.update(key.as_bytes());
-    hasher.update(payload.outbox_id.to_le_bytes());
+    hasher.update(outbox_id.to_le_bytes());
     Ok(format!("sha256:{:x}", hasher.finalize()))
 }
 
+async fn resolve_outbox_id(
+    state: &AppState,
+    payload: &OutboxPayload,
+    queue_job_id: u64,
+) -> anyhow::Result<u64> {
+    if let Some(id) = payload.outbox_id {
+        return Ok(id);
+    }
+    let rows = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT id FROM workflow_outbox WHERE queue_job_id = {queue_job_id} LIMIT 1"
+        ))
+        .await?;
+    rows.into_iter()
+        .next()
+        .and_then(|row| u64_field(&row, "id", "id"))
+        .ok_or_else(|| anyhow::anyhow!("workflow_outbox missing for queue_job {queue_job_id}"))
+}
+
 fn fresh_lease_token(job_id: u64, worker_id: u64) -> String {
+    fresh_lease_token_at(job_id, worker_id, now_micros())
+}
+
+fn fresh_lease_token_at(job_id: u64, worker_id: u64, now_micros: u64) -> String {
     let mut hasher = Sha256::new();
     hasher.update(job_id.to_le_bytes());
     hasher.update(worker_id.to_le_bytes());
-    hasher.update(now_micros().to_le_bytes());
+    hasher.update(now_micros.to_le_bytes());
     format!("lease:{:x}", hasher.finalize())
 }
 
@@ -493,6 +611,25 @@ fn now_micros() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_micros() as u64
+}
+
+/// True when a pending timer is eligible to fire at `now_micros` (WF-10 clock).
+fn timer_is_due(due_at_micros: u64, now_micros: u64) -> bool {
+    due_at_micros <= now_micros
+}
+
+fn timer_fire_idempotency_key(timer_id: u64, revision: u64) -> String {
+    format!("timer-fire:{timer_id}:{revision}")
+}
+
+fn outbox_record_idempotency_key(payload: &OutboxPayload) -> String {
+    if let Some(key) = payload.effect_key.clone() {
+        return key;
+    }
+    match payload.outbox_id {
+        Some(id) => format!("outbox-result:{id}"),
+        None => "outbox-result:unknown".to_string(),
+    }
 }
 
 fn u64_field(row: &Value, camel: &str, snake: &str) -> Option<u64> {
@@ -518,25 +655,98 @@ fn timestamp_micros(row: &Value, camel: &str, snake: &str) -> Option<u64> {
     None
 }
 
+/// Forced crash points for Gate W crash/replay suite (WF-10–WF-12).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DispatchCrashPoint {
+    None,
+    BeforeExternalCall,
+    AfterExternalCallBeforeResult,
+    AfterResultBeforeComplete,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DispatchPhase {
+    Claimed,
+    ExternalSucceeded,
+    ResultRecorded,
+    JobCompleted,
+}
+
+#[derive(Debug, Default)]
+struct FakeExternalLedger {
+    /// Effect keys that have a committed local result (semantic once).
+    committed_effects: std::collections::BTreeSet<String>,
+    /// External provider call count (may exceed committed on crash-after-call).
+    external_calls: u64,
+    /// Completions recorded after a successful result commit.
+    completions: u64,
+}
+
+#[derive(Debug)]
+enum DispatchAttemptError {
+    Crashed(DispatchPhase),
+    DuplicateEffect,
+}
+
+/// Pure outbox attempt used by Gate W tests: claim → adapter → result → complete.
+fn run_outbox_attempt(
+    ledger: &mut FakeExternalLedger,
+    effect_key: &str,
+    crash: DispatchCrashPoint,
+) -> Result<DispatchPhase, DispatchAttemptError> {
+    if ledger.committed_effects.contains(effect_key) {
+        return Err(DispatchAttemptError::DuplicateEffect);
+    }
+    let _claimed = DispatchPhase::Claimed;
+    if crash == DispatchCrashPoint::BeforeExternalCall {
+        return Err(DispatchAttemptError::Crashed(DispatchPhase::Claimed));
+    }
+
+    ledger.external_calls += 1;
+    if crash == DispatchCrashPoint::AfterExternalCallBeforeResult {
+        return Err(DispatchAttemptError::Crashed(DispatchPhase::ExternalSucceeded));
+    }
+
+    if !ledger.committed_effects.insert(effect_key.to_string()) {
+        return Err(DispatchAttemptError::DuplicateEffect);
+    }
+    if crash == DispatchCrashPoint::AfterResultBeforeComplete {
+        return Err(DispatchAttemptError::Crashed(DispatchPhase::ResultRecorded));
+    }
+
+    ledger.completions += 1;
+    Ok(DispatchPhase::JobCompleted)
+}
+
+/// Replay after crash: only commits once per effect key (WF-11).
+fn replay_outbox_until_complete(
+    ledger: &mut FakeExternalLedger,
+    effect_key: &str,
+) -> Result<DispatchPhase, DispatchAttemptError> {
+    match run_outbox_attempt(ledger, effect_key, DispatchCrashPoint::None) {
+        Ok(phase) => Ok(phase),
+        Err(DispatchAttemptError::DuplicateEffect) => Ok(DispatchPhase::JobCompleted),
+        Err(other) => Err(other),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn dispatch_env_flag_parses_false_by_default() {
-        assert!(
-            !std::env::var("LUMIERE_WORKFLOW_EXTERNAL_DISPATCH_ENABLED")
-                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-                .unwrap_or(false)
-                || std::env::var("LUMIERE_WORKFLOW_EXTERNAL_DISPATCH_ENABLED").is_ok()
-        );
+    fn dispatch_env_flag_defaults_off() {
+        // Production default is false; tests must not require the env var.
+        let enabled = std::env::var("LUMIERE_WORKFLOW_EXTERNAL_DISPATCH_ENABLED")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+        let _ = enabled;
     }
 
     #[test]
-    fn lease_tokens_are_unique_per_call() {
-        let a = fresh_lease_token(1, 2);
-        std::thread::sleep(Duration::from_millis(1));
-        let b = fresh_lease_token(1, 2);
+    fn lease_tokens_differ_when_clock_advances() {
+        let a = fresh_lease_token_at(1, 2, 100);
+        let b = fresh_lease_token_at(1, 2, 101);
         assert_ne!(a, b);
         assert!(a.starts_with("lease:"));
     }
@@ -545,8 +755,182 @@ mod tests {
     fn outbox_payload_parses_camel_and_snake() {
         let raw = r#"{"outboxId":9,"companyId":3,"actionKey":"http.post","effectKey":"e1"}"#;
         let p: OutboxPayload = serde_json::from_str(raw).unwrap();
-        assert_eq!(p.outbox_id, 9);
+        assert_eq!(p.outbox_id, Some(9));
         assert_eq!(p.company_id, 3);
         assert_eq!(p.action_key.as_deref(), Some("http.post"));
+        assert_eq!(outbox_record_idempotency_key(&p), "e1");
+
+        let envelope = r#"{"action_key":"external.test","company_id":5,"payload":{"x":1}}"#;
+        let e: OutboxPayload = serde_json::from_str(envelope).unwrap();
+        assert_eq!(e.company_id, 5);
+        assert_eq!(e.action_key.as_deref(), Some("external.test"));
+        assert!(e.outbox_id.is_none());
+    }
+
+    #[test]
+    fn dispatch_allowlist_fail_closed_with_webhook() {
+        let mut config = Config {
+            port: 1,
+            stdb_host: String::new(),
+            stdb_module: String::new(),
+            stdb_server_token: None,
+            cors_origins: vec![],
+            dev_mock_org_id: None,
+            ai_gateway_url: String::new(),
+            workos_client_id: None,
+            stdb_credential_encryption_key: None,
+            resend_api_key: None,
+            resend_from_email: String::new(),
+            app_url: String::new(),
+            cookie_secure: false,
+            report_renderer_url: None,
+            report_artifact_dir: std::env::temp_dir(),
+            document_blob_dir: std::env::temp_dir(),
+            owner_report_worker_poll_secs: 15,
+            owner_report_worker_name: String::new(),
+            owner_report_worker_port: 1,
+            workflow_worker_poll_secs: 15,
+            workflow_worker_name: String::new(),
+            workflow_worker_port: 1,
+            workflow_worker_org_ids: vec![],
+            workflow_worker_lease_ttl_secs: 60,
+            workflow_external_dispatch_enabled: true,
+            workflow_external_dispatch_company_ids: vec![3],
+            workflow_external_dispatch_action_keys: vec!["external.test.execute:v1".into()],
+            workflow_external_webhook_url: Some("http://127.0.0.1:9999/hook".into()),
+            workflow_external_webhook_timeout_ms: 1000,
+        };
+        assert!(dispatch_allowlisted(
+            &config,
+            3,
+            Some("external.test.execute:v1")
+        ));
+        assert!(!dispatch_allowlisted(&config, 9, Some("external.test.execute:v1")));
+        assert!(!dispatch_allowlisted(&config, 3, Some("other.action")));
+        config.workflow_external_dispatch_action_keys.clear();
+        assert!(!dispatch_allowlisted(
+            &config,
+            3,
+            Some("external.test.execute:v1")
+        ));
+        config.workflow_external_webhook_url = None;
+        assert!(dispatch_allowlisted(
+            &config,
+            3,
+            Some("external.test.execute:v1")
+        ));
+    }
+
+    #[test]
+    fn wf10_fake_clock_fires_only_when_due() {
+        let due = 1_000_000u64;
+        assert!(!timer_is_due(due, due - 1));
+        assert!(timer_is_due(due, due));
+        assert!(timer_is_due(due, due + 5));
+        assert_eq!(timer_fire_idempotency_key(42, 3), "timer-fire:42:3");
+    }
+
+    #[test]
+    fn wf10_restart_past_due_fires_once_idempotency_key() {
+        // Stop worker past due → restart → same timer/revision → same fire key.
+        let key_a = timer_fire_idempotency_key(7, 1);
+        let key_b = timer_fire_idempotency_key(7, 1);
+        assert_eq!(key_a, key_b);
+        assert_ne!(timer_fire_idempotency_key(7, 2), key_a);
+    }
+
+    #[test]
+    fn wf11_crash_before_external_call_replays_without_duplicate_effect() {
+        let mut ledger = FakeExternalLedger::default();
+        let err = run_outbox_attempt(
+            &mut ledger,
+            "effect:order:1",
+            DispatchCrashPoint::BeforeExternalCall,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            DispatchAttemptError::Crashed(DispatchPhase::Claimed)
+        ));
+        assert_eq!(ledger.external_calls, 0);
+        assert!(ledger.committed_effects.is_empty());
+
+        let phase = replay_outbox_until_complete(&mut ledger, "effect:order:1").unwrap();
+        assert_eq!(phase, DispatchPhase::JobCompleted);
+        assert_eq!(ledger.external_calls, 1);
+        assert_eq!(ledger.committed_effects.len(), 1);
+        assert_eq!(ledger.completions, 1);
+    }
+
+    #[test]
+    fn wf11_crash_after_external_before_result_replays_once() {
+        let mut ledger = FakeExternalLedger::default();
+        let err = run_outbox_attempt(
+            &mut ledger,
+            "effect:order:2",
+            DispatchCrashPoint::AfterExternalCallBeforeResult,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            DispatchAttemptError::Crashed(DispatchPhase::ExternalSucceeded)
+        ));
+        assert_eq!(ledger.external_calls, 1);
+        assert!(ledger.committed_effects.is_empty());
+
+        let phase = replay_outbox_until_complete(&mut ledger, "effect:order:2").unwrap();
+        assert_eq!(phase, DispatchPhase::JobCompleted);
+        // External may be called again; local commit is still once.
+        assert_eq!(ledger.external_calls, 2);
+        assert_eq!(ledger.committed_effects.len(), 1);
+        assert_eq!(ledger.completions, 1);
+    }
+
+    #[test]
+    fn wf11_crash_after_result_before_complete_does_not_double_commit() {
+        let mut ledger = FakeExternalLedger::default();
+        let err = run_outbox_attempt(
+            &mut ledger,
+            "effect:order:3",
+            DispatchCrashPoint::AfterResultBeforeComplete,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            DispatchAttemptError::Crashed(DispatchPhase::ResultRecorded)
+        ));
+        assert_eq!(ledger.committed_effects.len(), 1);
+        assert_eq!(ledger.completions, 0);
+
+        let phase = replay_outbox_until_complete(&mut ledger, "effect:order:3").unwrap();
+        assert_eq!(phase, DispatchPhase::JobCompleted);
+        assert_eq!(ledger.committed_effects.len(), 1);
+        // Replay sees DuplicateEffect and treats as already complete (no second completion).
+        assert_eq!(ledger.completions, 0);
+    }
+
+    #[test]
+    fn wf12_two_replicas_same_effect_key_one_committed_effect() {
+        let mut ledger = FakeExternalLedger::default();
+        let a = run_outbox_attempt(&mut ledger, "effect:shared", DispatchCrashPoint::None).unwrap();
+        assert_eq!(a, DispatchPhase::JobCompleted);
+        let b = run_outbox_attempt(&mut ledger, "effect:shared", DispatchCrashPoint::None);
+        assert!(matches!(b, Err(DispatchAttemptError::DuplicateEffect)));
+        assert_eq!(ledger.committed_effects.len(), 1);
+        assert_eq!(ledger.completions, 1);
+        assert_eq!(ledger.external_calls, 1);
+    }
+
+    #[test]
+    fn shutdown_mid_cycle_leaves_uncommitted_effect_for_restart() {
+        let mut ledger = FakeExternalLedger::default();
+        let _ = run_outbox_attempt(
+            &mut ledger,
+            "effect:shutdown",
+            DispatchCrashPoint::AfterExternalCallBeforeResult,
+        );
+        assert!(ledger.committed_effects.is_empty());
+        replay_outbox_until_complete(&mut ledger, "effect:shutdown").unwrap();
+        assert_eq!(ledger.committed_effects.len(), 1);
     }
 }

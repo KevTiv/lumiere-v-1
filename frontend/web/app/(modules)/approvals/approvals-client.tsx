@@ -14,6 +14,7 @@ import {
   taskStatusTag,
   useClaimHumanTask,
   useDecideHumanTask,
+  useCommentHumanTask,
   useHumanTaskInbox,
   type HumanTaskRow,
 } from "@lumiere/query-hooks/hooks/approvals"
@@ -48,9 +49,12 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
   )
   const claimTask = useClaimHumanTask(organizationId)
   const decideTask = useDecideHumanTask(organizationId)
+  const commentTask = useCommentHumanTask(organizationId)
 
   const [rejectingId, setRejectingId] = useState<number | null>(null)
   const [rejectReason, setRejectReason] = useState("")
+  const [commentingId, setCommentingId] = useState<number | null>(null)
+  const [commentText, setCommentText] = useState("")
 
   const pendingTasks = useMemo(
     () =>
@@ -66,7 +70,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
     [pendingTasks],
   )
 
-  const busy = claimTask.isPending || decideTask.isPending
+  const busy = claimTask.isPending || decideTask.isPending || commentTask.isPending
 
   const handleClaim = async (row: HumanTaskRow) => {
     await claimTask.mutateAsync({
@@ -108,15 +112,27 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
     setRejectReason("")
   }
 
+  const handleComment = async (row: HumanTaskRow) => {
+    if (!commentText.trim()) return
+    await commentTask.mutateAsync({
+      companyId: humanTaskCompanyId(row),
+      taskId: humanTaskId(row),
+      expectedRevision: humanTaskRevision(row),
+      comment: commentText.trim(),
+    })
+    setCommentingId(null)
+    setCommentText("")
+  }
+
   return (
     <div className="space-y-6" data-testid="module-view-approvals">
       <DashboardHeader
-        title="Approvals Inbox"
-        description="Authorized human tasks for guarded ERP actions. Claim a task, then approve or reject with revision checks."
+        title="Task inbox"
+        description="Company-scoped human tasks for guarded actions. Claim, comment, then approve or reject with revision checks."
       />
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        <span>
+        <span data-testid="approvals-inbox-count">
           {pendingTasks.length} open task{pendingTasks.length === 1 ? "" : "s"}
         </span>
         {aiDraftCount > 0 ? (
@@ -132,11 +148,17 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
       </div>
 
       {operatingCompanyId == null ? (
-        <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
+        <div
+          className="rounded-lg border bg-card p-6 text-sm text-muted-foreground"
+          data-testid="approvals-inbox-no-company"
+        >
           Select an operating company to load your authorized task inbox.
         </div>
       ) : pendingTasks.length === 0 ? (
-        <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
+        <div
+          className="rounded-lg border bg-card p-6 text-sm text-muted-foreground"
+          data-testid="approvals-inbox-empty"
+        >
           No open tasks for this company. Guarded actions create version-pinned human tasks when
           approval is required.
         </div>
@@ -218,13 +240,48 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                     data-testid={`approval-reject-${taskId}`}
                     onClick={() => {
                       setRejectingId(rejectingId === taskId ? null : taskId)
+                      setCommentingId(null)
                       setRejectReason("")
                     }}
                   >
                     <XCircle className="mr-1.5 h-4 w-4" />
                     Reject
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    data-testid={`approval-comment-${taskId}`}
+                    onClick={() => {
+                      setCommentingId(commentingId === taskId ? null : taskId)
+                      setRejectingId(null)
+                      setCommentText("")
+                    }}
+                    disabled={busy}
+                  >
+                    Comment
+                  </Button>
                 </div>
+
+                {commentingId === taskId ? (
+                  <div className="space-y-3 border-t pt-4">
+                    <textarea
+                      className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="Add an evidence comment"
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      rows={3}
+                      data-testid={`approval-comment-text-${taskId}`}
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!commentText.trim() || busy}
+                      data-testid={`approval-comment-confirm-${taskId}`}
+                      onClick={() => void handleComment(row)}
+                    >
+                      Save comment
+                    </Button>
+                  </div>
+                ) : null}
 
                 {rejectingId === taskId ? (
                   <div className="space-y-3 border-t pt-4">

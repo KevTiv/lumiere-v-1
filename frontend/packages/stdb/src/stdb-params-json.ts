@@ -457,6 +457,16 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   start_workflow: "StartWorkflowParams",
   signal_workflow: "SignalWorkflowParams",
   cancel_workflow: "CancelWorkflowParams",
+  simulate_workflow: "SimulateWorkflowParams",
+  upsert_workflow_node: "UpsertWorkflowNodeParams",
+  upsert_workflow_edge: "UpsertWorkflowEdgeParams",
+  create_workflow_migration_plan: "CreateWorkflowMigrationPlanParams",
+  preflight_workflow_migration: "PreflightWorkflowMigrationParams",
+  migrate_workflow_instance: "MigrateWorkflowInstanceParams",
+  fire_workflow_timer: "FireWorkflowTimerParams",
+  cancel_workflow_timer: "CancelWorkflowTimerParams",
+  cancel_workflow_outbox: "CancelWorkflowOutboxParams",
+  record_workflow_outbox_result: "RecordWorkflowOutboxResultParams",
   create_workflow_delegation: "CreateWorkflowDelegationParams",
   create_saved_report: "CreateSavedReportParams",
   create_utm_campaign: "CreateUtmCampaignParams",
@@ -485,6 +495,8 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   update_ai_action_draft_params: "UpdateAiActionDraftParamsParams",
   post_account_move: undefined,
   create_expense: "CreateExpenseParams",
+  create_fleet_vehicle: "CreateFleetVehicleParams",
+  update_vehicle_position: "UpdateVehiclePositionParams",
   create_expense_sheet: "CreateExpenseSheetParams",
   create_expense_receipt: "CreateExpenseReceiptParams",
   update_expense: "UpdateExpenseParams",
@@ -505,11 +517,31 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   upsert_expense_per_diem_rate: "UpsertExpensePerDiemRateParams",
   upsert_expense_policy: "UpsertExpensePolicyParams",
   fail_expense_integration_intent: "FailExpenseIntegrationIntentParams",
+  create_proposal: "CreateProposalParams",
+  update_proposal: "UpdateProposalParams",
+  upsert_proposal_section: "UpsertProposalSectionParams",
+  resolve_proposal_section_conflict: "UpsertProposalSectionParams",
+  add_proposal_line_item: "AddProposalLineItemParams",
+  update_proposal_line_item: "UpdateProposalLineItemParams",
+  record_proposal_bid_decision: "RecordProposalBidDecisionParams",
+  convert_proposal_to_sale_order: "ConvertProposalToSaleOrderParams",
+  convert_proposal_to_project: "ConvertProposalToProjectParams",
+  update_proposal_source_doc: "UpdateProposalSourceDocParams",
+  create_proposal_template: "CreateProposalTemplateParams",
+  create_proposal_clause: "CreateProposalClauseParams",
+  upsert_proposal_compliance_requirement: "UpsertProposalComplianceRequirementParams",
+  apply_proposal_analysis: "ApplyProposalAnalysisParams",
+  upsert_proposal_procurement_score: "UpsertProposalProcurementScoreParams",
+  create_proposal_integration_intent: "CreateProposalIntegrationIntentParams",
+  complete_proposal_integration_intent: "CompleteProposalIntegrationIntentParams",
+  fail_proposal_integration_intent: "FailProposalIntegrationIntentParams",
+  create_proposal_clarification: "CreateProposalClarificationParams",
+  answer_proposal_clarification: "AnswerProposalClarificationParams",
+  link_proposal_version_esign: "LinkProposalVersionEsignParams",
 }
 
 /** Flat `Option<T>` arg indices for reducers without a trailing params struct. */
 const FLAT_OPTION_ARG_INDICES: Partial<Record<string, readonly number[]>> = {
-  create_proposal: [4, 5, 6],
   update_payment_term: [2, 3, 4],
 }
 
@@ -530,20 +562,6 @@ const FLAT_ARG_ENCODERS: Partial<
 }
 
 function encodeFlatOptionalArg(value: unknown, argIndex: number, reducer: string): unknown {
-  if (reducer === "create_proposal") {
-    switch (argIndex) {
-      case 4:
-        return encodeOptionalTimestamp(
-          value instanceof Date ? value : (value as string | null | undefined),
-        )
-      case 5:
-        return encodeOptionalString(value as string | null | undefined)
-      case 6:
-        return encodeOptionalU64(value as number | null | undefined)
-      default:
-        return value
-    }
-  }
   if (reducer === "update_payment_term") {
     switch (argIndex) {
       case 2:

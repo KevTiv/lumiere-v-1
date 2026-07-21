@@ -53,7 +53,7 @@ import type { EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, Form
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
-import { RecordDocumentAttachments } from "@/components/record-document-attachments"
+import { RecordDocumentAttachments } from "../../../components/record-document-attachments"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import { groupBy } from "@/lib/utils"
 import {

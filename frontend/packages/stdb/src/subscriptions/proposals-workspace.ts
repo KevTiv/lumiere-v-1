@@ -5,11 +5,19 @@ import type { SubscriptionQueryContext } from "../queries/erp-subscriptions";
  * Compose with session workspace keys (`auth` bundle via `SESSION_WORKSPACE_RESOURCE_KEYS`).
  */
 export const PROPOSALS_WORKSPACE_RESOURCE_KEYS = [
+  "proposal-analyses",
+  "proposal-bid-decisions",
+  "proposal-clarifications",
+  "proposal-clauses",
   "proposal-comments",
+  "proposal-compliance-requirements",
+  "proposal-integration-intents",
   "proposal-line-items",
   "proposal-presence",
+  "proposal-procurement-scores",
   "proposal-sections",
   "proposal-source-docs",
+  "proposal-templates",
   "proposal-versions",
   "proposals",
 ] as const;

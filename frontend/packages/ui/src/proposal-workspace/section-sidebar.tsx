@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { Plus, FileText, ChevronDown, ChevronRight, Trash2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -27,17 +27,28 @@ function avatarColor(userId: string): string {
   return `hsl(${h}, 60%, 50%)`
 }
 
+function parseSectionStatus(raw: string): SectionStatus {
+  const status = raw.toLowerCase()
+  if (status === "empty" || status === "draft" || status === "complete" || status === "reviewed") {
+    return status
+  }
+  return "empty"
+}
+
 interface SectionSidebarProps {
   sections: Section[]
   sourceDocs: ProposalSourceDoc[]
   activeSectionId: bigint | null
   presenceBySection: Map<string, ProposalPresence[]>
   totalValue: number
+  libraryTemplates?: { id: string; name: string }[]
   onSelectSection: (id: bigint) => void
   onAddSection: (title: string) => void
+  onApplyLibraryTemplate?: (templateId: string) => void
   onDeleteSection: (id: bigint) => void
   onAddSourceDoc: () => void
   onDeleteSourceDoc: (id: bigint) => void
+  complianceSlot?: ReactNode
 }
 
 export function SectionSidebar({
@@ -46,11 +57,14 @@ export function SectionSidebar({
   activeSectionId,
   presenceBySection,
   totalValue,
+  libraryTemplates = [],
   onSelectSection,
   onAddSection,
+  onApplyLibraryTemplate,
   onDeleteSection,
   onAddSourceDoc,
   onDeleteSourceDoc,
+  complianceSlot,
 }: SectionSidebarProps) {
   const { t } = useTranslation()
   const [showTemplates, setShowTemplates] = useState(false)
@@ -88,20 +102,52 @@ export function SectionSidebar({
         <div className="mx-2 mb-2 rounded-md border border-border bg-popover shadow-md z-10">
           <p className="px-3 pt-2 pb-1 text-xs text-muted-foreground font-medium">{t("proposalWorkspace.sectionSidebar.chooseTemplate")}</p>
           <div className="max-h-48 overflow-y-auto">
-            {SECTION_TEMPLATES.map((t) => (
+            {libraryTemplates.length > 0 && (
+              <>
+                <p className="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Library
+                </p>
+                {libraryTemplates.map((tmpl) => (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    onClick={() => {
+                      onApplyLibraryTemplate?.(tmpl.id)
+                      setShowTemplates(false)
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors font-medium"
+                  >
+                    {tmpl.name}
+                  </button>
+                ))}
+                <div className="border-t border-border my-1" />
+                <p className="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Quick titles
+                </p>
+              </>
+            )}
+            {SECTION_TEMPLATES.map((tmpl) => (
               <button
-                key={t.id}
-                onClick={() => { onAddSection(t.title); setShowTemplates(false) }}
+                key={tmpl.id}
+                type="button"
+                onClick={() => {
+                  onAddSection(tmpl.title)
+                  setShowTemplates(false)
+                }}
                 className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors"
               >
-                {t.title}
+                {tmpl.title}
               </button>
             ))}
             <div className="border-t border-border">
               <button
+                type="button"
                 onClick={() => {
                   const title = prompt("Section title:")
-                  if (title?.trim()) { onAddSection(title.trim()); setShowTemplates(false) }
+                  if (title?.trim()) {
+                    onAddSection(title.trim())
+                    setShowTemplates(false)
+                  }
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors text-muted-foreground"
               >
@@ -127,15 +173,8 @@ export function SectionSidebar({
         )}
         {sections.map((section) => {
           const sectionId = rowBigint(section.id)
-          const statusRaw = rowString(section.status).toLowerCase()
-          const status: SectionStatus =
-            statusRaw === "empty" ||
-            statusRaw === "draft" ||
-            statusRaw === "complete" ||
-            statusRaw === "reviewed"
-              ? (statusRaw as SectionStatus)
-              : "empty"
-          const badgeVariant = STATUS_BADGE_VARIANT[status] ?? STATUS_BADGE_VARIANT.empty
+          const status = parseSectionStatus(rowString(section.status))
+          const badgeVariant = STATUS_BADGE_VARIANT[status]
           const badgeLabel = getStatusLabel(status)
           const presenceRows = presenceBySection.get(String(sectionId)) ?? []
           const isActive = activeSectionId === sectionId
@@ -237,6 +276,8 @@ export function SectionSidebar({
           </div>
         </div>
       )}
+
+      {complianceSlot}
     </aside>
   )
 }

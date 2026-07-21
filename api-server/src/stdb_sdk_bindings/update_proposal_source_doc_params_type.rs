@@ -11,6 +11,7 @@ pub struct UpdateProposalSourceDocParams {
     pub content: Option<String>,
     pub doc_type: Option<String>,
     pub word_count: Option<u32>,
+    pub document_id: Option<u64>,
 }
 
 impl __sdk::InModule for UpdateProposalSourceDocParams {

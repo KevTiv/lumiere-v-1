@@ -8,14 +8,19 @@ use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
+use super::calendar::{
+    calculate_deadline_from_delay_seconds, workflow_calendar, workflow_calendar_exception,
+    workflow_calendar_version, WorkflowCalendarVersion, WorkflowDeadlineEvidence,
+};
 use super::definitions::{
     create_workflow, publish_workflow_version, upsert_workflow_edge, upsert_workflow_node,
-    workflow, workflow_version, CreateWorkflowParams, UpsertWorkflowEdgeParams,
-    UpsertWorkflowNodeParams, WorkflowBranchKind, WorkflowHumanTaskKind, WorkflowNodeKind,
-    WorkflowTaskAssignment, WorkflowTaskPolicy, WorkflowTimerKind, WorkflowTimerPolicy,
-    WorkflowTrigger, WorkflowVersionStatus,
+    workflow, workflow_edge, workflow_node, workflow_version, CreateWorkflowParams,
+    UpsertWorkflowEdgeParams, UpsertWorkflowNodeParams, WorkflowBranchKind, WorkflowHumanTaskKind,
+    WorkflowNodeKind, WorkflowTaskAssignment, WorkflowTaskPolicy, WorkflowTimerKind,
+    WorkflowTimerPolicy, WorkflowTrigger, WorkflowVersionStatus,
 };
 use super::delivery::{workflow_timer, WorkflowTimer, WorkflowTimerStatus};
+use super::runtime::workflow_instance;
 
 const FOUNDATION_ASSET: &str =
     include_str!("../../assets/workflow_packs/templates-foundation-v1.json");
@@ -305,10 +310,31 @@ fn materialize_market_template(
         version.id,
         revision,
         UpsertWorkflowNodeParams {
+            node_key: "join".to_string(),
+            name: "Race join".to_string(),
+            kind: WorkflowNodeKind::Join,
+            sequence: 5,
+            split_kind: WorkflowBranchKind::None,
+            join_kind: WorkflowBranchKind::Or,
+            action: None,
+            task_policy: None,
+            timer_policy: None,
+            retry_policy: None,
+            subflow: None,
+            metadata: Some(pack_node_metadata(market, kind, "join", None)),
+        },
+    )?;
+    revision += 1;
+    upsert_workflow_node(
+        ctx,
+        organization_id,
+        version.id,
+        revision,
+        UpsertWorkflowNodeParams {
             node_key: "end".to_string(),
             name: "End".to_string(),
             kind: WorkflowNodeKind::End,
-            sequence: 5,
+            sequence: 6,
             split_kind: WorkflowBranchKind::None,
             join_kind: WorkflowBranchKind::None,
             action: None,
@@ -346,7 +372,7 @@ fn materialize_market_template(
             from_node_key: "race".to_string(),
             to_node_key: "approve".to_string(),
             sequence: 1,
-            signal_key: Some("approve".to_string()),
+            signal_key: None,
             condition: None,
             metadata: Some(pack_edge_metadata(market, kind, "race-approve", "approve")),
         },
@@ -362,7 +388,7 @@ fn materialize_market_template(
             from_node_key: "race".to_string(),
             to_node_key: "escalate".to_string(),
             sequence: 2,
-            signal_key: Some("escalate".to_string()),
+            signal_key: None,
             condition: None,
             metadata: Some(pack_edge_metadata(
                 market,
@@ -381,11 +407,11 @@ fn materialize_market_template(
         UpsertWorkflowEdgeParams {
             edge_key: "approved".to_string(),
             from_node_key: "approve".to_string(),
-            to_node_key: "end".to_string(),
+            to_node_key: "join".to_string(),
             sequence: 1,
             signal_key: Some("approved".to_string()),
             condition: None,
-            metadata: Some(pack_edge_metadata(market, kind, "approved", "end")),
+            metadata: Some(pack_edge_metadata(market, kind, "approved", "join")),
         },
     )?;
     revision += 1;
@@ -397,11 +423,11 @@ fn materialize_market_template(
         UpsertWorkflowEdgeParams {
             edge_key: "rejected".to_string(),
             from_node_key: "approve".to_string(),
-            to_node_key: "end".to_string(),
+            to_node_key: "join".to_string(),
             sequence: 2,
             signal_key: Some("rejected".to_string()),
             condition: None,
-            metadata: Some(pack_edge_metadata(market, kind, "rejected", "end")),
+            metadata: Some(pack_edge_metadata(market, kind, "rejected", "join")),
         },
     )?;
     revision += 1;
@@ -413,11 +439,27 @@ fn materialize_market_template(
         UpsertWorkflowEdgeParams {
             edge_key: "escalated".to_string(),
             from_node_key: "escalate".to_string(),
-            to_node_key: "end".to_string(),
+            to_node_key: "join".to_string(),
             sequence: 1,
             signal_key: Some("fired".to_string()),
             condition: None,
-            metadata: Some(pack_edge_metadata(market, kind, "escalated", "end")),
+            metadata: Some(pack_edge_metadata(market, kind, "escalated", "join")),
+        },
+    )?;
+    revision += 1;
+    upsert_workflow_edge(
+        ctx,
+        organization_id,
+        version.id,
+        revision,
+        UpsertWorkflowEdgeParams {
+            edge_key: "joined".to_string(),
+            from_node_key: "join".to_string(),
+            to_node_key: "end".to_string(),
+            sequence: 1,
+            signal_key: None,
+            condition: None,
+            metadata: Some(pack_edge_metadata(market, kind, "joined", "end")),
         },
     )?;
     revision += 1;
@@ -495,8 +537,9 @@ pub struct RecomputeWorkflowTimersParams {
 /// Authorized timer recomputation with before/after evidence.
 ///
 /// `confirm = false` performs impact analysis only (no timer mutation).
-/// `confirm = true` bumps revision/correlation evidence for matching Pending timers.
-/// Due-time math stays calendar-owned; pack updates alone never rewrite timers (WF-18).
+/// `confirm = true` recalculates `due_at` from the timer node's calendar policy
+/// (created_at + delay via working-time math) and bumps revision/correlation.
+/// Pack updates alone never rewrite timers (WF-18).
 #[reducer]
 pub fn recompute_workflow_timers_for_calendar(
     ctx: &ReducerContext,
@@ -531,7 +574,26 @@ pub fn recompute_workflow_timers_for_calendar(
         ));
     }
 
+    let mut projections = Vec::with_capacity(pending.len());
+    for timer in &pending {
+        let projection = project_timer_recompute(ctx, timer, &params.calendar_key)?;
+        projections.push(projection);
+    }
+
     let before_ids: Vec<u64> = pending.iter().map(|timer| timer.id).collect();
+    let projected_json: Vec<serde_json::Value> = projections
+        .iter()
+        .map(|row| {
+            serde_json::json!({
+                "timer_id": row.timer_id,
+                "before_due_at_micros": row.before_due_at_micros,
+                "after_due_at_micros": row.after_due_at_micros,
+                "calendar_content_hash": row.calendar_content_hash,
+                "delay_seconds": row.delay_seconds,
+            })
+        })
+        .collect();
+
     if !params.confirm {
         write_audit_log_v2(
             ctx,
@@ -545,6 +607,7 @@ pub fn recompute_workflow_timers_for_calendar(
                     serde_json::json!({
                         "calendar_key": params.calendar_key,
                         "pending_timer_ids": before_ids,
+                        "projections": projected_json,
                     })
                     .to_string(),
                 ),
@@ -563,10 +626,14 @@ pub fn recompute_workflow_timers_for_calendar(
     }
 
     let mut after_ids = Vec::new();
-    for timer in pending {
+    for (timer, projection) in pending.into_iter().zip(projections.into_iter()) {
         let next_revision = timer.revision.saturating_add(1);
         let timer_id = timer.id;
+        let new_due = spacetimedb::Timestamp::from_micros_since_unix_epoch(
+            projection.after_due_at_micros,
+        );
         ctx.db.workflow_timer().id().update(WorkflowTimer {
+            due_at: new_due,
             revision: next_revision,
             correlation_id: format!("recompute:{}:{}", params.calendar_key, timer_id),
             ..timer
@@ -593,11 +660,16 @@ pub fn recompute_workflow_timers_for_calendar(
                 serde_json::json!({
                     "calendar_key": params.calendar_key,
                     "pending_timer_ids": after_ids,
-                    "revision_bumped": true,
+                    "projections": projected_json,
+                    "due_at_rewritten": true,
                 })
                 .to_string(),
             ),
-            changed_fields: vec!["revision".to_string(), "correlation_id".to_string()],
+            changed_fields: vec![
+                "due_at".to_string(),
+                "revision".to_string(),
+                "correlation_id".to_string(),
+            ],
             metadata: Some(
                 serde_json::json!({
                     "confirm": true,
@@ -608,4 +680,113 @@ pub fn recompute_workflow_timers_for_calendar(
         },
     );
     Ok(())
+}
+
+#[derive(Clone, Debug)]
+struct TimerRecomputeProjection {
+    timer_id: u64,
+    before_due_at_micros: i64,
+    after_due_at_micros: i64,
+    calendar_content_hash: String,
+    delay_seconds: u64,
+}
+
+fn project_timer_recompute(
+    ctx: &ReducerContext,
+    timer: &WorkflowTimer,
+    calendar_key: &str,
+) -> Result<TimerRecomputeProjection, String> {
+    let before = timer.due_at.to_micros_since_unix_epoch();
+    let (delay_seconds, evidence) = resolve_timer_calendar_deadline(ctx, timer, calendar_key)?;
+    let after = evidence.utc_instant.to_micros_since_unix_epoch();
+    Ok(TimerRecomputeProjection {
+        timer_id: timer.id,
+        before_due_at_micros: before,
+        after_due_at_micros: after,
+        calendar_content_hash: evidence.calendar_content_hash,
+        delay_seconds,
+    })
+}
+
+fn resolve_timer_calendar_deadline(
+    ctx: &ReducerContext,
+    timer: &WorkflowTimer,
+    calendar_key: &str,
+) -> Result<(u64, WorkflowDeadlineEvidence), String> {
+    let instance = ctx
+        .db
+        .workflow_instance()
+        .id()
+        .find(&timer.instance_id)
+        .ok_or_else(|| format!("workflow instance {} missing for timer {}", timer.instance_id, timer.id))?;
+    if instance.organization_id != timer.organization_id || instance.company_id != timer.company_id {
+        return Err("timer instance tenant mismatch".to_string());
+    }
+
+    let edge = ctx
+        .db
+        .workflow_edge()
+        .id()
+        .find(&timer.edge_id)
+        .ok_or_else(|| format!("workflow edge {} missing for timer {}", timer.edge_id, timer.id))?;
+    if edge.workflow_version_id != instance.workflow_version_id {
+        return Err("timer edge is not pinned to the instance workflow version".to_string());
+    }
+
+    let node = ctx
+        .db
+        .workflow_node()
+        .workflow_node_by_key()
+        .filter(&edge.from_node_key)
+        .find(|row| row.workflow_version_id == instance.workflow_version_id)
+        .ok_or_else(|| {
+            format!(
+                "timer source node '{}' missing on version {}",
+                edge.from_node_key, instance.workflow_version_id
+            )
+        })?;
+    let policy = node
+        .timer_policy
+        .as_ref()
+        .ok_or_else(|| format!("node '{}' has no timer policy for recompute", node.node_key))?;
+    let policy_calendar = policy
+        .calendar_key
+        .as_deref()
+        .ok_or_else(|| format!("node '{}' timer policy has no calendar_key", node.node_key))?;
+    if policy_calendar != calendar_key {
+        return Err(format!(
+            "timer {} calendar_key mismatch: policy={policy_calendar} requested={calendar_key}",
+            timer.id
+        ));
+    }
+
+    let version = latest_calendar_version(ctx, calendar_key)?;
+    let exceptions: Vec<_> = ctx
+        .db
+        .workflow_calendar_exception()
+        .workflow_calendar_exception_by_version()
+        .filter(&version.id)
+        .collect();
+    let evidence =
+        calculate_deadline_from_delay_seconds(&version, &exceptions, timer.created_at, policy.delay_seconds)?;
+    Ok((policy.delay_seconds, evidence))
+}
+
+fn latest_calendar_version(
+    ctx: &ReducerContext,
+    calendar_key: &str,
+) -> Result<WorkflowCalendarVersion, String> {
+    let calendar = ctx
+        .db
+        .workflow_calendar()
+        .workflow_calendar_by_key()
+        .filter(&calendar_key.to_string())
+        .next()
+        .ok_or_else(|| format!("calendar '{calendar_key}' not found"))?;
+    ctx.db
+        .workflow_calendar_version()
+        .workflow_calendar_version_by_calendar()
+        .filter(&calendar.id)
+        .max_by_key(|version| (version.version_number, version.id))
+        .ok_or_else(|| format!("calendar '{calendar_key}' has no versions"))
 }

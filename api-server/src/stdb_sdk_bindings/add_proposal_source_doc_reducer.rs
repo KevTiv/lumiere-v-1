@@ -7,21 +7,27 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct AddProposalSourceDocArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub proposal_id: u64,
     pub name: String,
     pub content: String,
     pub doc_type: String,
     pub word_count: u32,
+    pub document_id: Option<u64>,
 }
 
 impl From<AddProposalSourceDocArgs> for super::Reducer {
     fn from(args: AddProposalSourceDocArgs) -> Self {
         Self::AddProposalSourceDoc {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             proposal_id: args.proposal_id,
             name: args.name,
             content: args.content,
             doc_type: args.doc_type,
             word_count: args.word_count,
+            document_id: args.document_id,
         }
     }
 }
@@ -43,18 +49,24 @@ pub trait add_proposal_source_doc {
     /// /// Use [`add_proposal_source_doc:add_proposal_source_doc_then`] to run a callback after the reducer completes.
     fn add_proposal_source_doc(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         name: String,
         content: String,
         doc_type: String,
         word_count: u32,
+        document_id: Option<u64>,
     ) -> __sdk::Result<()> {
         self.add_proposal_source_doc_then(
+            organization_id,
+            company_id,
             proposal_id,
             name,
             content,
             doc_type,
             word_count,
+            document_id,
             |_, _| {},
         )
     }
@@ -67,11 +79,14 @@ pub trait add_proposal_source_doc {
     ///  and its status can be observed with the `callback`.
     fn add_proposal_source_doc_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         name: String,
         content: String,
         doc_type: String,
         word_count: u32,
+        document_id: Option<u64>,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -82,11 +97,14 @@ pub trait add_proposal_source_doc {
 impl add_proposal_source_doc for super::RemoteReducers {
     fn add_proposal_source_doc_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         name: String,
         content: String,
         doc_type: String,
         word_count: u32,
+        document_id: Option<u64>,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -94,11 +112,14 @@ impl add_proposal_source_doc for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             AddProposalSourceDocArgs {
+                organization_id,
+                company_id,
                 proposal_id,
                 name,
                 content,
                 doc_type,
                 word_count,
+                document_id,
             },
             callback,
         )

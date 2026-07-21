@@ -7,6 +7,8 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct AddProposalCommentArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub proposal_id: u64,
     pub section_id: u64,
     pub content: String,
@@ -17,6 +19,8 @@ pub(super) struct AddProposalCommentArgs {
 impl From<AddProposalCommentArgs> for super::Reducer {
     fn from(args: AddProposalCommentArgs) -> Self {
         Self::AddProposalComment {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             proposal_id: args.proposal_id,
             section_id: args.section_id,
             content: args.content,
@@ -43,6 +47,8 @@ pub trait add_proposal_comment {
     /// /// Use [`add_proposal_comment:add_proposal_comment_then`] to run a callback after the reducer completes.
     fn add_proposal_comment(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: u64,
         content: String,
@@ -50,6 +56,8 @@ pub trait add_proposal_comment {
         author_name: String,
     ) -> __sdk::Result<()> {
         self.add_proposal_comment_then(
+            organization_id,
+            company_id,
             proposal_id,
             section_id,
             content,
@@ -67,6 +75,8 @@ pub trait add_proposal_comment {
     ///  and its status can be observed with the `callback`.
     fn add_proposal_comment_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: u64,
         content: String,
@@ -82,6 +92,8 @@ pub trait add_proposal_comment {
 impl add_proposal_comment for super::RemoteReducers {
     fn add_proposal_comment_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         section_id: u64,
         content: String,
@@ -94,6 +106,8 @@ impl add_proposal_comment for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             AddProposalCommentArgs {
+                organization_id,
+                company_id,
                 proposal_id,
                 section_id,
                 content,

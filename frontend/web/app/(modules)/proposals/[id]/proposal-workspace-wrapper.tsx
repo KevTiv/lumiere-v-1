@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { ProposalWorkspace, type ProposalWorkspaceHooks } from "@lumiere/ui"
 import type { AIAnalysis } from "@lumiere/ui"
 import {
@@ -15,6 +16,7 @@ import {
   useDeleteProposalSourceDoc,
   useUpdateProposalSourceDoc,
   useSaveProposalVersion,
+  useRestoreProposalVersion,
   useUpdateProposalStatus,
   useAddProposalLineItem,
   useUpdateProposalLineItem,
@@ -23,6 +25,11 @@ import {
   useClearProposalPresence,
   useAddProposalComment,
   useResolveProposalComment,
+  useProposalTemplates,
+  useProposalComplianceRequirements,
+  useApplyProposalTemplate,
+  useUpsertProposalComplianceRequirement,
+  useCreateProposalIntegrationIntent,
 } from "@lumiere/query-hooks/hooks/proposals"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import type { ProposalStatus } from "@lumiere/ui"
@@ -31,173 +38,190 @@ interface ProposalWorkspaceWrapperProps {
   proposalId: string
   proposalTitle: string
   organizationId: bigint
+  companyId: bigint
   initialStatus?: ProposalStatus
   currentUserId?: string
   currentUserName?: string
   onAnalyze: (text: string) => Promise<AIAnalysis>
 }
 
-// HTTP-based hooks adapter for ProposalWorkspace
-const httpHooks: ProposalWorkspaceHooks = {
-  // Query hooks
-  useProposalSections,
-  useProposalSourceDocs,
-  useProposalVersions,
-  useProposalLineItems,
-  useProposalPresence,
-  useProposalComments,
-  useProducts,
+function wrapOrgCompanyMutation<TParams>(
+  useHook: (
+    organizationId: bigint,
+    companyId?: bigint,
+  ) => { mutate: (params: TParams) => void; isPending: boolean },
+  organizationId: bigint,
+  companyId: bigint,
+): () => { mutate: (params: TParams) => void; isPending?: boolean } {
+  return () => {
+    const mutation = useHook(organizationId, companyId)
+    return {
+      mutate: (params) => mutation.mutate(params),
+      isPending: mutation.isPending,
+    }
+  }
+}
 
-  // Mutation hooks
-  useUpsertProposalSection,
-  useDeleteProposalSection: () => {
-    const mutation = useDeleteProposalSection()
-    return {
-      mutate: (params: { sectionId: bigint | number | string }) => mutation.mutate(params.sectionId),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useAddProposalSourceDoc: () => {
-    const mutation = useAddProposalSourceDoc()
-    return {
-      mutate: (params: {
-        proposalId: bigint | number | string
-        name: string
-        content: string
-        docType: string
-        wordCount: number
-      }) => mutation.mutate(params),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useDeleteProposalSourceDoc: () => {
-    const mutation = useDeleteProposalSourceDoc()
-    return {
-      mutate: (params: { docId: bigint | number | string }) => mutation.mutate(params.docId),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useUpdateProposalSourceDoc: () => {
-    const mutation = useUpdateProposalSourceDoc()
-    return {
-      mutate: (params: {
-        docId: bigint | number | string
-        name?: string
-        content?: string
-        docType?: string
-        wordCount?: number
-      }) => mutation.mutate(params),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useSaveProposalVersion: () => {
-    const mutation = useSaveProposalVersion()
-    return {
-      mutate: (params: {
-        proposalId: bigint | number | string
-        message: string
-        sectionsJson: string
-      }) => mutation.mutate(params),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useUpdateProposalStatus: () => {
-    const mutation = useUpdateProposalStatus()
-    return {
-      mutate: (params: { proposalId: bigint | number | string; status: string }) => mutation.mutate(params),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useAddProposalLineItem: () => {
-    const mutation = useAddProposalLineItem()
-    return {
-      mutate: (params: {
-        proposalId: bigint | number | string
-        sectionId?: bigint | number | string | null
-        productId: bigint | number | string
-        productName: string
-        quantity: number
-        priceUnit: number
-        discount: number
-        notes?: string | null
-      }) => mutation.mutate(params),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useUpdateProposalLineItem: () => {
-    const mutation = useUpdateProposalLineItem()
-    return {
-      mutate: (params: {
-        lineItemId: bigint | number | string
-        quantity: number
-        priceUnit: number
-        discount: number
-        notes?: string | null
-      }) => mutation.mutate(params),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useDeleteProposalLineItem: () => {
-    const mutation = useDeleteProposalLineItem()
-    return {
-      mutate: (params: { lineItemId: bigint | number | string }) => mutation.mutate(params.lineItemId),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useUpdateProposalPresence: () => {
-    const mutation = useUpdateProposalPresence()
-    return {
-      mutate: (params: {
-        proposalId: bigint | number | string
-        sectionId?: bigint | number | string | null
-        userName: string
-      }) => mutation.mutate(params),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useClearProposalPresence: () => {
-    const mutation = useClearProposalPresence()
-    return {
-      mutate: (proposalId: bigint | number | string) => mutation.mutate(proposalId),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useAddProposalComment: () => {
-    const mutation = useAddProposalComment()
-    return {
-      mutate: (params: {
-        proposalId: bigint | number | string
-        sectionId: bigint | number | string
-        content: string
-        parentId?: bigint | number | string | null
-        authorName: string
-      }) => mutation.mutate(params),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
-  useResolveProposalComment: () => {
-    const mutation = useResolveProposalComment()
-    return {
-      mutate: (commentId: bigint | number | string) => mutation.mutate(commentId),
-      isPending: (mutation as { isPending?: boolean }).isPending,
-    }
-  },
+function createHttpHooks(
+  organizationId: bigint,
+  companyId: bigint,
+): ProposalWorkspaceHooks {
+  return {
+    useProposalSections,
+    useProposalSourceDocs,
+    useProposalVersions,
+    useProposalLineItems,
+    useProposalPresence,
+    useProposalComments,
+    useProducts,
+
+    useUpsertProposalSection: () => {
+      const mutation = useUpsertProposalSection(organizationId, companyId)
+      return {
+        mutate: (params) => mutation.mutate(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useDeleteProposalSection: () => {
+      const mutation = useDeleteProposalSection(organizationId, companyId)
+      return {
+        mutate: (params: { sectionId: bigint | number | string }) =>
+          mutation.mutate(params.sectionId),
+        isPending: mutation.isPending,
+      }
+    },
+    useAddProposalSourceDoc: () => {
+      const mutation = useAddProposalSourceDoc(organizationId, companyId)
+      return {
+        mutate: (params) => mutation.mutate(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useDeleteProposalSourceDoc: () => {
+      const mutation = useDeleteProposalSourceDoc(organizationId, companyId)
+      return {
+        mutate: (params: { docId: bigint | number | string }) => mutation.mutate(params.docId),
+        isPending: mutation.isPending,
+      }
+    },
+    useUpdateProposalSourceDoc: () => {
+      const mutation = useUpdateProposalSourceDoc(organizationId, companyId)
+      return {
+        mutate: (params) => mutation.mutate(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useSaveProposalVersion: () => {
+      const mutation = useSaveProposalVersion(organizationId, companyId)
+      return {
+        mutate: (params) => mutation.mutate(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useRestoreProposalVersion: () => {
+      const mutation = useRestoreProposalVersion(organizationId, companyId)
+      return {
+        mutate: (params) => mutation.mutate(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useUpdateProposalStatus: () => {
+      const mutation = useUpdateProposalStatus(organizationId, companyId)
+      return {
+        mutate: (params) => mutation.mutate(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useAddProposalLineItem: () => {
+      const mutation = useAddProposalLineItem(organizationId, companyId)
+      return {
+        mutate: (params) => mutation.mutate(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useUpdateProposalLineItem: () => {
+      const mutation = useUpdateProposalLineItem(organizationId, companyId)
+      return {
+        mutate: (params) => mutation.mutate(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useDeleteProposalLineItem: () => {
+      const mutation = useDeleteProposalLineItem(organizationId, companyId)
+      return {
+        mutate: (params: { lineItemId: bigint | number | string }) =>
+          mutation.mutate(params.lineItemId),
+        isPending: mutation.isPending,
+      }
+    },
+    useUpdateProposalPresence: () => {
+      const mutation = useUpdateProposalPresence(organizationId, companyId)
+      return {
+        mutate: (params) => mutation.mutate(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useClearProposalPresence: () => {
+      const mutation = useClearProposalPresence(organizationId, companyId)
+      return {
+        mutate: (proposalId: bigint | number | string) => mutation.mutate(proposalId),
+        isPending: mutation.isPending,
+      }
+    },
+    useAddProposalComment: () => {
+      const mutation = useAddProposalComment(organizationId, companyId)
+      return {
+        mutate: (params) => mutation.mutate(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useResolveProposalComment: () => {
+      const mutation = useResolveProposalComment(organizationId, companyId)
+      return {
+        mutate: (commentId: bigint | number | string) => mutation.mutate(commentId),
+        isPending: mutation.isPending,
+      }
+    },
+    useProposalTemplates,
+    useProposalComplianceRequirements,
+    useApplyProposalTemplate: wrapOrgCompanyMutation(
+      useApplyProposalTemplate,
+      organizationId,
+      companyId,
+    ),
+    useUpsertProposalComplianceRequirement: wrapOrgCompanyMutation(
+      useUpsertProposalComplianceRequirement,
+      organizationId,
+      companyId,
+    ),
+    useCreateProposalIntegrationIntent: wrapOrgCompanyMutation(
+      useCreateProposalIntegrationIntent,
+      organizationId,
+      companyId,
+    ),
+  }
 }
 
 export function ProposalWorkspaceWrapper({
   proposalId,
   proposalTitle,
   organizationId,
+  companyId,
   initialStatus,
   currentUserId,
   currentUserName,
   onAnalyze,
 }: ProposalWorkspaceWrapperProps) {
+  const httpHooks = useMemo(
+    () => createHttpHooks(organizationId, companyId),
+    [organizationId, companyId],
+  )
   return (
     <ProposalWorkspace
       proposalId={proposalId}
       proposalTitle={proposalTitle}
       organizationId={organizationId}
+      companyId={companyId}
       initialStatus={initialStatus}
       currentUserId={currentUserId}
       currentUserName={currentUserName}

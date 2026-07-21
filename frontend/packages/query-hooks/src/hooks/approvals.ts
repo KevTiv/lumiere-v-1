@@ -226,6 +226,37 @@ export function useDecideHumanTask(organizationId: number) {
   })
 }
 
+export type CommentHumanTaskInput = {
+  companyId: number
+  taskId: number
+  expectedRevision: number
+  comment: string
+  correlationId?: string
+}
+
+export function useCommentHumanTask(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: CommentHumanTaskInput) => {
+      const params = {
+        companyId: input.companyId,
+        taskId: input.taskId,
+        expectedRevision: input.expectedRevision,
+        comment: input.comment,
+        idempotencyKey: newIdempotencyKey("comment"),
+        correlationId: input.correlationId ?? newIdempotencyKey("corr"),
+      }
+      const { urlPath, init } = approvalsBffPost("add_workflow_human_task_comment", [
+        organizationId,
+        stdbParamsToJson(params, "AddWorkflowHumanTaskCommentParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateHumanTaskQueries(qc, organizationId),
+  })
+}
+
 /** Compatibility wrappers for sales/purchasing panels during cutover. */
 export function useApproveApprovalRequest(organizationId: number, _companyId: number) {
   const decide = useDecideHumanTask(organizationId)

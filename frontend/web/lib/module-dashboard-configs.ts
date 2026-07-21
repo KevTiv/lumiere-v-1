@@ -215,6 +215,10 @@ import {
   workflowsTableConfig,
   workflowVersionsTableConfig,
   workflowInstancesTableConfig,
+  workflowTimersLateTableConfig,
+  workflowOutboxDeadTableConfig,
+  workflowMigrationPlansTableConfig,
+  workflowMigrationResultsTableConfig,
   newWorkflowForm,
   mailMessagesTableConfig,
   mailMyNotificationsTableConfig,
@@ -3052,6 +3056,32 @@ export const workflowsModuleConfig = (t: TFunction): ModuleConfig => ({
       type: "entity",
       entityConfig: workflowInstancesTableConfig(t),
     },
+    {
+      id: "operations",
+      label: "Operations",
+      type: "entity",
+      entityConfig: workflowTimersLateTableConfig(t),
+    },
+    {
+      id: "deadLetters",
+      label: "Dead letters",
+      type: "entity",
+      entityConfig: workflowOutboxDeadTableConfig(t),
+    },
+    {
+      id: "migrations",
+      label: "Migrations",
+      type: "entity",
+      entityConfig: workflowMigrationPlansTableConfig(t),
+      createLabel: "New migration plan",
+      createAction: "createMigrationPlan",
+    },
+    {
+      id: "migrationResults",
+      label: "Migration results",
+      type: "entity",
+      entityConfig: workflowMigrationResultsTableConfig(t),
+    },
   ],
 })
 
@@ -3166,7 +3196,7 @@ export const proposalsModuleConfig = (t: TFunction): ModuleConfig => ({
                 actions: [
                   { id: "new_proposal", label: "New Proposal", icon: "plus", color: "blue" },
                   { id: "use_template", label: "Use Template", icon: "file", color: "green" },
-                  { id: "import_rfp", label: "Import RFP", icon: "upload", color: "orange" },
+                  { id: "import_rfp", label: "Import RFP (coming soon)", icon: "upload", color: "orange" },
                   { id: "review_pending", label: "Review Pending", icon: "eye", color: "purple" },
                 ],
               },

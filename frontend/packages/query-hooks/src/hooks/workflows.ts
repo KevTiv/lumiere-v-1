@@ -11,8 +11,15 @@ import { workflowsBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   CancelWorkflowParams,
+  CancelWorkflowOutboxParams,
+  CancelWorkflowTimerParams,
+  CreateWorkflowMigrationPlanParams,
   CreateWorkflowParams,
+  FireWorkflowTimerParams,
+  MigrateWorkflowInstanceParams,
+  PreflightWorkflowMigrationParams,
   SignalWorkflowParams,
+  SimulateWorkflowParams,
   StartWorkflowParams,
 } from "@lumiere/stdb/types"
 
@@ -31,6 +38,10 @@ function invalidateAllWorkflowQueries(
   void qc.invalidateQueries({ queryKey: ["workflow-human-tasks-inbox"] })
   void qc.invalidateQueries({ queryKey: ["workflow-timers-late"] })
   void qc.invalidateQueries({ queryKey: ["workflow-outbox-dead"] })
+  void qc.invalidateQueries({ queryKey: ["workflow-decision-events"] })
+  void qc.invalidateQueries({ queryKey: ["workflow-migration-plans"] })
+  void qc.invalidateQueries({ queryKey: ["workflow-migration-preflights"] })
+  void qc.invalidateQueries({ queryKey: ["workflow-migration-results"] })
 }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -50,7 +61,7 @@ export function useWorkflowVersions(organizationId: bigint, initialData?: QueryR
     queryFn: () =>
       fetchQueryList("/api/query/workflow-versions", "Failed to fetch workflow versions"),
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    ...(initialData != null ? { initialData } : {}),
   })
 }
 
@@ -59,7 +70,7 @@ export function useWorkflowNodes(organizationId: bigint, initialData?: QueryRows
     queryKey: ["workflow-nodes", wfKeys(organizationId)],
     queryFn: () => fetchQueryList("/api/query/workflow-nodes", "Failed to fetch workflow nodes"),
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    ...(initialData != null ? { initialData } : {}),
   })
 }
 
@@ -68,7 +79,7 @@ export function useWorkflowEdges(organizationId: bigint, initialData?: QueryRows
     queryKey: ["workflow-edges", wfKeys(organizationId)],
     queryFn: () => fetchQueryList("/api/query/workflow-edges", "Failed to fetch workflow edges"),
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    ...(initialData != null ? { initialData } : {}),
   })
 }
 
@@ -78,7 +89,7 @@ export function useWorkflowInstances(organizationId: bigint, initialData?: Query
     queryFn: () =>
       fetchQueryList("/api/query/workflow-instances", "Failed to fetch workflow instances"),
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    ...(initialData != null ? { initialData } : {}),
   })
 }
 
@@ -88,7 +99,7 @@ export function useWorkflowTimersLate(organizationId: bigint, initialData?: Quer
     queryFn: () =>
       fetchQueryList("/api/query/workflow-timers-late", "Failed to fetch late workflow timers"),
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    ...(initialData != null ? { initialData } : {}),
   })
 }
 
@@ -98,7 +109,56 @@ export function useWorkflowOutboxDead(organizationId: bigint, initialData?: Quer
     queryFn: () =>
       fetchQueryList("/api/query/workflow-outbox-dead", "Failed to fetch dead-letter outbox"),
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    ...(initialData != null ? { initialData } : {}),
+  })
+}
+
+export function useWorkflowDecisionEvents(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ["workflow-decision-events", wfKeys(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        "/api/query/workflow-decision-events",
+        "Failed to fetch workflow decision events",
+      ),
+    staleTime: 30_000,
+    ...(initialData != null ? { initialData } : {}),
+  })
+}
+
+export function useWorkflowMigrationPlans(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ["workflow-migration-plans", wfKeys(organizationId)],
+    queryFn: () =>
+      fetchQueryList("/api/query/workflow-migration-plans", "Failed to fetch migration plans"),
+    staleTime: 30_000,
+    ...(initialData != null ? { initialData } : {}),
+  })
+}
+
+export function useWorkflowMigrationPreflights(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ["workflow-migration-preflights", wfKeys(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        "/api/query/workflow-migration-preflights",
+        "Failed to fetch migration preflights",
+      ),
+    staleTime: 15_000,
+    ...(initialData != null ? { initialData } : {}),
+  })
+}
+
+export function useWorkflowMigrationResults(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ["workflow-migration-results", wfKeys(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        "/api/query/workflow-migration-results",
+        "Failed to fetch migration results",
+      ),
+    staleTime: 15_000,
+    ...(initialData != null ? { initialData } : {}),
   })
 }
 
@@ -108,7 +168,7 @@ export function useWorkflowActivities(organizationId: bigint, initialData?: Quer
     queryKey: ["workflow-activities", wfKeys(organizationId)],
     queryFn: async () => [],
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    ...(initialData != null ? { initialData } : {}),
   })
 }
 
@@ -118,7 +178,7 @@ export function useWorkflowTransitions(organizationId: bigint, initialData?: Que
     queryKey: ["workflow-transitions", wfKeys(organizationId)],
     queryFn: async () => [],
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    ...(initialData != null ? { initialData } : {}),
   })
 }
 
@@ -128,11 +188,15 @@ export function useWorkflowWorkitems(organizationId: bigint, initialData?: Query
     queryKey: ["workflow-workitems", wfKeys(organizationId)],
     queryFn: async () => [],
     staleTime: 30_000,
-    initialData: initialData ?? [],
+    ...(initialData != null ? { initialData } : {}),
   })
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────
+
+function optionalCompanyArg(companyId?: number | null): { some: number } | { none: [] } {
+  return companyId != null && companyId > 0 ? { some: companyId } : { none: [] }
+}
 
 export function useCreateWorkflow(organizationId: bigint, companyId?: number | null) {
   const qc = useQueryClient()
@@ -140,7 +204,7 @@ export function useCreateWorkflow(organizationId: bigint, companyId?: number | n
     mutationFn: async (params) => {
       const { urlPath, init } = workflowsBffPost("create_workflow", [
         organizationId,
-        companyId ?? null,
+        optionalCompanyArg(companyId),
         stdbParamsToJson(params as object, "CreateWorkflowParams"),
       ])
       const r = await apiFetch(urlPath, init)
@@ -150,7 +214,7 @@ export function useCreateWorkflow(organizationId: bigint, companyId?: number | n
   })
 }
 
-export function usePublishWorkflowVersion(organizationId: bigint, companyId?: number | null) {
+export function usePublishWorkflowVersion(organizationId: bigint, _companyId?: number | null) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: {
@@ -159,7 +223,6 @@ export function usePublishWorkflowVersion(organizationId: bigint, companyId?: nu
     }) => {
       const { urlPath, init } = workflowsBffPost("publish_workflow_version", [
         organizationId,
-        companyId ?? null,
         input.workflowVersionId,
         input.expectedDraftRevision,
       ])
@@ -172,15 +235,18 @@ export function usePublishWorkflowVersion(organizationId: bigint, companyId?: nu
 
 export function useCloneWorkflowVersionToDraft(
   organizationId: bigint,
-  companyId?: number | null,
+  _companyId?: number | null,
 ) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (workflowVersionId: bigint | number | string) => {
+    mutationFn: async (input: {
+      workflowVersionId: bigint | number | string
+      expectedDraftRevision: number
+    }) => {
       const { urlPath, init } = workflowsBffPost("clone_workflow_version_to_draft", [
         organizationId,
-        companyId ?? null,
-        workflowVersionId,
+        input.workflowVersionId,
+        input.expectedDraftRevision,
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to clone workflow version")
@@ -189,14 +255,17 @@ export function useCloneWorkflowVersionToDraft(
   })
 }
 
-export function useRetireWorkflowVersion(organizationId: bigint, companyId?: number | null) {
+export function useRetireWorkflowVersion(organizationId: bigint, _companyId?: number | null) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (workflowVersionId: bigint | number | string) => {
+    mutationFn: async (input: {
+      workflowVersionId: bigint | number | string
+      expectedDraftRevision: number
+    }) => {
       const { urlPath, init } = workflowsBffPost("retire_workflow_version", [
         organizationId,
-        companyId ?? null,
-        workflowVersionId,
+        input.workflowVersionId,
+        input.expectedDraftRevision,
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to retire workflow version")
@@ -271,6 +340,136 @@ export function useCancelWorkflow(organizationId: bigint) {
   })
 }
 
+export function useSimulateWorkflow(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      workflowVersionId: bigint | number | string
+      params: SimulateWorkflowParams
+    }) => {
+      const { urlPath, init } = workflowsBffPost("simulate_workflow", [
+        organizationId,
+        input.workflowVersionId,
+        stdbParamsToJson(input.params as object, "SimulateWorkflowParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to simulate workflow")
+    },
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
+  })
+}
+
+export function useCreateWorkflowMigrationPlan(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: CreateWorkflowMigrationPlanParams) => {
+      const { urlPath, init } = workflowsBffPost("create_workflow_migration_plan", [
+        organizationId,
+        stdbParamsToJson(params as object, "CreateWorkflowMigrationPlanParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create migration plan")
+    },
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
+  })
+}
+
+export function useSetWorkflowMigrationPlanActive(
+  organizationId: bigint,
+  companyId?: number | null,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { planId: bigint | number | string; active: boolean }) => {
+      // `?withCompany=true` prepends org + company; body is planId + active only.
+      void organizationId
+      void companyId
+      const { urlPath, init } = workflowsBffPost("set_workflow_migration_plan_active", [
+        input.planId,
+        input.active,
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update migration plan")
+    },
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
+  })
+}
+
+export function usePreflightWorkflowMigration(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: PreflightWorkflowMigrationParams) => {
+      const { urlPath, init } = workflowsBffPost("preflight_workflow_migration", [
+        organizationId,
+        stdbParamsToJson(params as object, "PreflightWorkflowMigrationParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to preflight migration")
+    },
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
+  })
+}
+
+export function useMigrateWorkflowInstance(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: MigrateWorkflowInstanceParams) => {
+      const { urlPath, init } = workflowsBffPost("migrate_workflow_instance", [
+        organizationId,
+        stdbParamsToJson(params as object, "MigrateWorkflowInstanceParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to migrate workflow instance")
+    },
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
+  })
+}
+
+export function useFireWorkflowTimer(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: FireWorkflowTimerParams) => {
+      const { urlPath, init } = workflowsBffPost("fire_workflow_timer", [
+        organizationId,
+        stdbParamsToJson(params as object, "FireWorkflowTimerParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to fire workflow timer")
+    },
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
+  })
+}
+
+export function useCancelWorkflowTimer(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: CancelWorkflowTimerParams) => {
+      const { urlPath, init } = workflowsBffPost("cancel_workflow_timer", [
+        organizationId,
+        stdbParamsToJson(params as object, "CancelWorkflowTimerParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to cancel workflow timer")
+    },
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
+  })
+}
+
+export function useCancelWorkflowOutbox(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: CancelWorkflowOutboxParams) => {
+      const { urlPath, init } = workflowsBffPost("cancel_workflow_outbox", [
+        organizationId,
+        stdbParamsToJson(params as object, "CancelWorkflowOutboxParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to cancel workflow outbox")
+    },
+    onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
+  })
+}
+
 /** @deprecated Use useCancelWorkflow */
 export function useCancelWorkflowInstance(organizationId: bigint) {
   return useCancelWorkflow(organizationId)
@@ -313,4 +512,16 @@ export function useSetWorkitemException(organizationId: bigint) {
   })
 }
 
-export type { CreateWorkflowParams, StartWorkflowParams, SignalWorkflowParams, CancelWorkflowParams } from "@lumiere/stdb/types"
+export type {
+  CreateWorkflowParams,
+  StartWorkflowParams,
+  SignalWorkflowParams,
+  CancelWorkflowParams,
+  SimulateWorkflowParams,
+  CreateWorkflowMigrationPlanParams,
+  PreflightWorkflowMigrationParams,
+  MigrateWorkflowInstanceParams,
+  FireWorkflowTimerParams,
+  CancelWorkflowTimerParams,
+  CancelWorkflowOutboxParams,
+} from "@lumiere/stdb/types"

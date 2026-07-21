@@ -3,7 +3,7 @@ import { stringifyReducerCallBody } from "@lumiere/api-client";
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Versioned workflow definition + runtime mutations via BFF `POST /api/call/:reducer`.
+ * Versioned workflow definition + runtime + migration + ops mutations via BFF.
  */
 export const WORKFLOWS_BFF_REDUCERS = [
   "create_workflow",
@@ -20,20 +20,25 @@ export const WORKFLOWS_BFF_REDUCERS = [
   "cancel_workflow",
   "simulate_workflow",
   "import_workflow_csv",
+  "create_workflow_migration_plan",
+  "set_workflow_migration_plan_active",
+  "preflight_workflow_migration",
+  "migrate_workflow_instance",
+  "fire_workflow_timer",
+  "cancel_workflow_timer",
+  "cancel_workflow_outbox",
+  "record_workflow_outbox_result",
 ] as const;
 
 export type WorkflowsBffReducerKey = (typeof WORKFLOWS_BFF_REDUCERS)[number];
 
+/**
+ * `?withCompany=true` prepends `[organizationId, companyId]` on the BFF.
+ * Only use for reducers whose signature starts with `(organization_id, company_id: u64, …)`.
+ * Do not use for `Option<u64>` company args or reducers without a company parameter.
+ */
 const WITH_COMPANY_QUERY = new Set<WorkflowsBffReducerKey>([
-  "create_workflow",
-  "update_workflow_draft",
-  "upsert_workflow_node",
-  "upsert_workflow_edge",
-  "delete_workflow_node",
-  "delete_workflow_edge",
-  "publish_workflow_version",
-  "clone_workflow_version_to_draft",
-  "retire_workflow_version",
+  "set_workflow_migration_plan_active",
 ]);
 
 const WORKFLOW_RESOURCE_KEYS = [
@@ -43,6 +48,12 @@ const WORKFLOW_RESOURCE_KEYS = [
   "workflow-edges",
   "workflow-instances",
   "workflow-human-tasks-inbox",
+  "workflow-timers-late",
+  "workflow-outbox-dead",
+  "workflow-decision-events",
+  "workflow-migration-plans",
+  "workflow-migration-preflights",
+  "workflow-migration-results",
 ] as const;
 
 /** Same-origin path used by `apiFetch` in the web app. */
@@ -82,6 +93,14 @@ const WORKFLOWS_HINT_OVERRIDES: Partial<
   cancel_workflow: WORKFLOW_RESOURCE_KEYS,
   simulate_workflow: WORKFLOW_RESOURCE_KEYS,
   import_workflow_csv: WORKFLOW_RESOURCE_KEYS,
+  create_workflow_migration_plan: WORKFLOW_RESOURCE_KEYS,
+  set_workflow_migration_plan_active: WORKFLOW_RESOURCE_KEYS,
+  preflight_workflow_migration: WORKFLOW_RESOURCE_KEYS,
+  migrate_workflow_instance: WORKFLOW_RESOURCE_KEYS,
+  fire_workflow_timer: WORKFLOW_RESOURCE_KEYS,
+  cancel_workflow_timer: WORKFLOW_RESOURCE_KEYS,
+  cancel_workflow_outbox: WORKFLOW_RESOURCE_KEYS,
+  record_workflow_outbox_result: WORKFLOW_RESOURCE_KEYS,
 };
 
 function workflowsReducerHints(): Record<
@@ -113,8 +132,10 @@ export function workflowsCommandContract(
       "workflow_node",
       "workflow_edge",
       "workflow_instance",
+      "workflow_migration_plan",
+      "workflow_decision_event",
     ],
     expectations:
-      "Definition reducers require company scope; runtime reducers pass Start/Signal/Cancel params with revisions.",
+      "Definition reducers require company scope; runtime/migration pass params with revisions and idempotency keys.",
   };
 }

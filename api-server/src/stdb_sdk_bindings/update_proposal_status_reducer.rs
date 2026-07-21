@@ -7,6 +7,8 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct UpdateProposalStatusArgs {
+    pub organization_id: u64,
+    pub company_id: u64,
     pub proposal_id: u64,
     pub status: String,
 }
@@ -14,6 +16,8 @@ pub(super) struct UpdateProposalStatusArgs {
 impl From<UpdateProposalStatusArgs> for super::Reducer {
     fn from(args: UpdateProposalStatusArgs) -> Self {
         Self::UpdateProposalStatus {
+            organization_id: args.organization_id,
+            company_id: args.company_id,
             proposal_id: args.proposal_id,
             status: args.status,
         }
@@ -35,8 +39,20 @@ pub trait update_proposal_status {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`update_proposal_status:update_proposal_status_then`] to run a callback after the reducer completes.
-    fn update_proposal_status(&self, proposal_id: u64, status: String) -> __sdk::Result<()> {
-        self.update_proposal_status_then(proposal_id, status, |_, _| {})
+    fn update_proposal_status(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        proposal_id: u64,
+        status: String,
+    ) -> __sdk::Result<()> {
+        self.update_proposal_status_then(
+            organization_id,
+            company_id,
+            proposal_id,
+            status,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `update_proposal_status` to run as soon as possible,
@@ -47,6 +63,8 @@ pub trait update_proposal_status {
     ///  and its status can be observed with the `callback`.
     fn update_proposal_status_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         status: String,
 
@@ -59,6 +77,8 @@ pub trait update_proposal_status {
 impl update_proposal_status for super::RemoteReducers {
     fn update_proposal_status_then(
         &self,
+        organization_id: u64,
+        company_id: u64,
         proposal_id: u64,
         status: String,
 
@@ -68,6 +88,8 @@ impl update_proposal_status for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             UpdateProposalStatusArgs {
+                organization_id,
+                company_id,
                 proposal_id,
                 status,
             },

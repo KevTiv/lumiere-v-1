@@ -17,6 +17,7 @@ import {
 export default __t.row({
   id: __t.u64().primaryKey(),
   organizationId: __t.u64().name("organization_id"),
+  companyId: __t.u64().name("company_id"),
   name: __t.string(),
   licensePlate: __t.option(__t.string()).name("license_plate"),
   driverName: __t.option(__t.string()).name("driver_name"),
@@ -32,7 +33,6 @@ export default __t.row({
   fuelLevel: __t.option(__t.f64()).name("fuel_level"),
   odometerKm: __t.option(__t.f64()).name("odometer_km"),
   vehicleType: __t.string().name("vehicle_type"),
-  companyId: __t.option(__t.u64()).name("company_id"),
   createUid: __t.identity().name("create_uid"),
   createDate: __t.timestamp().name("create_date"),
   writeUid: __t.identity().name("write_uid"),

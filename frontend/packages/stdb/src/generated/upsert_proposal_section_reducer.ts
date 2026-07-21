@@ -10,12 +10,17 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  UpsertProposalSectionParams,
+} from "./types";
+
 export default {
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
   proposalId: __t.u64(),
   sectionId: __t.u64(),
-  title: __t.string(),
-  content: __t.string(),
-  status: __t.string(),
-  sequence: __t.u32(),
-  aiSuggestion: __t.option(__t.string()),
+  expectedRevision: __t.u32(),
+  get params() {
+    return UpsertProposalSectionParams;
+  },
 };

@@ -190,7 +190,7 @@ import { useModuleFilters } from '@/hooks/use-module-filters';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
 import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
-import { RecordDocumentAttachments } from '@/components/record-document-attachments';
+import { RecordDocumentAttachments } from '../../../components/record-document-attachments';
 import {
   SalesOpsPanel,
   parseOpsQueueFilter,

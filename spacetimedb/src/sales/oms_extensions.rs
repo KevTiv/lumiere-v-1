@@ -1856,6 +1856,7 @@ pub fn create_exchange_order_from_return(
             fiscal_position_id: so.fiscal_position_id,
             team_id: so.team_id,
             opportunity_id: None,
+            proposal_id: None,
             note: Some(format!("Exchange for return {return_order_id}")),
             terms_and_conditions: None,
             validity_days: Some(30),

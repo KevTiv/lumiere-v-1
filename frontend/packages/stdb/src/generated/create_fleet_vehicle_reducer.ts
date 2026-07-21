@@ -10,10 +10,14 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  CreateFleetVehicleParams,
+} from "./types";
+
 export default {
   organizationId: __t.u64(),
-  name: __t.string(),
-  vehicleType: __t.string(),
-  licensePlate: __t.option(__t.string()),
-  driverName: __t.option(__t.string()),
+  companyId: __t.u64(),
+  get params() {
+    return CreateFleetVehicleParams;
+  },
 };

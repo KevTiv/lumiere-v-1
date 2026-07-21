@@ -115,6 +115,16 @@ export const proposalsTableConfig = (
           width: "min-w-20",
         },
         {
+          key: "saleOrderId",
+          label: t("proposals.proposals.columns.saleOrderId", { defaultValue: "Sale order" }),
+          width: "min-w-24",
+        },
+        {
+          key: "projectId",
+          label: t("proposals.proposals.columns.projectId", { defaultValue: "Project" }),
+          width: "min-w-24",
+        },
+        {
           key: "writeDate",
           label: t("proposals.proposals.columns.writeDate"),
           type: "date",

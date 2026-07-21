@@ -4,24 +4,22 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::create_fleet_vehicle_params_type::CreateFleetVehicleParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct CreateFleetVehicleArgs {
     pub organization_id: u64,
-    pub name: String,
-    pub vehicle_type: String,
-    pub license_plate: Option<String>,
-    pub driver_name: Option<String>,
+    pub company_id: u64,
+    pub params: CreateFleetVehicleParams,
 }
 
 impl From<CreateFleetVehicleArgs> for super::Reducer {
     fn from(args: CreateFleetVehicleArgs) -> Self {
         Self::CreateFleetVehicle {
             organization_id: args.organization_id,
-            name: args.name,
-            vehicle_type: args.vehicle_type,
-            license_plate: args.license_plate,
-            driver_name: args.driver_name,
+            company_id: args.company_id,
+            params: args.params,
         }
     }
 }
@@ -44,19 +42,10 @@ pub trait create_fleet_vehicle {
     fn create_fleet_vehicle(
         &self,
         organization_id: u64,
-        name: String,
-        vehicle_type: String,
-        license_plate: Option<String>,
-        driver_name: Option<String>,
+        company_id: u64,
+        params: CreateFleetVehicleParams,
     ) -> __sdk::Result<()> {
-        self.create_fleet_vehicle_then(
-            organization_id,
-            name,
-            vehicle_type,
-            license_plate,
-            driver_name,
-            |_, _| {},
-        )
+        self.create_fleet_vehicle_then(organization_id, company_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `create_fleet_vehicle` to run as soon as possible,
@@ -68,10 +57,8 @@ pub trait create_fleet_vehicle {
     fn create_fleet_vehicle_then(
         &self,
         organization_id: u64,
-        name: String,
-        vehicle_type: String,
-        license_plate: Option<String>,
-        driver_name: Option<String>,
+        company_id: u64,
+        params: CreateFleetVehicleParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -83,10 +70,8 @@ impl create_fleet_vehicle for super::RemoteReducers {
     fn create_fleet_vehicle_then(
         &self,
         organization_id: u64,
-        name: String,
-        vehicle_type: String,
-        license_plate: Option<String>,
-        driver_name: Option<String>,
+        company_id: u64,
+        params: CreateFleetVehicleParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -95,10 +80,8 @@ impl create_fleet_vehicle for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             CreateFleetVehicleArgs {
                 organization_id,
-                name,
-                vehicle_type,
-                license_plate,
-                driver_name,
+                company_id,
+                params,
             },
             callback,
         )

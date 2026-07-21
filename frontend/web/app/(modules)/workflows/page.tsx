@@ -18,6 +18,7 @@ export default async function WorkflowsPage() {
   return (
     <WorkflowsClient
       initialWorkflows={workflows}
+      initialVersions={versions}
       initialInstances={instances}
       organizationId={session.organizationId}
     />

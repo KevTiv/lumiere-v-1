@@ -254,7 +254,16 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "proposal-source-docs",
   "proposal-presence",
   "proposal-comments",
+  "proposal-bid-decisions",
+  "proposal-templates",
+  "proposal-clauses",
+  "proposal-compliance-requirements",
+  "proposal-analyses",
+  "proposal-procurement-scores",
+  "proposal-integration-intents",
+  "proposal-clarifications",
   "fleet-vehicles",
+  "warehouse-geo",
   "pos-terminals",
   "pos-configs",
   "pos-sessions",
@@ -1492,8 +1501,40 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("proposal-presence", "proposal_presence", id, fa, ""),
   "proposal-comments": (id, fa) =>
     selectOrgScopedSql("proposal-comments", "proposal_comment", id, fa, "", " ORDER BY id DESC"),
+  "proposal-bid-decisions": (id, fa) =>
+    selectOrgScopedSql("proposal-bid-decisions", "proposal_bid_decision", id, fa, "", " ORDER BY id DESC"),
+  "proposal-templates": (id, fa) =>
+    selectOrgScopedSql("proposal-templates", "proposal_template", id, fa, " AND is_active = true", " ORDER BY name ASC"),
+  "proposal-clauses": (id, fa) =>
+    selectOrgScopedSql("proposal-clauses", "proposal_clause", id, fa, " AND is_active = true", " ORDER BY clause_key ASC"),
+  "proposal-compliance-requirements": (id, fa) =>
+    selectOrgScopedSql(
+      "proposal-compliance-requirements",
+      "proposal_compliance_requirement",
+      id,
+      fa,
+      "",
+      " ORDER BY sequence ASC",
+    ),
+  "proposal-analyses": (id, fa) =>
+    selectOrgScopedSql("proposal-analyses", "proposal_analysis", id, fa, "", " ORDER BY id DESC"),
+  "proposal-procurement-scores": (id, fa) =>
+    selectOrgScopedSql("proposal-procurement-scores", "proposal_procurement_score", id, fa, ""),
+  "proposal-integration-intents": (id, fa) =>
+    selectOrgScopedSql(
+      "proposal-integration-intents",
+      "proposal_integration_intent",
+      id,
+      fa,
+      "",
+      " ORDER BY id DESC",
+    ),
+  "proposal-clarifications": (id, fa) =>
+    selectOrgScopedSql("proposal-clarifications", "proposal_clarification", id, fa, "", " ORDER BY id DESC"),
   "fleet-vehicles": (id, fa) =>
     selectOrgScopedSql("fleet-vehicles", "fleet_vehicle", id, fa, "", " ORDER BY name ASC"),
+  "warehouse-geo": (id, fa) =>
+    selectOrgScopedSql("warehouse-geo", "warehouse_geo", id, fa, "", ""),
   "pos-terminals": (id, fa) =>
     selectOrgScopedSql("pos-terminals", "pos_terminal", id, fa, "", " ORDER BY name ASC"),
   "calendar-events": (id, fa) =>
