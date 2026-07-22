@@ -85,15 +85,10 @@ impl PrivacyPolicy {
     /// skill manifest as the authoritative output contract while letting admins
     /// enforce tenant-specific field policy.
     pub fn merge_with_org(&self, org: &OrgPrivacyPolicy) -> MergedPrivacyPolicy {
-        let allowed: std::collections::BTreeSet<String> = self
-            .allowed_fields
-            .iter()
-            .map(|field| normalized_field(field))
-            .collect();
-
         let org_allowed: std::collections::BTreeSet<String> = org
             .allowed_fields
             .iter()
+            .filter(|field| field.trim() != "*")
             .map(|field| normalized_field(field))
             .collect();
 
@@ -116,7 +111,7 @@ impl PrivacyPolicy {
         // - Otherwise, if the org lists specific allowed fields, restrict to the
         //   intersection (admins can use this to narrow, not widen).
         let mut merged_allowed = Vec::new();
-        let org_allows_all = org_allowed.contains("*");
+        let org_allows_all = org.allowed_fields.iter().any(|field| field.trim() == "*");
         for field in &self.allowed_fields {
             let normalized = normalized_field(field);
             if org_suppressed.contains(&normalized) {

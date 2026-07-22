@@ -1,14 +1,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use stdb_client::StdbClient;
 
 use crate::{
-    harness::LiveSnapshot,
-    providers::Providers,
-    qdrant_client::VectorStore,
-    rig_agent::RigContext,
-    sandbox::{DatasetSpec, SandboxSession},
+    harness::LiveSnapshot, providers::Providers, qdrant_client::VectorStore, rig_agent::RigContext,
     state::AppState,
 };
 
@@ -22,8 +18,6 @@ pub struct ToolContext {
     pub skill_key: String,
     pub config_json: Value,
     pub inputs: Value,
-    pub sandbox: Option<Arc<Mutex<SandboxSession>>>,
-    pub dataset_specs: Vec<DatasetSpec>,
     pub allowed_action_drafts: Vec<String>,
 }
 

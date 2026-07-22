@@ -250,7 +250,6 @@ use crate::ai::skills::{
     ai_skill, ai_skill_config, ai_team_member_skill, AiSkill, AiSkillConfig, AiTeamMemberSkill,
 };
 use crate::workflow::calendar::activate_foundation_calendar_packs;
-use crate::workflow::packs::activate_foundation_workflow_template_packs;
 use crate::workflow::definitions::{
     create_workflow, publish_workflow_version, upsert_workflow_edge, upsert_workflow_node,
     workflow, workflow_version, ConditionFieldDefinition, ConditionValueType, CreateWorkflowParams,
@@ -259,6 +258,7 @@ use crate::workflow::definitions::{
     WorkflowTaskPolicy, WorkflowTrigger, WorkflowVersionStatus,
 };
 use crate::workflow::evaluator::{canonical_condition_snapshot_hash, ConditionSnapshot};
+use crate::workflow::packs::activate_foundation_workflow_template_packs;
 use crate::workflow::runtime::{start_workflow, StartWorkflowParams};
 
 fn require_dev_reducers_enabled() -> Result<(), String> {
@@ -7052,64 +7052,47 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
 
     // ── 14.3 System AI skills + tenant config ─────────────────────────────────
-    let report_dataset_specs = r#"{"datasets":[
-      {"source":"stdb_table","key":"sale_order_lines","table":"sale_order_line","limit":2000},
-      {"source":"stdb_table","key":"stock_moves","table":"stock_move","limit":2000},
-      {"source":"stdb_table","key":"financial_reports","table":"financial_report","limit":500},
-      {"source":"input","key":"report_lines","input_field":"report_lines"}
-    ]}"#;
-
     let report_analysis = seed_system_skill(
         ctx,
         "report_analysis",
         "Report Analysis",
-        "Analyze ERP report and entity data using sandbox SQL, live snapshots, and semantic search.",
+        "Analyze ERP report and entity data using approved typed analytics, live snapshots, and semantic search.",
         "analytics",
         vec![
             "erp_snapshot".to_string(),
             "erp_search".to_string(),
-            "list_datasets".to_string(),
-            "describe_dataset".to_string(),
-            "run_query".to_string(),
+            "analytics_summary".to_string(),
             "save_artifact".to_string(),
         ],
         vec![],
-        r#"You are an ERP analytics assistant. Use sandbox SQL results, live ERP snapshots, and semantic search hits to produce concise factual summaries with cited sources.
+        r#"You are an ERP analytics assistant. Use approved typed analytics results, live ERP snapshots, and semantic search hits to produce concise factual summaries with cited sources.
 
 Inputs may include:
 - query or goal (required)
 - entity_type + entity_id (optional focus)
 - report_id / report_lines (optional report context)
-- analysis_sql (optional custom SELECT)
 
 Respond with grounded insights only. If data is insufficient, say so."#,
-        Some(report_dataset_specs.to_string()),
+        None,
         vec![],
     );
-
-    let process_dataset_specs = r#"{"datasets":[
-      {"source":"stdb_table","key":"stock_moves","table":"stock_move","limit":2000},
-      {"source":"stdb_table","key":"purchase_orders","table":"purchase_order","limit":1000},
-      {"source":"stdb_table","key":"workflow_instances","table":"workflow_instance","company_column":"","limit":1000}
-    ]}"#;
 
     let process_research = seed_system_skill(
         ctx,
         "process_research",
         "Process Research",
-        "Research operational process health using stock, purchasing, and workflow datasets.",
+        "Research operational process health using approved stock, purchasing, and workflow summaries.",
         "operations",
         vec![
             "erp_search".to_string(),
-            "list_datasets".to_string(),
-            "run_query".to_string(),
+            "analytics_summary".to_string(),
             "save_artifact".to_string(),
         ],
-        vec!["describe_dataset".to_string()],
-        r#"You are an ERP operations analyst. Use sandbox SQL aggregations and semantic search to identify bottlenecks, delays, and anomalies.
+        vec![],
+        r#"You are an ERP operations analyst. Use approved operational summaries and semantic search to identify bottlenecks, delays, and anomalies.
 
-Focus on state distributions, overdue items, and volume trends. Cite dataset evidence in your summary."#,
-        Some(process_dataset_specs.to_string()),
+Focus on state distributions, overdue items, and volume trends. Cite returned evidence in your summary."#,
+        None,
         vec![],
     );
 

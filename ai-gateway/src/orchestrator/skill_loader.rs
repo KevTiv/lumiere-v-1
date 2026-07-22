@@ -2,13 +2,6 @@ use anyhow::{Context, Result};
 use serde_json::Value;
 use stdb_client::StdbClient;
 
-use crate::sandbox::{
-    datasets::{
-        default_price_search_specs, default_process_research_specs, default_report_analysis_specs,
-        parse_dataset_specs,
-    },
-    DatasetSpec,
-};
 use crate::skills::{compose_prompt, load_bundled_skill};
 
 #[derive(Clone, Debug)]
@@ -26,7 +19,6 @@ pub struct LoadedSkill {
     pub custom_instructions: Option<String>,
     pub skill_config_id: Option<u64>,
     pub enabled: bool,
-    pub dataset_specs_raw: Option<String>,
     pub allowed_action_drafts: Vec<String>,
     pub source: SkillSource,
 }
@@ -111,10 +103,6 @@ pub async fn load_skill(
                 .as_ref()
                 .map(|row| row_bool(row, "isEnabled"))
                 .unwrap_or(true),
-            dataset_specs_raw: skill_row
-                .get("datasetSpecs")
-                .and_then(|v| v.as_str())
-                .map(str::to_string),
             allowed_action_drafts: row_string_list(skill_row, "allowedActionDrafts"),
             source: SkillSource::Remote,
         };
@@ -146,7 +134,6 @@ fn bundled_to_loaded(md: &crate::skills::BundledSkillMd) -> LoadedSkill {
         custom_instructions: None,
         skill_config_id: None,
         enabled: true,
-        dataset_specs_raw: md.dataset_specs.clone(),
         allowed_action_drafts: md.allowed_action_drafts.clone(),
         source: SkillSource::Bundled,
     }
@@ -158,9 +145,6 @@ fn apply_bundled_overlay(skill: &mut LoadedSkill) {
     };
 
     skill.prompt_template = compose_prompt(&md);
-    if skill.dataset_specs_raw.is_none() {
-        skill.dataset_specs_raw = md.dataset_specs.clone();
-    }
     if skill.required_tools.is_empty() && !md.required_tools.is_empty() {
         skill.required_tools = md.required_tools.clone();
         skill.optional_tools = md.optional_tools.clone();
@@ -168,19 +152,36 @@ fn apply_bundled_overlay(skill: &mut LoadedSkill) {
     if skill.allowed_action_drafts.is_empty() && !md.allowed_action_drafts.is_empty() {
         skill.allowed_action_drafts = md.allowed_action_drafts.clone();
     }
+    migrate_legacy_analytics_tools(skill);
     skill.source = SkillSource::Merged;
 }
 
-pub fn resolve_dataset_specs(skill: &LoadedSkill) -> Vec<DatasetSpec> {
-    let parsed = parse_dataset_specs(skill.dataset_specs_raw.as_deref());
-    if !parsed.is_empty() {
-        return parsed;
+fn migrate_legacy_analytics_tools(skill: &mut LoadedSkill) {
+    if !matches!(
+        skill.skill_key.as_str(),
+        "report_analysis" | "process_research"
+    ) {
+        return;
     }
-    match skill.skill_key.as_str() {
-        "report_analysis" => default_report_analysis_specs(),
-        "process_research" => default_process_research_specs(),
-        "price_search" => default_price_search_specs(),
-        _ => Vec::new(),
+
+    skill.required_tools.retain(|tool| {
+        !matches!(
+            tool.as_str(),
+            "list_datasets" | "describe_dataset" | "run_query"
+        )
+    });
+    skill.optional_tools.retain(|tool| {
+        !matches!(
+            tool.as_str(),
+            "list_datasets" | "describe_dataset" | "run_query"
+        )
+    });
+    if !skill
+        .required_tools
+        .iter()
+        .any(|tool| tool == "analytics_summary")
+    {
+        skill.required_tools.push("analytics_summary".to_string());
     }
 }
 
@@ -356,4 +357,57 @@ pub async fn sync_bundled_skills(stdb: &StdbClient, organization_id: u64) -> Res
     }
 
     Ok(synced)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn legacy_analytics_skill(skill_key: &str) -> LoadedSkill {
+        LoadedSkill {
+            id: 1,
+            skill_key: skill_key.to_string(),
+            name: "Legacy analytics".to_string(),
+            category: "analytics".to_string(),
+            prompt_template: String::new(),
+            required_tools: vec![
+                "erp_search".to_string(),
+                "list_datasets".to_string(),
+                "run_query".to_string(),
+            ],
+            optional_tools: vec!["describe_dataset".to_string()],
+            default_max_steps: 5,
+            default_max_tool_calls: 12,
+            config_json: serde_json::json!({}),
+            custom_instructions: None,
+            skill_config_id: None,
+            enabled: true,
+            allowed_action_drafts: vec![],
+            source: SkillSource::Remote,
+        }
+    }
+
+    #[test]
+    fn migrates_legacy_report_analysis_tools() {
+        let mut skill = legacy_analytics_skill("report_analysis");
+        migrate_legacy_analytics_tools(&mut skill);
+
+        assert_eq!(
+            skill.required_tools,
+            vec!["erp_search", "analytics_summary"]
+        );
+        assert!(skill.optional_tools.is_empty());
+    }
+
+    #[test]
+    fn leaves_unrelated_skills_unchanged() {
+        let mut skill = legacy_analytics_skill("price_search");
+        migrate_legacy_analytics_tools(&mut skill);
+
+        assert!(skill.required_tools.iter().any(|tool| tool == "run_query"));
+        assert!(skill
+            .optional_tools
+            .iter()
+            .any(|tool| tool == "describe_dataset"));
+    }
 }

@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
@@ -9,11 +9,8 @@ use crate::{
         enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed,
         ensure_within_budget, record_ai_spend, resolve_agent,
     },
-    orchestrator::skill_loader::{
-        complete_run, create_run, load_skill, resolve_dataset_specs, LoadedSkill,
-    },
+    orchestrator::skill_loader::{complete_run, create_run, load_skill, LoadedSkill},
     providers::llm::LlmMessage,
-    sandbox::{default_analysis_sql, SandboxSession},
     skills::{
         analyze_import_mapping, collect_briefing_context, preview_import_mapping, scan_insights,
         BriefingContextRequest, ImportAnalyzeRequest, ImportPreviewRequest, InsightsScanRequest,
@@ -98,6 +95,7 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
     if !skill.enabled {
         anyhow::bail!("skill '{skill_key}' is disabled for this company");
     }
+    reject_legacy_analytics_sql(&req.inputs)?;
 
     let agent = resolve_agent(&stdb, req.org_id, req.agent_id, req.team_member_id).await?;
     ensure_allowed_action(&agent, "skill_run")?;
@@ -132,29 +130,6 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
 
     let registry = ToolRegistry::new();
     let allowed_tools = resolve_allowed_tools(&skill, &agent);
-    let dataset_specs = resolve_dataset_specs(&skill);
-    let needs_sandbox = allowed_tools.iter().any(|t| {
-        matches!(
-            t.as_str(),
-            "list_datasets" | "describe_dataset" | "run_query"
-        )
-    });
-    let sandbox = if needs_sandbox && !dataset_specs.is_empty() {
-        Some(Arc::new(Mutex::new(
-            SandboxSession::materialize(
-                &stdb,
-                req.org_id,
-                req.company_id,
-                run_id,
-                &dataset_specs,
-                &req.inputs,
-            )
-            .await
-            .context("materialize analytics sandbox")?,
-        )))
-    } else {
-        None
-    };
 
     let tool_ctx = ToolContext {
         state: state.clone(),
@@ -165,8 +140,6 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
         skill_key: skill.skill_key.clone(),
         config_json: skill.config_json.clone(),
         inputs: req.inputs.clone(),
-        sandbox,
-        dataset_specs,
         allowed_action_drafts: skill.allowed_action_drafts.clone(),
     };
 
@@ -327,7 +300,8 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
         tool_payloads.push(json!({ "tool": "erp_search", "data": output.data }));
     }
 
-    if allowed_tools.iter().any(|t| t == "list_datasets") && step_no < max_steps {
+    let mut query_artifact: Option<SkillArtifact> = None;
+    if allowed_tools.iter().any(|t| t == "analytics_summary") && step_no < max_steps {
         step_no += 1;
         let output = registry
             .run_and_record(
@@ -336,50 +310,23 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
                 req.company_id,
                 run_id,
                 step_no,
-                "list_datasets",
+                "analytics_summary",
                 &tool_ctx,
                 &json!({}),
             )
             .await?;
         steps.push(RunSkillStepSummary {
             step_no,
-            tool: "list_datasets".to_string(),
+            tool: "analytics_summary".to_string(),
             duration_ms: 0,
             summary: output.summary.clone(),
         });
-        tool_payloads.push(json!({ "tool": "list_datasets", "data": output.data }));
-    }
-
-    let mut query_artifact: Option<SkillArtifact> = None;
-    if allowed_tools.iter().any(|t| t == "run_query") && step_no < max_steps {
-        let sql = extract_analysis_sql(&req.inputs, &skill);
-        if let Some(sql) = sql {
-            step_no += 1;
-            let output = registry
-                .run_and_record(
-                    &stdb,
-                    req.org_id,
-                    req.company_id,
-                    run_id,
-                    step_no,
-                    "run_query",
-                    &tool_ctx,
-                    &json!({ "sql": sql }),
-                )
-                .await?;
-            steps.push(RunSkillStepSummary {
-                step_no,
-                tool: "run_query".to_string(),
-                duration_ms: 0,
-                summary: output.summary.clone(),
-            });
-            tool_payloads.push(json!({ "tool": "run_query", "data": output.data }));
-            query_artifact = Some(SkillArtifact {
-                kind: "table".to_string(),
-                title: "Analytics query result".to_string(),
-                content: output.data,
-            });
-        }
+        tool_payloads.push(json!({ "tool": "analytics_summary", "data": output.data }));
+        query_artifact = Some(SkillArtifact {
+            kind: "table".to_string(),
+            title: "Approved analytics summary".to_string(),
+            content: output.data,
+        });
     }
 
     let mut comparison_artifact: Option<SkillArtifact> = None;
@@ -599,18 +546,6 @@ fn price_comparison_from_web(data: &Value) -> Value {
     })
 }
 
-fn extract_analysis_sql(inputs: &Value, skill: &LoadedSkill) -> Option<String> {
-    for key in ["analysis_sql", "sql", "analysisSql"] {
-        if let Some(value) = inputs.get(key).and_then(|v| v.as_str()) {
-            let trimmed = value.trim();
-            if !trimmed.is_empty() {
-                return Some(trimmed.to_string());
-            }
-        }
-    }
-    default_analysis_sql(&skill.skill_key).map(str::to_string)
-}
-
 fn extract_query(inputs: &Value) -> String {
     for key in ["query", "goal", "question", "prompt"] {
         if let Some(value) = inputs.get(key).and_then(|v| v.as_str()) {
@@ -621,6 +556,30 @@ fn extract_query(inputs: &Value) -> String {
         }
     }
     String::new()
+}
+
+fn reject_legacy_analytics_sql(inputs: &Value) -> Result<()> {
+    for key in ["analysis_sql", "analysisSql", "sql"] {
+        if inputs.get(key).is_some() {
+            anyhow::bail!(
+                "raw SQL input '{key}' is not supported; use an approved analytics skill"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_legacy_sql_inputs() {
+        assert!(reject_legacy_analytics_sql(&json!({"analysis_sql": "SELECT 1"})).is_err());
+        assert!(reject_legacy_analytics_sql(&json!({"analysisSql": "SELECT 1"})).is_err());
+        assert!(reject_legacy_analytics_sql(&json!({"sql": "SELECT 1"})).is_err());
+        assert!(reject_legacy_analytics_sql(&json!({"query": "revenue"})).is_ok());
+    }
 }
 
 async fn synthesize_summary(

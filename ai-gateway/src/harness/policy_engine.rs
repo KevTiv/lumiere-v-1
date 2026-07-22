@@ -424,17 +424,35 @@ impl PolicyEngine {
             }
         }
 
-        let scopes = match self.scopes.resolve(
-            manifest,
-            request.organization_id,
-            request.company_id,
-            &request.plan.named_resources,
-        ) {
-            Ok(scopes) => scopes,
-            Err(error) => {
-                violations.push(scope_reason(&error));
-                Vec::new()
+        let has_named_read = request
+            .plan
+            .tool_calls
+            .iter()
+            .any(|call| call.capability == Capability::NamedRead);
+        let scopes = if has_named_read {
+            match self.scopes.resolve(
+                manifest,
+                request.organization_id,
+                request.company_id,
+                &request.plan.named_resources,
+            ) {
+                Ok(scopes) => scopes,
+                Err(error) => {
+                    violations.push(scope_reason(&error));
+                    Vec::new()
+                }
             }
+        } else if request.plan.named_resources.is_empty() {
+            // A red action-draft request can be fully bounded by its typed input
+            // and company scope. It must not be forced through a read-resource
+            // contract when it has no named-read tool call.
+            Vec::new()
+        } else {
+            violations.push(DecisionReason::new(
+                PolicyReasonCode::ResourceNotAllowed,
+                "named resources require at least one named-read tool call",
+            ));
+            Vec::new()
         };
 
         for scope in &scopes {
@@ -716,8 +734,14 @@ mod tests {
         manifest.allowed_capabilities = match risk {
             RiskClass::Green => vec![Capability::NamedRead],
             RiskClass::Amber => vec![Capability::NamedRead, Capability::ActionDraft],
-            RiskClass::Red => vec![Capability::NamedRead, Capability::ActionExecute],
+            RiskClass::Red => vec![Capability::ActionDraft],
         };
+        if risk == RiskClass::Red {
+            manifest.named_resources.clear();
+            manifest.allowed_tools = vec!["create_sale_order".to_string()];
+            manifest.output_type = "action_draft".to_string();
+            manifest.limits.max_rows = 0;
+        }
         let mut skills = SkillRegistry::default();
         skills.insert(manifest);
         PolicyEngine::new(skills, ResourceRegistry::built_in())
@@ -823,6 +847,7 @@ mod tests {
         request.skill = SkillVersionRef::new("custom", 1);
         request.plan.tool_calls[0].capability = Capability::ActionDraft;
         request.plan.tool_calls[0].named_resource = None;
+        request.plan.named_resources.clear();
         assert_eq!(
             engine.evaluate(&request).outcome,
             DecisionOutcome::DraftOnly
@@ -870,6 +895,8 @@ mod tests {
         request.plan.tool_calls[0].tool_name = "create_sale_order".to_string();
         request.plan.tool_calls[0].capability = Capability::ActionDraft;
         request.plan.tool_calls[0].named_resource = None;
+        request.plan.named_resources.clear();
+        request.plan.expected_rows = 0;
         request.plan.output_type = "action_draft".to_string();
 
         let result = engine.execute_controlled(PolicyControlledRequest {

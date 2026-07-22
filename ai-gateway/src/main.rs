@@ -10,7 +10,6 @@ mod qdrant_client;
 mod rate_limit;
 mod rig_agent;
 mod routes;
-mod sandbox;
 mod skills;
 mod state;
 mod stdb_embed;

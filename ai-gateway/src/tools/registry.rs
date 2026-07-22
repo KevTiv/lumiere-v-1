@@ -23,9 +23,7 @@ pub trait AgentTool: Send + Sync {
 struct ErpSnapshotTool;
 struct ErpSearchTool;
 struct SaveArtifactTool;
-struct ListDatasetsTool;
-struct DescribeDatasetTool;
-struct RunQueryTool;
+struct AnalyticsSummaryTool;
 struct WebSearchTool;
 struct FetchUrlTool;
 struct ActionDraftTool;
@@ -76,9 +74,9 @@ impl AgentTool for SaveArtifactTool {
 }
 
 #[async_trait]
-impl AgentTool for ListDatasetsTool {
+impl AgentTool for AnalyticsSummaryTool {
     fn name(&self) -> &'static str {
-        "list_datasets"
+        "analytics_summary"
     }
 
     fn required_action(&self) -> &'static str {
@@ -87,36 +85,6 @@ impl AgentTool for ListDatasetsTool {
 
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
         analytics::execute(ctx, input).await
-    }
-}
-
-#[async_trait]
-impl AgentTool for DescribeDatasetTool {
-    fn name(&self) -> &'static str {
-        "describe_dataset"
-    }
-
-    fn required_action(&self) -> &'static str {
-        "analytics_read"
-    }
-
-    async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
-        analytics::execute_describe(ctx, input).await
-    }
-}
-
-#[async_trait]
-impl AgentTool for RunQueryTool {
-    fn name(&self) -> &'static str {
-        "run_query"
-    }
-
-    fn required_action(&self) -> &'static str {
-        "analytics_run"
-    }
-
-    async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
-        analytics::execute_query(ctx, input).await
     }
 }
 
@@ -181,9 +149,7 @@ impl ToolRegistry {
             tools: vec![
                 Box::new(ErpSnapshotTool),
                 Box::new(ErpSearchTool),
-                Box::new(ListDatasetsTool),
-                Box::new(DescribeDatasetTool),
-                Box::new(RunQueryTool),
+                Box::new(AnalyticsSummaryTool),
                 Box::new(WebSearchTool),
                 Box::new(FetchUrlTool),
                 Box::new(ActionDraftTool),
