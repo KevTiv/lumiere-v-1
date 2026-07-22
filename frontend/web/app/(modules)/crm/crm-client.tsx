@@ -1,4 +1,5 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { CrmDuplicateContacts } from "@/lib/crm-duplicate-contacts-panel"
 import { ContactIdentitiesPanel } from "./contact-identities-panel"
@@ -1547,12 +1548,7 @@ function CrmClientLoaded({
       .slice(0, 4)
 
     const openOpportunities = currentOpenOpportunities
-    const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -1725,17 +1721,14 @@ function CrmClientLoaded({
           return { ...w, data: { ...(w.data as Record<string, unknown>), rows: recentRows } }
         }
         return w
-      }),
-    }))
+          })
   }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, dashboardTimeRange, t, navigateToLeadsByState, opportunityStages, forecastSnapshots, createForecastSnapshot, operatingCompanyId])
 
   const config = useMemo(
     () =>
       ({
         ...moduleConfig,
-        tabs: moduleConfig.tabs.map((tab) =>
-          tab.id === "dashboard" ? { ...tab, sections: liveSections } : tab,
-        ),
+        tabs: withDashboardSections(moduleConfig, liveSections).tabs,
       }) as ModuleConfig,
     [moduleConfig, liveSections],
   )

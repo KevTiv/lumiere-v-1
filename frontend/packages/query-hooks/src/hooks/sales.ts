@@ -818,14 +818,7 @@ export function useCreateCreditNoteFromReturnOrder(organizationId: bigint, compa
 
 // ── CSV imports (organization_id, company_id, csv_data) ───────────────────────
 
-async function parseCallErrorSales(r: Response): Promise<string> {
-  try {
-    const j = (await r.json()) as { error?: string }
-    return j.error ?? r.statusText
-  } catch {
-    return r.statusText
-  }
-}
+import { responseErrorMessage as parseCallErrorSales } from "@lumiere/api-client/response-error"
 
 export function useImportSaleOrderCsv(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()

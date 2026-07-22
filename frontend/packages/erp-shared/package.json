@@ -46,7 +46,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/csv-import-transform.test.ts src/csv-import-safety.test.ts src/csv-import-bundles.test.ts src/csv-import-retry.test.ts"
+    "test": "node --import tsx --test src/form-coercion.test.ts src/csv-import-transform.test.ts src/csv-import-safety.test.ts src/csv-import-bundles.test.ts src/csv-import-retry.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",

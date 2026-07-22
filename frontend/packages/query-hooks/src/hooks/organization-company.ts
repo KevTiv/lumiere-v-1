@@ -6,10 +6,7 @@ import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
-async function parseCallError(r: Response): Promise<string> {
-  const j = (await r.json().catch(() => ({}))) as { error?: string }
-  return j.error ?? `Request failed (${r.status})`
-}
+import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
 function stdbQueryKey(resource: string, organizationId: number) {
   return ["stdb", resource, organizationId] as const

@@ -1,4 +1,5 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -672,12 +673,7 @@ function SubscriptionsClientLoaded({
       })
       .reduce((sum, m) => sum + Number(m.amountUntaxed ?? m.amount_untaxed ?? 0), 0)
 
-    const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -719,8 +715,7 @@ function SubscriptionsClientLoaded({
           }
         }
         return w
-      }),
-    }))
+          })
   }, [
     subscriptions,
     plans,
@@ -737,14 +732,7 @@ function SubscriptionsClientLoaded({
     () =>
       ({
         ...moduleConfig,
-        tabs: moduleConfig.tabs.map((tab) => {
-          if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "subscriptions")
-            return {
-              ...tab,
-              createForm: subscriptionFormConfig,
-              entityConfig: subscriptionsTableConfig(t, subscriptionRowActions),
-            }
+        tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
           if (tab.id === "plans") return { ...tab, createForm: planFormConfig }
           if (tab.id === "lines")
             return { ...tab, entityConfig: subscriptionLinesTableConfig(t) }

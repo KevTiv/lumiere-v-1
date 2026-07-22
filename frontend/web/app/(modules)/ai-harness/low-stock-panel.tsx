@@ -42,6 +42,7 @@ import {
 import { useAiLowStockScan } from "@lumiere/query-hooks/hooks/ai-low-stock"
 import type { DecisionOutcome } from "@lumiere/erp-shared/ai-policy-schemas"
 import type { LowStockScanResult } from "@lumiere/erp-shared/ai-low-stock-schemas"
+import { companyRowsToSelectOptions } from "@/lib/form-lookup"
 
 import { HarnessAuditTrailCard } from "./harness-audit-trail-card"
 
@@ -49,15 +50,6 @@ interface LowStockPanelProps {
   organizationId: bigint
   companies: Record<string, unknown>[]
   defaultCompanyId?: number
-}
-
-function companyRowsToSelectOptions(
-  rows: Record<string, unknown>[],
-): Array<{ value: string; label: string }> {
-  return rows.map((row) => ({
-    value: String(row.id ?? ""),
-    label: String(row.name ?? row.id ?? ""),
-  }))
 }
 
 function decisionBadgeVariant(outcome: DecisionOutcome): "default" | "secondary" | "destructive" {

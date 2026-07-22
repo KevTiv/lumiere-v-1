@@ -29,17 +29,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { nullableBigIntU64 as asId } from "@lumiere/erp-shared/form-coercion"
 
 type Row = Record<string, unknown>
-
-function asId(value: unknown): bigint | null {
-  if (value == null || value === "") return null
-  try {
-    return typeof value === "bigint" ? value : BigInt(String(value))
-  } catch {
-    return null
-  }
-}
 
 function isActiveRow(row: Row): boolean {
   return row.isActive !== false && row.is_active !== false

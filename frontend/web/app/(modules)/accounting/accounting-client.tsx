@@ -1,10 +1,12 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
+  CsvImportModal,
   RuntimeFormModal,
   EntityView,
   useRBAC,
@@ -141,7 +143,7 @@ import {
   toCreateBadDebtWriteOffParamsFromForm,
   toCreateAmortizationScheduleParamsFromForm,
 } from "@/lib/accounting-create-params"
-import { optionalBigIntU64 } from "@/lib/form-coercion"
+import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
 import type {
   AddAccountMoveLineParams,
@@ -675,7 +677,6 @@ function AccountingClientLoaded({
   const [fiscalSetupError, setFiscalSetupError] = useState<string | null>(null)
   const [accountPeriodEdit, setAccountPeriodEdit] = useState<Record<string, unknown> | null>(null)
   const [csvKind, setCsvKind] = useState<AccountingCsvImportKind | null>(null)
-  const [csvError, setCsvError] = useState<string | null>(null)
   const [registerPaymentForId, setRegisterPaymentForId] = useState<bigint | null>(null)
   const [registerPaymentError, setRegisterPaymentError] = useState<string | null>(null)
   const [reconcilePaymentOpen, setReconcilePaymentOpen] = useState(false)
@@ -2677,12 +2678,7 @@ function AccountingClientLoaded({
     const currentPaymentsReceived = paymentsReceivedIn(currentRange)
     const previousPaymentsReceived = paymentsReceivedIn(previousRange)
 
-    const dashboardTab = moduleConfigBase.tabs.find((tb) => tb.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfigBase, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -2822,8 +2818,7 @@ function AccountingClientLoaded({
           return { ...w, data: { deadlines } }
         }
         return w
-      }),
-    }))
+          })
   }, [
     accounts,
     invoices,
@@ -2979,10 +2974,6 @@ function AccountingClientLoaded({
     }
   }
 
-  useEffect(() => {
-    if (csvKind) setCsvError(null)
-  }, [csvKind])
-
   const addCsvToolbar = useCallback(
     (ec: EntityViewConfig, actions: Array<{ id: string; label: string; onClick: () => void }>): EntityViewConfig => {
       if (ec.view.mode !== "table") return ec
@@ -3020,7 +3011,7 @@ function AccountingClientLoaded({
       return {
         ...moduleWithoutTabs,
         tabs: (() => {
-          const mapped = moduleConfigBase.tabs.map((tab) => {
+          const mapped = withDashboardSections(moduleConfigBase, liveSections).tabs.map((tab) => {
             if (tab.id === "analytic-lines") {
               return { ...tab, createForm: analyticLineFormConfig }
             }
@@ -3029,9 +3020,6 @@ function AccountingClientLoaded({
             }
             if (tab.id === "analytic-distribution") {
               return { ...tab, createForm: analyticDistFormConfig }
-            }
-            if (tab.id === "dashboard") {
-              return { ...tab, sections: liveSections }
             }
             if (tab.id === "invoices") {
               const { createForm: _cf, createAction: _ca, createLabel: _cl, ...tabRest } = tab
@@ -3912,34 +3900,18 @@ function AccountingClientLoaded({
       ) : null}
 
       {csvKind && csvFormConfig ? (
-        <FormModal
+        <CsvImportModal
           key={csvKind}
-          open
-          onOpenChange={(o) => !o && setCsvKind(null)}
+          onClose={() => setCsvKind(null)}
           config={csvFormConfig}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null)
-            const files = data.csvFile as FileList | undefined
-            const file = files?.[0]
-            if (!file) {
-              setCsvError(t("common.validation.required"))
-              return
-            }
-            try {
-              const text = await file.text()
-              if (csvKind === "account") await csvImports.importAccount.mutateAsync(text)
-              else if (csvKind === "accountMove") await csvImports.importAccountMove.mutateAsync(text)
-              else if (csvKind === "accountMoveLine") await csvImports.importAccountMoveLine.mutateAsync(text)
-              else if (csvKind === "tax") await csvImports.importTaxRate.mutateAsync(text)
-              else if (csvKind === "budget") await csvImports.importBudget.mutateAsync(text)
-              else if (csvKind === "budgetLine") await csvImports.importBudgetLine.mutateAsync(text)
-              else await csvImports.importAnalyticAccount.mutateAsync(text)
-              setCsvKind(null)
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e))
-            }
+          onImport={async (text) => {
+            if (csvKind === "account") await csvImports.importAccount.mutateAsync(text)
+            else if (csvKind === "accountMove") await csvImports.importAccountMove.mutateAsync(text)
+            else if (csvKind === "accountMoveLine") await csvImports.importAccountMoveLine.mutateAsync(text)
+            else if (csvKind === "tax") await csvImports.importTaxRate.mutateAsync(text)
+            else if (csvKind === "budget") await csvImports.importBudget.mutateAsync(text)
+            else if (csvKind === "budgetLine") await csvImports.importBudgetLine.mutateAsync(text)
+            else await csvImports.importAnalyticAccount.mutateAsync(text)
           }}
         />
       ) : null}

@@ -14,10 +14,7 @@ import { apiFetch } from "../http"
 
 export type { DocumentPdfKind, DocumentExportFormat, DocumentExportKind }
 
-async function parseCallError(r: Response): Promise<string> {
-  const j = (await r.json().catch(() => ({}))) as { error?: string; detail?: string }
-  return j.error ?? j.detail ?? `Request failed (${r.status})`
-}
+import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
 export type DocumentTemplateRow = {
   id: number | string

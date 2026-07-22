@@ -9,10 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
 
-async function parseCallError(r: Response): Promise<string> {
-  const j = (await r.json().catch(() => ({}))) as { error?: string; detail?: string }
-  return j.error ?? j.detail ?? `Request failed (${r.status})`
-}
+import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
 function draftsQueryKey(organizationId: number, companyId?: number) {
   return ["ai-action-drafts", String(organizationId), companyId != null ? String(companyId) : "all"] as const

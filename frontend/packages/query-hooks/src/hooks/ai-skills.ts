@@ -61,10 +61,7 @@ export type AiSkillRunResponse = {
   skill_key: string
 }
 
-async function parseAiError(r: Response): Promise<string> {
-  const j = (await r.json().catch(() => ({}))) as { error?: string; detail?: string }
-  return j.error ?? j.detail ?? `Request failed (${r.status})`
-}
+import { responseErrorMessage as parseAiError } from "@lumiere/api-client/response-error"
 
 export function useAiSkills() {
   return useQuery({
@@ -172,11 +169,6 @@ export function useAiTeamMemberSkills(organizationId: bigint, enabled = true) {
   })
 }
 
-async function parseCallError(r: Response): Promise<string> {
-  const j = (await r.json().catch(() => ({}))) as { error?: string }
-  return j.error ?? `Request failed (${r.status})`
-}
-
 export function useCreateAiSkill(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
@@ -186,7 +178,7 @@ export function useCreateAiSkill(organizationId: number) {
         stdbParamsToJson(params as object),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      if (!r.ok) throw new Error(await parseAiError(r))
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiSkillsQueryKey(organizationId) })
@@ -204,7 +196,7 @@ export function useUpsertAiSkill(organizationId: number) {
         stdbParamsToJson(params as object),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      if (!r.ok) throw new Error(await parseAiError(r))
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiSkillsQueryKey(organizationId) })
@@ -223,7 +215,7 @@ export function useSetAiSkillActive(organizationId: number) {
         args.active,
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      if (!r.ok) throw new Error(await parseAiError(r))
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiSkillsQueryKey(organizationId) })
@@ -241,7 +233,7 @@ export function useAssignTeamMemberSkill(organizationId: number) {
         stdbParamsToJson(params as object),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      if (!r.ok) throw new Error(await parseAiError(r))
     },
     onSuccess: () => {
       void qc.invalidateQueries({
@@ -260,7 +252,7 @@ export function useUnassignTeamMemberSkill(organizationId: number) {
         teamMemberSkillId,
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      if (!r.ok) throw new Error(await parseAiError(r))
     },
     onSuccess: () => {
       void qc.invalidateQueries({
@@ -303,7 +295,7 @@ export function useCancelAiAgentRun(organizationId: number, companyId?: number) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify([organizationId, cid, runId, "Cancelled from UI"]),
       })
-      if (!r.ok) throw new Error(await parseCallError(r))
+      if (!r.ok) throw new Error(await parseAiError(r))
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["ai-agent-runs", organizationId] })

@@ -3,10 +3,7 @@
  */
 
 import type { CreateWorkflowParams, WorkflowTrigger } from "@lumiere/stdb/types"
-
-function field(formData: Record<string, unknown>, camel: string, snake: string): unknown {
-  return formData[camel] ?? formData[snake]
-}
+import { formValue as field } from "./form-coercion"
 
 function optionalTrimmedString(v: unknown): string | undefined {
   if (v == null) return undefined

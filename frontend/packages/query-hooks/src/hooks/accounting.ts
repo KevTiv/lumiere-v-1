@@ -399,10 +399,7 @@ export function useAccountAnalyticDistributionModels(
   return useStdbQuery("analytic-distribution-models", organizationId, options)
 }
 
-async function parseCallError(r: Response): Promise<string> {
-  const json = (await r.json().catch(() => ({}))) as Record<string, unknown>
-  return (json.error as string | undefined) ?? `Request failed (${r.status})`
-}
+import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
 function useAccountingCallMutation(
   reducer: AccountingBffReducerKey,

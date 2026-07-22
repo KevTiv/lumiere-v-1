@@ -1,4 +1,5 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useEffect, useMemo, useState } from "react"
 import { useModuleTab } from "@/hooks/use-module-tab"
@@ -6,6 +7,7 @@ import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
+  CsvImportModal,
   newManufacturingOrderForm,
   newBomForm,
   newWorkcenterForm,
@@ -98,7 +100,6 @@ function ManufacturingClientLoaded({
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [rowPick, setRowPick] = useState<{ tabId: string; row: Record<string, unknown> } | null>(null)
   const [csvKind, setCsvKind] = useState<ManufacturingCsvImportKind | null>(null)
-  const [csvError, setCsvError] = useState<string | null>(null)
   // activeTab is now URL-synced via useModuleTab below (after moduleConfig is defined)
 
   const { data: productions = [] } = useMrpProductions(orgId, initialProductions)
@@ -126,10 +127,6 @@ function ManufacturingClientLoaded({
     if (!csvKind) return null
     return manufacturingCsvImportForm(t, csvKind)
   }, [csvKind, t])
-
-  useEffect(() => {
-    if (csvKind) setCsvError(null)
-  }, [csvKind])
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
@@ -217,12 +214,7 @@ function ManufacturingClientLoaded({
 
     const readyWorkorders = workorders.filter((wo) => String(wo.state) === "Ready").length
 
-    return (
-      moduleConfig.tabs
-        .find((tab) => tab.id === "dashboard")
-        ?.sections?.map((section) => ({
-          ...section,
-          widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
             if (w.type === "stat-cards") {
               return {
                 ...w,
@@ -290,11 +282,7 @@ function ManufacturingClientLoaded({
               return { ...w, data: { ...(w.data as Record<string, unknown>), rows: activeOrdersRows } }
             }
             return w
-          }),
-        })) ??
-      moduleConfig.tabs.find((tab) => tab.id === "dashboard")?.sections ??
-      []
-    )
+              })
   }, [
     productions,
     workorders,
@@ -310,21 +298,7 @@ function ManufacturingClientLoaded({
     () =>
       ({
         ...moduleConfig,
-        tabs: moduleConfig.tabs.map((tab) => {
-          if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "orders" && tab.entityConfig) {
-            return {
-              ...tab,
-              createForm: moFormConfig,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
-                {
-                  id: "csv-mo",
-                  label: t("manufacturing.toolbar.importMoCsv"),
-                  onClick: () => setCsvKind("mo"),
-                },
-              ]),
-            }
-          }
+        tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
           if (tab.id === "boms" && tab.entityConfig) {
             return {
               ...tab,
@@ -458,32 +432,16 @@ function ManufacturingClientLoaded({
         t={t}
       />
       {csvKind && csvFormConfig ? (
-        <FormModal
+        <CsvImportModal
           key={csvKind}
-          open
-          onOpenChange={(o) => !o && setCsvKind(null)}
+          onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null)
-            const files = data.csvFile as FileList | undefined
-            const file = files?.[0]
-            if (!file) {
-              setCsvError(t("common.validation.required"))
-              return
-            }
-            try {
-              const text = await file.text()
-              if (csvKind === "mo") await m.importMoCsv.mutateAsync(text)
-              else if (csvKind === "bom") await m.importBomCsv.mutateAsync(text)
-              else if (csvKind === "bom_line") await m.importBomLineCsv.mutateAsync(text)
-              else await m.importWorkcenterCsv.mutateAsync(text)
-              setCsvKind(null)
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e))
-            }
+          onImport={async (text) => {
+            if (csvKind === "mo") await m.importMoCsv.mutateAsync(text)
+            else if (csvKind === "bom") await m.importBomCsv.mutateAsync(text)
+            else if (csvKind === "bom_line") await m.importBomLineCsv.mutateAsync(text)
+            else await m.importWorkcenterCsv.mutateAsync(text)
           }}
         />
       ) : null}

@@ -45,6 +45,7 @@ import { useReportCatalog } from "@lumiere/query-hooks/hooks/owner-reports"
 import { useAiReportComposer } from "@lumiere/query-hooks/hooks/ai-report-composer"
 import type { DecisionOutcome } from "@lumiere/erp-shared/ai-policy-schemas"
 import type { ReportComposerResult } from "@lumiere/erp-shared/ai-report-composer-schemas"
+import { companyRowsToSelectOptions } from "@/lib/form-lookup"
 
 import { HarnessAuditTrailCard } from "./harness-audit-trail-card"
 
@@ -52,15 +53,6 @@ interface ReportComposerPanelProps {
   organizationId: bigint
   companies: Record<string, unknown>[]
   defaultCompanyId?: number
-}
-
-function companyRowsToSelectOptions(
-  rows: Record<string, unknown>[],
-): Array<{ value: string; label: string }> {
-  return rows.map((row) => ({
-    value: String(row.id ?? ""),
-    label: String(row.name ?? row.id ?? ""),
-  }))
 }
 
 function todayInputValue(): string {

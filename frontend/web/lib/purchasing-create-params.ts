@@ -13,30 +13,9 @@ import type {
 } from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
+import { nullableBigIntU64, optionalBigIntU64, optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
+
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
-
-function optionalTrimmedString(v: unknown): string | undefined {
-  if (v == null) return undefined
-  const s = String(v).trim()
-  return s === "" ? undefined : s
-}
-
-function requiredBigIntU64(v: unknown): bigint | null {
-  if (v == null || v === "") return null
-  if (typeof v === "bigint") return v
-  const n = Number(v)
-  if (Number.isFinite(n) && n >= 0) return BigInt(Math.trunc(n))
-  try {
-    return BigInt(String(v).trim())
-  } catch {
-    return null
-  }
-}
-
-function optionalBigIntU64(v: unknown): bigint | undefined {
-  const n = requiredBigIntU64(v)
-  return n == null ? undefined : n
-}
 
 function timestampFromFormDate(v: unknown, fallback: Date): Timestamp {
   if (v == null || String(v).trim() === "") return stbTimestampFromDate(fallback)
@@ -101,9 +80,9 @@ export function toCreateBillFromPurchaseOrderParams(
   formData: Record<string, unknown>,
   order?: { partnerId?: bigint },
 ): CreateBillFromPurchaseOrderParams | null {
-  const journalId = requiredBigIntU64(formData.journalId)
-  const defaultExpenseAccountId = requiredBigIntU64(formData.defaultExpenseAccountId)
-  const payableAccountId = requiredBigIntU64(formData.payableAccountId)
+  const journalId = nullableBigIntU64(formData.journalId)
+  const defaultExpenseAccountId = nullableBigIntU64(formData.defaultExpenseAccountId)
+  const payableAccountId = nullableBigIntU64(formData.payableAccountId)
   if (journalId == null || defaultExpenseAccountId == null || payableAccountId == null) {
     return null
   }
@@ -141,8 +120,8 @@ export function toCreatePurchaseOrderParams(
   formData: Record<string, unknown>,
   pricelists: Array<{ id: unknown; currencyId?: unknown }>,
 ): CreatePurchaseOrderParams | null {
-  const partnerId = requiredBigIntU64(formData.partnerId)
-  const pricelistId = requiredBigIntU64(formData.pricelistId)
+  const partnerId = nullableBigIntU64(formData.partnerId)
+  const pricelistId = nullableBigIntU64(formData.pricelistId)
   if (partnerId == null || pricelistId == null) return null
 
   const pl = pricelists.find((p) => String(p.id) === String(pricelistId))
@@ -181,8 +160,8 @@ export function toCreatePurchaseOrderParams(
 export function toCreatePurchaseRequisitionParams(
   formData: Record<string, unknown>,
 ): CreatePurchaseRequisitionParams {
-  const productId = requiredBigIntU64(formData.productId)
-  const productUom = requiredBigIntU64(formData.uomId ?? formData.productUom)
+  const productId = nullableBigIntU64(formData.productId)
+  const productUom = nullableBigIntU64(formData.uomId ?? formData.productUom)
   const productUomQty = Number(formData.quantity ?? formData.productUomQty)
   const lines =
     productId != null &&
@@ -298,7 +277,7 @@ export function toCreateLandedCostParams(
   formData: Record<string, unknown>,
 ): CreateLandedCostParams | null {
   const pickingRaw = formData.pickingId
-  const currencyId = requiredBigIntU64(formData.currencyId)
+  const currencyId = nullableBigIntU64(formData.currencyId)
   const amountTotal = Number(formData.amountTotal)
   if (pickingRaw == null || pickingRaw === "" || currencyId == null) return null
   if (!Number.isFinite(amountTotal) || amountTotal < 0) return null
@@ -329,7 +308,7 @@ export function toUpdateLandedCostParams(
   if (formData.targetMove != null && formData.targetMove !== "") {
     params.targetMove = String(formData.targetMove)
   }
-  const currencyId = requiredBigIntU64(formData.currencyId)
+  const currencyId = nullableBigIntU64(formData.currencyId)
   if (currencyId != null) params.currencyId = currencyId
   const amountTotal = Number(formData.amountTotal)
   if (Number.isFinite(amountTotal) && amountTotal >= 0) params.amountTotal = amountTotal
@@ -345,8 +324,8 @@ export function toUpdateLandedCostParams(
 export function toAddLandedCostLineParams(
   formData: Record<string, unknown>,
 ): AddLandedCostLineParams | null {
-  const productId = requiredBigIntU64(formData.productId)
-  const currencyId = requiredBigIntU64(formData.currencyId)
+  const productId = nullableBigIntU64(formData.productId)
+  const currencyId = nullableBigIntU64(formData.currencyId)
   const priceUnit = Number(formData.priceUnit)
   const splitTag = String(formData.splitMethod ?? "Equal")
   if (productId == null || currencyId == null) return null

@@ -5,6 +5,12 @@
  * Mirrors `expense-capture-outbox.ts`.
  */
 
+import {
+  getOrCreateLocalStorageDeviceId,
+  readLocalStorageArray,
+  writeLocalStorageArray,
+} from "./local-outbox"
+
 export type TimesheetCapturePayload = {
   projectId: string
   taskId: string
@@ -33,17 +39,7 @@ function storageKey(organizationId: string | number, deviceId: string): string {
 }
 
 export function getOrCreateTimesheetCaptureDeviceId(): string {
-  if (typeof window === "undefined") return "server"
-  const key = "lumiere.timesheet-capture-device-id"
-  let id = window.localStorage.getItem(key)
-  if (!id) {
-    id =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `dev-${Date.now()}`
-    window.localStorage.setItem(key, id)
-  }
-  return id
+  return getOrCreateLocalStorageDeviceId("lumiere.timesheet-capture-device-id")
 }
 
 export function newTimesheetClientRequestId(): string {
@@ -57,15 +53,7 @@ export function readTimesheetCaptureOutbox(
   organizationId: string | number,
   deviceId: string,
 ): TimesheetCaptureOutboxItem[] {
-  if (typeof window === "undefined") return []
-  try {
-    const raw = window.localStorage.getItem(storageKey(organizationId, deviceId))
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as TimesheetCaptureOutboxItem[]
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
+  return readLocalStorageArray<TimesheetCaptureOutboxItem>(storageKey(organizationId, deviceId))
 }
 
 function writeTimesheetCaptureOutbox(
@@ -73,8 +61,7 @@ function writeTimesheetCaptureOutbox(
   deviceId: string,
   items: TimesheetCaptureOutboxItem[],
 ): void {
-  if (typeof window === "undefined") return
-  window.localStorage.setItem(storageKey(organizationId, deviceId), JSON.stringify(items))
+  writeLocalStorageArray(storageKey(organizationId, deviceId), items)
 }
 
 export function enqueueTimesheetCapture(

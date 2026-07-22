@@ -9,6 +9,7 @@ import type {
 } from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
+import { formValue as field } from "./form-coercion"
 import { stbTimestampFromDate } from "./stb-timestamp"
 
 function parseU64(v: unknown, fallback: bigint): bigint {
@@ -121,10 +122,6 @@ export function reportStateTag(state: unknown): string {
     if (keys.length === 1) return keys[0]?.toLowerCase()
   }
   return String(state).toLowerCase()
-}
-
-function field(formData: Record<string, unknown>, camel: string, snake: string): unknown {
-  return formData[camel] ?? formData[snake]
 }
 
 function num(v: unknown, fallback = 0): number {

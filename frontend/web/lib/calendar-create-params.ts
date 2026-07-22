@@ -5,13 +5,9 @@
 import type { CreateCalendarEventParams } from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
-import { stbTimestampFromDate } from "@/lib/stb-timestamp"
+import { optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
 
-function optionalTrimmedString(v: unknown): string | undefined {
-  if (v == null) return undefined
-  const s = String(v).trim()
-  return s === "" ? undefined : s
-}
+import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 function requiredTimestampFromForm(v: unknown): Timestamp | null {
   if (v == null || String(v).trim() === "") return null

@@ -22,14 +22,7 @@ import { i18n } from "@lumiere/i18n"
 
 type ScalarId = bigint | number | string
 
-async function parseCallError(r: Response): Promise<string> {
-  try {
-    const j = (await r.json()) as { error?: string }
-    return j.error ?? r.statusText
-  } catch {
-    return r.statusText
-  }
-}
+import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 

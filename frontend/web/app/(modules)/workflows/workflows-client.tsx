@@ -1,4 +1,5 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -269,12 +270,7 @@ function WorkflowsClientLoaded({
     const completeInst = instances.filter((i) => i.stateTag === "Completed").length
     const cancelledInst = instances.filter((i) => i.stateTag === "Cancelled").length
 
-    const dashboardTab = baseConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(baseConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -347,23 +343,13 @@ function WorkflowsClientLoaded({
           }
         }
         return w
-      }),
-    }))
+          })
   }, [workflows, versions, instances, baseConfig, t])
 
   const config = useMemo<ModuleConfig>(
     () => ({
       ...baseConfig,
-      tabs: baseConfig.tabs.map((tab) => {
-        if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-        if (tab.id === "migrations") {
-          return {
-            ...tab,
-            createForm: migrationPlanForm,
-            createLabel: "New migration plan",
-            createAction: "createMigrationPlan",
-          }
-        }
+      tabs: withDashboardSections(baseConfig, liveSections).tabs.map((tab) => {
         return tab
       }),
     }),

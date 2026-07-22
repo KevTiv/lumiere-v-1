@@ -15,17 +15,9 @@ import type {
 } from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
+import { nullableBigIntU64, optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
+
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
-
-function optionalString(v: unknown): string | undefined {
-  if (v == null) return undefined
-  const s = String(v).trim()
-  return s === "" ? undefined : s
-}
-
-function optionalTrimmedString(v: unknown): string | undefined {
-  return optionalString(v)
-}
 
 function parseF64(v: unknown, fallback = 0): number {
   if (v == null || v === "") return fallback
@@ -207,10 +199,6 @@ export function toConvertOpportunityParams(formData: Record<string, unknown>): C
   return { pricelistId, warehouseId }
 }
 
-function requiredBigIntU64(v: unknown): bigint | null {
-  return parseU64Field(v)
-}
-
 function parseTaxIdList(raw: unknown): bigint[] {
   if (raw == null || String(raw).trim() === "") return []
   return String(raw)
@@ -223,8 +211,8 @@ function parseTaxIdList(raw: unknown): bigint[] {
 export function toCreateOpportunityLineParams(
   formData: Record<string, unknown>,
 ): import("@lumiere/stdb/types").CreateOpportunityLineParams | null {
-  const productId = requiredBigIntU64(formData.productId)
-  const uomId = requiredBigIntU64(formData.uomId)
+  const productId = nullableBigIntU64(formData.productId)
+  const uomId = nullableBigIntU64(formData.uomId)
   const quantity = Number(formData.quantity)
   const priceUnit = Number(formData.priceUnit)
   if (

@@ -17,7 +17,7 @@ import type {
   CreateWhatsAppBusinessAccountParams,
 } from "@lumiere/stdb/types"
 
-import { optionalBigIntU64 } from "./form-coercion"
+import { formValue as field, optionalBigIntU64 } from "./form-coercion"
 import { stbTimestampFromDate } from "./stb-timestamp"
 
 function optionalTrimmedString(v: unknown): string | undefined {
@@ -103,7 +103,7 @@ export function toCreateCountryParams(formData: Record<string, unknown>): Create
   const name = requiredTrimmedString(formData.name)
   const iso3 = requiredTrimmedString(formData.iso3 ?? formData.code)
   if (!name || !iso3) return null
-  const langRaw = formData.languageCodes ?? formData.language_codes
+  const langRaw = field(formData, "languageCodes", "language_codes")
   const languageCodes = Array.isArray(langRaw)
     ? langRaw.map((c) => String(c))
     : optionalTrimmedString(langRaw)?.split(/[\s,]+/).filter(Boolean) ?? []
@@ -111,9 +111,9 @@ export function toCreateCountryParams(formData: Record<string, unknown>): Create
     name,
     iso3: iso3.toUpperCase(),
     numcode: Math.max(0, Math.trunc(Number(formData.numcode ?? formData.numCode ?? 0))),
-    phoneCode: String(formData.phoneCode ?? formData.phone_code ?? ""),
-    officialName: optionalTrimmedString(formData.officialName ?? formData.official_name),
-    currencyCode: optionalTrimmedString(formData.currencyCode ?? formData.currency_code),
+    phoneCode: String(field(formData, "phoneCode", "phone_code") ?? ""),
+    officialName: optionalTrimmedString(field(formData, "officialName", "official_name")),
+    currencyCode: optionalTrimmedString(field(formData, "currencyCode", "currency_code")),
     languageCodes,
     isActive: formData.isActive !== false,
     metadata: optionalTrimmedString(formData.metadata),
@@ -126,13 +126,13 @@ export function toCreateCurrencyParams(formData: Record<string, unknown>): Creat
   if (!name || !symbol) return null
   const decimalPlaces = Math.min(
     255,
-    Math.max(0, Math.trunc(Number(formData.decimalPlaces ?? formData.decimal_places ?? 2))),
+    Math.max(0, Math.trunc(Number(field(formData, "decimalPlaces", "decimal_places") ?? 2))),
   )
   return {
     name,
     symbol,
     decimalPlaces,
-    roundingFactor: Number(formData.roundingFactor ?? formData.rounding_factor ?? 0.01),
+    roundingFactor: Number(field(formData, "roundingFactor", "rounding_factor") ?? 0.01),
     position: String(formData.position ?? "before"),
     active: formData.active !== false,
     metadata: optionalTrimmedString(formData.metadata),
@@ -198,9 +198,9 @@ export function toCreateUserSessionParams(
 export function toCreateBillingAccountParams(
   formData: Record<string, unknown>,
 ): CreateBillingAccountParams | null {
-  const planTier = requiredTrimmedString(formData.planTier ?? formData.plan_tier)
+  const planTier = requiredTrimmedString(field(formData, "planTier", "plan_tier"))
   if (!planTier) return null
-  const trialEndsRaw = formData.trialEndsAt ?? formData.trial_ends_at
+  const trialEndsRaw = field(formData, "trialEndsAt", "trial_ends_at")
   let trialEndsAt: ReturnType<typeof stbTimestampFromDate> | undefined
   if (trialEndsRaw != null && String(trialEndsRaw).trim() !== "") {
     const d = new Date(String(trialEndsRaw))
@@ -208,15 +208,11 @@ export function toCreateBillingAccountParams(
   }
   return {
     planTier,
-    seatCount: Math.max(1, Math.trunc(Number(formData.seatCount ?? formData.seat_count ?? 1))),
+    seatCount: Math.max(1, Math.trunc(Number(field(formData, "seatCount", "seat_count") ?? 1))),
     status: String(formData.status ?? "trial"),
     trialEndsAt,
     metadata: optionalTrimmedString(formData.metadata),
   }
-}
-
-function field(formData: Record<string, unknown>, camel: string, snake: string): unknown {
-  return formData[camel] ?? formData[snake]
 }
 
 function stringArrayFromForm(raw: unknown): string[] {

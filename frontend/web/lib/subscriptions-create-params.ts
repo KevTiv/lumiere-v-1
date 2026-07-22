@@ -8,13 +8,9 @@ import type {
 } from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
-import { stbTimestampFromDate } from "@/lib/stb-timestamp"
+import { optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
 
-function optionalTrimmedString(v: unknown): string | undefined {
-  if (v == null) return undefined
-  const s = String(v).trim()
-  return s === "" ? undefined : s
-}
+import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 function parseU64FromForm(v: unknown): bigint | null {
   if (v === "" || v == null) return null

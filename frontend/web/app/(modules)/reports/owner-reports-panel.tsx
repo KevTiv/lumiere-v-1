@@ -61,6 +61,7 @@ import {
   useUpdateOwnerReportSchedule,
 } from "@lumiere/query-hooks/hooks/owner-reports"
 import { downloadPivotTableXlsx } from "@lumiere/query-hooks/hooks/templates"
+import { companyRowsToSelectOptions } from "@/lib/form-lookup"
 import { useToast } from "@/hooks/use-toast"
 
 interface OwnerReportsPanelProps {
@@ -75,15 +76,6 @@ function formatMoney(amount: MoneyAmount): string {
     minimumFractionDigits: amount.scale,
     maximumFractionDigits: amount.scale,
   })
-}
-
-function companyRowsToSelectOptions(
-  rows: Record<string, unknown>[],
-): Array<{ value: string; label: string }> {
-  return rows.map((row) => ({
-    value: String(row.id ?? ""),
-    label: String(row.name ?? row.id ?? ""),
-  }))
 }
 
 function todayInputValue(): string {

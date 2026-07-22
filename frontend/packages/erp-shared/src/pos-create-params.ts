@@ -10,11 +10,7 @@ import type {
   ModuleConfigInput,
 } from "@lumiere/stdb/types"
 
-import { optionalBigIntU64, u64IdArrayFromForm } from "./form-coercion"
-
-function field(formData: Record<string, unknown>, camel: string, snake: string): unknown {
-  return formData[camel] ?? formData[snake]
-}
+import { formValue as field, optionalBigIntU64, u64IdArrayFromForm } from "./form-coercion"
 
 function requiredBigIntU64(v: unknown): bigint | null {
   const b = optionalBigIntU64(v)

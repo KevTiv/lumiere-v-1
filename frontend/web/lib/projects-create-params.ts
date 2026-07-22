@@ -10,6 +10,8 @@ import type {
 } from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
+import { optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
+
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
@@ -22,12 +24,6 @@ const BILL_TYPES = new Set(['customer_project', 'customer_task', 'no'])
 const PRICING_TYPES = new Set(['task_rate', 'fixed_rate', 'employee_rate'])
 /** Valid TimesheetInvoiceType string values. */
 const TIMESHEET_INVOICE_TYPES = new Set(['billable', 'non_billable', 'timesheet_revenues'])
-
-function optionalTrimmedString(v: unknown): string | undefined {
-  if (v == null) return undefined
-  const s = String(v).trim()
-  return s === '' ? undefined : s
-}
 
 function parseF64(v: unknown, fallback = 0): number {
   if (v == null || v === '') return fallback

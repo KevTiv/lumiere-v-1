@@ -1,4 +1,5 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -305,12 +306,7 @@ function IotClientLoaded({
   )
 
   const liveSections = useMemo(() => {
-    const dashboardTab = moduleConfigBase.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfigBase, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -377,8 +373,7 @@ function IotClientLoaded({
           }
         }
         return w
-      }),
-    }))
+          })
   }, [
     moduleConfigBase,
     devices.length,
@@ -392,51 +387,7 @@ function IotClientLoaded({
   const config = useMemo(
     () => ({
       ...moduleConfigBase,
-      tabs: moduleConfigBase.tabs.map((tab) => {
-        if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-        if (tab.id === "iot-devices" && tab.entityConfig && tab.entityConfig.view.mode === "table") {
-          return {
-            ...tab,
-            entityConfig: withTableToolbar(tab.entityConfig, [
-              {
-                id: "device-action",
-                label: "Create action",
-                requiresSelection: true,
-                onClick: (rows) => {
-                  setIotModalError(null)
-                  setIotModal({ type: "createAction", form: createActionForm, rows })
-                },
-              },
-              {
-                id: "device-alert",
-                label: "Create alert",
-                requiresSelection: true,
-                onClick: (rows) => {
-                  setIotModalError(null)
-                  setIotModal({ type: "createAlert", form: createAlertForm, rows })
-                },
-              },
-              {
-                id: "device-threshold",
-                label: "Set threshold",
-                requiresSelection: true,
-                onClick: (rows) => {
-                  setIotModalError(null)
-                  setIotModal({ type: "setThreshold", form: setThresholdForm, rows })
-                },
-              },
-              {
-                id: "telemetry-batch",
-                label: "Record batch",
-                requiresSelection: true,
-                onClick: (rows) => {
-                  setIotModalError(null)
-                  setIotModal({ type: "telemetryBatch", form: telemetryBatchForm, rows })
-                },
-              },
-            ]),
-          }
-        }
+      tabs: withDashboardSections(moduleConfigBase, liveSections).tabs.map((tab) => {
         if (tab.id === "iot-hubs" && tab.entityConfig) {
           return {
             ...tab,

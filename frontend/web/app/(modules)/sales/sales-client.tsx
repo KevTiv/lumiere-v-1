@@ -1,4 +1,5 @@
 'use client';
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { phCapture } from '@/lib/posthog-browser';
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -7,6 +8,7 @@ import { useTranslation } from '@lumiere/i18n';
 import {
   ModuleView,
   FormModal,
+  CsvImportModal,
   RuntimeFormModal,
   useRBAC,
   newSaleOrderForm,
@@ -366,7 +368,6 @@ function SalesClientLoaded({
     action: string;
   } | null>(null);
   const [csvKind, setCsvKind] = useState<SalesCsvImportKind | null>(null);
-  const [csvError, setCsvError] = useState<string | null>(null);
   const [invoiceOrderId, setInvoiceOrderId] = useState<bigint | null>(null);
   const [invoiceOrderError, setInvoiceOrderError] = useState<string | null>(null);
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null);
@@ -748,10 +749,6 @@ function SalesClientLoaded({
   const validatePicking = useValidateStockPicking(orgId, operatingCompanyId);
   const cancelPicking = useCancelStockPicking(orgId, operatingCompanyId);
   const doneStockMove = useDoneStockMove(orgId, operatingCompanyId);
-
-  useEffect(() => {
-    if (csvKind) setCsvError(null);
-  }, [csvKind]);
 
   const csvFormConfig = useMemo(() => {
     if (!csvKind) return null;
@@ -1907,14 +1904,7 @@ function SalesClientLoaded({
       0,
     );
 
-    const dashboardTab = moduleConfig.tabs.find(
-      (tab) => tab.id === 'dashboard',
-    );
-    if (!dashboardTab?.sections) return [];
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === 'stat-cards') {
           if (w.id === 'sales-exception-queue-cards') {
             const awaitingApproval = saleOrdersToApprove.length;
@@ -2222,8 +2212,7 @@ function SalesClientLoaded({
           };
         }
         return w;
-      }),
-    }));
+          });
   }, [
     orders,
     confirmedOrders,
@@ -2251,10 +2240,7 @@ function SalesClientLoaded({
     () =>
       ({
         ...moduleConfig,
-        tabs: moduleConfig.tabs.map((tab) => {
-          if (tab.id === 'dashboard') {
-            return { ...tab, sections: liveSections };
-          }
+        tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
           if (tab.id === 'orders' && tab.type === 'entity') {
             return {
               ...tab,
@@ -2804,29 +2790,13 @@ function SalesClientLoaded({
         />
       ) : null}
       {csvKind && csvKind !== 'order' && csvFormConfig ? (
-        <FormModal
+        <CsvImportModal
           key={csvKind}
-          open
-          onOpenChange={(o) => !o && setCsvKind(null)}
+          onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null);
-            const files = data.csvFile as FileList | undefined;
-            const file = files?.[0];
-            if (!file) {
-              setCsvError(t('common.validation.required'));
-              return;
-            }
-            try {
-              const text = await file.text();
-              await importSaleOrderLineCsv.mutateAsync(text);
-              setCsvKind(null);
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e));
-            }
+          onImport={async (text) => {
+            await importSaleOrderLineCsv.mutateAsync(text);
           }}
         />
       ) : null}

@@ -703,14 +703,7 @@ export function useShareDashboard(organizationId: bigint) {
   })
 }
 
-async function parseCallErrorReports(r: Response): Promise<string> {
-  try {
-    const body = (await r.json()) as { error?: string; message?: string }
-    return body.error ?? body.message ?? r.statusText
-  } catch {
-    return r.statusText
-  }
-}
+import { responseErrorMessage as parseCallErrorReports } from "@lumiere/api-client/response-error"
 
 function useImportReportTemplateCsv(organizationId: bigint) {
   const qc = useQueryClient()

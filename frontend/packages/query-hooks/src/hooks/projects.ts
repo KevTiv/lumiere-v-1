@@ -676,14 +676,7 @@ export function useBillTimesheets(organizationId: bigint) {
 
 // ── CSV imports (organization_id, company_id, csv_data) ───────────────────────
 
-async function parseCallErrorProjects(r: Response): Promise<string> {
-  try {
-    const j = (await r.json()) as { error?: string }
-    return j.error ?? r.statusText
-  } catch {
-    return r.statusText
-  }
-}
+import { responseErrorMessage as parseCallErrorProjects } from "@lumiere/api-client/response-error"
 
 export function useImportProjectCsv(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()

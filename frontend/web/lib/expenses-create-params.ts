@@ -5,7 +5,7 @@ import type {
   ExpensePaymentMode,
 } from "@lumiere/stdb/types"
 
-import { optionalBigIntU64 } from "@/lib/form-coercion"
+import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 function optionalString(v: unknown): string | undefined {

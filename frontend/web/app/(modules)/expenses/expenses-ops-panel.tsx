@@ -18,7 +18,7 @@ import {
   upsertExpenseMileageRateForm,
   upsertExpensePerDiemRateForm,
 } from "@lumiere/ui"
-import { optionalBigIntU64 } from "@/lib/form-coercion"
+import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 /**

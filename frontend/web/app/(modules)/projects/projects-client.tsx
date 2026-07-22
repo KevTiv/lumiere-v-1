@@ -1,10 +1,12 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState, useCallback, useEffect } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
+  CsvImportModal,
   newProjectForm,
   newTaskForm,
   editProjectForm,
@@ -297,7 +299,6 @@ function ProjectsClientLoaded({
   const [lifecycleModal, setLifecycleModal] = useState<LifecycleModalState>({ type: null })
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<ProjectsCsvImportKind | null>(null)
-  const [csvError, setCsvError] = useState<string | null>(null)
 
   const { data: projects = [] } = useProjects(orgId, initialProjects)
   const { data: tasks = [] } = useTasks(orgId, initialTasks)
@@ -353,10 +354,6 @@ function ProjectsClientLoaded({
   const csvImports = useProjectsCsvImportMutations(orgId, operatingCompanyId)
 
   const moduleConfig = useMemo(() => projectsModuleConfig(t), [t])
-
-  useEffect(() => {
-    if (csvKind) setCsvError(null)
-  }, [csvKind])
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
@@ -815,12 +812,7 @@ function ProjectsClientLoaded({
       0,
     )
 
-    const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -917,8 +909,7 @@ function ProjectsClientLoaded({
           return { ...w, data: { ...(w.data as Record<string, unknown>), rows: upcomingTasks } }
         }
         return w
-      }),
-    }))
+          })
   }, [
     projects,
     tasks,
@@ -943,57 +934,7 @@ function ProjectsClientLoaded({
       ({
         ...moduleConfig,
         tabs: [
-          ...moduleConfig.tabs.map((tab) => {
-          if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "projects" && tab.entityConfig) {
-            return {
-              ...tab,
-              createForm: projectFormConfig,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
-                {
-                  id: "csv-project",
-                  label: t("projects.toolbar.importProjectCsv"),
-                  onClick: () => setCsvKind("project"),
-                },
-                {
-                  id: "toggle-favorite",
-                  label: "Toggle favorite",
-                  requiresSelection: true,
-                  onClick: (rows) => void runForSelectedIds(rows, (id) => toggleFavorite.mutateAsync(id)),
-                },
-                {
-                  id: "activate-project",
-                  label: "Activate",
-                  requiresSelection: true,
-                  onClick: (rows) =>
-                    void runForSelectedIds(rows, (id) =>
-                      setProjectActive.mutateAsync({ projectId: id, active: true }),
-                    ),
-                },
-                {
-                  id: "archive-project",
-                  label: "Archive",
-                  requiresSelection: true,
-                  onClick: (rows) =>
-                    void runForSelectedIds(rows, (id) =>
-                      setProjectActive.mutateAsync({ projectId: id, active: false }),
-                    ),
-                },
-                {
-                  id: "expense-rebill",
-                  label: "Expense rebill",
-                  onClick: () => {
-                    setLifecycleError(null)
-                    setLifecycleModal({
-                      type: "expenseRebill",
-                      rows: [],
-                      form: expenseRebillFormConfig,
-                    })
-                  },
-                },
-              ]),
-            }
-          }
+          ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
           if (tab.id === "rate-cards" && tab.entityConfig) {
             return {
               ...tab,
@@ -1528,30 +1469,14 @@ function ProjectsClientLoaded({
         />
       ) : null}
       {csvKind && csvKind !== "task" && csvFormConfig ? (
-        <FormModal
+        <CsvImportModal
           key={csvKind}
-          open
-          onOpenChange={(o) => !o && setCsvKind(null)}
+          onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null)
-            const files = data.csvFile as FileList | undefined
-            const file = files?.[0]
-            if (!file) {
-              setCsvError(t("common.validation.required"))
-              return
-            }
-            try {
-              const text = await file.text()
-              if (csvKind === "project") await csvImports.importProject.mutateAsync(text)
-              else await csvImports.importTimesheet.mutateAsync(text)
-              setCsvKind(null)
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e))
-            }
+          onImport={async (text) => {
+            if (csvKind === "project") await csvImports.importProject.mutateAsync(text)
+            else await csvImports.importTimesheet.mutateAsync(text)
           }}
         />
       ) : null}

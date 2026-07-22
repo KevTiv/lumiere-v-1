@@ -12,13 +12,12 @@ import type {
   CreateMailTemplateParams,
 } from "@lumiere/stdb/types"
 
-import { optionalBigIntU64, u64IdArrayFromForm } from "@/lib/form-coercion"
-
-function optionalTrimmedString(v: unknown): string | undefined {
-  if (v == null) return undefined
-  const s = String(v).trim()
-  return s === "" ? undefined : s
-}
+import {
+  formValue,
+  optionalBigIntU64,
+  optionalTrimmedString,
+  u64IdArrayFromForm,
+} from "@lumiere/erp-shared/form-coercion"
 
 function requiredTrimmedString(v: unknown): string | null {
   const s = optionalTrimmedString(v)
@@ -259,13 +258,13 @@ export function toCreateDocumentProcessingJobParams(
   formData: Record<string, unknown>,
 ): CreateDocumentProcessingJobParams {
   return {
-    documentType: String(formData.documentType ?? formData.document_type ?? ""),
-    jobType: String(formData.jobType ?? formData.job_type ?? ""),
-    aiAgentId: optionalBigIntU64(formData.aiAgentId ?? formData.ai_agent_id),
-    inputData: optionalTrimmedString(formData.inputData ?? formData.input_data),
-    documentId: optionalBigIntU64(formData.documentId ?? formData.document_id),
+    documentType: String(formValue(formData, "documentType", "document_type") ?? ""),
+    jobType: String(formValue(formData, "jobType", "job_type") ?? ""),
+    aiAgentId: optionalBigIntU64(formValue(formData, "aiAgentId", "ai_agent_id")),
+    inputData: optionalTrimmedString(formValue(formData, "inputData", "input_data")),
+    documentId: optionalBigIntU64(formValue(formData, "documentId", "document_id")),
     documentVersionId: optionalBigIntU64(
-      formData.documentVersionId ?? formData.document_version_id,
+      formValue(formData, "documentVersionId", "document_version_id"),
     ),
     metadata: optionalTrimmedString(formData.metadata),
   }
@@ -276,17 +275,17 @@ export function toCreateDocumentTemplateParams(
 ): CreateDocumentTemplateParams | null {
   const name = requiredTrimmedString(formData.name)
   const model = requiredTrimmedString(formData.model)
-  const bodyHtml = requiredTrimmedString(formData.bodyHtml ?? formData.body_html)
+  const bodyHtml = requiredTrimmedString(formValue(formData, "bodyHtml", "body_html"))
   if (!name || !model || !bodyHtml) return null
   return {
     name,
     model,
-    reportType: String(formData.reportType ?? formData.report_type ?? "qweb-pdf"),
+    reportType: String(formValue(formData, "reportType", "report_type") ?? "qweb-pdf"),
     bodyHtml,
-    headerHtml: optionalTrimmedString(formData.headerHtml ?? formData.header_html),
-    footerHtml: optionalTrimmedString(formData.footerHtml ?? formData.footer_html),
+    headerHtml: optionalTrimmedString(formValue(formData, "headerHtml", "header_html")),
+    footerHtml: optionalTrimmedString(formValue(formData, "footerHtml", "footer_html")),
     variableBindingsJson: optionalTrimmedString(
-      formData.variableBindingsJson ?? formData.variable_bindings_json,
+      formValue(formData, "variableBindingsJson", "variable_bindings_json"),
     ),
     isDefault: formData.isDefault === true || formData.is_default === true,
     isActive: formData.isActive !== false && formData.is_active !== false,
@@ -300,14 +299,16 @@ export function toCreateMailTemplateParams(
   const name = requiredTrimmedString(formData.name)
   const model = requiredTrimmedString(formData.model)
   const subject = requiredTrimmedString(formData.subject)
-  const bodyHtml = requiredTrimmedString(formData.bodyHtml ?? formData.body_html)
+  const bodyHtml = requiredTrimmedString(formValue(formData, "bodyHtml", "body_html"))
   if (!name || !model || !subject || !bodyHtml) return null
   return {
     name,
     model,
     subject,
     bodyHtml,
-    documentTemplateId: optionalBigIntU64(formData.documentTemplateId ?? formData.document_template_id),
+    documentTemplateId: optionalBigIntU64(
+      formValue(formData, "documentTemplateId", "document_template_id"),
+    ),
     attachDocument: formData.attachDocument === true || formData.attach_document === true,
     isDefault: formData.isDefault === true || formData.is_default === true,
     isActive: formData.isActive !== false && formData.is_active !== false,

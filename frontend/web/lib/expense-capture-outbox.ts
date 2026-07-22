@@ -4,6 +4,12 @@
  * flush retries `create_expense` idempotently.
  */
 
+import {
+  getOrCreateLocalStorageDeviceId,
+  readLocalStorageArray,
+  writeLocalStorageArray,
+} from "./local-outbox"
+
 export type ExpenseCapturePayload = {
   employeeId: string
   name: string
@@ -39,17 +45,7 @@ function storageKey(organizationId: string | number, deviceId: string): string {
 }
 
 export function getOrCreateExpenseCaptureDeviceId(): string {
-  if (typeof window === "undefined") return "server"
-  const key = "lumiere.expense-capture-device-id"
-  let id = window.localStorage.getItem(key)
-  if (!id) {
-    id =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `dev-${Date.now()}`
-    window.localStorage.setItem(key, id)
-  }
-  return id
+  return getOrCreateLocalStorageDeviceId("lumiere.expense-capture-device-id")
 }
 
 export function newExpenseClientRequestId(): string {
@@ -63,15 +59,7 @@ export function readExpenseCaptureOutbox(
   organizationId: string | number,
   deviceId: string,
 ): ExpenseCaptureOutboxItem[] {
-  if (typeof window === "undefined") return []
-  try {
-    const raw = window.localStorage.getItem(storageKey(organizationId, deviceId))
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as ExpenseCaptureOutboxItem[]
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
+  return readLocalStorageArray<ExpenseCaptureOutboxItem>(storageKey(organizationId, deviceId))
 }
 
 function writeExpenseCaptureOutbox(
@@ -79,8 +67,7 @@ function writeExpenseCaptureOutbox(
   deviceId: string,
   items: ExpenseCaptureOutboxItem[],
 ): void {
-  if (typeof window === "undefined") return
-  window.localStorage.setItem(storageKey(organizationId, deviceId), JSON.stringify(items))
+  writeLocalStorageArray(storageKey(organizationId, deviceId), items)
 }
 
 export function enqueueExpenseCapture(

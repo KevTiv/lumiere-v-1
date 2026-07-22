@@ -80,14 +80,7 @@ function invalidateSupplierIntakes(qc: QueryClient, organizationId: bigint) {
   void qc.invalidateQueries({ queryKey: ['contacts', k] })
 }
 
-async function parseCallErrorPo(r: Response): Promise<string> {
-  try {
-    const j = (await r.json()) as { error?: string }
-    return j.error ?? r.statusText
-  } catch {
-    return r.statusText
-  }
-}
+import { responseErrorMessage as parseCallErrorPo } from "@lumiere/api-client/response-error"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 

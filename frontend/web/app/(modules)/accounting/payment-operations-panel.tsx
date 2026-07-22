@@ -33,6 +33,7 @@ import {
   useBankStatementImports,
 } from "@lumiere/query-hooks/hooks/accounting"
 import type { PartnerType, PaymentDirection, PaymentFeeBearer, PaymentProviderCode } from "@lumiere/stdb/types"
+import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/erp-shared/form-coercion"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -41,22 +42,6 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
 type Row = Record<string, unknown>
-
-function optionValue(value: unknown): unknown {
-  return value != null && typeof value === "object" && "some" in value
-    ? (value as { some: unknown }).some
-    : value
-}
-
-function asId(value: unknown): bigint | null {
-  const raw = optionValue(value)
-  if (raw == null || raw === "") return null
-  try {
-    return typeof raw === "bigint" ? raw : BigInt(String(raw))
-  } catch {
-    return null
-  }
-}
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""

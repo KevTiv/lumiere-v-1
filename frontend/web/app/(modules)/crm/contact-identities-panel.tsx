@@ -29,6 +29,7 @@ import {
   useUpdateContactIdentity,
   useVerifyContactIdentity,
 } from "@lumiere/query-hooks/hooks/crm"
+import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/erp-shared/form-coercion"
 import type {
   ContactIdentityKind,
   ContactVerificationState,
@@ -69,23 +70,6 @@ const VERIFICATION_STATES: Array<{ value: VerificationStateName; label: string }
   { value: "Failed", label: "Failed" },
   { value: "OptedOut", label: "Opted out" },
 ]
-
-function optionValue(value: unknown): unknown {
-  if (value != null && typeof value === "object" && "some" in value) {
-    return (value as { some: unknown }).some
-  }
-  return value
-}
-
-function asId(value: unknown): bigint | null {
-  const raw = optionValue(value)
-  if (raw == null || raw === "") return null
-  try {
-    return typeof raw === "bigint" ? raw : BigInt(String(raw))
-  } catch {
-    return null
-  }
-}
 
 function enumName(value: unknown): string {
   if (value != null && typeof value === "object" && "tag" in value) {

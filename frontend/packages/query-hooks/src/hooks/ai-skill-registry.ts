@@ -170,10 +170,7 @@ export function fixtureHasPassingRun(
   )
 }
 
-async function parseCallError(r: Response): Promise<string> {
-  const j = (await r.json().catch(() => ({}))) as { error?: string }
-  return j.error ?? `Request failed (${r.status})`
-}
+import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
 function invalidateRegistry(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
   const org = BigInt(organizationId)

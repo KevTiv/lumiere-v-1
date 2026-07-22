@@ -12,10 +12,7 @@ import type { GatewayActionDraft } from "./ai-action-drafts"
 
 export type { AiUiContext } from "../ai-ui-context"
 
-async function parseAiError(r: Response): Promise<string> {
-  const j = (await r.json().catch(() => ({}))) as { error?: string; detail?: string }
-  return j.error ?? j.detail ?? `Request failed (${r.status})`
-}
+import { responseErrorMessage as parseAiError } from "@lumiere/api-client/response-error"
 
 export function useAiActionDraft() {
   return useMutation({

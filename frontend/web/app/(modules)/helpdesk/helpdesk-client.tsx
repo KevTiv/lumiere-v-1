@@ -1,4 +1,5 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -296,12 +297,7 @@ function HelpdeskClientLoaded({
     }).length
     const closed = tickets.filter((tk) => String(tk.state) === "Closed").length
     const urgent = tickets.filter((tk) => String(tk.priority) === "urgent").length
-    const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -334,17 +330,14 @@ function HelpdeskClientLoaded({
           }
         }
         return w
-      }),
-    }))
+          })
   }, [tickets, moduleConfig, t, ticketFormConfig])
 
   const config = useMemo(
     () =>
       ({
         ...moduleConfig,
-        tabs: moduleConfig.tabs.map((tab) => {
-          if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "tickets") return { ...tab, createForm: ticketFormConfig, entityConfig: ticketsEntityConfig }
+        tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
           if (tab.id === "teams") return { ...tab, createForm: teamFormConfig }
           if (tab.id === "stages") return { ...tab, createForm: stageFormConfig }
           if (tab.id === "slas") return { ...tab, createForm: slaFormConfig }

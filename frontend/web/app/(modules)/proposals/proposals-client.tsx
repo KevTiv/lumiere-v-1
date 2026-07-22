@@ -1,4 +1,5 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useCallback, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -254,12 +255,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
   }, [editRow, t])
 
   const liveSections = useMemo(() => {
-    const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -297,24 +293,13 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
           }
         }
         return w
-      }),
-    }))
+          })
   }, [activeCount, submittedCount, awardedCount, pipelineValueLabel, proposals, router, moduleConfig, t])
 
   const config = useMemo(
     (): ModuleConfig => ({
       ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) => {
-        if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-        if (tab.id === "proposals" && tab.type === "entity") {
-          return {
-            ...tab,
-            entityConfig: proposalsTableConfig(t, {
-              formatProposalDisplayName: proposalPrimaryLabel,
-              actions: proposalRowActions,
-            }),
-          }
-        }
+      tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
         return tab
       }),
     }),

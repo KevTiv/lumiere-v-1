@@ -3,28 +3,13 @@
  */
 import { type NextRequest, NextResponse } from 'next/server'
 
-import { fetchAiGateway, resolveAiGatewayBaseUrl } from '@/lib/ai-gateway-server'
-import { resolveApiSession } from '@/lib/api-session'
+import { fetchAiGateway } from '@/lib/ai-gateway-server'
+import { requireAiRouteContext } from '../../_lib/route-helpers'
 
-export async function POST(_request: NextRequest) {
-  if (!resolveAiGatewayBaseUrl()) {
-    return NextResponse.json(
-      {
-        error:
-          'AI gateway is not configured for this deployment. Set LUMIERE_AI_GATEWAY_URL (server-side).',
-      },
-      { status: 503 },
-    )
-  }
-
-  const session = await resolveApiSession(_request)
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  const orgId = session.organizationId
-  if (orgId === undefined || orgId <= 0) {
-    return NextResponse.json({ error: 'Organization context required' }, { status: 403 })
-  }
+export async function POST(request: NextRequest) {
+  const contextResult = await requireAiRouteContext(request)
+  if (!contextResult.ok) return contextResult.response
+  const { orgId } = contextResult.context
 
   try {
     const gw = await fetchAiGateway('/v1/context/ingest', {

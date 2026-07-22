@@ -26,6 +26,7 @@ import { AlertCircle, Building2, FilePenLine, Loader2, ShieldAlert } from "lucid
 
 import { useAiActionDraftBridge } from "@lumiere/query-hooks/hooks/ai-harness"
 import type { ChatActionDraftPayload } from "@lumiere/ui"
+import { companyRowsToSelectOptions } from "@/lib/form-lookup"
 
 interface RedActionDraftPanelProps {
   companies: Record<string, unknown>[]
@@ -39,15 +40,6 @@ interface SaleOrderDraftForm {
   warehouseId: string
   customerReference: string
   note: string
-}
-
-function companyRowsToSelectOptions(
-  rows: Record<string, unknown>[],
-): Array<{ value: string; label: string }> {
-  return rows.map((row) => ({
-    value: String(row.id ?? ""),
-    label: String(row.name ?? row.id ?? ""),
-  }))
 }
 
 function positiveId(value: string): number | null {

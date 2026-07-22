@@ -42,6 +42,7 @@ import type { Timestamp } from "spacetimedb"
 
 import { userTypeIdFromAccountTypes, userTypeIdFromInternalGroup } from "./accounting-defaults"
 import {
+  formValue as field,
   optionalBigIntU64,
   parseDelimitedU64Ids,
   u64IdArrayFromForm,
@@ -1663,7 +1664,7 @@ export function toCreateAccountBankStatementParams(
 ): CreateAccountBankStatementParams | null {
   const currencyId = requiredBigIntU64(formData.currencyId)
   if (currencyId === null) return null
-  const balanceStart = Number(formData.balanceStart ?? formData.balance_start ?? 0)
+  const balanceStart = Number(field(formData, "balanceStart", "balance_start") ?? 0)
   return {
     name: optionalTrimmedString(formData.name),
     reference: optionalTrimmedString(formData.reference),
@@ -1671,12 +1672,12 @@ export function toCreateAccountBankStatementParams(
     balanceStart: Number.isFinite(balanceStart) ? balanceStart : 0,
     currencyId,
     state: bankStatementStateFromForm(formData.state),
-    lineIds: u64IdArrayFromForm(formData.lineIds ?? formData.line_ids),
-    moveLineIds: u64IdArrayFromForm(formData.moveLineIds ?? formData.move_line_ids),
-    totalEntryEncoding: Number(formData.totalEntryEncoding ?? formData.total_entry_encoding ?? 0),
-    totalAmount: Number(formData.totalAmount ?? formData.total_amount ?? 0),
-    totalAmountCurrency: Number(formData.totalAmountCurrency ?? formData.total_amount_currency ?? 0),
-    dateDone: optionalTimestampFromFormDate(formData.dateDone ?? formData.date_done),
+    lineIds: u64IdArrayFromForm(field(formData, "lineIds", "line_ids")),
+    moveLineIds: u64IdArrayFromForm(field(formData, "moveLineIds", "move_line_ids")),
+    totalEntryEncoding: Number(field(formData, "totalEntryEncoding", "total_entry_encoding") ?? 0),
+    totalAmount: Number(field(formData, "totalAmount", "total_amount") ?? 0),
+    totalAmountCurrency: Number(field(formData, "totalAmountCurrency", "total_amount_currency") ?? 0),
+    dateDone: optionalTimestampFromFormDate(field(formData, "dateDone", "date_done")),
     isValidBalanceStart: formData.isValidBalanceStart !== false && formData.is_valid_balance_start !== false,
     isValidBalanceEnd: formData.isValidBalanceEnd !== false && formData.is_valid_balance_end !== false,
     metadata: optionalTrimmedString(formData.metadata),
@@ -1686,22 +1687,21 @@ export function toCreateAccountBankStatementParams(
 export function toCreateCrossoveredBudgetLineParams(
   formData: Record<string, unknown>,
 ): CreateCrossoveredBudgetLineParams {
-  const plannedAmount = Number(formData.plannedAmount ?? formData.planned_amount ?? 0)
+  const plannedAmount = Number(field(formData, "plannedAmount", "planned_amount") ?? 0)
   return {
-    analyticAccountId: optionalBigIntU64(formData.analyticAccountId ?? formData.analytic_account_id),
-    projectId: optionalBigIntU64(formData.projectId ?? formData.project_id),
-    dateFrom: timestampFromFormDate(formData.dateFrom ?? formData.date_from ?? new Date()),
-    dateTo: timestampFromFormDate(formData.dateTo ?? formData.date_to ?? new Date()),
-    paidDate: optionalTimestampFromFormDate(formData.paidDate ?? formData.paid_date),
+    analyticAccountId: optionalBigIntU64(field(formData, "analyticAccountId", "analytic_account_id")),
+    projectId: optionalBigIntU64(field(formData, "projectId", "project_id")),
+    dateFrom: timestampFromFormDate(field(formData, "dateFrom", "date_from") ?? new Date()),
+    dateTo: timestampFromFormDate(field(formData, "dateTo", "date_to") ?? new Date()),
+    paidDate: optionalTimestampFromFormDate(field(formData, "paidDate", "paid_date")),
     plannedAmount: Number.isFinite(plannedAmount) ? plannedAmount : 0,
-    practicalAmount: Number(formData.practicalAmount ?? formData.practical_amount ?? 0),
-    theoreticalAmount: Number(formData.theoreticalAmount ?? formData.theoretical_amount ?? 0),
-    achievePercentage: Number(formData.achievePercentage ?? formData.achieve_percentage ?? 0),
+    practicalAmount: Number(field(formData, "practicalAmount", "practical_amount") ?? 0),
+    theoreticalAmount: Number(field(formData, "theoreticalAmount", "theoretical_amount") ?? 0),
+    achievePercentage: Number(field(formData, "achievePercentage", "achieve_percentage") ?? 0),
     isAboveBudget: formData.isAboveBudget === true || formData.is_above_budget === true,
     variance: Number(formData.variance ?? -plannedAmount),
     variancePercentage: Number(
-      formData.variancePercentage ??
-        formData.variance_percentage ??
+      field(formData, "variancePercentage", "variance_percentage") ??
         (plannedAmount > 0 ? -100 : 0),
     ),
     metadata: optionalTrimmedString(formData.metadata),
@@ -1711,7 +1711,7 @@ export function toCreateCrossoveredBudgetLineParams(
 export function toCreateCreditNoteParams(
   formData: Record<string, unknown>,
 ): CreateCreditNoteParams {
-  const lineIdsRaw = formData.lineIds ?? formData.line_ids
+  const lineIdsRaw = field(formData, "lineIds", "line_ids")
   const lineIds = Array.isArray(lineIdsRaw)
     ? lineIdsRaw.map((id) => BigInt(String(id)))
     : u64IdArrayFromForm(lineIdsRaw)
@@ -1724,10 +1724,6 @@ export function toCreateCreditNoteParams(
     lineIds,
     reason,
   }
-}
-
-function field(formData: Record<string, unknown>, camel: string, snake: string): unknown {
-  return formData[camel] ?? formData[snake]
 }
 
 function num(v: unknown, fallback = 0): number {

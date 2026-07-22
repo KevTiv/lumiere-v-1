@@ -16,32 +16,11 @@ import type {
 } from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
+import { nullableBigIntU64, optionalBigIntU64, optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
+
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
-
-function optionalTrimmedString(v: unknown): string | undefined {
-  if (v == null) return undefined
-  const s = String(v).trim()
-  return s === '' ? undefined : s
-}
-
-function optionalBigIntU64(v: unknown): bigint | undefined {
-  if (v == null || v === '') return undefined
-  if (typeof v === 'bigint') return v
-  const n = Number(v)
-  if (Number.isFinite(n) && n >= 0) return BigInt(Math.trunc(n))
-  try {
-    return BigInt(String(v).trim())
-  } catch {
-    return undefined
-  }
-}
-
-function requiredBigIntU64(v: unknown): bigint | null {
-  const b = optionalBigIntU64(v)
-  return b === undefined ? null : b
-}
 
 function optionalTimestampFromFormDate(v: unknown): Timestamp | undefined {
   if (v == null || String(v).trim() === '') return undefined
@@ -68,15 +47,15 @@ export function toCreateSaleOrderParams(
   if (pricelistRaw === '' || pricelistRaw == null) return null
   if (warehouseRaw === '' || warehouseRaw == null) return null
 
-  const partnerId = requiredBigIntU64(partnerRaw)
-  const pricelistId = requiredBigIntU64(pricelistRaw)
-  const warehouseId = requiredBigIntU64(warehouseRaw)
+  const partnerId = nullableBigIntU64(partnerRaw)
+  const pricelistId = nullableBigIntU64(pricelistRaw)
+  const warehouseId = nullableBigIntU64(warehouseRaw)
   if (partnerId == null || pricelistId == null || warehouseId == null) return null
 
   const pl = pricelists.find((p) => String(p.id) === String(pricelistRaw))
   const currencyRaw = pl?.currencyId
   if (currencyRaw === undefined || currencyRaw === null) return null
-  const currencyId = requiredBigIntU64(currencyRaw)
+  const currencyId = nullableBigIntU64(currencyRaw)
   if (currencyId == null) return null
 
   const paymentTermId =
@@ -188,9 +167,9 @@ export function toCreateInvoiceFromSaleOrderParams(
   formData: Record<string, unknown>,
   order?: { partnerInvoiceId?: bigint },
 ): CreateInvoiceFromSaleOrderParams | null {
-  const journalId = requiredBigIntU64(formData.journalId)
-  const defaultIncomeAccountId = requiredBigIntU64(formData.defaultIncomeAccountId)
-  const receivableAccountId = requiredBigIntU64(formData.receivableAccountId)
+  const journalId = nullableBigIntU64(formData.journalId)
+  const defaultIncomeAccountId = nullableBigIntU64(formData.defaultIncomeAccountId)
+  const receivableAccountId = nullableBigIntU64(formData.receivableAccountId)
   if (journalId == null || defaultIncomeAccountId == null || receivableAccountId == null) {
     return null
   }
@@ -228,7 +207,7 @@ export function toCreatePricelistParams(
 ): CreatePricelistParams | null {
   const cid = formData.currencyId
   if (cid === '' || cid == null) return null
-  const currencyId = requiredBigIntU64(cid)
+  const currencyId = nullableBigIntU64(cid)
   if (currencyId == null) return null
 
   return {
@@ -307,8 +286,8 @@ function parseU64IdList(raw: unknown): bigint[] {
 export function toCreateSaleOrderLineParams(
   formData: Record<string, unknown>,
 ): CreateSaleOrderLineParams | null {
-  const productId = requiredBigIntU64(formData.productId)
-  const uomId = requiredBigIntU64(formData.uomId)
+  const productId = nullableBigIntU64(formData.productId)
+  const uomId = nullableBigIntU64(formData.uomId)
   const quantity = Number(formData.quantity)
   if (
     productId == null ||
@@ -390,8 +369,8 @@ export function toCreatePickingBatchParams(
 export function toCreateReturnOrderLineParams(
   formData: Record<string, unknown>,
 ): CreateReturnOrderLineParams | null {
-  const productId = requiredBigIntU64(formData.productId)
-  const productUom = requiredBigIntU64(formData.uomId)
+  const productId = nullableBigIntU64(formData.productId)
+  const productUom = nullableBigIntU64(formData.uomId)
   const productUomQty = Number(formData.productUomQty ?? formData.quantity)
   const priceUnit = Number(formData.priceUnit)
   if (
@@ -409,7 +388,7 @@ export function toCreateReturnOrderLineParams(
   const saleOrderLineId =
     saleOrderLineRaw == null || String(saleOrderLineRaw).trim() === ''
       ? undefined
-      : requiredBigIntU64(saleOrderLineRaw) ?? undefined
+      : nullableBigIntU64(saleOrderLineRaw) ?? undefined
 
   return {
     saleOrderLineId,
@@ -424,7 +403,7 @@ export function toCreateReturnOrderLineParams(
 export function toCreateReturnOrderParams(
   formData: Record<string, unknown>,
 ): CreateReturnOrderParams | null {
-  const partnerId = requiredBigIntU64(formData.partnerId)
+  const partnerId = nullableBigIntU64(formData.partnerId)
   if (partnerId == null) return null
 
   const line = toCreateReturnOrderLineParams(formData)
@@ -434,7 +413,7 @@ export function toCreateReturnOrderParams(
   const saleOrderId =
     saleOrderRaw == null || String(saleOrderRaw).trim() === ''
       ? undefined
-      : requiredBigIntU64(saleOrderRaw) ?? undefined
+      : nullableBigIntU64(saleOrderRaw) ?? undefined
 
   return {
     partnerId,

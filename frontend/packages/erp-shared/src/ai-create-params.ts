@@ -13,12 +13,8 @@ import type {
   InsightSeverity,
 } from "@lumiere/stdb/types"
 
-import { optionalBigIntU64 } from "./form-coercion"
+import { formValue as field, optionalBigIntU64 } from "./form-coercion"
 import { stbTimestampFromDate } from "./stb-timestamp"
-
-function field(formData: Record<string, unknown>, camel: string, snake: string): unknown {
-  return formData[camel] ?? formData[snake]
-}
 
 function optionalTrimmedString(v: unknown): string | undefined {
   if (v == null) return undefined

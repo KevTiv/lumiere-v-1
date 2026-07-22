@@ -712,14 +712,7 @@ export function useCompleteActivity(organizationId: bigint) {
 
 // ── CSV imports (organization_id + csv_data) ─────────────────────────────────
 
-async function parseCallErrorCrm(r: Response): Promise<string> {
-  try {
-    const j = (await r.json()) as { error?: string }
-    return j.error ?? r.statusText
-  } catch {
-    return r.statusText
-  }
-}
+import { responseErrorMessage as parseCallErrorCrm } from "@lumiere/api-client/response-error"
 
 export function useImportContactCsv(organizationId: bigint) {
   const qc = useQueryClient()

@@ -33,7 +33,7 @@ import {
 } from "@lumiere/query-hooks/hooks/organization-company"
 import { useUpdateOrganization, useUpsertOrganizationSettings, useCreateCountry, useCreateCurrency } from "@lumiere/query-hooks/hooks/settings"
 import { useErpSession } from "@lumiere/erp-session"
-import { csvImportForm, FormModal } from "@lumiere/ui"
+import { CsvImportModal, csvImportForm, FormModal } from "@lumiere/ui"
 import { hasValidOrganizationId } from "@/lib/org-scoped"
 import { ModularForm } from "../forms/modular-form"
 import { mergeFieldDefaultValues, mergeSelectOptionsByFieldName } from "../lib/form-config-merge"
@@ -80,7 +80,6 @@ export function OrganizationSettings() {
   const [isLoading, setIsLoading] = useState(false)
   const { organizationId } = useErpSession()
   const [csvKind, setCsvKind] = useState<OrgMasterCsvKind | null>(null)
-  const [csvError, setCsvError] = useState<string | null>(null)
   const [referenceModal, setReferenceModal] = useState<"country" | "currency" | null>(null)
   const [referenceError, setReferenceError] = useState<string | null>(null)
 
@@ -268,10 +267,6 @@ export function OrganizationSettings() {
       submitLabel: t("settings.organization.privacy.ruleTitle"),
     }
   }, [t, dataClassifications])
-
-  useEffect(() => {
-    if (csvKind) setCsvError(null)
-  }, [csvKind])
 
   useEffect(() => {
     if (!companies.length) {
@@ -1342,37 +1337,21 @@ export function OrganizationSettings() {
       </div>
 
       {csvKind && csvFormConfig && hasValidOrganizationId(organizationId) ? (
-        <FormModal
+        <CsvImportModal
           key={csvKind}
-          open
-          onOpenChange={(o) => !o && setCsvKind(null)}
+          onClose={() => setCsvKind(null)}
           config={csvFormConfig}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null)
-            const files = data.csvFile as FileList | undefined
-            const file = files?.[0]
-            if (!file) {
-              setCsvError(t("common.validation.required"))
-              return
-            }
-            try {
-              const text = await file.text()
-              if (csvKind === "country") await csvImports.importCountry.mutateAsync(text)
-              else if (csvKind === "currency") await csvImports.importCurrency.mutateAsync(text)
-              else if (csvKind === "currencyRate") await csvImports.importCurrencyRate.mutateAsync(text)
-              else if (csvKind === "company") await csvImports.importCompany.mutateAsync(text)
-              else if (csvKind === "role") await csvImports.importRole.mutateAsync(text)
-              else await csvImports.importAiAgent.mutateAsync(text)
-              toast({
-                title: t("settings.organization.csvImport.successTitle"),
-                description: t("settings.organization.csvImport.successDescription"),
-              })
-              setCsvKind(null)
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e))
-            }
+          onImport={async (text) => {
+            if (csvKind === "country") await csvImports.importCountry.mutateAsync(text)
+            else if (csvKind === "currency") await csvImports.importCurrency.mutateAsync(text)
+            else if (csvKind === "currencyRate") await csvImports.importCurrencyRate.mutateAsync(text)
+            else if (csvKind === "company") await csvImports.importCompany.mutateAsync(text)
+            else if (csvKind === "role") await csvImports.importRole.mutateAsync(text)
+            else await csvImports.importAiAgent.mutateAsync(text)
+            toast({
+              title: t("settings.organization.csvImport.successTitle"),
+              description: t("settings.organization.csvImport.successDescription"),
+            })
           }}
         />
       ) : null}

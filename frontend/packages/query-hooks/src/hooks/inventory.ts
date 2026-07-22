@@ -2601,14 +2601,7 @@ export function useUpsertWarehouseGeo(organizationId: bigint) {
 
 // ── CSV imports (inventory + UOM masters) ─────────────────────────────────────
 
-async function parseCallErrorInv(r: Response): Promise<string> {
-  try {
-    const j = (await r.json()) as { error?: string }
-    return j.error ?? r.statusText
-  } catch {
-    return r.statusText
-  }
-}
+import { responseErrorMessage as parseCallErrorInv } from "@lumiere/api-client/response-error"
 
 export function useImportUomCategoryCsv(organizationId: bigint) {
   const qc = useQueryClient()

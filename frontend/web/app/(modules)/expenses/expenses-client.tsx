@@ -1,10 +1,12 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
+  CsvImportModal,
   newExpenseForm,
   newExpenseSheetForm,
   editExpenseForm,
@@ -50,7 +52,7 @@ import {
   useExpenseMileageRates,
   useExpensePerDiemRates,
 } from "@lumiere/query-hooks/hooks/expenses"
-import { optionalBigIntU64 } from "@/lib/form-coercion"
+import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { ExpensesCapturePanel } from "./expenses-capture-panel"
 import { ExpensesInboxPanel } from "./expenses-inbox-panel"
 import { ExpensesOpsPanel } from "./expenses-ops-panel"
@@ -144,7 +146,6 @@ function ExpensesClientLoaded({
   >(null)
   const [refuseReason, setRefuseReason] = useState("")
   const [csvKind, setCsvKind] = useState<ExpensesCsvImportKind | null>(null)
-  const [csvError, setCsvError] = useState<string | null>(null)
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [timelineSheet, setTimelineSheet] = useState<Record<string, unknown> | null>(null)
 
@@ -220,10 +221,6 @@ function ExpensesClientLoaded({
   const setExpenseAllocations = useSetExpenseAllocations(orgId)
   const projectRebill = useCreateExpenseProjectRebill(orgId)
   const csvImports = useExpensesCsvImportMutations(orgId)
-
-  useEffect(() => {
-    if (csvKind) setCsvError(null)
-  }, [csvKind])
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
@@ -380,12 +377,7 @@ function ExpensesClientLoaded({
       return st === "Approved" || st === "Posted" || st === "Done"
     }).length
 
-    const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -419,8 +411,7 @@ function ExpensesClientLoaded({
           }
         }
         return w
-      }),
-    }))
+          })
   }, [
     expenses,
     sheets,
@@ -437,14 +428,7 @@ function ExpensesClientLoaded({
     () =>
       ({
         ...moduleConfig,
-        tabs: moduleConfig.tabs.map((tab) => {
-          if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "inbox") {
-            return {
-              ...tab,
-              customContent: <ExpensesInboxPanel organizationId={organizationId} />,
-            }
-          }
+        tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
           if (tab.id === "expenses" && tab.entityConfig) {
             return {
               ...tab,
@@ -928,30 +912,14 @@ function ExpensesClientLoaded({
       />
 
       {csvKind && csvFormConfig ? (
-        <FormModal
+        <CsvImportModal
           key={csvKind}
-          open
-          onOpenChange={(o) => !o && setCsvKind(null)}
+          onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null)
-            const files = data.csvFile as FileList | undefined
-            const file = files?.[0]
-            if (!file) {
-              setCsvError(t("common.validation.required"))
-              return
-            }
-            try {
-              const text = await file.text()
-              if (csvKind === "expense") await csvImports.importExpense.mutateAsync(text)
-              else await csvImports.importExpenseSheet.mutateAsync(text)
-              setCsvKind(null)
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e))
-            }
+          onImport={async (text) => {
+            if (csvKind === "expense") await csvImports.importExpense.mutateAsync(text)
+            else await csvImports.importExpenseSheet.mutateAsync(text)
           }}
         />
       ) : null}

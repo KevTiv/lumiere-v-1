@@ -1,10 +1,12 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
+  CsvImportModal,
   newDocumentForm,
   newKnowledgeArticleForm,
   newKnowledgeCategoryForm,
@@ -91,7 +93,7 @@ import {
   toSetDocumentIndexContentParams,
   toSetDocumentRetentionParams,
 } from "@/lib/documents-create-params"
-import { optionalBigIntU64 } from "@/lib/form-coercion"
+import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import type { QueryRows } from "@/lib/query-fetch"
@@ -283,7 +285,6 @@ function DocumentsClientLoaded({
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvKind, setCsvKind] = useState<"knowledge_category" | "knowledge_article" | null>(null)
-  const [csvError, setCsvError] = useState<string | null>(null)
   const [processingToolbarError, setProcessingToolbarError] = useState<string | null>(null)
   const [documentToolbarError, setDocumentToolbarError] = useState<string | null>(null)
   const [documentRowAction, setDocumentRowAction] = useState<DocumentRowAction>(null)
@@ -345,10 +346,6 @@ function DocumentsClientLoaded({
   const documentTemplateFormConfig = useMemo(() => newDocumentTemplateForm(t), [t])
   const mailTemplateFormConfig = useMemo(() => newMailTemplateForm(t), [t])
   const articleMemberFormConfig = useMemo(() => addArticleMemberForm(t), [t])
-
-  useEffect(() => {
-    if (csvKind) setCsvError(null)
-  }, [csvKind])
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
@@ -446,12 +443,7 @@ function DocumentsClientLoaded({
     const favorites = documents.filter((d) => d.isFavorite).length
     const published = articles.filter((a) => a.isPublished).length
 
-    const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -480,242 +472,13 @@ function DocumentsClientLoaded({
           }
         }
         return w
-      }),
-    }))
+          })
   }, [documents, articles, moduleConfig, t, documentFormConfig, knowledgeArticleFormConfig])
 
   const config = useMemo(
     () => ({
       ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) => {
-        if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-        if (tab.id === "documents" && tab.entityConfig) {
-          return {
-            ...tab,
-            createForm: documentFormConfig,
-            entityConfig: withTableActions(
-              tab.entityConfig,
-              [
-                {
-                  id: "edit-document",
-                  label: "Edit document",
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    setDocumentToolbarError(null)
-                    if (rows.length !== 1) {
-                      setDocumentToolbarError("Select one document to edit.")
-                      return
-                    }
-                    setDocumentRowSubmitError(null)
-                    setDocumentRowAction({
-                      action: "updateDocument",
-                      row: rows[0],
-                      form: editDocumentForm(rows[0]),
-                    })
-                  },
-                },
-                {
-                  id: "upload-version",
-                  label: "Upload version",
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    setDocumentToolbarError(null)
-                    if (rows.length !== 1) {
-                      setDocumentToolbarError("Select one document to version.")
-                      return
-                    }
-                    setDocumentRowSubmitError(null)
-                    setDocumentRowAction({
-                      action: "uploadVersion",
-                      row: rows[0],
-                      form: versionFormConfig,
-                    })
-                  },
-                },
-                {
-                  id: "lock-document",
-                  label: "Lock",
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    setDocumentToolbarError(null)
-                    try {
-                      for (const row of rows) {
-                        await lockDocument.mutateAsync({
-                          documentId: row.id as string | number,
-                          leaseSeconds: 3600,
-                        })
-                      }
-                    } catch (e) {
-                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
-                    }
-                  },
-                },
-                {
-                  id: "unlock-document",
-                  label: "Unlock",
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    setDocumentToolbarError(null)
-                    try {
-                      for (const row of rows) await unlockDocument.mutateAsync(row.id as string | number)
-                    } catch (e) {
-                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
-                    }
-                  },
-                },
-                {
-                  id: "record-document-view",
-                  label: "Record view",
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    setDocumentToolbarError(null)
-                    try {
-                      for (const row of rows) await recordDocumentView.mutateAsync(row.id as string | number)
-                    } catch (e) {
-                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
-                    }
-                  },
-                },
-                {
-                  id: "reindex-document",
-                  label: "Reindex",
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    setDocumentToolbarError(null)
-                    if (rows.length !== 1) {
-                      setDocumentToolbarError("Select one document to reindex.")
-                      return
-                    }
-                    const row = rows[0]
-                    const seed = [
-                      String(row.name ?? ""),
-                      String(row.fileName ?? ""),
-                      String(row.description ?? ""),
-                      String(row.indexContent ?? ""),
-                    ]
-                      .map((s) => s.trim())
-                      .filter(Boolean)
-                      .join("\n")
-                    setDocumentRowSubmitError(null)
-                    setDocumentRowAction({
-                      action: "reindexDocument",
-                      row,
-                      form: {
-                        ...reindexDocumentForm(t),
-                        sections: reindexDocumentForm(t).sections.map((section) => ({
-                          ...section,
-                          fields: section.fields.map((field) =>
-                            field.name === "content"
-                              ? { ...field, defaultValue: seed }
-                              : field.name === "language"
-                                ? {
-                                    ...field,
-                                    defaultValue: String(row.indexLanguage ?? ""),
-                                  }
-                                : field,
-                          ),
-                        })),
-                      },
-                    })
-                  },
-                },
-                {
-                  id: "set-retention",
-                  label: "Set retention",
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    setDocumentToolbarError(null)
-                    if (rows.length !== 1) {
-                      setDocumentToolbarError("Select one document for retention.")
-                      return
-                    }
-                    const row = rows[0]
-                    setDocumentRowSubmitError(null)
-                    setDocumentRowAction({
-                      action: "setRetention",
-                      row,
-                      form: {
-                        ...setDocumentRetentionForm(t),
-                        sections: setDocumentRetentionForm(t).sections.map((section) => ({
-                          ...section,
-                          fields: section.fields.map((field) =>
-                            field.name === "retentionDays"
-                              ? {
-                                  ...field,
-                                  defaultValue:
-                                    row.retentionDays != null
-                                      ? Number(row.retentionDays)
-                                      : undefined,
-                                }
-                              : field.name === "classificationId"
-                                ? {
-                                    ...field,
-                                    defaultValue:
-                                      row.classificationId != null
-                                        ? Number(row.classificationId)
-                                        : undefined,
-                                  }
-                                : field,
-                          ),
-                        })),
-                      },
-                    })
-                  },
-                },
-                {
-                  id: "legal-hold",
-                  label: "Legal hold",
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    setDocumentToolbarError(null)
-                    try {
-                      for (const row of rows) {
-                        await applyDocumentLegalHold.mutateAsync({
-                          documentId: row.id as string | number,
-                          reason: "Legal hold",
-                        })
-                      }
-                    } catch (e) {
-                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
-                    }
-                  },
-                },
-                {
-                  id: "presence-ping",
-                  label: "Presence ping",
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    setDocumentToolbarError(null)
-                    try {
-                      for (const row of rows) {
-                        await updateDocumentPresence.mutateAsync({
-                          documentId: row.id as string | number,
-                          userName: "User",
-                        })
-                      }
-                    } catch (e) {
-                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
-                    }
-                  },
-                },
-                {
-                  id: "delete-document",
-                  label: "Delete",
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    setDocumentToolbarError(null)
-                    try {
-                      for (const row of rows) await deleteDocument.mutateAsync(row.id as string | number)
-                    } catch (e) {
-                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
-                    }
-                  },
-                },
-              ],
-              true,
-            ),
-          }
-        }
+      tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
         if (tab.id === "knowledge-base" && tab.entityConfig) {
           return {
             ...tab,
@@ -1228,32 +991,16 @@ function DocumentsClientLoaded({
         }}
       />
       {csvKind && csvFormConfig ? (
-        <FormModal
+        <CsvImportModal
           key={csvKind}
-          open
-          onOpenChange={(o) => !o && setCsvKind(null)}
+          onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null)
-            const files = data.csvFile as FileList | undefined
-            const file = files?.[0]
-            if (!file) {
-              setCsvError(t("common.validation.required"))
-              return
-            }
-            try {
-              const text = await file.text()
-              if (csvKind === "knowledge_category") {
-                await csvImports.importKnowledgeCategory.mutateAsync(text)
-              } else {
-                await csvImports.importKnowledgeArticle.mutateAsync(text)
-              }
-              setCsvKind(null)
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e))
+          onImport={async (text) => {
+            if (csvKind === "knowledge_category") {
+              await csvImports.importKnowledgeCategory.mutateAsync(text)
+            } else {
+              await csvImports.importKnowledgeArticle.mutateAsync(text)
             }
           }}
         />

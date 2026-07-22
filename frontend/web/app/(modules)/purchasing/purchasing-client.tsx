@@ -1,4 +1,5 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useModuleTab } from "@/hooks/use-module-tab"
@@ -7,6 +8,7 @@ import { Badge } from "@lumiere/ui/components/badge"
 import {
   ModuleView,
   FormModal,
+  CsvImportModal,
   RuntimeFormModal,
   useRBAC,
   EntityView,
@@ -454,7 +456,6 @@ function PurchasingClientLoaded({
   )
   const [formModalKey, setFormModalKey] = useState(0)
   const [csvKind, setCsvKind] = useState<PurchasingCsvImportKind | null>(null)
-  const [csvError, setCsvError] = useState<string | null>(null)
   const [billOrderId, setBillOrderId] = useState<bigint | null>(null)
   const [billOrderError, setBillOrderError] = useState<string | null>(null)
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
@@ -465,10 +466,6 @@ function PurchasingClientLoaded({
       setFormModalKey((k) => k + 1)
     }
   }, [quickActionForm])
-
-  useEffect(() => {
-    if (csvKind) setCsvError(null)
-  }, [csvKind])
 
   const { data: orders = [], isLoading: ordersLoading } = usePurchaseOrders(orgId, initialOrders)
   const { data: ordersToApprove = [] } = usePurchaseOrdersToApprove(orgId)
@@ -2253,12 +2250,7 @@ function PurchasingClientLoaded({
         ? Math.round((onTimeCount / confirmedWithPlan.length) * 100)
         : null
 
-    const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -2369,8 +2361,7 @@ function PurchasingClientLoaded({
           return { ...w, data: { ...(w.data as Record<string, unknown>), rows: openRows } }
         }
         return w
-      }),
-    }))
+          })
   }, [
     orders,
     ordersToApprove,
@@ -2391,10 +2382,7 @@ function PurchasingClientLoaded({
       ({
         ...moduleConfig,
         tabs: [
-          ...moduleConfig.tabs.map((tab) => {
-            if (tab.id === "dashboard") {
-              return { ...tab, sections: liveSections }
-            }
+          ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
             if (tab.id === "orders" && tab.type === "entity") {
               return {
                 ...tab,
@@ -2907,31 +2895,15 @@ function PurchasingClientLoaded({
         }}
       />
       {csvKind && csvFormConfig ? (
-        <FormModal
+        <CsvImportModal
           key={csvKind}
-          open
-          onOpenChange={(o) => !o && setCsvKind(null)}
+          onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null)
-            const files = data.csvFile as FileList | undefined
-            const file = files?.[0]
-            if (!file) {
-              setCsvError(t("common.validation.required"))
-              return
-            }
-            try {
-              const text = await file.text()
-              if (csvKind === "order") await csvImports.importPurchaseOrder.mutateAsync(text)
-              else if (csvKind === "orderLine") await csvImports.importPurchaseOrderLine.mutateAsync(text)
-              else await csvImports.importSupplierInfo.mutateAsync(text)
-              setCsvKind(null)
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e))
-            }
+          onImport={async (text) => {
+            if (csvKind === "order") await csvImports.importPurchaseOrder.mutateAsync(text)
+            else if (csvKind === "orderLine") await csvImports.importPurchaseOrderLine.mutateAsync(text)
+            else await csvImports.importSupplierInfo.mutateAsync(text)
           }}
         />
       ) : null}

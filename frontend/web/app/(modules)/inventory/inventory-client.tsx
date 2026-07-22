@@ -1,4 +1,5 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState, useEffect, useCallback } from "react"
 import dynamic from "next/dynamic"
@@ -6,6 +7,7 @@ import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
+  CsvImportModal,
   newProductForm,
   newTransferForm,
   newInventoryAdjustmentForm,
@@ -423,7 +425,6 @@ function InventoryClientLoaded({
   const [supplierLineProductId, setSupplierLineProductId] = useState<ScalarId | null>(null)
   const [packagingProductId, setPackagingProductId] = useState<ScalarId | null>(null)
   const [csvKind, setCsvKind] = useState<InventoryCsvImportKind | null>(null)
-  const [csvError, setCsvError] = useState<string | null>(null)
   const [productPriceSearch, setProductPriceSearch] = useState<ProductPriceSearchState>(null)
   const [productPriceSearchError, setProductPriceSearchError] = useState<string | null>(null)
   const [productPriceSearchResult, setProductPriceSearchResult] = useState<Record<string, unknown> | null>(null)
@@ -473,10 +474,6 @@ function InventoryClientLoaded({
     importStockQuant: useImportStockQuantCsv(orgId, operatingCompanyId),
     importLot: useImportLotCsv(orgId, operatingCompanyId),
   }
-
-  useEffect(() => {
-    if (csvKind) setCsvError(null)
-  }, [csvKind])
 
   const csvFormConfig = useMemo(() => {
     if (!csvKind) return null
@@ -1247,12 +1244,7 @@ function InventoryClientLoaded({
       inPreviousRange(a as Record<string, unknown>),
     ).length
 
-    return (
-      moduleConfig.tabs
-        .find((tab) => tab.id === "dashboard")
-        ?.sections?.map((section) => ({
-          ...section,
-          widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
             if (w.type === "stat-cards") {
               return {
                 ...w,
@@ -1401,11 +1393,7 @@ function InventoryClientLoaded({
               }
             }
             return w
-          }),
-        })) ??
-      moduleConfig.tabs.find((tab) => tab.id === "dashboard")?.sections ??
-      []
-    )
+              })
   }, [
     products,
     stockQuants,
@@ -3079,15 +3067,7 @@ function InventoryClientLoaded({
     return {
       ...moduleConfig,
       tabs: [
-        ...moduleConfig.tabs.map((tab) => {
-          if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "ops") {
-            return {
-              ...tab,
-              type: "custom" as const,
-              customContent: <InventoryOpsPanel />,
-            }
-          }
+        ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
           if (tab.id === "products") {
             return withTransferActions({
               ...tab,
@@ -3995,48 +3975,31 @@ function InventoryClientLoaded({
         />
       ) : null}
       {csvKind && csvKind !== "product" && csvFormConfig ? (
-        <FormModal
+        <CsvImportModal
           key={csvKind}
-          open
-          onOpenChange={(o) => !o && setCsvKind(null)}
+          onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null)
-            const files = data.csvFile as FileList | undefined
-            const file = files?.[0]
-            if (!file) {
-              setCsvError(t("common.validation.required"))
-              return
-            }
-            try {
-              const text = await file.text()
-              if (csvKind === "uomCategory") await csvImports.importUomCategory.mutateAsync(text)
-              else if (csvKind === "uom") await csvImports.importUom.mutateAsync(text)
-              else if (csvKind === "productCategory") await csvImports.importProductCategory.mutateAsync(text)
-              else if (csvKind === "productVariant") await csvImports.importProductVariant.mutateAsync(text)
-              else if (csvKind === "warehouse") await csvImports.importWarehouse.mutateAsync(text)
-              else if (csvKind === "stockLocation") await csvImports.importStockLocation.mutateAsync(text)
-              else if (csvKind === "stockQuant") await csvImports.importStockQuant.mutateAsync(text)
-              else if (csvKind === "lot") await csvImports.importLot.mutateAsync(text)
-              else if (csvKind === "product") {
-                const pl = pricelists.find(
-                  (p) => p.currencyId != null && String(p.currencyId).trim() !== "",
-                )
-                if (pl == null || pl.currencyId == null) {
-                  setCsvError(t("inventory.csvImport.noPricelistCurrency"))
-                  return
-                }
-                await csvImports.importProduct.mutateAsync({
-                  csvData: text,
-                  currencyId: Number(pl.currencyId),
-                })
+          onImport={async (text) => {
+            if (csvKind === "uomCategory") await csvImports.importUomCategory.mutateAsync(text)
+            else if (csvKind === "uom") await csvImports.importUom.mutateAsync(text)
+            else if (csvKind === "productCategory") await csvImports.importProductCategory.mutateAsync(text)
+            else if (csvKind === "productVariant") await csvImports.importProductVariant.mutateAsync(text)
+            else if (csvKind === "warehouse") await csvImports.importWarehouse.mutateAsync(text)
+            else if (csvKind === "stockLocation") await csvImports.importStockLocation.mutateAsync(text)
+            else if (csvKind === "stockQuant") await csvImports.importStockQuant.mutateAsync(text)
+            else if (csvKind === "lot") await csvImports.importLot.mutateAsync(text)
+            else if (csvKind === "product") {
+              const pl = pricelists.find(
+                (p) => p.currencyId != null && String(p.currencyId).trim() !== "",
+              )
+              if (pl == null || pl.currencyId == null) {
+                throw new Error(t("inventory.csvImport.noPricelistCurrency"))
               }
-              setCsvKind(null)
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e))
+              await csvImports.importProduct.mutateAsync({
+                csvData: text,
+                currencyId: Number(pl.currencyId),
+              })
             }
           }}
         />

@@ -195,7 +195,7 @@ export async function createExpenseReceiptAndResolveId(
     ),
   ])
   const r = await apiFetch(urlPath, init)
-  if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || "Failed to create expense receipt")
+  if (!r.ok) throw new Error(await parseCallErrorExpenses(r, "Failed to create expense receipt"))
   const rows = await fetchQueryList(
     "/api/query/expense-receipts",
     "Failed to fetch expense receipts",
@@ -327,7 +327,7 @@ export function useSubmitExpenseSheet(organizationId: bigint) {
         sheetId,
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to submit expense sheet')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to submit expense sheet'))
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)
@@ -350,7 +350,7 @@ export function useApproveExpenseSheet(organizationId: bigint) {
         sheetId,
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to approve expense sheet')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to approve expense sheet'))
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)
@@ -379,7 +379,7 @@ export function useRefuseExpenseSheet(organizationId: bigint) {
         stdbParamsToJson(params ?? {}, "RefuseExpenseSheetParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to refuse expense sheet')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to refuse expense sheet'))
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)
@@ -408,7 +408,7 @@ export function usePostExpenseSheet(organizationId: bigint) {
         stdbParamsToJson(params, "PostExpenseSheetParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to post expense sheet')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to post expense sheet'))
     },
     onSuccess: async () => {
       await Promise.all([
@@ -435,7 +435,7 @@ export function useCreateExpenseReimbursementPayment(organizationId: bigint) {
         stdbParamsToJson(params, "CreateExpenseReimbursementParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to reimburse expense sheet')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to reimburse expense sheet'))
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)
@@ -467,7 +467,7 @@ export function useUpsertExpenseMileageRate(organizationId: bigint, companyId?: 
         ),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to upsert mileage rate')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to upsert mileage rate'))
     },
     onSuccess: () => {
       const k = rqBigIntKey(organizationId)
@@ -497,7 +497,7 @@ export function useSeedStatutoryExpenseMileageRates(
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         throw new Error(
-          (await parseCallErrorExpenses(r)) || "Failed to seed statutory mileage rates",
+          await parseCallErrorExpenses(r, "Failed to seed statutory mileage rates"),
         )
       }
     },
@@ -528,7 +528,7 @@ export function useUpsertExpensePerDiemRate(organizationId: bigint, companyId?: 
         ),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to upsert per diem rate')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to upsert per diem rate'))
     },
     onSuccess: () => {
       const k = rqBigIntKey(organizationId)
@@ -554,7 +554,7 @@ export function useSetExpenseAllocations(organizationId: bigint) {
         stdbParamsToJson(params),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to set expense allocations')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to set expense allocations'))
     },
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
@@ -577,7 +577,7 @@ export function useCreateExpenseProjectRebill(organizationId: bigint) {
         stdbParamsToJson(params, "CreateExpenseProjectRebillParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to create project rebill')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to create project rebill'))
     },
     onSuccess: async () => {
       await Promise.all([
@@ -613,7 +613,7 @@ export function useCreateExpenseIntegrationIntent(organizationId: bigint, compan
         ),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to create integration intent')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to create integration intent'))
     },
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
@@ -629,7 +629,7 @@ export function useApplyExpenseIntegrationIntent(organizationId: bigint) {
         intentId,
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to apply integration intent')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to apply integration intent'))
     },
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
@@ -654,7 +654,7 @@ export function useSetExpenseFraudHold(organizationId: bigint) {
         stdbParamsToJson({ fraudHold, fraudReason }, "SetExpenseFraudHoldParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to set fraud hold')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to set fraud hold'))
     },
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
@@ -677,7 +677,7 @@ export function useRequestExpensePolicyException(organizationId: bigint) {
         stdbParamsToJson({ reason }, "RequestExpensePolicyExceptionParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to request policy exception')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to request policy exception'))
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)
@@ -698,7 +698,7 @@ export function useApproveExpensePolicyException(organizationId: bigint) {
         exceptionId,
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to approve policy exception')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to approve policy exception'))
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)
@@ -726,7 +726,7 @@ export function useRejectExpensePolicyException(organizationId: bigint) {
         stdbParamsToJson({ reason }, "RejectExpensePolicyExceptionParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to reject policy exception')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to reject policy exception'))
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)
@@ -750,7 +750,7 @@ export function useCreateExpenseAdvance(organizationId: bigint, companyId?: bigi
         ),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to create advance')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to create advance'))
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)
@@ -781,7 +781,7 @@ export function useApplyExpenseAdvanceToSheet(organizationId: bigint) {
         stdbParamsToJson({ amount }, "ApplyExpenseAdvanceParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to apply advance')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to apply advance'))
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)
@@ -809,7 +809,7 @@ export function useCreateExpenseCardStatementLine(
         ),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to create card statement line')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to create card statement line'))
     },
     onSuccess: () => {
       const k = rqBigIntKey(organizationId)
@@ -835,7 +835,7 @@ export function useMatchExpenseCardStatementLine(organizationId: bigint) {
         stdbParamsToJson({ expenseId, metadata: null }, "MatchExpenseCardStatementLineParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to match statement line')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to match statement line'))
     },
     onSuccess: () => {
       const k = rqBigIntKey(organizationId)
@@ -859,7 +859,7 @@ export function useUnmatchExpenseCardStatementLine(organizationId: bigint) {
         stdbParamsToJson({ metadata: null }, "UnmatchExpenseCardStatementLineParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to unmatch statement line')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to unmatch statement line'))
     },
     onSuccess: () => {
       const k = rqBigIntKey(organizationId)
@@ -878,7 +878,7 @@ export function useApplyPendingExpenseIntegrationIntents(organizationId: bigint)
         limit,
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r) || 'Failed to apply pending intents')
+      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to apply pending intents'))
     },
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
@@ -887,14 +887,7 @@ export function useApplyPendingExpenseIntegrationIntents(organizationId: bigint)
 
 // ── CSV imports (organization_id, csv_data) ───────────────────────────────────
 
-async function parseCallErrorExpenses(r: Response): Promise<string> {
-  try {
-    const j = (await r.json()) as { error?: string }
-    return j.error ?? r.statusText
-  } catch {
-    return r.statusText
-  }
-}
+import { responseErrorMessage as parseCallErrorExpenses } from "@lumiere/api-client/response-error"
 
 export function useImportExpenseCsv(organizationId: bigint) {
   const qc = useQueryClient()

@@ -10,6 +10,8 @@ import type {
 } from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
+import { nullableBigIntU64, optionalBigIntU64, optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
+
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 export type InventoryCreateProductPayload = Record<string, unknown> & {
@@ -84,26 +86,6 @@ export type InventoryCreateStockQuantPayload = Record<string, unknown> & {
   quantity: number
   reservedQuantity: number
   cost: number
-}
-
-function optionalTrimmedString(v: unknown): string | undefined {
-  if (v == null) return undefined
-  const s = String(v).trim()
-  return s === "" ? undefined : s
-}
-
-function requiredBigIntU64(v: unknown): bigint | null {
-  if (v == null || v === "") return null
-  try {
-    return BigInt(String(v).trim())
-  } catch {
-    return null
-  }
-}
-
-function optionalBigIntU64(v: unknown): bigint | undefined {
-  const b = requiredBigIntU64(v)
-  return b === null ? undefined : b
 }
 
 function timestampFromFormDate(v: unknown, fallback = new Date()): Timestamp {
@@ -374,9 +356,9 @@ export function toCreateAdjustmentReasonParamsFromForm(
 export function toCreateTraceabilityRecordParamsFromForm(
   formData: Record<string, unknown>,
 ): CreateTraceabilityRecordParams | null {
-  const productId = requiredBigIntU64(formData.productId)
-  const documentId = requiredBigIntU64(formData.documentId)
-  const uomId = requiredBigIntU64(formData.uomId)
+  const productId = nullableBigIntU64(formData.productId)
+  const documentId = nullableBigIntU64(formData.documentId)
+  const uomId = nullableBigIntU64(formData.uomId)
   const documentType = optionalTrimmedString(formData.documentType)
   const qty = Number(formData.quantity)
   if (!productId || !documentId || !uomId || !documentType || !Number.isFinite(qty)) return null

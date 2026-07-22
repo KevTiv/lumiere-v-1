@@ -24,14 +24,7 @@ function toScalarU64(v: ScalarId): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
 }
 
-async function parseCallErrorDocuments(r: Response): Promise<string> {
-  try {
-    const body = (await r.json()) as { error?: string; message?: string }
-    return body.error ?? body.message ?? r.statusText
-  } catch {
-    return r.statusText
-  }
-}
+import { responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-client/response-error"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 

@@ -7,7 +7,7 @@ import type {
 } from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
-import { optionalBigIntU64 } from "@/lib/form-coercion"
+import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import { timestampToDateInputValue } from "@/lib/crm-update-params"
 

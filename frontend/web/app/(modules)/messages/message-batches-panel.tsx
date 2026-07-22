@@ -21,6 +21,7 @@ import {
   useMessageTemplates,
   useReviewMessageBatch,
 } from "@lumiere/query-hooks/hooks/messages"
+import { nullableBigIntU64 as asId } from "@lumiere/erp-shared/form-coercion"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,14 +32,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 type Row = Record<string, unknown>
 type PickerOption = { value: string; label: string; description?: string }
 type PickerField = CustomField & { options?: PickerOption[] }
-
-function asId(value: unknown): bigint | null {
-  try {
-    return value == null || value === "" ? null : typeof value === "bigint" ? value : BigInt(String(value))
-  } catch {
-    return null
-  }
-}
 
 function enumName(value: unknown): string {
   return value != null && typeof value === "object" && "tag" in value

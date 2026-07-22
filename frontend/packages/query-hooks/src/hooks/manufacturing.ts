@@ -286,14 +286,7 @@ export function useUnblockWorkcenter(organizationId: bigint) {
 
 // ── Additional manufacturing reducers (HTTP bridge) ─────────────────────────
 
-async function parseCallError(r: Response): Promise<string> {
-  try {
-    const j = (await r.json()) as { error?: string }
-    return j.error ?? r.statusText
-  } catch {
-    return r.statusText
-  }
-}
+import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
 export function useCheckMoAvailability(organizationId: bigint) {
   const qc = useQueryClient()

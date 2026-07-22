@@ -5,10 +5,7 @@ import { orgMasterCsvImportsBffPost } from "@lumiere/stdb/commands"
 import { apiFetch } from "../http"
 import { useMutation } from "@tanstack/react-query"
 
-async function parseCallErrorOrgMaster(res: Response): Promise<string> {
-  const j = (await res.json().catch(() => ({}))) as { error?: string }
-  return j.error ?? res.statusText ?? "Request failed"
-}
+import { responseErrorMessage as parseCallErrorOrgMaster } from "@lumiere/api-client/response-error"
 
 /** Reducers: `(organization_id, csv_data)` — no company scope. */
 export function useImportCountryCsv(organizationId: number) {

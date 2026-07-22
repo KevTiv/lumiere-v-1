@@ -1,10 +1,12 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
+  CsvImportModal,
   newEmployeeForm,
   newLeaveRequestForm,
   newContractForm,
@@ -387,7 +389,6 @@ function HrClientLoaded({
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvKind, setCsvKind] = useState<HrCsvImportKind | null>(null)
-  const [csvError, setCsvError] = useState<string | null>(null)
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [rowAction, setRowAction] = useState<HrRowAction>(null)
   const [rowActionError, setRowActionError] = useState<string | null>(null)
@@ -449,10 +450,6 @@ function HrClientLoaded({
   const csvImports = useHrCsvImportMutations(orgId)
 
   const moduleConfig = useMemo(() => hrModuleConfig(t), [t])
-
-  useEffect(() => {
-    if (csvKind) setCsvError(null)
-  }, [csvKind])
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
@@ -831,12 +828,7 @@ function HrClientLoaded({
     const currentContracts = contracts.filter((c) => inCurrentRange(c as Record<string, unknown>)).length
     const previousContracts = contracts.filter((c) => inPreviousRange(c as Record<string, unknown>)).length
 
-    return (
-      moduleConfig.tabs
-        .find((tab) => tab.id === "dashboard")
-        ?.sections?.map((section) => ({
-          ...section,
-          widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
             if (w.type === "stat-cards") {
               return {
                 ...w,
@@ -954,11 +946,7 @@ function HrClientLoaded({
               return { ...w, data: { ...(w.data as Record<string, unknown>), rows } }
             }
             return w
-          }),
-        })) ??
-      moduleConfig.tabs.find((tab) => tab.id === "dashboard")?.sections ??
-      []
-    )
+              })
   }, [
     employees,
     departments,
@@ -991,46 +979,8 @@ function HrClientLoaded({
           performanceTab,
           benefitsTab,
           recruitmentTab,
-          ...moduleConfig.tabs.map((tab) => {
+          ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
           if (tab.id === "recruitment") return null
-          if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-          if (tab.id === "employees" && tab.entityConfig) {
-            return {
-              ...tab,
-              createForm: employeeFormConfig,
-              recordSheet: employeeRecordSheet,
-              entityConfig: attachEmptyStateAction(
-                addCsvToolbar(tab.entityConfig, [
-                {
-                  id: "csv-employee",
-                  label: t("hr.toolbar.importEmployeeCsv"),
-                  onClick: () => setCsvKind("employee"),
-                },
-                {
-                  id: "edit-employee",
-                  label: "Edit",
-                  requiresSelection: true,
-                  onClick: (rows) => openEditRow(rows, "updateEmployee", buildEditEmployeeForm),
-                },
-                {
-                  id: "archive-employee",
-                  label: "Archive",
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    setToolbarError(null)
-                    if (rows.length === 0) {
-                      setToolbarError("Select at least one employee.")
-                      return
-                    }
-                    setRowActionError(null)
-                    setRowAction({ action: "archiveEmployee", rows, form: archiveEmployeeForm })
-                  },
-                },
-              ]),
-                openCreateEmployee,
-              ),
-            }
-          }
           if (tab.id === "departments" && tab.entityConfig) {
             return {
               ...tab,
@@ -1671,25 +1621,13 @@ function HrClientLoaded({
         />
       ) : null}
       {csvKind && csvFormConfig ? (
-        <FormModal
+        <CsvImportModal
           key={csvKind}
-          open
-          onOpenChange={(o) => !o && setCsvKind(null)}
+          onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null)
-            const files = data.csvFile as FileList | undefined
-            const file = files?.[0]
-            if (!file) {
-              setCsvError(t("common.validation.required"))
-              return
-            }
-            try {
-              const text = await file.text()
-              switch (csvKind) {
+          onImport={async (text) => {
+            switch (csvKind) {
                 case "resource":
                   await csvImports.importResource.mutateAsync(text)
                   break
@@ -1720,12 +1658,8 @@ function HrClientLoaded({
                 case "payslip":
                   await csvImports.importPayslip.mutateAsync(text)
                   break
-                default:
-                  break
-              }
-              setCsvKind(null)
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e))
+              default:
+                break
             }
           }}
         />

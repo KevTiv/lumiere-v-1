@@ -8,10 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
 
-async function parseCallError(r: Response): Promise<string> {
-  const j = (await r.json().catch(() => ({}))) as { error?: string }
-  return j.error ?? `Request failed (${r.status})`
-}
+import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
 export function aiReducerAllowlistQueryKey(organizationId: number) {
   return ["ai-reducer-allowlist", String(organizationId)] as const

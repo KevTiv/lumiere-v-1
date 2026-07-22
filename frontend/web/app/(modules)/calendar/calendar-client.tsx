@@ -1,4 +1,5 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { calendarModuleConfig } from "@/lib/module-dashboard-configs"
 import { useCalendarModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -63,12 +64,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
     const confirmed = events?.filter((e) => String(e.state) === "confirmed").length
     const allDay = events?.filter((e) => e.allday).length
 
-    const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -95,21 +91,13 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
           }
         }
         return w
-      }),
-    }))
+          })
   }, [events, moduleConfig, t])
 
   const config = useMemo(
     () => ({
       ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) => {
-        if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-        if (tab.id === "events") {
-          return {
-            ...tab,
-            createForm: newCalendarEventForm(t),
-          }
-        }
+      tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
         if (tab.id === "activities") {
           return {
             ...tab,

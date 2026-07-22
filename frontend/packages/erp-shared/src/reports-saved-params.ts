@@ -3,6 +3,7 @@
  */
 
 import type { CreateSavedReportParams } from "@lumiere/stdb/types"
+import { formValue } from "./form-coercion"
 
 function optionalTrimmedString(v: unknown): string | undefined {
   if (v == null) return undefined
@@ -15,17 +16,17 @@ export function toCreateSavedReportParams(
 ): CreateSavedReportParams | null {
   const name = String(formData.name ?? "").trim()
   if (!name) return null
-  const columnRaw = formData.columnDimension ?? formData.column_dimension
+  const columnRaw = formValue(formData, "columnDimension", "column_dimension")
   const columnDimension =
     columnRaw == null || String(columnRaw).trim() === "" ? undefined : String(columnRaw)
   return {
     name,
     model: String(formData.model ?? "trial_balance"),
-    rowDimension: String(formData.rowDimension ?? formData.row_dimension ?? "accountCode"),
+    rowDimension: String(formValue(formData, "rowDimension", "row_dimension") ?? "accountCode"),
     columnDimension,
-    measureField: String(formData.measureField ?? formData.measure_field ?? "closingDebit"),
-    measureOp: String(formData.measureOp ?? formData.measure_op ?? "sum"),
-    filterJson: optionalTrimmedString(formData.filterJson ?? formData.filter_json),
+    measureField: String(formValue(formData, "measureField", "measure_field") ?? "closingDebit"),
+    measureOp: String(formValue(formData, "measureOp", "measure_op") ?? "sum"),
+    filterJson: optionalTrimmedString(formValue(formData, "filterJson", "filter_json")),
     isActive: formData.isActive !== false && formData.is_active !== false,
     metadata: optionalTrimmedString(formData.metadata),
   }

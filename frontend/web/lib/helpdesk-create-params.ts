@@ -9,11 +9,7 @@ import type {
   CreateTicketParams,
 } from "@lumiere/stdb/types"
 
-function optionalTrimmedString(v: unknown): string | undefined {
-  if (v == null) return undefined
-  const s = String(v).trim()
-  return s === "" ? undefined : s
-}
+import { optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
 
 function parseU64Field(v: unknown): bigint | null {
   if (typeof v === "bigint") return v >= 0n ? v : null

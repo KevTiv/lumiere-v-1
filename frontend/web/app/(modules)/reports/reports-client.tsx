@@ -1,10 +1,12 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
+  CsvImportModal,
   newFinancialReportForm,
   newReportTemplateForm,
   newScheduledReportForm,
@@ -262,7 +264,6 @@ function ReportsClientLoaded({
   const [recordRunOpen, setRecordRunOpen] = useState(false)
   const [recordRunScheduledId, setRecordRunScheduledId] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<"report_template" | "analytics_metric" | null>(null)
-  const [csvError, setCsvError] = useState<string | null>(null)
 
   // Dashboard modal states
   const [editReportOpen, setEditReportOpen] = useState(false)
@@ -327,10 +328,6 @@ function ReportsClientLoaded({
   const updateWidgetLayout = useUpdateWidgetLayout(orgId)
   const shareDashboard = useShareDashboard(orgId)
   const runReportAnalysis = useRunAiSkill()
-
-  useEffect(() => {
-    if (csvKind) setCsvError(null)
-  }, [csvKind])
 
   const templateSelectOptions = useMemo(
     () =>
@@ -837,12 +834,7 @@ function ReportsClientLoaded({
     const generated = reports.filter((r) => String(r.state) === "generated").length
     const exported = reports.filter((r) => String(r.state) === "exported").length
 
-    const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -912,8 +904,7 @@ function ReportsClientLoaded({
           }
         }
         return w
-      }),
-    }))
+          })
   }, [
     reports,
     trialBalances,
@@ -931,23 +922,7 @@ function ReportsClientLoaded({
   const config = useMemo(
     () => ({
       ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) => {
-        if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-        if (tab.id === "owner-reports") {
-          return {
-            ...tab,
-            type: "custom" as const,
-            customContent: (
-              <OwnerReportsPanel
-                organizationId={orgId}
-                companies={companies as Record<string, unknown>[]}
-                defaultCompanyId={
-                  operatingCompanyId > 0n ? Number(operatingCompanyId) : undefined
-                }
-              />
-            ),
-          }
-        }
+      tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
         if (tab.id === "reports") return { ...tab, entityConfig: financialReportsEntityConfig }
         if (tab.id === "trial-balance") return { ...tab, entityConfig: trialBalanceEntityConfig, createForm: trialBalanceEntryFormConfig, createAction: "createTrialBalanceEntry", createLabel: t("reports.trialBalance.createEntryLabel") }
         if (tab.id === "report-templates") return { ...tab, entityConfig: reportTemplatesEntityConfig, createForm: reportTemplateFormConfig }
@@ -1293,32 +1268,16 @@ function ReportsClientLoaded({
         }}
       />
       {csvKind && csvFormConfig ? (
-        <FormModal
+        <CsvImportModal
           key={csvKind}
-          open
-          onOpenChange={(o) => !o && setCsvKind(null)}
+          onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={csvError}
-          onSubmit={async (data) => {
-            setCsvError(null)
-            const files = data.csvFile as FileList | undefined
-            const file = files?.[0]
-            if (!file) {
-              setCsvError(t("common.validation.required"))
-              return
-            }
-            try {
-              const text = await file.text()
-              if (csvKind === "report_template") {
-                await importReportTemplateCsv.mutateAsync(text)
-              } else {
-                await importAnalyticsMetricCsv.mutateAsync(text)
-              }
-              setCsvKind(null)
-            } catch (e) {
-              setCsvError(e instanceof Error ? e.message : String(e))
+          onImport={async (text) => {
+            if (csvKind === "report_template") {
+              await importReportTemplateCsv.mutateAsync(text)
+            } else {
+              await importAnalyticsMetricCsv.mutateAsync(text)
             }
           }}
         />

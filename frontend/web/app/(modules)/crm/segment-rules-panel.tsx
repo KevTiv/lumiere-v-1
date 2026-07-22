@@ -28,24 +28,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/erp-shared/form-coercion"
+
 type Row = Record<string, unknown>
-
-function optionValue(value: unknown): unknown {
-  if (value != null && typeof value === "object" && "some" in value) {
-    return (value as { some: unknown }).some
-  }
-  return value
-}
-
-function asId(value: unknown): bigint | null {
-  const raw = optionValue(value)
-  if (raw == null || raw === "") return null
-  try {
-    return typeof raw === "bigint" ? raw : BigInt(String(raw))
-  } catch {
-    return null
-  }
-}
 
 function enumTag(value: unknown): string {
   if (value != null && typeof value === "object" && "tag" in value) {

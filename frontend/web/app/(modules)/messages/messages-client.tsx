@@ -1,4 +1,5 @@
 "use client"
+import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -25,7 +26,7 @@ import {
 } from "@lumiere/query-hooks/hooks/messages"
 import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
-import { optionalBigIntU64 } from "@/lib/form-coercion"
+import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { mailMessageRowsToSelectOptions } from "@/lib/form-lookup"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
@@ -132,12 +133,7 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
     const comments = messages.filter((m) => String(m.messageType) === "comment").length
     const notifications = myNotifications.length
 
-    const dashboardTab = moduleConfig.tabs.find((tab) => tab.id === "dashboard")
-    if (!dashboardTab?.sections) return []
-
-    return dashboardTab.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
+    return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -168,18 +164,13 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
           }
         }
         return w
-      }),
-    }))
+          })
   }, [messages, myNotifications.length, moduleConfig, t, mailMessageFormConfig])
 
   const config = useMemo(
     () => ({
       ...moduleConfig,
-      tabs: moduleConfig.tabs.map((tab) => {
-        if (tab.id === "dashboard") return { ...tab, sections: liveSections }
-        if (tab.id === "messages" && tab.type === "entity") {
-          return { ...tab, createForm: mailMessageFormConfig }
-        }
+      tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
         if (tab.id === "message-batches") {
           return {
             ...tab,
