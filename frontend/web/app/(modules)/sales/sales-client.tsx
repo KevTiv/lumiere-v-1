@@ -504,7 +504,7 @@ function SalesClientLoaded({
       name,
       isActive: true,
       defaultRatePercent,
-      metadata: null,
+      metadata: undefined,
     });
   };
 
@@ -537,7 +537,7 @@ function SalesClientLoaded({
       planId: BigInt(planId),
       partnerId: BigInt(partnerId),
       sharePercent,
-      metadata: null,
+      metadata: undefined,
     });
   };
 
@@ -561,10 +561,10 @@ function SalesClientLoaded({
       companyId: operatingCompanyId,
       name,
       partnerId: BigInt(partnerId),
-      dateStart: null,
-      dateEnd: null,
-      pricelistId: null,
-      metadata: null,
+      dateStart: undefined,
+      dateEnd: undefined,
+      pricelistId: undefined,
+      metadata: undefined,
     });
   };
 
@@ -592,7 +592,7 @@ function SalesClientLoaded({
       name,
       ruleJson,
       isActive: true,
-      metadata: null,
+      metadata: undefined,
     });
   };
 
@@ -637,10 +637,10 @@ function SalesClientLoaded({
       companyId: operatingCompanyId,
       provider,
       intentType,
-      saleOrderId: orderRaw ? BigInt(orderRaw) : null,
+      saleOrderId: orderRaw ? BigInt(orderRaw) : undefined,
       idempotencyKey,
-      requestPayload: null,
-      metadata: null,
+      requestPayload: undefined,
+      metadata: undefined,
     });
   };
 
@@ -670,14 +670,14 @@ function SalesClientLoaded({
             defaultValue: 'External reference (optional)',
           }),
         )
-        ?.trim() || null;
+        ?.trim() || undefined;
     await recordSalesIntegrationResult.mutateAsync({
       intentId,
       params: {
         status,
         externalReference,
-        lastError: status === 'failed' ? 'recorded via Ops' : null,
-        metadata: null,
+        lastError: status === 'failed' ? 'recorded via Ops' : undefined,
+        metadata: undefined,
       },
     });
   };
@@ -1613,7 +1613,7 @@ function SalesClientLoaded({
                       defaultValue: 'Channel (optional, e.g. web, store)',
                     }),
                   )
-                  ?.trim() || null;
+                  ?.trim() || undefined;
               const routeRaw =
                 window
                   .prompt(
@@ -1626,9 +1626,9 @@ function SalesClientLoaded({
                 .mutateAsync({
                   orderId: r.id as string | number | bigint,
                   params: {
-                    preferredRouteId: routeRaw ? BigInt(routeRaw) : null,
+                    preferredRouteId: routeRaw ? BigInt(routeRaw) : undefined,
                     channel,
-                    metadata: null,
+                    metadata: undefined,
                   },
                 })
                 .catch((e: unknown) => {

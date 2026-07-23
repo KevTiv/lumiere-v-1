@@ -254,7 +254,7 @@ export function WorkflowsRowDialog({
                         workflowVersionId: id,
                         params: {
                           simulationKey: newKey("sim"),
-                          signalKey: null,
+                          signalKey: undefined,
                           snapshot: {
                             subjectModel: String(row.model ?? "e2e.subject"),
                             subjectId: BigInt(0),

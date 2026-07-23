@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useErpSession } from '@lumiere/erp-session'
-import { useOperatingCompanyId } from '@lumiere/query-hooks/hooks/use-operating-company'
+import { useOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company'
 import {
   useApplyWarehouseSyncIntent,
   useCreateWarehouseSyncIntent,
@@ -45,9 +45,10 @@ export function InventoryOpsPanel({
   onQueueChange,
 }: InventoryOpsPanelProps) {
   const { organizationId } = useErpSession()
-  const orgId =
+  const orgIdNum =
     organizationId != null && organizationId > 0 ? organizationId : 0
-  const operatingCompanyId = useOperatingCompanyId(orgId)
+  const orgId = BigInt(orgIdNum)
+  const operatingCompanyId = useOperatingCompanyBigInt(orgIdNum) ?? 0n
   const [localQueue, setLocalQueue] = useState<InventoryOpsQueueId>('short_atp')
   const activeQueue = controlledQueue ?? localQueue
   const setQueue = (q: InventoryOpsQueueId) => {
@@ -58,11 +59,11 @@ export function InventoryOpsPanel({
   const shortAtp = useInventoryExceptionsShortAtp(orgId)
   const expiredLots = useInventoryExceptionsExpiredLots(orgId)
   const openQc = useInventoryExceptionsOpenQc(orgId)
-  const refresh = useRefreshInventoryExceptions(orgId, operatingCompanyId ?? 0)
-  const resolve = useResolveInventoryException(orgId, operatingCompanyId ?? 0)
+  const refresh = useRefreshInventoryExceptions(orgId, operatingCompanyId)
+  const resolve = useResolveInventoryException(orgId, operatingCompanyId)
   const pendingSync = useWarehouseSyncIntentsPending(orgId)
-  const createSync = useCreateWarehouseSyncIntent(orgId, operatingCompanyId ?? 0)
-  const applySync = useApplyWarehouseSyncIntent(orgId, operatingCompanyId ?? 0)
+  const createSync = useCreateWarehouseSyncIntent(orgId, operatingCompanyId)
+  const applySync = useApplyWarehouseSyncIntent(orgId, operatingCompanyId)
   const [actionError, setActionError] = useState<string | null>(null)
   const [syncBusy, setSyncBusy] = useState(false)
   const deviceId = useMemo(() => getOrCreateDeviceId(), [])

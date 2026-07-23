@@ -12,7 +12,10 @@ import {
   useRejectApprovalRequest,
 } from '@lumiere/query-hooks/hooks/approvals'
 import { useRefreshSaleOrderPromiseDates } from '@lumiere/query-hooks/hooks/sales'
-import { useOperatingCompanyId } from '@lumiere/query-hooks/hooks/use-operating-company'
+import {
+  useOperatingCompanyBigInt,
+  useOperatingCompanyId,
+} from '@lumiere/query-hooks/hooks/use-operating-company'
 import { Button, FormModal } from '@lumiere/ui'
 import type { FormConfig } from '@lumiere/ui'
 
@@ -201,7 +204,9 @@ export function SalesOpsPanel({
   const { organizationId, identity } = useErpSession()
   const orgId =
     organizationId != null && organizationId > 0 ? organizationId : 0
+  const orgIdBig = BigInt(orgId)
   const operatingCompanyId = useOperatingCompanyId(orgId)
+  const operatingCompanyBig = useOperatingCompanyBigInt(orgId) ?? 0n
   const inboxEnabled = activeQueue === 'to_approve' && orgId > 0
   const inboxQuery = useApprovalInbox(orgId, inboxEnabled)
   const approveRequest = useApproveApprovalRequest(
@@ -220,8 +225,8 @@ export function SalesOpsPanel({
   const [settleOpen, setSettleOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const refreshPromise = useRefreshSaleOrderPromiseDates(
-    orgId,
-    operatingCompanyId ?? 0,
+    orgIdBig,
+    operatingCompanyBig,
   )
 
   const runAdvanced = async (fn?: () => Promise<void>) => {

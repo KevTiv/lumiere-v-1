@@ -1168,9 +1168,17 @@ function ExpensesClientLoaded({
                 <div className="text-muted-foreground">
                   {String(row.status ?? "pending")} · {String(row.action ?? "")}
                 </div>
-                {row.rejectReason || row.reject_reason ? (
+                {row.rejectReason ||
+                row.reject_reason ||
+                row.decisionComment ||
+                row.decision_comment ? (
                   <div className="text-destructive">
-                    {String(row.rejectReason ?? row.reject_reason)}
+                    {String(
+                      row.rejectReason ??
+                        row.reject_reason ??
+                        row.decisionComment ??
+                        row.decision_comment,
+                    )}
                   </div>
                 ) : null}
               </div>

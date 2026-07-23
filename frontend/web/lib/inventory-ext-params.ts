@@ -234,6 +234,7 @@ export function toCreateStockMoveParams(input: {
     inventoryId: undefined,
     saleLineId: undefined,
     lotId: undefined,
+    serialId: undefined,
     packageId: undefined,
     resultPackageId: undefined,
     ownerId: undefined,

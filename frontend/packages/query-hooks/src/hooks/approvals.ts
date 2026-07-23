@@ -51,6 +51,8 @@ export type HumanTaskRow = {
   decision?: string | { tag?: string } | null
   decisionComment?: string | null
   decision_comment?: string | null
+  rejectReason?: string | null
+  reject_reason?: string | null
   correlationId?: string
   correlation_id?: string
   summary?: {

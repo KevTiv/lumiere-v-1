@@ -57,6 +57,11 @@ export function RecordDocumentAttachments({
           partnerId: undefined,
           tagIds: [],
           isFavorite: false,
+          indexContent: undefined,
+          classificationId: undefined,
+          retentionDays: undefined,
+          fiscalKind: undefined,
+          residencyRegion: undefined,
           metadata: undefined,
         })
       }}
