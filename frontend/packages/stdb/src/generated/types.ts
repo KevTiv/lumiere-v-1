@@ -1253,6 +1253,100 @@ export const AiSkill = __t.object("AiSkill", {
 });
 export type AiSkill = __Infer<typeof AiSkill>;
 
+export const AiSkillCertificationEnvironment = __t.object("AiSkillCertificationEnvironment", {
+  id: __t.u64(),
+  environmentKey: __t.string(),
+  organizationId: __t.u64(),
+  skillId: __t.u64(),
+  fixtureId: __t.u64(),
+  datasetJson: __t.string(),
+  virtualFilesJson: __t.string(),
+  environmentFingerprint: __t.string(),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiSkillCertificationEnvironment = __Infer<typeof AiSkillCertificationEnvironment>;
+
+export const AiSkillCertificationEvidence = __t.object("AiSkillCertificationEvidence", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  skillId: __t.u64(),
+  skillVersionId: __t.u64(),
+  fixtureId: __t.u64(),
+  certificationRequestId: __t.u64(),
+  certificationEnvironmentId: __t.u64(),
+  runtimeProfileId: __t.u64(),
+  get status() {
+    return AiSkillTestRunStatus;
+  },
+  outputFingerprint: __t.string(),
+  sourceHash: __t.string(),
+  manifestHash: __t.string(),
+  fixtureHash: __t.string(),
+  runtimeHash: __t.string(),
+  environmentHash: __t.string(),
+  policySnapshotHash: __t.string(),
+  executionEvidenceHash: __t.string(),
+  executorRunId: __t.string(),
+  get failureKind() {
+    return __t.option(AiSkillTestRunFailureKind);
+  },
+  failureReason: __t.option(__t.string()),
+  executedBy: __t.identity(),
+  executedAt: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type AiSkillCertificationEvidence = __Infer<typeof AiSkillCertificationEvidence>;
+
+export const AiSkillCertificationRequest = __t.object("AiSkillCertificationRequest", {
+  id: __t.u64(),
+  requestKey: __t.string(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  skillId: __t.u64(),
+  skillVersionId: __t.u64(),
+  fixtureId: __t.u64(),
+  get status() {
+    return AiSkillCertificationRequestStatus;
+  },
+  requestedBy: __t.identity(),
+  requestedAt: __t.timestamp(),
+  requesterSuperuserBypass: __t.bool(),
+  attemptCount: __t.u32(),
+  certificationEnvironmentId: __t.option(__t.u64()),
+  runtimeProfileId: __t.option(__t.u64()),
+  claimedBy: __t.option(__t.identity()),
+  claimedAt: __t.option(__t.timestamp()),
+  terminalAt: __t.option(__t.timestamp()),
+  errorCode: __t.option(__t.string()),
+});
+export type AiSkillCertificationRequest = __Infer<typeof AiSkillCertificationRequest>;
+
+// The tagged union or sum type for the algebraic type `AiSkillCertificationRequestStatus`.
+export const AiSkillCertificationRequestStatus = __t.enum("AiSkillCertificationRequestStatus", {
+  Queued: __t.unit(),
+  Running: __t.unit(),
+  Completed: __t.unit(),
+  Errored: __t.unit(),
+});
+export type AiSkillCertificationRequestStatus = __Infer<typeof AiSkillCertificationRequestStatus>;
+
+export const AiSkillCertificationRuntimeProfile = __t.object("AiSkillCertificationRuntimeProfile", {
+  id: __t.u64(),
+  profileKey: __t.string(),
+  organizationId: __t.u64(),
+  runtimeHash: __t.string(),
+  executorIdentity: __t.identity(),
+  isActive: __t.bool(),
+  registeredBy: __t.identity(),
+  registeredAt: __t.timestamp(),
+  retiredAt: __t.option(__t.timestamp()),
+  metadata: __t.option(__t.string()),
+});
+export type AiSkillCertificationRuntimeProfile = __Infer<typeof AiSkillCertificationRuntimeProfile>;
+
 export const AiSkillConfig = __t.object("AiSkillConfig", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -1324,6 +1418,13 @@ export const AiSkillTestRun = __t.object("AiSkillTestRun", {
   metadata: __t.option(__t.string()),
 });
 export type AiSkillTestRun = __Infer<typeof AiSkillTestRun>;
+
+// The tagged union or sum type for the algebraic type `AiSkillTestRunFailureKind`.
+export const AiSkillTestRunFailureKind = __t.enum("AiSkillTestRunFailureKind", {
+  Assertion: __t.unit(),
+  Execution: __t.unit(),
+});
+export type AiSkillTestRunFailureKind = __Infer<typeof AiSkillTestRunFailureKind>;
 
 // The tagged union or sum type for the algebraic type `AiSkillTestRunStatus`.
 export const AiSkillTestRunStatus = __t.enum("AiSkillTestRunStatus", {
@@ -2276,6 +2377,17 @@ export const CompleteAiAgentRunParams = __t.object("CompleteAiAgentRunParams", {
   errorMessage: __t.option(__t.string()),
 });
 export type CompleteAiAgentRunParams = __Infer<typeof CompleteAiAgentRunParams>;
+
+export const CompleteAiSkillCertificationParams = __t.object("CompleteAiSkillCertificationParams", {
+  requestId: __t.u64(),
+  actualOutputJson: __t.string(),
+  environmentHash: __t.string(),
+  policySnapshotHash: __t.string(),
+  executionEvidenceHash: __t.string(),
+  executorRunId: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CompleteAiSkillCertificationParams = __Infer<typeof CompleteAiSkillCertificationParams>;
 
 export const CompleteDocumentProcessingJobParams = __t.object("CompleteDocumentProcessingJobParams", {
   extractedData: __t.option(__t.string()),
@@ -3282,6 +3394,15 @@ export const CreateAiReducerAllowlistParams = __t.object("CreateAiReducerAllowli
   metadata: __t.option(__t.string()),
 });
 export type CreateAiReducerAllowlistParams = __Infer<typeof CreateAiReducerAllowlistParams>;
+
+export const CreateAiSkillCertificationEnvironmentParams = __t.object("CreateAiSkillCertificationEnvironmentParams", {
+  fixtureId: __t.u64(),
+  environmentKey: __t.string(),
+  datasetJson: __t.string(),
+  virtualFilesJson: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateAiSkillCertificationEnvironmentParams = __Infer<typeof CreateAiSkillCertificationEnvironmentParams>;
 
 export const CreateAiSkillFixtureParams = __t.object("CreateAiSkillFixtureParams", {
   skillId: __t.u64(),
@@ -7793,6 +7914,18 @@ export const ExportFinancialReportParams = __t.object("ExportFinancialReportPara
   exportFormat: __t.string(),
 });
 export type ExportFinancialReportParams = __Infer<typeof ExportFinancialReportParams>;
+
+export const FailAiSkillCertificationParams = __t.object("FailAiSkillCertificationParams", {
+  requestId: __t.u64(),
+  errorCode: __t.string(),
+  failureReason: __t.string(),
+  environmentHash: __t.string(),
+  policySnapshotHash: __t.string(),
+  executionEvidenceHash: __t.string(),
+  executorRunId: __t.string(),
+  metadata: __t.option(__t.string()),
+});
+export type FailAiSkillCertificationParams = __Infer<typeof FailAiSkillCertificationParams>;
 
 export const FailExpenseIntegrationIntentParams = __t.object("FailExpenseIntegrationIntentParams", {
   lastError: __t.string(),
@@ -12954,15 +13087,6 @@ export const ReconcileAccountBankStatementLineParams = __t.object("ReconcileAcco
 });
 export type ReconcileAccountBankStatementLineParams = __Infer<typeof ReconcileAccountBankStatementLineParams>;
 
-export const RecordAiSkillTestRunParams = __t.object("RecordAiSkillTestRunParams", {
-  skillVersionId: __t.u64(),
-  fixtureId: __t.u64(),
-  actualOutputJson: __t.string(),
-  failureReason: __t.option(__t.string()),
-  metadata: __t.option(__t.string()),
-});
-export type RecordAiSkillTestRunParams = __Infer<typeof RecordAiSkillTestRunParams>;
-
 export const RecordBarcodeScanParams = __t.object("RecordBarcodeScanParams", {
   barcode: __t.string(),
   barcodeType: __t.string(),
@@ -13172,6 +13296,14 @@ export const RefuseExpenseSheetParams = __t.object("RefuseExpenseSheetParams", {
 });
 export type RefuseExpenseSheetParams = __Infer<typeof RefuseExpenseSheetParams>;
 
+export const RegisterAiSkillCertificationRuntimeProfileParams = __t.object("RegisterAiSkillCertificationRuntimeProfileParams", {
+  profileKey: __t.string(),
+  runtimeHash: __t.string(),
+  executorIdentity: __t.identity(),
+  metadata: __t.option(__t.string()),
+});
+export type RegisterAiSkillCertificationRuntimeProfileParams = __Infer<typeof RegisterAiSkillCertificationRuntimeProfileParams>;
+
 export const RegisterDeviceParams = __t.object("RegisterDeviceParams", {
   name: __t.string(),
   deviceType: __t.string(),
@@ -13322,6 +13454,14 @@ export const ReportType = __t.enum("ReportType", {
   VatReturn: __t.unit(),
 });
 export type ReportType = __Infer<typeof ReportType>;
+
+export const RequestAiSkillCertificationParams = __t.object("RequestAiSkillCertificationParams", {
+  companyId: __t.u64(),
+  skillVersionId: __t.u64(),
+  fixtureId: __t.u64(),
+  idempotencyKey: __t.string(),
+});
+export type RequestAiSkillCertificationParams = __Infer<typeof RequestAiSkillCertificationParams>;
 
 export const RequestExpensePolicyExceptionParams = __t.object("RequestExpensePolicyExceptionParams", {
   reason: __t.string(),

@@ -1053,6 +1053,77 @@
     "write_date",
     "metadata"
   ],
+  "AiSkillCertificationEnvironment": [
+    "id",
+    "environment_key",
+    "organization_id",
+    "skill_id",
+    "fixture_id",
+    "dataset_json",
+    "virtual_files_json",
+    "environment_fingerprint",
+    "created_by",
+    "created_at",
+    "metadata"
+  ],
+  "AiSkillCertificationEvidence": [
+    "id",
+    "organization_id",
+    "company_id",
+    "skill_id",
+    "skill_version_id",
+    "fixture_id",
+    "certification_request_id",
+    "certification_environment_id",
+    "runtime_profile_id",
+    "status",
+    "output_fingerprint",
+    "source_hash",
+    "manifest_hash",
+    "fixture_hash",
+    "runtime_hash",
+    "environment_hash",
+    "policy_snapshot_hash",
+    "execution_evidence_hash",
+    "executor_run_id",
+    "failure_kind",
+    "failure_reason",
+    "executed_by",
+    "executed_at",
+    "metadata"
+  ],
+  "AiSkillCertificationRequest": [
+    "id",
+    "request_key",
+    "organization_id",
+    "company_id",
+    "skill_id",
+    "skill_version_id",
+    "fixture_id",
+    "status",
+    "requested_by",
+    "requested_at",
+    "requester_superuser_bypass",
+    "attempt_count",
+    "certification_environment_id",
+    "runtime_profile_id",
+    "claimed_by",
+    "claimed_at",
+    "terminal_at",
+    "error_code"
+  ],
+  "AiSkillCertificationRuntimeProfile": [
+    "id",
+    "profile_key",
+    "organization_id",
+    "runtime_hash",
+    "executor_identity",
+    "is_active",
+    "registered_by",
+    "registered_at",
+    "retired_at",
+    "metadata"
+  ],
   "AiSkillConfig": [
     "id",
     "organization_id",
@@ -1828,6 +1899,15 @@
     "tokens_used",
     "error_message"
   ],
+  "CompleteAiSkillCertificationParams": [
+    "request_id",
+    "actual_output_json",
+    "environment_hash",
+    "policy_snapshot_hash",
+    "execution_evidence_hash",
+    "executor_run_id",
+    "metadata"
+  ],
   "CompleteDocumentProcessingJobParams": [
     "extracted_data",
     "confidence_score",
@@ -2568,6 +2648,13 @@
     "permission_resource",
     "permission_action",
     "enabled",
+    "metadata"
+  ],
+  "CreateAiSkillCertificationEnvironmentParams": [
+    "fixture_id",
+    "environment_key",
+    "dataset_json",
+    "virtual_files_json",
     "metadata"
   ],
   "CreateAiSkillFixtureParams": [
@@ -6340,6 +6427,16 @@
   ],
   "ExportFinancialReportParams": [
     "export_format"
+  ],
+  "FailAiSkillCertificationParams": [
+    "request_id",
+    "error_code",
+    "failure_reason",
+    "environment_hash",
+    "policy_snapshot_hash",
+    "execution_evidence_hash",
+    "executor_run_id",
+    "metadata"
   ],
   "FailExpenseIntegrationIntentParams": [
     "last_error",
@@ -10506,13 +10603,6 @@
     "move_ids",
     "amount_residual"
   ],
-  "RecordAiSkillTestRunParams": [
-    "skill_version_id",
-    "fixture_id",
-    "actual_output_json",
-    "failure_reason",
-    "metadata"
-  ],
   "RecordBarcodeScanParams": [
     "barcode",
     "barcode_type",
@@ -10674,6 +10764,12 @@
   "RefuseExpenseSheetParams": [
     "reason"
   ],
+  "RegisterAiSkillCertificationRuntimeProfileParams": [
+    "profile_key",
+    "runtime_hash",
+    "executor_identity",
+    "metadata"
+  ],
   "RegisterDeviceParams": [
     "name",
     "device_type",
@@ -10777,6 +10873,12 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "RequestAiSkillCertificationParams": [
+    "company_id",
+    "skill_version_id",
+    "fixture_id",
+    "idempotency_key"
   ],
   "RequestExpensePolicyExceptionParams": [
     "reason",

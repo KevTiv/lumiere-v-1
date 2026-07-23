@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react"
 
 import {
-  fixtureHasPassingRun,
+  certificationHasPassingEvidence,
+  latestCertificationFor,
+  useAiSkillCertificationRequests,
   useAiSkillFixtures,
   useAiSkillReleases,
   useAiSkillTestRuns,
@@ -11,7 +13,7 @@ import {
   useCreateAiSkillFixture,
   useCreateAiSkillVersion,
   usePromoteAiSkillVersion,
-  useRecordAiSkillTestRun,
+  useRequestAiSkillCertification,
   useRollbackAiSkillRelease,
   versionWorkflowStatus,
   type AiSkillFixtureRow,
@@ -26,6 +28,7 @@ const DEFAULT_MANIFEST = `{"limits":{"max_steps":8,"max_tool_calls":16},"output_
 
 interface SkillRegistryPanelProps {
   organizationId: bigint
+  companyId: number | null
   skills: AiSkillListItem[]
 }
 
@@ -41,16 +44,36 @@ function fixtureRowId(row: AiSkillFixtureRow): number {
   return Number(row.id)
 }
 
-export function SkillRegistryPanel({ organizationId, skills }: SkillRegistryPanelProps) {
+function certificationButtonLabel(passed: boolean, requestStatus: string): string {
+  if (passed) return "Passed"
+  if (requestStatus === "queued") return "Queued"
+  if (requestStatus === "running") return "Running"
+  if (requestStatus === "errored" || requestStatus === "completed") return "Retry certification"
+  return "Run certification"
+}
+
+function versionCertificationHint(
+  status: string,
+  fixtureCount: number,
+  certificationReady: boolean,
+): string {
+  if (status === "promoted") return ""
+  if (fixtureCount === 0) return " · certification blocked: fixture required"
+  if (certificationReady) return " · certification passed"
+  return " · certification pending"
+}
+
+export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillRegistryPanelProps) {
   const orgNumber = Number(organizationId)
   const versions = useAiSkillVersions(organizationId)
   const releases = useAiSkillReleases(organizationId)
   const fixtures = useAiSkillFixtures(organizationId)
   const testRuns = useAiSkillTestRuns(organizationId)
+  const certifications = useAiSkillCertificationRequests(organizationId)
 
   const createVersion = useCreateAiSkillVersion(orgNumber)
   const createFixture = useCreateAiSkillFixture(orgNumber)
-  const recordTestRun = useRecordAiSkillTestRun(orgNumber)
+  const requestCertification = useRequestAiSkillCertification(orgNumber)
   const promoteVersion = usePromoteAiSkillVersion(orgNumber)
   const rollbackRelease = useRollbackAiSkillRelease(orgNumber)
 
@@ -110,8 +133,8 @@ export function SkillRegistryPanel({ organizationId, skills }: SkillRegistryPane
       <div className="border-b border-border px-4 py-4">
         <h2 className="text-base font-semibold">Skill registry</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review immutable skill versions, record fixture test runs, and promote or roll back active
-          releases.
+          Review immutable skill versions, run server-owned fixture certification, and manage
+          release history.
         </p>
       </div>
 
@@ -157,10 +180,15 @@ export function SkillRegistryPanel({ organizationId, skills }: SkillRegistryPane
                 {skillVersions.map((version) => {
                   const id = versionId(version)
                   const status = versionWorkflowStatus(id, skillReleases)
-                  const fixturesReady =
-                    skillFixtures.length === 0 ||
+                  const certificationReady =
+                    skillFixtures.length > 0 &&
                     skillFixtures.every((fixture) =>
-                      fixtureHasPassingRun(fixtureRowId(fixture), id, testRuns.data ?? []),
+                      certificationHasPassingEvidence(
+                        fixtureRowId(fixture),
+                        id,
+                        certifications.data ?? [],
+                        testRuns.data ?? [],
+                      ),
                     )
                   return (
                     <li
@@ -173,18 +201,14 @@ export function SkillRegistryPanel({ organizationId, skills }: SkillRegistryPane
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {status}
-                          {skillFixtures.length > 0
-                            ? fixturesReady
-                              ? " · fixtures passed"
-                              : " · fixtures pending"
-                            : ""}
+                          {versionCertificationHint(status, skillFixtures.length, certificationReady)}
                         </p>
                       </div>
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={
-                          promoteVersion.isPending || status === "promoted" || !fixturesReady
+                          promoteVersion.isPending || status === "promoted" || !certificationReady
                         }
                         onClick={() =>
                           void runAction(() =>
@@ -239,6 +263,11 @@ export function SkillRegistryPanel({ organizationId, skills }: SkillRegistryPane
 
           <div className="space-y-3 rounded-lg border border-border p-4">
             <h3 className="text-sm font-medium">Fixtures & test runs</h3>
+            {!companyId ? (
+              <p className="text-sm text-amber-600 dark:text-amber-400" role="status">
+                Select an operating company before requesting certification.
+              </p>
+            ) : null}
             {skillFixtures.length === 0 ? (
               <p className="text-sm text-muted-foreground">No fixtures yet.</p>
             ) : (
@@ -251,33 +280,43 @@ export function SkillRegistryPanel({ organizationId, skills }: SkillRegistryPane
                       <div className="mt-2 flex flex-wrap gap-2">
                         {skillVersions.map((version) => {
                           const vid = versionId(version)
-                          const passed = fixtureHasPassingRun(
+                          const request = latestCertificationFor(
                             fixtureId,
                             vid,
+                            certifications.data ?? [],
+                          )
+                          const requestStatus = String(request?.status ?? "").toLowerCase()
+                          const passed = certificationHasPassingEvidence(
+                            fixtureId,
+                            vid,
+                            certifications.data ?? [],
                             testRuns.data ?? [],
                           )
+                          const active = requestStatus === "queued" || requestStatus === "running"
+                          const label = certificationButtonLabel(passed, requestStatus)
                           return (
                             <Button
                               key={`${fixtureId}-${vid}`}
                               size="sm"
                               variant={passed ? "secondary" : "outline"}
-                              disabled={recordTestRun.isPending}
+                              disabled={
+                                !companyId ||
+                                active ||
+                                passed ||
+                                requestCertification.isPending
+                              }
                               onClick={() =>
                                 void runAction(() =>
-                                  recordTestRun.mutateAsync({
-                                    skillVersionId: BigInt(vid),
-                                    fixtureId: BigInt(fixtureId),
-                                    actualOutputJson:
-                                      fixture.expectedOutputJson ??
-                                      fixture.expected_output_json ??
-                                      "{}",
-                                    failureReason: undefined,
-                                    metadata: undefined,
+                                  requestCertification.mutateAsync({
+                                    companyId: companyId ?? 0,
+                                    skillVersionId: vid,
+                                    fixtureId,
+                                    idempotencyKey: globalThis.crypto.randomUUID(),
                                   }),
                                 )
                               }
                             >
-                              {passed ? "Passed" : "Record pass"} v{version.version}
+                              {label} · v{version.version}
                             </Button>
                           )
                         })}

@@ -5,7 +5,10 @@
  */
 
 
-import { proposalsBffPost } from "@lumiere/stdb/commands"
+import {
+  proposalsBffPost,
+  type ProposalsBffReducerKey,
+} from "@lumiere/stdb/commands"
 import { encodeOptionalU64, stdbParamsToJson } from "@lumiere/stdb/stdb-params-json"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
@@ -1001,7 +1004,7 @@ export function useConvertProposalToProject(
 }
 
 async function postProposalReducer(
-  reducer: string,
+  reducer: ProposalsBffReducerKey,
   args: unknown[],
   errorMessage: string,
 ): Promise<void> {

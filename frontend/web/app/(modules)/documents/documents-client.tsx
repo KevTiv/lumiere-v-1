@@ -1,7 +1,7 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -30,7 +30,6 @@ import {
 import type { EntityViewConfig, FormConfig } from "@lumiere/ui"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useDocumentsModuleSubscription } from "@/lib/module-subscription-hooks"
-import { AiResultPanel } from "@/lib/ai-result-panel"
 import {
   useDocuments,
   useDeletedDocuments,
@@ -97,8 +96,9 @@ import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import type { QueryRows } from "@/lib/query-fetch"
-import { useRunAiSkill } from "@lumiere/query-hooks/hooks/ai-skills"
 import { useAiAgents } from "@lumiere/query-hooks/hooks/ai-agents"
+import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
+import { useOpenErpAiChat } from "@/lib/erp-ai-context"
 import {
   documentFolderRowsToSelectOptions,
   knowledgeCategoryRowsToSelectOptions,
@@ -117,44 +117,6 @@ type DocumentRowAction =
   | { action: "updateFolder"; row: Record<string, unknown>; form: FormConfig }
   | { action: "addArticleMember"; row: Record<string, unknown>; form: FormConfig }
   | null
-
-const aiInsightsGenerateForm: FormConfig = {
-  id: "ai-generate-insights",
-  title: "Generate AI Insights",
-  description: "Run the insights_scan skill for a resource scope.",
-  submitLabel: "Generate insights",
-  sections: [
-    {
-      id: "scope",
-      fields: [
-        {
-          id: "resource",
-          type: "text",
-          name: "resource",
-          label: "Resource",
-          defaultValue: "documents",
-          width: "1/2",
-        },
-        {
-          id: "force",
-          type: "switch",
-          name: "force",
-          label: "Force regeneration",
-          width: "1/2",
-        },
-        {
-          id: "scope-json",
-          type: "textarea",
-          name: "scopeJson",
-          label: "Scope JSON",
-          placeholder: "{\"limit\": 20}",
-          rows: 4,
-          width: "full",
-        },
-      ],
-    },
-  ],
-}
 
 function editDocumentForm(row: Record<string, unknown>): FormConfig {
   return {
@@ -293,9 +255,7 @@ function DocumentsClientLoaded({
   const [completeSubmitError, setCompleteSubmitError] = useState<string | null>(null)
   const [ackModalRows, setAckModalRows] = useState<Record<string, unknown>[] | null>(null)
   const [ackSubmitError, setAckSubmitError] = useState<string | null>(null)
-  const [generateInsightsOpen, setGenerateInsightsOpen] = useState(false)
-  const [generateInsightsError, setGenerateInsightsError] = useState<string | null>(null)
-  const [generateInsightsResult, setGenerateInsightsResult] = useState<Record<string, unknown> | null>(null)
+  const openErpAiChat = useOpenErpAiChat()
 
   const { data: documents = [] } = useDocuments(orgId, initialDocuments)
   const { data: deletedDocuments = [] } = useDeletedDocuments(
@@ -341,7 +301,6 @@ function DocumentsClientLoaded({
   const approveProcessingJob = useApproveDocumentProcessingJob(orgId)
   const acknowledgeInsight = useAcknowledgeInsight(orgId)
   const csvImports = useDocumentsCsvImportMutations(orgId)
-  const runInsightsScan = useRunAiSkill()
   const versionFormConfig = useMemo(() => uploadDocumentVersionForm(t), [t])
   const documentTemplateFormConfig = useMemo(() => newDocumentTemplateForm(t), [t])
   const mailTemplateFormConfig = useMemo(() => newMailTemplateForm(t), [t])
@@ -788,11 +747,21 @@ function DocumentsClientLoaded({
                   },
                 },
                 {
-                  id: "generate-insights",
-                  label: "Generate insights",
-                  onClick: (_rows) => {
-                    setGenerateInsightsError(null)
-                    setGenerateInsightsOpen(true)
+                  id: "ask-ai",
+                  label: "Ask AI",
+                  onClick: (rows) => {
+                    const selection = rows[0]
+                      ? buildEntitySelection({
+                          activeTab: "document-insights",
+                          entityType: "document_insight",
+                          row: rows[0],
+                        })
+                      : {
+                          activeTab: "document-insights",
+                          entityType: "document_insight",
+                          selectionSummary: "Document insights",
+                        }
+                    openErpAiChat({ selection })
                   },
                 },
               ],
@@ -818,7 +787,7 @@ function DocumentsClientLoaded({
       applyDocumentLegalHold,
       updateDocumentPresence,
       restoreDocument,
-      runInsightsScan,
+      openErpAiChat,
       documentFormConfig,
       knowledgeArticleFormConfig,
       knowledgeCategoryFormConfig,
@@ -947,7 +916,6 @@ function DocumentsClientLoaded({
     completeProcessingJob.isPending ||
     approveProcessingJob.isPending ||
     acknowledgeInsight.isPending ||
-    runInsightsScan.isPending ||
     csvImports.importKnowledgeCategory.isPending ||
     csvImports.importKnowledgeArticle.isPending
 
@@ -969,15 +937,6 @@ function DocumentsClientLoaded({
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
       />
-      {generateInsightsResult ? (
-        <div className="mb-4">
-          <AiResultPanel
-            title="Generated AI insights"
-            result={generateInsightsResult}
-            onDismiss={() => setGenerateInsightsResult(null)}
-          />
-        </div>
-      ) : null}
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
@@ -1005,51 +964,6 @@ function DocumentsClientLoaded({
           }}
         />
       ) : null}
-      <FormModal
-        open={generateInsightsOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setGenerateInsightsOpen(false)
-            setGenerateInsightsError(null)
-          }
-        }}
-        config={aiInsightsGenerateForm}
-        isPending={isFormMutationPending}
-        closeOnSubmit={false}
-        submitError={generateInsightsError}
-        onSubmit={async (formData) => {
-          setGenerateInsightsError(null)
-          try {
-            const scopeRaw =
-              typeof formData.scopeJson === "string" ? formData.scopeJson.trim() : ""
-            const scope =
-              scopeRaw !== "" ? (JSON.parse(scopeRaw) as Record<string, unknown>) : undefined
-            const result = await runInsightsScan.mutateAsync({
-              companyId: Number(operatingCompanyId ?? 0),
-              skillKey: "insights_scan",
-              inputs: {
-                resource:
-                  formData.resource != null && String(formData.resource).trim() !== ""
-                    ? String(formData.resource).trim()
-                    : undefined,
-                scope,
-                force: Boolean(formData.force),
-              },
-            })
-            setGenerateInsightsResult({
-              summary: result.summary,
-              preview_insights:
-                result.artifacts.find((artifact) => artifact.kind === "insights")?.content ??
-                result.artifacts,
-              steps: result.steps,
-              skill_key: result.skill_key,
-            })
-            setGenerateInsightsOpen(false)
-          } catch (e) {
-            setGenerateInsightsError(e instanceof Error ? e.message : String(e))
-          }
-        }}
-      />
       {documentRowAction ? (
         <FormModal
           open

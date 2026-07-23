@@ -68,11 +68,17 @@ pub mod ai_document_processing_job_type;
 pub mod ai_insight_type;
 pub mod ai_reducer_allowlist_type;
 pub mod ai_skill_type;
+pub mod ai_skill_certification_environment_type;
+pub mod ai_skill_certification_evidence_type;
+pub mod ai_skill_certification_request_type;
+pub mod ai_skill_certification_request_status_type;
+pub mod ai_skill_certification_runtime_profile_type;
 pub mod ai_skill_config_type;
 pub mod ai_skill_fixture_type;
 pub mod ai_skill_release_type;
 pub mod ai_skill_risk_type;
 pub mod ai_skill_test_run_type;
+pub mod ai_skill_test_run_failure_kind_type;
 pub mod ai_skill_test_run_status_type;
 pub mod ai_skill_version_type;
 pub mod ai_team_member_type;
@@ -149,6 +155,7 @@ pub mod company_country_pack_type;
 pub mod company_scope_params_type;
 pub mod company_vertical_pack_type;
 pub mod complete_ai_agent_run_params_type;
+pub mod complete_ai_skill_certification_params_type;
 pub mod complete_document_processing_job_params_type;
 pub mod complete_document_signature_request_params_type;
 pub mod complete_offboarding_item_params_type;
@@ -216,6 +223,7 @@ pub mod create_ai_agent_run_params_type;
 pub mod create_ai_chat_session_params_type;
 pub mod create_ai_insight_params_type;
 pub mod create_ai_reducer_allowlist_params_type;
+pub mod create_ai_skill_certification_environment_params_type;
 pub mod create_ai_skill_fixture_params_type;
 pub mod create_ai_skill_params_type;
 pub mod create_ai_skill_version_params_type;
@@ -507,6 +515,7 @@ pub mod expense_policy_exception_state_type;
 pub mod expense_sheet_state_type;
 pub mod expense_state_type;
 pub mod export_financial_report_params_type;
+pub mod fail_ai_skill_certification_params_type;
 pub mod fail_expense_integration_intent_params_type;
 pub mod fail_project_integration_intent_params_type;
 pub mod fail_proposal_integration_intent_params_type;
@@ -524,6 +533,7 @@ pub mod fixed_point_decimal_type;
 pub mod fleet_vehicle_type;
 pub mod form_config_type;
 pub mod form_config_field_type;
+pub mod form_field_label_type;
 pub mod form_role_config_type;
 pub mod fx_revaluation_line_params_type;
 pub mod fx_revaluation_run_type;
@@ -762,6 +772,7 @@ pub mod proposal_status_type;
 pub mod proposal_template_type;
 pub mod proposal_version_type;
 pub mod public_holiday_type;
+pub mod publish_form_configuration_params_type;
 pub mod purchase_approval_delegate_type;
 pub mod purchase_blanket_order_type;
 pub mod purchase_contract_type;
@@ -796,7 +807,6 @@ pub mod recognize_deferred_revenue_params_type;
 pub mod recognize_project_revenue_params_type;
 pub mod recompute_workflow_timers_params_type;
 pub mod reconcile_account_bank_statement_line_params_type;
-pub mod record_ai_skill_test_run_params_type;
 pub mod record_barcode_scan_params_type;
 pub mod record_custom_field_entry_type;
 pub mod record_custom_field_value_type;
@@ -820,6 +830,7 @@ pub mod refresh_project_earned_value_params_type;
 pub mod refresh_project_margin_params_type;
 pub mod refresh_resource_utilisation_params_type;
 pub mod refuse_expense_sheet_params_type;
+pub mod register_ai_skill_certification_runtime_profile_params_type;
 pub mod register_device_params_type;
 pub mod register_hub_params_type;
 pub mod register_queue_worker_params_type;
@@ -834,6 +845,7 @@ pub mod replenishment_rule_type;
 pub mod report_state_type;
 pub mod report_template_type;
 pub mod report_type_type;
+pub mod request_ai_skill_certification_params_type;
 pub mod request_expense_policy_exception_params_type;
 pub mod requisition_state_type;
 pub mod res_partner_bank_type;
@@ -893,6 +905,7 @@ pub mod set_document_retention_params_type;
 pub mod set_drive_conflict_policy_params_type;
 pub mod set_expense_allocations_params_type;
 pub mod set_expense_fraud_hold_params_type;
+pub mod set_form_field_label_params_type;
 pub mod set_purchase_approval_delegate_params_type;
 pub mod set_record_custom_field_values_params_type;
 pub mod set_subscription_commitment_params_type;
@@ -1333,6 +1346,7 @@ pub mod cancel_workflow_reducer;
 pub mod cancel_workflow_outbox_reducer;
 pub mod cancel_workflow_timer_reducer;
 pub mod check_mo_availability_reducer;
+pub mod claim_ai_skill_certification_reducer;
 pub mod claim_hub_with_token_reducer;
 pub mod claim_queue_job_reducer;
 pub mod claim_workflow_human_task_reducer;
@@ -1351,6 +1365,7 @@ pub mod close_subscription_reducer;
 pub mod close_ticket_reducer;
 pub mod complete_activity_reducer;
 pub mod complete_ai_agent_run_reducer;
+pub mod complete_ai_skill_certification_reducer;
 pub mod complete_document_processing_job_reducer;
 pub mod complete_document_signature_request_reducer;
 pub mod complete_intercompany_transaction_reducer;
@@ -1410,6 +1425,7 @@ pub mod create_ai_chat_session_reducer;
 pub mod create_ai_insight_reducer;
 pub mod create_ai_reducer_allowlist_reducer;
 pub mod create_ai_skill_reducer;
+pub mod create_ai_skill_certification_environment_reducer;
 pub mod create_ai_skill_fixture_reducer;
 pub mod create_ai_skill_version_reducer;
 pub mod create_ai_team_member_reducer;
@@ -1736,6 +1752,7 @@ pub mod expire_ai_action_drafts_reducer;
 pub mod expire_contract_reducer;
 pub mod explode_bom_reducer;
 pub mod export_financial_report_reducer;
+pub mod fail_ai_skill_certification_reducer;
 pub mod fail_expense_integration_intent_reducer;
 pub mod fail_iot_action_reducer;
 pub mod fail_project_integration_intent_reducer;
@@ -1881,6 +1898,7 @@ pub mod process_inventory_adjustment_reducer;
 pub mod process_pending_scans_reducer;
 pub mod produce_manufacturing_order_reducer;
 pub mod promote_ai_skill_version_reducer;
+pub mod publish_form_configuration_reducer;
 pub mod publish_workflow_version_reducer;
 pub mod purge_expired_documents_reducer;
 pub mod queue_mail_from_template_reducer;
@@ -1897,7 +1915,6 @@ pub mod recompute_workflow_timers_for_calendar_reducer;
 pub mod reconcile_account_bank_statement_line_reducer;
 pub mod reconcile_payment_with_invoice_reducer;
 pub mod record_ai_agent_run_policy_snapshot_reducer;
-pub mod record_ai_skill_test_run_reducer;
 pub mod record_ai_spend_reducer;
 pub mod record_barcode_scan_reducer;
 pub mod record_cycle_count_line_reducer;
@@ -1933,6 +1950,7 @@ pub mod refresh_subscription_exception_flags_reducer;
 pub mod refresh_tax_deadline_statuses_reducer;
 pub mod refuse_expense_sheet_reducer;
 pub mod refuse_leave_reducer;
+pub mod register_ai_skill_certification_runtime_profile_reducer;
 pub mod register_iot_device_reducer;
 pub mod register_iot_hub_reducer;
 pub mod register_payment_on_invoice_reducer;
@@ -1957,6 +1975,7 @@ pub mod reopen_inventory_close_reducer;
 pub mod reopen_ticket_reducer;
 pub mod reopen_timesheets_reducer;
 pub mod reorder_proposal_line_items_reducer;
+pub mod request_ai_skill_certification_reducer;
 pub mod request_embedding_job_reducer;
 pub mod request_expense_policy_exception_reducer;
 pub mod reserve_serial_reducer;
@@ -2034,6 +2053,7 @@ pub mod run_expenses_wave_d_test_reducer;
 pub mod run_expenses_wave_e_test_reducer;
 pub mod run_expenses_wave_f_test_reducer;
 pub mod run_fleet_wave_a_test_reducer;
+pub mod run_forms_custom_field_test_reducer;
 pub mod run_fx_revaluation_reducer;
 pub mod run_fx_revaluation_batch_reducer;
 pub mod run_helpdesk_ticket_test_reducer;
@@ -2151,6 +2171,7 @@ pub mod set_document_index_content_reducer;
 pub mod set_document_retention_reducer;
 pub mod set_expense_allocations_reducer;
 pub mod set_expense_fraud_hold_reducer;
+pub mod set_form_field_label_reducer;
 pub mod set_form_role_config_reducer;
 pub mod set_google_drive_conflict_policy_reducer;
 pub mod set_intercompany_rule_active_reducer;
@@ -2432,6 +2453,10 @@ pub mod ai_document_processing_job_table;
 pub mod ai_insight_table;
 pub mod ai_reducer_allowlist_table;
 pub mod ai_skill_table;
+pub mod ai_skill_certification_environment_table;
+pub mod ai_skill_certification_evidence_table;
+pub mod ai_skill_certification_request_table;
+pub mod ai_skill_certification_runtime_profile_table;
 pub mod ai_skill_config_table;
 pub mod ai_skill_fixture_table;
 pub mod ai_skill_release_table;
@@ -2517,6 +2542,7 @@ pub mod financial_report_table;
 pub mod fleet_vehicle_table;
 pub mod form_config_table;
 pub mod form_config_field_table;
+pub mod form_field_label_table;
 pub mod form_role_config_table;
 pub mod fx_revaluation_run_table;
 pub mod generated_owner_report_table;
@@ -2851,11 +2877,17 @@ pub use ai_document_processing_job_type::AiDocumentProcessingJob;
 pub use ai_insight_type::AiInsight;
 pub use ai_reducer_allowlist_type::AiReducerAllowlist;
 pub use ai_skill_type::AiSkill;
+pub use ai_skill_certification_environment_type::AiSkillCertificationEnvironment;
+pub use ai_skill_certification_evidence_type::AiSkillCertificationEvidence;
+pub use ai_skill_certification_request_type::AiSkillCertificationRequest;
+pub use ai_skill_certification_request_status_type::AiSkillCertificationRequestStatus;
+pub use ai_skill_certification_runtime_profile_type::AiSkillCertificationRuntimeProfile;
 pub use ai_skill_config_type::AiSkillConfig;
 pub use ai_skill_fixture_type::AiSkillFixture;
 pub use ai_skill_release_type::AiSkillRelease;
 pub use ai_skill_risk_type::AiSkillRisk;
 pub use ai_skill_test_run_type::AiSkillTestRun;
+pub use ai_skill_test_run_failure_kind_type::AiSkillTestRunFailureKind;
 pub use ai_skill_test_run_status_type::AiSkillTestRunStatus;
 pub use ai_skill_version_type::AiSkillVersion;
 pub use ai_team_member_type::AiTeamMember;
@@ -2932,6 +2964,7 @@ pub use company_country_pack_type::CompanyCountryPack;
 pub use company_scope_params_type::CompanyScopeParams;
 pub use company_vertical_pack_type::CompanyVerticalPack;
 pub use complete_ai_agent_run_params_type::CompleteAiAgentRunParams;
+pub use complete_ai_skill_certification_params_type::CompleteAiSkillCertificationParams;
 pub use complete_document_processing_job_params_type::CompleteDocumentProcessingJobParams;
 pub use complete_document_signature_request_params_type::CompleteDocumentSignatureRequestParams;
 pub use complete_offboarding_item_params_type::CompleteOffboardingItemParams;
@@ -2999,6 +3032,7 @@ pub use create_ai_agent_run_params_type::CreateAiAgentRunParams;
 pub use create_ai_chat_session_params_type::CreateAiChatSessionParams;
 pub use create_ai_insight_params_type::CreateAiInsightParams;
 pub use create_ai_reducer_allowlist_params_type::CreateAiReducerAllowlistParams;
+pub use create_ai_skill_certification_environment_params_type::CreateAiSkillCertificationEnvironmentParams;
 pub use create_ai_skill_fixture_params_type::CreateAiSkillFixtureParams;
 pub use create_ai_skill_params_type::CreateAiSkillParams;
 pub use create_ai_skill_version_params_type::CreateAiSkillVersionParams;
@@ -3290,6 +3324,7 @@ pub use expense_policy_exception_state_type::ExpensePolicyExceptionState;
 pub use expense_sheet_state_type::ExpenseSheetState;
 pub use expense_state_type::ExpenseState;
 pub use export_financial_report_params_type::ExportFinancialReportParams;
+pub use fail_ai_skill_certification_params_type::FailAiSkillCertificationParams;
 pub use fail_expense_integration_intent_params_type::FailExpenseIntegrationIntentParams;
 pub use fail_project_integration_intent_params_type::FailProjectIntegrationIntentParams;
 pub use fail_proposal_integration_intent_params_type::FailProposalIntegrationIntentParams;
@@ -3307,6 +3342,7 @@ pub use fixed_point_decimal_type::FixedPointDecimal;
 pub use fleet_vehicle_type::FleetVehicle;
 pub use form_config_type::FormConfig;
 pub use form_config_field_type::FormConfigField;
+pub use form_field_label_type::FormFieldLabel;
 pub use form_role_config_type::FormRoleConfig;
 pub use fx_revaluation_line_params_type::FxRevaluationLineParams;
 pub use fx_revaluation_run_type::FxRevaluationRun;
@@ -3545,6 +3581,7 @@ pub use proposal_status_type::ProposalStatus;
 pub use proposal_template_type::ProposalTemplate;
 pub use proposal_version_type::ProposalVersion;
 pub use public_holiday_type::PublicHoliday;
+pub use publish_form_configuration_params_type::PublishFormConfigurationParams;
 pub use purchase_approval_delegate_type::PurchaseApprovalDelegate;
 pub use purchase_blanket_order_type::PurchaseBlanketOrder;
 pub use purchase_contract_type::PurchaseContract;
@@ -3579,7 +3616,6 @@ pub use recognize_deferred_revenue_params_type::RecognizeDeferredRevenueParams;
 pub use recognize_project_revenue_params_type::RecognizeProjectRevenueParams;
 pub use recompute_workflow_timers_params_type::RecomputeWorkflowTimersParams;
 pub use reconcile_account_bank_statement_line_params_type::ReconcileAccountBankStatementLineParams;
-pub use record_ai_skill_test_run_params_type::RecordAiSkillTestRunParams;
 pub use record_barcode_scan_params_type::RecordBarcodeScanParams;
 pub use record_custom_field_entry_type::RecordCustomFieldEntry;
 pub use record_custom_field_value_type::RecordCustomFieldValue;
@@ -3603,6 +3639,7 @@ pub use refresh_project_earned_value_params_type::RefreshProjectEarnedValueParam
 pub use refresh_project_margin_params_type::RefreshProjectMarginParams;
 pub use refresh_resource_utilisation_params_type::RefreshResourceUtilisationParams;
 pub use refuse_expense_sheet_params_type::RefuseExpenseSheetParams;
+pub use register_ai_skill_certification_runtime_profile_params_type::RegisterAiSkillCertificationRuntimeProfileParams;
 pub use register_device_params_type::RegisterDeviceParams;
 pub use register_hub_params_type::RegisterHubParams;
 pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
@@ -3617,6 +3654,7 @@ pub use replenishment_rule_type::ReplenishmentRule;
 pub use report_state_type::ReportState;
 pub use report_template_type::ReportTemplate;
 pub use report_type_type::ReportType;
+pub use request_ai_skill_certification_params_type::RequestAiSkillCertificationParams;
 pub use request_expense_policy_exception_params_type::RequestExpensePolicyExceptionParams;
 pub use requisition_state_type::RequisitionState;
 pub use res_partner_bank_type::ResPartnerBank;
@@ -3676,6 +3714,7 @@ pub use set_document_retention_params_type::SetDocumentRetentionParams;
 pub use set_drive_conflict_policy_params_type::SetDriveConflictPolicyParams;
 pub use set_expense_allocations_params_type::SetExpenseAllocationsParams;
 pub use set_expense_fraud_hold_params_type::SetExpenseFraudHoldParams;
+pub use set_form_field_label_params_type::SetFormFieldLabelParams;
 pub use set_purchase_approval_delegate_params_type::SetPurchaseApprovalDelegateParams;
 pub use set_record_custom_field_values_params_type::SetRecordCustomFieldValuesParams;
 pub use set_subscription_commitment_params_type::SetSubscriptionCommitmentParams;
@@ -4031,6 +4070,10 @@ pub use ai_document_processing_job_table::*;
 pub use ai_insight_table::*;
 pub use ai_reducer_allowlist_table::*;
 pub use ai_skill_table::*;
+pub use ai_skill_certification_environment_table::*;
+pub use ai_skill_certification_evidence_table::*;
+pub use ai_skill_certification_request_table::*;
+pub use ai_skill_certification_runtime_profile_table::*;
 pub use ai_skill_config_table::*;
 pub use ai_skill_fixture_table::*;
 pub use ai_skill_release_table::*;
@@ -4116,6 +4159,7 @@ pub use financial_report_table::*;
 pub use fleet_vehicle_table::*;
 pub use form_config_table::*;
 pub use form_config_field_table::*;
+pub use form_field_label_table::*;
 pub use form_role_config_table::*;
 pub use fx_revaluation_run_table::*;
 pub use generated_owner_report_table::*;
@@ -4515,6 +4559,7 @@ pub use cancel_workflow_reducer::cancel_workflow;
 pub use cancel_workflow_outbox_reducer::cancel_workflow_outbox;
 pub use cancel_workflow_timer_reducer::cancel_workflow_timer;
 pub use check_mo_availability_reducer::check_mo_availability;
+pub use claim_ai_skill_certification_reducer::claim_ai_skill_certification;
 pub use claim_hub_with_token_reducer::claim_hub_with_token;
 pub use claim_queue_job_reducer::claim_queue_job;
 pub use claim_workflow_human_task_reducer::claim_workflow_human_task;
@@ -4533,6 +4578,7 @@ pub use close_subscription_reducer::close_subscription;
 pub use close_ticket_reducer::close_ticket;
 pub use complete_activity_reducer::complete_activity;
 pub use complete_ai_agent_run_reducer::complete_ai_agent_run;
+pub use complete_ai_skill_certification_reducer::complete_ai_skill_certification;
 pub use complete_document_processing_job_reducer::complete_document_processing_job;
 pub use complete_document_signature_request_reducer::complete_document_signature_request;
 pub use complete_intercompany_transaction_reducer::complete_intercompany_transaction;
@@ -4592,6 +4638,7 @@ pub use create_ai_chat_session_reducer::create_ai_chat_session;
 pub use create_ai_insight_reducer::create_ai_insight;
 pub use create_ai_reducer_allowlist_reducer::create_ai_reducer_allowlist;
 pub use create_ai_skill_reducer::create_ai_skill;
+pub use create_ai_skill_certification_environment_reducer::create_ai_skill_certification_environment;
 pub use create_ai_skill_fixture_reducer::create_ai_skill_fixture;
 pub use create_ai_skill_version_reducer::create_ai_skill_version;
 pub use create_ai_team_member_reducer::create_ai_team_member;
@@ -4918,6 +4965,7 @@ pub use expire_ai_action_drafts_reducer::expire_ai_action_drafts;
 pub use expire_contract_reducer::expire_contract;
 pub use explode_bom_reducer::explode_bom;
 pub use export_financial_report_reducer::export_financial_report;
+pub use fail_ai_skill_certification_reducer::fail_ai_skill_certification;
 pub use fail_expense_integration_intent_reducer::fail_expense_integration_intent;
 pub use fail_iot_action_reducer::fail_iot_action;
 pub use fail_project_integration_intent_reducer::fail_project_integration_intent;
@@ -5063,6 +5111,7 @@ pub use process_inventory_adjustment_reducer::process_inventory_adjustment;
 pub use process_pending_scans_reducer::process_pending_scans;
 pub use produce_manufacturing_order_reducer::produce_manufacturing_order;
 pub use promote_ai_skill_version_reducer::promote_ai_skill_version;
+pub use publish_form_configuration_reducer::publish_form_configuration;
 pub use publish_workflow_version_reducer::publish_workflow_version;
 pub use purge_expired_documents_reducer::purge_expired_documents;
 pub use queue_mail_from_template_reducer::queue_mail_from_template;
@@ -5079,7 +5128,6 @@ pub use recompute_workflow_timers_for_calendar_reducer::recompute_workflow_timer
 pub use reconcile_account_bank_statement_line_reducer::reconcile_account_bank_statement_line;
 pub use reconcile_payment_with_invoice_reducer::reconcile_payment_with_invoice;
 pub use record_ai_agent_run_policy_snapshot_reducer::record_ai_agent_run_policy_snapshot;
-pub use record_ai_skill_test_run_reducer::record_ai_skill_test_run;
 pub use record_ai_spend_reducer::record_ai_spend;
 pub use record_barcode_scan_reducer::record_barcode_scan;
 pub use record_cycle_count_line_reducer::record_cycle_count_line;
@@ -5115,6 +5163,7 @@ pub use refresh_subscription_exception_flags_reducer::refresh_subscription_excep
 pub use refresh_tax_deadline_statuses_reducer::refresh_tax_deadline_statuses;
 pub use refuse_expense_sheet_reducer::refuse_expense_sheet;
 pub use refuse_leave_reducer::refuse_leave;
+pub use register_ai_skill_certification_runtime_profile_reducer::register_ai_skill_certification_runtime_profile;
 pub use register_iot_device_reducer::register_iot_device;
 pub use register_iot_hub_reducer::register_iot_hub;
 pub use register_payment_on_invoice_reducer::register_payment_on_invoice;
@@ -5139,6 +5188,7 @@ pub use reopen_inventory_close_reducer::reopen_inventory_close;
 pub use reopen_ticket_reducer::reopen_ticket;
 pub use reopen_timesheets_reducer::reopen_timesheets;
 pub use reorder_proposal_line_items_reducer::reorder_proposal_line_items;
+pub use request_ai_skill_certification_reducer::request_ai_skill_certification;
 pub use request_embedding_job_reducer::request_embedding_job;
 pub use request_expense_policy_exception_reducer::request_expense_policy_exception;
 pub use reserve_serial_reducer::reserve_serial;
@@ -5216,6 +5266,7 @@ pub use run_expenses_wave_d_test_reducer::run_expenses_wave_d_test;
 pub use run_expenses_wave_e_test_reducer::run_expenses_wave_e_test;
 pub use run_expenses_wave_f_test_reducer::run_expenses_wave_f_test;
 pub use run_fleet_wave_a_test_reducer::run_fleet_wave_a_test;
+pub use run_forms_custom_field_test_reducer::run_forms_custom_field_test;
 pub use run_fx_revaluation_reducer::run_fx_revaluation;
 pub use run_fx_revaluation_batch_reducer::run_fx_revaluation_batch;
 pub use run_helpdesk_ticket_test_reducer::run_helpdesk_ticket_test;
@@ -5333,6 +5384,7 @@ pub use set_document_index_content_reducer::set_document_index_content;
 pub use set_document_retention_reducer::set_document_retention;
 pub use set_expense_allocations_reducer::set_expense_allocations;
 pub use set_expense_fraud_hold_reducer::set_expense_fraud_hold;
+pub use set_form_field_label_reducer::set_form_field_label;
 pub use set_form_role_config_reducer::set_form_role_config;
 pub use set_google_drive_conflict_policy_reducer::set_google_drive_conflict_policy;
 pub use set_intercompany_rule_active_reducer::set_intercompany_rule_active;
@@ -6193,6 +6245,10 @@ pub enum Reducer {
         organization_id: u64,
         mo_id: u64,
 }    ,
+    ClaimAiSkillCertification {
+        organization_id: u64,
+        request_id: u64,
+}    ,
     ClaimHubWithToken {
         token: String,
         serial: String,
@@ -6275,6 +6331,10 @@ pub enum Reducer {
         company_id: u64,
         run_id: u64,
         params: CompleteAiAgentRunParams,
+}    ,
+    CompleteAiSkillCertification {
+        organization_id: u64,
+        params: CompleteAiSkillCertificationParams,
 }    ,
     CompleteDocumentProcessingJob {
         organization_id: u64,
@@ -6558,6 +6618,10 @@ pub enum Reducer {
     CreateAiSkill {
         organization_id: u64,
         params: CreateAiSkillParams,
+}    ,
+    CreateAiSkillCertificationEnvironment {
+        organization_id: u64,
+        params: CreateAiSkillCertificationEnvironmentParams,
 }    ,
     CreateAiSkillFixture {
         organization_id: u64,
@@ -8057,6 +8121,10 @@ pub enum Reducer {
         report_id: u64,
         params: ExportFinancialReportParams,
 }    ,
+    FailAiSkillCertification {
+        organization_id: u64,
+        params: FailAiSkillCertificationParams,
+}    ,
     FailExpenseIntegrationIntent {
         organization_id: u64,
         intent_id: u64,
@@ -8737,6 +8805,10 @@ pub enum Reducer {
         skill_version_id: u64,
         reason: Option::<String>,
 }    ,
+    PublishFormConfiguration {
+        organization_id: u64,
+        params: PublishFormConfigurationParams,
+}    ,
     PublishWorkflowVersion {
         organization_id: u64,
         workflow_version_id: u64,
@@ -8818,10 +8890,6 @@ pub enum Reducer {
         company_id: u64,
         run_id: u64,
         expected_release_id: Option::<u64>,
-}    ,
-    RecordAiSkillTestRun {
-        organization_id: u64,
-        params: RecordAiSkillTestRunParams,
 }    ,
     RecordAiSpend {
         organization_id: u64,
@@ -8996,6 +9064,10 @@ pub enum Reducer {
         company_id: u64,
         leave_id: u64,
 }    ,
+    RegisterAiSkillCertificationRuntimeProfile {
+        organization_id: u64,
+        params: RegisterAiSkillCertificationRuntimeProfileParams,
+}    ,
     RegisterIotDevice {
         organization_id: u64,
         company_id: u64,
@@ -9113,6 +9185,10 @@ pub enum Reducer {
         company_id: u64,
         proposal_id: u64,
         ordered_ids: Vec::<u64>,
+}    ,
+    RequestAiSkillCertification {
+        organization_id: u64,
+        params: RequestAiSkillCertificationParams,
 }    ,
     RequestEmbeddingJob {
         organization_id: u64,
@@ -9304,6 +9380,7 @@ pub enum Reducer {
     RunExpensesWaveETest ,
     RunExpensesWaveFTest ,
     RunFleetWaveATest ,
+    RunFormsCustomFieldTest ,
     RunFxRevaluation {
         organization_id: u64,
         company_id: u64,
@@ -9545,6 +9622,11 @@ pub enum Reducer {
         organization_id: u64,
         expense_id: u64,
         params: SetExpenseFraudHoldParams,
+}    ,
+    SetFormFieldLabel {
+        organization_id: u64,
+        field_row_id: u64,
+        params: SetFormFieldLabelParams,
 }    ,
     SetFormRoleConfig {
         organization_id: u64,
@@ -10935,6 +11017,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CancelWorkflowOutbox { .. } => "cancel_workflow_outbox",
             Reducer::CancelWorkflowTimer { .. } => "cancel_workflow_timer",
             Reducer::CheckMoAvailability { .. } => "check_mo_availability",
+            Reducer::ClaimAiSkillCertification { .. } => "claim_ai_skill_certification",
             Reducer::ClaimHubWithToken { .. } => "claim_hub_with_token",
             Reducer::ClaimQueueJob { .. } => "claim_queue_job",
             Reducer::ClaimWorkflowHumanTask { .. } => "claim_workflow_human_task",
@@ -10953,6 +11036,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CloseTicket { .. } => "close_ticket",
             Reducer::CompleteActivity { .. } => "complete_activity",
             Reducer::CompleteAiAgentRun { .. } => "complete_ai_agent_run",
+            Reducer::CompleteAiSkillCertification { .. } => "complete_ai_skill_certification",
             Reducer::CompleteDocumentProcessingJob { .. } => "complete_document_processing_job",
             Reducer::CompleteDocumentSignatureRequest { .. } => "complete_document_signature_request",
             Reducer::CompleteIntercompanyTransaction { .. } => "complete_intercompany_transaction",
@@ -11012,6 +11096,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateAiInsight { .. } => "create_ai_insight",
             Reducer::CreateAiReducerAllowlist { .. } => "create_ai_reducer_allowlist",
             Reducer::CreateAiSkill { .. } => "create_ai_skill",
+            Reducer::CreateAiSkillCertificationEnvironment { .. } => "create_ai_skill_certification_environment",
             Reducer::CreateAiSkillFixture { .. } => "create_ai_skill_fixture",
             Reducer::CreateAiSkillVersion { .. } => "create_ai_skill_version",
             Reducer::CreateAiTeamMember { .. } => "create_ai_team_member",
@@ -11338,6 +11423,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ExpireContract { .. } => "expire_contract",
             Reducer::ExplodeBom { .. } => "explode_bom",
             Reducer::ExportFinancialReport { .. } => "export_financial_report",
+            Reducer::FailAiSkillCertification { .. } => "fail_ai_skill_certification",
             Reducer::FailExpenseIntegrationIntent { .. } => "fail_expense_integration_intent",
             Reducer::FailIotAction { .. } => "fail_iot_action",
             Reducer::FailProjectIntegrationIntent { .. } => "fail_project_integration_intent",
@@ -11483,6 +11569,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ProcessPendingScans { .. } => "process_pending_scans",
             Reducer::ProduceManufacturingOrder { .. } => "produce_manufacturing_order",
             Reducer::PromoteAiSkillVersion { .. } => "promote_ai_skill_version",
+            Reducer::PublishFormConfiguration { .. } => "publish_form_configuration",
             Reducer::PublishWorkflowVersion { .. } => "publish_workflow_version",
             Reducer::PurgeExpiredDocuments { .. } => "purge_expired_documents",
             Reducer::QueueMailFromTemplate { .. } => "queue_mail_from_template",
@@ -11499,7 +11586,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReconcileAccountBankStatementLine { .. } => "reconcile_account_bank_statement_line",
             Reducer::ReconcilePaymentWithInvoice { .. } => "reconcile_payment_with_invoice",
             Reducer::RecordAiAgentRunPolicySnapshot { .. } => "record_ai_agent_run_policy_snapshot",
-            Reducer::RecordAiSkillTestRun { .. } => "record_ai_skill_test_run",
             Reducer::RecordAiSpend { .. } => "record_ai_spend",
             Reducer::RecordBarcodeScan { .. } => "record_barcode_scan",
             Reducer::RecordCycleCountLine { .. } => "record_cycle_count_line",
@@ -11535,6 +11621,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RefreshTaxDeadlineStatuses { .. } => "refresh_tax_deadline_statuses",
             Reducer::RefuseExpenseSheet { .. } => "refuse_expense_sheet",
             Reducer::RefuseLeave { .. } => "refuse_leave",
+            Reducer::RegisterAiSkillCertificationRuntimeProfile { .. } => "register_ai_skill_certification_runtime_profile",
             Reducer::RegisterIotDevice { .. } => "register_iot_device",
             Reducer::RegisterIotHub { .. } => "register_iot_hub",
             Reducer::RegisterPaymentOnInvoice { .. } => "register_payment_on_invoice",
@@ -11559,6 +11646,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReopenTicket { .. } => "reopen_ticket",
             Reducer::ReopenTimesheets { .. } => "reopen_timesheets",
             Reducer::ReorderProposalLineItems { .. } => "reorder_proposal_line_items",
+            Reducer::RequestAiSkillCertification { .. } => "request_ai_skill_certification",
             Reducer::RequestEmbeddingJob { .. } => "request_embedding_job",
             Reducer::RequestExpensePolicyException { .. } => "request_expense_policy_exception",
             Reducer::ReserveSerial { .. } => "reserve_serial",
@@ -11636,6 +11724,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunExpensesWaveETest => "run_expenses_wave_e_test",
             Reducer::RunExpensesWaveFTest => "run_expenses_wave_f_test",
             Reducer::RunFleetWaveATest => "run_fleet_wave_a_test",
+            Reducer::RunFormsCustomFieldTest => "run_forms_custom_field_test",
             Reducer::RunFxRevaluation { .. } => "run_fx_revaluation",
             Reducer::RunFxRevaluationBatch { .. } => "run_fx_revaluation_batch",
             Reducer::RunHelpdeskTicketTest => "run_helpdesk_ticket_test",
@@ -11753,6 +11842,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetDocumentRetention { .. } => "set_document_retention",
             Reducer::SetExpenseAllocations { .. } => "set_expense_allocations",
             Reducer::SetExpenseFraudHold { .. } => "set_expense_fraud_hold",
+            Reducer::SetFormFieldLabel { .. } => "set_form_field_label",
             Reducer::SetFormRoleConfig { .. } => "set_form_role_config",
             Reducer::SetGoogleDriveConflictPolicy { .. } => "set_google_drive_conflict_policy",
             Reducer::SetIntercompanyRuleActive { .. } => "set_intercompany_rule_active",
@@ -13097,6 +13187,13 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 mo_id: mo_id.clone(),
 }),
+            Reducer::ClaimAiSkillCertification{
+                organization_id,
+                request_id,
+}             => __sats::bsatn::to_vec(&claim_ai_skill_certification_reducer::ClaimAiSkillCertificationArgs {
+                organization_id: organization_id.clone(),
+                request_id: request_id.clone(),
+}),
             Reducer::ClaimHubWithToken{
                 token,
                 serial,
@@ -13243,6 +13340,13 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 run_id: run_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CompleteAiSkillCertification{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&complete_ai_skill_certification_reducer::CompleteAiSkillCertificationArgs {
+                organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CompleteDocumentProcessingJob{
@@ -13749,6 +13853,13 @@ Reducer::BillProjectMilestone{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_ai_skill_reducer::CreateAiSkillArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateAiSkillCertificationEnvironment{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_ai_skill_certification_environment_reducer::CreateAiSkillCertificationEnvironmentArgs {
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
@@ -16424,6 +16535,13 @@ Reducer::ErrorIntercompanyTransaction{
                 report_id: report_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::FailAiSkillCertification{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&fail_ai_skill_certification_reducer::FailAiSkillCertificationArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::FailExpenseIntegrationIntent{
                 organization_id,
                 intent_id,
@@ -17640,6 +17758,13 @@ Reducer::MigrateWorkflowInstance{
                 skill_version_id: skill_version_id.clone(),
                 reason: reason.clone(),
 }),
+            Reducer::PublishFormConfiguration{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&publish_form_configuration_reducer::PublishFormConfigurationArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::PublishWorkflowVersion{
                 organization_id,
                 workflow_version_id,
@@ -17787,13 +17912,6 @@ Reducer::MigrateWorkflowInstance{
                 company_id: company_id.clone(),
                 run_id: run_id.clone(),
                 expected_release_id: expected_release_id.clone(),
-}),
-            Reducer::RecordAiSkillTestRun{
-                organization_id,
-                params,
-}             => __sats::bsatn::to_vec(&record_ai_skill_test_run_reducer::RecordAiSkillTestRunArgs {
-                organization_id: organization_id.clone(),
-                params: params.clone(),
 }),
             Reducer::RecordAiSpend{
                 organization_id,
@@ -18106,6 +18224,13 @@ Reducer::MigrateWorkflowInstance{
                 company_id: company_id.clone(),
                 leave_id: leave_id.clone(),
 }),
+            Reducer::RegisterAiSkillCertificationRuntimeProfile{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&register_ai_skill_certification_runtime_profile_reducer::RegisterAiSkillCertificationRuntimeProfileArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::RegisterIotDevice{
                 organization_id,
                 company_id,
@@ -18317,6 +18442,13 @@ Reducer::MigrateWorkflowInstance{
                 company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
                 ordered_ids: ordered_ids.clone(),
+}),
+            Reducer::RequestAiSkillCertification{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&request_ai_skill_certification_reducer::RequestAiSkillCertificationArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
 }),
             Reducer::RequestEmbeddingJob{
                 organization_id,
@@ -18668,6 +18800,8 @@ Reducer::RunExpensesWaveETest => __sats::bsatn::to_vec(&run_expenses_wave_e_test
 Reducer::RunExpensesWaveFTest => __sats::bsatn::to_vec(&run_expenses_wave_f_test_reducer::RunExpensesWaveFTestArgs {
                 }),
 Reducer::RunFleetWaveATest => __sats::bsatn::to_vec(&run_fleet_wave_a_test_reducer::RunFleetWaveATestArgs {
+                }),
+Reducer::RunFormsCustomFieldTest => __sats::bsatn::to_vec(&run_forms_custom_field_test_reducer::RunFormsCustomFieldTestArgs {
                 }),
 Reducer::RunFxRevaluation{
                 organization_id,
@@ -19118,6 +19252,15 @@ Reducer::SeedHrCountryPackOverlays{
 }             => __sats::bsatn::to_vec(&set_expense_fraud_hold_reducer::SetExpenseFraudHoldArgs {
                 organization_id: organization_id.clone(),
                 expense_id: expense_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::SetFormFieldLabel{
+                organization_id,
+                field_row_id,
+                params,
+}             => __sats::bsatn::to_vec(&set_form_field_label_reducer::SetFormFieldLabelArgs {
+                organization_id: organization_id.clone(),
+                field_row_id: field_row_id.clone(),
                 params: params.clone(),
 }),
             Reducer::SetFormRoleConfig{
@@ -21439,6 +21582,10 @@ pub struct DbUpdate {
     ai_insight: __sdk::TableUpdate<AiInsight>,
     ai_reducer_allowlist: __sdk::TableUpdate<AiReducerAllowlist>,
     ai_skill: __sdk::TableUpdate<AiSkill>,
+    ai_skill_certification_environment: __sdk::TableUpdate<AiSkillCertificationEnvironment>,
+    ai_skill_certification_evidence: __sdk::TableUpdate<AiSkillCertificationEvidence>,
+    ai_skill_certification_request: __sdk::TableUpdate<AiSkillCertificationRequest>,
+    ai_skill_certification_runtime_profile: __sdk::TableUpdate<AiSkillCertificationRuntimeProfile>,
     ai_skill_config: __sdk::TableUpdate<AiSkillConfig>,
     ai_skill_fixture: __sdk::TableUpdate<AiSkillFixture>,
     ai_skill_release: __sdk::TableUpdate<AiSkillRelease>,
@@ -21524,6 +21671,7 @@ pub struct DbUpdate {
     fleet_vehicle: __sdk::TableUpdate<FleetVehicle>,
     form_config: __sdk::TableUpdate<FormConfig>,
     form_config_field: __sdk::TableUpdate<FormConfigField>,
+    form_field_label: __sdk::TableUpdate<FormFieldLabel>,
     form_role_config: __sdk::TableUpdate<FormRoleConfig>,
     fx_revaluation_run: __sdk::TableUpdate<FxRevaluationRun>,
     generated_owner_report: __sdk::TableUpdate<GeneratedOwnerReport>,
@@ -21848,6 +21996,10 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "ai_insight" => db_update.ai_insight.append(ai_insight_table::parse_table_update(table_update)?),
     "ai_reducer_allowlist" => db_update.ai_reducer_allowlist.append(ai_reducer_allowlist_table::parse_table_update(table_update)?),
     "ai_skill" => db_update.ai_skill.append(ai_skill_table::parse_table_update(table_update)?),
+    "ai_skill_certification_environment" => db_update.ai_skill_certification_environment.append(ai_skill_certification_environment_table::parse_table_update(table_update)?),
+    "ai_skill_certification_evidence" => db_update.ai_skill_certification_evidence.append(ai_skill_certification_evidence_table::parse_table_update(table_update)?),
+    "ai_skill_certification_request" => db_update.ai_skill_certification_request.append(ai_skill_certification_request_table::parse_table_update(table_update)?),
+    "ai_skill_certification_runtime_profile" => db_update.ai_skill_certification_runtime_profile.append(ai_skill_certification_runtime_profile_table::parse_table_update(table_update)?),
     "ai_skill_config" => db_update.ai_skill_config.append(ai_skill_config_table::parse_table_update(table_update)?),
     "ai_skill_fixture" => db_update.ai_skill_fixture.append(ai_skill_fixture_table::parse_table_update(table_update)?),
     "ai_skill_release" => db_update.ai_skill_release.append(ai_skill_release_table::parse_table_update(table_update)?),
@@ -21933,6 +22085,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "fleet_vehicle" => db_update.fleet_vehicle.append(fleet_vehicle_table::parse_table_update(table_update)?),
     "form_config" => db_update.form_config.append(form_config_table::parse_table_update(table_update)?),
     "form_config_field" => db_update.form_config_field.append(form_config_field_table::parse_table_update(table_update)?),
+    "form_field_label" => db_update.form_field_label.append(form_field_label_table::parse_table_update(table_update)?),
     "form_role_config" => db_update.form_role_config.append(form_role_config_table::parse_table_update(table_update)?),
     "fx_revaluation_run" => db_update.fx_revaluation_run.append(fx_revaluation_run_table::parse_table_update(table_update)?),
     "generated_owner_report" => db_update.generated_owner_report.append(generated_owner_report_table::parse_table_update(table_update)?),
@@ -22269,6 +22422,10 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.ai_insight = cache.apply_diff_to_table::<AiInsight>("ai_insight", &self.ai_insight).with_updates_by_pk(|row| &row.id);
         diff.ai_reducer_allowlist = cache.apply_diff_to_table::<AiReducerAllowlist>("ai_reducer_allowlist", &self.ai_reducer_allowlist).with_updates_by_pk(|row| &row.id);
         diff.ai_skill = cache.apply_diff_to_table::<AiSkill>("ai_skill", &self.ai_skill).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_certification_environment = cache.apply_diff_to_table::<AiSkillCertificationEnvironment>("ai_skill_certification_environment", &self.ai_skill_certification_environment).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_certification_evidence = cache.apply_diff_to_table::<AiSkillCertificationEvidence>("ai_skill_certification_evidence", &self.ai_skill_certification_evidence).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_certification_request = cache.apply_diff_to_table::<AiSkillCertificationRequest>("ai_skill_certification_request", &self.ai_skill_certification_request).with_updates_by_pk(|row| &row.id);
+        diff.ai_skill_certification_runtime_profile = cache.apply_diff_to_table::<AiSkillCertificationRuntimeProfile>("ai_skill_certification_runtime_profile", &self.ai_skill_certification_runtime_profile).with_updates_by_pk(|row| &row.id);
         diff.ai_skill_config = cache.apply_diff_to_table::<AiSkillConfig>("ai_skill_config", &self.ai_skill_config).with_updates_by_pk(|row| &row.id);
         diff.ai_skill_fixture = cache.apply_diff_to_table::<AiSkillFixture>("ai_skill_fixture", &self.ai_skill_fixture).with_updates_by_pk(|row| &row.id);
         diff.ai_skill_release = cache.apply_diff_to_table::<AiSkillRelease>("ai_skill_release", &self.ai_skill_release).with_updates_by_pk(|row| &row.id);
@@ -22354,6 +22511,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.fleet_vehicle = cache.apply_diff_to_table::<FleetVehicle>("fleet_vehicle", &self.fleet_vehicle).with_updates_by_pk(|row| &row.id);
         diff.form_config = cache.apply_diff_to_table::<FormConfig>("form_config", &self.form_config).with_updates_by_pk(|row| &row.id);
         diff.form_config_field = cache.apply_diff_to_table::<FormConfigField>("form_config_field", &self.form_config_field).with_updates_by_pk(|row| &row.id);
+        diff.form_field_label = cache.apply_diff_to_table::<FormFieldLabel>("form_field_label", &self.form_field_label).with_updates_by_pk(|row| &row.id);
         diff.form_role_config = cache.apply_diff_to_table::<FormRoleConfig>("form_role_config", &self.form_role_config).with_updates_by_pk(|row| &row.id);
         diff.fx_revaluation_run = cache.apply_diff_to_table::<FxRevaluationRun>("fx_revaluation_run", &self.fx_revaluation_run).with_updates_by_pk(|row| &row.id);
         diff.generated_owner_report = cache.apply_diff_to_table::<GeneratedOwnerReport>("generated_owner_report", &self.generated_owner_report).with_updates_by_pk(|row| &row.id);
@@ -22675,6 +22833,10 @@ for table_rows in raw.tables {
                 "ai_insight" => db_update.ai_insight.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_reducer_allowlist" => db_update.ai_reducer_allowlist.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_skill" => db_update.ai_skill.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_certification_environment" => db_update.ai_skill_certification_environment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_certification_evidence" => db_update.ai_skill_certification_evidence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_certification_request" => db_update.ai_skill_certification_request.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "ai_skill_certification_runtime_profile" => db_update.ai_skill_certification_runtime_profile.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_skill_config" => db_update.ai_skill_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_skill_fixture" => db_update.ai_skill_fixture.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "ai_skill_release" => db_update.ai_skill_release.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -22760,6 +22922,7 @@ for table_rows in raw.tables {
                 "fleet_vehicle" => db_update.fleet_vehicle.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "form_config" => db_update.form_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "form_config_field" => db_update.form_config_field.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "form_field_label" => db_update.form_field_label.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "form_role_config" => db_update.form_role_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "fx_revaluation_run" => db_update.fx_revaluation_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "generated_owner_report" => db_update.generated_owner_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -23081,6 +23244,10 @@ for table_rows in raw.tables {
                 "ai_insight" => db_update.ai_insight.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_reducer_allowlist" => db_update.ai_reducer_allowlist.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_skill" => db_update.ai_skill.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_certification_environment" => db_update.ai_skill_certification_environment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_certification_evidence" => db_update.ai_skill_certification_evidence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_certification_request" => db_update.ai_skill_certification_request.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "ai_skill_certification_runtime_profile" => db_update.ai_skill_certification_runtime_profile.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_skill_config" => db_update.ai_skill_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_skill_fixture" => db_update.ai_skill_fixture.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "ai_skill_release" => db_update.ai_skill_release.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23166,6 +23333,7 @@ for table_rows in raw.tables {
                 "fleet_vehicle" => db_update.fleet_vehicle.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "form_config" => db_update.form_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "form_config_field" => db_update.form_config_field.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "form_field_label" => db_update.form_field_label.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "form_role_config" => db_update.form_role_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "fx_revaluation_run" => db_update.fx_revaluation_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "generated_owner_report" => db_update.generated_owner_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23489,6 +23657,10 @@ pub struct AppliedDiff<'r> {
     ai_insight: __sdk::TableAppliedDiff<'r, AiInsight>,
     ai_reducer_allowlist: __sdk::TableAppliedDiff<'r, AiReducerAllowlist>,
     ai_skill: __sdk::TableAppliedDiff<'r, AiSkill>,
+    ai_skill_certification_environment: __sdk::TableAppliedDiff<'r, AiSkillCertificationEnvironment>,
+    ai_skill_certification_evidence: __sdk::TableAppliedDiff<'r, AiSkillCertificationEvidence>,
+    ai_skill_certification_request: __sdk::TableAppliedDiff<'r, AiSkillCertificationRequest>,
+    ai_skill_certification_runtime_profile: __sdk::TableAppliedDiff<'r, AiSkillCertificationRuntimeProfile>,
     ai_skill_config: __sdk::TableAppliedDiff<'r, AiSkillConfig>,
     ai_skill_fixture: __sdk::TableAppliedDiff<'r, AiSkillFixture>,
     ai_skill_release: __sdk::TableAppliedDiff<'r, AiSkillRelease>,
@@ -23574,6 +23746,7 @@ pub struct AppliedDiff<'r> {
     fleet_vehicle: __sdk::TableAppliedDiff<'r, FleetVehicle>,
     form_config: __sdk::TableAppliedDiff<'r, FormConfig>,
     form_config_field: __sdk::TableAppliedDiff<'r, FormConfigField>,
+    form_field_label: __sdk::TableAppliedDiff<'r, FormFieldLabel>,
     form_role_config: __sdk::TableAppliedDiff<'r, FormRoleConfig>,
     fx_revaluation_run: __sdk::TableAppliedDiff<'r, FxRevaluationRun>,
     generated_owner_report: __sdk::TableAppliedDiff<'r, GeneratedOwnerReport>,
@@ -23898,6 +24071,10 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<AiInsight>("ai_insight", &self.ai_insight, event);
         callbacks.invoke_table_row_callbacks::<AiReducerAllowlist>("ai_reducer_allowlist", &self.ai_reducer_allowlist, event);
         callbacks.invoke_table_row_callbacks::<AiSkill>("ai_skill", &self.ai_skill, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillCertificationEnvironment>("ai_skill_certification_environment", &self.ai_skill_certification_environment, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillCertificationEvidence>("ai_skill_certification_evidence", &self.ai_skill_certification_evidence, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillCertificationRequest>("ai_skill_certification_request", &self.ai_skill_certification_request, event);
+        callbacks.invoke_table_row_callbacks::<AiSkillCertificationRuntimeProfile>("ai_skill_certification_runtime_profile", &self.ai_skill_certification_runtime_profile, event);
         callbacks.invoke_table_row_callbacks::<AiSkillConfig>("ai_skill_config", &self.ai_skill_config, event);
         callbacks.invoke_table_row_callbacks::<AiSkillFixture>("ai_skill_fixture", &self.ai_skill_fixture, event);
         callbacks.invoke_table_row_callbacks::<AiSkillRelease>("ai_skill_release", &self.ai_skill_release, event);
@@ -23983,6 +24160,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<FleetVehicle>("fleet_vehicle", &self.fleet_vehicle, event);
         callbacks.invoke_table_row_callbacks::<FormConfig>("form_config", &self.form_config, event);
         callbacks.invoke_table_row_callbacks::<FormConfigField>("form_config_field", &self.form_config_field, event);
+        callbacks.invoke_table_row_callbacks::<FormFieldLabel>("form_field_label", &self.form_field_label, event);
         callbacks.invoke_table_row_callbacks::<FormRoleConfig>("form_role_config", &self.form_role_config, event);
         callbacks.invoke_table_row_callbacks::<FxRevaluationRun>("fx_revaluation_run", &self.fx_revaluation_run, event);
         callbacks.invoke_table_row_callbacks::<GeneratedOwnerReport>("generated_owner_report", &self.generated_owner_report, event);
@@ -24938,6 +25116,10 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         ai_insight_table::register_table(client_cache);
         ai_reducer_allowlist_table::register_table(client_cache);
         ai_skill_table::register_table(client_cache);
+        ai_skill_certification_environment_table::register_table(client_cache);
+        ai_skill_certification_evidence_table::register_table(client_cache);
+        ai_skill_certification_request_table::register_table(client_cache);
+        ai_skill_certification_runtime_profile_table::register_table(client_cache);
         ai_skill_config_table::register_table(client_cache);
         ai_skill_fixture_table::register_table(client_cache);
         ai_skill_release_table::register_table(client_cache);
@@ -25023,6 +25205,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         fleet_vehicle_table::register_table(client_cache);
         form_config_table::register_table(client_cache);
         form_config_field_table::register_table(client_cache);
+        form_field_label_table::register_table(client_cache);
         form_role_config_table::register_table(client_cache);
         fx_revaluation_run_table::register_table(client_cache);
         generated_owner_report_table::register_table(client_cache);
@@ -25339,6 +25522,10 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "ai_insight",
         "ai_reducer_allowlist",
         "ai_skill",
+        "ai_skill_certification_environment",
+        "ai_skill_certification_evidence",
+        "ai_skill_certification_request",
+        "ai_skill_certification_runtime_profile",
         "ai_skill_config",
         "ai_skill_fixture",
         "ai_skill_release",
@@ -25424,6 +25611,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "fleet_vehicle",
         "form_config",
         "form_config_field",
+        "form_field_label",
         "form_role_config",
         "fx_revaluation_run",
         "generated_owner_report",

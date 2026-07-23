@@ -242,71 +242,12 @@ type InventoryCsvImportKind =
   | "stockQuant"
   | "lot"
 
-type ProductPriceSearchState = {
-  row: Record<string, unknown>
-  form: FormConfig
-} | null
-
 function recordTimestampMs(row: Record<string, unknown>): number {
   const raw = row.writeDate ?? row.write_date ?? row.createDate ?? row.create_date
   if (raw == null) return 0
   const n = Number(raw)
   if (!Number.isFinite(n) || n <= 0) return 0
   return n > 1e15 ? n / 1000 : n
-}
-
-function skillRunToPanel(result: AiSkillRunResponse): Record<string, unknown> {
-  const tableArtifact = result.artifacts.find((a) => a.kind === "table")
-  return {
-    summary: result.summary,
-    citations: result.citations,
-    artifacts: result.artifacts,
-    steps: result.steps,
-    run_id: result.run_id,
-    ...(tableArtifact?.content && typeof tableArtifact.content === "object"
-      ? { rows: (tableArtifact.content as { rows?: unknown[] }).rows ?? [] }
-      : {}),
-  }
-}
-
-function productPriceSearchForm(row: Record<string, unknown>): FormConfig {
-  return {
-    id: "ai-product-price-search",
-    title: "Find prices",
-    description: "Search external suppliers and compare with ERP product context.",
-    submitLabel: "Search prices",
-    sections: [
-      {
-        id: "search",
-        fields: [
-          {
-            id: "question",
-            type: "textarea",
-            name: "question",
-            label: "Search goal",
-            defaultValue: "Find competitive supplier prices and summarize best options.",
-            rows: 3,
-            width: "full",
-          },
-          {
-            id: "target-price",
-            type: "number",
-            name: "targetPrice",
-            label: "Target price (optional)",
-            width: "1/2",
-          },
-          {
-            id: "quantity",
-            type: "number",
-            name: "quantity",
-            label: "Quantity (optional)",
-            width: "1/2",
-            defaultValue: 1,
-          },
-        ],
-      },
-    ],
-  }
 }
 
 import {
@@ -347,8 +288,8 @@ import {
 import { withDefaultsFromRow } from "@/lib/prefill-form-config"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import { CycleCountWizard, LocationHierarchyPanel, QualityAlertsPanel } from "./cycle-count-wizard"
-import { AiResultPanel } from "@/lib/ai-result-panel"
-import { useRunAiSkill, type AiSkillRunResponse } from "@lumiere/query-hooks/hooks/ai-skills"
+import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
+import { useOpenErpAiChat } from "@/lib/erp-ai-context"
 
 // WarehouseViewer uses Three.js — must be loaded client-side only, imported directly to avoid SSR barrel evaluation
 const WarehouseViewer = dynamic(
@@ -425,11 +366,8 @@ function InventoryClientLoaded({
   const [supplierLineProductId, setSupplierLineProductId] = useState<ScalarId | null>(null)
   const [packagingProductId, setPackagingProductId] = useState<ScalarId | null>(null)
   const [csvKind, setCsvKind] = useState<InventoryCsvImportKind | null>(null)
-  const [productPriceSearch, setProductPriceSearch] = useState<ProductPriceSearchState>(null)
-  const [productPriceSearchError, setProductPriceSearchError] = useState<string | null>(null)
-  const [productPriceSearchResult, setProductPriceSearchResult] = useState<Record<string, unknown> | null>(null)
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
-  const runPriceSearch = useRunAiSkill()
+  const openErpAiChat = useOpenErpAiChat()
 
   const { data: products = [], isLoading: productsLoading } = useProducts(orgId, initialProducts)
   const { data: productCategories = [] } = useProductCategories(orgId, initialProductCategories)
@@ -1718,15 +1656,20 @@ function InventoryClientLoaded({
                   },
                 },
                 {
-                  id: "find-prices",
-                  label: "Find prices",
+                  id: "ask-ai",
+                  label: "Ask AI",
                   icon: Sparkles,
                   requiresSelection: true,
                   onClick: (rows) => {
                     const first = rows[0] as Record<string, unknown> | undefined
                     if (!first?.id) return
-                    setProductPriceSearchError(null)
-                    setProductPriceSearch({ row: first, form: productPriceSearchForm(first) })
+                    openErpAiChat({
+                      selection: buildEntitySelection({
+                        activeTab: "products",
+                        entityType: "product",
+                        row: first,
+                      }),
+                    })
                   },
                 },
                 {
@@ -3144,6 +3087,7 @@ function InventoryClientLoaded({
     unreserveQuant,
     deleteStockLocation,
     deleteProduct,
+    openErpAiChat,
     deleteWarehouse,
     updateProductPricing,
     updateProductInventoryData,
@@ -3582,7 +3526,6 @@ function InventoryClientLoaded({
       restoreProductCategory,
       upsertWarehouseGeo,
       updateWhatsappQualityScore,
-      runPriceSearch,
     ].some((h) => h.isPending) || Object.values(csvImports).some((h) => h.isPending)
 
   return (
@@ -3710,66 +3653,6 @@ function InventoryClientLoaded({
           setSolveQualityAlertId(null)
         }}
       />
-      {productPriceSearchResult ? (
-        <div className="mt-4 px-4">
-          <AiResultPanel
-            title="Price search results"
-            result={productPriceSearchResult}
-            onDismiss={() => setProductPriceSearchResult(null)}
-          />
-        </div>
-      ) : null}
-      {productPriceSearch ? (
-        <FormModal
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setProductPriceSearch(null)
-              setProductPriceSearchError(null)
-            }
-          }}
-          config={productPriceSearch.form}
-          isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={productPriceSearchError}
-          onSubmit={async (formData) => {
-            setProductPriceSearchError(null)
-            try {
-              const row = productPriceSearch.row
-              const productIdRaw = row.id
-              const result = await runPriceSearch.mutateAsync({
-                companyId: Number(operatingCompanyId ?? 0),
-                skillKey: "price_search",
-                inputs: {
-                  query: String(formData.question ?? "").trim(),
-                  product_id: productIdRaw != null ? Number(productIdRaw) : undefined,
-                  entity_type: "product",
-                  entity_id: productIdRaw != null ? Number(productIdRaw) : undefined,
-                  product_name: row.name != null ? String(row.name) : undefined,
-                  default_code:
-                    row.defaultCode != null
-                      ? String(row.defaultCode)
-                      : row.default_code != null
-                        ? String(row.default_code)
-                        : undefined,
-                  target_price:
-                    formData.targetPrice != null && String(formData.targetPrice).trim() !== ""
-                      ? Number(formData.targetPrice)
-                      : undefined,
-                  quantity:
-                    formData.quantity != null && String(formData.quantity).trim() !== ""
-                      ? Number(formData.quantity)
-                      : undefined,
-                },
-              })
-              setProductPriceSearchResult(skillRunToPanel(result))
-              setProductPriceSearch(null)
-            } catch (e) {
-              setProductPriceSearchError(e instanceof Error ? e.message : String(e))
-            }
-          }}
-        />
-      ) : null}
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}

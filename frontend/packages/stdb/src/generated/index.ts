@@ -157,6 +157,7 @@ import CancelWorkflowReducer from "./cancel_workflow_reducer";
 import CancelWorkflowOutboxReducer from "./cancel_workflow_outbox_reducer";
 import CancelWorkflowTimerReducer from "./cancel_workflow_timer_reducer";
 import CheckMoAvailabilityReducer from "./check_mo_availability_reducer";
+import ClaimAiSkillCertificationReducer from "./claim_ai_skill_certification_reducer";
 import ClaimHubWithTokenReducer from "./claim_hub_with_token_reducer";
 import ClaimQueueJobReducer from "./claim_queue_job_reducer";
 import ClaimWorkflowHumanTaskReducer from "./claim_workflow_human_task_reducer";
@@ -175,6 +176,7 @@ import CloseSubscriptionReducer from "./close_subscription_reducer";
 import CloseTicketReducer from "./close_ticket_reducer";
 import CompleteActivityReducer from "./complete_activity_reducer";
 import CompleteAiAgentRunReducer from "./complete_ai_agent_run_reducer";
+import CompleteAiSkillCertificationReducer from "./complete_ai_skill_certification_reducer";
 import CompleteDocumentProcessingJobReducer from "./complete_document_processing_job_reducer";
 import CompleteDocumentSignatureRequestReducer from "./complete_document_signature_request_reducer";
 import CompleteIntercompanyTransactionReducer from "./complete_intercompany_transaction_reducer";
@@ -234,6 +236,7 @@ import CreateAiChatSessionReducer from "./create_ai_chat_session_reducer";
 import CreateAiInsightReducer from "./create_ai_insight_reducer";
 import CreateAiReducerAllowlistReducer from "./create_ai_reducer_allowlist_reducer";
 import CreateAiSkillReducer from "./create_ai_skill_reducer";
+import CreateAiSkillCertificationEnvironmentReducer from "./create_ai_skill_certification_environment_reducer";
 import CreateAiSkillFixtureReducer from "./create_ai_skill_fixture_reducer";
 import CreateAiSkillVersionReducer from "./create_ai_skill_version_reducer";
 import CreateAiTeamMemberReducer from "./create_ai_team_member_reducer";
@@ -560,6 +563,7 @@ import ExpireAiActionDraftsReducer from "./expire_ai_action_drafts_reducer";
 import ExpireContractReducer from "./expire_contract_reducer";
 import ExplodeBomReducer from "./explode_bom_reducer";
 import ExportFinancialReportReducer from "./export_financial_report_reducer";
+import FailAiSkillCertificationReducer from "./fail_ai_skill_certification_reducer";
 import FailExpenseIntegrationIntentReducer from "./fail_expense_integration_intent_reducer";
 import FailIotActionReducer from "./fail_iot_action_reducer";
 import FailProjectIntegrationIntentReducer from "./fail_project_integration_intent_reducer";
@@ -722,7 +726,6 @@ import RecomputeWorkflowTimersForCalendarReducer from "./recompute_workflow_time
 import ReconcileAccountBankStatementLineReducer from "./reconcile_account_bank_statement_line_reducer";
 import ReconcilePaymentWithInvoiceReducer from "./reconcile_payment_with_invoice_reducer";
 import RecordAiAgentRunPolicySnapshotReducer from "./record_ai_agent_run_policy_snapshot_reducer";
-import RecordAiSkillTestRunReducer from "./record_ai_skill_test_run_reducer";
 import RecordAiSpendReducer from "./record_ai_spend_reducer";
 import RecordBarcodeScanReducer from "./record_barcode_scan_reducer";
 import RecordCycleCountLineReducer from "./record_cycle_count_line_reducer";
@@ -758,6 +761,7 @@ import RefreshSubscriptionExceptionFlagsReducer from "./refresh_subscription_exc
 import RefreshTaxDeadlineStatusesReducer from "./refresh_tax_deadline_statuses_reducer";
 import RefuseExpenseSheetReducer from "./refuse_expense_sheet_reducer";
 import RefuseLeaveReducer from "./refuse_leave_reducer";
+import RegisterAiSkillCertificationRuntimeProfileReducer from "./register_ai_skill_certification_runtime_profile_reducer";
 import RegisterIotDeviceReducer from "./register_iot_device_reducer";
 import RegisterIotHubReducer from "./register_iot_hub_reducer";
 import RegisterPaymentOnInvoiceReducer from "./register_payment_on_invoice_reducer";
@@ -782,6 +786,7 @@ import ReopenInventoryCloseReducer from "./reopen_inventory_close_reducer";
 import ReopenTicketReducer from "./reopen_ticket_reducer";
 import ReopenTimesheetsReducer from "./reopen_timesheets_reducer";
 import ReorderProposalLineItemsReducer from "./reorder_proposal_line_items_reducer";
+import RequestAiSkillCertificationReducer from "./request_ai_skill_certification_reducer";
 import RequestEmbeddingJobReducer from "./request_embedding_job_reducer";
 import RequestExpensePolicyExceptionReducer from "./request_expense_policy_exception_reducer";
 import ReserveSerialReducer from "./reserve_serial_reducer";
@@ -1263,6 +1268,10 @@ import AiDocumentProcessingJobRow from "./ai_document_processing_job_table";
 import AiInsightRow from "./ai_insight_table";
 import AiReducerAllowlistRow from "./ai_reducer_allowlist_table";
 import AiSkillRow from "./ai_skill_table";
+import AiSkillCertificationEnvironmentRow from "./ai_skill_certification_environment_table";
+import AiSkillCertificationEvidenceRow from "./ai_skill_certification_evidence_table";
+import AiSkillCertificationRequestRow from "./ai_skill_certification_request_table";
+import AiSkillCertificationRuntimeProfileRow from "./ai_skill_certification_runtime_profile_table";
 import AiSkillConfigRow from "./ai_skill_config_table";
 import AiSkillFixtureRow from "./ai_skill_fixture_table";
 import AiSkillReleaseRow from "./ai_skill_release_table";
@@ -2401,6 +2410,93 @@ const tablesSchema = __schema({
       { name: 'ai_skill_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AiSkillRow),
+  ai_skill_certification_environment: __table({
+    name: 'ai_skill_certification_environment',
+    indexes: [
+      { name: 'environment_key', algorithm: 'btree', columns: [
+        'environmentKey',
+      ] },
+      { name: 'ai_skill_certification_environment_by_fixture', algorithm: 'btree', columns: [
+        'fixtureId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_skill_certification_environment_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_skill_certification_environment_environment_key_key', constraint: 'unique', columns: ['environmentKey'] },
+      { name: 'ai_skill_certification_environment_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiSkillCertificationEnvironmentRow),
+  ai_skill_certification_evidence: __table({
+    name: 'ai_skill_certification_evidence',
+    indexes: [
+      { name: 'certification_request_id', algorithm: 'btree', columns: [
+        'certificationRequestId',
+      ] },
+      { name: 'ai_skill_certification_evidence_by_fixture', algorithm: 'btree', columns: [
+        'fixtureId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_skill_certification_evidence_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'ai_skill_certification_evidence_by_version', algorithm: 'btree', columns: [
+        'skillVersionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_skill_certification_evidence_certification_request_id_key', constraint: 'unique', columns: ['certificationRequestId'] },
+      { name: 'ai_skill_certification_evidence_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiSkillCertificationEvidenceRow),
+  ai_skill_certification_request: __table({
+    name: 'ai_skill_certification_request',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_skill_certification_request_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'request_key', algorithm: 'btree', columns: [
+        'requestKey',
+      ] },
+      { name: 'ai_skill_certification_request_by_version', algorithm: 'btree', columns: [
+        'skillVersionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_skill_certification_request_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'ai_skill_certification_request_request_key_key', constraint: 'unique', columns: ['requestKey'] },
+    ],
+  }, AiSkillCertificationRequestRow),
+  ai_skill_certification_runtime_profile: __table({
+    name: 'ai_skill_certification_runtime_profile',
+    indexes: [
+      { name: 'ai_skill_certification_runtime_profile_by_executor', algorithm: 'btree', columns: [
+        'executorIdentity',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ai_skill_certification_runtime_profile_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'profile_key', algorithm: 'btree', columns: [
+        'profileKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_skill_certification_runtime_profile_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'ai_skill_certification_runtime_profile_profile_key_key', constraint: 'unique', columns: ['profileKey'] },
+    ],
+  }, AiSkillCertificationRuntimeProfileRow),
   ai_skill_config: __table({
     name: 'ai_skill_config',
     indexes: [
@@ -9011,6 +9107,7 @@ const reducersSchema = __reducers(
   __reducerSchema("cancel_workflow_outbox", CancelWorkflowOutboxReducer),
   __reducerSchema("cancel_workflow_timer", CancelWorkflowTimerReducer),
   __reducerSchema("check_mo_availability", CheckMoAvailabilityReducer),
+  __reducerSchema("claim_ai_skill_certification", ClaimAiSkillCertificationReducer),
   __reducerSchema("claim_hub_with_token", ClaimHubWithTokenReducer),
   __reducerSchema("claim_queue_job", ClaimQueueJobReducer),
   __reducerSchema("claim_workflow_human_task", ClaimWorkflowHumanTaskReducer),
@@ -9029,6 +9126,7 @@ const reducersSchema = __reducers(
   __reducerSchema("close_ticket", CloseTicketReducer),
   __reducerSchema("complete_activity", CompleteActivityReducer),
   __reducerSchema("complete_ai_agent_run", CompleteAiAgentRunReducer),
+  __reducerSchema("complete_ai_skill_certification", CompleteAiSkillCertificationReducer),
   __reducerSchema("complete_document_processing_job", CompleteDocumentProcessingJobReducer),
   __reducerSchema("complete_document_signature_request", CompleteDocumentSignatureRequestReducer),
   __reducerSchema("complete_intercompany_transaction", CompleteIntercompanyTransactionReducer),
@@ -9088,6 +9186,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_ai_insight", CreateAiInsightReducer),
   __reducerSchema("create_ai_reducer_allowlist", CreateAiReducerAllowlistReducer),
   __reducerSchema("create_ai_skill", CreateAiSkillReducer),
+  __reducerSchema("create_ai_skill_certification_environment", CreateAiSkillCertificationEnvironmentReducer),
   __reducerSchema("create_ai_skill_fixture", CreateAiSkillFixtureReducer),
   __reducerSchema("create_ai_skill_version", CreateAiSkillVersionReducer),
   __reducerSchema("create_ai_team_member", CreateAiTeamMemberReducer),
@@ -9414,6 +9513,7 @@ const reducersSchema = __reducers(
   __reducerSchema("expire_contract", ExpireContractReducer),
   __reducerSchema("explode_bom", ExplodeBomReducer),
   __reducerSchema("export_financial_report", ExportFinancialReportReducer),
+  __reducerSchema("fail_ai_skill_certification", FailAiSkillCertificationReducer),
   __reducerSchema("fail_expense_integration_intent", FailExpenseIntegrationIntentReducer),
   __reducerSchema("fail_iot_action", FailIotActionReducer),
   __reducerSchema("fail_project_integration_intent", FailProjectIntegrationIntentReducer),
@@ -9576,7 +9676,6 @@ const reducersSchema = __reducers(
   __reducerSchema("reconcile_account_bank_statement_line", ReconcileAccountBankStatementLineReducer),
   __reducerSchema("reconcile_payment_with_invoice", ReconcilePaymentWithInvoiceReducer),
   __reducerSchema("record_ai_agent_run_policy_snapshot", RecordAiAgentRunPolicySnapshotReducer),
-  __reducerSchema("record_ai_skill_test_run", RecordAiSkillTestRunReducer),
   __reducerSchema("record_ai_spend", RecordAiSpendReducer),
   __reducerSchema("record_barcode_scan", RecordBarcodeScanReducer),
   __reducerSchema("record_cycle_count_line", RecordCycleCountLineReducer),
@@ -9612,6 +9711,7 @@ const reducersSchema = __reducers(
   __reducerSchema("refresh_tax_deadline_statuses", RefreshTaxDeadlineStatusesReducer),
   __reducerSchema("refuse_expense_sheet", RefuseExpenseSheetReducer),
   __reducerSchema("refuse_leave", RefuseLeaveReducer),
+  __reducerSchema("register_ai_skill_certification_runtime_profile", RegisterAiSkillCertificationRuntimeProfileReducer),
   __reducerSchema("register_iot_device", RegisterIotDeviceReducer),
   __reducerSchema("register_iot_hub", RegisterIotHubReducer),
   __reducerSchema("register_payment_on_invoice", RegisterPaymentOnInvoiceReducer),
@@ -9636,6 +9736,7 @@ const reducersSchema = __reducers(
   __reducerSchema("reopen_ticket", ReopenTicketReducer),
   __reducerSchema("reopen_timesheets", ReopenTimesheetsReducer),
   __reducerSchema("reorder_proposal_line_items", ReorderProposalLineItemsReducer),
+  __reducerSchema("request_ai_skill_certification", RequestAiSkillCertificationReducer),
   __reducerSchema("request_embedding_job", RequestEmbeddingJobReducer),
   __reducerSchema("request_expense_policy_exception", RequestExpensePolicyExceptionReducer),
   __reducerSchema("reserve_serial", ReserveSerialReducer),

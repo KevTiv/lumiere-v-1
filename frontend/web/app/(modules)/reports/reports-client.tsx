@@ -1,7 +1,7 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useEffect, useMemo, useState, useRef, useCallback } from "react"
+import { useMemo, useState, useRef, useCallback } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -46,7 +46,6 @@ import {
 import type { EntityTableConfig, EntityViewConfig, FormConfig } from "@lumiere/ui"
 import { reportsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useReportsModuleSubscription } from "@/lib/module-subscription-hooks"
-import { AiResultPanel } from "@/lib/ai-result-panel"
 import {
   useFinancialReports,
   useTrialBalances,
@@ -108,16 +107,15 @@ import {
   Gauge,
   PlayCircle,
   Upload,
-  LayoutDashboard,
   Share2,
   Plus,
   Grid3X3,
-  Sparkles,
   Eye,
   Download,
+  Sparkles,
 } from "lucide-react"
-import { useRunAiSkill, type AiSkillRunResponse } from "@lumiere/query-hooks/hooks/ai-skills"
-import { OwnerReportsPanel } from "./owner-reports-panel"
+import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
+import { useOpenErpAiChat } from "@/lib/erp-ai-context"
 import { PivotExplorer } from "./pivot-explorer"
 import { VatReportPanel } from "./vat-report-panel"
 import { QueryBuilder } from "./query-builder"
@@ -137,99 +135,6 @@ interface ReportsClientProps {
 
 type ReportsClientLoadedProps = Omit<ReportsClientProps, "organizationId"> & {
   organizationId: number
-}
-
-type ReportExplainState = {
-  row: Record<string, unknown>
-  form: FormConfig
-} | null
-
-type ReportAnalyzeState = {
-  row: Record<string, unknown>
-  reportLines: Record<string, unknown>[]
-  form: FormConfig
-} | null
-
-function skillRunToPanel(result: AiSkillRunResponse): Record<string, unknown> {
-  const tableArtifact = result.artifacts.find((a) => a.kind === "table")
-  return {
-    summary: result.summary,
-    citations: result.citations,
-    artifacts: result.artifacts,
-    steps: result.steps,
-    run_id: result.run_id,
-    ...(tableArtifact?.content && typeof tableArtifact.content === "object"
-      ? { rows: (tableArtifact.content as { rows?: unknown[] }).rows ?? [] }
-      : {}),
-  }
-}
-
-function reportAnalyzeForm(row: Record<string, unknown>): FormConfig {
-  return {
-    id: "ai-report-analyze",
-    title: "Analyze with AI",
-    description:
-      "Run sandbox SQL and live ERP lookups on report data. Returns a summary plus query results.",
-    submitLabel: "Analyze report",
-    sections: [
-      {
-        id: "analysis",
-        fields: [
-          {
-            id: "question",
-            type: "textarea",
-            name: "question",
-            label: "Analysis goal",
-            defaultValue:
-              "Summarize revenue drivers, anomalies, and follow-up actions for this report.",
-            rows: 4,
-            width: "full",
-          },
-        ],
-      },
-    ],
-  }
-}
-
-function reportExplainForm(row: Record<string, unknown>): FormConfig {
-  return {
-    id: "ai-report-explain",
-    title: "Explain Report",
-    description: "Ask AI to explain the selected report or answer a finance question about it.",
-    submitLabel: "Explain report",
-    sections: [
-      {
-        id: "report",
-        fields: [
-          {
-            id: "report-type",
-            type: "text",
-            name: "reportType",
-            label: "Report type",
-            required: true,
-            defaultValue: String(row.reportType ?? row.type ?? "financial_report"),
-            width: "1/2",
-          },
-          {
-            id: "comparison-report-id",
-            type: "number",
-            name: "comparisonReportId",
-            label: "Comparison report ID",
-            width: "1/2",
-          },
-          {
-            id: "question",
-            type: "textarea",
-            name: "question",
-            label: "Question",
-            defaultValue: "Explain the key movements, risks, and follow-up actions.",
-            rows: 4,
-            width: "full",
-          },
-        ],
-      },
-    ],
-  }
 }
 
 export function ReportsClient(props: ReportsClientProps) {
@@ -278,12 +183,7 @@ function ReportsClientLoaded({
   const [updateLayoutWidgetId, setUpdateLayoutWidgetId] = useState<string | null>(null)
   const [viewDashboardId, setViewDashboardId] = useState<string | null>(null)
   const [viewDashboardRange, setViewDashboardRange] = useState<"all" | "7d" | "30d" | "90d" | "ytd">("all")
-  const [reportExplain, setReportExplain] = useState<ReportExplainState>(null)
-  const [reportExplainError, setReportExplainError] = useState<string | null>(null)
-  const [reportExplainResult, setReportExplainResult] = useState<Record<string, unknown> | null>(null)
-  const [reportAnalyze, setReportAnalyze] = useState<ReportAnalyzeState>(null)
-  const [reportAnalyzeError, setReportAnalyzeError] = useState<string | null>(null)
-  const [reportAnalyzeResult, setReportAnalyzeResult] = useState<Record<string, unknown> | null>(null)
+  const openErpAiChat = useOpenErpAiChat()
 
   const { data: reportsRaw = [] } = useFinancialReports(orgId, initialReports)
   const { data: trialBalances = [] } = useTrialBalances(orgId, initialBalances)
@@ -327,7 +227,6 @@ function ReportsClientLoaded({
   const addWidgetToDashboard = useAddWidgetToDashboard(orgId)
   const updateWidgetLayout = useUpdateWidgetLayout(orgId)
   const shareDashboard = useShareDashboard(orgId)
-  const runReportAnalysis = useRunAiSkill()
 
   const templateSelectOptions = useMemo(
     () =>
@@ -614,32 +513,19 @@ function ReportsClientLoaded({
             },
           },
           {
-            id: "ai-explain",
-            label: "AI Explain",
-            icon: FileText,
-            requiresSelection: true,
-            onClick: (rows) => {
-              const first = rows[0]
-              if (!first?.id) return
-              setReportExplainError(null)
-              setReportExplain({ row: first, form: reportExplainForm(first) })
-            },
-          },
-          {
-            id: "ai-analyze",
-            label: "Analyze with AI",
+            id: "ask-ai",
+            label: "Ask AI",
             icon: Sparkles,
             requiresSelection: true,
             onClick: (rows) => {
               const first = rows[0]
               if (!first?.id) return
-              const reportId = String(first.id)
-              const lines = trialBalances.filter((row) => String(row.reportId) === reportId)
-              setReportAnalyzeError(null)
-              setReportAnalyze({
-                row: first,
-                reportLines: lines,
-                form: reportAnalyzeForm(first),
+              openErpAiChat({
+                selection: buildEntitySelection({
+                  activeTab: "reports",
+                  entityType: "financial_report",
+                  row: first,
+                }),
               })
             },
           },
@@ -652,7 +538,7 @@ function ReportsClientLoaded({
     generateFinancialReport,
     archiveFinancialReport,
     deleteFinancialReport,
-    trialBalances,
+    openErpAiChat,
   ])
 
   const reportTemplatesEntityConfig = useMemo((): EntityViewConfig => {
@@ -1058,7 +944,6 @@ function ReportsClientLoaded({
     addWidgetToDashboard.isPending ||
     updateWidgetLayout.isPending ||
     shareDashboard.isPending ||
-    runReportAnalysis.isPending ||
     importReportTemplateCsv.isPending ||
     importAnalyticsMetricCsv.isPending
 
@@ -1076,24 +961,6 @@ function ReportsClientLoaded({
           }
         }}
       />
-      {reportExplainResult ? (
-        <div className="mt-4">
-          <AiResultPanel
-            title="AI report explanation"
-            result={reportExplainResult}
-            onDismiss={() => setReportExplainResult(null)}
-          />
-        </div>
-      ) : null}
-      {reportAnalyzeResult ? (
-        <div className="mt-4">
-          <AiResultPanel
-            title="AI report analysis"
-            result={reportAnalyzeResult}
-            onDismiss={() => setReportAnalyzeResult(null)}
-          />
-        </div>
-      ) : null}
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
@@ -1106,87 +973,6 @@ function ReportsClientLoaded({
           }
         }}
       />
-      {reportExplain ? (
-        <FormModal
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setReportExplain(null)
-              setReportExplainError(null)
-            }
-          }}
-          config={reportExplain.form}
-          isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={reportExplainError}
-          onSubmit={async (formData) => {
-            setReportExplainError(null)
-            try {
-              const reportIdRaw = reportExplain.row.id
-              const comparisonRaw = formData.comparisonReportId
-              const result = await runReportAnalysis.mutateAsync({
-                companyId: Number(operatingCompanyId ?? 0),
-                skillKey: "report_analysis",
-                inputs: {
-                  query:
-                    formData.question != null && String(formData.question).trim() !== ""
-                      ? String(formData.question)
-                      : "Explain this report",
-                  entity_type: "financial_report",
-                  entity_id: reportIdRaw != null ? Number(reportIdRaw) : undefined,
-                  report_id: reportIdRaw != null ? Number(reportIdRaw) : undefined,
-                  report_type: String(formData.reportType ?? "financial_report"),
-                  comparison_report_id:
-                    comparisonRaw != null && String(comparisonRaw).trim() !== ""
-                      ? Number(comparisonRaw)
-                      : undefined,
-                  report_payload: reportExplain.row,
-                },
-              })
-              setReportExplainResult(skillRunToPanel(result))
-              setReportExplain(null)
-            } catch (e) {
-              setReportExplainError(e instanceof Error ? e.message : String(e))
-            }
-          }}
-        />
-      ) : null}
-      {reportAnalyze ? (
-        <FormModal
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setReportAnalyze(null)
-              setReportAnalyzeError(null)
-            }
-          }}
-          config={reportAnalyze.form}
-          isPending={isFormMutationPending}
-          closeOnSubmit={false}
-          submitError={reportAnalyzeError}
-          onSubmit={async (formData) => {
-            setReportAnalyzeError(null)
-            try {
-              const reportIdRaw = reportAnalyze.row.id
-              const result = await runReportAnalysis.mutateAsync({
-                companyId: Number(operatingCompanyId ?? 0),
-                skillKey: "report_analysis",
-                inputs: {
-                  query: String(formData.question ?? "").trim(),
-                  entity_type: "financial_report",
-                  entity_id: reportIdRaw != null ? Number(reportIdRaw) : undefined,
-                  report_id: reportIdRaw != null ? Number(reportIdRaw) : undefined,
-                  report_lines: reportAnalyze.reportLines,
-                },
-              })
-              setReportAnalyzeResult(skillRunToPanel(result))
-              setReportAnalyze(null)
-            } catch (e) {
-              setReportAnalyzeError(e instanceof Error ? e.message : String(e))
-            }
-          }}
-        />
-      ) : null}
       <FormModal
         open={editTemplateOpen}
         onOpenChange={(open) => {

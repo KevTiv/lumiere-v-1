@@ -29,6 +29,7 @@ pub struct CreateFormFieldParams {
     pub show_in_list: bool,
     pub width: FieldWidth,
     pub section_id: Option<String>,
+    pub visibility_json: Option<String>,
 }
 
 impl __sdk::InModule for CreateFormFieldParams {

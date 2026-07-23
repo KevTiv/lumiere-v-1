@@ -13,6 +13,7 @@ use stdb_auth::{
     select_org_scoped_sql, FieldAccessContext,
 };
 use stdb_client::StdbClient;
+use stdb_config::runtime_is_production;
 
 fn row_not_soft_deleted(r: &Value) -> bool {
     match r.get("deletedAt").or_else(|| r.get("deleted_at")) {
@@ -20,6 +21,17 @@ fn row_not_soft_deleted(r: &Value) -> bool {
         Some(Value::Object(obj)) if obj.contains_key("none") => true,
         Some(_) => false,
     }
+}
+
+fn ai_skill_permission_allowed(field_access: Option<&FieldAccessContext>, action: &str) -> bool {
+    field_access.is_some_and(|access| {
+        access.is_superuser
+            || access.role_permissions.iter().any(|permission| {
+                permission == "*:*"
+                    || permission == "ai_skill:*"
+                    || permission == &format!("ai_skill:{action}")
+            })
+    })
 }
 
 fn strip_soft_delete_fields(row: &mut Value) {
@@ -312,8 +324,17 @@ pub async fn execute_resource_query(
             return Ok(rows);
         }
         "ai-skill-test-runs" => {
+            if fa.is_some() || runtime_is_production() {
+                let allowed = ai_skill_permission_allowed(fa, "read")
+                    || ai_skill_permission_allowed(fa, "write");
+                if !allowed {
+                    return Err(ApiError::Forbidden(
+                        "Permission denied: read on ai_skill".into(),
+                    ));
+                }
+            }
             let sql = format!(
-                "SELECT id, organization_id, skill_id, skill_version_id, fixture_id, status, actual_output_json, output_fingerprint, failure_reason, executed_at, metadata FROM ai_skill_test_run WHERE organization_id = {organization_id}"
+                "SELECT id, organization_id, company_id, skill_id, skill_version_id, fixture_id, certification_request_id, runtime_profile_id, certification_environment_id, status, output_fingerprint, source_hash, manifest_hash, fixture_hash, runtime_hash, environment_hash, policy_snapshot_hash, execution_evidence_hash, executor_run_id, failure_kind, failure_reason, executed_at, metadata FROM ai_skill_certification_evidence WHERE organization_id = {organization_id}"
             );
             let mut rows = client
                 .query_sql(&sql)

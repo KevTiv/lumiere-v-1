@@ -11,12 +11,12 @@ import {
 } from "spacetimedb";
 
 import {
-  RecordAiSkillTestRunParams,
+  CompleteAiSkillCertificationParams,
 } from "./types";
 
 export default {
   organizationId: __t.u64(),
   get params() {
-    return RecordAiSkillTestRunParams;
+    return CompleteAiSkillCertificationParams;
   },
 };

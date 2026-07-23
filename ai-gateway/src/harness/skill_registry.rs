@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
 use super::{
-    distributor_controls, low_stock,
+    daily_briefing, distributor_controls, governed_llm_skills, import_mapping, insights_scan,
+    low_stock,
     manifest::{SkillManifest, SkillVersionRef},
     red_action_drafts, report_composer,
 };
@@ -18,6 +19,13 @@ impl SkillRegistry {
         registry.insert(distributor_controls::delivery_run_manifest());
         registry.insert(low_stock::manifest());
         registry.insert(report_composer::manifest());
+        registry.insert(import_mapping::manifest());
+        registry.insert(insights_scan::manifest());
+        registry.insert(daily_briefing::manifest());
+        registry.insert(governed_llm_skills::report_analysis_manifest());
+        registry.insert(governed_llm_skills::process_research_manifest());
+        registry.insert(governed_llm_skills::price_search_manifest());
+        registry.insert(governed_llm_skills::supplier_discovery_manifest());
         registry.insert(red_action_drafts::create_sale_order_draft_manifest());
         registry
     }

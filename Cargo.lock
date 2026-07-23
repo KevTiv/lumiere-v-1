@@ -80,6 +80,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha2",
  "stdb-client",
  "stdb-config",
  "thiserror 1.0.69",

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use stdb_config::{env_stdb_host_or_next_public, normalize_stdb_http_host};
+use stdb_config::{env_stdb_host_or_next_public, normalize_stdb_http_host, runtime_is_production};
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -13,6 +13,19 @@ pub struct Config {
     pub stdb_host: String,
     pub stdb_module: String,
     pub stdb_token: String,
+    /// Dedicated executor identity for server-owned AI certification runs.
+    ///
+    /// When absent, the certification worker is disabled. This token must not
+    /// be shared with the HTTP gateway or browser-facing sessions.
+    pub ai_certification_stdb_token: Option<String>,
+    /// SHA-256 fingerprint of the certification executor build/profile.
+    pub ai_certification_runtime_hash: Option<String>,
+    /// How often the certification worker polls for queued requests (seconds).
+    pub ai_certification_poll_secs: u64,
+    /// Maximum certification requests claimed per poll cycle.
+    pub ai_certification_batch_size: u32,
+    /// Hard deadline for one candidate adapter execution (seconds).
+    pub ai_certification_timeout_secs: u64,
     /// How often the queue worker polls for pending jobs (seconds)
     pub worker_poll_secs: u64,
     /// Max jobs to process per poll cycle
@@ -74,6 +87,18 @@ impl Config {
             .ok()
             .or_else(|| std::env::var("GEMINI_API_KEY").ok())
             .filter(|v| !v.trim().is_empty());
+        let stdb_token = std::env::var("STDB_TOKEN").context("STDB_TOKEN is required")?;
+        let (ai_certification_stdb_token, ai_certification_runtime_hash) =
+            validate_certification_identity(
+                std::env::var("AI_CERTIFICATION_STDB_TOKEN").ok(),
+                std::env::var("AI_CERTIFICATION_RUNTIME_HASH").ok(),
+            )?;
+        ensure_dedicated_certification_token(&stdb_token, ai_certification_stdb_token.as_deref())?;
+        if runtime_is_production() && ai_certification_stdb_token.is_none() {
+            anyhow::bail!(
+                "AI_CERTIFICATION_STDB_TOKEN and AI_CERTIFICATION_RUNTIME_HASH are required in production"
+            );
+        }
 
         Ok(Config {
             port: std::env::var("PORT")
@@ -94,7 +119,20 @@ impl Config {
             ),
             stdb_module: std::env::var("STDB_MODULE")
                 .context("STDB_MODULE is required (e.g. lumiere-v1)")?,
-            stdb_token: std::env::var("STDB_TOKEN").context("STDB_TOKEN is required")?,
+            stdb_token,
+            ai_certification_stdb_token,
+            ai_certification_runtime_hash,
+            ai_certification_poll_secs: std::env::var("AI_CERTIFICATION_POLL_SECS")
+                .unwrap_or_else(|_| "5".to_string())
+                .parse()
+                .context("AI_CERTIFICATION_POLL_SECS must be a valid number")?,
+            ai_certification_batch_size: std::env::var("AI_CERTIFICATION_BATCH_SIZE")
+                .unwrap_or_else(|_| "10".to_string())
+                .parse()
+                .context("AI_CERTIFICATION_BATCH_SIZE must be a valid number")?,
+            ai_certification_timeout_secs: parse_certification_timeout(
+                std::env::var("AI_CERTIFICATION_TIMEOUT_SECS").ok(),
+            )?,
             worker_poll_secs: std::env::var("WORKER_POLL_SECS")
                 .unwrap_or_else(|_| "10".to_string())
                 .parse()
@@ -166,5 +204,123 @@ impl Config {
                 .ok()
                 .filter(|v| !v.trim().is_empty()),
         })
+    }
+}
+
+fn validate_certification_identity(
+    token: Option<String>,
+    runtime_hash: Option<String>,
+) -> Result<(Option<String>, Option<String>)> {
+    let token = token.filter(|value| !value.trim().is_empty());
+    let runtime_hash = runtime_hash.filter(|value| !value.trim().is_empty());
+
+    match (token, runtime_hash) {
+        (None, None) => Ok((None, None)),
+        (Some(_), None) => anyhow::bail!(
+            "AI_CERTIFICATION_RUNTIME_HASH is required when AI_CERTIFICATION_STDB_TOKEN is set"
+        ),
+        (None, Some(_)) => anyhow::bail!(
+            "AI_CERTIFICATION_STDB_TOKEN is required when AI_CERTIFICATION_RUNTIME_HASH is set"
+        ),
+        (Some(token), Some(runtime_hash)) if valid_sha256(&runtime_hash) => {
+            Ok((Some(token), Some(runtime_hash)))
+        }
+        (Some(_), Some(_)) => anyhow::bail!(
+            "AI_CERTIFICATION_RUNTIME_HASH must be sha256: followed by 64 lowercase hex characters"
+        ),
+    }
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.strip_prefix("sha256:").is_some_and(|digest| {
+        digest.len() == 64
+            && digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
+fn ensure_dedicated_certification_token(
+    stdb_token: &str,
+    certification_token: Option<&str>,
+) -> Result<()> {
+    if certification_token == Some(stdb_token) {
+        anyhow::bail!(
+            "AI_CERTIFICATION_STDB_TOKEN must use a dedicated identity distinct from STDB_TOKEN"
+        );
+    }
+    Ok(())
+}
+
+fn parse_certification_timeout(value: Option<String>) -> Result<u64> {
+    const DEFAULT_SECS: u64 = 30;
+    const MIN_SECS: u64 = 1;
+    const MAX_SECS: u64 = 300;
+
+    let seconds = value
+        .unwrap_or_else(|| DEFAULT_SECS.to_string())
+        .parse::<u64>()
+        .context("AI_CERTIFICATION_TIMEOUT_SECS must be a valid number")?;
+    if !(MIN_SECS..=MAX_SECS).contains(&seconds) {
+        anyhow::bail!("AI_CERTIFICATION_TIMEOUT_SECS must be between {MIN_SECS} and {MAX_SECS}");
+    }
+    Ok(seconds)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn certification_identity_must_be_configured_as_a_pair() {
+        assert!(validate_certification_identity(None, None).is_ok());
+        assert!(validate_certification_identity(Some("token".to_string()), None).is_err());
+        assert!(
+            validate_certification_identity(None, Some(format!("sha256:{}", "a".repeat(64))))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn certification_runtime_hash_is_strict_sha256() {
+        let valid = format!("sha256:{}", "a".repeat(64));
+        assert!(validate_certification_identity(Some("token".to_string()), Some(valid)).is_ok());
+        assert!(validate_certification_identity(
+            Some("token".to_string()),
+            Some(format!("sha256:{}", "A".repeat(64)))
+        )
+        .is_err());
+        assert!(
+            validate_certification_identity(Some("token".to_string()), Some("a".repeat(64)))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn certification_token_must_not_reuse_the_gateway_identity() {
+        assert!(ensure_dedicated_certification_token("gateway", Some("certifier")).is_ok());
+        assert!(ensure_dedicated_certification_token("gateway", None).is_ok());
+        assert!(ensure_dedicated_certification_token("gateway", Some("gateway")).is_err());
+    }
+
+    #[test]
+    fn certification_timeout_has_a_safe_bounded_range() {
+        assert_eq!(
+            parse_certification_timeout(None).expect("default timeout should be valid"),
+            30
+        );
+        assert_eq!(
+            parse_certification_timeout(Some("1".to_string()))
+                .expect("minimum timeout should be valid"),
+            1
+        );
+        assert_eq!(
+            parse_certification_timeout(Some("300".to_string()))
+                .expect("maximum timeout should be valid"),
+            300
+        );
+        assert!(parse_certification_timeout(Some("0".to_string())).is_err());
+        assert!(parse_certification_timeout(Some("301".to_string())).is_err());
+        assert!(parse_certification_timeout(Some("forever".to_string())).is_err());
     }
 }

@@ -11,10 +11,6 @@ use crate::{
     },
     orchestrator::skill_loader::{complete_run, create_run, load_skill, LoadedSkill},
     providers::llm::LlmMessage,
-    skills::{
-        analyze_import_mapping, collect_briefing_context, preview_import_mapping, scan_insights,
-        BriefingContextRequest, ImportAnalyzeRequest, ImportPreviewRequest, InsightsScanRequest,
-    },
     state::AppState,
     tools::{
         registry::ToolRegistry,
@@ -83,6 +79,26 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
     }
     crate::harness::legacy_fence::ensure_legacy_orchestrator_allowed(skill_key)
         .map_err(|message| anyhow::anyhow!(message))?;
+
+    run_skill_unlocked(state, req).await
+}
+
+/// Execute a bundled skill after a harness adapter has already enforced release
+/// and policy. Callers must not expose this on `/v1/skills/run`.
+pub async fn run_skill_unlocked(
+    state: &AppState,
+    req: RunSkillRequest,
+) -> Result<RunSkillResponse> {
+    if req.org_id == 0 {
+        anyhow::bail!("org_id is required");
+    }
+    if req.company_id == 0 {
+        anyhow::bail!("company_id is required");
+    }
+    let skill_key = req.skill_key.trim();
+    if skill_key.is_empty() {
+        anyhow::bail!("skill_key is required");
+    }
 
     let stdb = req
         .stdb_token
@@ -156,60 +172,6 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
     let mut tool_payloads: Vec<Value> = Vec::new();
 
     let query = extract_query(&req.inputs);
-
-    if skill.skill_key == "daily_briefing" {
-        let briefing = collect_briefing_context(
-            state.rig.as_ref(),
-            BriefingContextRequest {
-                org_id: req.org_id,
-                company_id: Some(req.company_id),
-                since_micros: req.inputs.get("since_micros").and_then(|v| v.as_i64()),
-                until_micros: req.inputs.get("until_micros").and_then(|v| v.as_i64()),
-                allowed_modules: string_list_from_input(&req.inputs, "resources")
-                    .or_else(|| string_list_from_input(&req.inputs, "allowed_modules"))
-                    .unwrap_or_default(),
-                activity_query: req
-                    .inputs
-                    .get("activity_query")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string),
-                top_k: req
-                    .inputs
-                    .get("top_k")
-                    .and_then(|v| v.as_u64())
-                    .map(|v| v as usize),
-            },
-        )
-        .await;
-        tool_payloads.push(json!({ "tool": "daily_briefing", "data": briefing }));
-    }
-
-    if skill.skill_key == "import_mapping" {
-        if let Some(result) = run_import_mapping_skill(&req.inputs) {
-            tool_payloads.push(json!({ "tool": "import_mapping", "data": result }));
-        }
-    }
-
-    if skill.skill_key == "insights_scan" {
-        let scan = scan_insights(
-            state,
-            InsightsScanRequest {
-                org_id: req.org_id,
-                company_id: Some(req.company_id),
-                max_insights: req
-                    .inputs
-                    .get("max_insights")
-                    .and_then(|v| v.as_u64())
-                    .map(|v| v as usize),
-                abnormal_amount_threshold: req
-                    .inputs
-                    .get("abnormal_amount_threshold")
-                    .and_then(|v| v.as_f64()),
-            },
-        )
-        .await;
-        tool_payloads.push(json!({ "tool": "insights_scan", "data": scan }));
-    }
 
     let entity_type = req
         .inputs
@@ -373,20 +335,6 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
     };
 
     let mut artifacts = vec![artifact.clone()];
-    if skill.skill_key == "insights_scan" {
-        if let Some(payload) = tool_payloads
-            .iter()
-            .find(|p| p.get("tool").and_then(|v| v.as_str()) == Some("insights_scan"))
-        {
-            if let Some(data) = payload.get("data") {
-                artifacts.push(SkillArtifact {
-                    kind: "insights".to_string(),
-                    title: "Insight scan preview".to_string(),
-                    content: data.clone(),
-                });
-            }
-        }
-    }
     if let Some(table) = query_artifact {
         artifacts.push(table);
     }
@@ -668,99 +616,4 @@ fn string_list_from_input(inputs: &Value, key: &str) -> Option<Vec<String>> {
                 .collect()
         })
     })
-}
-
-fn string_matrix_from_input(inputs: &Value, key: &str) -> Option<Vec<Vec<String>>> {
-    inputs.get(key).and_then(|value| {
-        let rows = value.as_array()?;
-        Some(
-            rows.iter()
-                .filter_map(|row| {
-                    row.as_array().map(|cells| {
-                        cells
-                            .iter()
-                            .map(|cell| match cell {
-                                Value::String(s) => s.clone(),
-                                other => other.to_string(),
-                            })
-                            .collect()
-                    })
-                })
-                .collect(),
-        )
-    })
-}
-
-fn run_import_mapping_skill(inputs: &Value) -> Option<Value> {
-    let target_entity = inputs
-        .get("target_entity")
-        .or_else(|| inputs.get("targetEntity"))
-        .and_then(|v| v.as_str())
-        .map(str::trim)
-        .filter(|s| !s.is_empty())?;
-
-    let (headers, sample_rows) = if let Some(csv_text) = inputs
-        .get("csv_text")
-        .or_else(|| inputs.get("csvText"))
-        .and_then(|v| v.as_str())
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-    {
-        match crate::skills::parse_csv_text(csv_text) {
-            Ok(parsed) => parsed,
-            Err(message) => {
-                return Some(json!({ "error": message }));
-            }
-        }
-    } else {
-        let headers = string_list_from_input(inputs, "header")
-            .or_else(|| string_list_from_input(inputs, "headers"))?;
-        let sample_rows = string_matrix_from_input(inputs, "sample_rows")
-            .or_else(|| string_matrix_from_input(inputs, "sampleRows"))
-            .unwrap_or_default();
-        (headers, sample_rows)
-    };
-
-    if inputs.get("mapping").is_some() || inputs.get("mappingJson").is_some() {
-        let mapping_value = inputs
-            .get("mapping")
-            .cloned()
-            .or_else(|| inputs.get("mappingJson").cloned())?;
-        let mapping = mapping_value.as_object()?.clone();
-        let preview_rows_data = string_matrix_from_input(inputs, "sample_rows")
-            .or_else(|| string_matrix_from_input(inputs, "sampleRows"))
-            .unwrap_or(sample_rows);
-        let preview = preview_import_mapping(ImportPreviewRequest {
-            target_entity: target_entity.to_string(),
-            headers: headers.clone(),
-            rows: preview_rows_data,
-            mapping: mapping.into_iter().collect(),
-            max_rows: inputs
-                .get("max_rows")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as usize),
-        })
-        .ok()?;
-        return Some(json!(preview));
-    }
-
-    let prior_mappings = inputs
-        .get("prior_mappings")
-        .or_else(|| inputs.get("priorMappings"))
-        .and_then(|v| v.as_object())
-        .cloned()
-        .unwrap_or_default();
-    let analyze = analyze_import_mapping(ImportAnalyzeRequest {
-        target_entity: target_entity.to_string(),
-        headers,
-        sample_rows,
-        prior_mappings: prior_mappings.into_iter().collect(),
-        bundle_key: inputs
-            .get("bundle_key")
-            .or_else(|| inputs.get("bundleKey"))
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-    })
-    .ok()?;
-    Some(json!(analyze))
 }

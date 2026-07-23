@@ -4,57 +4,57 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::record_ai_skill_test_run_params_type::RecordAiSkillTestRunParams;
+use super::request_ai_skill_certification_params_type::RequestAiSkillCertificationParams;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub(super) struct RecordAiSkillTestRunArgs {
+pub(super) struct RequestAiSkillCertificationArgs {
     pub organization_id: u64,
-    pub params: RecordAiSkillTestRunParams,
+    pub params: RequestAiSkillCertificationParams,
 }
 
-impl From<RecordAiSkillTestRunArgs> for super::Reducer {
-    fn from(args: RecordAiSkillTestRunArgs) -> Self {
-        Self::RecordAiSkillTestRun {
+impl From<RequestAiSkillCertificationArgs> for super::Reducer {
+    fn from(args: RequestAiSkillCertificationArgs) -> Self {
+        Self::RequestAiSkillCertification {
             organization_id: args.organization_id,
             params: args.params,
         }
     }
 }
 
-impl __sdk::InModule for RecordAiSkillTestRunArgs {
+impl __sdk::InModule for RequestAiSkillCertificationArgs {
     type Module = super::RemoteModule;
 }
 
 #[allow(non_camel_case_types)]
-/// Extension trait for access to the reducer `record_ai_skill_test_run`.
+/// Extension trait for access to the reducer `request_ai_skill_certification`.
 ///
 /// Implemented for [`super::RemoteReducers`].
-pub trait record_ai_skill_test_run {
-    /// Request that the remote module invoke the reducer `record_ai_skill_test_run` to run as soon as possible.
+pub trait request_ai_skill_certification {
+    /// Request that the remote module invoke the reducer `request_ai_skill_certification` to run as soon as possible.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
-    /// /// Use [`record_ai_skill_test_run:record_ai_skill_test_run_then`] to run a callback after the reducer completes.
-    fn record_ai_skill_test_run(
+    /// /// Use [`request_ai_skill_certification:request_ai_skill_certification_then`] to run a callback after the reducer completes.
+    fn request_ai_skill_certification(
         &self,
         organization_id: u64,
-        params: RecordAiSkillTestRunParams,
+        params: RequestAiSkillCertificationParams,
     ) -> __sdk::Result<()> {
-        self.record_ai_skill_test_run_then(organization_id, params, |_, _| {})
+        self.request_ai_skill_certification_then(organization_id, params, |_, _| {})
     }
 
-    /// Request that the remote module invoke the reducer `record_ai_skill_test_run` to run as soon as possible,
+    /// Request that the remote module invoke the reducer `request_ai_skill_certification` to run as soon as possible,
     /// registering `callback` to run when we are notified that the reducer completed.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and its status can be observed with the `callback`.
-    fn record_ai_skill_test_run_then(
+    fn request_ai_skill_certification_then(
         &self,
         organization_id: u64,
-        params: RecordAiSkillTestRunParams,
+        params: RequestAiSkillCertificationParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -62,18 +62,18 @@ pub trait record_ai_skill_test_run {
     ) -> __sdk::Result<()>;
 }
 
-impl record_ai_skill_test_run for super::RemoteReducers {
-    fn record_ai_skill_test_run_then(
+impl request_ai_skill_certification for super::RemoteReducers {
+    fn request_ai_skill_certification_then(
         &self,
         organization_id: u64,
-        params: RecordAiSkillTestRunParams,
+        params: RequestAiSkillCertificationParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
             + 'static,
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
-            RecordAiSkillTestRunArgs {
+            RequestAiSkillCertificationArgs {
                 organization_id,
                 params,
             },

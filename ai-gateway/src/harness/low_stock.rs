@@ -231,7 +231,7 @@ async fn fetch_low_stock_output(
         "SELECT id, default_code, name, reordering_min_qty FROM product WHERE organization_id = {organization_id} AND company_id = {company_id} LIMIT 500"
     );
     let quant_sql = format!(
-        "SELECT product_id, quantity FROM stock_quant WHERE organization_id = {organization_id} AND company_id = {company_id} LIMIT 500"
+        "SELECT product_id, location_id, quantity FROM stock_quant WHERE organization_id = {organization_id} AND company_id = {company_id} LIMIT 500"
     );
 
     let products = stdb
@@ -243,8 +243,31 @@ async fn fetch_low_stock_output(
         .await
         .map_err(|error| format!("load stock quants: {error}"))?;
 
+    evaluate_low_stock_rows(
+        &products,
+        &quants,
+        organization_id,
+        company_id,
+        input,
+        manifest().limits.max_rows as usize,
+    )
+}
+
+pub(crate) fn evaluate_low_stock_rows(
+    products: &[Value],
+    quants: &[Value],
+    organization_id: u64,
+    company_id: u64,
+    input: &LowStockInput,
+    max_rows: usize,
+) -> Result<LowStockOutput, String> {
     let mut quantity_by_product = std::collections::BTreeMap::<u64, f64>::new();
     for row in quants {
+        if input.location_id.is_some()
+            && row_u64(row, "locationId", "location_id") != input.location_id
+        {
+            continue;
+        }
         let product_id = row_u64(&row, "productId", "product_id").unwrap_or(0);
         if product_id == 0 {
             continue;
@@ -271,9 +294,6 @@ async fn fetch_low_stock_output(
         if quantity_on_hand > threshold {
             continue;
         }
-        if let Some(location_id) = input.location_id {
-            let _ = location_id;
-        }
         items.push(LowStockItem {
             organization_id,
             company_id,
@@ -284,6 +304,9 @@ async fn fetch_low_stock_output(
             quantity_on_hand,
             reorder_level: threshold,
         });
+        if items.len() > max_rows {
+            return Err("low-stock row limit exceeded".to_string());
+        }
     }
 
     items.sort_by(|left, right| {

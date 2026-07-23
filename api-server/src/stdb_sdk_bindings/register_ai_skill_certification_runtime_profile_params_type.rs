@@ -6,14 +6,13 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub struct RecordAiSkillTestRunParams {
-    pub skill_version_id: u64,
-    pub fixture_id: u64,
-    pub actual_output_json: String,
-    pub failure_reason: Option<String>,
+pub struct RegisterAiSkillCertificationRuntimeProfileParams {
+    pub profile_key: String,
+    pub runtime_hash: String,
+    pub executor_identity: __sdk::Identity,
     pub metadata: Option<String>,
 }
 
-impl __sdk::InModule for RecordAiSkillTestRunParams {
+impl __sdk::InModule for RegisterAiSkillCertificationRuntimeProfileParams {
     type Module = super::RemoteModule;
 }

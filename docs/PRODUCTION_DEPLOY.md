@@ -24,6 +24,8 @@ These variables use `${VAR:?set VAR}` in `docker-compose.yml` — Compose fails 
 | `STDB_MODULE` | web, api-server, ai-gateway | Published SpacetimeDB database name |
 | `STDB_SERVER_TOKEN` | web, api-server | Admin/service JWT for HTTP SQL and auth reducers |
 | `STDB_TOKEN` | ai-gateway | Service token for SpacetimeDB HTTP API (not the same as `STDB_SERVER_TOKEN`) |
+| `AI_CERTIFICATION_STDB_TOKEN` | ai-gateway | Dedicated certification executor token; never reuse browser, API, or general gateway credentials |
+| `AI_CERTIFICATION_RUNTIME_HASH` | ai-gateway | Registered immutable executor digest (`sha256:` plus 64 lowercase hex characters) |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | web, api-server, ai-gateway | Shared secret (`X-Lumiere-Gateway-Secret`) |
 
 Common optional host overrides (have defaults in compose):
@@ -78,11 +80,22 @@ Realtime WebSocket: Kong/same-origin deployments use `wss://<host>/v1/realtime/w
 |----------|----------|--------|
 | `STDB_MODULE` | yes | |
 | `STDB_TOKEN` | yes | Service account token |
+| `AI_CERTIFICATION_STDB_TOKEN` | yes | Dedicated token matching the active organization certification runtime profile |
+| `AI_CERTIFICATION_RUNTIME_HASH` | yes | Exact digest registered in that runtime profile |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | yes | |
 | `QDRANT_URL` | in compose | `http://qdrant:6333` |
 | `STDB_HOST` | recommended | Defaults in gateway dev config only |
 
 Provider keys (`MISTRAL_API_KEY`, `GOOGLE_API_KEY`, etc.) depend on tenant `AiAgent` rows and `EMBEDDING_PROVIDER`.
+
+Before enabling certification for an organization, an active platform
+superuser must call `register_ai_skill_certification_runtime_profile` directly
+in SpacetimeDB with the dedicated token's exact executor identity and the same
+`AI_CERTIFICATION_RUNTIME_HASH`. The public reducer endpoint intentionally
+blocks runtime registration, claims, completion, and failure. Rotate a runtime
+by registering a new profile, deploy the matching token/hash together, and
+allow already-pinned jobs to finish; promotion accepts evidence from only the
+currently active profile.
 
 ## Quick start (Docker)
 

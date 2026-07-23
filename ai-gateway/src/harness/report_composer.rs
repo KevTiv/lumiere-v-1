@@ -286,7 +286,7 @@ async fn fetch_report_preview(
     serde_json::from_str(&text).map_err(|error| format!("invalid api-server preview JSON: {error}"))
 }
 
-fn build_composer_output(
+pub(crate) fn build_composer_output(
     report_key: &str,
     company_id: u64,
     preview: &Value,

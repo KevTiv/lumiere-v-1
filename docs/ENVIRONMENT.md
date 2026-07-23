@@ -14,6 +14,8 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `LUMIERE_REDUCER_ALLOWLIST` | api-server | `strict` (production default) blocks bootstrap/test/import reducers on `POST /v1/call/{reducer}`; `off` disables filtering (local dev / e2e). |
 | `AI_GATEWAY_URL` | api-server | Internal AI gateway base URL. Required in production; must not be `localhost`. |
 | `STDB_TOKEN` | ai-gateway, iot-gateway | Service token for SpacetimeDB HTTP API (distinct from per-user tokens). |
+| `AI_CERTIFICATION_STDB_TOKEN` | ai-gateway | Dedicated SpacetimeDB token whose identity alone may claim and complete certification jobs. Required with `AI_CERTIFICATION_RUNTIME_HASH`. |
+| `AI_CERTIFICATION_RUNTIME_HASH` | ai-gateway | Immutable executor build/profile digest (`sha256:` plus 64 lowercase hex characters). Required with `AI_CERTIFICATION_STDB_TOKEN`. |
 
 ### AI gateway (`ai-gateway`)
 
@@ -24,6 +26,9 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `OLLAMA_URL` | Local Ollama for embed, vision, and chat |
 | `KONG_LLM_URL` | Optional internal Kong AI route for LLM chat (else direct provider HTTP) |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | BFF → gateway auth header |
+| `AI_CERTIFICATION_POLL_SECS` | Certification queue poll interval; defaults to `5` |
+| `AI_CERTIFICATION_BATCH_SIZE` | Maximum jobs considered per poll; defaults to `10` |
+| `AI_CERTIFICATION_TIMEOUT_SECS` | Per-adapter hard timeout, `1..=300`; defaults to `30` |
 
 Tenant LLM provider/model selection is stored in SpacetimeDB `AiAgent` rows (Mistral, Gemini, Ollama).
 

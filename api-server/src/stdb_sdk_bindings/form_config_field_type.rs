@@ -29,6 +29,7 @@ pub struct FormConfigField {
     pub show_in_list: bool,
     pub width: FieldWidth,
     pub section_id: String,
+    pub visibility_json: String,
     pub created_at: __sdk::Timestamp,
     pub updated_at: __sdk::Timestamp,
 }
@@ -60,6 +61,7 @@ pub struct FormConfigFieldCols {
     pub show_in_list: __sdk::__query_builder::Col<FormConfigField, bool>,
     pub width: __sdk::__query_builder::Col<FormConfigField, FieldWidth>,
     pub section_id: __sdk::__query_builder::Col<FormConfigField, String>,
+    pub visibility_json: __sdk::__query_builder::Col<FormConfigField, String>,
     pub created_at: __sdk::__query_builder::Col<FormConfigField, __sdk::Timestamp>,
     pub updated_at: __sdk::__query_builder::Col<FormConfigField, __sdk::Timestamp>,
 }
@@ -90,6 +92,7 @@ impl __sdk::__query_builder::HasCols for FormConfigField {
             show_in_list: __sdk::__query_builder::Col::new(table_name, "show_in_list"),
             width: __sdk::__query_builder::Col::new(table_name, "width"),
             section_id: __sdk::__query_builder::Col::new(table_name, "section_id"),
+            visibility_json: __sdk::__query_builder::Col::new(table_name, "visibility_json"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
         }

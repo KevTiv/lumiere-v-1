@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{
-    distributor_controls, low_stock,
+    daily_briefing, distributor_controls, governed_llm_skills, import_mapping, insights_scan,
+    low_stock,
     manifest::{ReviewMetadata, ReviewStatus, SkillManifest},
     report_composer,
 };
@@ -71,6 +72,13 @@ impl ResourceRegistry {
         registry.insert(distributor_controls::delivery_run_resource_contract());
         registry.insert(low_stock::resource_contract());
         registry.insert(report_composer::resource_contract());
+        registry.insert(import_mapping::resource_contract());
+        registry.insert(insights_scan::resource_contract());
+        registry.insert(daily_briefing::resource_contract());
+        registry.insert(governed_llm_skills::report_analysis_resource_contract());
+        registry.insert(governed_llm_skills::process_research_resource_contract());
+        registry.insert(governed_llm_skills::price_search_resource_contract());
+        registry.insert(governed_llm_skills::supplier_discovery_resource_contract());
         registry
     }
 

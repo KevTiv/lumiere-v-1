@@ -4,8 +4,11 @@
 
 Evolve the existing AI gateway into a bounded, auditable enterprise harness.
 Agents use approved skills and generated shells with explicit scope and resource
-allowlists; they never receive unrestricted tenant data, arbitrary SQL, secrets,
-filesystem, or network access.
+allowlists. SQL and file access use the typed tenant/desktop capability brokers
+defined in
+[`ai-unified-execution-capabilities-subagent-plan.md`](./ai-unified-execution-capabilities-subagent-plan.md);
+agents never receive unrestricted tenant data, shared-database SQL authority,
+secrets, process filesystem access, or unreviewed network access.
 
 ## Current Codebase References
 
@@ -149,9 +152,10 @@ must remain unavailable to AI.
 - Authorization is checked at the BFF, policy engine, resource service, and
   reducer. No layer trusts a company ID, allowed reducer, tool, or role supplied
   by the browser/model.
-- Shells have no filesystem/network process capability; only approved SDK/data
-  operations are available. Secrets remain server-side references and cannot be
-  loaded into prompts or artifacts.
+- Shells have no process filesystem or unrestricted network capability. They may
+  use approved tenant-object and desktop-host operations through scoped,
+  auditable grants. Secrets remain server-side references and cannot be loaded
+  into prompts or artifacts.
 - Enforce retention and encrypted/policy-restricted access to run prompts,
   outputs, artifacts, and failure diagnostics.
 

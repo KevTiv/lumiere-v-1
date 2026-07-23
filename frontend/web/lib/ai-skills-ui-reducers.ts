@@ -5,7 +5,6 @@ export const AI_SKILLS_UI_REDUCERS = [
   "create_ai_skill_fixture",
   "create_ai_skill_version",
   "promote_ai_skill_version",
-  "record_ai_skill_test_run",
   "rollback_ai_skill_release",
   "set_ai_skill_active",
   "unassign_team_member_skill",

@@ -53,6 +53,13 @@ pub fn blocked_reducer_reason(reducer: &str, mode: ReducerAllowlistMode) -> Opti
         "delete_organization" | "purge_organization_data" => {
             Some("destructive organization reducers are not callable via the public API")
         }
+        "record_ai_skill_test_run"
+        | "claim_ai_skill_certification"
+        | "complete_ai_skill_certification"
+        | "fail_ai_skill_certification"
+        | "register_ai_skill_certification_runtime_profile" => {
+            Some("AI skill test results require the trusted certification executor")
+        }
         _ if name.starts_with("import_") && name.ends_with("_csv") => {
             Some("bulk CSV import reducers require dedicated endpoints")
         }
@@ -100,6 +107,23 @@ mod tests {
         assert!(
             blocked_reducer_reason("import_contact_csv", ReducerAllowlistMode::Strict).is_some()
         );
+    }
+
+    #[test]
+    fn strict_blocks_caller_recorded_ai_skill_test_results() {
+        for reducer in [
+            "record_ai_skill_test_run",
+            "claim_ai_skill_certification",
+            "complete_ai_skill_certification",
+            "fail_ai_skill_certification",
+            "register_ai_skill_certification_runtime_profile",
+        ] {
+            assert_eq!(
+                blocked_reducer_reason(reducer, ReducerAllowlistMode::Strict),
+                Some("AI skill test results require the trusted certification executor"),
+                "{reducer} should not be callable through the public API",
+            );
+        }
     }
 
     #[test]

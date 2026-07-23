@@ -243,8 +243,9 @@ use crate::ai::intelligence::{
     SearchEmbedding,
 };
 use crate::ai::skill_registry::{
-    ai_skill_fixture, ai_skill_release, ai_skill_test_run, ai_skill_version, AiSkillFixture,
-    AiSkillRelease, AiSkillRisk, AiSkillTestRun, AiSkillTestRunStatus, AiSkillVersion,
+    ai_skill_certification_environment, ai_skill_fixture, ai_skill_release, ai_skill_version,
+    certification_environment_fingerprint, AiSkillCertificationEnvironment, AiSkillFixture,
+    AiSkillRelease, AiSkillRisk, AiSkillVersion,
 };
 use crate::ai::skills::{
     ai_skill, ai_skill_config, ai_team_member_skill, AiSkill, AiSkillConfig, AiTeamMemberSkill,
@@ -529,20 +530,17 @@ fn seed_promoted_harness_skill(
         created_at: ctx.timestamp,
         metadata: Some("{\"seed\":true}".to_string()),
     });
-    let _ = ctx.db.ai_skill_test_run().insert(AiSkillTestRun {
-        id: 0,
-        organization_id: org_id,
-        skill_id: skill.id,
-        skill_version_id: version.id,
-        fixture_id: fixture.id,
-        status: AiSkillTestRunStatus::Passed,
-        actual_output_json: fixture.expected_output_json.clone(),
-        output_fingerprint: format!("fnv1a:seed-{skill_key}-smoke"),
-        failure_reason: None,
-        executed_by: seeder,
-        executed_at: ctx.timestamp,
-        metadata: Some("{\"seed\":true}".to_string()),
-    });
+    seed_ai_skill_certification_environment(
+        ctx,
+        org_id,
+        skill.id,
+        &fixture,
+        seeder,
+        &format!("{skill_key}-smoke-v1"),
+        "{}",
+        "{}",
+        "synthetic-empty-v1",
+    );
     let _ = ctx.db.ai_skill_release().insert(AiSkillRelease {
         id: 0,
         organization_id: org_id,
@@ -557,6 +555,105 @@ fn seed_promoted_harness_skill(
         released_at: ctx.timestamp,
         reason: Some("Seeded Phase 5 distributor control release".to_string()),
     });
+}
+
+/// Promote an already-seeded system skill so harness `load_active_manifest` succeeds.
+fn seed_active_release_for_skill(
+    ctx: &ReducerContext,
+    org_id: u64,
+    seeder: Identity,
+    skill: &AiSkill,
+    resource: &str,
+    output_type: &str,
+    source_hash_char: char,
+) {
+    let existing_release = ctx.db.ai_skill_release().iter().any(|row| {
+        row.organization_id == org_id && row.skill_id == skill.id && row.is_active
+    });
+    if existing_release {
+        return;
+    }
+
+    let hash = source_hash_char.to_string().repeat(64);
+    let skill_key = skill.skill_key.as_str();
+    let manifest_json = format!(
+        r#"{{"limits":{{"max_steps":8,"max_tool_calls":12}},"output_types":["{output_type}"],"permissions":["report:read"],"resources":["{resource}"],"risk":"green","schema_version":1,"skill_key":"{skill_key}","source_hash":"sha256:{hash}","version":"1.0.0"}}"#,
+    );
+    let version = ctx.db.ai_skill_version().insert(AiSkillVersion {
+        id: 0,
+        version_key: format!("{org_id}:{}:1.0.0", skill.id),
+        organization_id: org_id,
+        skill_id: skill.id,
+        skill_key: skill_key.to_string(),
+        version: "1.0.0".to_string(),
+        manifest_schema_version: 1,
+        manifest_json,
+        source_hash: format!("sha256:{hash}"),
+        risk: AiSkillRisk::Green,
+        max_steps: 8,
+        max_tool_calls: 12,
+        permissions: vec!["report:read".to_string()],
+        resources: vec![resource.to_string()],
+        output_types: vec![output_type.to_string()],
+        reviewed_by: seeder,
+        reviewed_at: ctx.timestamp,
+        review_notes: Some("Seeded harness migration release".to_string()),
+        created_by: seeder,
+        created_at: ctx.timestamp,
+        metadata: Some("{\"seed\":true,\"purpose\":\"legacy_harness_migration\"}".to_string()),
+    });
+    let _ = ctx.db.ai_skill_release().insert(AiSkillRelease {
+        id: 0,
+        organization_id: org_id,
+        skill_id: skill.id,
+        skill_version_id: version.id,
+        release_number: 1,
+        is_active: true,
+        action: "promote".to_string(),
+        previous_release_id: None,
+        rollback_target_release_id: None,
+        released_by: seeder,
+        released_at: ctx.timestamp,
+        reason: Some("Seeded harness migration release".to_string()),
+    });
+}
+
+fn seed_ai_skill_certification_environment(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    skill_id: u64,
+    fixture: &AiSkillFixture,
+    seeder: Identity,
+    key: &str,
+    dataset_json: &str,
+    virtual_files_json: &str,
+    environment_name: &str,
+) {
+    let environment_fingerprint = certification_environment_fingerprint(
+        organization_id,
+        skill_id,
+        fixture.id,
+        dataset_json,
+        virtual_files_json,
+    );
+    let _ = ctx
+        .db
+        .ai_skill_certification_environment()
+        .insert(AiSkillCertificationEnvironment {
+            id: 0,
+            environment_key: format!("{organization_id}:{}:{key}", fixture.id),
+            organization_id,
+            skill_id,
+            fixture_id: fixture.id,
+            dataset_json: dataset_json.to_string(),
+            virtual_files_json: virtual_files_json.to_string(),
+            environment_fingerprint,
+            created_by: seeder,
+            created_at: ctx.timestamp,
+            metadata: Some(format!(
+                r#"{{"seed":true,"environment":"{environment_name}"}}"#
+            )),
+        });
 }
 
 #[spacetimedb::reducer]
@@ -7147,7 +7244,7 @@ Focus on credibility, region fit, and category relevance. Always cite URLs from 
         vec![],
     );
 
-    let _daily_briefing = seed_system_skill(
+    let daily_briefing = seed_system_skill(
         ctx,
         "daily_briefing",
         "Daily Briefing",
@@ -7162,7 +7259,7 @@ Use activity search results and semantic ERP hits. Group by module. Highlight it
         vec![],
     );
 
-    let _import_mapping = seed_system_skill(
+    let import_mapping = seed_system_skill(
         ctx,
         "import_mapping",
         "Import Mapping",
@@ -7177,7 +7274,7 @@ Explain mapping confidence, unmapped columns, and validation warnings."#,
         vec![],
     );
 
-    let _insights_scan = seed_system_skill(
+    let insights_scan = seed_system_skill(
         ctx,
         "insights_scan",
         "Insights Scan",
@@ -7190,6 +7287,70 @@ Explain mapping confidence, unmapped columns, and validation warnings."#,
 Prioritize high-severity findings and cite related records."#,
         None,
         vec![],
+    );
+
+    seed_active_release_for_skill(
+        ctx,
+        org_id,
+        seeder,
+        &report_analysis,
+        "analytics.report_analysis.v1",
+        "analytics.report_analysis.result.v1",
+        '1',
+    );
+    seed_active_release_for_skill(
+        ctx,
+        org_id,
+        seeder,
+        &process_research,
+        "operations.process_research.v1",
+        "operations.process_research.result.v1",
+        '2',
+    );
+    seed_active_release_for_skill(
+        ctx,
+        org_id,
+        seeder,
+        &price_search,
+        "procurement.price_search.v1",
+        "procurement.price_search.result.v1",
+        '3',
+    );
+    seed_active_release_for_skill(
+        ctx,
+        org_id,
+        seeder,
+        &supplier_discovery,
+        "procurement.supplier_discovery.v1",
+        "procurement.supplier_discovery.result.v1",
+        '4',
+    );
+    seed_active_release_for_skill(
+        ctx,
+        org_id,
+        seeder,
+        &daily_briefing,
+        "operations.daily_briefing.v1",
+        "operations.daily_briefing.result.v1",
+        '5',
+    );
+    seed_active_release_for_skill(
+        ctx,
+        org_id,
+        seeder,
+        &import_mapping,
+        "data.import_mapping.v1",
+        "data.import_mapping.result.v1",
+        '6',
+    );
+    seed_active_release_for_skill(
+        ctx,
+        org_id,
+        seeder,
+        &insights_scan,
+        "analytics.insights_scan.v1",
+        "analytics.insights_scan.result.v1",
+        '7',
     );
 
     ctx.db.ai_skill_config().insert(AiSkillConfig {
@@ -7290,12 +7451,11 @@ Prioritize high-severity findings and cite related records."#,
         vec![],
     );
 
-    let report_composer_manifest = concat!(
-        r#"{"limits":{"max_steps":1,"max_tool_calls":1},"output_types":["reports.daily_business_summary.summary.v1"],"permissions":["report:read"],"resources":["reports.daily_business_summary.v1"],"risk":"green","schema_version":1,"skill_key":"report_composer","source_hash":"sha256:"#,
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        r#","version":"1.0.0"}"#
-    )
-    .to_string();
+    let report_composer_source_hash =
+        "sha256:e0dd18d042e585ae5dbb7ee37064b24506b126b024fabe80b449a74232d28add";
+    let report_composer_manifest = format!(
+        r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["reports.daily_business_summary.summary.v1"],"permissions":["report:read"],"resources":["reports.daily_business_summary.v1"],"risk":"green","schema_version":1,"skill_key":"report_composer","source_hash":"{report_composer_source_hash}","version":"1.0.0"}}"#
+    );
 
     let report_composer_version = ctx.db.ai_skill_version().insert(AiSkillVersion {
         id: 0,
@@ -7306,7 +7466,7 @@ Prioritize high-severity findings and cite related records."#,
         version: "1.0.0".to_string(),
         manifest_schema_version: 1,
         manifest_json: report_composer_manifest,
-        source_hash: format!("sha256:{}", "a".repeat(64)),
+        source_hash: report_composer_source_hash.to_string(),
         risk: AiSkillRisk::Green,
         max_steps: 1,
         max_tool_calls: 1,
@@ -7321,6 +7481,55 @@ Prioritize high-severity findings and cite related records."#,
         metadata: Some("{\"seed\":true,\"purpose\":\"harness_report_composer\"}".to_string()),
     });
 
+    let report_composer_expected_output = serde_json::json!({
+        "reportKey": "daily_business_summary_v1",
+        "title": "Daily Business Summary",
+        "items": [
+            {
+                "companyId": company_id,
+                "label": "sales_gross",
+                "valueMinorUnits": 1000,
+                "currencyId": 1,
+                "scale": 2
+            },
+            {
+                "companyId": company_id,
+                "label": "purchases_gross",
+                "valueMinorUnits": 300,
+                "currencyId": 1,
+                "scale": 2
+            },
+            {
+                "companyId": company_id,
+                "label": "receipts",
+                "valueMinorUnits": 900,
+                "currencyId": 1,
+                "scale": 2
+            },
+            {
+                "companyId": company_id,
+                "label": "disbursements",
+                "valueMinorUnits": 200,
+                "currencyId": 1,
+                "scale": 2
+            },
+            {
+                "companyId": company_id,
+                "label": "fees_and_tax",
+                "valueMinorUnits": 100,
+                "currencyId": 1,
+                "scale": 2
+            },
+            {
+                "companyId": company_id,
+                "label": "net_cash_flow",
+                "valueMinorUnits": 700,
+                "currencyId": 1,
+                "scale": 2
+            }
+        ]
+    })
+    .to_string();
     let report_composer_fixture = ctx.db.ai_skill_fixture().insert(AiSkillFixture {
         id: 0,
         fixture_key: format!("{}:{}:daily-summary-smoke", org_id, report_composer.id),
@@ -7328,27 +7537,51 @@ Prioritize high-severity findings and cite related records."#,
         skill_id: report_composer.id,
         name: "Daily summary smoke".to_string(),
         description: Some("Canonical report composer output shape for daily summary".to_string()),
-        input_json: r#"{"companyId":1,"date":"2026-07-10","reportKey":"daily_business_summary_v1","timezone":"UTC"}"#.to_string(),
-        expected_output_json: r#"{"items":[],"reportKey":"daily_business_summary_v1","title":"Daily Business Summary"}"#.to_string(),
+        input_json: serde_json::json!({
+            "companyId": company_id,
+            "date": "2026-07-10",
+            "reportKey": "daily_business_summary_v1",
+            "timezone": "UTC"
+        })
+        .to_string(),
+        expected_output_json: report_composer_expected_output,
         created_by: seeder,
         created_at: ctx.timestamp,
         metadata: Some("{\"seed\":true}".to_string()),
     });
-
-    let _ = ctx.db.ai_skill_test_run().insert(AiSkillTestRun {
-        id: 0,
-        organization_id: org_id,
-        skill_id: report_composer.id,
-        skill_version_id: report_composer_version.id,
-        fixture_id: report_composer_fixture.id,
-        status: AiSkillTestRunStatus::Passed,
-        actual_output_json: report_composer_fixture.expected_output_json.clone(),
-        output_fingerprint: "fnv1a:seed-smoke".to_string(),
-        failure_reason: None,
-        executed_by: seeder,
-        executed_at: ctx.timestamp,
-        metadata: Some("{\"seed\":true}".to_string()),
-    });
+    let report_preview = serde_json::json!({
+        "organizationId": org_id,
+        "companyId": company_id,
+        "content": {
+            "currency": {"currencyId": 1, "minorUnitScale": 2},
+            "report": {
+                "totals": {
+                    "salesGross": {"minorUnits": 1000},
+                    "purchasesGross": {"minorUnits": 300},
+                    "receipts": {"minorUnits": 900},
+                    "disbursements": {"minorUnits": 200},
+                    "feesAndTax": {"minorUnits": 100},
+                    "netCashFlow": {"minorUnits": 700}
+                }
+            }
+        }
+    })
+    .to_string();
+    let report_virtual_files = serde_json::json!({
+        "reports/daily_business_summary_v1/preview.json": report_preview
+    })
+    .to_string();
+    seed_ai_skill_certification_environment(
+        ctx,
+        org_id,
+        report_composer.id,
+        &report_composer_fixture,
+        seeder,
+        "report-composer-smoke-v1",
+        "{}",
+        &report_virtual_files,
+        "synthetic-report-preview-v1",
+    );
 
     let _ = ctx.db.ai_skill_release().insert(AiSkillRelease {
         id: 0,
@@ -7379,12 +7612,11 @@ Prioritize high-severity findings and cite related records."#,
         vec![],
     );
 
-    let low_stock_manifest = concat!(
-        r#"{"limits":{"max_steps":1,"max_tool_calls":1},"output_types":["inventory.low_stock.result.v1"],"permissions":["inventory:read"],"resources":["inventory.low_stock.v1"],"risk":"green","schema_version":1,"skill_key":"low_stock","source_hash":"sha256:"#,
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        r#","version":"1.0.0"}"#
-    )
-    .to_string();
+    let low_stock_source_hash =
+        "sha256:3317b1a5bd83c522f3c5f020965cf2959fcc629d38a75c40034cd31756be13b3";
+    let low_stock_manifest = format!(
+        r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["inventory.low_stock.result.v1"],"permissions":["inventory:read"],"resources":["inventory.low_stock.v1"],"risk":"green","schema_version":1,"skill_key":"low_stock","source_hash":"{low_stock_source_hash}","version":"1.0.0"}}"#
+    );
 
     let low_stock_version = ctx.db.ai_skill_version().insert(AiSkillVersion {
         id: 0,
@@ -7395,7 +7627,7 @@ Prioritize high-severity findings and cite related records."#,
         version: "1.0.0".to_string(),
         manifest_schema_version: 1,
         manifest_json: low_stock_manifest,
-        source_hash: format!("sha256:{}", "b".repeat(64)),
+        source_hash: low_stock_source_hash.to_string(),
         risk: AiSkillRisk::Green,
         max_steps: 1,
         max_tool_calls: 1,
@@ -7410,6 +7642,18 @@ Prioritize high-severity findings and cite related records."#,
         metadata: Some("{\"seed\":true,\"purpose\":\"harness_low_stock\"}".to_string()),
     });
 
+    let low_stock_expected_output = serde_json::json!({
+        "items": [{
+            "organization_id": org_id,
+            "company_id": company_id,
+            "product_id": 20,
+            "sku": "W-20",
+            "name": "Widget",
+            "quantity_on_hand": 2.0,
+            "reorder_level": 5.0
+        }]
+    })
+    .to_string();
     let low_stock_fixture = ctx.db.ai_skill_fixture().insert(AiSkillFixture {
         id: 0,
         fixture_key: format!("{}:{}:low-stock-smoke", org_id, low_stock.id),
@@ -7417,27 +7661,47 @@ Prioritize high-severity findings and cite related records."#,
         skill_id: low_stock.id,
         name: "Low stock smoke".to_string(),
         description: Some("Canonical low stock output shape for inventory scan".to_string()),
-        input_json: r#"{"threshold":5.0,"locationId":null}"#.to_string(),
-        expected_output_json: r#"{"items":[]}"#.to_string(),
+        input_json: r#"{"location_id":4,"threshold":5.0}"#.to_string(),
+        expected_output_json: low_stock_expected_output,
         created_by: seeder,
         created_at: ctx.timestamp,
         metadata: Some("{\"seed\":true}".to_string()),
     });
-
-    let _ = ctx.db.ai_skill_test_run().insert(AiSkillTestRun {
-        id: 0,
-        organization_id: org_id,
-        skill_id: low_stock.id,
-        skill_version_id: low_stock_version.id,
-        fixture_id: low_stock_fixture.id,
-        status: AiSkillTestRunStatus::Passed,
-        actual_output_json: low_stock_fixture.expected_output_json.clone(),
-        output_fingerprint: "fnv1a:seed-low-stock-smoke".to_string(),
-        failure_reason: None,
-        executed_by: seeder,
-        executed_at: ctx.timestamp,
-        metadata: Some("{\"seed\":true}".to_string()),
-    });
+    let low_stock_dataset = serde_json::json!({
+        "inventory.low_stock.v1": {
+            "organizationId": org_id,
+            "companyId": company_id,
+            "data": {
+                "products": [{
+                    "organizationId": org_id,
+                    "companyId": company_id,
+                    "id": 20,
+                    "defaultCode": "W-20",
+                    "name": "Widget",
+                    "reorderingMinQty": 5.0
+                }],
+                "stockQuants": [{
+                    "organizationId": org_id,
+                    "companyId": company_id,
+                    "productId": 20,
+                    "locationId": 4,
+                    "quantity": 2.0
+                }]
+            }
+        }
+    })
+    .to_string();
+    seed_ai_skill_certification_environment(
+        ctx,
+        org_id,
+        low_stock.id,
+        &low_stock_fixture,
+        seeder,
+        "low-stock-smoke-v1",
+        &low_stock_dataset,
+        "{}",
+        "synthetic-low-stock-v1",
+    );
 
     let _ = ctx.db.ai_skill_release().insert(AiSkillRelease {
         id: 0,

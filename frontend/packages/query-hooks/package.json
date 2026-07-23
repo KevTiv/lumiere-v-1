@@ -16,7 +16,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/hooks/*-params-merge.test.ts"
+    "test": "node --import tsx --test src/hooks/*.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",

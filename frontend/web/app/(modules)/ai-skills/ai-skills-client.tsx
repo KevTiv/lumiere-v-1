@@ -12,72 +12,18 @@ import {
   useAiAgentRuns,
   useCancelAiAgentRun,
   useCreateAiSkill,
-  useRunAiSkill,
   useSetAiSkillActive,
   useSyncAiSkills,
   useUnassignTeamMemberSkill,
   useUpsertAiSkillConfig,
   type AiSkillListItem,
 } from "@lumiere/query-hooks/hooks/ai-skills"
-import { AiResultPanel } from "@/lib/ai-result-panel"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 
 import { SkillRegistryPanel } from "./skill-registry-panel"
 
 export { AI_SKILLS_UI_REDUCERS } from "@/lib/ai-skills-ui-reducers"
-
-const runSkillForm = (skillKey: string): FormConfig => ({
-  id: "ai-skills-run",
-  title: "Run AI Skill",
-  submitLabel: "Run skill",
-  sections: [
-    {
-      id: "skill",
-      fields: [
-        {
-          id: "skill-key",
-          type: "text",
-          name: "skillKey",
-          label: "Skill key",
-          defaultValue: skillKey,
-          required: true,
-          width: "full",
-        },
-        {
-          id: "query",
-          type: "textarea",
-          name: "query",
-          label: "Query / goal",
-          rows: 3,
-          width: "full",
-        },
-        {
-          id: "entity-type",
-          type: "text",
-          name: "entityType",
-          label: "Entity type (optional)",
-          width: "1/2",
-        },
-        {
-          id: "entity-id",
-          type: "number",
-          name: "entityId",
-          label: "Entity id (optional)",
-          width: "1/2",
-        },
-        {
-          id: "inputs-json",
-          type: "textarea",
-          name: "inputsJson",
-          label: "Extra inputs JSON",
-          rows: 4,
-          width: "full",
-        },
-      ],
-    },
-  ],
-})
 
 const createSkillForm: FormConfig = {
   id: "ai-skills-create",
@@ -236,23 +182,6 @@ const assignSkillForm: FormConfig = {
   ],
 }
 
-function optionalJsonObject(value: unknown, label: string): Record<string, unknown> | undefined {
-  const raw = typeof value === "string" ? value.trim() : ""
-  if (!raw) return undefined
-  const parsed = JSON.parse(raw) as unknown
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`${label} must be a JSON object`)
-  }
-  return parsed as Record<string, unknown>
-}
-
-function csvList(value: unknown): string[] {
-  return String(value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
 function skillSourceLabel(skill: AiSkillListItem): string {
   if (skill.source === "bundled_md") return "Local MD"
   if (skill.is_system) return "System (STDB)"
@@ -271,7 +200,6 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   const { data: skills = [], isLoading, error } = useAiSkills()
   const { data: teamMembers = [] } = useAiTeamMembers(orgId)
   const { data: memberSkills = [] } = useAiTeamMemberSkills(orgId)
-  const runSkill = useRunAiSkill()
   const syncSkills = useSyncAiSkills()
   const createSkill = useCreateAiSkill(organizationId)
   const setSkillActive = useSetAiSkillActive(organizationId)
@@ -281,13 +209,18 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   const { data: agentRuns = [] } = useAiAgentRuns(organizationId)
   const cancelRun = useCancelAiAgentRun(organizationId, operatingCompanyId ?? undefined)
 
-  const [activeSkillKey, setActiveSkillKey] = useState<string | null>(null)
   const [modal, setModal] = useState<"create" | "assign" | "config" | "active" | null>(null)
   const [configSkill, setConfigSkill] = useState<{ id: number; name: string } | null>(null)
   const [activeSkillTarget, setActiveSkillTarget] = useState<{ id: number; name: string } | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
-  const [result, setResult] = useState<Record<string, unknown> | null>(null)
+
+  const closeModal = () => {
+    setModal(null)
+    setConfigSkill(null)
+    setActiveSkillTarget(null)
+    setSubmitError(null)
+  }
 
   const sortedSkills = useMemo(
     () => [...skills].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)),
@@ -318,33 +251,6 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
       setSyncMessage(`Synced ${response.synced.length} bundled skill(s) to SpacetimeDB.`)
     } catch (e) {
       setSyncMessage(e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  const handleRunSubmit = async (formData: Record<string, unknown>) => {
-    setSubmitError(null)
-    const inputs: Record<string, unknown> = {
-      ...(optionalJsonObject(formData.inputsJson, "Extra inputs") ?? {}),
-    }
-    const query = String(formData.query ?? "").trim()
-    if (query) inputs.query = query
-    const entityType = String(formData.entityType ?? "").trim()
-    const entityIdRaw = formData.entityId
-    if (entityType) inputs.entity_type = entityType
-    if (entityIdRaw != null && entityIdRaw !== "") {
-      inputs.entity_id = Number(entityIdRaw)
-    }
-
-    try {
-      const next = await runSkill.mutateAsync({
-        companyId: operatingCompanyId ?? 0,
-        skillKey: String(formData.skillKey ?? activeSkillKey ?? "report_analysis"),
-        inputs,
-      })
-      setResult(next as unknown as Record<string, unknown>)
-      setActiveSkillKey(null)
-    } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -390,7 +296,6 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   }
 
   const isPending =
-    runSkill.isPending ||
     syncSkills.isPending ||
     createSkill.isPending ||
     setSkillActive.isPending ||
@@ -402,7 +307,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
     <div className="space-y-6">
       <DashboardHeader
         title="AI Skills"
-        description="Run configurable ERP skills, manage org-specific playbooks, and assign skills to AI team members."
+        description="Manage org skill playbooks, registry releases, and AI team member assignments. Skills are invoked by the ERP Assistant, not from this page."
         actions={[
           {
             label: "Create skill",
@@ -441,16 +346,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
             className="rounded-xl border border-border bg-card p-4"
           >
             <div className="flex items-start justify-between gap-2">
-              <button
-                type="button"
-                className="text-left"
-                onClick={() => {
-                  setSubmitError(null)
-                  setActiveSkillKey(skill.skill_key)
-                }}
-              >
-                <p className="text-sm font-semibold hover:underline">{skill.name}</p>
-              </button>
+              <p className="text-sm font-semibold">{skill.name}</p>
               <span className="rounded bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                 {skillSourceLabel(skill)}
               </span>
@@ -493,6 +389,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
 
       <SkillRegistryPanel
         organizationId={orgId}
+        companyId={operatingCompanyId}
         skills={sortedSkills.filter((skill) => skill.id > 0)}
       />
 
@@ -557,35 +454,11 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
         </div>
       </section>
 
-      {result ? (
-        <AiResultPanel title="Skill run result" result={result} onDismiss={() => setResult(null)} />
-      ) : null}
-
-      {activeSkillKey ? (
-        <FormModal
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setActiveSkillKey(null)
-              setSubmitError(null)
-            }
-          }}
-          config={runSkillForm(activeSkillKey)}
-          isPending={runSkill.isPending}
-          closeOnSubmit={false}
-          submitError={submitError}
-          onSubmit={handleRunSubmit}
-        />
-      ) : null}
-
       {modal === "create" ? (
         <FormModal
           open
           onOpenChange={(open) => {
-            if (!open) {
-              setModal(null)
-              setSubmitError(null)
-            }
+            if (!open) closeModal()
           }}
           config={createSkillForm}
           isPending={isPending}
@@ -599,11 +472,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
         <FormModal
           open
           onOpenChange={(open) => {
-            if (!open) {
-              setModal(null)
-              setConfigSkill(null)
-              setSubmitError(null)
-            }
+            if (!open) closeModal()
           }}
           config={skillConfigForm(configSkill.id, configSkill.name)}
           isPending={isPending}
@@ -617,10 +486,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
         <FormModal
           open
           onOpenChange={(open) => {
-            if (!open) {
-              setModal(null)
-              setSubmitError(null)
-            }
+            if (!open) closeModal()
           }}
           config={assignSkillForm}
           isPending={isPending}
@@ -634,11 +500,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
         <FormModal
           open
           onOpenChange={(open) => {
-            if (!open) {
-              setModal(null)
-              setActiveSkillTarget(null)
-              setSubmitError(null)
-            }
+            if (!open) closeModal()
           }}
           config={setActiveSkillForm(activeSkillTarget.id, activeSkillTarget.name)}
           isPending={isPending}

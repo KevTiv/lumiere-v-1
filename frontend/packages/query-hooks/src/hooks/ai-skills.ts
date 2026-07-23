@@ -9,8 +9,24 @@ import type {
   CreateAiSkillParams,
   UpsertAiSkillParams,
 } from "@lumiere/stdb/types"
+import type {
+  DailyBriefingResult,
+  GovernedLlmSkillInput,
+  GovernedLlmSkillResult,
+  ImportMappingResult,
+  InsightsScanHarnessResult,
+} from "@lumiere/erp-shared/ai-skill-harness-schemas"
+import { responseErrorMessage as parseAiError } from "@lumiere/api-client/response-error"
 
 import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
+
+export type {
+  DailyBriefingResult,
+  GovernedLlmSkillInput,
+  GovernedLlmSkillResult,
+  ImportMappingResult,
+  InsightsScanHarnessResult,
+}
 
 export type AiSkillListItem = {
   id: number
@@ -60,8 +76,6 @@ export type AiSkillRunResponse = {
   agent_id: number
   skill_key: string
 }
-
-import { responseErrorMessage as parseAiError } from "@lumiere/api-client/response-error"
 
 export function useAiSkills() {
   return useQuery({
@@ -301,4 +315,85 @@ export function useCancelAiAgentRun(organizationId: number, companyId?: number) 
       void qc.invalidateQueries({ queryKey: ["ai-agent-runs", organizationId] })
     },
   })
+}
+
+// ── Harness skill runs (dedicated /api/ai/skills/* routes) ───────────────────
+
+async function postHarnessSkill<T>(
+  path: string,
+  body: Record<string, unknown>,
+): Promise<T> {
+  const r = await apiFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  if (!r.ok) throw new Error(await parseAiError(r))
+  return (await r.json()) as T
+}
+
+export function useAiImportMapping() {
+  return useMutation({
+    mutationFn: async (input: {
+      companyId: number
+      targetEntity: string
+      csvText?: string
+      headers?: string[]
+      sampleRows?: string[][]
+      mapping?: Record<string, unknown>
+      priorMappings?: Record<string, unknown>
+      bundleKey?: string
+      maxRows?: number
+    }) => postHarnessSkill<ImportMappingResult>("/api/ai/skills/import-mapping", input),
+  })
+}
+
+export function useAiInsightsScan() {
+  return useMutation({
+    mutationFn: async (input: {
+      companyId: number
+      maxInsights?: number
+      abnormalAmountThreshold?: number
+    }) =>
+      postHarnessSkill<InsightsScanHarnessResult>("/api/ai/skills/insights-scan", input),
+  })
+}
+
+export function useAiDailyBriefing() {
+  return useMutation({
+    mutationFn: async (input: {
+      companyId: number
+      sinceMicros?: number
+      untilMicros?: number
+      allowedModules?: string[]
+      activityQuery?: string
+      topK?: number
+    }) => postHarnessSkill<DailyBriefingResult>("/api/ai/skills/daily-briefing", input),
+  })
+}
+
+function useGovernedLlmSkill(path: string) {
+  return useMutation({
+    mutationFn: async (input: GovernedLlmSkillInput) =>
+      postHarnessSkill<GovernedLlmSkillResult>(path, {
+        ...input,
+        inputs: input.inputs ?? {},
+      }),
+  })
+}
+
+export function useAiReportAnalysis() {
+  return useGovernedLlmSkill("/api/ai/skills/report-analysis")
+}
+
+export function useAiProcessResearch() {
+  return useGovernedLlmSkill("/api/ai/skills/process-research")
+}
+
+export function useAiPriceSearch() {
+  return useGovernedLlmSkill("/api/ai/skills/price-search")
+}
+
+export function useAiSupplierDiscovery() {
+  return useGovernedLlmSkill("/api/ai/skills/supplier-discovery")
 }

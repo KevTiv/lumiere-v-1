@@ -14,7 +14,6 @@ export const AI_SKILLS_BFF_REDUCERS = [
   "unassign_team_member_skill",
   "create_ai_skill_version",
   "create_ai_skill_fixture",
-  "record_ai_skill_test_run",
   "promote_ai_skill_version",
   "rollback_ai_skill_release",
 ] as const;
@@ -53,7 +52,6 @@ const AI_SKILLS_HINT_OVERRIDES: Partial<
   unassign_team_member_skill: ["ai-team-member-skills"],
   create_ai_skill_version: ["ai-skill-versions"],
   create_ai_skill_fixture: ["ai-skill-fixtures"],
-  record_ai_skill_test_run: ["ai-skill-test-runs"],
   promote_ai_skill_version: ["ai-skill-releases"],
   rollback_ai_skill_release: ["ai-skill-releases"],
 };

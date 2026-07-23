@@ -2,6 +2,7 @@
 
 mod accounting;
 mod admin;
+mod ai_certifications;
 mod auth;
 mod billing;
 mod bootstrap;
@@ -30,6 +31,7 @@ use crate::state::AppState;
 
 pub fn domain_router() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(ai_certifications::router())
         .merge(auth::router())
         .merge(session::router())
         .merge(stdb::router())

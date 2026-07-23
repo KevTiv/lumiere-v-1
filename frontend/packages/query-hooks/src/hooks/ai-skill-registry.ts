@@ -7,7 +7,6 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   CreateAiSkillFixtureParams,
   CreateAiSkillVersionParams,
-  RecordAiSkillTestRunParams,
 } from "@lumiere/stdb/types"
 
 import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
@@ -59,6 +58,8 @@ export type AiSkillFixtureRow = {
 
 export type AiSkillTestRunRow = {
   id: number
+  certificationRequestId?: number
+  certification_request_id?: number
   skillVersionId?: number
   skill_version_id?: number
   fixtureId?: number
@@ -68,6 +69,28 @@ export type AiSkillTestRunRow = {
   executed_at?: string
   failureReason?: string
   failure_reason?: string
+}
+
+export type AiSkillCertificationRequestRow = {
+  id: number
+  companyId?: number
+  company_id?: number
+  skillId?: number
+  skill_id?: number
+  skillVersionId?: number
+  skill_version_id?: number
+  fixtureId?: number
+  fixture_id?: number
+  status?: string
+  requestedAt?: string
+  requested_at?: string
+  claimedAt?: string
+  claimed_at?: string
+  terminalAt?: string
+  terminal_at?: string
+  errorCode?: string
+  error_code?: string
+  hasCurrentPassingEvidence?: boolean
 }
 
 function registryQueryKey(organizationId: bigint, resource: string) {
@@ -143,6 +166,30 @@ export function useAiSkillTestRuns(organizationId: bigint, enabled = true) {
   })
 }
 
+export function useAiSkillCertificationRequests(organizationId: bigint, enabled = true) {
+  return useQuery({
+    queryKey: registryQueryKey(organizationId, "certifications"),
+    enabled: enabled && organizationId > 0n,
+    queryFn: async () => {
+      const rows = await fetchQueryList(
+        "/api/ai/skills/certifications",
+        "Failed to fetch AI skill certifications",
+      )
+      return rows as AiSkillCertificationRequestRow[]
+    },
+    staleTime: 2_000,
+    refetchInterval: (query) => {
+      const rows = (query.state.data ?? []) as AiSkillCertificationRequestRow[]
+      return rows.some((row) => {
+        const status = String(row.status ?? "").toLowerCase()
+        return status === "queued" || status === "running"
+      })
+        ? 2_000
+        : false
+    },
+  })
+}
+
 export function versionWorkflowStatus(
   versionId: number,
   releases: AiSkillReleaseRow[],
@@ -157,13 +204,37 @@ export function versionWorkflowStatus(
   return "reviewed"
 }
 
-export function fixtureHasPassingRun(
+export function latestCertificationFor(
   fixtureId: number,
   versionId: number,
+  requests: AiSkillCertificationRequestRow[],
+): AiSkillCertificationRequestRow | undefined {
+  return requests
+    .filter(
+      (request) =>
+        Number(request.fixtureId ?? request.fixture_id) === fixtureId &&
+        Number(request.skillVersionId ?? request.skill_version_id) === versionId,
+    )
+    .sort((left, right) => Number(right.id) - Number(left.id))[0]
+}
+
+export function certificationHasPassingEvidence(
+  fixtureId: number,
+  versionId: number,
+  requests: AiSkillCertificationRequestRow[],
   runs: AiSkillTestRunRow[],
 ): boolean {
+  const request = latestCertificationFor(fixtureId, versionId, requests)
+  if (
+    !request ||
+    request.hasCurrentPassingEvidence !== true ||
+    String(request.status ?? "").toLowerCase() !== "completed"
+  ) {
+    return false
+  }
   return runs.some(
     (run) =>
+      Number(run.certificationRequestId ?? run.certification_request_id) === Number(request.id) &&
       Number(run.fixtureId ?? run.fixture_id) === fixtureId &&
       Number(run.skillVersionId ?? run.skill_version_id) === versionId &&
       String(run.status ?? "").toLowerCase() === "passed",
@@ -178,6 +249,7 @@ function invalidateRegistry(qc: ReturnType<typeof useQueryClient>, organizationI
   void qc.invalidateQueries({ queryKey: ["ai-skill-registry", "releases", rqBigIntKey(org)] })
   void qc.invalidateQueries({ queryKey: ["ai-skill-registry", "fixtures", rqBigIntKey(org)] })
   void qc.invalidateQueries({ queryKey: ["ai-skill-registry", "test-runs", rqBigIntKey(org)] })
+  void qc.invalidateQueries({ queryKey: ["ai-skill-registry", "certifications", rqBigIntKey(org)] })
 }
 
 export function useCreateAiSkillVersion(organizationId: number) {
@@ -210,16 +282,21 @@ export function useCreateAiSkillFixture(organizationId: number) {
   })
 }
 
-export function useRecordAiSkillTestRun(organizationId: number) {
+export function useRequestAiSkillCertification(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: RecordAiSkillTestRunParams) => {
-      const { urlPath, init } = aiSkillsBffPost("record_ai_skill_test_run", [
-        organizationId,
-        stdbParamsToJson(params as object),
-      ])
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+    mutationFn: async (args: {
+      companyId: number
+      skillVersionId: number
+      fixtureId: number
+      idempotencyKey: string
+    }) => {
+      const response = await apiFetch("/api/ai/skills/certifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(args),
+      })
+      if (!response.ok) throw new Error(await parseCallError(response))
     },
     onSuccess: () => invalidateRegistry(qc, organizationId),
   })

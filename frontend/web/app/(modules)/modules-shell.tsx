@@ -41,7 +41,7 @@ import {
 import { useApprovalInboxCount } from "@lumiere/query-hooks/hooks/approvals"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { ErpAiRouteContextProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
+import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { performSignOut } from "@/lib/auth-sign-out"
 
 const AI_CHAT_SESSION_KEY_STORAGE = "lumiere:erp-ai-chat-session-key"
@@ -510,50 +510,56 @@ function ModulesContent({ children }: { children: ReactNode }) {
     return Object.keys(badges).length > 0 ? badges : undefined
   }, [approvalInboxCountQuery.count])
 
+  const openAiChat = useCallback(() => {
+    setIsAIChatOpen(true)
+  }, [])
+
   return (
-    <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">
-      <DashboardSidebar
-        forceCollapsed={isAIChatDocked || isNotebookOpen}
-        navBadges={navBadges}
-        onOpenJournal={() => setIsJournalOpen(true)}
-        onOpenNotebook={() => setIsNotebookOpen(true)}
-        onOpenAIChat={() => setIsAIChatOpen(true)}
-        onSignOut={() => void performSignOut()}
-      />
-      <main className="flex-1 overflow-auto scroll-smooth">
-        <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">{children}</div>
-      </main>
+    <ErpAiChatControllerProvider open={openAiChat}>
+      <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">
+        <DashboardSidebar
+          forceCollapsed={isAIChatDocked || isNotebookOpen}
+          navBadges={navBadges}
+          onOpenJournal={() => setIsJournalOpen(true)}
+          onOpenNotebook={() => setIsNotebookOpen(true)}
+          onOpenAIChat={openAiChat}
+          onSignOut={() => void performSignOut()}
+        />
+        <main className="flex-1 overflow-auto scroll-smooth">
+          <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">{children}</div>
+        </main>
 
-      <ErpAiChatPanel
-        open={isAIChatOpen}
-        onClose={() => {
-          setIsAIChatOpen(false)
-          setIsAIChatDocked(false)
-        }}
-        docked={isAIChatDocked}
-        onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
-        config={{
-          title: "ERP Assistant",
-          welcomeMessage: "Ask questions about your data or use @ commands for quick actions.",
-          placeholder: "Ask anything... Type @ for commands",
-        }}
-      />
+        <ErpAiChatPanel
+          open={isAIChatOpen}
+          onClose={() => {
+            setIsAIChatOpen(false)
+            setIsAIChatDocked(false)
+          }}
+          docked={isAIChatDocked}
+          onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
+          config={{
+            title: "ERP Assistant",
+            welcomeMessage: "Ask questions about your data or use @ commands for quick actions.",
+            placeholder: "Ask anything... Type @ for commands",
+          }}
+        />
 
-      <NotebookPanel
-        open={isNotebookOpen}
-        onClose={() => setIsNotebookOpen(false)}
-        onAIChat={() => setIsAIChatOpen(true)}
-        dataContext={{}}
-      />
+        <NotebookPanel
+          open={isNotebookOpen}
+          onClose={() => setIsNotebookOpen(false)}
+          onAIChat={openAiChat}
+          dataContext={{}}
+        />
 
-      <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
+        <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
 
-      <ErpCommandPalette
-        onOpenAIChat={() => setIsAIChatOpen(true)}
-        onOpenNotebook={() => setIsNotebookOpen(true)}
-        onOpenJournal={() => setIsJournalOpen(true)}
-      />
-    </div>
+        <ErpCommandPalette
+          onOpenAIChat={openAiChat}
+          onOpenNotebook={() => setIsNotebookOpen(true)}
+          onOpenJournal={() => setIsJournalOpen(true)}
+        />
+      </div>
+    </ErpAiChatControllerProvider>
   )
 }
 

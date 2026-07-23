@@ -8,6 +8,7 @@ pub mod health;
 pub mod import;
 pub mod inventory;
 pub mod kaggle;
+pub mod harness_skills;
 pub mod policy;
 pub mod rag;
 pub mod report;

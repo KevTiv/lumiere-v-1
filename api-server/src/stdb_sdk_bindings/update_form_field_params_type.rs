@@ -22,6 +22,8 @@ pub struct UpdateFormFieldParams {
     pub is_enabled: Option<bool>,
     pub show_in_list: Option<bool>,
     pub width: Option<FieldWidth>,
+    pub visibility_json: Option<String>,
+    pub expected_updated_at_micros: Option<i64>,
 }
 
 impl __sdk::InModule for UpdateFormFieldParams {

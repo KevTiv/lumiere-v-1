@@ -103,6 +103,13 @@ async fn main() -> anyhow::Result<()> {
     rig.ensure_collection().await?;
 
     let config = Arc::new(config);
+    let certification_stdb = config.ai_certification_stdb_token.as_ref().map(|token| {
+        Arc::new(StdbClient::new(
+            config.stdb_host.clone(),
+            config.stdb_module.clone(),
+            token.clone(),
+        ))
+    });
     let vector_store = Arc::new(vector_store);
     let stdb = Arc::new(stdb);
     let rig = Arc::new(rig);
@@ -126,6 +133,18 @@ async fn main() -> anyhow::Result<()> {
         vector_store.clone(),
         stdb.clone(),
     ));
+
+    if let Some(certification_stdb) = certification_stdb {
+        tokio::spawn(harness::certification::run(
+            config.clone(),
+            certification_stdb,
+            Arc::new(harness::certification::CandidateAdapterRegistry::production()),
+        ));
+    } else {
+        tracing::info!(
+            "AI certification worker disabled; AI_CERTIFICATION_STDB_TOKEN is not configured"
+        );
+    }
 
     tokio::spawn(context_worker::run(state.clone()));
 
@@ -174,6 +193,34 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/skills/distributor/delivery-run-summary",
             post(routes::distributor::post_delivery_run_summary),
+        )
+        .route(
+            "/v1/skills/import-mapping",
+            post(routes::harness_skills::post_import_mapping),
+        )
+        .route(
+            "/v1/skills/insights-scan",
+            post(routes::harness_skills::post_insights_scan),
+        )
+        .route(
+            "/v1/skills/daily-briefing",
+            post(routes::harness_skills::post_daily_briefing),
+        )
+        .route(
+            "/v1/skills/report-analysis",
+            post(routes::harness_skills::post_report_analysis),
+        )
+        .route(
+            "/v1/skills/process-research",
+            post(routes::harness_skills::post_process_research),
+        )
+        .route(
+            "/v1/skills/price-search",
+            post(routes::harness_skills::post_price_search),
+        )
+        .route(
+            "/v1/skills/supplier-discovery",
+            post(routes::harness_skills::post_supplier_discovery),
         )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
