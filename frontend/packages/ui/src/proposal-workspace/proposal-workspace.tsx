@@ -820,7 +820,7 @@ export function ProposalWorkspace({
             onDeleteSourceDoc={(id) => deleteSourceDoc.mutate({ docId: id })}
             complianceSlot={
               <ComplianceChecklist
-                rows={proposalCompliance}
+                rows={proposalCompliance as Record<string, unknown>[]}
                 proposalId={proposalIdBig}
                 onToggleComplete={handleToggleCompliance}
               />
