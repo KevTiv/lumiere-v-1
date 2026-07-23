@@ -3575,7 +3575,8 @@
       "openPositions": "Open Positions",
       "pendingLeaveRequests": "Pending Leave Requests",
       "runningContracts": "Running Contracts",
-      "headcountTrend": "Headcount Trend"
+      "headcountTrend": "Headcount Trend",
+      "payslipsToExport": "Payslips to export"
     },
     "employees": {
       "title": "Employees",
@@ -4096,6 +4097,9 @@
           "details": "Leave Type Details"
         }
       }
+    },
+    "workflow": {
+      "approvalTimeline": "Approval timeline"
     }
   },
   "inventory": {
@@ -4136,7 +4140,8 @@
       "adjustmentReasons": "Adjustment reasons",
       "barcodeNomenclatures": "Barcode nomenclatures",
       "traceabilityRecords": "Traceability lines",
-      "traceabilityReports": "Traceability reports"
+      "traceabilityReports": "Traceability reports",
+      "ops": "Ops"
     },
     "products": {
       "title": "Products",
@@ -5362,7 +5367,10 @@
       "spendMTD": "Spend MTD",
       "pendingReceipt": "Pending Receipt",
       "awaitingApproval": "Awaiting Approval",
-      "vendorLabel": "Vendor {{id}}"
+      "vendorLabel": "Vendor {{id}}",
+      "onTimePct": "On-time (MVP)",
+      "overBilled": "Over-billed lines",
+      "partialReceipt": "Partial receipt"
     },
     "purchaseOrders": {
       "title": "Purchase Orders",
@@ -5383,7 +5391,8 @@
         "amountUntaxed": "Subtotal",
         "amountTotal": "Total",
         "receiptStatus": "Receipt",
-        "invoiceStatus": "Billing"
+        "invoiceStatus": "Billing",
+        "fulfillment": "Fulfillment"
       },
       "invoiceStatus": {
         "No": "Not billed",
@@ -5410,6 +5419,10 @@
         "Approved": "Purchase Order",
         "Done": "Done",
         "Cancelled": "Cancelled"
+      },
+      "fulfillment": {
+        "dropship": "Dropship",
+        "standard": "Standard"
       }
     },
     "orderLines": {
@@ -5577,7 +5590,10 @@
       "removeLandedCostLineForm": "Remove cost line…",
       "editLandedCostForm": "Edit landed cost…",
       "reviewSupplierIntakeForm": "Review intake…",
-      "editSupplierIntakeForm": "Edit intake…"
+      "editSupplierIntakeForm": "Edit intake…",
+      "convertToPo": "Convert to PO",
+      "createRfq": "Create RFQ",
+      "editHeader": "Edit header"
     },
     "landedCostDetail": {
       "title": "Landed cost lines",
@@ -5649,7 +5665,8 @@
         "description": "Create a purchase requisition / blanket order",
         "sections": {
           "general": "General",
-          "dates": "Dates"
+          "dates": "Dates",
+          "line": "Requested line"
         },
         "fields": {
           "vendorId": "Vendor",
@@ -5662,7 +5679,12 @@
           "descriptionPlaceholder": "Describe the purchase requirement…",
           "orderingDate": "Ordering Date",
           "dateEnd": "Expiry Date",
-          "scheduleDate": "Scheduled Date"
+          "scheduleDate": "Scheduled Date",
+          "productId": "Product",
+          "productPlaceholder": "Select product",
+          "quantity": "Quantity",
+          "uomId": "UoM",
+          "uomPlaceholder": "Select UoM"
         }
       },
       "editPurchaseOrderLine": {
@@ -5859,7 +5881,87 @@
         "noPayableAccounts": "No payable accounts — create chart of accounts first",
         "noJournals": "No purchase journals — create one in Accounting",
         "noAccounts": "No GL accounts — create chart of accounts first"
+      },
+      "editPurchaseOrder": {
+        "description": "Update draft purchase order header fields.",
+        "fields": {
+          "orderId": "Purchase order"
+        },
+        "sections": {
+          "header": "Header"
+        },
+        "title": "Edit purchase order"
       }
+    },
+    "ops": {
+      "addRfqBid": "Add RFQ bid",
+      "advancedHelp": "Blanket orders, contracts, scorecards, consignment, and customs/e-invoice intents (no list subscriptions yet).",
+      "advancedTitle": "Advanced procurement",
+      "approve": "Approve",
+      "awardRfqBid": "Award RFQ bid",
+      "cannotSelfApprove": "Requester cannot approve their own request (SoD)",
+      "confirmPurchaseReturn": "Confirm purchase return",
+      "createBlanket": "Create blanket order",
+      "createConsignment": "Create consignment",
+      "createContract": "Create contract",
+      "createIntent": "Create customs/e-invoice intent",
+      "createPurchaseReturn": "Create purchase return",
+      "createRfq": "Create RFQ",
+      "noPendingApproval": "No pending approval request for this order.",
+      "openInWorkflow": "Open in Workflow",
+      "prompt": {
+        "bidId": "Bid ID",
+        "bidPriceUnit": "Bid unit price",
+        "bidVendorId": "Vendor partner ID",
+        "blanketId": "Blanket order ID",
+        "blanketName": "Blanket order name",
+        "commodityCode": "Commodity code",
+        "commodityRate": "Commodity rate",
+        "consignmentName": "Consignment name",
+        "contractName": "Contract name",
+        "creditExpenseAccountId": "Expense account ID",
+        "creditJournalId": "Journal ID",
+        "creditPayableAccountId": "Payable account ID",
+        "currencyId": "Currency ID",
+        "delegateIdentity": "Delegate identity",
+        "externalRef": "External reference",
+        "idempotencyKey": "Idempotency key",
+        "intentId": "Intent ID",
+        "intentPoId": "Purchase order ID",
+        "intentProvider": "Provider",
+        "intentStatus": "Status",
+        "intentType": "Intent type",
+        "otifScore": "OTIF score",
+        "partnerId": "Partner ID",
+        "principalIdentity": "Principal identity",
+        "productId": "Product ID",
+        "purchaseReturnId": "Purchase return ID",
+        "qualityScore": "Quality score",
+        "returnPoId": "Purchase order ID",
+        "returnPrice": "Return price",
+        "returnProductId": "Product ID",
+        "returnQty": "Quantity",
+        "returnUomId": "UoM ID",
+        "returnVendorId": "Vendor ID",
+        "rfqId": "RFQ ID",
+        "rfqProductId": "Product ID",
+        "rfqQty": "Quantity",
+        "rfqRequisitionId": "Requisition ID",
+        "rfqUomId": "UoM ID",
+        "riskLevel": "Risk level",
+        "warehouseId": "Warehouse ID"
+      },
+      "recordIntentResult": "Record integration result",
+      "reject": "Reject",
+      "rejectReasonPrompt": "Rejection reason",
+      "releaseBlanket": "Release blanket → PO",
+      "setCommodity": "Set commodity index",
+      "setDelegate": "Set approval delegate",
+      "setRiskFlag": "Set vendor risk flag",
+      "toApproveHelp": "Approve or reject workflow requests for ToApprove POs (SoD).",
+      "toApproveTitle": "Purchase orders awaiting approval",
+      "upsertScorecard": "Upsert vendor scorecard",
+      "vendorCreditFromReturn": "Vendor credit from return"
     }
   },
   "sales": {
@@ -5907,7 +6009,41 @@
         "commissions_to_accrue": "To accrue",
         "commissions_accrued": "Commissions accrued",
         "commissions_settled": "Commissions settled"
-      }
+      },
+      "advancedHelp": "Create commission plans, contracts, and fiscal/carrier intents (no list subscriptions yet).",
+      "advancedTitle": "Advanced OMS",
+      "approve": "Approve",
+      "approveInWorkflow": "Open in Workflow",
+      "cannotSelfApprove": "Requester cannot approve their own request (SoD)",
+      "createCommissionPlan": "Create commission plan",
+      "createCommissionSplit": "Add plan split",
+      "createContract": "Create contract",
+      "createCpqConstraint": "Create CPQ constraint",
+      "createIntegrationIntent": "Create fiscal/carrier intent",
+      "missingCompany": "Select an operating company first.",
+      "noPendingApproval": "No pending approval request for this order.",
+      "prompt": {
+        "commissionPlanName": "Commission plan name",
+        "commissionPlanRate": "Commission rate",
+        "contractName": "Contract name",
+        "cpqName": "CPQ constraint name",
+        "cpqRuleJson": "Rule JSON",
+        "externalRef": "External reference",
+        "idempotencyKey": "Idempotency key",
+        "intentId": "Intent ID",
+        "intentOrderId": "Sale order ID",
+        "intentProvider": "Provider",
+        "intentStatus": "Status",
+        "intentType": "Intent type",
+        "partnerId": "Partner ID",
+        "planId": "Plan ID",
+        "sharePercent": "Share percent",
+        "slaDelaySecs": "SLA delay (seconds)"
+      },
+      "recordIntegrationResult": "Record integration result",
+      "reject": "Reject",
+      "rejectReasonPrompt": "Reason for rejection",
+      "scheduleSla": "Schedule SLA escalation"
     },
     "csvImport": {
       "ordersTitle": "Import sale orders (CSV)",
@@ -6116,7 +6252,8 @@
       "loyaltyPrograms": "Loyalty programs",
       "createLoyaltyProgram": "New program",
       "loyaltyCards": "Loyalty cards",
-      "createLoyaltyCard": "New card"
+      "createLoyaltyCard": "New card",
+      "ops": "Ops"
     },
     "deliveryPriceRules": {
       "title": "Delivery price rules",
@@ -6217,7 +6354,10 @@
           "validityDate": "Expiration Date",
           "commitmentDate": "Delivery Date",
           "note": "Notes",
-          "notePlaceholder": "Internal notes…"
+          "notePlaceholder": "Internal notes…",
+          "commissionRatePercent": "Commission rate %",
+          "isDropship": "Dropship (vendor ships to customer)",
+          "invoicePolicy": "Invoice policy"
         }
       },
       "newPricelist": {
@@ -6519,7 +6659,8 @@
         "fields": {
           "note": "Internal note",
           "incoterm": "Incoterm",
-          "incotermLocation": "Incoterm location"
+          "incotermLocation": "Incoterm location",
+          "commissionRatePercent": "Commission rate %"
         }
       }
     },
@@ -6543,7 +6684,17 @@
       "completeBatches": "Complete",
       "cancelBatches": "Cancel batch",
       "deletePricelistRules": "Delete rules",
-      "deletePricelistRulesConfirm": "Delete {{count}} pricing rule(s)?"
+      "deletePricelistRulesConfirm": "Delete {{count}} pricing rule(s)?",
+      "acceptQuotation": "Accept quotation",
+      "acceptQuotationPrompt": "Accepted by (name)",
+      "applyOmnichannel": "Apply omnichannel allocation",
+      "applyOptions": "Apply CPQ options",
+      "applyPromotion": "Apply promotion",
+      "applyPromotionPrompt": "Promotion code",
+      "deleteOrderLines": "Delete lines",
+      "exportCommercialPacket": "Export commercial packet",
+      "omnichannelChannelPrompt": "Channel (optional, e.g. web, store)",
+      "omnichannelRoutePrompt": "Preferred route id (optional)"
     }
   },
   "manufacturing": {
@@ -7958,7 +8109,19 @@
       "generateInvoice": "Generate invoice",
       "recognizeLine": "Post recognition",
       "activateRule": "Activate rule",
-      "deactivateRule": "Deactivate rule"
+      "deactivateRule": "Deactivate rule",
+      "advanceDunning": "Advance dunning",
+      "amend": "Amend",
+      "cancel": "Cancel + credit",
+      "ingestUsage": "Ingest usage",
+      "pause": "Pause",
+      "payInvoice": "Apply payment",
+      "rateUsage": "Rate usage",
+      "recordFailure": "Record payment fail",
+      "refreshFlags": "Refresh exception flags",
+      "renew": "Renew",
+      "resume": "Resume",
+      "setCommitment": "Set commitment"
     },
     "forms": {
       "newSubscription": {
@@ -8109,7 +8272,8 @@
         "fields": {
           "closeReasonId": "Close reason ID",
           "closeReasonIdPlaceholder": "Optional reason record ID",
-          "notes": "Notes"
+          "notes": "Notes",
+          "noCharge": "Close without final invoice (no charge)"
         }
       },
       "generateInvoice": {
@@ -8119,7 +8283,12 @@
           "main": "Invoice"
         },
         "fields": {
-          "invoiceDate": "Invoice date"
+          "invoiceDate": "Invoice date",
+          "billingRunKey": "Billing run key (optional)",
+          "incomeAccountId": "Income account",
+          "journalId": "Journal",
+          "receivableAccountId": "Receivable account",
+          "taxAccountId": "Tax payable account (optional)"
         }
       },
       "recognizeLine": {
@@ -8154,11 +8323,184 @@
           "csvData": "CSV content",
           "csvPlaceholder": "code,plan_id,partner_id,..."
         }
+      },
+      "amend": {
+        "description": "Change price, quantity, or product with optional mid-period proration.",
+        "fields": {
+          "amendmentType": "Type",
+          "incomeAccountId": "Income account",
+          "journalId": "Journal",
+          "lineId": "Line",
+          "newPriceUnit": "New price",
+          "newQuantity": "New quantity",
+          "notes": "Notes",
+          "prorate": "Prorate unused period",
+          "receivableAccountId": "Receivable account"
+        },
+        "sections": {
+          "main": "Amendment"
+        },
+        "title": "Amend subscription"
+      },
+      "cancel": {
+        "description": "Close the contract and optionally issue an OutRefund credit note.",
+        "fields": {
+          "createCreditNote": "Create credit note from last posted invoice",
+          "invoiceMoveId": "Invoice (optional)",
+          "notes": "Notes"
+        },
+        "sections": {
+          "main": "Cancel"
+        },
+        "title": "Cancel subscription"
+      },
+      "commitment": {
+        "description": "True-up floor applied when usage is below this amount at invoice time.",
+        "fields": {
+          "active": "Active",
+          "minAmount": "Minimum amount"
+        },
+        "sections": {
+          "main": "Commitment"
+        },
+        "title": "Set minimum commitment"
+      },
+      "ingestUsage": {
+        "description": "Append an idempotent meter event (org+source+event id).",
+        "fields": {
+          "eventId": "Event id",
+          "quantity": "Quantity",
+          "source": "Source",
+          "unit": "Unit"
+        },
+        "sections": {
+          "main": "Usage"
+        },
+        "title": "Ingest usage event"
+      },
+      "payInvoice": {
+        "description": "Post the subscription invoice (if draft) and clear AR residual.",
+        "fields": {
+          "amount": "Amount (blank = residual)",
+          "bankAccountId": "Bank account",
+          "cogsAccountId": "COGS account (for draft post)",
+          "inventoryAccountId": "Inventory account (for draft post)",
+          "invoiceMoveId": "Invoice",
+          "paymentJournalId": "Bank journal",
+          "receivableAccountId": "Receivable account"
+        },
+        "sections": {
+          "main": "Payment"
+        },
+        "title": "Apply payment"
+      },
+      "priceTier": {
+        "description": "Progressive volume band for usage rating.",
+        "fields": {
+          "maxQty": "Max qty (empty = open)",
+          "minQty": "Min qty",
+          "planId": "Plan",
+          "sequence": "Sequence",
+          "unitPrice": "Unit price"
+        },
+        "sections": {
+          "main": "Tier"
+        },
+        "title": "Add price tier"
+      },
+      "renew": {
+        "description": "Push the next invoice date forward by N billing intervals.",
+        "fields": {
+          "intervals": "Intervals to extend",
+          "notes": "Notes"
+        },
+        "sections": {
+          "main": "Renewal"
+        },
+        "title": "Renew / extend term"
       }
     },
     "dashboard": {
       "importPlanCsv": "Import plans (CSV)",
       "importSubscriptionCsv": "Import subscriptions (CSV)"
+    },
+    "amendments": {
+      "columns": {
+        "amendmentType": "Type",
+        "creditNoteMoveId": "Credit note",
+        "notes": "Notes",
+        "prorationMoveId": "Proration move",
+        "subscriptionId": "Subscription",
+        "version": "Version"
+      },
+      "description": "Versioned commercial changes with proration links",
+      "emptyMessage": "No amendments yet.",
+      "searchPlaceholder": "Search amendments…",
+      "tabLabel": "Amendments",
+      "title": "Amendments"
+    },
+    "dueToBill": {
+      "description": "Active contracts with next invoice date due",
+      "emptyMessage": "Nothing due to bill.",
+      "tabLabel": "Due to bill",
+      "title": "Due to bill"
+    },
+    "entitlements": {
+      "description": "Customer access grants (not platform SaaS billing_account)",
+      "emptyMessage": "No entitlements yet.",
+      "tabLabel": "Entitlements",
+      "title": "Entitlements"
+    },
+    "lines": {
+      "columns": {
+        "name": "Description",
+        "priceSubtotal": "Subtotal",
+        "priceUnit": "Unit price",
+        "qty": "Qty",
+        "recurringRuleType": "Cadence",
+        "subscriptionId": "Subscription"
+      },
+      "description": "Recurring contract lines copied from sale orders",
+      "emptyMessage": "No subscription lines yet.",
+      "searchPlaceholder": "Search lines…",
+      "tabLabel": "Lines",
+      "title": "Subscription lines"
+    },
+    "pastDue": {
+      "description": "Collections queue (dunning / failed payments)",
+      "emptyMessage": "No past-due subscriptions.",
+      "tabLabel": "Past due",
+      "title": "Past due"
+    },
+    "paymentIntents": {
+      "description": "Card + local rail charge intents for workers",
+      "emptyMessage": "No payment intents yet.",
+      "tabLabel": "Payment intents",
+      "title": "Payment intents"
+    },
+    "priceTiers": {
+      "description": "Progressive volume ladders on plans",
+      "emptyMessage": "No price tiers yet.",
+      "tabLabel": "Price tiers",
+      "title": "Price tiers"
+    },
+    "ratingBacklog": {
+      "description": "Pending usage events waiting to be rated",
+      "emptyMessage": "Rating backlog is empty.",
+      "tabLabel": "Rating backlog",
+      "title": "Rating backlog"
+    },
+    "usageCharges": {
+      "description": "Rated charges awaiting or attached to billing runs",
+      "emptyMessage": "No usage charges yet.",
+      "tabLabel": "Usage charges",
+      "title": "Usage charges"
+    },
+    "usageEvents": {
+      "description": "Meter ingest ledger (pending → rated)",
+      "emptyMessage": "No usage events yet.",
+      "tabLabel": "Usage events",
+      "title": "Usage events"
     }
   },
   "expenses": {
@@ -8173,7 +8515,8 @@
       "pendingApproval": "Pending Approval",
       "missingReceipts": "Missing Receipts",
       "approved": "Approved",
-      "totalAmount": "Total Amount"
+      "totalAmount": "Total Amount",
+      "unmatchedCards": "Unmatched cards"
     },
     "expenses": {
       "title": "Expenses",
@@ -8607,7 +8950,9 @@
         "onCreate": "On create",
         "createDate": "Created",
         "state": "Status",
-        "active": "Active"
+        "active": "Active",
+        "companyId": "Company",
+        "key": "Key"
       },
       "filters": {
         "state": {
@@ -8646,7 +8991,8 @@
         "createDate": "Created",
         "writeDate": "Updated",
         "dateStart": "Started",
-        "dateEnd": "Completed"
+        "dateEnd": "Completed",
+        "versionId": "Version"
       },
       "filters": {
         "state": {
@@ -8731,7 +9077,10 @@
           "active": "Active",
           "onCreate": "Trigger on Create",
           "stateField": "State Field",
-          "stateFieldPlaceholder": "e.g. state"
+          "stateFieldPlaceholder": "e.g. state",
+          "schemaVersion": "Schema version",
+          "trigger": "Trigger",
+          "workflowKey": "Workflow key"
         }
       }
     },
@@ -8762,7 +9111,38 @@
       "startInstance": "Start on record",
       "resType": "Resource type",
       "resId": "Resource id",
-      "start": "Start workflow"
+      "start": "Start workflow",
+      "versionTitle": "Version #{{id}}"
+    },
+    "migration": {
+      "plansDescription": "Version-to-version mappings for active instance cutover",
+      "plansEmpty": "No migration plans yet",
+      "plansTitle": "Migration plans",
+      "resultsDescription": "Per-instance migration outcomes",
+      "resultsEmpty": "No migration results yet",
+      "resultsTitle": "Migration results"
+    },
+    "operations": {
+      "outboxDescription": "Failed or ambiguous external deliveries needing operator action",
+      "outboxEmpty": "No dead-letter outbox rows",
+      "outboxTitle": "Dead-letter outbox",
+      "timersDescription": "Pending workflow timers awaiting fire or cancel",
+      "timersEmpty": "No pending timers",
+      "timersTitle": "Pending timers"
+    },
+    "versions": {
+      "description": "Draft, published, and retired workflow versions",
+      "emptyMessage": "No workflow versions yet",
+      "filters": {
+        "statusLabel": "Status"
+      },
+      "searchPlaceholder": "Search versions…",
+      "states": {
+        "Draft": "Draft",
+        "Published": "Published",
+        "Retired": "Retired"
+      },
+      "title": "Versions"
     }
   },
   "proposals": {
@@ -8779,7 +9159,9 @@
         "deadline": "Deadline",
         "ownerId": "Owner",
         "versionCount": "Versions",
-        "writeDate": "Updated"
+        "writeDate": "Updated",
+        "projectId": "Project",
+        "saleOrderId": "Sale order"
       },
       "filters": {
         "status": {
@@ -10954,7 +11336,12 @@
       "contentPlaceholder": "Write content for \"{{title}}\"…",
       "aiSuggestion": "AI Suggestion",
       "insert": "Insert"
-    }
+    },
+    "compliance": {
+      "empty": "No compliance requirements yet — run Analyze to materialize.",
+      "title": "Compliance"
+    },
+    "requestPdf": "Queue PDF render"
   },
   "forensics": {
     "page": {
