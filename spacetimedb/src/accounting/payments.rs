@@ -4,12 +4,17 @@
 /// A payment is a cash/bank movement that settles one or more invoices or bills.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
-use crate::accounting::journal_entries::{account_move, AccountMove};
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, insert_draft_account_move_line, reconcile_payment_with_invoice,
+    AccountMove, AccountMoveLine, AddAccountMoveLineParams,
+};
 use crate::accounting::tax_management::account_tax;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::types::{
-    AccountMoveState, MoveType, PartnerType, PaymentState, PaymentType, TaxAmountType, TaxTypeUse,
+    AccountMoveState, AccountTypeInternal, MoveType, PartnerType, PaymentState, PaymentType,
+    TaxAmountType, TaxTypeUse,
 };
 use crate::workflow::action_registry::{
     GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
@@ -70,6 +75,98 @@ pub struct CreatePaymentParams {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+fn payment_line_params(
+    account_id: u64,
+    name: String,
+    debit: f64,
+    credit: f64,
+    sequence: u32,
+    partner_id: u64,
+    payment_id: u64,
+) -> AddAccountMoveLineParams {
+    AddAccountMoveLineParams {
+        account_id,
+        name,
+        debit,
+        credit,
+        sequence,
+        quantity: 1.0,
+        price_unit: debit.max(credit),
+        discount: 0.0,
+        tax_ids: vec![],
+        partner_id: Some(partner_id),
+        product_id: None,
+        product_uom_id: None,
+        product_category_id: None,
+        analytic_account_id: None,
+        analytic_tag_ids: vec![],
+        display_type: None,
+        is_downpayment: false,
+        exclude_from_invoice_tab: false,
+        blocked: false,
+        group_tax_id: None,
+        tax_line_id: None,
+        tax_group_id: None,
+        tax_repartition_line_id: None,
+        tax_audit: None,
+        reconcile_model_id: None,
+        payment_id: Some(payment_id),
+        statement_line_id: None,
+        matching_number: None,
+        matching_label: None,
+        expected_pay_date: None,
+        expected_pay_date_currency_id: None,
+        expected_pay_date_amount: 0.0,
+        expected_pay_date_residual: 0.0,
+        metadata: None,
+    }
+}
+
+fn resolve_payment_liquidity_account(
+    ctx: &ReducerContext,
+    journal_id: u64,
+) -> Result<u64, String> {
+    let journal = ctx
+        .db
+        .account_journal()
+        .id()
+        .find(&journal_id)
+        .ok_or("Payment journal not found")?;
+    journal
+        .default_account_id
+        .or(journal.bank_account_id)
+        .ok_or_else(|| {
+            "Payment journal missing default/bank liquidity account".to_string()
+        })
+}
+
+fn resolve_payment_clearing_account(
+    ctx: &ReducerContext,
+    company_id: u64,
+    payment_type: PaymentType,
+) -> Result<(u64, &'static str), String> {
+    let want = match payment_type {
+        PaymentType::InBound => AccountTypeInternal::Receivable,
+        PaymentType::OutBound => AccountTypeInternal::Payable,
+    };
+    let label = match want {
+        AccountTypeInternal::Receivable => "receivable",
+        AccountTypeInternal::Payable => "payable",
+        _ => "clearing",
+    };
+    let account_id = ctx
+        .db
+        .account_account()
+        .account_by_company()
+        .filter(&company_id)
+        .find(|a| !a.deprecated && a.internal_type.as_ref() == Some(&want))
+        .map(|a| a.id)
+        .ok_or_else(|| {
+            format!("No active {label} account found for company {company_id}")
+        })?;
+    Ok((account_id, label))
+}
 
 /// Wave C WHT MVP: if outbound supplier payment and company has active pack WHT taxes,
 /// record withhold amount on the payment journal move metadata (no full WHT certificate engine).
@@ -223,27 +320,29 @@ pub fn post_payment_impl(
 
     ensure_accounting_period_open_for_date(ctx, payment.company_id, payment.date)?;
 
-    // Generate document number
+    if payment.amount <= 0.0 {
+        return Err("Payment amount must be positive".to_string());
+    }
+
     let name = next_doc_number(ctx, "PAY");
-
-    // Determine move_type from payment direction
-    let move_type = match payment.payment_type {
-        PaymentType::InBound => MoveType::Entry,
-        PaymentType::OutBound => MoveType::Entry,
-    };
-
-    // WHT on AP payment (country-pack seeds): metadata hook when Withholding tax exists.
+    let payment_type = payment.payment_type.clone();
+    let amount = payment.amount;
+    let partner_id = payment.partner_id;
+    let company_id = payment.company_id;
+    let liquidity_account_id = resolve_payment_liquidity_account(ctx, payment.journal_id)?;
+    let (clearing_account_id, clearing_label) =
+        resolve_payment_clearing_account(ctx, company_id, payment_type.clone())?;
     let wht_metadata = wht_metadata_for_vendor_payment(ctx, organization_id, &payment);
 
-    // Create a corresponding journal entry (AccountMove)
-    let move_record = ctx.db.account_move().insert(AccountMove {
+    // Draft move first so line inserts stay consistent; mark Posted after balanced lines.
+    let mut move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id,
         name: name.clone(),
         ref_: payment.ref_.clone(),
-        move_type,
+        move_type: MoveType::Entry,
         auto_post: false,
-        state: AccountMoveState::Posted,
+        state: AccountMoveState::Draft,
         date: payment.date,
         invoice_date: None,
         invoice_date_due: None,
@@ -254,8 +353,8 @@ pub fn post_payment_impl(
         payment_reference: payment.memo.clone(),
         partner_shipping_id: None,
         sale_order_id: None,
-        partner_id: Some(payment.partner_id),
-        commercial_partner_id: None,
+        partner_id: Some(partner_id),
+        commercial_partner_id: Some(partner_id),
         partner_bank_id: None,
         fiscal_position_id: None,
         invoice_user_id: None,
@@ -264,19 +363,19 @@ pub fn post_payment_impl(
         campaign_id: None,
         source_id: None,
         medium_id: None,
-        company_id: payment.company_id,
+        company_id,
         journal_id: payment.journal_id,
         currency_id: payment.currency_id,
         company_currency_id: payment.currency_id,
-        amount_untaxed: payment.amount,
+        amount_untaxed: amount,
         amount_tax: 0.0,
-        amount_total: payment.amount,
-        amount_residual: payment.amount,
-        amount_untaxed_signed: payment.amount,
+        amount_total: amount,
+        amount_residual: 0.0,
+        amount_untaxed_signed: amount,
         amount_tax_signed: 0.0,
-        amount_total_signed: payment.amount,
-        amount_total_in_currency_signed: payment.amount,
-        amount_residual_signed: payment.amount,
+        amount_total_signed: amount,
+        amount_total_in_currency_signed: amount,
+        amount_residual_signed: 0.0,
         to_check: false,
         posted_before: false,
         is_storno: false,
@@ -292,7 +391,64 @@ pub fn post_payment_impl(
         metadata: wht_metadata,
     });
 
-    // Update payment to Posted
+    let (bank_debit, bank_credit, clear_debit, clear_credit) = match payment_type {
+        PaymentType::InBound => (amount, 0.0, 0.0, amount),
+        PaymentType::OutBound => (0.0, amount, amount, 0.0),
+    };
+
+    insert_draft_account_move_line(
+        ctx,
+        &move_record,
+        payment_line_params(
+            liquidity_account_id,
+            "Bank".to_string(),
+            bank_debit,
+            bank_credit,
+            1,
+            partner_id,
+            payment_id,
+        ),
+    )?;
+    let clearing_line = insert_draft_account_move_line(
+        ctx,
+        &move_record,
+        payment_line_params(
+            clearing_account_id,
+            format!("Accounts {}", clearing_label),
+            clear_debit,
+            clear_credit,
+            2,
+            partner_id,
+            payment_id,
+        ),
+    )?;
+    // Reconcile matcher expects lowercase internal types.
+    ctx.db.account_move_line().id().update(AccountMoveLine {
+        account_internal_type: Some(clearing_label.to_string()),
+        amount_residual: amount,
+        amount_residual_currency: amount,
+        ..clearing_line
+    });
+
+    for ml in ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_record.id)
+    {
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            parent_state: AccountMoveState::Posted,
+            ..ml
+        });
+    }
+    move_record = ctx.db.account_move().id().update(AccountMove {
+        state: AccountMoveState::Posted,
+        posted_before: true,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..move_record
+    });
+
     ctx.db.account_payment().id().update(AccountPayment {
         name: Some(name),
         move_id: Some(move_record.id),
@@ -309,7 +465,14 @@ pub fn post_payment_impl(
             record_id: payment_id,
             action: "POST",
             old_values: None,
-            new_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "move_id": move_record.id,
+                    "liquidity_account_id": liquidity_account_id,
+                    "clearing_account_id": clearing_account_id,
+                })
+                .to_string(),
+            ),
             changed_fields: vec![
                 "state".to_string(),
                 "name".to_string(),
@@ -400,23 +563,36 @@ pub fn register_payment_on_invoice(
         }
     }
 
+    let payment_move_id = payment
+        .move_id
+        .ok_or("Posted payment is missing linked journal move")?;
+    let company_id = payment.company_id;
+    let old_invoice_ids = payment.reconciled_invoice_ids.clone();
+    let old_bill_ids = payment.reconciled_bill_ids.clone();
+
     ctx.db.account_payment().id().update(AccountPayment {
         reconciled_invoice_ids: reconciled_invoice_ids.clone(),
         reconciled_bill_ids: reconciled_bill_ids.clone(),
         ..payment
     });
+
+    // Settle residual in the same txn — register without reconcile left AR open.
+    for inv_id in &invoice_ids {
+        reconcile_payment_with_invoice(ctx, organization_id, payment_move_id, *inv_id)?;
+    }
+
     write_audit_log_v2(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(payment.company_id),
+            company_id: Some(company_id),
             table_name: "account_payment",
             record_id: payment_id,
             action: "REGISTER_ON_INVOICE",
             old_values: Some(
                 serde_json::json!({
-                    "reconciled_invoice_ids": payment.reconciled_invoice_ids,
-                    "reconciled_bill_ids": payment.reconciled_bill_ids,
+                    "reconciled_invoice_ids": old_invoice_ids,
+                    "reconciled_bill_ids": old_bill_ids,
                 })
                 .to_string(),
             ),
@@ -426,6 +602,7 @@ pub fn register_payment_on_invoice(
                     "reconciled_bill_ids": reconciled_bill_ids,
                     "invoice_ids": invoice_ids,
                     "is_bill": is_bill,
+                    "settled": true,
                 })
                 .to_string(),
             ),

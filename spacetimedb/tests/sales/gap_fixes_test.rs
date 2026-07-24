@@ -1,6 +1,7 @@
 //! Wave A–C gap-fix domain tests (lock/lines, FX, dropship, exchange, isolation).
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::inventory::product::product;
 use crate::sales::oms_extensions::create_exchange_order_from_return;
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
@@ -304,7 +305,7 @@ pub fn test_fx_snapshot_fail_closed(ctx: &ReducerContext) -> Result<(), String> 
     let fixture = OrgFixture::seed_minimal(ctx)?;
     // currency_id 2 vs company currency 1 — no rate seeded → fail closed
     let order_id = seed_so(ctx, &fixture, "FX Fail PL", 1.0, 10.0, None, 2)?;
-    let err = confirm_sales_order(ctx, fixture.organization_id, order_id);
+    let err = confirm_sales_order(ctx, fixture.organization_id, fixture.company_id, order_id);
     match err {
         Err(msg) if msg.to_lowercase().contains("exchange rate") => Ok(()),
         Err(msg) => Err(format!("Expected exchange rate error, got: {msg}")),
@@ -316,10 +317,11 @@ pub fn test_dropship_confirm_creates_po(ctx: &ReducerContext) -> Result<(), Stri
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
     let order_id = seed_so(ctx, &fixture, "Dropship PL", 1.0, 10.0, Some(true), 1)?;
 
     // Ensure product has a seller/vendor if required by dropship helper — may fail closed.
-    match confirm_sales_order(ctx, org_id, order_id) {
+    match confirm_sales_order(ctx, org_id, company_id, order_id) {
         Ok(()) => {
             let order = ctx
                 .db
@@ -349,17 +351,46 @@ pub fn test_dropship_confirm_creates_po(ctx: &ReducerContext) -> Result<(), Stri
 pub fn test_company_isolation_on_confirm(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture_a = OrgFixture::seed_minimal(ctx)?;
-    let fixture_b = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture_a.organization_id;
+    let company_a = fixture_a.company_id;
+    create_company(
+        ctx,
+        org_id,
+        CreateCompanyParams {
+            name: "Sales Iso Company B".to_string(),
+            code: format!("SO-CB-{}", company_a),
+            currency_id: 1,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: Some(r#"{"harness":"sales-iso-b"}"#.to_string()),
+        },
+    )?;
+    let company_b = ctx
+        .db
+        .company()
+        .company_by_org()
+        .filter(&org_id)
+        .map(|c| c.id)
+        .filter(|id| *id != company_a)
+        .max()
+        .ok_or("company B missing")?;
+
     let order_id = seed_so(ctx, &fixture_a, "Iso PL", 1.0, 10.0, None, 1)?;
 
-    // Confirm using org B must fail org scope.
-    let err = confirm_sales_order(ctx, fixture_b.organization_id, order_id);
+    // Same org, wrong company must fail company guard.
+    let err = confirm_sales_order(ctx, org_id, company_b, order_id);
     match err {
-        Err(msg) if msg.to_lowercase().contains("organization") || msg.to_lowercase().contains("not found") => {
-            Ok(())
-        }
-        Err(msg) => Err(format!("Expected org isolation error, got: {msg}")),
-        Ok(()) => Err("Cross-org confirm must fail".to_string()),
+        Err(msg) if msg.to_lowercase().contains("company") => Ok(()),
+        Err(msg) => Err(format!("Expected company isolation error, got: {msg}")),
+        Ok(()) => Err("Cross-company confirm must fail".to_string()),
     }
 }
 
@@ -369,7 +400,7 @@ pub fn test_exchange_order_from_return(ctx: &ReducerContext) -> Result<(), Strin
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
     let order_id = seed_so(ctx, &fixture, "Exchange PL", 1.0, 10.0, None, 1)?;
-    confirm_sales_order(ctx, org_id, order_id)?;
+    confirm_sales_order(ctx, org_id, company_id, order_id)?;
 
     let sol_id = ctx
         .db

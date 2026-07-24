@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct ConvertLeadParams {
     pub create_contact: bool,
     pub create_opportunity: bool,
+    pub company_id: Option<u64>,
     pub contact_type: Option<String>,
     pub is_vendor: Option<bool>,
     pub is_employee: Option<bool>,

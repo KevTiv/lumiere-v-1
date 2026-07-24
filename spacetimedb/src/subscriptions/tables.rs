@@ -18,6 +18,7 @@ pub struct SubscriptionBillingRun {
     pub organization_id: u64,
     pub company_id: u64,
     pub subscription_id: u64,
+    #[unique]
     pub billing_run_key: String,
     pub invoice_move_id: u64,
     pub invoice_date: Timestamp,

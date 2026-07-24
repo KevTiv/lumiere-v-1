@@ -238,6 +238,22 @@ pub fn test_leave_approve_consumes_balance(ctx: &ReducerContext) -> Result<(), S
         fixture.company_id,
         leave_a,
     )?;
+
+    // Reservation happens at submit (before approval).
+    let alloc_after_submit = ctx
+        .db
+        .hr_leave_allocation()
+        .leave_allocation_by_employee()
+        .filter(&employee_id)
+        .find(|a| a.leave_type_id == leave_type_id)
+        .ok_or_else(|| "allocation missing after submit".to_string())?;
+    if (alloc_after_submit.used_days - 3.0).abs() > f64::EPSILON {
+        return Err(format!(
+            "expected 3 reserved days after submit, got {}",
+            alloc_after_submit.used_days
+        ));
+    }
+
     approve_leave(
         ctx,
         fixture.organization_id,
@@ -253,24 +269,18 @@ pub fn test_leave_approve_consumes_balance(ctx: &ReducerContext) -> Result<(), S
         .find(|a| a.leave_type_id == leave_type_id)
         .ok_or_else(|| "allocation missing".to_string())?;
     if (alloc.used_days - 3.0).abs() > f64::EPSILON {
-        return Err(format!("expected 3 used days, got {}", alloc.used_days));
+        return Err(format!("expected 3 used days after approve, got {}", alloc.used_days));
     }
 
     let leave_b = create_draft_leave(ctx, &fixture, employee_id, leave_type_id, 3.0, "bal-b")?;
-    submit_leave(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        leave_b,
-    )?;
-    let over = approve_leave(
+    let over = submit_leave(
         ctx,
         fixture.organization_id,
         fixture.company_id,
         leave_b,
     );
     if over.is_ok() {
-        return Err("over-balance approve should fail".into());
+        return Err("over-balance submit should fail".into());
     }
     Ok(())
 }

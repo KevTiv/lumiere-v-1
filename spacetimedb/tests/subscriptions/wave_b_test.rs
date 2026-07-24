@@ -299,7 +299,7 @@ fn seed_plan_and_sub_with_tax(
         })
         .map(|o| o.id)
         .ok_or("SO")?;
-    confirm_sales_order(ctx, org_id, order_id)?;
+    confirm_sales_order(ctx, org_id, fixture.company_id, order_id)?;
 
     create_subscription_from_sale_order(
         ctx,
@@ -622,7 +622,7 @@ pub fn test_pay_subscription_invoice_clears_residual(ctx: &ReducerContext) -> Re
         .find(|o| o.organization_id == org_id && o.client_order_ref.as_deref() == Some("SUB-PAY"))
         .map(|o| o.id)
         .ok_or("so")?;
-    confirm_sales_order(ctx, org_id, order_id)?;
+    confirm_sales_order(ctx, org_id, fixture.company_id, order_id)?;
 
     create_subscription_from_sale_order(
         ctx,

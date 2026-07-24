@@ -242,11 +242,18 @@ async function salesReducerError(r: Response, fallback: string): Promise<Error> 
   return new Error(body || fallback)
 }
 
-export function useConfirmSaleOrder(organizationId: bigint) {
+export function useConfirmSaleOrder(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("confirm_sales_order", [organizationId, orderId])
+      if (companyId == null || companyId === 0n) {
+        throw new Error("companyId is required to confirm a sale order")
+      }
+      const { urlPath, init } = salesBffPost("confirm_sales_order", [
+        organizationId,
+        companyId,
+        orderId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw await salesReducerError(r, "Failed to confirm sale order")
     },

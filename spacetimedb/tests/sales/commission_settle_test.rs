@@ -250,7 +250,7 @@ pub fn test_commission_accrue_on_invoice_hook(ctx: &ReducerContext) -> Result<()
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let order_id = create_draft_so_with_commission_meta(ctx, &fixture, "COMM-ACCRUE")?;
-    confirm_sales_order(ctx, org_id, order_id)?;
+    confirm_sales_order(ctx, org_id, fixture.company_id, order_id)?;
 
     let on_confirm = ctx
         .db
@@ -289,7 +289,7 @@ pub fn test_commission_settle_and_refuse_double(ctx: &ReducerContext) -> Result<
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
     let order_id = create_draft_so_with_commission_meta(ctx, &fixture, "COMM-SETTLE")?;
-    confirm_sales_order(ctx, org_id, order_id)?;
+    confirm_sales_order(ctx, org_id, company_id, order_id)?;
     accrue_sale_commission(
         ctx,
         org_id,
@@ -364,7 +364,7 @@ pub fn test_commission_cancel_clawback(ctx: &ReducerContext) -> Result<(), Strin
     let company_id = fixture.company_id;
 
     let order_a = create_draft_so_with_commission_meta(ctx, &fixture, "COMM-CANCEL-A")?;
-    confirm_sales_order(ctx, org_id, order_a)?;
+    confirm_sales_order(ctx, org_id, company_id, order_a)?;
     accrue_sale_commission(
         ctx,
         org_id,
@@ -392,7 +392,7 @@ pub fn test_commission_cancel_clawback(ctx: &ReducerContext) -> Result<(), Strin
     }
 
     let order_b = create_draft_so_with_commission_meta(ctx, &fixture, "COMM-CANCEL-B")?;
-    confirm_sales_order(ctx, org_id, order_b)?;
+    confirm_sales_order(ctx, org_id, company_id, order_b)?;
     accrue_sale_commission(
         ctx,
         org_id,

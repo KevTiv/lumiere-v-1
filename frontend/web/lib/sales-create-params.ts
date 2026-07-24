@@ -337,6 +337,33 @@ export function toCreateSaleOrderLineParams(
   }
 }
 
+/** Partial update for draft/sent SO lines (`update_sale_order_line`). */
+export function toUpdateSaleOrderLineParams(
+  formData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const quantityRaw = formData.quantity
+  const quantity =
+    quantityRaw === '' || quantityRaw == null ? undefined : Number(quantityRaw)
+  if (quantity != null && (!Number.isFinite(quantity) || quantity <= 0)) return null
+
+  const priceUnitRaw = formData.priceUnit
+  const priceUnit =
+    priceUnitRaw === '' || priceUnitRaw == null ? undefined : Number(priceUnitRaw)
+  if (priceUnit != null && (!Number.isFinite(priceUnit) || priceUnit < 0)) return null
+
+  const discountRaw = formData.discount
+  const discount =
+    discountRaw === '' || discountRaw == null ? undefined : Number(discountRaw)
+  if (discount != null && (!Number.isFinite(discount) || discount < 0)) return null
+
+  if (quantity == null && priceUnit == null && discount == null) return null
+  return {
+    ...(quantity != null ? { quantity } : {}),
+    ...(priceUnit != null ? { priceUnit } : {}),
+    ...(discount != null ? { discount } : {}),
+  }
+}
+
 /** Default when the form does not include an explicit wave batch toggle. */
 export const PICKING_BATCH_DEFAULT_IS_WAVE = false
 

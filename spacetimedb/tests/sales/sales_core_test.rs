@@ -135,7 +135,7 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
         })
         .ok_or("Sale order not found after create")?;
 
-    confirm_sales_order(ctx, org_id, order.id)?;
+    confirm_sales_order(ctx, org_id, fixture.company_id, order.id)?;
 
     let confirmed = ctx
         .db
@@ -499,7 +499,7 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
         })
         .ok_or("Sale order not found after create")?;
 
-    confirm_sales_order(ctx, org_id, order.id)?;
+    confirm_sales_order(ctx, org_id, fixture.company_id, order.id)?;
 
     let confirmed = ctx
         .db
@@ -750,7 +750,7 @@ pub fn test_order_confirm_cancel_releases_reservation(ctx: &ReducerContext) -> R
         })
         .ok_or("Sale order not found after create")?;
 
-    confirm_sales_order(ctx, org_id, order.id)?;
+    confirm_sales_order(ctx, org_id, fixture.company_id, order.id)?;
 
     cancel_sale_order(
         ctx,
@@ -925,7 +925,7 @@ pub fn test_confirm_fails_on_atp_shortfall(ctx: &ReducerContext) -> Result<(), S
         })
         .ok_or("Sale order not found")?;
 
-    match confirm_sales_order(ctx, org_id, order.id) {
+    match confirm_sales_order(ctx, org_id, fixture.company_id, order.id) {
         Ok(()) => Err("Expected confirm to fail on ATP shortfall".to_string()),
         Err(e) if e.contains("Insufficient available quantity") => Ok(()),
         Err(e) => Err(format!("Unexpected confirm error: {e}")),
@@ -999,7 +999,7 @@ pub fn test_confirm_blocked_by_partner_credit_hold(ctx: &ReducerContext) -> Resu
         })
         .ok_or("Sale order not found")?;
 
-    match confirm_sales_order(ctx, org_id, order.id) {
+    match confirm_sales_order(ctx, org_id, company_id, order.id) {
         Ok(()) => Err("Expected confirm to fail on payment hold".to_string()),
         Err(e) if e.contains("payment hold") => Ok(()),
         Err(e) => Err(format!("Unexpected confirm error: {e}")),
@@ -1160,7 +1160,7 @@ pub fn test_send_quotation_then_confirm(ctx: &ReducerContext) -> Result<(), Stri
         return Err(format!("Expected Sent after send quotation, got {:?}", sent.state));
     }
 
-    confirm_sales_order(ctx, org_id, order.id)?;
+    confirm_sales_order(ctx, org_id, fixture.company_id, order.id)?;
     let confirmed = ctx
         .db
         .sale_order()
@@ -1226,7 +1226,7 @@ pub fn test_partial_validate_creates_backorder(ctx: &ReducerContext) -> Result<(
         })
         .ok_or("Sale order not found")?;
 
-    confirm_sales_order(ctx, org_id, order.id)?;
+    confirm_sales_order(ctx, org_id, company_id, order.id)?;
 
     let scope = CompanyScopeParams {
         company_id: Some(company_id),

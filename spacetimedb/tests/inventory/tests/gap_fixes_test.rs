@@ -53,8 +53,8 @@ use crate::inventory::replenishment::{
     CreateReplenishmentRuleParams,
 };
 use crate::inventory::stock::{
-    assign_stock_picking, confirm_stock_picking, create_stock_move, create_stock_picking,
-    create_stock_quant, increase_quant_at_location, reserve_quantity_at_location,
+    apply_validated_move_to_quants, assign_stock_picking, confirm_stock_picking, create_stock_move,
+    create_stock_picking, create_stock_quant, increase_quant_at_location, reserve_quantity_at_location,
     reserve_stock_quant, resolve_warehouse_stock_location, stock_move, stock_picking, stock_quant,
     to_product_stock_qty, validate_stock_picking, CreateStockMoveParams, CreateStockPickingParams,
     CreateStockQuantParams, StockQuantReserveParams,
@@ -732,6 +732,114 @@ pub fn test_lot_required_on_validate(ctx: &ReducerContext) -> Result<(), String>
         Err(msg) => Err(format!("Expected lot-required on validate, got: {msg}")),
         Ok(()) => Err("lot validate enforcement failed: validated without lot_id".into()),
     }
+}
+
+/// Inbound validate stamps move lot_id onto the destination quant.
+pub fn test_inbound_validate_stamps_lot_id(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = create_tracked_product(ctx, &fixture, "lot", "LOT-IN")?;
+
+    create_stock_production_lot(
+        ctx,
+        org_id,
+        CreateStockProductionLotParams {
+            company_id: Some(company_id),
+            name: "LOT-IN-A".to_string(),
+            product_id,
+            product_variant_id: None,
+            ref_: None,
+            note: None,
+            expiration_date: None,
+            use_date: None,
+            removal_date: None,
+            alert_date: None,
+            product_qty: 5.0,
+            location_id: Some(fixture.warehouse_id),
+            package_id: None,
+            owner_id: None,
+            is_scrap: false,
+            is_locked: false,
+            metadata: None,
+        },
+    )?;
+    let lot_id = ctx
+        .db
+        .stock_production_lot()
+        .iter()
+        .find(|l| {
+            l.organization_id == org_id && l.name == "LOT-IN-A" && l.product_id == product_id
+        })
+        .map(|l| l.id)
+        .ok_or("inbound lot missing")?;
+
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "Supplier Inbound".to_string(),
+            usage: "supplier".to_string(),
+            location_category: "supplier".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: None,
+            complete_name: Some("Supplier Inbound".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: Some(r#"{"test":"inbound-lot"}"#.to_string()),
+        },
+    )?;
+    let src_loc = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "Supplier Inbound")
+        .map(|l| l.id)
+        .ok_or("supplier location missing")?;
+
+    apply_validated_move_to_quants(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        src_loc,
+        fixture.warehouse_id,
+        5.0,
+        true,
+        10.0,
+        Some(lot_id),
+    )?;
+
+    let stamped = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&product_id)
+        .find(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.location_id == fixture.warehouse_id
+                && q.lot_id == Some(lot_id)
+        })
+        .ok_or("inbound quant missing lot_id stamp")?;
+    if (stamped.quantity - 5.0).abs() > 1e-9 {
+        return Err(format!("expected qty 5, got {}", stamped.quantity));
+    }
+    Ok(())
 }
 
 fn past_timestamp(ctx: &ReducerContext) -> Timestamp {
@@ -3695,7 +3803,7 @@ pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
         return Err("commitment_date should be set".into());
     }
 
-    confirm_sales_order(ctx, org_id, order.id)?;
+    confirm_sales_order(ctx, org_id, company_id, order.id)?;
 
     let reserved_b: f64 = ctx
         .db

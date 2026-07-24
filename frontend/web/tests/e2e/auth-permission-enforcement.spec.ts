@@ -400,7 +400,7 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
     ],
   )
 
-  await callReducerBff(page, "confirm_sales_order", [orgId, orderId])
+  await callReducerBff(page, "confirm_sales_order", [orgId, companyId, orderId])
 
   const pickingId = await fetchFulfillmentPickingIdBySaleOrderId(page, orderId)
   await callReducerBff(

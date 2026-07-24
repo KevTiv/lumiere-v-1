@@ -22,6 +22,7 @@ import {
   newLoyaltyProgramForm,
   newReturnOrderForm,
   addSaleOrderLineForm,
+  editSaleOrderLineForm,
   createInvoiceFromSaleOrderForm,
   buildPartialDeliveryForm,
   cancelPickingConfirmForm,
@@ -66,6 +67,7 @@ import {
   toCreatePricelistItemParams,
   toCreateSaleOrderParams,
   toCreateSaleOrderLineParams,
+  toUpdateSaleOrderLineParams,
   toCreateCreditNoteFromReturnOrderParams,
   toCreateInvoiceFromSaleOrderParams,
   toCreateReturnOrderParams,
@@ -701,7 +703,7 @@ function SalesClientLoaded({
   const createPricelist = useCreatePricelist(orgId);
   const createPricelistItem = useCreatePricelistItem(orgId);
   const createPickingBatch = useCreatePickingBatch(orgId, operatingCompanyId);
-  const confirmSaleOrder = useConfirmSaleOrder(orgId);
+  const confirmSaleOrder = useConfirmSaleOrder(orgId, operatingCompanyId);
   const sendSaleOrderQuotation = useSendSaleOrderQuotation(orgId);
   const acceptSaleOrderQuotation = useAcceptSaleOrderQuotation(orgId);
   const applySalePromotion = useApplySalePromotion(orgId);
@@ -949,6 +951,39 @@ function SalesClientLoaded({
         uomId: uomFieldOptions,
       }),
     [t, draftSaleOrderOptions, productFieldOptions, uomFieldOptions],
+  );
+
+  const editSaleOrderLineOptions = useMemo(() => {
+    const draftOrderIds = new Set(
+      (orders as Record<string, unknown>[])
+        .filter((o) => saleOrderState(o) === 'Draft' || saleOrderState(o) === 'Sent')
+        .map((o) => String(o.id)),
+    );
+    return (orderLines as Record<string, unknown>[])
+      .filter((l) => draftOrderIds.has(String(l.orderId ?? l.order_id ?? '')))
+      .map((l) => ({
+        value: String(l.id),
+        label: `${l.name ?? l.productId ?? l.id} (#${l.id})`,
+      }));
+  }, [orders, orderLines]);
+
+  const editSaleOrderLineFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(editSaleOrderLineForm(t), {
+        lineId:
+          editSaleOrderLineOptions.length > 0
+            ? editSaleOrderLineOptions
+            : [
+                {
+                  value: '',
+                  label: t('sales.forms.editSaleOrderLine.fields.linePlaceholder', {
+                    defaultValue: 'No draft lines',
+                  }),
+                  disabled: true,
+                },
+              ],
+      }),
+    [t, editSaleOrderLineOptions],
   );
 
   const pricelistItemFormConfig = useMemo(
@@ -2269,6 +2304,17 @@ function SalesClientLoaded({
                       onClick: () => setCsvKind('orderLine'),
                     },
                     {
+                      id: 'edit-sale-order-line',
+                      label: t('sales.actions.editOrderLine', {
+                        defaultValue: 'Edit line',
+                      }),
+                      onClick: () =>
+                        setQuickActionForm({
+                          form: editSaleOrderLineFormConfig,
+                          action: 'updateSaleOrderLine',
+                        }),
+                    },
+                    {
                       id: 'delete-sale-order-lines',
                       label: t('sales.actions.deleteOrderLines', {
                         defaultValue: 'Delete lines',
@@ -2485,6 +2531,7 @@ function SalesClientLoaded({
       liveSections,
       saleOrderFormConfig,
       addSaleOrderLineFormConfig,
+      editSaleOrderLineFormConfig,
       ordersEntityConfig,
       saleOrderRecordSheet,
       pricelistsEntityConfig,
@@ -2624,6 +2671,14 @@ function SalesClientLoaded({
       if (params == null || orderId === '' || orderId == null) return;
       await createSaleOrderLine.mutateAsync({
         orderId: orderId as string | number | bigint,
+        params,
+      });
+    } else if (action === 'updateSaleOrderLine') {
+      const lineId = formData.lineId;
+      const params = toUpdateSaleOrderLineParams(formData);
+      if (params == null || lineId === '' || lineId == null) return;
+      await updateSaleOrderLine.mutateAsync({
+        lineId: lineId as string | number | bigint,
         params,
       });
     } else if (action === 'createReturnOrder') {

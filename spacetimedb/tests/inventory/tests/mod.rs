@@ -114,7 +114,9 @@ pub fn run_inventory_serial_reserve_test(ctx: &ReducerContext) -> Result<(), Str
 
 #[spacetimedb::reducer]
 pub fn run_inventory_lot_validate_test(ctx: &ReducerContext) -> Result<(), String> {
-    gap_fixes_test::test_lot_required_on_validate(ctx).map_err(|e| format!("lot_validate: {e}"))
+    gap_fixes_test::test_lot_required_on_validate(ctx).map_err(|e| format!("lot_validate: {e}"))?;
+    gap_fixes_test::test_inbound_validate_stamps_lot_id(ctx)
+        .map_err(|e| format!("inbound_lot_stamp: {e}"))
 }
 
 #[spacetimedb::reducer]

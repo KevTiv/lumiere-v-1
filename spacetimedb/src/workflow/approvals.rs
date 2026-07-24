@@ -9,7 +9,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::permissions::user_role_assignment;
 use crate::core::users::user_organization;
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 use super::action_registry::{
     execute_guarded_action, snapshot_guarded_action, ExecuteGuardedActionParams,
@@ -447,7 +447,32 @@ pub fn claim_workflow_human_task(
     organization_id: u64,
     params: ClaimWorkflowHumanTaskParams,
 ) -> Result<(), String> {
-    claim_workflow_human_task_for_actor(ctx, organization_id, ctx.sender(), params)?;
+    let task = claim_workflow_human_task_for_actor(ctx, organization_id, ctx.sender(), params)?;
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(task.company_id),
+            table_name: "workflow_human_task",
+            record_id: task.id,
+            action: "CLAIM",
+            old_values: Some(r#"{"status":"Open"}"#.to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "status": "Claimed",
+                    "revision": task.revision,
+                    "claimed_by": task.claimed_by.map(|id| id.to_hex().to_string()),
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "status".to_string(),
+                "revision".to_string(),
+                "claimed_by".to_string(),
+            ],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -527,7 +552,37 @@ pub fn decide_workflow_human_task(
     organization_id: u64,
     params: DecideWorkflowHumanTaskParams,
 ) -> Result<(), String> {
-    decide_workflow_human_task_for_actor(ctx, organization_id, ctx.sender(), params)?;
+    let action = match params.decision {
+        WorkflowHumanTaskDecision::Approve => "APPROVE",
+        WorkflowHumanTaskDecision::Reject => "REJECT",
+        WorkflowHumanTaskDecision::Complete => "COMPLETE",
+    };
+    let task = decide_workflow_human_task_for_actor(ctx, organization_id, ctx.sender(), params)?;
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(task.company_id),
+            table_name: "workflow_human_task",
+            record_id: task.id,
+            action,
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "status": format!("{:?}", task.status),
+                    "decision": format!("{:?}", task.decision),
+                    "revision": task.revision,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "status".to_string(),
+                "decision".to_string(),
+                "revision".to_string(),
+            ],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 

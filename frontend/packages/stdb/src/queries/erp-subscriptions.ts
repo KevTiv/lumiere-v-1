@@ -1824,6 +1824,33 @@ export function subscriptionQueriesForResource(
     ];
   }
 
+  // Document folder ACL: SpacetimeDB HTTP SQL cannot express Vec<Identity> membership
+  // (`read_access_ids`). Honest subset = unrestricted folders OR caller is owner.
+  if (r === "document-folders") {
+    if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
+    const org = ctx.organizationId;
+    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
+    const idLit = identitySqlLiteral(ctx.identityHex);
+    const cols = resolveHttpSqlColumns("document-folders", ctx.fieldAccess).join(", ");
+    return [
+      `SELECT ${cols} FROM doc_folder WHERE organization_id = ${Number(org)} AND (is_access_restricted = false OR owner_id = ${idLit})`,
+    ];
+  }
+
+  // Documents inherit folder ACL in reducers; without SQL joins, unrestricted-folder
+  // contents cannot be expressed. Owner filter is the honest subset.
+  if (r === "documents" || r === "documents-deleted") {
+    if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
+    const org = ctx.organizationId;
+    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
+    const idLit = identitySqlLiteral(ctx.identityHex);
+    const cols = resolveHttpSqlColumns(r, ctx.fieldAccess).join(", ");
+    const deleted = r === "documents-deleted" ? "true" : "false";
+    return [
+      `SELECT ${cols} FROM document WHERE organization_id = ${Number(org)} AND is_deleted = ${deleted} AND owner_id = ${idLit}`,
+    ];
+  }
+
   if (r === "field-permissions") {
     const org = ctx.organizationId;
     if (org === undefined || org === null || Number.isNaN(Number(org))) {

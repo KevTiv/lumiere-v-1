@@ -6,6 +6,7 @@
 ///   - LeadLostReason
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::{company_id_from_scope, default_company_id_for_organization};
 use crate::crm::contacts::{contact, Contact};
 use crate::crm::opportunities::{opportunity, Opportunity};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -90,6 +91,8 @@ pub struct UpdateLeadRevenueParams {
 pub struct ConvertLeadParams {
     pub create_contact: bool,
     pub create_opportunity: bool,
+    /// Operating company for contact/opportunity; falls back to org default when None.
+    pub company_id: Option<u64>,
     // Contact creation options (used when create_contact is true)
     pub contact_type: Option<String>,
     pub is_vendor: Option<bool>,
@@ -465,13 +468,20 @@ pub fn convert_lead_to_customer(
         return Err("Lead must be qualified before conversion".to_string());
     }
 
+    let operating_company_id = match params.company_id {
+        Some(cid) => Some(company_id_from_scope(ctx, organization_id, Some(cid))?),
+        None => default_company_id_for_organization(ctx, organization_id).ok(),
+    };
+    let contact_company_id = operating_company_id;
+    let opportunity_company_id = operating_company_id;
+
     let mut contact_id: Option<u64> = None;
 
     if params.create_contact {
         let contact = ctx.db.contact().insert(Contact {
             id: 0,
             organization_id,
-            company_id: None,
+            company_id: contact_company_id,
             type_: params.contact_type.unwrap_or_else(|| "contact".to_string()),
             name: lead.name.clone(),
             display_name: lead.name.clone(),
@@ -547,7 +557,7 @@ pub fn convert_lead_to_customer(
             user_id: lead.user_id,
             team_id: lead.team_id,
             company_currency_id: None,
-            company_id: None,
+            company_id: opportunity_company_id,
             date_open: Some(ctx.timestamp),
             date_closed: None,
             date_deadline: lead.date_deadline,

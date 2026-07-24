@@ -738,6 +738,7 @@
     "metadata"
   ],
   "ConvertLeadParams": [
+    "company_id",
     "contact_type",
     "is_vendor",
     "is_employee",

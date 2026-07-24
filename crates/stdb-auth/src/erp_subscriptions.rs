@@ -338,6 +338,41 @@ pub fn subscription_queries_for_resource(
         )]));
     }
 
+    // Document folder ACL: HTTP SQL cannot express Vec<Identity> membership
+    // (`read_access_ids`). Honest subset = unrestricted OR caller is owner.
+    if r == "document-folders" {
+        let Some(org) = ctx.organization_id else {
+            return Ok(None);
+        };
+        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
+            return Ok(None);
+        };
+        let id_lit = crate::field_policy::identity_sql_literal(id)?;
+        let cols = resolve_http_sql_columns("document-folders", ctx.field_access)?.join(", ");
+        return Ok(Some(vec![format!(
+            "SELECT {cols} FROM doc_folder WHERE organization_id = {org} AND (is_access_restricted = false OR owner_id = {id_lit})"
+        )]));
+    }
+
+    if r == "documents" || r == "documents-deleted" {
+        let Some(org) = ctx.organization_id else {
+            return Ok(None);
+        };
+        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
+            return Ok(None);
+        };
+        let id_lit = crate::field_policy::identity_sql_literal(id)?;
+        let cols = resolve_http_sql_columns(r, ctx.field_access)?.join(", ");
+        let deleted = if r == "documents-deleted" {
+            "true"
+        } else {
+            "false"
+        };
+        return Ok(Some(vec![format!(
+            "SELECT {cols} FROM document WHERE organization_id = {org} AND is_deleted = {deleted} AND owner_id = {id_lit}"
+        )]));
+    }
+
     if r == "field-permissions" {
         let Some(org) = ctx.organization_id else {
             return Ok(None);

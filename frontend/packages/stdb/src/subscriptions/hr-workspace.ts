@@ -7,10 +7,10 @@ import type { SubscriptionQueryContext } from "../queries/erp-subscriptions";
 export const HR_WORKSPACE_RESOURCE_KEYS = [
   "contracts",
   "departments",
-  "employees",
-  "employee-documents",
+  // Prefer purpose-scoped employee feeds over org-wide `employees` for default WS mirror.
   "my-employee",
   "direct-reports",
+  "employee-documents",
   "job-positions",
   "applicants",
   "leave-requests",

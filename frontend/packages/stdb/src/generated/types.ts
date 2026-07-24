@@ -2903,6 +2903,7 @@ export type ContractState = __Infer<typeof ContractState>;
 export const ConvertLeadParams = __t.object("ConvertLeadParams", {
   createContact: __t.bool(),
   createOpportunity: __t.bool(),
+  companyId: __t.option(__t.u64()),
   contactType: __t.option(__t.string()),
   isVendor: __t.option(__t.bool()),
   isEmployee: __t.option(__t.bool()),

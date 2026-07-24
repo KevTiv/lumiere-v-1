@@ -1008,6 +1008,63 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+/** Draft line edits — quantity/price/discount (mirrors purchasing edit-line form). */
+export const editSaleOrderLineForm = (t: TFunction): FormConfig => ({
+  id: "edit-sale-order-line",
+  title: t("sales.forms.editSaleOrderLine.title", {
+    defaultValue: "Edit sale order line",
+  }),
+  description: t("sales.forms.editSaleOrderLine.description", {
+    defaultValue: "Update quantity or price on a draft line.",
+  }),
+  sections: [
+    {
+      id: "esol-line",
+      title: t("sales.forms.editSaleOrderLine.sections.line", {
+        defaultValue: "Line",
+      }),
+      fields: [
+        {
+          id: "lineId",
+          name: "lineId",
+          type: "select",
+          label: t("sales.forms.editSaleOrderLine.fields.lineId", {
+            defaultValue: "Line",
+          }),
+          placeholder: t("sales.forms.editSaleOrderLine.fields.linePlaceholder", {
+            defaultValue: "Select a line",
+          }),
+          required: true,
+          width: "full",
+          options: emptySelect,
+        },
+        {
+          id: "quantity",
+          name: "quantity",
+          type: "number",
+          label: t("sales.forms.addSaleOrderLine.fields.quantity"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "priceUnit",
+          name: "priceUnit",
+          type: "number",
+          label: t("sales.forms.addSaleOrderLine.fields.priceUnit"),
+          width: "1/2",
+        },
+        {
+          id: "discount",
+          name: "discount",
+          type: "number",
+          label: t("sales.forms.addSaleOrderLine.fields.discount"),
+          width: "1/2",
+        },
+      ],
+    },
+  ],
+})
+
 export const createInvoiceFromSaleOrderForm = (t: TFunction): FormConfig => ({
   id: "create-invoice-from-sale-order",
   title: t("sales.forms.createInvoiceFromOrder.title"),
@@ -1343,6 +1400,7 @@ export const salesFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-pricelist-item": newPricelistItemForm(t),
   "new-picking-batch": newPickingBatchForm(t),
   "add-sale-order-line": addSaleOrderLineForm(t),
+  "edit-sale-order-line": editSaleOrderLineForm(t),
   "create-invoice-from-sale-order": createInvoiceFromSaleOrderForm(t),
   "new-return-order": newReturnOrderForm(t),
   "add-return-order-line": addReturnOrderLineForm(t),

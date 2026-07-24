@@ -349,7 +349,7 @@ pub fn test_delivery_decreases_reserved_or_moves_quant(ctx: &ReducerContext) -> 
         })
         .ok_or("Sale order not found")?;
 
-    confirm_sales_order(ctx, org_id, order.id)?;
+    confirm_sales_order(ctx, org_id, fixture.company_id, order.id)?;
 
     let scope = CompanyScopeParams {
         company_id: Some(company_id),

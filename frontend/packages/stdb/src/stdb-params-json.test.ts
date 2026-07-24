@@ -85,6 +85,7 @@ describe("stdbParamsToJson", () => {
     assert.equal(params.create_contact, true)
     assert.equal(params.create_opportunity, true)
     assert.deepEqual(params.opportunity_stage_id, { some: 7 })
+    assert.deepEqual(params.company_id, { none: [] })
     assert.deepEqual(params.contact_type, { none: [] })
     assert.deepEqual(params.metadata, { none: [] })
   })

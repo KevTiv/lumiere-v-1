@@ -5,11 +5,12 @@ use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, create_account_move,
-    insert_draft_account_move_line, post_invoice, reconcile_payment_with_invoice, AccountMove,
-    AccountMoveLine, AddAccountMoveLineParams, CreateAccountMoveParams,
+    insert_draft_account_move_line, post_invoice, AccountMove, AccountMoveLine,
+    AddAccountMoveLineParams, CreateAccountMoveParams,
 };
 use crate::accounting::payments::{
-    account_payment, create_payment, register_payment_on_invoice, CreatePaymentParams,
+    account_payment, create_payment, register_payment_on_invoice, AccountPayment,
+    CreatePaymentParams,
 };
 use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::organization::company;
@@ -1068,28 +1069,25 @@ pub fn apply_subscription_invoice_payment(
         .map(|p| p.id)
         .ok_or("Payment not found after create")?;
 
-    let payment_input = GuardedActionInput::PostPayment { payment_id };
-    let payment_snapshot = snapshot_guarded_action(
-        ctx,
-        organization_id,
-        company_id,
-        GuardedActionKey::PostPayment,
-        GUARDED_ACTION_SCHEMA_VERSION,
-        payment_input.clone(),
-    )?;
-    execute_guarded_action(
-        ctx,
-        ExecuteGuardedActionParams {
-            organization_id,
-            company_id,
-            action: GuardedActionKey::PostPayment,
-            action_version: GUARDED_ACTION_SCHEMA_VERSION,
-            input: payment_input,
-            expected_subject_revision_hash: payment_snapshot.subject_revision_hash,
-            idempotency_key: format!("subscription-payment:{payment_id}"),
-            execution_reason: None,
-        },
-    )?;
+    // Link to the balanced payment move already posted above — do not call
+    // post_payment (would create a second empty/duplicate journal header).
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("Payment not found after create")?;
+    let pay_name = payment
+        .name
+        .clone()
+        .unwrap_or_else(|| format!("PAY-SUB-{}", payment_id));
+    ctx.db.account_payment().id().update(AccountPayment {
+        name: Some(pay_name),
+        move_id: Some(payment_move_id),
+        state: PaymentState::Paid,
+        ..payment
+    });
+
     register_payment_on_invoice(
         ctx,
         organization_id,
@@ -1097,7 +1095,6 @@ pub fn apply_subscription_invoice_payment(
         vec![invoice_move_id],
         false,
     )?;
-    reconcile_payment_with_invoice(ctx, organization_id, payment_move_id, invoice_move_id)?;
 
     Ok(SubscriptionPaymentResult {
         payment_id,

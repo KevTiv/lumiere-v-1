@@ -1015,7 +1015,7 @@ fn execute_adapter(
             send_purchase_order_impl(ctx, organization_id, *order_id, true)
         }
         GuardedActionInput::ConfirmSalesOrder { order_id } => {
-            confirm_sales_order_impl(ctx, organization_id, *order_id, true)
+            confirm_sales_order_impl(ctx, organization_id, company_id, *order_id, true)
         }
         GuardedActionInput::PostAccountMove { move_id } => {
             post_account_move_impl(ctx, organization_id, *move_id, true)

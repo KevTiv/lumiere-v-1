@@ -420,7 +420,7 @@ pub fn test_incoterm_id_and_promotion_and_options(ctx: &ReducerContext) -> Resul
         return Err("option not materialised to line".into());
     }
 
-    confirm_sales_order(ctx, org_id, order.id)?;
+    confirm_sales_order(ctx, org_id, fixture.company_id, order.id)?;
     // Commission accrues on invoice post (or manual accrue), not on confirm.
     let on_confirm = ctx
         .db

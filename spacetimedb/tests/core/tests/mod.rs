@@ -1,5 +1,6 @@
 //! Core domain test suite — invoke via `run_all_core_tests` reducer.
 pub mod operational_messaging_test;
+pub mod permissions_tests;
 pub mod queue_tests;
 pub mod sod_test;
 
@@ -9,6 +10,7 @@ use spacetimedb::ReducerContext;
 pub fn run_all_core_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_core_operational_messaging_test(ctx)?;
     run_core_sod_test(ctx)?;
+    run_core_permissions_test(ctx)?;
     run_queue_foundation_tests(ctx)?;
     log::info!("✅ run_all_core_tests complete");
     Ok(())
@@ -40,4 +42,10 @@ pub fn run_core_sod_test(ctx: &ReducerContext) -> Result<(), String> {
     sod_test::test_revoke_delegated_admin_scope(ctx)
         .map_err(|e| format!("delegated_revoke: {e}"))?;
     sod_test::test_opportunity_field_write_policy(ctx).map_err(|e| format!("opp_field_write: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_core_permissions_test(ctx: &ReducerContext) -> Result<(), String> {
+    permissions_tests::test_grant_and_revoke_field_permission(ctx)
+        .map_err(|e| format!("field_permission_grant_revoke: {e}"))
 }

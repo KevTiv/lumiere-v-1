@@ -177,9 +177,12 @@ export function toConvertLeadParams(formData: Record<string, unknown>): ConvertL
     opportunityStageId = undefined
   }
 
+  const companyId = parseU64Field(formData.companyId) ?? undefined
+
   return {
     createContact,
     createOpportunity,
+    companyId,
     contactType: undefined,
     isVendor: undefined,
     isEmployee: undefined,

@@ -1848,7 +1848,14 @@ function CrmClientLoaded({
     if (!workflowModal) return
     try {
       if (workflowModal.kind === "convertLead") {
-        const p = toConvertLeadParams(formData)
+        const p = toConvertLeadParams({
+          ...formData,
+          companyId:
+            formData.companyId ??
+            (operatingCompanyId && operatingCompanyId !== 0n
+              ? operatingCompanyId
+              : undefined),
+        })
         if (!p) throw new Error(t("crm.forms.convertLead.validation.stageRequired"))
         await convertLead.mutateAsync({ leadId: workflowModal.leadId, params: p })
       } else if (workflowModal.kind === "convertOpp") {

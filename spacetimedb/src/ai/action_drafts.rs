@@ -508,7 +508,7 @@ pub fn expire_ai_action_drafts(
 // Execution registry: `execute_whitelisted_draft` dispatches known reducers via
 // builder fns (`build_create_task_params`, etc.). To add a new reducer:
 // 1. Add a builder + match arm in `execute_whitelisted_draft`
-// 2. Add an `AiReducerAllowlist` row (or rely on default allowlist before org rows exist)
+// 2. Add an `AiReducerAllowlist` row (empty org allowlists fail closed)
 // 3. Ensure Casbin grants the target resource `create` permission
 
 fn load_mutable_draft(

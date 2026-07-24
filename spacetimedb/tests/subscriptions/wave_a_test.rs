@@ -220,7 +220,7 @@ fn seed_confirmed_so(ctx: &ReducerContext, fixture: &OrgFixture, label: &str) ->
         .find(|o| o.organization_id == org_id && o.client_order_ref.as_deref() == Some(label))
         .map(|o| o.id)
         .ok_or("SO not found")?;
-    confirm_sales_order(ctx, org_id, order_id)?;
+    confirm_sales_order(ctx, org_id, fixture.company_id, order_id)?;
     let confirmed = ctx
         .db
         .sale_order()

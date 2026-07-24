@@ -2242,6 +2242,7 @@
   "ConvertLeadParams": [
     "create_contact",
     "create_opportunity",
+    "company_id",
     "contact_type",
     "is_vendor",
     "is_employee",
@@ -6442,6 +6443,17 @@
     "color",
     "icon"
   ],
+  "FieldPermission": [
+    "id",
+    "organization_id",
+    "subject",
+    "role_id",
+    "resource",
+    "action",
+    "allowed_fields",
+    "created_by",
+    "created_at"
+  ],
   "FieldValidation": [
     "required",
     "min_length",
@@ -6668,6 +6680,12 @@
   "GrantDelegatedAdminScopeParams": [
     "user_identity",
     "metadata"
+  ],
+  "GrantFieldPermissionParams": [
+    "subject",
+    "resource",
+    "action",
+    "allowed_fields"
   ],
   "GrantOrgPermissionParams": [
     "subject",

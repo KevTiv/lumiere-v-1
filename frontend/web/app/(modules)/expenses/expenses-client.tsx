@@ -786,6 +786,10 @@ function ExpensesClientLoaded({
           journalId: BigInt(String(journalId)),
           payableAccountId: BigInt(String(payableAccountId)),
           defaultExpenseAccountId: BigInt(String(defaultExpenseAccountId)),
+          clientRequestId:
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+              ? `exp-post-${crypto.randomUUID()}`
+              : `exp-post-${Date.now()}`,
           defaultTaxAccountId:
             defaultTaxAccountId != null && String(defaultTaxAccountId).trim() !== ""
               ? BigInt(String(defaultTaxAccountId))

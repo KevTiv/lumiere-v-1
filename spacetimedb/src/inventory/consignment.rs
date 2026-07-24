@@ -120,6 +120,7 @@ pub fn receive_consignment_stock(
         params.quantity,
         params.cost,
         Some(agreement.partner_id),
+        None,
         &method,
     )?;
 

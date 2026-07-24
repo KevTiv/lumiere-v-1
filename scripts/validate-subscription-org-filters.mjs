@@ -50,12 +50,11 @@ const authKeys = new Set([
   "user-role-assignment",
   "auth-role-table",
   "user-organization",
-  "casbin-rule",
   "org-permissions",
   "policy-snapshots",
 ]);
 
-const globalKeys = new Set(["user-profile", "casbin-rule"]);
+const globalKeys = new Set(["user-profile"]);
 
 let failed = false;
 

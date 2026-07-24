@@ -827,7 +827,7 @@ pub fn convert_opportunity_to_sale_order(
         .ok_or("Opportunity has no partner — set a partner before converting")?;
 
     let currency_id = opp.company_currency_id.unwrap_or(1);
-    let opp_company_id = opp.company_id.unwrap_or(company_id);
+    let opp_company_id = resolve_opportunity_company_id(&opp, company_id)?;
 
     // Ensure the partner is flagged as a customer
     if let Some(partner) = ctx.db.contact().id().find(&partner_id) {

@@ -6471,6 +6471,7 @@ pub enum Reducer {
 }    ,
     ConfirmSalesOrder {
         organization_id: u64,
+        company_id: u64,
         order_id: u64,
 }    ,
     ConfirmStockMove {
@@ -13588,9 +13589,11 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::ConfirmSalesOrder{
                 organization_id,
+                company_id,
                 order_id,
 }             => __sats::bsatn::to_vec(&confirm_sales_order_reducer::ConfirmSalesOrderArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 order_id: order_id.clone(),
 }),
             Reducer::ConfirmStockMove{

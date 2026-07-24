@@ -222,6 +222,27 @@ fn consume_leave_days(
     Ok(days)
 }
 
+fn release_leave_days(
+    ctx: &ReducerContext,
+    employee_id: u64,
+    leave_type_id: u64,
+    period_year: u32,
+    days: f64,
+) -> Result<(), String> {
+    if days <= 0.0 {
+        return Ok(());
+    }
+    let Some(alloc) = find_leave_allocation(ctx, employee_id, leave_type_id, period_year) else {
+        return Ok(());
+    };
+    let new_used = (alloc.used_days - days).max(0.0);
+    ctx.db.hr_leave_allocation().id().update(HrLeaveAllocation {
+        used_days: new_used,
+        ..alloc
+    });
+    Ok(())
+}
+
 fn leave_requester_identity(ctx: &ReducerContext, leave: &HrLeave) -> Option<Identity> {
     ctx.db
         .hr_employee()
@@ -415,13 +436,15 @@ pub fn submit_leave(
     }
 
     let period_year = period_year_from_timestamp(leave.date_from);
-    ensure_leave_allocation(
+    // Reserve allocation at submit so concurrent requests cannot oversubscribe.
+    consume_leave_days(
         ctx,
         organization_id,
         company_id,
         leave.employee_id,
         leave.leave_type_id,
         period_year,
+        leave.number_of_days,
     )?;
 
     let old_state = format!("{:?}", leave.state);
@@ -509,10 +532,10 @@ pub fn approve_leave_impl(
     }
 
     let old_state = format!("{:?}", leave.state);
-    let period_year = period_year_from_timestamp(leave.date_from);
     let employee_id = leave.employee_id;
     let number_of_days = leave.number_of_days;
 
+    // Days were reserved at submit; approval only advances state.
     let (updated, days_consumed, changed_fields) = match leave.state {
         HrLeaveState::Confirm if requires_dual_approval(&leave) => (
             HrLeave {
@@ -523,46 +546,24 @@ pub fn approve_leave_impl(
             0.0,
             vec!["state".to_string(), "first_approver_id".to_string()],
         ),
-        HrLeaveState::Confirm => {
-            let days_consumed = consume_leave_days(
-                ctx,
-                organization_id,
-                company_id,
-                employee_id,
-                leave.leave_type_id,
-                period_year,
-                number_of_days,
-            )?;
-            (
-                HrLeave {
-                    state: HrLeaveState::Validated,
-                    first_approver_id: Some(ctx.sender()),
-                    ..leave
-                },
-                days_consumed,
-                vec!["state".to_string(), "first_approver_id".to_string()],
-            )
-        }
-        HrLeaveState::ValidatedOne => {
-            let days_consumed = consume_leave_days(
-                ctx,
-                organization_id,
-                company_id,
-                employee_id,
-                leave.leave_type_id,
-                period_year,
-                number_of_days,
-            )?;
-            (
-                HrLeave {
-                    state: HrLeaveState::Validated,
-                    second_approver_id: Some(ctx.sender()),
-                    ..leave
-                },
-                days_consumed,
-                vec!["state".to_string(), "second_approver_id".to_string()],
-            )
-        }
+        HrLeaveState::Confirm => (
+            HrLeave {
+                state: HrLeaveState::Validated,
+                first_approver_id: Some(ctx.sender()),
+                ..leave
+            },
+            number_of_days,
+            vec!["state".to_string(), "first_approver_id".to_string()],
+        ),
+        HrLeaveState::ValidatedOne => (
+            HrLeave {
+                state: HrLeaveState::Validated,
+                second_approver_id: Some(ctx.sender()),
+                ..leave
+            },
+            number_of_days,
+            vec!["state".to_string(), "second_approver_id".to_string()],
+        ),
         _ => unreachable!(),
     };
 
@@ -637,6 +638,14 @@ pub fn refuse_leave(
     }
 
     let old_state = format!("{:?}", leave.state);
+    let period_year = period_year_from_timestamp(leave.date_from);
+    release_leave_days(
+        ctx,
+        leave.employee_id,
+        leave.leave_type_id,
+        period_year,
+        leave.number_of_days,
+    )?;
     ctx.db.hr_leave().id().update(HrLeave {
         state: HrLeaveState::Refused,
         ..leave
@@ -686,6 +695,20 @@ pub fn reset_leave_to_draft(
     }
 
     let old_state = format!("{:?}", leave.state);
+    let should_release = matches!(
+        leave.state,
+        HrLeaveState::Confirm | HrLeaveState::ValidatedOne
+    );
+    if should_release {
+        let period_year = period_year_from_timestamp(leave.date_from);
+        release_leave_days(
+            ctx,
+            leave.employee_id,
+            leave.leave_type_id,
+            period_year,
+            leave.number_of_days,
+        )?;
+    }
     ctx.db.hr_leave().id().update(HrLeave {
         state: HrLeaveState::Draft,
         first_approver_id: None,

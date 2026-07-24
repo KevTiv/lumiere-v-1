@@ -229,7 +229,7 @@ fn seed_active_subscription(
         .find(|o| o.organization_id == org_id && o.client_order_ref.as_deref() == Some(label))
         .map(|o| o.id)
         .ok_or("so")?;
-    confirm_sales_order(ctx, org_id, so_id)?;
+    confirm_sales_order(ctx, org_id, fixture.company_id, so_id)?;
 
     create_subscription_from_sale_order(
         ctx,

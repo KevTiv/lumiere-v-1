@@ -1151,9 +1151,10 @@ fn create_outgoing_pickings_for_confirmed_order(
 pub fn confirm_sales_order(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
-    confirm_sales_order_impl(ctx, organization_id, order_id, false)
+    confirm_sales_order_impl(ctx, organization_id, company_id, order_id, false)
 }
 
 /// Draft quotation → Sent (awaiting customer acceptance / confirm).
@@ -1233,6 +1234,7 @@ pub fn send_sale_order_quotation(
 pub fn confirm_sales_order_impl(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     order_id: u64,
     skip_approval_check: bool,
 ) -> Result<(), String> {
@@ -1244,6 +1246,9 @@ pub fn confirm_sales_order_impl(
         .ok_or("Sale order not found")?;
 
     validate_order_org_scope(&order, organization_id)?;
+    if order.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
     check_permission(ctx, organization_id, "sale_order", "confirm")?;
     if order.is_locked {
         return Err("Sale order is locked".to_string());

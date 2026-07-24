@@ -310,10 +310,8 @@ pub fn set_ai_reducer_allowlist_enabled(
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const DEFAULT_ALLOWED_REDUCERS: &[&str] =
-    &["create_task", "create_sale_order", "create_purchase_order"];
-
-/// Returns the default Casbin permission for built-in draft reducers.
+/// Suggested Casbin permission pairs when seeding an org allowlist (not used as an
+/// empty-allowlist fallback — empty lists fail closed).
 pub fn default_reducer_permission(reducer_name: &str) -> Option<(&'static str, &'static str)> {
     match reducer_name {
         "create_task" => Some(("project_task", "create")),
@@ -336,15 +334,10 @@ pub fn is_allowed_ai_reducer(
         .filter(&organization_id)
         .collect();
 
+    // Fail closed: no org rows means no AI draft reducers are permitted.
     if allowlist_rows.is_empty() {
-        if DEFAULT_ALLOWED_REDUCERS.contains(&reducer_name) {
-            if let Some((resource, action)) = default_reducer_permission(reducer_name) {
-                check_permission(ctx, organization_id, resource, action)?;
-            }
-            return Ok(());
-        }
         return Err(format!(
-            "reducer '{reducer_name}' is not allowed for AI drafts"
+            "reducer '{reducer_name}' is not allowed for AI drafts (empty allowlist)"
         ));
     }
 
