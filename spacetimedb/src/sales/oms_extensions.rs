@@ -443,6 +443,7 @@ pub(crate) fn create_dropship_purchase_orders_for_sale(
                     account_analytic_id: None,
                     date_planned: None,
                     propagate_cancel: Some(true),
+                    lot_id: None,
                     metadata: Some(format!(r#"{{"sale_order_id":{order_id}}}"#)),
                 },
             )?;

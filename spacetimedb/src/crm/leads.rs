@@ -470,7 +470,8 @@ pub fn convert_lead_to_customer(
 
     let operating_company_id = match params.company_id {
         Some(cid) => Some(company_id_from_scope(ctx, organization_id, Some(cid))?),
-        None => default_company_id_for_organization(ctx, organization_id).ok(),
+        // Fail closed: never create contact/opportunity with company_id: None.
+        None => Some(default_company_id_for_organization(ctx, organization_id)?),
     };
     let contact_company_id = operating_company_id;
     let opportunity_company_id = operating_company_id;

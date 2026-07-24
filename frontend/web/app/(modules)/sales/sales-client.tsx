@@ -722,7 +722,7 @@ function SalesClientLoaded({
   const lockSaleOrder = useLockSaleOrder(orgId);
   const unlockSaleOrder = useUnlockSaleOrder(orgId);
   const createSaleOrderLine = useCreateSaleOrderLine(orgId);
-  const updateSaleOrderLine = useUpdateSaleOrderLine(orgId);
+  const updateSaleOrderLine = useUpdateSaleOrderLine(orgId, operatingCompanyId);
   const deleteSaleOrderLine = useDeleteSaleOrderLine(orgId);
   const createInvoiceFromSaleOrder = useCreateInvoiceFromSaleOrder(orgId);
   const importSaleOrderCsv = useImportSaleOrderCsv(orgId, operatingCompanyId);

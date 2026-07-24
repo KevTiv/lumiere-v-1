@@ -424,6 +424,10 @@ export function toCreateReturnOrderLineParams(
     productUomQty,
     priceUnit,
     toRefund: checkboxFromForm(formData.toRefund, true),
+    lotId:
+      formData.lotId == null || String(formData.lotId).trim() === ''
+        ? undefined
+        : nullableBigIntU64(formData.lotId) ?? undefined,
   }
 }
 

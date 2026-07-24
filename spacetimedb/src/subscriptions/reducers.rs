@@ -986,6 +986,47 @@ pub fn pay_subscription_invoice(
         params.memo.clone(),
     )?;
 
+    if result.pending_approval {
+        write_audit_log_v2(
+            ctx,
+            organization_id,
+            AuditLogParams {
+                company_id: Some(company_id),
+                table_name: "subscription",
+                record_id: subscription_id,
+                action: "UPDATE",
+                old_values: None,
+                new_values: Some(
+                    serde_json::json!({
+                        "invoice_move_id": result.invoice_move_id,
+                        "payment_id": result.payment_id,
+                        "payment_move_id": result.payment_move_id,
+                        "amount": result.amount,
+                        "pending_approval": true,
+                    })
+                    .to_string(),
+                ),
+                changed_fields: vec!["payment_pending_approval".to_string()],
+                metadata: Some(
+                    serde_json::json!({
+                        "payment_applied": false,
+                        "pending_approval": true,
+                        "invoice_move_id": result.invoice_move_id,
+                        "payment_id": result.payment_id,
+                    })
+                    .to_string(),
+                ),
+            },
+        );
+        log::info!(
+            "Subscription {} payment {} pending PostPayment approval for invoice {}",
+            subscription_id,
+            result.payment_id,
+            result.invoice_move_id
+        );
+        return Ok(());
+    }
+
     let refreshed = ctx
         .db
         .subscription()

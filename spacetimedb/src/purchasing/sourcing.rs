@@ -557,6 +557,7 @@ pub fn award_purchase_rfq_bid(
                 account_analytic_id: None,
                 date_planned: None,
                 propagate_cancel: None,
+                lot_id: None,
                 metadata: Some(format!(r#"{{"rfq_line_id":{}}}"#, line.id)),
             },
         )?;

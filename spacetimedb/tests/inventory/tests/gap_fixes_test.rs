@@ -842,6 +842,173 @@ pub fn test_inbound_validate_stamps_lot_id(ctx: &ReducerContext) -> Result<(), S
     Ok(())
 }
 
+/// Outbound validate keeps move lot_id on the destination quant.
+pub fn test_outbound_transfer_keeps_lot_id(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = create_tracked_product(ctx, &fixture, "lot", "LOT-OUT")?;
+
+    create_stock_production_lot(
+        ctx,
+        org_id,
+        CreateStockProductionLotParams {
+            company_id: Some(company_id),
+            name: "LOT-OUT-A".to_string(),
+            product_id,
+            product_variant_id: None,
+            ref_: None,
+            note: None,
+            expiration_date: None,
+            use_date: None,
+            removal_date: None,
+            alert_date: None,
+            product_qty: 8.0,
+            location_id: Some(fixture.warehouse_id),
+            package_id: None,
+            owner_id: None,
+            is_scrap: false,
+            is_locked: false,
+            metadata: None,
+        },
+    )?;
+    let lot_id = ctx
+        .db
+        .stock_production_lot()
+        .iter()
+        .find(|l| {
+            l.organization_id == org_id && l.name == "LOT-OUT-A" && l.product_id == product_id
+        })
+        .map(|l| l.id)
+        .ok_or("outbound lot missing")?;
+
+    // Untracked quant at source should be ignored when move carries lot_id.
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.warehouse_id,
+        20.0,
+        None,
+    )?;
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.warehouse_id,
+        8.0,
+        Some(lot_id),
+    )?;
+
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "Transfer Dest".to_string(),
+            usage: "internal".to_string(),
+            location_category: "internal".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: None,
+            complete_name: Some("Transfer Dest".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: Some(r#"{"test":"outbound-lot"}"#.to_string()),
+        },
+    )?;
+    let dest_loc = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "Transfer Dest")
+        .map(|l| l.id)
+        .ok_or("dest location missing")?;
+
+    apply_validated_move_to_quants(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.warehouse_id,
+        dest_loc,
+        3.0,
+        false,
+        0.0,
+        Some(lot_id),
+    )?;
+
+    let dest = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&product_id)
+        .find(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.location_id == dest_loc
+                && q.lot_id == Some(lot_id)
+        })
+        .ok_or("dest quant missing lot_id stamp")?;
+    if (dest.quantity - 3.0).abs() > 1e-9 {
+        return Err(format!("expected dest qty 3, got {}", dest.quantity));
+    }
+
+    let remaining_lot = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&product_id)
+        .find(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.location_id == fixture.warehouse_id
+                && q.lot_id == Some(lot_id)
+        })
+        .ok_or("lot-matched source quant missing after consume")?;
+    if (remaining_lot.quantity - 5.0).abs() > 1e-9 {
+        return Err(format!(
+            "expected lot source qty 5 after consume, got {}",
+            remaining_lot.quantity
+        ));
+    }
+
+    let untracked = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&product_id)
+        .find(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.location_id == fixture.warehouse_id
+                && q.lot_id.is_none()
+        })
+        .ok_or("untracked source quant should be untouched")?;
+    if (untracked.quantity - 20.0).abs() > 1e-9 {
+        return Err(format!(
+            "expected untracked source qty 20, got {}",
+            untracked.quantity
+        ));
+    }
+
+    Ok(())
+}
+
 fn past_timestamp(ctx: &ReducerContext) -> Timestamp {
     Timestamp::from_micros_since_unix_epoch(
         ctx.timestamp.to_micros_since_unix_epoch() - 86_400_000_000,
@@ -2316,6 +2483,7 @@ pub fn test_consignment_excluded_from_atp(ctx: &ReducerContext) -> Result<(), St
             location_id: Some(wh.lot_stock_id),
             quantity: 12.0,
             cost: 5.0,
+            lot_id: None,
             metadata: None,
         },
     )?;

@@ -8,7 +8,9 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::accounting::chart_of_accounts::account_journal;
 use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove};
-use crate::accounting::payments::{account_payment, AccountPayment};
+use crate::accounting::payments::{
+    account_payment, insert_balanced_payment_lines_and_post, AccountPayment,
+};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::types::{
     AccountMoveState, MoveType, PartnerType, PaymentDirection, PaymentFeeBearer,
@@ -333,8 +335,8 @@ fn validate_payment_transaction_invariants(
     Ok(())
 }
 
-/// Build and insert the ledger `AccountPayment` and `AccountMove` for a posted
-/// operational transaction. Returns the created `AccountPayment` id.
+/// Build and insert the ledger `AccountPayment` and balanced `AccountMove` for a
+/// posted operational transaction. Returns the created `AccountPayment` id.
 fn post_ledger_payment(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -370,7 +372,9 @@ fn post_ledger_payment(
     });
 
     let name = next_doc_number(ctx, "PAY");
+    let amount = transaction.settlement_amount;
 
+    // Draft first — never flip Posted with empty lines.
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id,
@@ -378,7 +382,7 @@ fn post_ledger_payment(
         ref_: transaction.external_reference.clone(),
         move_type: MoveType::Entry,
         auto_post: false,
-        state: AccountMoveState::Posted,
+        state: AccountMoveState::Draft,
         date: transaction.occurred_at,
         invoice_date: None,
         invoice_date_due: None,
@@ -390,7 +394,7 @@ fn post_ledger_payment(
         partner_shipping_id: None,
         sale_order_id: None,
         partner_id: Some(transaction.partner_id),
-        commercial_partner_id: None,
+        commercial_partner_id: Some(transaction.partner_id),
         partner_bank_id: None,
         fiscal_position_id: None,
         invoice_user_id: None,
@@ -403,15 +407,15 @@ fn post_ledger_payment(
         journal_id: account.account_journal_id,
         currency_id: transaction.currency_id,
         company_currency_id: transaction.currency_id,
-        amount_untaxed: transaction.settlement_amount,
+        amount_untaxed: amount,
         amount_tax: 0.0,
-        amount_total: transaction.settlement_amount,
-        amount_residual: transaction.settlement_amount,
-        amount_untaxed_signed: transaction.settlement_amount,
+        amount_total: amount,
+        amount_residual: 0.0,
+        amount_untaxed_signed: amount,
         amount_tax_signed: 0.0,
-        amount_total_signed: transaction.settlement_amount,
-        amount_total_in_currency_signed: transaction.settlement_amount,
-        amount_residual_signed: transaction.settlement_amount,
+        amount_total_signed: amount,
+        amount_total_in_currency_signed: amount,
+        amount_residual_signed: 0.0,
         to_check: false,
         posted_before: false,
         is_storno: false,
@@ -426,6 +430,9 @@ fn post_ledger_payment(
         write_date: Some(ctx.timestamp),
         metadata: None,
     });
+
+    let (move_record, _liquidity_account_id, _clearing_account_id) =
+        insert_balanced_payment_lines_and_post(ctx, &payment, move_record)?;
 
     ctx.db.account_payment().id().update(AccountPayment {
         name: Some(name),
@@ -443,7 +450,14 @@ fn post_ledger_payment(
             record_id: payment.id,
             action: "POST",
             old_values: None,
-            new_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "move_id": move_record.id,
+                    "source": "payment_transaction",
+                    "transaction_id": transaction.id,
+                })
+                .to_string(),
+            ),
             changed_fields: vec![
                 "state".to_string(),
                 "name".to_string(),

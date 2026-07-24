@@ -61,6 +61,8 @@ pub struct ReturnOrderLine {
     pub product_uom_qty: f64,
     pub price_unit: f64,
     pub to_refund: bool,
+    /// Optional production lot to stamp on inbound return moves.
+    pub lot_id: Option<u64>,
 }
 
 // ── Input Params ─────────────────────────────────────────────────────────────
@@ -73,6 +75,7 @@ pub struct CreateReturnOrderLineParams {
     pub product_uom_qty: f64,
     pub price_unit: f64,
     pub to_refund: bool,
+    pub lot_id: Option<u64>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -332,7 +335,7 @@ fn create_return_picking_for_order(
                 has_tracking: false,
                 inventory_id: None,
                 sale_line_id: line.sale_order_line_id,
-                lot_id: None,
+                lot_id: line.lot_id,
                 serial_id: None,
                 package_id: None,
                 result_package_id: None,
@@ -426,6 +429,7 @@ pub fn create_return_order(
             product_uom_qty: line.product_uom_qty,
             price_unit: line.price_unit,
             to_refund: line.to_refund,
+            lot_id: line.lot_id,
         });
         line_ids.push(row.id);
     }
@@ -498,6 +502,7 @@ pub fn confirm_return_order(
                 product_uom_qty: l.product_uom_qty,
                 price_unit: l.price_unit,
                 to_refund: l.to_refund,
+                lot_id: l.lot_id,
             })
             .collect();
         validate_return_lines_against_sale_order(ctx, so_id, &line_params)?;

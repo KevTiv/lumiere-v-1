@@ -902,6 +902,7 @@ export const AddPurchaseOrderLineParams = __t.object("AddPurchaseOrderLineParams
   accountAnalyticId: __t.option(__t.u64()),
   datePlanned: __t.option(__t.timestamp()),
   propagateCancel: __t.option(__t.bool()),
+  lotId: __t.option(__t.u64()),
   metadata: __t.option(__t.string()),
 });
 export type AddPurchaseOrderLineParams = __Infer<typeof AddPurchaseOrderLineParams>;
@@ -5883,6 +5884,7 @@ export const CreateReturnOrderLineParams = __t.object("CreateReturnOrderLinePara
   productUomQty: __t.f64(),
   priceUnit: __t.f64(),
   toRefund: __t.bool(),
+  lotId: __t.option(__t.u64()),
 });
 export type CreateReturnOrderLineParams = __Infer<typeof CreateReturnOrderLineParams>;
 
@@ -12634,6 +12636,7 @@ export const PurchaseOrderLine = __t.object("PurchaseOrderLine", {
   moveDestIds: __t.array(__t.u64()),
   moveIds: __t.array(__t.u64()),
   matchState: __t.string(),
+  lotId: __t.option(__t.u64()),
   createUid: __t.identity(),
   createDate: __t.timestamp(),
   writeUid: __t.identity(),
@@ -13061,6 +13064,7 @@ export const ReceiveConsignmentStockParams = __t.object("ReceiveConsignmentStock
   locationId: __t.option(__t.u64()),
   quantity: __t.f64(),
   cost: __t.f64(),
+  lotId: __t.option(__t.u64()),
   metadata: __t.option(__t.string()),
 });
 export type ReceiveConsignmentStockParams = __Infer<typeof ReceiveConsignmentStockParams>;
@@ -13620,6 +13624,7 @@ export const ReturnOrderLine = __t.object("ReturnOrderLine", {
   productUomQty: __t.f64(),
   priceUnit: __t.f64(),
   toRefund: __t.bool(),
+  lotId: __t.option(__t.u64()),
 });
 export type ReturnOrderLine = __Infer<typeof ReturnOrderLine>;
 
@@ -17062,6 +17067,7 @@ export const UpdatePurchaseOrderLineParams = __t.object("UpdatePurchaseOrderLine
   accountAnalyticId: __t.option(__t.u64()),
   displayType: __t.option(__t.string()),
   propagateCancel: __t.option(__t.bool()),
+  lotId: __t.option(__t.u64()),
   metadata: __t.option(__t.string()),
 });
 export type UpdatePurchaseOrderLineParams = __Infer<typeof UpdatePurchaseOrderLineParams>;

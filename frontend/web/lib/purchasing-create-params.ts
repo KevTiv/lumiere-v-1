@@ -227,6 +227,10 @@ export function toAddPurchaseOrderLineParams(
     quantity,
     uomId: Number(uomId),
     priceUnit,
+    lotId:
+      formData.lotId == null || String(formData.lotId).trim() === ""
+        ? undefined
+        : Number(formData.lotId),
   }
 }
 

@@ -149,6 +149,8 @@ pub struct PurchaseOrderLine {
     pub move_ids: Vec<u64>,
     /// First-class three-way match label (`pending`, `matched`, `over_billed`, …).
     pub match_state: String,
+    /// Optional production lot to stamp on inbound receipt moves.
+    pub lot_id: Option<u64>,
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -258,6 +260,7 @@ pub struct AddPurchaseOrderLineParams {
     pub account_analytic_id: Option<u64>,
     pub date_planned: Option<Timestamp>,
     pub propagate_cancel: Option<bool>,
+    pub lot_id: Option<u64>,
     pub metadata: Option<String>,
 }
 
@@ -290,6 +293,7 @@ pub struct UpdatePurchaseOrderLineParams {
     pub account_analytic_id: Option<u64>,
     pub display_type: Option<String>,
     pub propagate_cancel: Option<bool>,
+    pub lot_id: Option<u64>,
     pub metadata: Option<String>,
 }
 
@@ -1049,7 +1053,7 @@ fn create_incoming_pickings_for_confirmed_order(
                 has_tracking: false,
                 inventory_id: None,
                 sale_line_id: None,
-                lot_id: None,
+                lot_id: line.lot_id,
                 serial_id: None,
                 package_id: None,
                 result_package_id: None,
@@ -1360,6 +1364,7 @@ pub fn add_purchase_order_line(
         move_dest_ids: Vec::new(),
         move_ids: Vec::new(),
         match_state: "pending".to_string(),
+        lot_id: params.lot_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
@@ -1504,6 +1509,7 @@ pub fn update_purchase_order_line(
     let account_analytic_id = params.account_analytic_id.or(line.account_analytic_id);
     let display_type = params.display_type.or(line.display_type.clone());
     let propagate_cancel = params.propagate_cancel.unwrap_or(line.propagate_cancel);
+    let lot_id = params.lot_id.or(line.lot_id);
     let metadata = params.metadata.or(line.metadata.clone());
     let order_id = line.order_id;
     let company_id = order.company_id;
@@ -1524,6 +1530,7 @@ pub fn update_purchase_order_line(
         account_analytic_id,
         display_type,
         propagate_cancel,
+        lot_id,
         metadata,
         qty_to_invoice: (quantity - line.qty_invoiced).max(0.0),
         write_uid: ctx.sender(),
@@ -2584,6 +2591,7 @@ pub fn convert_purchase_requisition_to_po(
                 account_analytic_id: None,
                 date_planned: requisition.schedule_date,
                 propagate_cancel: None,
+                lot_id: None,
                 metadata: Some(format!(r#"{{"requisition_line_id":{}}}"#, line.id)),
             },
         )?;

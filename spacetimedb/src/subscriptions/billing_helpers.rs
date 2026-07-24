@@ -9,8 +9,8 @@ use crate::accounting::journal_entries::{
     AddAccountMoveLineParams, CreateAccountMoveParams,
 };
 use crate::accounting::payments::{
-    account_payment, create_payment, register_payment_on_invoice, AccountPayment,
-    CreatePaymentParams,
+    account_payment, create_payment, post_payment_impl, register_payment_on_invoice,
+    AccountPayment, CreatePaymentParams,
 };
 use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::organization::company;
@@ -835,6 +835,8 @@ pub struct SubscriptionPaymentResult {
     pub payment_move_id: u64,
     pub invoice_move_id: u64,
     pub amount: f64,
+    /// True when PostPayment gate created a human approval task (payment still NotPaid).
+    pub pending_approval: bool,
 }
 
 /// Post a subscription invoice (if draft) and apply a customer payment that clears AR residual.
@@ -898,7 +900,8 @@ pub fn apply_subscription_invoice_payment(
         return Err("Invoice must be posted before payment".to_string());
     }
 
-    // Ensure receivable line type is lowercase for reconcile matcher.
+    // Ensure AR residual is set for reconcile (casing may be Debug "Receivable";
+    // matcher is case-insensitive).
     if let Some(ar_line) = ctx
         .db
         .account_move_line()
@@ -910,7 +913,6 @@ pub fn apply_subscription_invoice_payment(
             .abs()
             .max(ar_line.amount_residual.abs());
         ctx.db.account_move_line().id().update(AccountMoveLine {
-            account_internal_type: Some("receivable".to_string()),
             amount_residual: residual,
             amount_residual_currency: residual,
             ..ar_line
@@ -1069,8 +1071,8 @@ pub fn apply_subscription_invoice_payment(
         .map(|p| p.id)
         .ok_or("Payment not found after create")?;
 
-    // Link to the balanced payment move already posted above — do not call
-    // post_payment (would create a second empty/duplicate journal header).
+    // Pre-link the balanced move already posted above, then route through the same
+    // PostPayment gate as post_payment (do not silently mark Paid).
     let payment = ctx
         .db
         .account_payment()
@@ -1084,9 +1086,28 @@ pub fn apply_subscription_invoice_payment(
     ctx.db.account_payment().id().update(AccountPayment {
         name: Some(pay_name),
         move_id: Some(payment_move_id),
-        state: PaymentState::Paid,
+        // Stay NotPaid until post_payment_impl clears the PostPayment gate.
         ..payment
     });
+
+    post_payment_impl(ctx, organization_id, payment_id, false)?;
+
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("Payment not found after PostPayment gate")?;
+    if payment.state != PaymentState::Paid {
+        // Human approval task created — do not register/settle until approved.
+        return Ok(SubscriptionPaymentResult {
+            payment_id,
+            payment_move_id,
+            invoice_move_id,
+            amount: pay_amount,
+            pending_approval: true,
+        });
+    }
 
     register_payment_on_invoice(
         ctx,
@@ -1101,5 +1122,6 @@ pub fn apply_subscription_invoice_payment(
         payment_move_id,
         invoice_move_id,
         amount: pay_amount,
+        pending_approval: false,
     })
 }

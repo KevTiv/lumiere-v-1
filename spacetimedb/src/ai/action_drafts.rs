@@ -306,6 +306,8 @@ pub fn approve_ai_action_draft_core(
     if draft.elevated && draft.proposed_by == ctx.sender() {
         return Err("elevated drafts require a different approver than the proposer".to_string());
     }
+    // Re-check allowlist on approve so emptying/disabling blocks pending drafts.
+    is_allowed_ai_reducer(ctx, organization_id, &draft.reducer_name)?;
 
     let execution_result = execute_whitelisted_draft(ctx, organization_id, company_id, &draft);
 
@@ -589,6 +591,9 @@ fn execute_whitelisted_draft(
     company_id: u64,
     draft: &AiActionDraft,
 ) -> Result<Option<u64>, String> {
+    // Fail closed on execute as well (empty allowlist / disabled reducer).
+    is_allowed_ai_reducer(ctx, organization_id, &draft.reducer_name)?;
+
     let params: Value = serde_json::from_str(&draft.params_json)
         .map_err(|e| format!("invalid params_json: {e}"))?;
 
@@ -876,6 +881,7 @@ fn build_add_purchase_order_line_params(value: &Value) -> Option<AddPurchaseOrde
         account_analytic_id: obj.get("account_analytic_id").and_then(json_u64),
         date_planned: None,
         propagate_cancel: json_bool(obj, "propagate_cancel"),
+        lot_id: obj.get("lot_id").and_then(json_u64),
         metadata: json_string(obj, "metadata"),
     })
 }

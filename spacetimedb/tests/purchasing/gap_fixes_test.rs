@@ -145,6 +145,7 @@ pub fn seed_vendor_po(
             account_analytic_id: None,
             date_planned: None,
             propagate_cancel: None,
+            lot_id: None,
             metadata: None,
         },
     )?;

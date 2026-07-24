@@ -2034,6 +2034,7 @@ pub mod run_all_workflow_foundation_tests_reducer;
 pub mod run_all_workflow_human_effect_tests_reducer;
 pub mod run_cartonization_reducer;
 pub mod run_core_operational_messaging_test_reducer;
+pub mod run_core_permissions_test_reducer;
 pub mod run_core_sod_test_reducer;
 pub mod run_country_pack_test_reducer;
 pub mod run_crm_contact_identity_test_reducer;
@@ -5248,6 +5249,7 @@ pub use run_all_workflow_foundation_tests_reducer::run_all_workflow_foundation_t
 pub use run_all_workflow_human_effect_tests_reducer::run_all_workflow_human_effect_tests;
 pub use run_cartonization_reducer::run_cartonization;
 pub use run_core_operational_messaging_test_reducer::run_core_operational_messaging_test;
+pub use run_core_permissions_test_reducer::run_core_permissions_test;
 pub use run_core_sod_test_reducer::run_core_sod_test;
 pub use run_country_pack_test_reducer::run_country_pack_test;
 pub use run_crm_contact_identity_test_reducer::run_crm_contact_identity_test;
@@ -9363,6 +9365,7 @@ pub enum Reducer {
         params: RunCartonizationParams,
 }    ,
     RunCoreOperationalMessagingTest ,
+    RunCorePermissionsTest ,
     RunCoreSodTest ,
     RunCountryPackTest ,
     RunCrmContactIdentityTest ,
@@ -10552,6 +10555,7 @@ pub enum Reducer {
 }    ,
     UpdateSaleOrderLine {
         organization_id: u64,
+        company_id: u64,
         line_id: u64,
         params: UpdateSaleOrderLineParams,
 }    ,
@@ -11707,6 +11711,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllWorkflowHumanEffectTests => "run_all_workflow_human_effect_tests",
             Reducer::RunCartonization { .. } => "run_cartonization",
             Reducer::RunCoreOperationalMessagingTest => "run_core_operational_messaging_test",
+            Reducer::RunCorePermissionsTest => "run_core_permissions_test",
             Reducer::RunCoreSodTest => "run_core_sod_test",
             Reducer::RunCountryPackTest => "run_country_pack_test",
             Reducer::RunCrmContactIdentityTest => "run_crm_contact_identity_test",
@@ -18766,6 +18771,8 @@ Reducer::RunCartonization{
 }),
             Reducer::RunCoreOperationalMessagingTest => __sats::bsatn::to_vec(&run_core_operational_messaging_test_reducer::RunCoreOperationalMessagingTestArgs {
                 }),
+Reducer::RunCorePermissionsTest => __sats::bsatn::to_vec(&run_core_permissions_test_reducer::RunCorePermissionsTestArgs {
+                }),
 Reducer::RunCoreSodTest => __sats::bsatn::to_vec(&run_core_sod_test_reducer::RunCoreSodTestArgs {
                 }),
 Reducer::RunCountryPackTest => __sats::bsatn::to_vec(&run_country_pack_test_reducer::RunCountryPackTestArgs {
@@ -20934,10 +20941,12 @@ Reducer::ToggleProjectFavorite{
 }),
             Reducer::UpdateSaleOrderLine{
                 organization_id,
+                company_id,
                 line_id,
                 params,
 }             => __sats::bsatn::to_vec(&update_sale_order_line_reducer::UpdateSaleOrderLineArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 line_id: line_id.clone(),
                 params: params.clone(),
 }),

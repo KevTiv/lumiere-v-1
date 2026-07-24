@@ -11,6 +11,7 @@ pub struct ReceiveConsignmentStockParams {
     pub location_id: Option<u64>,
     pub quantity: f64,
     pub cost: f64,
+    pub lot_id: Option<u64>,
     pub metadata: Option<String>,
 }
 

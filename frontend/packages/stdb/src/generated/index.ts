@@ -844,6 +844,7 @@ import RunAllWorkflowFoundationTestsReducer from "./run_all_workflow_foundation_
 import RunAllWorkflowHumanEffectTestsReducer from "./run_all_workflow_human_effect_tests_reducer";
 import RunCartonizationReducer from "./run_cartonization_reducer";
 import RunCoreOperationalMessagingTestReducer from "./run_core_operational_messaging_test_reducer";
+import RunCorePermissionsTestReducer from "./run_core_permissions_test_reducer";
 import RunCoreSodTestReducer from "./run_core_sod_test_reducer";
 import RunCountryPackTestReducer from "./run_country_pack_test_reducer";
 import RunCrmContactIdentityTestReducer from "./run_crm_contact_identity_test_reducer";
@@ -8221,6 +8222,7 @@ const tablesSchema = __schema({
       ] },
     ],
     constraints: [
+      { name: 'subscription_billing_run_billing_run_key_key', constraint: 'unique', columns: ['billingRunKey'] },
       { name: 'subscription_billing_run_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, SubscriptionBillingRunRow),
@@ -9797,6 +9799,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_all_workflow_human_effect_tests", RunAllWorkflowHumanEffectTestsReducer),
   __reducerSchema("run_cartonization", RunCartonizationReducer),
   __reducerSchema("run_core_operational_messaging_test", RunCoreOperationalMessagingTestReducer),
+  __reducerSchema("run_core_permissions_test", RunCorePermissionsTestReducer),
   __reducerSchema("run_core_sod_test", RunCoreSodTestReducer),
   __reducerSchema("run_country_pack_test", RunCountryPackTestReducer),
   __reducerSchema("run_crm_contact_identity_test", RunCrmContactIdentityTestReducer),

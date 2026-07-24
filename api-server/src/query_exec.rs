@@ -1070,6 +1070,55 @@ pub async fn execute_resource_query(
         return Ok(rows);
     }
 
+    // Pilot ACL = owner-only on both WS and HTTP (match erp_subscriptions.rs; not full
+    // `read_access_ids`). Documents/folders/versions must not fall through to org-only SQL.
+    if resource == "document-folders" {
+        let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+        let cols = resolve_http_sql_columns("document-folders", fa).map_err(ApiError::Internal)?;
+        let col_part = cols.join(", ");
+        let sql = format!(
+            "SELECT {col_part} FROM doc_folder WHERE organization_id = {organization_id} AND (is_access_restricted = false OR owner_id = {id})"
+        );
+        return client
+            .query_sql(&sql)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()));
+    }
+
+    if resource == "documents" || resource == "documents-deleted" {
+        let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+        let cols = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
+        let col_part = cols.join(", ");
+        let deleted = if resource == "documents-deleted" {
+            "true"
+        } else {
+            "false"
+        };
+        let sql = format!(
+            "SELECT {col_part} FROM document WHERE organization_id = {organization_id} AND is_deleted = {deleted} AND owner_id = {id}"
+        );
+        return client
+            .query_sql(&sql)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()));
+    }
+
+    // Pilot ACL = owner-only. `document_version` has no `owner_id`; SpacetimeDB SQL cannot
+    // JOIN/subquery parent `document.owner_id`. Filter by `created_by` (same as WS).
+    if resource == "document-versions" {
+        let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+        let cols =
+            resolve_http_sql_columns("document-versions", fa).map_err(ApiError::Internal)?;
+        let col_part = cols.join(", ");
+        let sql = format!(
+            "SELECT {col_part} FROM document_version WHERE organization_id = {organization_id} AND created_by = {id}"
+        );
+        return client
+            .query_sql(&sql)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()));
+    }
+
     let Some(reg) = registry_get(resource) else {
         return Err(ApiError::NotFound(format!(
             "Unknown resource: \"{resource}\""

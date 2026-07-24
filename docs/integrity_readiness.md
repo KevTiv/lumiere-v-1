@@ -5,7 +5,7 @@
 **Rubric:** Backend spine → FE wire (form→mapper→hook→reducer) → company/org scoping + audit → E2E proven → known integrity holes.  
 **Scores:** GREEN = pilot-integrity ready · YELLOW = wired but holes · RED = integrity-breaking · SKIP = non-pilot shell.
 
-**Overall:** **GREEN** (pilot integrity) — remediation landed 2026-07-24; see [GREEN remediation plans](#green-remediation-plans-pilot-integrity). Secondary modules still mixed.
+**Overall:** **YELLOW** (post Wave 0–2 remediation 2026-07-24) — Accounting off RED; Inv/CRM company+lot P0s closed. See [integrity_adversarial_review.md](./integrity_adversarial_review.md) and [integrity_remediation_plan.md](./integrity_remediation_plan.md).
 
 ---
 
@@ -13,22 +13,25 @@
 
 | Domain | Verdict | Spine | Biggest integrity hole |
 |--------|---------|-------|------------------------|
-| Platform / core | GREEN | Auth, forms, reports, drafts wired | Field-permission Playwright deferred |
-| CRM + Sales | GREEN | Lead→cash @p0 proven | Competitive OMS edges deferred |
-| Purchasing + Inventory | GREEN | PO→receive→3-way→bill + lot stamp | RFQ UI / outbound FIFO deferred |
-| Accounting + Expenses + Subs | GREEN | Period lock, expense post, balanced pay | Full sub activate→pay Playwright deferred |
-| HR + PSA + Documents | GREEN | Leave reserve, doc ACL subset, purpose feeds | PSA Draft AR close / blob E2E deferred |
+| Platform / core | YELLOW | Allowlist on create/approve/execute; field-perms FULL_CLIENT | Soft `permissions_tests` (P3) |
+| CRM + Sales | GREEN | Lead convert fail-closed; confirm + SO line company guard | Competitive OMS edges deferred |
+| Purchasing + Inventory | GREEN | P2P @p0; inbound+outbound lot continuity | RFQ UI / outbound FIFO deferred |
+| Accounting + Expenses + Subs | YELLOW | Period lock; balanced pay; case-insensitive reconcile; PostPayment on sub | Multi-invoice residual (A3); clearing acct (A4); expense idempotency (A6) |
+| HR + PSA + Documents | YELLOW | Leave reserve; docs owner-only WS+HTTP | Org-wide employees HTTP (H1); PSA Draft AR deferred |
 | Secondary | Mixed | Mfg / helpdesk / proposals / workflow GREEN | Trackers/forensics SKIP; IoT/POS/fleet thin E2E |
 
 ---
 
-## P0 blockers (cross-module) — closed 2026-07-24
+## P0 blockers (cross-module)
 
-1. ~~`post_payment` empty JE~~ — balanced lines + register settles residual.
-2. ~~FieldPermission cutover cleanup~~ — registry/CI green; permissions tests restored.
-3. ~~Inbound lot→quant stamp~~ — `lot_id` passed into quant insert.
-4. ~~Documents read ACL~~ — subscribe filtered to owner / unrestricted folders (honest SQL subset).
-5. ~~CRM→Sales company binding~~ — convert + confirm company-scoped.
+> Closed in remediation pass — see [integrity_adversarial_review.md](./integrity_adversarial_review.md).
+
+1. ~~`post_payment` / `post_ledger_payment` empty JE~~ — balanced lines shared helper (A2).
+2. ~~FieldPermission cutover~~ — registry/CI; FULL_CLIENT includes field-permissions (P2).
+3. ~~Inbound/outbound lot~~ — plumb + dest stamp (I1/I2); domain lot validate EXIT 0.
+4. ~~Documents read ACL~~ — owner-only on WS+HTTP; versions by `created_by` (D1/D2).
+5. ~~CRM→Sales company binding~~ — convert fail-closed; confirm + SO line company (C1/C2).
+6. ~~Register/reconcile casing + company~~ — case-insensitive match (A1); company guard (A5); sub PostPayment (A7).
 
 ---
 
@@ -230,13 +233,13 @@ Prefer **gap-fix Done checklists + code** over investigation intros (CRM/Sales/E
 
 ### Overall after remediation
 
-| Domain | Before | After |
-|--------|--------|-------|
-| Platform / core | YELLOW | **GREEN** |
-| CRM + Sales | YELLOW | **GREEN** |
-| Purchasing + Inventory | YELLOW | **GREEN** |
-| Accounting + Expenses + Subs | YELLOW | **GREEN** |
-| HR + PSA + Documents | YELLOW | **GREEN** |
-| Secondary | Mixed | Unchanged |
+| Domain | Before | After (optimistic checklist) | After adversarial |
+|--------|--------|------------------------------|-------------------|
+| Platform / core | YELLOW | GREEN | **YELLOW** |
+| CRM + Sales | YELLOW | GREEN | **YELLOW** |
+| Purchasing + Inventory | YELLOW | GREEN | **YELLOW** |
+| Accounting + Expenses + Subs | YELLOW | GREEN | **RED** |
+| HR + PSA + Documents | YELLOW | GREEN | **YELLOW** |
+| Secondary | Mixed | Unchanged | Hold |
 
-**Overall:** **GREEN** for pilot-integrity wedges A–E above. Secondary YELLOW/SKIP unchanged. Deferred: field-permission Playwright, full subscription E2E, competitive OMS edges.
+**Overall:** Remediation closed several holes but **must not** be treated as wedge-GREEN. Authoritative post-fix scoreboard: [integrity_adversarial_review.md](./integrity_adversarial_review.md).

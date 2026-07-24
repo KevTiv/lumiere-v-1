@@ -32,6 +32,11 @@ impl __sdk::InModule for ConfirmSalesOrderArgs {
 /// Implemented for [`super::RemoteReducers`].
 pub trait confirm_sales_order {
     /// Request that the remote module invoke the reducer `confirm_sales_order` to run as soon as possible.
+    ///
+    /// This method returns immediately, and errors only if we are unable to send the request.
+    /// The reducer will run asynchronously in the future,
+    ///  and this method provides no way to listen for its completion status.
+    /// /// Use [`confirm_sales_order:confirm_sales_order_then`] to run a callback after the reducer completes.
     fn confirm_sales_order(
         &self,
         organization_id: u64,
@@ -41,11 +46,18 @@ pub trait confirm_sales_order {
         self.confirm_sales_order_then(organization_id, company_id, order_id, |_, _| {})
     }
 
+    /// Request that the remote module invoke the reducer `confirm_sales_order` to run as soon as possible,
+    /// registering `callback` to run when we are notified that the reducer completed.
+    ///
+    /// This method returns immediately, and errors only if we are unable to send the request.
+    /// The reducer will run asynchronously in the future,
+    ///  and its status can be observed with the `callback`.
     fn confirm_sales_order_then(
         &self,
         organization_id: u64,
         company_id: u64,
         order_id: u64,
+
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
             + 'static,
@@ -58,6 +70,7 @@ impl confirm_sales_order for super::RemoteReducers {
         organization_id: u64,
         company_id: u64,
         order_id: u64,
+
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
             + 'static,

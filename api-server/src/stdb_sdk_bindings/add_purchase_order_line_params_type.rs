@@ -20,6 +20,7 @@ pub struct AddPurchaseOrderLineParams {
     pub account_analytic_id: Option<u64>,
     pub date_planned: Option<__sdk::Timestamp>,
     pub propagate_cancel: Option<bool>,
+    pub lot_id: Option<u64>,
     pub metadata: Option<String>,
 }
 

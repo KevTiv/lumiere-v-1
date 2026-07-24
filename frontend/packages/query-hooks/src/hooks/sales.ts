@@ -654,12 +654,13 @@ export function useCreateSaleOrderLine(organizationId: bigint) {
   })
 }
 
-export function useUpdateSaleOrderLine(organizationId: bigint) {
+export function useUpdateSaleOrderLine(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { lineId: bigint | number | string; params: Record<string, unknown> }>({
     mutationFn: async ({ lineId, params }) => {
       const { urlPath, init } = salesBffPost("update_sale_order_line", [
           organizationId,
+          companyId,
           toScalarU64(lineId),
           stdbParamsToJson(params as object),
         ])

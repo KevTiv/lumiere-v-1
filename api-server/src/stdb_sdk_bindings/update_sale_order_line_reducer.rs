@@ -10,6 +10,7 @@ use super::update_sale_order_line_params_type::UpdateSaleOrderLineParams;
 #[sats(crate = __lib)]
 pub(super) struct UpdateSaleOrderLineArgs {
     pub organization_id: u64,
+    pub company_id: u64,
     pub line_id: u64,
     pub params: UpdateSaleOrderLineParams,
 }
@@ -18,6 +19,7 @@ impl From<UpdateSaleOrderLineArgs> for super::Reducer {
     fn from(args: UpdateSaleOrderLineArgs) -> Self {
         Self::UpdateSaleOrderLine {
             organization_id: args.organization_id,
+            company_id: args.company_id,
             line_id: args.line_id,
             params: args.params,
         }
@@ -42,10 +44,11 @@ pub trait update_sale_order_line {
     fn update_sale_order_line(
         &self,
         organization_id: u64,
+        company_id: u64,
         line_id: u64,
         params: UpdateSaleOrderLineParams,
     ) -> __sdk::Result<()> {
-        self.update_sale_order_line_then(organization_id, line_id, params, |_, _| {})
+        self.update_sale_order_line_then(organization_id, company_id, line_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `update_sale_order_line` to run as soon as possible,
@@ -57,6 +60,7 @@ pub trait update_sale_order_line {
     fn update_sale_order_line_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         line_id: u64,
         params: UpdateSaleOrderLineParams,
 
@@ -70,6 +74,7 @@ impl update_sale_order_line for super::RemoteReducers {
     fn update_sale_order_line_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         line_id: u64,
         params: UpdateSaleOrderLineParams,
 
@@ -80,6 +85,7 @@ impl update_sale_order_line for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             UpdateSaleOrderLineArgs {
                 organization_id,
+                company_id,
                 line_id,
                 params,
             },

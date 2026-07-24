@@ -6,6 +6,7 @@ use crate::accounting::payment_management::{
     payment_account, payment_transaction, post_payment_transaction, void_payment_transaction,
     CreatePaymentAccountParams, CreatePaymentFeeParams, CreatePaymentTransactionParams,
 };
+use crate::accounting::journal_entries::account_move_line;
 use crate::accounting::payments::account_payment;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{
@@ -257,6 +258,40 @@ pub fn test_payment_transaction_post_creates_ledger_payment(
         return Err(format!(
             "Ledger payment amount mismatch: expected 100.0, got {}",
             ledger_payment.amount
+        ));
+    }
+
+    let payment_move_id = ledger_payment
+        .move_id
+        .ok_or("Ledger payment missing move_id after post")?;
+    let line_count = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+        .count();
+    if line_count < 2 {
+        return Err(format!(
+            "post_ledger_payment must insert balanced lines, got {line_count}"
+        ));
+    }
+    let debit: f64 = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+        .map(|l| l.debit)
+        .sum();
+    let credit: f64 = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+        .map(|l| l.credit)
+        .sum();
+    if (debit - credit).abs() > 0.01 {
+        return Err(format!(
+            "Ledger payment move unbalanced: debit={debit} credit={credit}"
         ));
     }
 

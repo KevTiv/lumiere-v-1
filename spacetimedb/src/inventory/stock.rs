@@ -1601,13 +1601,29 @@ pub(crate) fn apply_validated_move_to_quants(
     }
 
     // Outbound: consume reserved qty at source and transfer to dest.
-    let quant = find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
-        .ok_or_else(|| {
-            format!(
-                "No stock quant for product {} at location {} on validate",
-                product_id, location_id
-            )
-        })?;
+    // Prefer a lot-matched source quant when the move carries a lot_id.
+    let quant = if lot_id.is_some() {
+        find_quant_at_location_with_owner_and_lot(
+            ctx,
+            organization_id,
+            company_id,
+            product_id,
+            location_id,
+            None,
+            lot_id,
+        )
+        .or_else(|| {
+            find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
+        })
+    } else {
+        find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
+    }
+    .ok_or_else(|| {
+        format!(
+            "No stock quant for product {} at location {} on validate",
+            product_id, location_id
+        )
+    })?;
 
     if quant.quantity + 1e-9 < qty {
         return Err(format!(
@@ -1635,7 +1651,10 @@ pub(crate) fn apply_validated_move_to_quants(
     }
 
     if location_dest_id != location_id {
-        increase_quant_at_location(
+        let method = crate::inventory::costing::product_for_costing(ctx, product_id)
+            .map(|p| crate::inventory::costing::normalize_cost_method(&p.cost_method))
+            .unwrap_or_else(|_| "standard".to_string());
+        increase_quant_at_location_owned(
             ctx,
             organization_id,
             company_id,
@@ -1643,6 +1662,9 @@ pub(crate) fn apply_validated_move_to_quants(
             location_dest_id,
             qty,
             cost,
+            None,
+            lot_id,
+            &method,
         )?;
     }
     Ok(())

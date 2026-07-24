@@ -243,6 +243,7 @@ pub fn import_purchase_order_line_csv(
             move_dest_ids: vec![],
             move_ids: vec![],
             match_state: "pending".to_string(),
+            lot_id: None,
             create_uid: ctx.sender(),
             create_date: ctx.timestamp,
             write_uid: ctx.sender(),

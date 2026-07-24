@@ -142,6 +142,7 @@ pub fn test_receipt_increases_quant(ctx: &ReducerContext) -> Result<(), String> 
             account_analytic_id: None,
             date_planned: None,
             propagate_cancel: None,
+            lot_id: None,
             metadata: None,
         },
     )?;

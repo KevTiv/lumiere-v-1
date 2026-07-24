@@ -16,6 +16,7 @@ pub struct ReceiveConsignmentStockParams {
     pub location_id: Option<u64>,
     pub quantity: f64,
     pub cost: f64,
+    pub lot_id: Option<u64>,
     pub metadata: Option<String>,
 }
 
@@ -120,7 +121,7 @@ pub fn receive_consignment_stock(
         params.quantity,
         params.cost,
         Some(agreement.partner_id),
-        None,
+        params.lot_id,
         &method,
     )?;
 

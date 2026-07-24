@@ -176,7 +176,9 @@ pub fn create_balanced_customer_invoice(
         },
     )?;
 
-    patch_receivable_line_type(ctx, move_id, ar_id)?;
+    // Lines come from add_account_move_line → insert stamps Debug casing ("Receivable").
+    // Reconcile is case-insensitive (A1); do not patch casing here for payment settlement proofs.
+    // Payment settlement tests must NOT call patch_receivable_line_type.
 
     add_account_move_line(
         ctx,
@@ -227,7 +229,11 @@ pub fn create_balanced_customer_invoice(
     Ok(move_id)
 }
 
-/// Patch AR line metadata so `reconcile_payment_with_invoice` can match it.
+/// Legacy helper: force lowercase `receivable` on an AR line.
+///
+/// **Payment settlement tests must NOT use this.** Reconcile matches case-insensitively
+/// (`Receivable` from insert is enough). Keep only for unrelated tests that still need
+/// an explicit residual/type stamp outside the payment path.
 pub fn patch_receivable_line_type(
     ctx: &ReducerContext,
     move_id: u64,

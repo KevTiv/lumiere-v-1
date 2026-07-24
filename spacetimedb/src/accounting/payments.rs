@@ -76,7 +76,7 @@ pub struct CreatePaymentParams {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn payment_line_params(
+pub(crate) fn payment_line_params(
     account_id: u64,
     name: String,
     debit: f64,
@@ -123,7 +123,7 @@ fn payment_line_params(
     }
 }
 
-fn resolve_payment_liquidity_account(
+pub(crate) fn resolve_payment_liquidity_account(
     ctx: &ReducerContext,
     journal_id: u64,
 ) -> Result<u64, String> {
@@ -141,7 +141,7 @@ fn resolve_payment_liquidity_account(
         })
 }
 
-fn resolve_payment_clearing_account(
+pub(crate) fn resolve_payment_clearing_account(
     ctx: &ReducerContext,
     company_id: u64,
     payment_type: PaymentType,
@@ -166,6 +166,135 @@ fn resolve_payment_clearing_account(
             format!("No active {label} account found for company {company_id}")
         })?;
     Ok((account_id, label))
+}
+
+/// Insert liquidity + AR/AP clearing lines on a draft payment move and mark it Posted.
+/// Shared by `post_payment_impl` and operational `post_ledger_payment`.
+pub(crate) fn insert_balanced_payment_lines_and_post(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+    mut move_record: AccountMove,
+) -> Result<(AccountMove, u64, u64), String> {
+    let amount = payment.amount;
+    let payment_type = payment.payment_type.clone();
+    let partner_id = payment.partner_id;
+    let payment_id = payment.id;
+    let liquidity_account_id = resolve_payment_liquidity_account(ctx, payment.journal_id)?;
+    let (clearing_account_id, clearing_label) =
+        resolve_payment_clearing_account(ctx, payment.company_id, payment_type.clone())?;
+
+    let (bank_debit, bank_credit, clear_debit, clear_credit) = match payment_type {
+        PaymentType::InBound => (amount, 0.0, 0.0, amount),
+        PaymentType::OutBound => (0.0, amount, amount, 0.0),
+    };
+
+    insert_draft_account_move_line(
+        ctx,
+        &move_record,
+        payment_line_params(
+            liquidity_account_id,
+            "Bank".to_string(),
+            bank_debit,
+            bank_credit,
+            1,
+            partner_id,
+            payment_id,
+        ),
+    )?;
+    let clearing_line = insert_draft_account_move_line(
+        ctx,
+        &move_record,
+        payment_line_params(
+            clearing_account_id,
+            format!("Accounts {}", clearing_label),
+            clear_debit,
+            clear_credit,
+            2,
+            partner_id,
+            payment_id,
+        ),
+    )?;
+    // Explicit clearing label for reconcile (snake); residual must stay open until register.
+    ctx.db.account_move_line().id().update(AccountMoveLine {
+        account_internal_type: Some(clearing_label.to_string()),
+        amount_residual: amount,
+        amount_residual_currency: amount,
+        ..clearing_line
+    });
+
+    for ml in ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_record.id)
+    {
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            parent_state: AccountMoveState::Posted,
+            ..ml
+        });
+    }
+    move_record = ctx.db.account_move().id().update(AccountMove {
+        state: AccountMoveState::Posted,
+        posted_before: true,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..move_record
+    });
+
+    Ok((move_record, liquidity_account_id, clearing_account_id))
+}
+
+fn assert_existing_payment_move_ready(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+    move_id: u64,
+) -> Result<AccountMove, String> {
+    let move_record = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_id)
+        .ok_or("Linked payment move not found")?;
+    if move_record.organization_id != payment.organization_id {
+        return Err("Linked payment move belongs to a different organization".to_string());
+    }
+    if move_record.company_id != payment.company_id {
+        return Err("Linked payment move belongs to a different company".to_string());
+    }
+    if move_record.state != AccountMoveState::Posted {
+        return Err("Linked payment move must be posted before marking payment Paid".to_string());
+    }
+    let line_count = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .count();
+    if line_count < 2 {
+        return Err(format!(
+            "Linked payment move must have balanced lines, got {line_count}"
+        ));
+    }
+    let debit: f64 = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .map(|l| l.debit)
+        .sum();
+    let credit: f64 = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .map(|l| l.credit)
+        .sum();
+    if (debit - credit).abs() > 0.01 {
+        return Err(format!(
+            "Linked payment move unbalanced: debit={debit} credit={credit}"
+        ));
+    }
+    Ok(move_record)
 }
 
 /// Wave C WHT MVP: if outbound supplier payment and company has active pack WHT taxes,
@@ -324,18 +453,50 @@ pub fn post_payment_impl(
         return Err("Payment amount must be positive".to_string());
     }
 
+    // Subscription (and similar) paths may pre-build a balanced move and link it
+    // before calling this gate — mark Paid without creating a second journal header.
+    if let Some(existing_move_id) = payment.move_id {
+        let move_record = assert_existing_payment_move_ready(ctx, &payment, existing_move_id)?;
+        let name = payment
+            .name
+            .clone()
+            .unwrap_or_else(|| next_doc_number(ctx, "PAY"));
+        ctx.db.account_payment().id().update(AccountPayment {
+            name: Some(name),
+            state: PaymentState::Paid,
+            ..payment
+        });
+        write_audit_log_v2(
+            ctx,
+            organization_id,
+            AuditLogParams {
+                company_id: Some(move_record.company_id),
+                table_name: "account_payment",
+                record_id: payment_id,
+                action: "POST",
+                old_values: None,
+                new_values: Some(
+                    serde_json::json!({
+                        "move_id": move_record.id,
+                        "linked_existing_move": true,
+                    })
+                    .to_string(),
+                ),
+                changed_fields: vec!["state".to_string(), "name".to_string()],
+                metadata: None,
+            },
+        );
+        return Ok(());
+    }
+
     let name = next_doc_number(ctx, "PAY");
-    let payment_type = payment.payment_type.clone();
     let amount = payment.amount;
     let partner_id = payment.partner_id;
     let company_id = payment.company_id;
-    let liquidity_account_id = resolve_payment_liquidity_account(ctx, payment.journal_id)?;
-    let (clearing_account_id, clearing_label) =
-        resolve_payment_clearing_account(ctx, company_id, payment_type.clone())?;
     let wht_metadata = wht_metadata_for_vendor_payment(ctx, organization_id, &payment);
 
     // Draft move first so line inserts stay consistent; mark Posted after balanced lines.
-    let mut move_record = ctx.db.account_move().insert(AccountMove {
+    let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id,
         name: name.clone(),
@@ -391,63 +552,8 @@ pub fn post_payment_impl(
         metadata: wht_metadata,
     });
 
-    let (bank_debit, bank_credit, clear_debit, clear_credit) = match payment_type {
-        PaymentType::InBound => (amount, 0.0, 0.0, amount),
-        PaymentType::OutBound => (0.0, amount, amount, 0.0),
-    };
-
-    insert_draft_account_move_line(
-        ctx,
-        &move_record,
-        payment_line_params(
-            liquidity_account_id,
-            "Bank".to_string(),
-            bank_debit,
-            bank_credit,
-            1,
-            partner_id,
-            payment_id,
-        ),
-    )?;
-    let clearing_line = insert_draft_account_move_line(
-        ctx,
-        &move_record,
-        payment_line_params(
-            clearing_account_id,
-            format!("Accounts {}", clearing_label),
-            clear_debit,
-            clear_credit,
-            2,
-            partner_id,
-            payment_id,
-        ),
-    )?;
-    // Reconcile matcher expects lowercase internal types.
-    ctx.db.account_move_line().id().update(AccountMoveLine {
-        account_internal_type: Some(clearing_label.to_string()),
-        amount_residual: amount,
-        amount_residual_currency: amount,
-        ..clearing_line
-    });
-
-    for ml in ctx
-        .db
-        .account_move_line()
-        .move_line_by_move()
-        .filter(&move_record.id)
-    {
-        ctx.db.account_move_line().id().update(AccountMoveLine {
-            parent_state: AccountMoveState::Posted,
-            ..ml
-        });
-    }
-    move_record = ctx.db.account_move().id().update(AccountMove {
-        state: AccountMoveState::Posted,
-        posted_before: true,
-        write_uid: Some(ctx.sender()),
-        write_date: Some(ctx.timestamp),
-        ..move_record
-    });
+    let (move_record, liquidity_account_id, clearing_account_id) =
+        insert_balanced_payment_lines_and_post(ctx, &payment, move_record)?;
 
     ctx.db.account_payment().id().update(AccountPayment {
         name: Some(name),
@@ -550,6 +656,30 @@ pub fn register_payment_on_invoice(
         return Err("Only posted payments can be reconciled".to_string());
     }
 
+    let payment_move_id = payment
+        .move_id
+        .ok_or("Posted payment is missing linked journal move")?;
+
+    // Company/org guard before mutating residuals or reconciled_* lists.
+    for inv_id in &invoice_ids {
+        let invoice = ctx
+            .db
+            .account_move()
+            .id()
+            .find(inv_id)
+            .ok_or_else(|| format!("Invoice/bill move {inv_id} not found"))?;
+        if invoice.organization_id != organization_id {
+            return Err(format!(
+                "Invoice/bill {inv_id} belongs to a different organization"
+            ));
+        }
+        if invoice.company_id != payment.company_id {
+            return Err(format!(
+                "Invoice/bill {inv_id} belongs to a different company than the payment"
+            ));
+        }
+    }
+
     let mut reconciled_invoice_ids = payment.reconciled_invoice_ids.clone();
     let mut reconciled_bill_ids = payment.reconciled_bill_ids.clone();
 
@@ -563,9 +693,6 @@ pub fn register_payment_on_invoice(
         }
     }
 
-    let payment_move_id = payment
-        .move_id
-        .ok_or("Posted payment is missing linked journal move")?;
     let company_id = payment.company_id;
     let old_invoice_ids = payment.reconciled_invoice_ids.clone();
     let old_bill_ids = payment.reconciled_bill_ids.clone();

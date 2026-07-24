@@ -21,4 +21,5 @@ export default __t.row({
   productUomQty: __t.f64().name("product_uom_qty"),
   priceUnit: __t.f64().name("price_unit"),
   toRefund: __t.bool().name("to_refund"),
+  lotId: __t.option(__t.u64()).name("lot_id"),
 });

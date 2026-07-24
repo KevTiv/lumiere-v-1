@@ -925,7 +925,7 @@ pub fn finish_manufacturing_order(
                     has_tracking: false,
                     inventory_id: None,
                     sale_line_id: None,
-                    lot_id: None,
+                    lot_id: mo.lot_producing_id,
                     serial_id: None,
                     package_id: None,
                     result_package_id: None,

@@ -17,6 +17,7 @@ pub struct UpdatePurchaseOrderLineParams {
     pub account_analytic_id: Option<u64>,
     pub display_type: Option<String>,
     pub propagate_cancel: Option<bool>,
+    pub lot_id: Option<u64>,
     pub metadata: Option<String>,
 }
 

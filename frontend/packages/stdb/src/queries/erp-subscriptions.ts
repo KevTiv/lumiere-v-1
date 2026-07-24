@@ -1824,8 +1824,8 @@ export function subscriptionQueriesForResource(
     ];
   }
 
-  // Document folder ACL: SpacetimeDB HTTP SQL cannot express Vec<Identity> membership
-  // (`read_access_ids`). Honest subset = unrestricted folders OR caller is owner.
+  // Pilot ACL = owner-only on both WS and HTTP (not full `read_access_ids`).
+  // Folder: unrestricted OR caller is owner — SQL cannot express Vec<Identity> membership.
   if (r === "document-folders") {
     if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
     const org = ctx.organizationId;
@@ -1837,8 +1837,7 @@ export function subscriptionQueriesForResource(
     ];
   }
 
-  // Documents inherit folder ACL in reducers; without SQL joins, unrestricted-folder
-  // contents cannot be expressed. Owner filter is the honest subset.
+  // Pilot ACL = owner-only on both WS and HTTP (match query_exec / erp_subscriptions.rs).
   if (r === "documents" || r === "documents-deleted") {
     if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
     const org = ctx.organizationId;
@@ -1848,6 +1847,20 @@ export function subscriptionQueriesForResource(
     const deleted = r === "documents-deleted" ? "true" : "false";
     return [
       `SELECT ${cols} FROM document WHERE organization_id = ${Number(org)} AND is_deleted = ${deleted} AND owner_id = ${idLit}`,
+    ];
+  }
+
+  // Pilot ACL = owner-only. `document_version` has no `owner_id`; SpacetimeDB SQL
+  // cannot JOIN/subquery parent `document.owner_id`. Filter by `created_by` (version
+  // author) — under owner-only docs the owner creates versions.
+  if (r === "document-versions") {
+    if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
+    const org = ctx.organizationId;
+    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
+    const idLit = identitySqlLiteral(ctx.identityHex);
+    const cols = resolveHttpSqlColumns("document-versions", ctx.fieldAccess).join(", ");
+    return [
+      `SELECT ${cols} FROM document_version WHERE organization_id = ${Number(org)} AND created_by = ${idLit}`,
     ];
   }
 
@@ -1933,6 +1946,8 @@ export const ALL_ERP_RESOURCE_KEYS: string[] = Array.from(
 export const FULL_CLIENT_SUBSCRIPTION_RESOURCES: string[] = [
   "auth",
   "form-configuration",
+  // Live field-permission rows (special-cased SQL; not in ERP_ORG_SQL).
+  "field-permissions",
   ...ALL_ERP_RESOURCE_KEYS,
 ];
 

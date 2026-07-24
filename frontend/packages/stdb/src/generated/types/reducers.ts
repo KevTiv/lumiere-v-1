@@ -816,6 +816,7 @@ import RunAllWorkflowFoundationTestsReducer from "../run_all_workflow_foundation
 import RunAllWorkflowHumanEffectTestsReducer from "../run_all_workflow_human_effect_tests_reducer";
 import RunCartonizationReducer from "../run_cartonization_reducer";
 import RunCoreOperationalMessagingTestReducer from "../run_core_operational_messaging_test_reducer";
+import RunCorePermissionsTestReducer from "../run_core_permissions_test_reducer";
 import RunCoreSodTestReducer from "../run_core_sod_test_reducer";
 import RunCountryPackTestReducer from "../run_country_pack_test_reducer";
 import RunCrmContactIdentityTestReducer from "../run_crm_contact_identity_test_reducer";
@@ -2009,6 +2010,7 @@ export type RunAllWorkflowFoundationTestsParams = __Infer<typeof RunAllWorkflowF
 export type RunAllWorkflowHumanEffectTestsParams = __Infer<typeof RunAllWorkflowHumanEffectTestsReducer>;
 export type RunCartonizationParams = __Infer<typeof RunCartonizationReducer>;
 export type RunCoreOperationalMessagingTestParams = __Infer<typeof RunCoreOperationalMessagingTestReducer>;
+export type RunCorePermissionsTestParams = __Infer<typeof RunCorePermissionsTestReducer>;
 export type RunCoreSodTestParams = __Infer<typeof RunCoreSodTestReducer>;
 export type RunCountryPackTestParams = __Infer<typeof RunCountryPackTestReducer>;
 export type RunCrmContactIdentityTestParams = __Infer<typeof RunCrmContactIdentityTestReducer>;

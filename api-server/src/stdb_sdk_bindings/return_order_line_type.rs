@@ -17,6 +17,7 @@ pub struct ReturnOrderLine {
     pub product_uom_qty: f64,
     pub price_unit: f64,
     pub to_refund: bool,
+    pub lot_id: Option<u64>,
 }
 
 impl __sdk::InModule for ReturnOrderLine {
@@ -37,6 +38,7 @@ pub struct ReturnOrderLineCols {
     pub product_uom_qty: __sdk::__query_builder::Col<ReturnOrderLine, f64>,
     pub price_unit: __sdk::__query_builder::Col<ReturnOrderLine, f64>,
     pub to_refund: __sdk::__query_builder::Col<ReturnOrderLine, bool>,
+    pub lot_id: __sdk::__query_builder::Col<ReturnOrderLine, Option<u64>>,
 }
 
 impl __sdk::__query_builder::HasCols for ReturnOrderLine {
@@ -53,6 +55,7 @@ impl __sdk::__query_builder::HasCols for ReturnOrderLine {
             product_uom_qty: __sdk::__query_builder::Col::new(table_name, "product_uom_qty"),
             price_unit: __sdk::__query_builder::Col::new(table_name, "price_unit"),
             to_refund: __sdk::__query_builder::Col::new(table_name, "to_refund"),
+            lot_id: __sdk::__query_builder::Col::new(table_name, "lot_id"),
         }
     }
 }

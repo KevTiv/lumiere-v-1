@@ -2608,6 +2608,13 @@ pub fn create_credit_note_from_invoice(
     Ok(())
 }
 
+/// Match Debug (`Receivable`) or snake (`receivable`) stamps on move lines.
+fn is_receivable_or_payable_line_type(account_internal_type: Option<&str>) -> bool {
+    account_internal_type.is_some_and(|t| {
+        t.eq_ignore_ascii_case("receivable") || t.eq_ignore_ascii_case("payable")
+    })
+}
+
 /// Reconcile a payment AccountMove against an invoice AccountMove.
 ///
 /// Marks the receivable/payable lines as matched and updates the invoice's
@@ -2635,6 +2642,15 @@ pub fn reconcile_payment_with_invoice(
         .find(&invoice_move_id)
         .ok_or("Invoice move not found")?;
 
+    if payment_move.organization_id != organization_id
+        || invoice_move.organization_id != organization_id
+    {
+        return Err("Payment or invoice move belongs to a different organization".to_string());
+    }
+    if payment_move.company_id != invoice_move.company_id {
+        return Err("Payment and invoice must belong to the same company".to_string());
+    }
+
     if payment_move.state != AccountMoveState::Posted {
         return Err("Payment move must be posted".to_string());
     }
@@ -2650,12 +2666,7 @@ pub fn reconcile_payment_with_invoice(
         .account_move_line()
         .move_line_by_move()
         .filter(&invoice_move_id)
-        .filter(|l| {
-            matches!(
-                l.account_internal_type.as_deref(),
-                Some("receivable") | Some("payable")
-            )
-        })
+        .filter(|l| is_receivable_or_payable_line_type(l.account_internal_type.as_deref()))
         .collect();
 
     // Find the matching line on the payment
@@ -2664,12 +2675,7 @@ pub fn reconcile_payment_with_invoice(
         .account_move_line()
         .move_line_by_move()
         .filter(&payment_move_id)
-        .filter(|l| {
-            matches!(
-                l.account_internal_type.as_deref(),
-                Some("receivable") | Some("payable")
-            )
-        })
+        .filter(|l| is_receivable_or_payable_line_type(l.account_internal_type.as_deref()))
         .collect();
 
     if invoice_lines.is_empty() {
@@ -2721,12 +2727,7 @@ pub fn reconcile_payment_with_invoice(
         .account_move_line()
         .move_line_by_move()
         .filter(&invoice_move_id)
-        .filter(|l| {
-            matches!(
-                l.account_internal_type.as_deref(),
-                Some("receivable") | Some("payable")
-            )
-        })
+        .filter(|l| is_receivable_or_payable_line_type(l.account_internal_type.as_deref()))
         .map(|l| l.amount_residual.abs())
         .sum();
 

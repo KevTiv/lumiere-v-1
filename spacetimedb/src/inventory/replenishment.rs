@@ -281,6 +281,7 @@ fn create_buy_demand(
             account_analytic_id: None,
             date_planned: order.date_planned,
             propagate_cancel: Some(true),
+            lot_id: None,
             metadata: Some(
                 serde_json::json!({ "replenishment_rule_id": rule.id }).to_string(),
             ),

@@ -139,6 +139,7 @@ pub fn test_po_confirm_to_balanced_bill(ctx: &ReducerContext) -> Result<(), Stri
             account_analytic_id: None,
             date_planned: None,
             propagate_cancel: None,
+            lot_id: None,
             metadata: None,
         },
     )?;

@@ -226,6 +226,7 @@ pub fn test_update_and_delete_sale_order_line(ctx: &ReducerContext) -> Result<()
     update_sale_order_line(
         ctx,
         org_id,
+        fixture.company_id,
         line_id,
         UpdateSaleOrderLineParams {
             product_id: None,
@@ -442,6 +443,7 @@ pub fn test_exchange_order_from_return(ctx: &ReducerContext) -> Result<(), Strin
                 product_uom_qty: 1.0,
                 price_unit: 10.0,
                 to_refund: true,
+                lot_id: None,
             }],
         },
     )?;

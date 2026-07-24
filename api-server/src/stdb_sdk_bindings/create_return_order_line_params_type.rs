@@ -13,6 +13,7 @@ pub struct CreateReturnOrderLineParams {
     pub product_uom_qty: f64,
     pub price_unit: f64,
     pub to_refund: bool,
+    pub lot_id: Option<u64>,
 }
 
 impl __sdk::InModule for CreateReturnOrderLineParams {

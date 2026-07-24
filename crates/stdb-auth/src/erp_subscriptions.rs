@@ -338,8 +338,8 @@ pub fn subscription_queries_for_resource(
         )]));
     }
 
-    // Document folder ACL: HTTP SQL cannot express Vec<Identity> membership
-    // (`read_access_ids`). Honest subset = unrestricted OR caller is owner.
+    // Pilot ACL = owner-only on both WS and HTTP (not full `read_access_ids`).
+    // Folder: unrestricted OR caller is owner — SQL cannot express Vec<Identity> membership.
     if r == "document-folders" {
         let Some(org) = ctx.organization_id else {
             return Ok(None);
@@ -354,6 +354,7 @@ pub fn subscription_queries_for_resource(
         )]));
     }
 
+    // Pilot ACL = owner-only on both WS and HTTP (match query_exec special-case).
     if r == "documents" || r == "documents-deleted" {
         let Some(org) = ctx.organization_id else {
             return Ok(None);
@@ -370,6 +371,23 @@ pub fn subscription_queries_for_resource(
         };
         return Ok(Some(vec![format!(
             "SELECT {cols} FROM document WHERE organization_id = {org} AND is_deleted = {deleted} AND owner_id = {id_lit}"
+        )]));
+    }
+
+    // Pilot ACL = owner-only. `document_version` has no `owner_id`; SpacetimeDB SQL
+    // cannot JOIN/subquery parent `document.owner_id`. Filter by `created_by` (version
+    // author) — under owner-only docs the owner creates versions.
+    if r == "document-versions" {
+        let Some(org) = ctx.organization_id else {
+            return Ok(None);
+        };
+        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
+            return Ok(None);
+        };
+        let id_lit = crate::field_policy::identity_sql_literal(id)?;
+        let cols = resolve_http_sql_columns("document-versions", ctx.field_access)?.join(", ");
+        return Ok(Some(vec![format!(
+            "SELECT {cols} FROM document_version WHERE organization_id = {org} AND created_by = {id_lit}"
         )]));
     }
 

@@ -2258,6 +2258,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         move_dest_ids: vec![],
         move_ids: vec![],
         match_state: "pending".to_string(),
+        lot_id: None,
         create_uid: seeder,
         create_date: ctx.timestamp,
         write_uid: seeder,

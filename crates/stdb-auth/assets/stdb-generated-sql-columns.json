@@ -748,6 +748,7 @@
     "account_analytic_id",
     "date_planned",
     "propagate_cancel",
+    "lot_id",
     "metadata"
   ],
   "AddPurchaseRequisitionLineParams": [
@@ -4701,7 +4702,8 @@
     "product_uom",
     "product_uom_qty",
     "price_unit",
-    "to_refund"
+    "to_refund",
+    "lot_id"
   ],
   "CreateReturnOrderParams": [
     "sale_order_id",
@@ -10574,6 +10576,7 @@
     "location_id",
     "quantity",
     "cost",
+    "lot_id",
     "metadata"
   ],
   "RecognizeAmortizationLineParams": [
@@ -13828,6 +13831,7 @@
     "account_analytic_id",
     "display_type",
     "propagate_cancel",
+    "lot_id",
     "metadata"
   ],
   "UpdatePurchaseOrderParams": [

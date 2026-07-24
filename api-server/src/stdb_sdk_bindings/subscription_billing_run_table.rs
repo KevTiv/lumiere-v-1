@@ -127,11 +127,42 @@ impl<'ctx> SubscriptionBillingRunIdUnique<'ctx> {
     }
 }
 
+/// Access to the `billing_run_key` unique index on the table `subscription_billing_run`,
+/// which allows point queries on the field of the same name
+/// via the [`SubscriptionBillingRunBillingRunKeyUnique::find`] method.
+///
+/// Users are encouraged not to explicitly reference this type,
+/// but to directly chain method calls,
+/// like `ctx.db.subscription_billing_run().billing_run_key().find(...)`.
+pub struct SubscriptionBillingRunBillingRunKeyUnique<'ctx> {
+    imp: __sdk::UniqueConstraintHandle<SubscriptionBillingRun, String>,
+    phantom: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+impl<'ctx> SubscriptionBillingRunTableHandle<'ctx> {
+    /// Get a handle on the `billing_run_key` unique index on the table `subscription_billing_run`.
+    pub fn billing_run_key(&self) -> SubscriptionBillingRunBillingRunKeyUnique<'ctx> {
+        SubscriptionBillingRunBillingRunKeyUnique {
+            imp: self.imp.get_unique_constraint::<String>("billing_run_key"),
+            phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'ctx> SubscriptionBillingRunBillingRunKeyUnique<'ctx> {
+    /// Find the subscribed row whose `billing_run_key` column value is equal to `col_val`,
+    /// if such a row is present in the client cache.
+    pub fn find(&self, col_val: &String) -> Option<SubscriptionBillingRun> {
+        self.imp.find(col_val)
+    }
+}
+
 #[doc(hidden)]
 pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
     let _table =
         client_cache.get_or_make_table::<SubscriptionBillingRun>("subscription_billing_run");
     _table.add_unique_constraint::<u64>("id", |row| &row.id);
+    _table.add_unique_constraint::<String>("billing_run_key", |row| &row.billing_run_key);
 }
 
 #[doc(hidden)]

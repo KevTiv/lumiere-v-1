@@ -2032,6 +2032,7 @@ pub fn unlock_sale_order(
 pub fn update_sale_order_line(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     line_id: u64,
     params: UpdateSaleOrderLineParams,
 ) -> Result<(), String> {
@@ -2054,6 +2055,9 @@ pub fn update_sale_order_line(
         .find(&line.order_id)
         .ok_or("Sale order not found")?;
     validate_order_org_scope(&order, organization_id)?;
+    if order.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
     if order.is_locked {
         return Err("Sale order is locked".to_string());
     }
@@ -2106,7 +2110,6 @@ pub fn update_sale_order_line(
         .or_else(|| line.display_type.clone());
     let metadata = params.metadata.clone().or_else(|| line.metadata.clone());
     let order_id = line.order_id;
-    let company_id = line.company_id;
 
     ctx.db.sale_order_line().id().update(SaleOrderLine {
         product_id,

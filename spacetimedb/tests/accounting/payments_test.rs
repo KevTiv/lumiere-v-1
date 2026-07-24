@@ -95,6 +95,8 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
     }
 
     // register_payment_on_invoice settles residual in the same txn.
+    // Relies on case-insensitive reconcile (A1) — invoice AR lines keep Debug
+    // "Receivable" from insert; do not call patch_receivable_line_type.
     register_payment_on_invoice(ctx, org_id, payment_id, vec![invoice_move_id], false)?;
 
     let payment = ctx
