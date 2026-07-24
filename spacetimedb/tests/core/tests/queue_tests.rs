@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::organization::{create_organization, organization, CreateOrganizationParams};
+use crate::core::organization::{insert_organization_with_owner, CreateOrganizationParams};
 use crate::core::queue::{
     cancel_queue_job, claim_queue_job, complete_queue_job, enqueue_job, queue_attempt,
     queue_effect_receipt, queue_job, queue_worker, register_queue_worker,
@@ -13,7 +13,10 @@ use crate::core::queue::{
 use crate::types::{QueueAttemptOutcome, QueueCompletionOutcome, QueueJobStatus};
 
 fn create_test_organization(ctx: &ReducerContext, code: &str, name: &str) -> Result<u64, String> {
-    create_organization(
+    // Return the inserted row id — org `code` is not unique, so find-by-code can
+    // reuse a prior QUEUE_* fixture left by `run_all_core_tests` before the e2e
+    // domain loop calls `run_queue_foundation_tests` again.
+    let (org, _) = insert_organization_with_owner(
         ctx,
         CreateOrganizationParams {
             name: name.to_string(),
@@ -31,12 +34,7 @@ fn create_test_organization(ctx: &ReducerContext, code: &str, name: &str) -> Res
             metadata: None,
         },
     )?;
-    ctx.db
-        .organization()
-        .iter()
-        .find(|organization| organization.code == code)
-        .map(|organization| organization.id)
-        .ok_or_else(|| format!("test organization {code} was not created"))
+    Ok(org.id)
 }
 
 fn register_test_worker(

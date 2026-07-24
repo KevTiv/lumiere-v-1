@@ -6,9 +6,9 @@ use serde_json::Value;
 use crate::error::ApiError;
 use crate::state::AppState;
 use stdb_auth::{
-    select_casbin_rules_in_subjects_sql, select_roles_active_sql,
-    select_user_organization_for_identity_sql, select_user_profile_by_identity_sql, CasbinRuleLike,
-    FieldAccessContext,
+    select_field_permissions_for_org_sql, select_roles_active_sql,
+    select_user_organization_for_identity_sql, select_user_profile_by_identity_sql,
+    FieldAccessContext, FieldPermissionLike,
 };
 use stdb_client::StdbClient;
 use stdb_config::runtime_is_production;
@@ -201,24 +201,17 @@ pub async fn load_field_access_context(
         .unwrap_or("")
         .to_string();
 
-    let esc = |s: &str| s.replace('\'', "''");
-    let subjects = [
-        format!("'{}'", esc(identity_hex)),
-        format!("'{}'", esc(&role_id.to_string())),
-        format!("'{}'", esc(&role_name)),
-    ]
-    .join(", ");
-    let sql_casbin =
-        select_casbin_rules_in_subjects_sql(&subjects, None).map_err(|e| e.to_string())?;
-    let casbin_rows = client
-        .query_sql(&sql_casbin)
+    let sql_fields =
+        select_field_permissions_for_org_sql(organization_id).map_err(|e| e.to_string())?;
+    let field_rows = client
+        .query_sql(&sql_fields)
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut casbin_rules = Vec::new();
-    for row in casbin_rows {
-        if let Ok(rule) = serde_json::from_value::<CasbinRuleLike>(row) {
-            casbin_rules.push(rule);
+    let mut field_permissions = Vec::new();
+    for row in field_rows {
+        if let Some(rule) = parse_field_permission_row(&row, identity_hex) {
+            field_permissions.push(rule);
         }
     }
 
@@ -238,8 +231,77 @@ pub async fn load_field_access_context(
         is_superuser,
         role_permissions,
         identity_hex: identity_hex.to_string(),
-        casbin_rules,
+        field_permissions,
     }))
+}
+
+fn parse_field_permission_row(row: &Value, identity_hex: &str) -> Option<FieldPermissionLike> {
+    let resource = row
+        .get("resource")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    if resource.is_empty() {
+        return None;
+    }
+
+    let action = row
+        .get("action")
+        .and_then(|v| {
+            v.as_str()
+                .map(|s| s.to_string())
+                .or_else(|| v.as_object().and_then(|o| o.keys().next().cloned()))
+        })
+        .unwrap_or_default();
+
+    let allowed_fields: Vec<String> = row
+        .get("allowedFields")
+        .or_else(|| row.get("allowed_fields"))
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let role_id = row
+        .get("roleId")
+        .or_else(|| row.get("role_id"))
+        .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok())));
+
+    let mut subject_role_id = role_id;
+    let mut subject_user_hex = None;
+    if let Some(subject) = row.get("subject") {
+        if let Some(obj) = subject.as_object() {
+            if let Some(rid) = obj.get("Role").and_then(|v| {
+                v.as_u64()
+                    .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+            }) {
+                subject_role_id = Some(rid);
+            }
+            if let Some(hex) = obj.get("User").and_then(|v| v.as_str()) {
+                subject_user_hex = Some(hex.trim_start_matches("0x").to_string());
+            }
+        }
+    }
+    let _ = identity_hex;
+
+    Some(FieldPermissionLike {
+        id: row
+            .get("id")
+            .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok()))),
+        organization_id: row
+            .get("organizationId")
+            .or_else(|| row.get("organization_id"))
+            .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok()))),
+        role_id,
+        resource,
+        action,
+        allowed_fields,
+        subject_user_hex,
+        subject_role_id,
+    })
 }
 
 pub struct ApiSession {

@@ -9,16 +9,24 @@ import {
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
 } from "spacetimedb";
+import {
+  PermissionSubject,
+  FieldPermissionAction,
+} from "./types";
+
 
 export default __t.row({
   id: __t.u64().primaryKey(),
-  ptype: __t.string(),
-  v0: __t.option(__t.string()).name("v_0"),
-  v1: __t.option(__t.string()).name("v_1"),
-  v2: __t.option(__t.string()).name("v_2"),
-  v3: __t.option(__t.string()).name("v_3"),
-  v4: __t.option(__t.string()).name("v_4"),
-  v5: __t.option(__t.string()).name("v_5"),
+  organizationId: __t.u64().name("organization_id"),
+  get subject() {
+    return PermissionSubject;
+  },
+  roleId: __t.option(__t.u64()).name("role_id"),
+  resource: __t.string(),
+  get action() {
+    return FieldPermissionAction;
+  },
+  allowedFields: __t.array(__t.string()).name("allowed_fields"),
+  createdBy: __t.identity().name("created_by"),
   createdAt: __t.timestamp().name("created_at"),
-  metadata: __t.option(__t.string()),
 });

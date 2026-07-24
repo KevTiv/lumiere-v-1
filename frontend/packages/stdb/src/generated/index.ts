@@ -45,7 +45,6 @@ import ActivateSubscriptionReducer from "./activate_subscription_reducer";
 import ActivateSubscriptionPlanReducer from "./activate_subscription_plan_reducer";
 import AddAccountMoveLineReducer from "./add_account_move_line_reducer";
 import AddArticleMemberReducer from "./add_article_member_reducer";
-import AddCasbinRuleReducer from "./add_casbin_rule_reducer";
 import AddContactToSegmentReducer from "./add_contact_to_segment_reducer";
 import AddDocumentVersionReducer from "./add_document_version_reducer";
 import AddFormFieldReducer from "./add_form_field_reducer";
@@ -584,6 +583,7 @@ import GenerateSubscriptionInvoiceReducer from "./generate_subscription_invoice_
 import GetFormConfigurationReducer from "./get_form_configuration_reducer";
 import GetOrganizationFormConfigsReducer from "./get_organization_form_configs_reducer";
 import GrantDelegatedAdminScopeReducer from "./grant_delegated_admin_scope_reducer";
+import GrantFieldPermissionReducer from "./grant_field_permission_reducer";
 import GrantPermissionReducer from "./grant_permission_reducer";
 import GrantSubscriptionEntitlementReducer from "./grant_subscription_entitlement_reducer";
 import HoldSupplierIntakeReducer from "./hold_supplier_intake_reducer";
@@ -774,7 +774,6 @@ import ReleaseBlanketToPoReducer from "./release_blanket_to_po_reducer";
 import ReleaseDocumentLegalHoldReducer from "./release_document_legal_hold_reducer";
 import ReleasePickingWaveReducer from "./release_picking_wave_reducer";
 import RemoveArticleMemberReducer from "./remove_article_member_reducer";
-import RemoveCasbinRuleReducer from "./remove_casbin_rule_reducer";
 import RemoveLandedCostLineReducer from "./remove_landed_cost_line_reducer";
 import RemoveMemberFromQualityTeamReducer from "./remove_member_from_quality_team_reducer";
 import RemovePurchaseOrderLineReducer from "./remove_purchase_order_line_reducer";
@@ -809,6 +808,7 @@ import ReverseSaleCommissionSettlementReducer from "./reverse_sale_commission_se
 import ReviewMessageBatchReducer from "./review_message_batch_reducer";
 import ReviewSupplierIntakeReducer from "./review_supplier_intake_reducer";
 import RevokeDelegatedAdminScopeReducer from "./revoke_delegated_admin_scope_reducer";
+import RevokeFieldPermissionReducer from "./revoke_field_permission_reducer";
 import RevokePermissionReducer from "./revoke_permission_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
 import RevokeSubscriptionEntitlementReducer from "./revoke_subscription_entitlement_reducer";
@@ -1298,7 +1298,6 @@ import BudgetPostRow from "./budget_post_table";
 import CalendarEventRow from "./calendar_event_table";
 import CapacityForecastSnapshotRow from "./capacity_forecast_snapshot_table";
 import CartonizationResultRow from "./cartonization_result_table";
-import CasbinRuleRow from "./casbin_rule_table";
 import CashFlowLineRow from "./cash_flow_line_table";
 import CommodityPriceIndexRow from "./commodity_price_index_table";
 import CompanyRow from "./company_table";
@@ -1353,6 +1352,7 @@ import DocumentVersionRow from "./document_version_table";
 import ExpenseCardStatementLineRow from "./expense_card_statement_line_table";
 import ExpenseIntegrationIntentRow from "./expense_integration_intent_table";
 import ExpenseSheetRow from "./expense_sheet_table";
+import FieldPermissionRow from "./field_permission_table";
 import FinancialReportRow from "./financial_report_table";
 import FleetVehicleRow from "./fleet_vehicle_table";
 import FormConfigRow from "./form_config_table";
@@ -2965,20 +2965,6 @@ const tablesSchema = __schema({
       { name: 'cartonization_result_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CartonizationResultRow),
-  casbin_rule: __table({
-    name: 'casbin_rule',
-    indexes: [
-      { name: 'id', algorithm: 'btree', columns: [
-        'id',
-      ] },
-      { name: 'casbin_by_ptype', algorithm: 'btree', columns: [
-        'ptype',
-      ] },
-    ],
-    constraints: [
-      { name: 'casbin_rule_id_key', constraint: 'unique', columns: ['id'] },
-    ],
-  }, CasbinRuleRow),
   cash_flow_line: __table({
     name: 'cash_flow_line',
     indexes: [
@@ -3887,6 +3873,23 @@ const tablesSchema = __schema({
       { name: 'expense_sheet_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ExpenseSheetRow),
+  field_permission: __table({
+    name: 'field_permission',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'field_perm_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'field_perm_by_role', algorithm: 'btree', columns: [
+        'roleId',
+      ] },
+    ],
+    constraints: [
+      { name: 'field_permission_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FieldPermissionRow),
   financial_report: __table({
     name: 'financial_report',
     indexes: [
@@ -8995,7 +8998,6 @@ const reducersSchema = __reducers(
   __reducerSchema("activate_subscription_plan", ActivateSubscriptionPlanReducer),
   __reducerSchema("add_account_move_line", AddAccountMoveLineReducer),
   __reducerSchema("add_article_member", AddArticleMemberReducer),
-  __reducerSchema("add_casbin_rule", AddCasbinRuleReducer),
   __reducerSchema("add_contact_to_segment", AddContactToSegmentReducer),
   __reducerSchema("add_document_version", AddDocumentVersionReducer),
   __reducerSchema("add_form_field", AddFormFieldReducer),
@@ -9534,6 +9536,7 @@ const reducersSchema = __reducers(
   __reducerSchema("get_form_configuration", GetFormConfigurationReducer),
   __reducerSchema("get_organization_form_configs", GetOrganizationFormConfigsReducer),
   __reducerSchema("grant_delegated_admin_scope", GrantDelegatedAdminScopeReducer),
+  __reducerSchema("grant_field_permission", GrantFieldPermissionReducer),
   __reducerSchema("grant_permission", GrantPermissionReducer),
   __reducerSchema("grant_subscription_entitlement", GrantSubscriptionEntitlementReducer),
   __reducerSchema("hold_supplier_intake", HoldSupplierIntakeReducer),
@@ -9724,7 +9727,6 @@ const reducersSchema = __reducers(
   __reducerSchema("release_document_legal_hold", ReleaseDocumentLegalHoldReducer),
   __reducerSchema("release_picking_wave", ReleasePickingWaveReducer),
   __reducerSchema("remove_article_member", RemoveArticleMemberReducer),
-  __reducerSchema("remove_casbin_rule", RemoveCasbinRuleReducer),
   __reducerSchema("remove_landed_cost_line", RemoveLandedCostLineReducer),
   __reducerSchema("remove_member_from_quality_team", RemoveMemberFromQualityTeamReducer),
   __reducerSchema("remove_purchase_order_line", RemovePurchaseOrderLineReducer),
@@ -9759,6 +9761,7 @@ const reducersSchema = __reducers(
   __reducerSchema("review_message_batch", ReviewMessageBatchReducer),
   __reducerSchema("review_supplier_intake", ReviewSupplierIntakeReducer),
   __reducerSchema("revoke_delegated_admin_scope", RevokeDelegatedAdminScopeReducer),
+  __reducerSchema("revoke_field_permission", RevokeFieldPermissionReducer),
   __reducerSchema("revoke_permission", RevokePermissionReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
   __reducerSchema("revoke_subscription_entitlement", RevokeSubscriptionEntitlementReducer),

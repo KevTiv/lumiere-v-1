@@ -10,7 +10,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company, organization};
 use crate::core::permissions::{
-    casbin_rule, org_permission, role, sod_conflict_rule, user_role_assignment, PermissionAction,
+    org_permission, role, sod_conflict_rule, user_role_assignment, PermissionAction,
     PermissionEffect, PermissionSubject,
 };
 use crate::core::users::{user_organization, user_profile};
@@ -683,31 +683,7 @@ fn has_required_permission(
         }
     }
 
-    let org_string = organization_id.to_string();
-    let identity_string = principal_identity.to_hex().to_string();
-    Ok(ctx
-        .db
-        .casbin_rule()
-        .casbin_by_ptype()
-        .filter(&"p".to_string())
-        .any(|rule| {
-            let subject_matches = rule.v0.as_deref() == Some(identity_string.as_str())
-                || rule.v0.as_deref().is_some_and(|subject| {
-                    current_roles.iter().any(|current| {
-                        subject == current.role_id.to_string() || subject == current.role_name
-                    })
-                });
-            subject_matches
-                && rule.v1.as_deref() == Some(org_string.as_str())
-                && rule
-                    .v2
-                    .as_deref()
-                    .is_some_and(|configured| permission_resource_matches(configured, resource))
-                && rule
-                    .v3
-                    .as_deref()
-                    .is_some_and(|configured| configured == "*" || configured == action)
-        }))
+    Ok(false)
 }
 
 fn permission_set_has(permissions: &[String], required_permission: &str) -> bool {

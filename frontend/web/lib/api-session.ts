@@ -89,7 +89,7 @@ export interface ApiSession {
   organizationId: number | undefined
   /** Pre-built StdbHttpOptions ready to pass to server query functions */
   opts: StdbHttpOptions
-  /** Casbin + role context for field-level SQL projection on `/api/query` */
+  /** Field-permission + role context for field-level SQL projection on `/api/query` */
   fieldAccess?: FieldAccessContext
 }
 

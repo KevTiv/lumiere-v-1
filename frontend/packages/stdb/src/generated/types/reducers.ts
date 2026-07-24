@@ -17,7 +17,6 @@ import ActivateSubscriptionReducer from "../activate_subscription_reducer";
 import ActivateSubscriptionPlanReducer from "../activate_subscription_plan_reducer";
 import AddAccountMoveLineReducer from "../add_account_move_line_reducer";
 import AddArticleMemberReducer from "../add_article_member_reducer";
-import AddCasbinRuleReducer from "../add_casbin_rule_reducer";
 import AddContactToSegmentReducer from "../add_contact_to_segment_reducer";
 import AddDocumentVersionReducer from "../add_document_version_reducer";
 import AddFormFieldReducer from "../add_form_field_reducer";
@@ -556,6 +555,7 @@ import GenerateSubscriptionInvoiceReducer from "../generate_subscription_invoice
 import GetFormConfigurationReducer from "../get_form_configuration_reducer";
 import GetOrganizationFormConfigsReducer from "../get_organization_form_configs_reducer";
 import GrantDelegatedAdminScopeReducer from "../grant_delegated_admin_scope_reducer";
+import GrantFieldPermissionReducer from "../grant_field_permission_reducer";
 import GrantPermissionReducer from "../grant_permission_reducer";
 import GrantSubscriptionEntitlementReducer from "../grant_subscription_entitlement_reducer";
 import HoldSupplierIntakeReducer from "../hold_supplier_intake_reducer";
@@ -746,7 +746,6 @@ import ReleaseBlanketToPoReducer from "../release_blanket_to_po_reducer";
 import ReleaseDocumentLegalHoldReducer from "../release_document_legal_hold_reducer";
 import ReleasePickingWaveReducer from "../release_picking_wave_reducer";
 import RemoveArticleMemberReducer from "../remove_article_member_reducer";
-import RemoveCasbinRuleReducer from "../remove_casbin_rule_reducer";
 import RemoveLandedCostLineReducer from "../remove_landed_cost_line_reducer";
 import RemoveMemberFromQualityTeamReducer from "../remove_member_from_quality_team_reducer";
 import RemovePurchaseOrderLineReducer from "../remove_purchase_order_line_reducer";
@@ -781,6 +780,7 @@ import ReverseSaleCommissionSettlementReducer from "../reverse_sale_commission_s
 import ReviewMessageBatchReducer from "../review_message_batch_reducer";
 import ReviewSupplierIntakeReducer from "../review_supplier_intake_reducer";
 import RevokeDelegatedAdminScopeReducer from "../revoke_delegated_admin_scope_reducer";
+import RevokeFieldPermissionReducer from "../revoke_field_permission_reducer";
 import RevokePermissionReducer from "../revoke_permission_reducer";
 import RevokeRoleReducer from "../revoke_role_reducer";
 import RevokeSubscriptionEntitlementReducer from "../revoke_subscription_entitlement_reducer";
@@ -1210,7 +1210,6 @@ export type ActivateSubscriptionParams = __Infer<typeof ActivateSubscriptionRedu
 export type ActivateSubscriptionPlanParams = __Infer<typeof ActivateSubscriptionPlanReducer>;
 export type AddAccountMoveLineParams = __Infer<typeof AddAccountMoveLineReducer>;
 export type AddArticleMemberParams = __Infer<typeof AddArticleMemberReducer>;
-export type AddCasbinRuleParams = __Infer<typeof AddCasbinRuleReducer>;
 export type AddContactToSegmentParams = __Infer<typeof AddContactToSegmentReducer>;
 export type AddDocumentVersionParams = __Infer<typeof AddDocumentVersionReducer>;
 export type AddFormFieldParams = __Infer<typeof AddFormFieldReducer>;
@@ -1749,6 +1748,7 @@ export type GenerateSubscriptionInvoiceParams = __Infer<typeof GenerateSubscript
 export type GetFormConfigurationParams = __Infer<typeof GetFormConfigurationReducer>;
 export type GetOrganizationFormConfigsParams = __Infer<typeof GetOrganizationFormConfigsReducer>;
 export type GrantDelegatedAdminScopeParams = __Infer<typeof GrantDelegatedAdminScopeReducer>;
+export type GrantFieldPermissionParams = __Infer<typeof GrantFieldPermissionReducer>;
 export type GrantPermissionParams = __Infer<typeof GrantPermissionReducer>;
 export type GrantSubscriptionEntitlementParams = __Infer<typeof GrantSubscriptionEntitlementReducer>;
 export type HoldSupplierIntakeParams = __Infer<typeof HoldSupplierIntakeReducer>;
@@ -1939,7 +1939,6 @@ export type ReleaseBlanketToPoParams = __Infer<typeof ReleaseBlanketToPoReducer>
 export type ReleaseDocumentLegalHoldParams = __Infer<typeof ReleaseDocumentLegalHoldReducer>;
 export type ReleasePickingWaveParams = __Infer<typeof ReleasePickingWaveReducer>;
 export type RemoveArticleMemberParams = __Infer<typeof RemoveArticleMemberReducer>;
-export type RemoveCasbinRuleParams = __Infer<typeof RemoveCasbinRuleReducer>;
 export type RemoveLandedCostLineParams = __Infer<typeof RemoveLandedCostLineReducer>;
 export type RemoveMemberFromQualityTeamParams = __Infer<typeof RemoveMemberFromQualityTeamReducer>;
 export type RemovePurchaseOrderLineParams = __Infer<typeof RemovePurchaseOrderLineReducer>;
@@ -1974,6 +1973,7 @@ export type ReverseSaleCommissionSettlementParams = __Infer<typeof ReverseSaleCo
 export type ReviewMessageBatchParams = __Infer<typeof ReviewMessageBatchReducer>;
 export type ReviewSupplierIntakeParams = __Infer<typeof ReviewSupplierIntakeReducer>;
 export type RevokeDelegatedAdminScopeParams = __Infer<typeof RevokeDelegatedAdminScopeReducer>;
+export type RevokeFieldPermissionParams = __Infer<typeof RevokeFieldPermissionReducer>;
 export type RevokePermissionParams = __Infer<typeof RevokePermissionReducer>;
 export type RevokeRoleParams = __Infer<typeof RevokeRoleReducer>;
 export type RevokeSubscriptionEntitlementParams = __Infer<typeof RevokeSubscriptionEntitlementReducer>;

@@ -1,6 +1,6 @@
 /// Cross-cutting helpers available to every domain module.
 ///
-/// - `check_permission`  — multi-tenant RBAC + Casbin policy check
+/// - `check_permission`  — multi-tenant RBAC check
 /// - `write_audit_log`   — structured audit trail insert
 /// - `calculate_tax`     — compute tax amount from AccountTax records
 ///
@@ -11,7 +11,7 @@ use spacetimedb::{Identity, ReducerContext, Table};
 use crate::accounting::tax_management::account_tax;
 use crate::core::audit::{audit_log, AuditLog};
 use crate::core::permissions::{
-    casbin_rule, org_permission, role, PermissionAction, PermissionEffect, PermissionSubject,
+    org_permission, role, PermissionAction, PermissionEffect, PermissionSubject,
 };
 use crate::core::reference::{document_sequence, DocumentSequence};
 use crate::core::users::{user_organization, user_profile};
@@ -30,13 +30,12 @@ pub enum PermissionResolution {
 ///   1. Superuser → Allow
 ///   2. Role.permissions string list (`"resource:action"` or `"resource:*"`)
 ///   3. OrgPermission rows for the org (explicit **Deny** wins over **Allow**)
-///   4. Legacy CasbinRule policy rows (`ptype == "p"`), org-scoped via index
 pub fn resolve_permission(
     ctx: &ReducerContext,
     organization_id: u64,
     user_identity: Identity,
     role_id: u64,
-    role_name: &str,
+    _role_name: &str,
     role_permissions: &[String],
     is_superuser: bool,
     resource: &str,
@@ -69,26 +68,6 @@ pub fn resolve_permission(
             Ok(()) => PermissionResolution::Allow,
             Err(_) => PermissionResolution::Deny,
         };
-    }
-
-    let role_str = role_id.to_string();
-    let org_str = organization_id.to_string();
-    let has_casbin = ctx
-        .db
-        .casbin_rule()
-        .casbin_by_ptype()
-        .filter(&"p".to_string())
-        .any(|r| {
-            let subject_ok = r.v0.as_deref() == Some(role_str.as_str())
-                || r.v0.as_deref() == Some(role_name)
-                || r.v0.as_deref() == Some(user_identity.to_hex().to_string().as_str());
-            let res_ok = r.v2.as_deref() == Some("*") || r.v2.as_deref() == Some(resource);
-            let act_ok = r.v3.as_deref() == Some("*") || r.v3.as_deref() == Some(action);
-            subject_ok && r.v1.as_deref() == Some(org_str.as_str()) && res_ok && act_ok
-        });
-
-    if has_casbin {
-        return PermissionResolution::Allow;
     }
 
     PermissionResolution::NotGranted

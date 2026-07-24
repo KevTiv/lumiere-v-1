@@ -12,5 +12,5 @@ import {
 
 export default {
   organizationId: __t.u64(),
-  ruleId: __t.u64(),
+  permissionId: __t.u64(),
 };

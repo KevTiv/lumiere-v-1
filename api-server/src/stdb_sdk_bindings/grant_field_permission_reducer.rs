@@ -4,51 +4,57 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::grant_field_permission_params_type::GrantFieldPermissionParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub(super) struct RemoveCasbinRuleArgs {
+pub(super) struct GrantFieldPermissionArgs {
     pub organization_id: u64,
-    pub rule_id: u64,
+    pub params: GrantFieldPermissionParams,
 }
 
-impl From<RemoveCasbinRuleArgs> for super::Reducer {
-    fn from(args: RemoveCasbinRuleArgs) -> Self {
-        Self::RemoveCasbinRule {
+impl From<GrantFieldPermissionArgs> for super::Reducer {
+    fn from(args: GrantFieldPermissionArgs) -> Self {
+        Self::GrantFieldPermission {
             organization_id: args.organization_id,
-            rule_id: args.rule_id,
+            params: args.params,
         }
     }
 }
 
-impl __sdk::InModule for RemoveCasbinRuleArgs {
+impl __sdk::InModule for GrantFieldPermissionArgs {
     type Module = super::RemoteModule;
 }
 
 #[allow(non_camel_case_types)]
-/// Extension trait for access to the reducer `remove_casbin_rule`.
+/// Extension trait for access to the reducer `grant_field_permission`.
 ///
 /// Implemented for [`super::RemoteReducers`].
-pub trait remove_casbin_rule {
-    /// Request that the remote module invoke the reducer `remove_casbin_rule` to run as soon as possible.
+pub trait grant_field_permission {
+    /// Request that the remote module invoke the reducer `grant_field_permission` to run as soon as possible.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
-    /// /// Use [`remove_casbin_rule:remove_casbin_rule_then`] to run a callback after the reducer completes.
-    fn remove_casbin_rule(&self, organization_id: u64, rule_id: u64) -> __sdk::Result<()> {
-        self.remove_casbin_rule_then(organization_id, rule_id, |_, _| {})
+    /// /// Use [`grant_field_permission:grant_field_permission_then`] to run a callback after the reducer completes.
+    fn grant_field_permission(
+        &self,
+        organization_id: u64,
+        params: GrantFieldPermissionParams,
+    ) -> __sdk::Result<()> {
+        self.grant_field_permission_then(organization_id, params, |_, _| {})
     }
 
-    /// Request that the remote module invoke the reducer `remove_casbin_rule` to run as soon as possible,
+    /// Request that the remote module invoke the reducer `grant_field_permission` to run as soon as possible,
     /// registering `callback` to run when we are notified that the reducer completed.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and its status can be observed with the `callback`.
-    fn remove_casbin_rule_then(
+    fn grant_field_permission_then(
         &self,
         organization_id: u64,
-        rule_id: u64,
+        params: GrantFieldPermissionParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -56,20 +62,20 @@ pub trait remove_casbin_rule {
     ) -> __sdk::Result<()>;
 }
 
-impl remove_casbin_rule for super::RemoteReducers {
-    fn remove_casbin_rule_then(
+impl grant_field_permission for super::RemoteReducers {
+    fn grant_field_permission_then(
         &self,
         organization_id: u64,
-        rule_id: u64,
+        params: GrantFieldPermissionParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
             + 'static,
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
-            RemoveCasbinRuleArgs {
+            GrantFieldPermissionArgs {
                 organization_id,
-                rule_id,
+                params,
             },
             callback,
         )

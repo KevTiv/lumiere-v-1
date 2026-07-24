@@ -3,10 +3,11 @@ use spacetimedb::{Identity, ReducerContext};
 
 use crate::core::organization::{insert_organization_with_owner, CreateOrganizationParams};
 use crate::core::permissions::{
-    add_casbin_rule, assign_role, create_role, create_sod_conflict_rule, ensure_resource_fields_writable,
-    grant_delegated_admin_scope, grant_permission, revoke_delegated_admin_scope, role,
-    delegated_admin_scope, sod_conflict_rule, update_sod_conflict_rule, AddCasbinRuleParams, AssignRoleParams,
-    CreateRoleParams, CreateSodConflictRuleParams, GrantDelegatedAdminScopeParams,
+    assign_role, create_role, create_sod_conflict_rule, ensure_resource_fields_writable,
+    grant_delegated_admin_scope, grant_field_permission, grant_permission,
+    revoke_delegated_admin_scope, role, delegated_admin_scope, sod_conflict_rule,
+    update_sod_conflict_rule, AssignRoleParams, CreateRoleParams, CreateSodConflictRuleParams,
+    FieldPermissionAction, GrantDelegatedAdminScopeParams, GrantFieldPermissionParams,
     GrantOrgPermissionParams, PermissionAction, PermissionEffect, PermissionSubject,
     UpdateSodConflictRuleParams,
 };
@@ -241,20 +242,14 @@ pub fn test_field_write_policy_blocks_disallowed_columns(ctx: &ReducerContext) -
         .find(|r| r.name == "Contact Name Only")
         .ok_or("Limited role not found")?;
 
-    let org_str = org_id.to_string();
-    let role_str = limited_role.id.to_string();
-    add_casbin_rule(
+    grant_field_permission(
         ctx,
         org_id,
-        AddCasbinRuleParams {
-            ptype: "p".to_string(),
-            v0: Some(role_str),
-            v1: Some(org_str),
-            v2: Some("contact".to_string()),
-            v3: Some("write".to_string()),
-            v4: None,
-            v5: None,
-            metadata: Some(r#"{"fields":["name"]}"#.to_string()),
+        GrantFieldPermissionParams {
+            subject: PermissionSubject::Role(limited_role.id),
+            resource: "contact".to_string(),
+            action: FieldPermissionAction::Write,
+            allowed_fields: vec!["name".to_string()],
         },
     )?;
 
@@ -412,19 +407,14 @@ pub fn test_opportunity_field_write_policy(ctx: &ReducerContext) -> Result<(), S
         .find(|r| r.name == "Opportunity Name Only")
         .ok_or("Limited role not found")?;
 
-    let org_str = org_id.to_string();
-    add_casbin_rule(
+    grant_field_permission(
         ctx,
         org_id,
-        AddCasbinRuleParams {
-            ptype: "p".to_string(),
-            v0: Some(limited_role.id.to_string()),
-            v1: Some(org_str),
-            v2: Some("opportunity".to_string()),
-            v3: Some("write".to_string()),
-            v4: None,
-            v5: None,
-            metadata: Some(r#"{"fields":["name"]}"#.to_string()),
+        GrantFieldPermissionParams {
+            subject: PermissionSubject::Role(limited_role.id),
+            resource: "opportunity".to_string(),
+            action: FieldPermissionAction::Write,
+            allowed_fields: vec!["name".to_string()],
         },
     )?;
 

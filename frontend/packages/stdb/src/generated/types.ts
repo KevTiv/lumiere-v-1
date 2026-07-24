@@ -831,18 +831,6 @@ export const AddAccountMoveLineParams = __t.object("AddAccountMoveLineParams", {
 });
 export type AddAccountMoveLineParams = __Infer<typeof AddAccountMoveLineParams>;
 
-export const AddCasbinRuleParams = __t.object("AddCasbinRuleParams", {
-  ptype: __t.string(),
-  v0: __t.option(__t.string()),
-  v1: __t.option(__t.string()),
-  v2: __t.option(__t.string()),
-  v3: __t.option(__t.string()),
-  v4: __t.option(__t.string()),
-  v5: __t.option(__t.string()),
-  metadata: __t.option(__t.string()),
-});
-export type AddCasbinRuleParams = __Infer<typeof AddCasbinRuleParams>;
-
 export const AddDocumentVersionParams = __t.object("AddDocumentVersionParams", {
   fileName: __t.string(),
   fileSize: __t.u64(),
@@ -2233,20 +2221,6 @@ export const CartonizationResult = __t.object("CartonizationResult", {
   metadata: __t.option(__t.string()),
 });
 export type CartonizationResult = __Infer<typeof CartonizationResult>;
-
-export const CasbinRule = __t.object("CasbinRule", {
-  id: __t.u64(),
-  ptype: __t.string(),
-  v0: __t.option(__t.string()),
-  v1: __t.option(__t.string()),
-  v2: __t.option(__t.string()),
-  v3: __t.option(__t.string()),
-  v4: __t.option(__t.string()),
-  v5: __t.option(__t.string()),
-  createdAt: __t.timestamp(),
-  metadata: __t.option(__t.string()),
-});
-export type CasbinRule = __Infer<typeof CasbinRule>;
 
 export const CashFlowLine = __t.object("CashFlowLine", {
   id: __t.u64(),
@@ -7965,6 +7939,30 @@ export const FieldOption = __t.object("FieldOption", {
 });
 export type FieldOption = __Infer<typeof FieldOption>;
 
+export const FieldPermission = __t.object("FieldPermission", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  get subject() {
+    return PermissionSubject;
+  },
+  roleId: __t.option(__t.u64()),
+  resource: __t.string(),
+  get action() {
+    return FieldPermissionAction;
+  },
+  allowedFields: __t.array(__t.string()),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+});
+export type FieldPermission = __Infer<typeof FieldPermission>;
+
+// The tagged union or sum type for the algebraic type `FieldPermissionAction`.
+export const FieldPermissionAction = __t.enum("FieldPermissionAction", {
+  Read: __t.unit(),
+  Write: __t.unit(),
+});
+export type FieldPermissionAction = __Infer<typeof FieldPermissionAction>;
+
 // The tagged union or sum type for the algebraic type `FieldType`.
 export const FieldType = __t.enum("FieldType", {
   Text: __t.unit(),
@@ -8289,6 +8287,18 @@ export const GrantDelegatedAdminScopeParams = __t.object("GrantDelegatedAdminSco
   metadata: __t.option(__t.string()),
 });
 export type GrantDelegatedAdminScopeParams = __Infer<typeof GrantDelegatedAdminScopeParams>;
+
+export const GrantFieldPermissionParams = __t.object("GrantFieldPermissionParams", {
+  get subject() {
+    return PermissionSubject;
+  },
+  resource: __t.string(),
+  get action() {
+    return FieldPermissionAction;
+  },
+  allowedFields: __t.array(__t.string()),
+});
+export type GrantFieldPermissionParams = __Infer<typeof GrantFieldPermissionParams>;
 
 export const GrantOrgPermissionParams = __t.object("GrantOrgPermissionParams", {
   get subject() {

@@ -1,30 +1,21 @@
 import type { Infer } from "spacetimedb";
 import type UserProfileRow from "../generated/user_profile_table";
-import type CasbinRuleRow from "../generated/casbin_rule_table";
 import type RoleRow from "../generated/role_table";
 import type UserRoleAssignmentRow from "../generated/user_role_assignment_table";
 import type UserOrganizationRow from "../generated/user_organization_table";
+import { selectFieldPermissionsForOrgSql } from "../field-policy";
 
 export type UserProfile = Infer<typeof UserProfileRow>;
-export type CasbinRule = Infer<typeof CasbinRuleRow>;
 export type StdbRole = Infer<typeof RoleRow>;
 export type UserRoleAssignment = Infer<typeof UserRoleAssignmentRow>;
 export type UserOrganization = Infer<typeof UserOrganizationRow>;
-
-function sqlQuoteStr(s: string): string {
-  return `'${s.replace(/'/g, "''")}'`;
-}
-
-function isNarrowIdentityHex(s: string | undefined): s is string {
-  return typeof s === "string" && /^[0-9a-fA-F]{64}$/.test(s);
-}
 
 /**
  * Returns subscription SQL for the current user's auth data.
  *
  * When `identityHex` is a valid 64-char hex identity (and usually when the layout
  * passes `organizationId`), queries are scoped so clients do not mirror every
- * user's profile, memberships, or Casbin rows.
+ * user's profile, memberships, or field-permission rows.
  *
  * When identity is unknown (e.g. dev-first connect before cookies), falls back
  * to broad `SELECT *` mirrors — same as historical behavior.
@@ -62,20 +53,10 @@ export function authSubscriptions(
     ? `SELECT * FROM user_organization WHERE user_identity = 0x${id} AND is_active = true`
     : "SELECT * FROM user_organization";
 
-  const casbinSubjects: string[] = [];
-  if (id) {
-    casbinSubjects.push(id);
-    for (const r of roles) {
-      casbinSubjects.push(r);
-    }
-  }
-
-  const casbinSql =
-    casbinSubjects.length > 0
-      ? `SELECT * FROM casbin_rule WHERE (${casbinSubjects
-          .map((s) => `v0 = ${sqlQuoteStr(s)}`)
-          .join(" OR ")})`
-      : "SELECT * FROM casbin_rule";
+  const fieldPermissionSql =
+    orgIdNum !== undefined
+      ? selectFieldPermissionsForOrgSql(orgIdNum)
+      : "SELECT id, organization_id, subject, role_id, resource, action, allowed_fields, created_by, created_at FROM field_permission";
 
   const orgPermissionSql =
     orgIdNum !== undefined
@@ -94,8 +75,12 @@ export function authSubscriptions(
     userRoleAssignmentSql,
     roleSql,
     userOrganizationSql,
-    casbinSql,
+    fieldPermissionSql,
     orgPermissionSql,
     policySnapshotSql,
   ];
+}
+
+function isNarrowIdentityHex(s: string | undefined): s is string {
+  return typeof s === "string" && /^[0-9a-fA-F]{64}$/.test(s);
 }

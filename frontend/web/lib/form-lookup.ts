@@ -717,15 +717,6 @@ export function mailMessageRowsToSelectOptions(
   })
 }
 
-export function casbinRuleRowsToSelectOptions(
-  rows: Record<string, unknown>[],
-): Array<{ value: string; label: string }> {
-  return rows.map((row) => ({
-    value: String(row.id ?? ''),
-    label: `#${String(row.id ?? '')} · ${String(row.ptype ?? '')} ${String(row.v0 ?? '')}/${String(row.v1 ?? '')}`,
-  }))
-}
-
 export function orgMemberRowsToSelectOptions(
   rows: Record<string, unknown>[],
 ): Array<{ value: string; label: string }> {

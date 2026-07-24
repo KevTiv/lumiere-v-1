@@ -6,17 +6,13 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub struct AddCasbinRuleParams {
-    pub ptype: String,
-    pub v_0: Option<String>,
-    pub v_1: Option<String>,
-    pub v_2: Option<String>,
-    pub v_3: Option<String>,
-    pub v_4: Option<String>,
-    pub v_5: Option<String>,
-    pub metadata: Option<String>,
+#[derive(Copy, Eq, Hash)]
+pub enum FieldPermissionAction {
+    Read,
+
+    Write,
 }
 
-impl __sdk::InModule for AddCasbinRuleParams {
+impl __sdk::InModule for FieldPermissionAction {
     type Module = super::RemoteModule;
 }

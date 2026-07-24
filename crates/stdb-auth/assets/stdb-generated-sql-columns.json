@@ -689,16 +689,6 @@
     "expected_pay_date_residual",
     "metadata"
   ],
-  "AddCasbinRuleParams": [
-    "ptype",
-    "v0",
-    "v1",
-    "v2",
-    "v3",
-    "v4",
-    "v5",
-    "metadata"
-  ],
   "AddDocumentVersionParams": [
     "file_name",
     "file_size",
@@ -1774,18 +1764,6 @@
     "move_line_ids",
     "is_optimal",
     "algorithm_used",
-    "created_at",
-    "metadata"
-  ],
-  "CasbinRule": [
-    "id",
-    "ptype",
-    "v_0",
-    "v_1",
-    "v_2",
-    "v_3",
-    "v_4",
-    "v_5",
     "created_at",
     "metadata"
   ],

@@ -18,27 +18,31 @@ pub struct FieldAccessContext {
     pub is_superuser: bool,
     pub role_permissions: Vec<String>,
     pub identity_hex: String,
-    pub casbin_rules: Vec<CasbinRuleLike>,
+    pub field_permissions: Vec<FieldPermissionLike>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CasbinRuleLike {
+#[serde(rename_all = "camelCase")]
+pub struct FieldPermissionLike {
     #[serde(default)]
-    pub ptype: String,
+    pub id: Option<u64>,
     #[serde(default)]
-    pub v0: Option<String>,
+    pub organization_id: Option<u64>,
     #[serde(default)]
-    pub v1: Option<String>,
+    pub role_id: Option<u64>,
     #[serde(default)]
-    pub v2: Option<String>,
+    pub resource: String,
+    /// `"read"` or `"write"`
     #[serde(default)]
-    pub v3: Option<String>,
+    pub action: String,
     #[serde(default)]
-    pub v4: Option<String>,
+    pub allowed_fields: Vec<String>,
+    /// When subject is a user, identity hex; otherwise empty.
     #[serde(default)]
-    pub v5: Option<String>,
+    pub subject_user_hex: Option<String>,
+    /// When subject is a role, role id as string.
     #[serde(default)]
-    pub metadata: Option<String>,
+    pub subject_role_id: Option<u64>,
 }
 
 static STDB_GENERATED_SQL_COLUMNS: Lazy<HashMap<String, Vec<String>>> = Lazy::new(|| {
@@ -161,57 +165,36 @@ fn unique_preserve_order(cols: &[String]) -> Vec<String> {
     out
 }
 
-fn parse_fields_from_metadata(metadata: Option<&str>) -> Option<Vec<String>> {
-    let raw = metadata?;
-    let j: serde_json::Value = serde_json::from_str(raw).ok()?;
-    let arr = j.get("fields")?.as_array()?;
-    let mut out = Vec::new();
-    for x in arr {
-        let s = x.as_str()?.trim();
-        if !s.is_empty() {
-            out.push(s.to_string());
-        }
+fn field_resource_matches(configured: &str, resource_key: &str) -> bool {
+    if configured == "*" || configured == resource_key {
+        return true;
     }
-    if out.is_empty() {
-        return None;
-    }
-    assert_safe_sql_identifiers(&out).ok()
-}
-
-fn parse_fields_from_v5(v5: Option<&str>) -> Option<Vec<String>> {
-    let s = v5?.trim();
-    if s.is_empty() {
-        return None;
-    }
-    let parts: Vec<String> = s
-        .split(',')
-        .map(|p| p.trim().to_string())
-        .filter(|p| !p.is_empty())
-        .collect();
-    if parts.is_empty() {
-        return None;
-    }
-    assert_safe_sql_identifiers(&parts).ok()
-}
-
-fn matches_resource(v2: Option<&str>, resource_key: &str) -> bool {
-    let Some(v2) = v2 else {
-        return false;
-    };
-    if v2 == resource_key {
+    let configured_norm = configured.replace('-', "_");
+    let resource_norm = resource_key.replace('-', "_");
+    if configured_norm == resource_norm {
         return true;
     }
     let Some(reg) = registry_get(resource_key) else {
         return false;
     };
-    reg.aliases.iter().any(|a| a == v2)
+    reg.aliases.iter().any(|a| {
+        a == configured || a.replace('-', "_") == configured_norm
+    })
 }
 
-fn subject_matches(v0: Option<&str>, ctx: &FieldAccessContext) -> bool {
-    let Some(v0) = v0 else {
-        return false;
-    };
-    v0 == ctx.identity_hex || v0 == ctx.role_id.to_string() || v0 == ctx.role_name
+fn field_permission_applies(rule: &FieldPermissionLike, ctx: &FieldAccessContext) -> bool {
+    if let Some(role_id) = rule.subject_role_id {
+        if role_id == ctx.role_id {
+            return true;
+        }
+    }
+    if let Some(user_hex) = rule.subject_user_hex.as_deref() {
+        if user_hex == ctx.identity_hex {
+            return true;
+        }
+    }
+    // Fallback: denormalized role_id column.
+    rule.role_id == Some(ctx.role_id)
 }
 
 /// `None` = full row access; `Some(cols)` = explicit snake_case columns.
@@ -232,54 +215,25 @@ pub(crate) fn resolve_read_columns(
         return Err(format!("unknown resource key: {resource_key}"));
     };
 
-    let org_str = field_access.organization_id.to_string();
-    let mut saw_full_wildcard = false;
     let mut field_batches: Vec<Vec<String>> = Vec::new();
 
-    for rule in &field_access.casbin_rules {
-        if rule.ptype != "p" {
+    for rule in &field_access.field_permissions {
+        let action = rule.action.to_ascii_lowercase();
+        if action != "read" {
             continue;
         }
-        if !subject_matches(rule.v0.as_deref(), field_access) {
+        if !field_permission_applies(rule, field_access) {
             continue;
         }
-        if rule.v1.as_deref() != Some(org_str.as_str()) {
+        if !field_resource_matches(&rule.resource, resource_key) {
             continue;
         }
-
-        let v2 = rule.v2.clone().unwrap_or_default();
-        let v3 = rule.v3.clone().unwrap_or_default();
-
-        if v2 == "*" && (v3 == "*" || v3 == "read") {
-            let deny = rule
-                .v4
-                .as_deref()
-                .map(|s| s.eq_ignore_ascii_case("deny"))
-                .unwrap_or(false);
-            if !deny {
-                saw_full_wildcard = true;
-            }
+        if rule.allowed_fields.is_empty() {
             continue;
         }
-
-        if !matches_resource(Some(&v2), resource_key) {
-            continue;
+        if let Ok(safe) = assert_safe_sql_identifiers(&rule.allowed_fields) {
+            field_batches.push(safe);
         }
-        if v3 != "read" && v3 != "*" {
-            continue;
-        }
-
-        let fields = parse_fields_from_metadata(rule.metadata.as_deref())
-            .or_else(|| parse_fields_from_v5(rule.v5.as_deref()));
-        if let Some(f) = fields {
-            if !f.is_empty() {
-                field_batches.push(f);
-            }
-        }
-    }
-
-    if saw_full_wildcard {
-        return Ok(None);
     }
 
     if !field_batches.is_empty() {
@@ -524,14 +478,9 @@ pub fn select_user_organization_for_identity_sql(
     ))
 }
 
-pub fn select_casbin_rules_in_subjects_sql(
-    subjects_list_sql: &str,
-    field_access: Option<&FieldAccessContext>,
-) -> Result<String, String> {
-    let cols = resolve_http_sql_columns("casbin-rule", field_access)?;
-    let col_part = cols.join(", ");
+pub fn select_field_permissions_for_org_sql(organization_id: u64) -> Result<String, String> {
     Ok(format!(
-        "SELECT {col_part} FROM casbin_rule WHERE v0 IN ({subjects_list_sql})"
+        "SELECT id, organization_id, subject, role_id, resource, action, allowed_fields, created_by, created_at FROM field_permission WHERE organization_id = {organization_id}"
     ))
 }
 

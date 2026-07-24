@@ -102,9 +102,8 @@ const EXCLUDED_PREFIXES = [
   /^bootstrap_/,
   /^ensure_dev/,
   /^queue_/,
-  /^add_casbin_rule/,
-  /^update_casbin_rule/,
-  /^remove_casbin_rule/,
+  /^grant_field_permission/,
+  /^revoke_field_permission/,
   /^load_casbin_policy/,
   /^add_org_member/, // internal auth, not UI
   /^add_user_to_organization/,
@@ -338,7 +337,7 @@ function isExcludedReducer(name: string): { excluded: boolean; category: string 
       else if (/^bootstrap_/.test(name)) category = 'bootstrap'
       else if (/^ensure_dev/.test(name)) category = 'bootstrap'
       else if (/^queue_/.test(name)) category = 'internal_queue'
-      else if (/^add_casbin_rule|^update_casbin_rule|^remove_casbin_rule|^load_casbin_policy/.test(name)) category = 'casbin_auth'
+      else if (/^grant_field_permission|^revoke_field_permission/.test(name)) category = 'field_permission_auth'
       else if (/^add_org_member|^add_user_to_organization/.test(name)) category = 'org_membership'
       else if (/^add_form_field|^update_form_field|^delete_form_field|^set_form_role_config/.test(name)) category = 'form_config'
       else if (/^add_user_custom_field|^delete_user_custom_field/.test(name)) category = 'user_custom_fields'

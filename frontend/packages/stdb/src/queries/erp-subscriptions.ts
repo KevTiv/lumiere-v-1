@@ -4,6 +4,7 @@ import {
   hasHrPermission,
   identitySqlLiteral,
   resolveHttpSqlColumns,
+  selectFieldPermissionsForOrgSql,
   selectOrgScopedSql,
   selectRolesActiveSql,
   selectUserRoleAssignmentsForIdentitySql,
@@ -39,7 +40,7 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "user-role-assignment",
   "auth-role-table",
   "user-organization",
-  "casbin-rule",
+  "field-permissions",
   "org-permissions",
   "policy-snapshots",
   "account-accounts",
@@ -310,7 +311,6 @@ const AUTH_SINGLE: Record<string, string> = {
   /** Full `role` table (matches auth bundle); for active-only use `roles`. */
   "auth-role-table": authSelectAll("role", "Role"),
   "user-organization": authSelectAll("user_organization", "UserOrganization"),
-  "casbin-rule": authSelectAll("casbin_rule", "CasbinRule"),
 };
 
 /** Org-scoped ERP resources — row metadata codegen'd to `crates/stdb-auth/assets/erp-org-sql.json` via `make codegen`. */
@@ -1822,6 +1822,14 @@ export function subscriptionQueriesForResource(
     return [
       `SELECT ${cols} FROM hr_employee_document WHERE organization_id = ${Number(org)}${extra}`,
     ];
+  }
+
+  if (r === "field-permissions") {
+    const org = ctx.organizationId;
+    if (org === undefined || org === null || Number.isNaN(Number(org))) {
+      return null;
+    }
+    return [selectFieldPermissionsForOrgSql(Number(org))];
   }
 
   if (r === "org-permissions") {

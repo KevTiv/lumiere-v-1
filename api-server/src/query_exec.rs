@@ -993,6 +993,15 @@ pub async fn execute_resource_query(
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()));
         }
+        "field-permissions" => {
+            let sql = format!(
+                "SELECT id, organization_id, subject, role_id, resource, action, allowed_fields, created_by, created_at FROM field_permission WHERE organization_id = {organization_id}"
+            );
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
         "policy-snapshots" => {
             let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
             let sql = format!(

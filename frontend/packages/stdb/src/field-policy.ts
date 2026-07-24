@@ -16,6 +16,23 @@ import {
 export type { QueryResourceKey, ResourceEntry }
 export { QUERY_RESOURCE_KEYS, RESOURCE_REGISTRY }
 
+export interface FieldPermissionLike {
+  id?: number | string | bigint | null
+  organizationId?: number | null
+  organization_id?: number | null
+  roleId?: number | string | null
+  role_id?: number | string | null
+  resource?: string | null
+  /** `"read"` or `"write"` (SpacetimeDB enum JSON may use `{ read: [] }`). */
+  action?: string | Record<string, unknown> | null
+  allowedFields?: string[] | null
+  allowed_fields?: string[] | null
+  subjectUserHex?: string | null
+  subject_user_hex?: string | null
+  subjectRoleId?: number | string | null
+  subject_role_id?: number | string | null
+}
+
 export interface FieldAccessContext {
   organizationId: number
   roleId: number
@@ -23,18 +40,7 @@ export interface FieldAccessContext {
   isSuperuser: boolean
   rolePermissions: readonly string[]
   identityHex: string
-  casbinRules: ReadonlyArray<CasbinRuleLike>
-}
-
-export interface CasbinRuleLike {
-  ptype: string
-  v0?: string | null
-  v1?: string | null
-  v2?: string | null
-  v3?: string | null
-  v4?: string | null
-  v5?: string | null
-  metadata?: string | null
+  fieldPermissions: ReadonlyArray<FieldPermissionLike>
 }
 
 export function assertSafeSqlIdentifiers(cols: string[]): string[] {
@@ -58,42 +64,55 @@ function uniquePreserveOrder(cols: string[]): string[] {
   return out
 }
 
-function parseFieldsFromMetadata(metadata: string | null | undefined): string[] | null {
-  if (!metadata) return null
-  try {
-    const j = JSON.parse(metadata) as { fields?: unknown }
-    if (!Array.isArray(j.fields)) return null
-    const raw = j.fields.filter((x): x is string => typeof x === 'string')
-    if (raw.length === 0) return null
-    return assertSafeSqlIdentifiers(raw.map(s => s.trim()))
-  } catch {
-    return null
+function fieldPermissionActionLabel(action: FieldPermissionLike['action']): string {
+  if (typeof action === 'string') return action.toLowerCase()
+  if (action && typeof action === 'object') {
+    const key = Object.keys(action)[0]
+    if (key) return key.toLowerCase()
   }
+  return ''
 }
 
-function parseFieldsFromV5(v5: string | null | undefined): string[] | null {
-  if (!v5?.trim()) return null
-  const parts = v5.split(',').map(s => s.trim()).filter(Boolean)
-  if (parts.length === 0) return null
-  return assertSafeSqlIdentifiers(parts)
-}
-
-function matchesResource(v2: string | null | undefined, resourceKey: QueryResourceKey): boolean {
-  if (!v2) return false
+function fieldResourceMatches(configured: string, resourceKey: QueryResourceKey): boolean {
+  if (!configured) return false
+  if (configured === '*' || configured === resourceKey) return true
+  const configuredNorm = configured.replace(/-/g, '_')
+  const resourceNorm = resourceKey.replace(/-/g, '_')
+  if (configuredNorm === resourceNorm) return true
   const reg = RESOURCE_REGISTRY[resourceKey]
-  if (v2 === resourceKey) return true
-  return reg.aliases.includes(v2)
+  return reg.aliases.includes(configured) || reg.aliases.some(
+    (alias) => alias.replace(/-/g, '_') === configuredNorm,
+  )
 }
 
-function subjectMatches(
-  v0: string | null | undefined,
-  ctx: FieldAccessContext,
-): boolean {
-  if (!v0) return false
-  return (
-    v0 === ctx.identityHex
-    || v0 === String(ctx.roleId)
-    || v0 === ctx.roleName
+function fieldPermissionApplies(rule: FieldPermissionLike, ctx: FieldAccessContext): boolean {
+  const subjectRoleId = rule.subjectRoleId ?? rule.subject_role_id
+  if (subjectRoleId != null && Number(subjectRoleId) === ctx.roleId) {
+    return true
+  }
+
+  const subjectUserHex = (rule.subjectUserHex ?? rule.subject_user_hex ?? '')
+    .trim()
+    .replace(/^0x/i, '')
+    .toLowerCase()
+  const identityHex = ctx.identityHex.trim().replace(/^0x/i, '').toLowerCase()
+  if (subjectUserHex && subjectUserHex === identityHex) {
+    return true
+  }
+
+  const roleId = rule.roleId ?? rule.role_id
+  if (roleId != null && Number(roleId) === ctx.roleId) {
+    return true
+  }
+
+  return false
+}
+
+function allowedFieldsFromRule(rule: FieldPermissionLike): string[] {
+  const raw = rule.allowedFields ?? rule.allowed_fields ?? []
+  if (!Array.isArray(raw)) return []
+  return assertSafeSqlIdentifiers(
+    raw.filter((f): f is string => typeof f === 'string').map((s) => s.trim()).filter(Boolean),
   )
 }
 
@@ -110,36 +129,17 @@ export function resolveReadColumns(
 
   if (fieldAccess.rolePermissions.includes('*:*')) return null
 
-  const orgStr = String(fieldAccess.organizationId)
   const reg = RESOURCE_REGISTRY[resourceKey]
-
-  let sawFullWildcard = false
   const fieldBatches: string[][] = []
 
-  for (const rule of fieldAccess.casbinRules) {
-    if (rule.ptype !== 'p') continue
-    if (!subjectMatches(rule.v0, fieldAccess)) continue
-    if (rule.v1 !== orgStr) continue
-
-    const v2 = rule.v2 ?? ''
-    const v3 = rule.v3 ?? ''
-
-    if (v2 === '*' && (v3 === '*' || v3 === 'read')) {
-      const deny = rule.v4?.toLowerCase() === 'deny'
-      if (!deny) sawFullWildcard = true
-      continue
-    }
-
-    if (!matchesResource(v2, resourceKey)) continue
-    if (!(v3 === 'read' || v3 === '*')) continue
-
-    const fromMeta = parseFieldsFromMetadata(rule.metadata ?? null)
-    const fromV5 = parseFieldsFromV5(rule.v5 ?? null)
-    const fields = fromMeta ?? fromV5
-    if (fields?.length) fieldBatches.push(fields)
+  for (const rule of fieldAccess.fieldPermissions) {
+    if (fieldPermissionActionLabel(rule.action) !== 'read') continue
+    if (!fieldPermissionApplies(rule, fieldAccess)) continue
+    const resource = String(rule.resource ?? '')
+    if (!fieldResourceMatches(resource, resourceKey)) continue
+    const fields = allowedFieldsFromRule(rule)
+    if (fields.length > 0) fieldBatches.push(fields)
   }
-
-  if (sawFullWildcard) return null
 
   if (fieldBatches.length > 0) {
     const merged = uniquePreserveOrder([...reg.mandatory, ...fieldBatches.flat()])
@@ -300,7 +300,7 @@ function filterHttpSqlUnsafeColumns(
 }
 
 /**
- * Column list for SpacetimeDB HTTP SQL — never `*`. Uses Casbin/role restrictions when set;
+ * Column list for SpacetimeDB HTTP SQL — never `*`. Uses field-permission restrictions when set;
  * otherwise registry mandatory + defaultRestricted (full generated schema often includes
  * Timestamp/Identity/Vec/enum columns that HTTP SQL rejects).
  */
@@ -411,11 +411,8 @@ export function selectUserOrganizationForIdentitySql(
   return `SELECT ${colPart} FROM user_organization WHERE user_identity = ${id} AND is_active = true`
 }
 
-export function selectCasbinRulesInSubjectsSql(
-  subjectsListSql: string,
-  fieldAccess: FieldAccessContext | undefined,
+export function selectFieldPermissionsForOrgSql(
+  organizationId: bigint | number,
 ): string {
-  const cols = resolveHttpSqlColumns('casbin-rule', fieldAccess)
-  const colPart = cols.join(', ')
-  return `SELECT ${colPart} FROM casbin_rule WHERE v0 IN (${subjectsListSql})`
+  return `SELECT id, organization_id, subject, role_id, resource, action, allowed_fields, created_by, created_at FROM field_permission WHERE organization_id = ${organizationId}`
 }

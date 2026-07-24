@@ -65,7 +65,8 @@ pub struct TemplateSeedSummary {
 }
 
 /// Parse and validate the foundation template asset (10 markets × 4 kinds).
-pub(crate) fn foundation_template_packs() -> Result<(Vec<TemplateKindSeed>, Vec<MarketSeed>), String> {
+// ponytail: private — only used in this module; pub(crate) leaked private seed types
+fn foundation_template_packs() -> Result<(Vec<TemplateKindSeed>, Vec<MarketSeed>), String> {
     let asset: TemplatePackAsset = serde_json::from_str(FOUNDATION_ASSET)
         .map_err(|error| format!("workflow template foundation asset is invalid: {error}"))?;
     if asset.schema_version != 1 {

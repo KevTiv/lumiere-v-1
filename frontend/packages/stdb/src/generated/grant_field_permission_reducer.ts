@@ -11,12 +11,12 @@ import {
 } from "spacetimedb";
 
 import {
-  AddCasbinRuleParams,
+  GrantFieldPermissionParams,
 } from "./types";
 
 export default {
   organizationId: __t.u64(),
   get params() {
-    return AddCasbinRuleParams;
+    return GrantFieldPermissionParams;
   },
 };

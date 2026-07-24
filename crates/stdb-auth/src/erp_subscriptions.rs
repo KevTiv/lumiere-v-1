@@ -7,9 +7,9 @@ use serde::Deserialize;
 
 use crate::field_policy::{
     company_ids_dual_field_or_clause, company_ids_equality_or_clause,
-    resolve_http_sql_columns, select_org_scoped_sql, select_roles_active_sql,
-    select_user_role_assignments_for_identity_sql, sql_column_list_for_generated_type,
-    FieldAccessContext,
+    resolve_http_sql_columns, select_field_permissions_for_org_sql, select_org_scoped_sql,
+    select_roles_active_sql, select_user_role_assignments_for_identity_sql,
+    sql_column_list_for_generated_type, FieldAccessContext,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -69,10 +69,6 @@ static AUTH_SINGLE: Lazy<HashMap<String, String>> = Lazy::new(|| {
     m.insert(
         "user-organization".into(),
         auth_select_all("user_organization", "UserOrganization").expect("UserOrganization cols"),
-    );
-    m.insert(
-        "casbin-rule".into(),
-        auth_select_all("casbin_rule", "CasbinRule").expect("CasbinRule cols"),
     );
     m
 });
@@ -136,22 +132,10 @@ pub fn auth_subscriptions(
         "SELECT * FROM user_organization".into()
     };
 
-    let mut casbin_subjects: Vec<String> = Vec::new();
-    if let Some(ref idv) = id {
-        casbin_subjects.push(idv.clone());
-        for r in roles {
-            casbin_subjects.push(r.to_string());
-        }
-    }
-
-    let casbin_sql = if !casbin_subjects.is_empty() {
-        let conds: Vec<String> = casbin_subjects
-            .iter()
-            .map(|s| format!("v0 = {}", sql_quote_str(s)))
-            .collect();
-        format!("SELECT * FROM casbin_rule WHERE ({})", conds.join(" OR "))
+    let field_permission_sql = if let Some(n) = org_id_num {
+        select_field_permissions_for_org_sql(n).expect("field permission sql")
     } else {
-        "SELECT * FROM casbin_rule".into()
+        "SELECT id, organization_id, subject, role_id, resource, action, allowed_fields, created_by, created_at FROM field_permission".into()
     };
 
     vec![
@@ -159,7 +143,7 @@ pub fn auth_subscriptions(
         user_role_assignment_sql,
         role_sql,
         user_organization_sql,
-        casbin_sql,
+        field_permission_sql,
     ]
 }
 
@@ -352,6 +336,13 @@ pub fn subscription_queries_for_resource(
         return Ok(Some(vec![format!(
             "SELECT {cols} FROM hr_employee_document WHERE organization_id = {org}{extra}"
         )]));
+    }
+
+    if r == "field-permissions" {
+        let Some(org) = ctx.organization_id else {
+            return Ok(None);
+        };
+        return Ok(Some(vec![select_field_permissions_for_org_sql(org)?]));
     }
 
     let Some(org) = ctx.organization_id else {

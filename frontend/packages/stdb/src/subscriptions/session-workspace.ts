@@ -10,7 +10,7 @@ export const SESSION_WORKSPACE_TABLES = [
   "user_role_assignment",
   "role",
   "user_organization",
-  "casbin_rule",
+  "field_permission",
 ] as const;
 
 /**

@@ -9,7 +9,7 @@
 /// |------------------|-----------------------------------------------------|
 /// | organization     | Organization · OrganizationSettings · Company       |
 /// | users            | UserProfile · UserOrganization · UserSession        |
-/// | permissions      | Role · CasbinRule · UserRoleAssignment              |
+/// | permissions      | Role · OrgPermission · FieldPermission · …         |
 /// | reference        | Country · Currency · CurrencyRate · UOM · …        |
 /// | audit            | AuditLog · AuditRule                                |
 /// | queue            | QueueJob · QueueWorker                              |

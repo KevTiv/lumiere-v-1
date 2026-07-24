@@ -8,8 +8,8 @@ import {
   type QueryResourceKey,
 } from "@lumiere/stdb/field-policy"
 import {
-  useAddCasbinRule,
-  useRemoveCasbinRule,
+  useGrantFieldPermission,
+  useRevokeFieldPermission,
 } from "@lumiere/query-hooks/hooks/auth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -39,25 +39,52 @@ const FIELD_POLICY_RESOURCES: readonly { key: QueryResourceKey; label: string }[
   { key: "documents", label: "Documents" },
 ]
 
-type CasbinRuleRow = {
+type FieldPermissionRow = {
   id: bigint | number | string
-  ptype: string
-  v0?: string | null
-  v1?: string | null
-  v2?: string | null
-  v3?: string | null
-  metadata?: string | null
+  organization_id?: number | null
+  organizationId?: number | null
+  role_id?: bigint | number | string | null
+  roleId?: bigint | number | string | null
+  subject?: unknown
+  resource?: string | null
+  action?: string | Record<string, unknown> | null
+  allowed_fields?: string[] | null
+  allowedFields?: string[] | null
 }
 
-function parseFieldsFromRule(rule: CasbinRuleRow): string[] {
-  if (!rule.metadata?.trim()) return []
-  try {
-    const parsed = JSON.parse(rule.metadata) as { fields?: unknown }
-    if (!Array.isArray(parsed.fields)) return []
-    return parsed.fields.filter((f): f is string => typeof f === "string")
-  } catch {
-    return []
+function actionLabel(action: FieldPermissionRow["action"]): string {
+  if (typeof action === "string") return action.toLowerCase()
+  if (action && typeof action === "object") {
+    const key = Object.keys(action)[0]
+    if (key) return key.toLowerCase()
   }
+  return ""
+}
+
+function roleIdFromRow(row: FieldPermissionRow): string | null {
+  const direct = row.role_id ?? row.roleId
+  if (direct != null && String(direct).trim() !== "") {
+    return String(direct)
+  }
+  const subject = row.subject
+  if (subject && typeof subject === "object") {
+    const obj = subject as Record<string, unknown>
+    const role = obj.Role ?? obj.role
+    if (role != null && String(role).trim() !== "") {
+      return String(role)
+    }
+  }
+  return null
+}
+
+function allowedFieldsFromRow(row: FieldPermissionRow): string[] {
+  const raw = row.allowed_fields ?? row.allowedFields ?? []
+  if (!Array.isArray(raw)) return []
+  return raw.filter((f): f is string => typeof f === "string")
+}
+
+function resourceMatchesRow(resourceKey: QueryResourceKey, resource: string): boolean {
+  return resource === resourceKey || resource === resourceKey.replace(/-/g, "_")
 }
 
 export interface FieldPermissionsEditorProps {
@@ -77,13 +104,13 @@ export function FieldPermissionsEditor({
 }: FieldPermissionsEditorProps) {
   const { t } = useTranslation()
   const orgBigInt = BigInt(organizationId)
-  const addCasbinRule = useAddCasbinRule(orgBigInt)
-  const removeCasbinRule = useRemoveCasbinRule(orgBigInt)
+  const grantFieldPermission = useGrantFieldPermission(orgBigInt)
+  const revokeFieldPermission = useRevokeFieldPermission(orgBigInt)
 
   const [resourceKey, setResourceKey] = useState<QueryResourceKey>("contacts")
   const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set())
-  const [existingRuleId, setExistingRuleId] = useState<bigint | null>(null)
-  const [rules, setRules] = useState<CasbinRuleRow[]>([])
+  const [existingPermissionId, setExistingPermissionId] = useState<bigint | null>(null)
+  const [rules, setRules] = useState<FieldPermissionRow[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,15 +127,15 @@ export function FieldPermissionsEditor({
     }
     setLoading(true)
     try {
-      const list = (await stdbBrowserQuery("casbin-rule")) as CasbinRuleRow[]
+      const list = (await stdbBrowserQuery("field-permissions")) as FieldPermissionRow[]
       const orgStr = String(organizationId)
-      const filtered = list.filter(
-        (r) =>
-          r.ptype === "p" &&
-          (r.v0 === roleId || r.v0 === roleName) &&
-          r.v1 === orgStr &&
-          r.v3 === "read",
-      )
+      const filtered = list.filter((row) => {
+        const org = String(row.organization_id ?? row.organizationId ?? "")
+        if (org !== orgStr) return false
+        if (actionLabel(row.action) !== "read") return false
+        const rowRoleId = roleIdFromRow(row)
+        return rowRoleId === roleId || rowRoleId === roleName
+      })
       setRules(filtered)
     } catch {
       setRules([])
@@ -122,15 +149,12 @@ export function FieldPermissionsEditor({
   }, [reloadRules])
 
   useEffect(() => {
-    const match = rules.find((r) => {
-      const v2 = r.v2 ?? ""
-      return v2 === resourceKey || v2 === resourceKey.replace(/-/g, "_")
-    })
+    const match = rules.find((row) => resourceMatchesRow(resourceKey, String(row.resource ?? "")))
     if (match) {
-      setExistingRuleId(BigInt(String(match.id)))
-      setSelectedFields(new Set(parseFieldsFromRule(match)))
+      setExistingPermissionId(BigInt(String(match.id)))
+      setSelectedFields(new Set(allowedFieldsFromRow(match)))
     } else {
-      setExistingRuleId(null)
+      setExistingPermissionId(null)
       setSelectedFields(new Set(availableColumns))
     }
   }, [rules, resourceKey, availableColumns])
@@ -154,16 +178,14 @@ export function FieldPermissionsEditor({
     setSaving(true)
     setError(null)
     try {
-      if (existingRuleId != null) {
-        await removeCasbinRule.mutateAsync(existingRuleId)
+      if (existingPermissionId != null) {
+        await revokeFieldPermission.mutateAsync(existingPermissionId)
       }
-      await addCasbinRule.mutateAsync({
-        ptype: "p",
-        v0: roleId,
-        v1: String(organizationId),
-        v2: resourceKey,
-        v3: "read",
-        metadata: JSON.stringify({ fields }),
+      await grantFieldPermission.mutateAsync({
+        roleId,
+        resource: resourceKey,
+        action: "Read",
+        allowedFields: fields,
       })
       await reloadRules()
     } catch (e) {
@@ -174,11 +196,11 @@ export function FieldPermissionsEditor({
   }
 
   const handleClear = async () => {
-    if (!canEdit || existingRuleId == null) return
+    if (!canEdit || existingPermissionId == null) return
     setSaving(true)
     setError(null)
     try {
-      await removeCasbinRule.mutateAsync(existingRuleId)
+      await revokeFieldPermission.mutateAsync(existingPermissionId)
       await reloadRules()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -189,10 +211,7 @@ export function FieldPermissionsEditor({
 
   const configuredResources = useMemo(() => {
     return FIELD_POLICY_RESOURCES.filter((res) =>
-      rules.some((r) => {
-        const v2 = r.v2 ?? ""
-        return v2 === res.key || v2 === res.key.replace(/-/g, "_")
-      }),
+      rules.some((row) => resourceMatchesRow(res.key, String(row.resource ?? ""))),
     )
   }, [rules])
 
@@ -264,7 +283,7 @@ export function FieldPermissionsEditor({
             >
               {t("settings.fieldPermissions.save")}
             </Button>
-            {existingRuleId != null ? (
+            {existingPermissionId != null ? (
               <Button
                 type="button"
                 size="sm"

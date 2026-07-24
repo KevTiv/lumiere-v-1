@@ -17,8 +17,8 @@ use crate::core::organization::{
     OrganizationSettings,
 };
 use crate::core::permissions::{
-    casbin_rule, org_permission, role, seed_insert_org_permission, user_role_assignment,
-    CasbinRule, PermissionAction, PermissionEffect, PermissionSubject, Role, UserRoleAssignment,
+    org_permission, role, seed_insert_org_permission, user_role_assignment, PermissionAction,
+    PermissionEffect, PermissionSubject, Role, UserRoleAssignment,
 };
 use crate::core::privacy::{
     data_classification, data_classification_rule, privacy_consent, DataClassification,
@@ -10724,8 +10724,6 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
         });
     }
 
-    let org_id_str = org_id.to_string();
-
     let already_has_org_perm = ctx.db.org_permission().iter().any(|p| {
         p.organization_id == org_id
             && matches!(&p.subject, PermissionSubject::Role(rid) if *rid == owner_role.id)
@@ -10745,29 +10743,8 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
         );
     }
 
-    // Ensure casbin grouping: g, <caller_hex>, owner, <org_id> (user→role mapping)
-    let caller_hex = caller.to_hex().to_string();
-    let already_grouped = ctx.db.casbin_rule().iter().any(|r| {
-        r.ptype == "g"
-            && r.v0.as_deref() == Some(&caller_hex)
-            && r.v1.as_deref() == Some("owner")
-            && r.v2.as_deref() == Some(&org_id_str)
-    });
-
-    if !already_grouped {
-        ctx.db.casbin_rule().insert(CasbinRule {
-            id: 0,
-            ptype: "g".to_string(),
-            v0: Some(caller_hex),          // user identity hex
-            v1: Some("owner".to_string()), // role name
-            v2: Some(org_id_str),          // domain (org)
-            v3: None,
-            v4: None,
-            v5: None,
-            created_at: ctx.timestamp,
-            metadata: None,
-        });
-    }
+    // UserOrganization + Role.permissions / OrgPermission are authoritative;
+    // no Casbin grouping row is required.
 
     log::info!(
         "[ensure_dev_admin] Caller provisioned as owner of org {}",

@@ -12,7 +12,7 @@
 /// │   ├── mod.rs
 /// │   ├── organization.rs   Organization · OrganizationSettings · Company
 /// │   ├── users.rs          UserProfile · UserOrganization · UserSession
-/// │   ├── permissions.rs    Role · CasbinRule · UserRoleAssignment
+/// │   ├── permissions.rs    Role · OrgPermission · FieldPermission · …
 /// │   ├── reference.rs      Country · Currency · CurrencyRate · UOM*
 /// │   ├── audit.rs          AuditLog · AuditRule
 /// │   ├── queue.rs          QueueJob · QueueWorker

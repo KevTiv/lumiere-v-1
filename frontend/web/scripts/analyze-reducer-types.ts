@@ -829,7 +829,7 @@ function guessModule(reducerName: string): string {
 }
 
 function isExcludedReducer(name: string): boolean {
-  return /^(seed_|import_|bootstrap_|ensure_dev|queue_|add_casbin|update_casbin|remove_casbin|load_casbin|add_org_member|add_user_to_org|add_form_field|update_form_field|delete_form_field|set_form_role|add_user_custom|delete_user_custom|client_connected|client_disconnected|init$)/.test(name)
+  return /^(seed_|import_|bootstrap_|ensure_dev|queue_|grant_field_permission|revoke_field_permission|add_org_member|add_user_to_org|add_form_field|update_form_field|delete_form_field|set_form_role|add_user_custom|delete_user_custom|client_connected|client_disconnected|init$)/.test(name)
 }
 
 // ── Report printing ───────────────────────────────────────────────────────────

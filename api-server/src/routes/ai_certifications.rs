@@ -542,7 +542,7 @@ mod tests {
             is_superuser: false,
             role_permissions: vec!["contact:read".to_string()],
             identity_hex: "a".repeat(64),
-            casbin_rules: vec![],
+            field_permissions: vec![],
         };
         assert!(ensure_ai_skill_access(Some(&denied), "read").is_err());
 

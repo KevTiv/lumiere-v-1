@@ -210,32 +210,10 @@ fn resolve_permission(
     }
 
     let org = ctx.organization_id.to_string();
-    let allowed = ctx.casbin_rules.iter().any(|rule| {
-        if rule.ptype != "p" {
-            return false;
-        }
-        if !subject_matches(rule.v0.as_deref(), ctx) {
-            return false;
-        }
-        if rule.v1.as_deref() != Some(org.as_str()) {
-            return false;
-        }
-        let resource_ok = rule.v2.as_deref() == Some("*") || rule.v2.as_deref() == Some(resource);
-        let action_ok = rule.v3.as_deref() == Some("*") || rule.v3.as_deref() == Some(action);
-        resource_ok && action_ok
-    });
-    if allowed {
-        PermissionResolution::Allow
-    } else {
-        PermissionResolution::NotGranted
-    }
-}
-
-fn subject_matches(subject: Option<&str>, ctx: &FieldAccessContext) -> bool {
-    let Some(subject) = subject else {
-        return false;
-    };
-    subject == ctx.identity_hex || subject == ctx.role_id.to_string() || subject == ctx.role_name
+    let _ = org;
+    // Resource grants come from Role.permissions (and org_permission on the module).
+    // FieldAccessContext no longer carries Casbin rows.
+    PermissionResolution::NotGranted
 }
 
 fn can_read_contact_identity(field_access: &FieldAccessContext) -> bool {
@@ -310,7 +288,6 @@ fn mask_supplier_payables(
 mod tests {
     use super::*;
     use crate::error::ApiError;
-    use stdb_auth::CasbinRuleLike;
 
     fn ctx(role_permissions: Vec<&str>) -> FieldAccessContext {
         FieldAccessContext {
@@ -320,7 +297,7 @@ mod tests {
             is_superuser: false,
             role_permissions: role_permissions.into_iter().map(str::to_string).collect(),
             identity_hex: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".into(),
-            casbin_rules: vec![],
+            field_permissions: vec![],
         }
     }
 
@@ -371,25 +348,10 @@ mod tests {
     }
 
     #[test]
-    fn casbin_rule_can_grant_missing_role_permission() {
-        let mut access = ctx(vec!["report:read"]);
-        access.casbin_rules.push(CasbinRuleLike {
-            ptype: "p".into(),
-            v0: Some("viewer".into()),
-            v1: Some("1".into()),
-            v2: Some("stock_quant".into()),
-            v3: Some("read".into()),
-            v4: None,
-            v5: None,
-            metadata: None,
-        });
-        ensure_report_access(
-            Some(&access),
-            ReportKey::DailyBusinessSummaryV1,
-            ReportAccess::Preview,
-        )
-        .expect_err("still missing other sources");
+    fn role_permission_grants_source_access() {
+        let access = ctx(vec!["report:read", "stock_quant:read"]);
         assert!(permission_allowed(&access, "stock_quant", "read"));
+        assert!(!permission_allowed(&access, "sale_order", "read"));
     }
 
     #[test]

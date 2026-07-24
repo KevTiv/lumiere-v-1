@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
+import { useMemo } from "react"
 
 import {
   mapOrgPermissionRowsToPolicyRules,
@@ -41,7 +41,7 @@ function readVersionHash(row: PolicySnapshotRow | undefined): string | undefined
 
 /**
  * Unified org permission snapshot for the current user.
- * Loads org-permissions + cached policy_snapshot; refreshes snapshot on mount.
+ * Subscribes to org-permissions + cached policy_snapshot (server auto-refreshes snapshots).
  */
 export function usePolicySnapshot(
   organizationId?: number,
@@ -62,21 +62,9 @@ export function usePolicySnapshot(
   const {
     data: snapshots = [],
     isLoading: snapshotLoading,
-    refetch: refetchSnapshot,
   } = useStdbQuery("policy-snapshots", orgKey, { enabled })
 
   const refreshSnapshot = useStdbReducer("refresh_policy_snapshot")
-
-  useEffect(() => {
-    if (!enabled || refreshSnapshot.isPending) return
-    refreshSnapshot.mutate([organizationId], {
-      onSuccess: () => {
-        void refetchSnapshot()
-      },
-    })
-    // Refresh once per org/identity session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, organizationId, identityHex])
 
   const orgPolicyRules = useMemo<PolicyRule[]>(() => {
     return mapOrgPermissionRowsToPolicyRules(orgPermissions as BackendOrgPermissionRow[])
@@ -89,7 +77,7 @@ export function usePolicySnapshot(
     orgPolicyRules,
     snapshot,
     versionHash,
-    isLoading: orgPermsLoading || snapshotLoading || refreshSnapshot.isPending,
+    isLoading: orgPermsLoading || snapshotLoading,
     refreshSnapshot: () => refreshSnapshot.mutate([organizationId]),
   }
 }

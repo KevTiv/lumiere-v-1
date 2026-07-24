@@ -4,57 +4,55 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::add_casbin_rule_params_type::AddCasbinRuleParams;
-
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub(super) struct AddCasbinRuleArgs {
+pub(super) struct RevokeFieldPermissionArgs {
     pub organization_id: u64,
-    pub params: AddCasbinRuleParams,
+    pub permission_id: u64,
 }
 
-impl From<AddCasbinRuleArgs> for super::Reducer {
-    fn from(args: AddCasbinRuleArgs) -> Self {
-        Self::AddCasbinRule {
+impl From<RevokeFieldPermissionArgs> for super::Reducer {
+    fn from(args: RevokeFieldPermissionArgs) -> Self {
+        Self::RevokeFieldPermission {
             organization_id: args.organization_id,
-            params: args.params,
+            permission_id: args.permission_id,
         }
     }
 }
 
-impl __sdk::InModule for AddCasbinRuleArgs {
+impl __sdk::InModule for RevokeFieldPermissionArgs {
     type Module = super::RemoteModule;
 }
 
 #[allow(non_camel_case_types)]
-/// Extension trait for access to the reducer `add_casbin_rule`.
+/// Extension trait for access to the reducer `revoke_field_permission`.
 ///
 /// Implemented for [`super::RemoteReducers`].
-pub trait add_casbin_rule {
-    /// Request that the remote module invoke the reducer `add_casbin_rule` to run as soon as possible.
+pub trait revoke_field_permission {
+    /// Request that the remote module invoke the reducer `revoke_field_permission` to run as soon as possible.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
-    /// /// Use [`add_casbin_rule:add_casbin_rule_then`] to run a callback after the reducer completes.
-    fn add_casbin_rule(
+    /// /// Use [`revoke_field_permission:revoke_field_permission_then`] to run a callback after the reducer completes.
+    fn revoke_field_permission(
         &self,
         organization_id: u64,
-        params: AddCasbinRuleParams,
+        permission_id: u64,
     ) -> __sdk::Result<()> {
-        self.add_casbin_rule_then(organization_id, params, |_, _| {})
+        self.revoke_field_permission_then(organization_id, permission_id, |_, _| {})
     }
 
-    /// Request that the remote module invoke the reducer `add_casbin_rule` to run as soon as possible,
+    /// Request that the remote module invoke the reducer `revoke_field_permission` to run as soon as possible,
     /// registering `callback` to run when we are notified that the reducer completed.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and its status can be observed with the `callback`.
-    fn add_casbin_rule_then(
+    fn revoke_field_permission_then(
         &self,
         organization_id: u64,
-        params: AddCasbinRuleParams,
+        permission_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -62,20 +60,20 @@ pub trait add_casbin_rule {
     ) -> __sdk::Result<()>;
 }
 
-impl add_casbin_rule for super::RemoteReducers {
-    fn add_casbin_rule_then(
+impl revoke_field_permission for super::RemoteReducers {
+    fn revoke_field_permission_then(
         &self,
         organization_id: u64,
-        params: AddCasbinRuleParams,
+        permission_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
             + 'static,
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
-            AddCasbinRuleArgs {
+            RevokeFieldPermissionArgs {
                 organization_id,
-                params,
+                permission_id,
             },
             callback,
         )

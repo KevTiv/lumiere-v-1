@@ -1,14 +1,12 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState } from "react"
 import { useRBAC } from "@/lib/rbac-context"
 import { resourceGroups } from "@/lib/rbac-defaults"
 import {
   permissionsMapToStrings,
-  useAddCasbinRule,
   useCreateRole,
   useCreateSodConflictRule,
-  useRemoveCasbinRule,
   useSettingsRoles,
   useSodConflictRules,
   useUpdateRole,
@@ -50,10 +48,7 @@ import type { Role, Resource, Action } from "@/lib/rbac-types"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
 import { rolePillClassForColor, roleSwatchClass } from "@/lib/theme-colors"
-import { FormModal } from "../forms/form-modal"
-import { addCasbinRuleForm, removeCasbinRuleForm } from "../lib/settings-platform-form-configs"
 import { FieldPermissionsEditor } from "./field-permissions-editor"
-import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 
 const roleColors = [
   { value: "blue", label: "Blue", class: roleSwatchClass.blue },
@@ -73,56 +68,22 @@ export function RoleManagement() {
   const roles = rolesData as Role[]
   const createRole = useCreateRole(orgBigInt)
   const updateRole = useUpdateRole(orgBigInt)
-  const addCasbinRule = useAddCasbinRule(orgBigInt)
-  const removeCasbinRule = useRemoveCasbinRule(orgBigInt)
   const createSodRule = useCreateSodConflictRule(orgBigInt)
   const updateSodRule = useUpdateSodConflictRule(orgBigInt)
   const { data: sodRules = [], refetch: refetchSodRules } = useSodConflictRules(orgBigInt)
   const { checkPermission } = useRBAC()
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [casbinModal, setCasbinModal] = useState<"add" | "remove" | null>(null)
   const [sodModalOpen, setSodModalOpen] = useState(false)
   const [sodError, setSodError] = useState<string | null>(null)
   const [sodPermissionA, setSodPermissionA] = useState("")
   const [sodPermissionB, setSodPermissionB] = useState("")
   const [sodDescription, setSodDescription] = useState("")
-  const [casbinError, setCasbinError] = useState<string | null>(null)
-  const [casbinRules, setCasbinRules] = useState<Record<string, unknown>[]>([])
   const [selectedPermissions, setSelectedPermissions] = useState<Map<string, Set<Action>>>(new Map())
   const [selectedColor, setSelectedColor] = useState<Role["color"]>("blue")
   const [isSaving, setIsSaving] = useState(false)
 
   const canEdit = checkPermission("admin:roles", "update").allowed
-
-  useEffect(() => {
-    if (!orgReady) {
-      setCasbinRules([])
-      return
-    }
-    void (async () => {
-      try {
-        const list = (await stdbBrowserQuery("casbin-rule")) as Record<string, unknown>[]
-        setCasbinRules(list)
-      } catch {
-        setCasbinRules([])
-      }
-    })()
-  }, [orgReady])
-
-  const casbinRuleOptions = useMemo(
-    () =>
-      casbinRules.map((row) => ({
-        value: String(row.id ?? ""),
-        label: `#${String(row.id ?? "")} · ${String(row.ptype ?? "")} ${String(row.v0 ?? "")}/${String(row.v1 ?? "")}`,
-      })),
-    [casbinRules],
-  )
-
-  const removeCasbinRuleFormConfig = useMemo(
-    () => removeCasbinRuleForm(t, casbinRuleOptions),
-    [t, casbinRuleOptions],
-  )
 
   const canDelete = checkPermission("admin:roles", "delete").allowed
   const canCreate = checkPermission("admin:roles", "create").allowed
@@ -440,39 +401,6 @@ export function RoleManagement() {
         </Card>
       ) : null}
 
-      {canManagePolicies && orgReady ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("settings.adminOps.casbin.cardTitle")}</CardTitle>
-            <CardDescription>{t("settings.adminOps.casbin.cardDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setCasbinError(null)
-                setCasbinModal("add")
-              }}
-            >
-              {t("settings.adminOps.casbin.addButton")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setCasbinError(null)
-                setCasbinModal("remove")
-              }}
-            >
-              {t("settings.adminOps.casbin.removeButton")}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
-
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -675,38 +603,6 @@ export function RoleManagement() {
             </form>
           </DialogContent>
         </Dialog>
-      ) : null}
-
-      {casbinModal ? (
-        <FormModal
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setCasbinModal(null)
-              setCasbinError(null)
-            }
-          }}
-          config={casbinModal === "add" ? addCasbinRuleForm(t) : removeCasbinRuleFormConfig}
-          isPending={addCasbinRule.isPending || removeCasbinRule.isPending}
-          closeOnSubmit={false}
-          submitError={casbinError}
-          onSubmit={async (data) => {
-            setCasbinError(null)
-            try {
-              if (casbinModal === "add") {
-                await addCasbinRule.mutateAsync({
-                  ...data,
-                  v1: data.v1 ?? String(organizationId),
-                })
-              } else {
-                await removeCasbinRule.mutateAsync(data.ruleId as string | number)
-              }
-              setCasbinModal(null)
-            } catch (error) {
-              setCasbinError(error instanceof Error ? error.message : String(error))
-            }
-          }}
-        />
       ) : null}
     </div>
   )

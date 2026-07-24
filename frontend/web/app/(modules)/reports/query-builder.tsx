@@ -58,7 +58,7 @@ const AGGREGATIONS = ["count", "sum", "avg", "min", "max"] as const
 const CHART_TYPES = ["bar", "line", "area", "pie"] as const
 
 /** Tables that make no sense as self-serve widget sources. */
-const EXCLUDED_TABLES = new Set(["casbin_rule", "ai_reducer_allowlist"])
+const EXCLUDED_TABLES = new Set(["field_permission", "ai_reducer_allowlist"])
 
 function camelToSnake(key: string): string {
   return key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)

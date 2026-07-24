@@ -17,7 +17,7 @@ export function normalizeEnsureDevAdminInput(
 export const ensureDevAdminContract = {
   reducerName: "ensure_dev_admin",
   description:
-    "Ensures minimal dev org exists and caller is owner (memberships, Casbin g-rule, superuser profile flag).",
+    "Ensures minimal dev org exists and caller is owner (memberships, org permissions, superuser profile flag).",
   requiredSubscriptionResources: ["auth"],
   affectedTables: [
     "organization",
@@ -26,7 +26,7 @@ export const ensureDevAdminContract = {
     "user_organization",
     "user_role_assignment",
     "org_permission",
-    "casbin_rule",
+    "field_permission",
     "user_profile",
   ],
   expectations:

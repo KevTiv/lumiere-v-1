@@ -1,12 +1,14 @@
-/// Casbin-Style Permission System
+/// Permission System
 ///
-/// Tables:  Role · CasbinRule (legacy) · OrgPermission · UserRoleAssignment
+/// Tables:  Role · OrgPermission · FieldPermission · UserRoleAssignment
 /// Pattern: Roles carry a `permissions` string list (`"resource:action"`).
 ///          OrgPermission provides typed fine-grained allow/deny rules.
-///          CasbinRule is retained temporarily for migration; prefer OrgPermission.
+///          FieldPermission provides column allowlists for read/write.
+///          PolicySnapshot is a client projection rebuilt on policy mutations.
 ///          UserRoleAssignment links identities to roles within an organization.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::users::user_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
@@ -34,20 +36,6 @@ pub struct UpdateRoleParams {
     pub description: Option<String>,
     pub permissions: Option<Vec<String>>,
     pub is_active: Option<bool>,
-}
-
-/// Params for adding a Casbin policy or grouping rule.
-/// Scope: `organization_id` is a flat reducer param.
-#[derive(SpacetimeType, Clone, Debug)]
-pub struct AddCasbinRuleParams {
-    pub ptype: String,
-    pub v0: Option<String>,
-    pub v1: Option<String>,
-    pub v2: Option<String>,
-    pub v3: Option<String>,
-    pub v4: Option<String>,
-    pub v5: Option<String>,
-    pub metadata: Option<String>,
 }
 
 /// Params for assigning a role to a user.
@@ -82,7 +70,7 @@ pub struct GrantDelegatedAdminScopeParams {
     pub metadata: Option<String>,
 }
 
-#[derive(SpacetimeType, Clone, Debug)]
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
 pub enum PermissionSubject {
     Role(u64),
     User(Identity),
@@ -112,6 +100,21 @@ pub struct GrantOrgPermissionParams {
     pub effect: PermissionEffect,
 }
 
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
+pub enum FieldPermissionAction {
+    Read,
+    Write,
+}
+
+/// Params for `grant_field_permission`.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct GrantFieldPermissionParams {
+    pub subject: PermissionSubject,
+    pub resource: String,
+    pub action: FieldPermissionAction,
+    pub allowed_fields: Vec<String>,
+}
+
 // ── Tables ───────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(
@@ -136,28 +139,6 @@ pub struct Role {
     pub metadata: Option<String>,
 }
 
-/// Legacy Casbin-shaped policy rows. Prefer [`OrgPermission`] for new grants.
-#[spacetimedb::table(
-    accessor = casbin_rule,
-    public,
-    index(accessor = casbin_by_ptype, btree(columns = [ptype]))
-)]
-pub struct CasbinRule {
-    #[primary_key]
-    #[auto_inc]
-    pub id: u64,
-    /// `"p"` = policy rule, `"g"` = role-grouping rule.
-    pub ptype: String,
-    pub v0: Option<String>, // subject (role id or user identity)
-    pub v1: Option<String>, // domain / organization_id
-    pub v2: Option<String>, // object / resource
-    pub v3: Option<String>, // action
-    pub v4: Option<String>, // extra (effect, priority …)
-    pub v5: Option<String>, // extra
-    pub created_at: Timestamp,
-    pub metadata: Option<String>,
-}
-
 #[spacetimedb::table(
     accessor = org_permission,
     public,
@@ -175,6 +156,28 @@ pub struct OrgPermission {
     pub resource: String,
     pub action: PermissionAction,
     pub effect: PermissionEffect,
+    pub created_by: Identity,
+    pub created_at: Timestamp,
+}
+
+/// Column allowlist for a subject on a resource (read or write).
+#[spacetimedb::table(
+    accessor = field_permission,
+    public,
+    index(accessor = field_perm_by_org, btree(columns = [organization_id])),
+    index(accessor = field_perm_by_role, btree(columns = [role_id]))
+)]
+pub struct FieldPermission {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub subject: PermissionSubject,
+    /// Denormalized `Some(role_id)` when `subject` is [`PermissionSubject::Role`]; else `None`.
+    pub role_id: Option<u64>,
+    pub resource: String,
+    pub action: FieldPermissionAction,
+    pub allowed_fields: Vec<String>,
     pub created_by: Identity,
     pub created_at: Timestamp,
 }
@@ -298,19 +301,30 @@ fn org_permission_applies_to_user(p: &OrgPermission, user_identity: Identity, ro
     }
 }
 
-fn parse_casbin_field_list(metadata: &Option<String>) -> Option<Vec<String>> {
-    let meta = metadata.as_ref()?;
-    let value: serde_json::Value = serde_json::from_str(meta).ok()?;
-    let fields = value
-        .get("fields")?
-        .as_array()?
-        .iter()
-        .filter_map(|entry| entry.as_str().map(str::to_string))
-        .collect::<Vec<_>>();
-    if fields.is_empty() {
-        None
-    } else {
-        Some(fields)
+fn field_permission_applies_to_user(
+    p: &FieldPermission,
+    user_identity: Identity,
+    role_id: u64,
+) -> bool {
+    match &p.subject {
+        PermissionSubject::Role(r) => *r == role_id,
+        PermissionSubject::User(id) => *id == user_identity,
+    }
+}
+
+fn field_resource_matches(configured: &str, requested: &str) -> bool {
+    if configured == "*" || configured == requested {
+        return true;
+    }
+    let configured_norm = configured.replace('-', "_");
+    let requested_norm = requested.replace('-', "_");
+    configured_norm == requested_norm
+}
+
+fn field_permission_action_label(action: &FieldPermissionAction) -> &'static str {
+    match action {
+        FieldPermissionAction::Read => "read",
+        FieldPermissionAction::Write => "write",
     }
 }
 
@@ -332,7 +346,7 @@ pub(crate) fn build_policy_snapshot_row(
     organization_id: u64,
     user_identity: Identity,
 ) -> Result<PolicySnapshot, String> {
-    use crate::core::users::{user_organization, user_profile};
+    use crate::core::users::user_profile;
 
     let user = ctx
         .db
@@ -384,62 +398,36 @@ pub(crate) fn build_policy_snapshot_row(
         ));
     }
 
-    let role_str = role.id.to_string();
-    let role_name = role.name.as_str();
-    let identity_hex = user_identity.to_hex().to_string();
-    let org_str = organization_id.to_string();
-
     let mut field_permissions = Vec::new();
-    for rule in ctx
+    for p in ctx
         .db
-        .casbin_rule()
-        .casbin_by_ptype()
-        .filter(&"p".to_string())
+        .field_permission()
+        .field_perm_by_org()
+        .filter(&organization_id)
     {
-        if rule.v1.as_deref() != Some(org_str.as_str()) {
+        if !field_permission_applies_to_user(&p, user_identity, role.id) {
             continue;
         }
-        let subject_ok = rule.v0.as_deref() == Some(role_str.as_str())
-            || rule.v0.as_deref() == Some(role_name)
-            || rule.v0.as_deref() == Some(identity_hex.as_str());
-        if !subject_ok {
-            continue;
-        }
-        let action = rule.v3.as_deref().unwrap_or("");
-        if action != "read" && action != "*" {
-            continue;
-        }
-        let resource = match rule.v2.as_deref() {
-            Some(r) if !r.is_empty() => r.to_string(),
-            _ => continue,
-        };
-        if let Some(fields) = parse_casbin_field_list(&rule.metadata) {
-            hash_parts.push(format!("cf:{}:{}", rule.id, resource));
-            field_permissions.push(PolicyFieldPermission { resource, fields });
-        }
-    }
-
-    for rule in ctx
-        .db
-        .casbin_rule()
-        .casbin_by_ptype()
-        .filter(&"p".to_string())
-    {
-        if rule.v1.as_deref() != Some(org_str.as_str()) {
-            continue;
-        }
-        let subject_ok = rule.v0.as_deref() == Some(role_str.as_str())
-            || rule.v0.as_deref() == Some(role_name)
-            || rule.v0.as_deref() == Some(identity_hex.as_str());
-        if subject_ok {
+        // Snapshot surfaces read allowlists for UI/API column projection.
+        if p.action != FieldPermissionAction::Read {
             hash_parts.push(format!(
-                "cb:{}:{}:{}:{}",
-                rule.id,
-                rule.v2.as_deref().unwrap_or(""),
-                rule.v3.as_deref().unwrap_or(""),
-                rule.v4.as_deref().unwrap_or("")
+                "fpw:{}:{}:{}",
+                p.id,
+                p.resource,
+                p.allowed_fields.join(",")
             ));
+            continue;
         }
+        hash_parts.push(format!(
+            "fp:{}:{}:{}",
+            p.id,
+            p.resource,
+            p.allowed_fields.join(",")
+        ));
+        field_permissions.push(PolicyFieldPermission {
+            resource: p.resource.clone(),
+            fields: p.allowed_fields.clone(),
+        });
     }
 
     let version_hash = fnv1a_hash(
@@ -483,6 +471,71 @@ pub(crate) fn upsert_policy_snapshot(
     } else {
         let row = ctx.db.policy_snapshot().insert(snapshot);
         Ok(row.id)
+    }
+}
+
+fn collect_identities_for_role(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    role_id: u64,
+) -> Vec<Identity> {
+    let mut identities = Vec::new();
+    for uo in ctx
+        .db
+        .user_organization()
+        .iter()
+        .filter(|uo| {
+            uo.organization_id == organization_id && uo.role_id == role_id && uo.is_active
+        })
+    {
+        identities.push(uo.user_identity);
+    }
+    for assignment in ctx
+        .db
+        .user_role_assignment()
+        .role_assign_by_org()
+        .filter(&organization_id)
+        .filter(|a| a.role_id == role_id && a.is_active)
+    {
+        identities.push(assignment.user_identity);
+    }
+    identities.sort_by_key(|id| id.to_hex().to_string());
+    identities.dedup();
+    identities
+}
+
+pub(crate) fn touch_policy_snapshot_for_user(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    user_identity: Identity,
+) {
+    if let Ok(snapshot) = build_policy_snapshot_row(ctx, organization_id, user_identity) {
+        let _ = upsert_policy_snapshot(ctx, snapshot);
+    }
+}
+
+pub(crate) fn touch_policy_snapshots_for_role(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    role_id: u64,
+) {
+    for identity in collect_identities_for_role(ctx, organization_id, role_id) {
+        touch_policy_snapshot_for_user(ctx, organization_id, identity);
+    }
+}
+
+pub(crate) fn touch_policy_snapshots_for_subject(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    subject: &PermissionSubject,
+) {
+    match subject {
+        PermissionSubject::Role(role_id) => {
+            touch_policy_snapshots_for_role(ctx, organization_id, *role_id);
+        }
+        PermissionSubject::User(user_identity) => {
+            touch_policy_snapshot_for_user(ctx, organization_id, *user_identity);
+        }
     }
 }
 
@@ -603,13 +656,13 @@ pub(crate) fn ensure_delegated_admin_may_grant_permission(
     Ok(())
 }
 
-/// When Casbin `write` field rules exist for the caller, changed fields must stay in the allow-list.
+/// When field write allowlists exist for the caller, changed fields must stay in the allow-list.
 pub(crate) fn ensure_resource_fields_writable(
     ctx: &ReducerContext,
     organization_id: u64,
     user_identity: Identity,
     role_id: u64,
-    role_name: &str,
+    _role_name: &str,
     is_superuser: bool,
     resource: &str,
     changed_fields: &[String],
@@ -618,38 +671,24 @@ pub(crate) fn ensure_resource_fields_writable(
         return Ok(());
     }
 
-    let role_str = role_id.to_string();
-    let org_str = organization_id.to_string();
-    let identity_hex = user_identity.to_hex().to_string();
-
     let mut allowed: Option<Vec<String>> = None;
     for rule in ctx
         .db
-        .casbin_rule()
-        .casbin_by_ptype()
-        .filter(&"p".to_string())
+        .field_permission()
+        .field_perm_by_org()
+        .filter(&organization_id)
     {
-        if rule.v1.as_deref() != Some(org_str.as_str()) {
+        if rule.action != FieldPermissionAction::Write {
             continue;
         }
-        if rule.v3.as_deref() != Some("write") {
+        if !field_permission_applies_to_user(&rule, user_identity, role_id) {
             continue;
         }
-        let resource_ok = rule.v2.as_deref() == Some(resource)
-            || rule.v2.as_deref() == Some(&resource.replace('_', "-"));
-        if !resource_ok {
+        if !field_resource_matches(&rule.resource, resource) {
             continue;
         }
-        let subject_ok = rule.v0.as_deref() == Some(role_str.as_str())
-            || rule.v0.as_deref() == Some(role_name)
-            || rule.v0.as_deref() == Some(identity_hex.as_str());
-        if !subject_ok {
-            continue;
-        }
-        if let Some(fields) = parse_casbin_field_list(&rule.metadata) {
-            allowed = Some(fields);
-            break;
-        }
+        allowed = Some(rule.allowed_fields.clone());
+        break;
     }
 
     let Some(allowed_fields) = allowed else {
@@ -667,15 +706,6 @@ pub(crate) fn ensure_resource_fields_writable(
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
-
-fn casbin_rule_belongs_to_org(rule: &CasbinRule, organization_id: u64) -> bool {
-    let org_id = organization_id.to_string();
-    match rule.ptype.as_str() {
-        "p" => rule.v1.as_deref() == Some(org_id.as_str()),
-        "g" => rule.v2.as_deref() == Some(org_id.as_str()),
-        _ => false,
-    }
-}
 
 #[spacetimedb::reducer]
 pub fn create_role(
@@ -729,6 +759,8 @@ pub fn create_role(
             metadata: None,
         },
     );
+
+    touch_policy_snapshots_for_role(ctx, organization_id, row.id);
 
     Ok(())
 }
@@ -808,44 +840,59 @@ pub fn update_role(
         },
     );
 
+    touch_policy_snapshots_for_role(ctx, organization_id, role_id);
+
     Ok(())
 }
 
-/// Add a Casbin policy or grouping rule.
-/// `ptype` must be `"p"` (policy) or `"g"` (grouping).
 #[spacetimedb::reducer]
-pub fn add_casbin_rule(
+pub fn grant_field_permission(
     ctx: &ReducerContext,
     organization_id: u64,
-    params: AddCasbinRuleParams,
+    params: GrantFieldPermissionParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "casbin_rule", "create")?;
+    check_permission(ctx, organization_id, "field_permission", "create")?;
+    ensure_delegated_admin_may_grant_permission(ctx, organization_id)?;
 
-    if params.ptype != "p" && params.ptype != "g" {
-        return Err("ptype must be 'p' (policy) or 'g' (grouping)".to_string());
+    if params.resource.is_empty() {
+        return Err("resource cannot be empty".to_string());
+    }
+    if params.allowed_fields.is_empty() {
+        return Err("allowed_fields cannot be empty".to_string());
     }
 
-    let org_id = organization_id.to_string();
-    let scoped_domain = if params.ptype == "p" {
-        params.v1.as_deref()
-    } else {
-        params.v2.as_deref()
+    let role_id = match &params.subject {
+        PermissionSubject::Role(rid) => Some(*rid),
+        PermissionSubject::User(_) => None,
     };
-    if scoped_domain != Some(org_id.as_str()) {
-        return Err("Casbin rule domain must match organization".to_string());
+
+    // Replace existing allowlist for the same subject/resource/action.
+    let existing: Vec<u64> = ctx
+        .db
+        .field_permission()
+        .field_perm_by_org()
+        .filter(&organization_id)
+        .filter(|row| {
+            row.subject == params.subject
+                && row.resource == params.resource
+                && row.action == params.action
+        })
+        .map(|row| row.id)
+        .collect();
+    for id in existing {
+        ctx.db.field_permission().id().delete(&id);
     }
 
-    let row = ctx.db.casbin_rule().insert(CasbinRule {
+    let row = ctx.db.field_permission().insert(FieldPermission {
         id: 0,
-        ptype: params.ptype,
-        v0: params.v0,
-        v1: params.v1,
-        v2: params.v2,
-        v3: params.v3,
-        v4: params.v4,
-        v5: params.v5,
+        organization_id,
+        subject: params.subject.clone(),
+        role_id,
+        resource: params.resource.clone(),
+        action: params.action.clone(),
+        allowed_fields: params.allowed_fields.clone(),
+        created_by: ctx.sender(),
         created_at: ctx.timestamp,
-        metadata: params.metadata,
     });
 
     write_audit_log_v2(
@@ -853,76 +900,68 @@ pub fn add_casbin_rule(
         organization_id,
         AuditLogParams {
             company_id: None,
-            table_name: "casbin_rule",
+            table_name: "field_permission",
             record_id: row.id,
             action: "CREATE",
             old_values: None,
             new_values: Some(
                 serde_json::json!({
-                    "ptype": row.ptype,
-                    "v0": row.v0,
-                    "v1": row.v1,
-                    "v2": row.v2,
-                    "v3": row.v3,
-                    "v4": row.v4,
-                    "v5": row.v5,
+                    "resource": params.resource,
+                    "action": field_permission_action_label(&params.action),
+                    "allowed_fields": params.allowed_fields,
                 })
                 .to_string(),
             ),
             changed_fields: vec![
-                "ptype".to_string(),
-                "v0".to_string(),
-                "v1".to_string(),
-                "v2".to_string(),
-                "v3".to_string(),
-                "v4".to_string(),
-                "v5".to_string(),
+                "resource".to_string(),
+                "action".to_string(),
+                "allowed_fields".to_string(),
             ],
             metadata: None,
         },
     );
 
+    touch_policy_snapshots_for_subject(ctx, organization_id, &params.subject);
+
     Ok(())
 }
 
 #[spacetimedb::reducer]
-pub fn remove_casbin_rule(
+pub fn revoke_field_permission(
     ctx: &ReducerContext,
     organization_id: u64,
-    rule_id: u64,
+    permission_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "casbin_rule", "delete")?;
+    check_permission(ctx, organization_id, "field_permission", "delete")?;
+
     let row = ctx
         .db
-        .casbin_rule()
+        .field_permission()
         .id()
-        .find(&rule_id)
-        .ok_or("Casbin rule not found")?;
+        .find(&permission_id)
+        .ok_or("Field permission not found")?;
 
-    if !casbin_rule_belongs_to_org(&row, organization_id) {
-        return Err("Casbin rule does not belong to this organization".to_string());
+    if row.organization_id != organization_id {
+        return Err("Field permission does not belong to this organization".to_string());
     }
 
+    let subject = row.subject.clone();
     let old_values = serde_json::json!({
-        "ptype": row.ptype,
-        "v0": row.v0,
-        "v1": row.v1,
-        "v2": row.v2,
-        "v3": row.v3,
-        "v4": row.v4,
-        "v5": row.v5,
+        "resource": row.resource,
+        "action": field_permission_action_label(&row.action),
+        "allowed_fields": row.allowed_fields,
     })
     .to_string();
 
-    ctx.db.casbin_rule().id().delete(&rule_id);
+    ctx.db.field_permission().id().delete(&permission_id);
 
     write_audit_log_v2(
         ctx,
         organization_id,
         AuditLogParams {
             company_id: None,
-            table_name: "casbin_rule",
-            record_id: rule_id,
+            table_name: "field_permission",
+            record_id: permission_id,
             action: "DELETE",
             old_values: Some(old_values),
             new_values: None,
@@ -930,6 +969,8 @@ pub fn remove_casbin_rule(
             metadata: None,
         },
     );
+
+    touch_policy_snapshots_for_subject(ctx, organization_id, &subject);
 
     Ok(())
 }
@@ -990,6 +1031,8 @@ pub fn grant_permission(
         },
     );
 
+    touch_policy_snapshots_for_subject(ctx, organization_id, &params.subject);
+
     Ok(())
 }
 
@@ -1012,6 +1055,7 @@ pub fn revoke_permission(
         return Err("Permission does not belong to this organization".to_string());
     }
 
+    let subject = row.subject.clone();
     let old_values = serde_json::json!({
         "resource": row.resource,
         "action": format!("{:?}", row.action),
@@ -1035,6 +1079,8 @@ pub fn revoke_permission(
             metadata: None,
         },
     );
+
+    touch_policy_snapshots_for_subject(ctx, organization_id, &subject);
 
     Ok(())
 }
@@ -1399,6 +1445,8 @@ pub fn assign_role(
         },
     );
 
+    touch_policy_snapshot_for_user(ctx, organization_id, user_identity);
+
     Ok(())
 }
 
@@ -1460,6 +1508,8 @@ pub fn revoke_role(
             metadata: None,
         },
     );
+
+    touch_policy_snapshot_for_user(ctx, organization_id, user_identity);
 
     Ok(())
 }

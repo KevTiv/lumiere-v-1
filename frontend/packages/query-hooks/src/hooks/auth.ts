@@ -290,8 +290,8 @@ function backendPermissionEquivalents(resource: string, action: string): string[
   }
 
   if (resource === 'admin:permissions') {
-    if (action === 'manage') return ['org_permission:*', 'casbin_rule:*']
-    return [`org_permission:${writeAction}`, `casbin_rule:${writeAction}`]
+    if (action === 'manage') return ['org_permission:*', 'field_permission:*']
+    return [`org_permission:${writeAction}`, `field_permission:${writeAction}`]
   }
 
   if (resource === 'admin:audit-log') {
@@ -951,7 +951,7 @@ export function useUpdateWhatsappCredentials(organizationId: bigint) {
   })
 }
 
-// ── Mutations — Casbin & org membership (admin platform) ─────────────────────
+// ── Mutations — Field permissions & org membership (admin platform) ──────────
 
 function optionalStringField(value: unknown): string | null {
   const raw = String(value ?? "").trim()
@@ -970,46 +970,51 @@ function timestampFromDatetime(value: unknown): { microsSinceUnixEpoch: bigint }
   return { microsSinceUnixEpoch: BigInt(millis) * 1000n }
 }
 
-export function useAddCasbinRule(organizationId: bigint) {
+export type GrantFieldPermissionInput = {
+  roleId: string | number | bigint
+  resource: string
+  action?: "Read" | "Write"
+  allowedFields: string[]
+}
+
+export function useGrantFieldPermission(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
-    mutationFn: async (formData) => {
+  return useMutation<void, Error, GrantFieldPermissionInput>({
+    mutationFn: async ({ roleId, resource, action = "Read", allowedFields }) => {
       const params = {
-        ptype: String(formData.ptype ?? "p"),
-        v0: optionalStringField(formData.v0),
-        v1: optionalStringField(formData.v1),
-        v2: optionalStringField(formData.v2),
-        v3: optionalStringField(formData.v3),
-        v4: optionalStringField(formData.v4),
-        v5: optionalStringField(formData.v5),
-        metadata: optionalStringField(formData.metadata),
+        subject: { tag: "Role", value: toScalarU64(roleId) },
+        resource: resource.trim(),
+        action: { tag: action },
+        allowed_fields: allowedFields,
       }
-      const { urlPath, init } = stdbBffPost("add_casbin_rule", [
+      const { urlPath, init } = stdbBffPost("grant_field_permission", [
         organizationId,
-        stdbParamsToJson(params),
+        stdbParamsToJson(params, "GrantFieldPermissionParams"),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to add Casbin rule")
+      if (!r.ok) throw new Error("Failed to grant field permission")
     },
     onSuccess: async () => {
       await invalidateAuthModule(qc, organizationId)
+      await qc.invalidateQueries({ queryKey: ["field-permissions", rqBigIntKey(organizationId)] })
     },
   })
 }
 
-export function useRemoveCasbinRule(organizationId: bigint) {
+export function useRevokeFieldPermission(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
-    mutationFn: async (ruleId) => {
-      const { urlPath, init } = stdbBffPost("remove_casbin_rule", [
+    mutationFn: async (permissionId) => {
+      const { urlPath, init } = stdbBffPost("revoke_field_permission", [
         organizationId,
-        toScalarU64(ruleId),
+        toScalarU64(permissionId),
       ])
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to remove Casbin rule")
+      if (!r.ok) throw new Error("Failed to revoke field permission")
     },
     onSuccess: async () => {
       await invalidateAuthModule(qc, organizationId)
+      await qc.invalidateQueries({ queryKey: ["field-permissions", rqBigIntKey(organizationId)] })
     },
   })
 }

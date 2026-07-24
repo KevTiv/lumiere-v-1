@@ -43,7 +43,6 @@ pub mod accrue_sale_commission_params_type;
 pub mod activity_type;
 pub mod activity_type_type;
 pub mod add_account_move_line_params_type;
-pub mod add_casbin_rule_params_type;
 pub mod add_document_version_params_type;
 pub mod add_landed_cost_line_params_type;
 pub mod add_org_member_params_type;
@@ -144,7 +143,6 @@ pub mod cancel_workflow_timer_params_type;
 pub mod capacity_forecast_snapshot_type;
 pub mod card_state_type;
 pub mod cartonization_result_type;
-pub mod casbin_rule_type;
 pub mod cash_flow_line_type;
 pub mod claim_queue_job_params_type;
 pub mod claim_workflow_human_task_params_type;
@@ -522,6 +520,8 @@ pub mod fail_proposal_integration_intent_params_type;
 pub mod fail_subscription_payment_intent_params_type;
 pub mod fail_warehouse_sync_intent_params_type;
 pub mod field_option_type;
+pub mod field_permission_type;
+pub mod field_permission_action_type;
 pub mod field_type_type;
 pub mod field_validation_type;
 pub mod field_width_type;
@@ -542,6 +542,7 @@ pub mod generate_subscription_invoice_params_type;
 pub mod generated_owner_report_type;
 pub mod google_drive_connection_type;
 pub mod grant_delegated_admin_scope_params_type;
+pub mod grant_field_permission_params_type;
 pub mod grant_org_permission_params_type;
 pub mod grant_subscription_entitlement_params_type;
 pub mod guarded_action_key_type;
@@ -1234,7 +1235,6 @@ pub mod activate_subscription_reducer;
 pub mod activate_subscription_plan_reducer;
 pub mod add_account_move_line_reducer;
 pub mod add_article_member_reducer;
-pub mod add_casbin_rule_reducer;
 pub mod add_contact_to_segment_reducer;
 pub mod add_document_version_reducer;
 pub mod add_form_field_reducer;
@@ -1773,6 +1773,7 @@ pub mod generate_subscription_invoice_reducer;
 pub mod get_form_configuration_reducer;
 pub mod get_organization_form_configs_reducer;
 pub mod grant_delegated_admin_scope_reducer;
+pub mod grant_field_permission_reducer;
 pub mod grant_permission_reducer;
 pub mod grant_subscription_entitlement_reducer;
 pub mod hold_supplier_intake_reducer;
@@ -1963,7 +1964,6 @@ pub mod release_blanket_to_po_reducer;
 pub mod release_document_legal_hold_reducer;
 pub mod release_picking_wave_reducer;
 pub mod remove_article_member_reducer;
-pub mod remove_casbin_rule_reducer;
 pub mod remove_landed_cost_line_reducer;
 pub mod remove_member_from_quality_team_reducer;
 pub mod remove_purchase_order_line_reducer;
@@ -1998,6 +1998,7 @@ pub mod reverse_sale_commission_settlement_reducer;
 pub mod review_message_batch_reducer;
 pub mod review_supplier_intake_reducer;
 pub mod revoke_delegated_admin_scope_reducer;
+pub mod revoke_field_permission_reducer;
 pub mod revoke_permission_reducer;
 pub mod revoke_role_reducer;
 pub mod revoke_subscription_entitlement_reducer;
@@ -2483,7 +2484,6 @@ pub mod budget_post_table;
 pub mod calendar_event_table;
 pub mod capacity_forecast_snapshot_table;
 pub mod cartonization_result_table;
-pub mod casbin_rule_table;
 pub mod cash_flow_line_table;
 pub mod commodity_price_index_table;
 pub mod company_table;
@@ -2538,6 +2538,7 @@ pub mod document_version_table;
 pub mod expense_card_statement_line_table;
 pub mod expense_integration_intent_table;
 pub mod expense_sheet_table;
+pub mod field_permission_table;
 pub mod financial_report_table;
 pub mod fleet_vehicle_table;
 pub mod form_config_table;
@@ -2852,7 +2853,6 @@ pub use accrue_sale_commission_params_type::AccrueSaleCommissionParams;
 pub use activity_type::Activity;
 pub use activity_type_type::ActivityType;
 pub use add_account_move_line_params_type::AddAccountMoveLineParams;
-pub use add_casbin_rule_params_type::AddCasbinRuleParams;
 pub use add_document_version_params_type::AddDocumentVersionParams;
 pub use add_landed_cost_line_params_type::AddLandedCostLineParams;
 pub use add_org_member_params_type::AddOrgMemberParams;
@@ -2953,7 +2953,6 @@ pub use cancel_workflow_timer_params_type::CancelWorkflowTimerParams;
 pub use capacity_forecast_snapshot_type::CapacityForecastSnapshot;
 pub use card_state_type::CardState;
 pub use cartonization_result_type::CartonizationResult;
-pub use casbin_rule_type::CasbinRule;
 pub use cash_flow_line_type::CashFlowLine;
 pub use claim_queue_job_params_type::ClaimQueueJobParams;
 pub use claim_workflow_human_task_params_type::ClaimWorkflowHumanTaskParams;
@@ -3331,6 +3330,8 @@ pub use fail_proposal_integration_intent_params_type::FailProposalIntegrationInt
 pub use fail_subscription_payment_intent_params_type::FailSubscriptionPaymentIntentParams;
 pub use fail_warehouse_sync_intent_params_type::FailWarehouseSyncIntentParams;
 pub use field_option_type::FieldOption;
+pub use field_permission_type::FieldPermission;
+pub use field_permission_action_type::FieldPermissionAction;
 pub use field_type_type::FieldType;
 pub use field_validation_type::FieldValidation;
 pub use field_width_type::FieldWidth;
@@ -3351,6 +3352,7 @@ pub use generate_subscription_invoice_params_type::GenerateSubscriptionInvoicePa
 pub use generated_owner_report_type::GeneratedOwnerReport;
 pub use google_drive_connection_type::GoogleDriveConnection;
 pub use grant_delegated_admin_scope_params_type::GrantDelegatedAdminScopeParams;
+pub use grant_field_permission_params_type::GrantFieldPermissionParams;
 pub use grant_org_permission_params_type::GrantOrgPermissionParams;
 pub use grant_subscription_entitlement_params_type::GrantSubscriptionEntitlementParams;
 pub use guarded_action_key_type::GuardedActionKey;
@@ -4100,7 +4102,6 @@ pub use budget_post_table::*;
 pub use calendar_event_table::*;
 pub use capacity_forecast_snapshot_table::*;
 pub use cartonization_result_table::*;
-pub use casbin_rule_table::*;
 pub use cash_flow_line_table::*;
 pub use commodity_price_index_table::*;
 pub use company_table::*;
@@ -4155,6 +4156,7 @@ pub use document_version_table::*;
 pub use expense_card_statement_line_table::*;
 pub use expense_integration_intent_table::*;
 pub use expense_sheet_table::*;
+pub use field_permission_table::*;
 pub use financial_report_table::*;
 pub use fleet_vehicle_table::*;
 pub use form_config_table::*;
@@ -4447,7 +4449,6 @@ pub use activate_subscription_reducer::activate_subscription;
 pub use activate_subscription_plan_reducer::activate_subscription_plan;
 pub use add_account_move_line_reducer::add_account_move_line;
 pub use add_article_member_reducer::add_article_member;
-pub use add_casbin_rule_reducer::add_casbin_rule;
 pub use add_contact_to_segment_reducer::add_contact_to_segment;
 pub use add_document_version_reducer::add_document_version;
 pub use add_form_field_reducer::add_form_field;
@@ -4986,6 +4987,7 @@ pub use generate_subscription_invoice_reducer::generate_subscription_invoice;
 pub use get_form_configuration_reducer::get_form_configuration;
 pub use get_organization_form_configs_reducer::get_organization_form_configs;
 pub use grant_delegated_admin_scope_reducer::grant_delegated_admin_scope;
+pub use grant_field_permission_reducer::grant_field_permission;
 pub use grant_permission_reducer::grant_permission;
 pub use grant_subscription_entitlement_reducer::grant_subscription_entitlement;
 pub use hold_supplier_intake_reducer::hold_supplier_intake;
@@ -5176,7 +5178,6 @@ pub use release_blanket_to_po_reducer::release_blanket_to_po;
 pub use release_document_legal_hold_reducer::release_document_legal_hold;
 pub use release_picking_wave_reducer::release_picking_wave;
 pub use remove_article_member_reducer::remove_article_member;
-pub use remove_casbin_rule_reducer::remove_casbin_rule;
 pub use remove_landed_cost_line_reducer::remove_landed_cost_line;
 pub use remove_member_from_quality_team_reducer::remove_member_from_quality_team;
 pub use remove_purchase_order_line_reducer::remove_purchase_order_line;
@@ -5211,6 +5212,7 @@ pub use reverse_sale_commission_settlement_reducer::reverse_sale_commission_sett
 pub use review_message_batch_reducer::review_message_batch;
 pub use review_supplier_intake_reducer::review_supplier_intake;
 pub use revoke_delegated_admin_scope_reducer::revoke_delegated_admin_scope;
+pub use revoke_field_permission_reducer::revoke_field_permission;
 pub use revoke_permission_reducer::revoke_permission;
 pub use revoke_role_reducer::revoke_role;
 pub use revoke_subscription_entitlement_reducer::revoke_subscription_entitlement;
@@ -5691,10 +5693,6 @@ pub enum Reducer {
         organization_id: u64,
         article_id: u64,
         member: __sdk::Identity,
-}    ,
-    AddCasbinRule {
-        organization_id: u64,
-        params: AddCasbinRuleParams,
 }    ,
     AddContactToSegment {
         organization_id: u64,
@@ -8226,6 +8224,10 @@ pub enum Reducer {
         company_id: u64,
         params: GrantDelegatedAdminScopeParams,
 }    ,
+    GrantFieldPermission {
+        organization_id: u64,
+        params: GrantFieldPermissionParams,
+}    ,
     GrantPermission {
         organization_id: u64,
         params: GrantOrgPermissionParams,
@@ -9130,10 +9132,6 @@ pub enum Reducer {
         article_id: u64,
         member: __sdk::Identity,
 }    ,
-    RemoveCasbinRule {
-        organization_id: u64,
-        rule_id: u64,
-}    ,
     RemoveLandedCostLine {
         organization_id: u64,
         line_id: u64,
@@ -9299,6 +9297,10 @@ pub enum Reducer {
     RevokeDelegatedAdminScope {
         organization_id: u64,
         scope_id: u64,
+}    ,
+    RevokeFieldPermission {
+        organization_id: u64,
+        permission_id: u64,
 }    ,
     RevokePermission {
         organization_id: u64,
@@ -10905,7 +10907,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::ActivateSubscriptionPlan { .. } => "activate_subscription_plan",
             Reducer::AddAccountMoveLine { .. } => "add_account_move_line",
             Reducer::AddArticleMember { .. } => "add_article_member",
-            Reducer::AddCasbinRule { .. } => "add_casbin_rule",
             Reducer::AddContactToSegment { .. } => "add_contact_to_segment",
             Reducer::AddDocumentVersion { .. } => "add_document_version",
             Reducer::AddFormField { .. } => "add_form_field",
@@ -11444,6 +11445,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::GetFormConfiguration { .. } => "get_form_configuration",
             Reducer::GetOrganizationFormConfigs { .. } => "get_organization_form_configs",
             Reducer::GrantDelegatedAdminScope { .. } => "grant_delegated_admin_scope",
+            Reducer::GrantFieldPermission { .. } => "grant_field_permission",
             Reducer::GrantPermission { .. } => "grant_permission",
             Reducer::GrantSubscriptionEntitlement { .. } => "grant_subscription_entitlement",
             Reducer::HoldSupplierIntake { .. } => "hold_supplier_intake",
@@ -11634,7 +11636,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReleaseDocumentLegalHold { .. } => "release_document_legal_hold",
             Reducer::ReleasePickingWave { .. } => "release_picking_wave",
             Reducer::RemoveArticleMember { .. } => "remove_article_member",
-            Reducer::RemoveCasbinRule { .. } => "remove_casbin_rule",
             Reducer::RemoveLandedCostLine { .. } => "remove_landed_cost_line",
             Reducer::RemoveMemberFromQualityTeam { .. } => "remove_member_from_quality_team",
             Reducer::RemovePurchaseOrderLine { .. } => "remove_purchase_order_line",
@@ -11669,6 +11670,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReviewMessageBatch { .. } => "review_message_batch",
             Reducer::ReviewSupplierIntake { .. } => "review_supplier_intake",
             Reducer::RevokeDelegatedAdminScope { .. } => "revoke_delegated_admin_scope",
+            Reducer::RevokeFieldPermission { .. } => "revoke_field_permission",
             Reducer::RevokePermission { .. } => "revoke_permission",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::RevokeSubscriptionEntitlement { .. } => "revoke_subscription_entitlement",
@@ -12190,13 +12192,6 @@ fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
                 organization_id: organization_id.clone(),
                 article_id: article_id.clone(),
                 member: member.clone(),
-}),
-            Reducer::AddCasbinRule{
-                organization_id,
-                params,
-}             => __sats::bsatn::to_vec(&add_casbin_rule_reducer::AddCasbinRuleArgs {
-                organization_id: organization_id.clone(),
-                params: params.clone(),
 }),
             Reducer::AddContactToSegment{
                 organization_id,
@@ -16724,6 +16719,13 @@ Reducer::ErrorIntercompanyTransaction{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::GrantFieldPermission{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&grant_field_permission_reducer::GrantFieldPermissionArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::GrantPermission{
                 organization_id,
                 params,
@@ -18343,13 +18345,6 @@ Reducer::MigrateWorkflowInstance{
                 article_id: article_id.clone(),
                 member: member.clone(),
 }),
-            Reducer::RemoveCasbinRule{
-                organization_id,
-                rule_id,
-}             => __sats::bsatn::to_vec(&remove_casbin_rule_reducer::RemoveCasbinRuleArgs {
-                organization_id: organization_id.clone(),
-                rule_id: rule_id.clone(),
-}),
             Reducer::RemoveLandedCostLine{
                 organization_id,
                 line_id,
@@ -18647,6 +18642,13 @@ Reducer::MigrateWorkflowInstance{
 }             => __sats::bsatn::to_vec(&revoke_delegated_admin_scope_reducer::RevokeDelegatedAdminScopeArgs {
                 organization_id: organization_id.clone(),
                 scope_id: scope_id.clone(),
+}),
+            Reducer::RevokeFieldPermission{
+                organization_id,
+                permission_id,
+}             => __sats::bsatn::to_vec(&revoke_field_permission_reducer::RevokeFieldPermissionArgs {
+                organization_id: organization_id.clone(),
+                permission_id: permission_id.clone(),
 }),
             Reducer::RevokePermission{
                 organization_id,
@@ -21612,7 +21614,6 @@ pub struct DbUpdate {
     calendar_event: __sdk::TableUpdate<CalendarEvent>,
     capacity_forecast_snapshot: __sdk::TableUpdate<CapacityForecastSnapshot>,
     cartonization_result: __sdk::TableUpdate<CartonizationResult>,
-    casbin_rule: __sdk::TableUpdate<CasbinRule>,
     cash_flow_line: __sdk::TableUpdate<CashFlowLine>,
     commodity_price_index: __sdk::TableUpdate<CommodityPriceIndex>,
     company: __sdk::TableUpdate<Company>,
@@ -21667,6 +21668,7 @@ pub struct DbUpdate {
     expense_card_statement_line: __sdk::TableUpdate<ExpenseCardStatementLine>,
     expense_integration_intent: __sdk::TableUpdate<ExpenseIntegrationIntent>,
     expense_sheet: __sdk::TableUpdate<HrExpenseSheet>,
+    field_permission: __sdk::TableUpdate<FieldPermission>,
     financial_report: __sdk::TableUpdate<FinancialReport>,
     fleet_vehicle: __sdk::TableUpdate<FleetVehicle>,
     form_config: __sdk::TableUpdate<FormConfig>,
@@ -22026,7 +22028,6 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "calendar_event" => db_update.calendar_event.append(calendar_event_table::parse_table_update(table_update)?),
     "capacity_forecast_snapshot" => db_update.capacity_forecast_snapshot.append(capacity_forecast_snapshot_table::parse_table_update(table_update)?),
     "cartonization_result" => db_update.cartonization_result.append(cartonization_result_table::parse_table_update(table_update)?),
-    "casbin_rule" => db_update.casbin_rule.append(casbin_rule_table::parse_table_update(table_update)?),
     "cash_flow_line" => db_update.cash_flow_line.append(cash_flow_line_table::parse_table_update(table_update)?),
     "commodity_price_index" => db_update.commodity_price_index.append(commodity_price_index_table::parse_table_update(table_update)?),
     "company" => db_update.company.append(company_table::parse_table_update(table_update)?),
@@ -22081,6 +22082,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "expense_card_statement_line" => db_update.expense_card_statement_line.append(expense_card_statement_line_table::parse_table_update(table_update)?),
     "expense_integration_intent" => db_update.expense_integration_intent.append(expense_integration_intent_table::parse_table_update(table_update)?),
     "expense_sheet" => db_update.expense_sheet.append(expense_sheet_table::parse_table_update(table_update)?),
+    "field_permission" => db_update.field_permission.append(field_permission_table::parse_table_update(table_update)?),
     "financial_report" => db_update.financial_report.append(financial_report_table::parse_table_update(table_update)?),
     "fleet_vehicle" => db_update.fleet_vehicle.append(fleet_vehicle_table::parse_table_update(table_update)?),
     "form_config" => db_update.form_config.append(form_config_table::parse_table_update(table_update)?),
@@ -22452,7 +22454,6 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.calendar_event = cache.apply_diff_to_table::<CalendarEvent>("calendar_event", &self.calendar_event).with_updates_by_pk(|row| &row.id);
         diff.capacity_forecast_snapshot = cache.apply_diff_to_table::<CapacityForecastSnapshot>("capacity_forecast_snapshot", &self.capacity_forecast_snapshot).with_updates_by_pk(|row| &row.id);
         diff.cartonization_result = cache.apply_diff_to_table::<CartonizationResult>("cartonization_result", &self.cartonization_result).with_updates_by_pk(|row| &row.id);
-        diff.casbin_rule = cache.apply_diff_to_table::<CasbinRule>("casbin_rule", &self.casbin_rule).with_updates_by_pk(|row| &row.id);
         diff.cash_flow_line = cache.apply_diff_to_table::<CashFlowLine>("cash_flow_line", &self.cash_flow_line).with_updates_by_pk(|row| &row.id);
         diff.commodity_price_index = cache.apply_diff_to_table::<CommodityPriceIndex>("commodity_price_index", &self.commodity_price_index).with_updates_by_pk(|row| &row.id);
         diff.company = cache.apply_diff_to_table::<Company>("company", &self.company).with_updates_by_pk(|row| &row.id);
@@ -22507,6 +22508,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.expense_card_statement_line = cache.apply_diff_to_table::<ExpenseCardStatementLine>("expense_card_statement_line", &self.expense_card_statement_line).with_updates_by_pk(|row| &row.id);
         diff.expense_integration_intent = cache.apply_diff_to_table::<ExpenseIntegrationIntent>("expense_integration_intent", &self.expense_integration_intent).with_updates_by_pk(|row| &row.id);
         diff.expense_sheet = cache.apply_diff_to_table::<HrExpenseSheet>("expense_sheet", &self.expense_sheet).with_updates_by_pk(|row| &row.id);
+        diff.field_permission = cache.apply_diff_to_table::<FieldPermission>("field_permission", &self.field_permission).with_updates_by_pk(|row| &row.id);
         diff.financial_report = cache.apply_diff_to_table::<FinancialReport>("financial_report", &self.financial_report).with_updates_by_pk(|row| &row.id);
         diff.fleet_vehicle = cache.apply_diff_to_table::<FleetVehicle>("fleet_vehicle", &self.fleet_vehicle).with_updates_by_pk(|row| &row.id);
         diff.form_config = cache.apply_diff_to_table::<FormConfig>("form_config", &self.form_config).with_updates_by_pk(|row| &row.id);
@@ -22863,7 +22865,6 @@ for table_rows in raw.tables {
                 "calendar_event" => db_update.calendar_event.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "capacity_forecast_snapshot" => db_update.capacity_forecast_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "cartonization_result" => db_update.cartonization_result.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "casbin_rule" => db_update.casbin_rule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "cash_flow_line" => db_update.cash_flow_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "commodity_price_index" => db_update.commodity_price_index.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "company" => db_update.company.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -22918,6 +22919,7 @@ for table_rows in raw.tables {
                 "expense_card_statement_line" => db_update.expense_card_statement_line.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "expense_integration_intent" => db_update.expense_integration_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "expense_sheet" => db_update.expense_sheet.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "field_permission" => db_update.field_permission.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "financial_report" => db_update.financial_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "fleet_vehicle" => db_update.fleet_vehicle.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "form_config" => db_update.form_config.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -23274,7 +23276,6 @@ for table_rows in raw.tables {
                 "calendar_event" => db_update.calendar_event.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "capacity_forecast_snapshot" => db_update.capacity_forecast_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "cartonization_result" => db_update.cartonization_result.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "casbin_rule" => db_update.casbin_rule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "cash_flow_line" => db_update.cash_flow_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "commodity_price_index" => db_update.commodity_price_index.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "company" => db_update.company.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23329,6 +23330,7 @@ for table_rows in raw.tables {
                 "expense_card_statement_line" => db_update.expense_card_statement_line.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "expense_integration_intent" => db_update.expense_integration_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "expense_sheet" => db_update.expense_sheet.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "field_permission" => db_update.field_permission.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "financial_report" => db_update.financial_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "fleet_vehicle" => db_update.fleet_vehicle.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "form_config" => db_update.form_config.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23687,7 +23689,6 @@ pub struct AppliedDiff<'r> {
     calendar_event: __sdk::TableAppliedDiff<'r, CalendarEvent>,
     capacity_forecast_snapshot: __sdk::TableAppliedDiff<'r, CapacityForecastSnapshot>,
     cartonization_result: __sdk::TableAppliedDiff<'r, CartonizationResult>,
-    casbin_rule: __sdk::TableAppliedDiff<'r, CasbinRule>,
     cash_flow_line: __sdk::TableAppliedDiff<'r, CashFlowLine>,
     commodity_price_index: __sdk::TableAppliedDiff<'r, CommodityPriceIndex>,
     company: __sdk::TableAppliedDiff<'r, Company>,
@@ -23742,6 +23743,7 @@ pub struct AppliedDiff<'r> {
     expense_card_statement_line: __sdk::TableAppliedDiff<'r, ExpenseCardStatementLine>,
     expense_integration_intent: __sdk::TableAppliedDiff<'r, ExpenseIntegrationIntent>,
     expense_sheet: __sdk::TableAppliedDiff<'r, HrExpenseSheet>,
+    field_permission: __sdk::TableAppliedDiff<'r, FieldPermission>,
     financial_report: __sdk::TableAppliedDiff<'r, FinancialReport>,
     fleet_vehicle: __sdk::TableAppliedDiff<'r, FleetVehicle>,
     form_config: __sdk::TableAppliedDiff<'r, FormConfig>,
@@ -24101,7 +24103,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<CalendarEvent>("calendar_event", &self.calendar_event, event);
         callbacks.invoke_table_row_callbacks::<CapacityForecastSnapshot>("capacity_forecast_snapshot", &self.capacity_forecast_snapshot, event);
         callbacks.invoke_table_row_callbacks::<CartonizationResult>("cartonization_result", &self.cartonization_result, event);
-        callbacks.invoke_table_row_callbacks::<CasbinRule>("casbin_rule", &self.casbin_rule, event);
         callbacks.invoke_table_row_callbacks::<CashFlowLine>("cash_flow_line", &self.cash_flow_line, event);
         callbacks.invoke_table_row_callbacks::<CommodityPriceIndex>("commodity_price_index", &self.commodity_price_index, event);
         callbacks.invoke_table_row_callbacks::<Company>("company", &self.company, event);
@@ -24156,6 +24157,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<ExpenseCardStatementLine>("expense_card_statement_line", &self.expense_card_statement_line, event);
         callbacks.invoke_table_row_callbacks::<ExpenseIntegrationIntent>("expense_integration_intent", &self.expense_integration_intent, event);
         callbacks.invoke_table_row_callbacks::<HrExpenseSheet>("expense_sheet", &self.expense_sheet, event);
+        callbacks.invoke_table_row_callbacks::<FieldPermission>("field_permission", &self.field_permission, event);
         callbacks.invoke_table_row_callbacks::<FinancialReport>("financial_report", &self.financial_report, event);
         callbacks.invoke_table_row_callbacks::<FleetVehicle>("fleet_vehicle", &self.fleet_vehicle, event);
         callbacks.invoke_table_row_callbacks::<FormConfig>("form_config", &self.form_config, event);
@@ -25146,7 +25148,6 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         calendar_event_table::register_table(client_cache);
         capacity_forecast_snapshot_table::register_table(client_cache);
         cartonization_result_table::register_table(client_cache);
-        casbin_rule_table::register_table(client_cache);
         cash_flow_line_table::register_table(client_cache);
         commodity_price_index_table::register_table(client_cache);
         company_table::register_table(client_cache);
@@ -25201,6 +25202,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         expense_card_statement_line_table::register_table(client_cache);
         expense_integration_intent_table::register_table(client_cache);
         expense_sheet_table::register_table(client_cache);
+        field_permission_table::register_table(client_cache);
         financial_report_table::register_table(client_cache);
         fleet_vehicle_table::register_table(client_cache);
         form_config_table::register_table(client_cache);
@@ -25552,7 +25554,6 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "calendar_event",
         "capacity_forecast_snapshot",
         "cartonization_result",
-        "casbin_rule",
         "cash_flow_line",
         "commodity_price_index",
         "company",
@@ -25607,6 +25608,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "expense_card_statement_line",
         "expense_integration_intent",
         "expense_sheet",
+        "field_permission",
         "financial_report",
         "fleet_vehicle",
         "form_config",
