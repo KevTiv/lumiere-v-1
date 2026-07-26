@@ -1,4 +1,5 @@
 //! Proposals domain test suite — invoke via `run_all_proposals_tests` reducer.
+pub mod convert_integrity_test;
 pub mod wave_a_test;
 pub mod wave_d_test;
 
@@ -35,8 +36,20 @@ pub fn run_proposals_wave_d_test(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_proposals_convert_integrity_test(ctx: &ReducerContext) -> Result<(), String> {
+    convert_integrity_test::test_convert_proposal_missing_product_fail_closed(ctx)
+        .map_err(|e| format!("r5_missing_product: {e}"))?;
+    convert_integrity_test::test_convert_proposal_derives_product_uom(ctx)
+        .map_err(|e| format!("r5_derive_uom: {e}"))?;
+    convert_integrity_test::test_convert_proposal_zero_product_uom_fail_closed(ctx)
+        .map_err(|e| format!("r5_zero_uom: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_proposals_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_proposals_wave_a_test(ctx)?;
     run_proposals_wave_d_test(ctx)?;
+    run_proposals_convert_integrity_test(ctx)?;
     Ok(())
 }

@@ -22,12 +22,115 @@ pub fn create_balanced_customer_invoice(
     amount: f64,
     post: bool,
 ) -> Result<u64, String> {
-    let org_id = fixture.organization_id;
-    let company_id = fixture.company_id;
     let ar_id = *fixture
         .chart_account_ids
         .get(chart_keys::AR)
         .ok_or("Harness missing AR account")?;
+    create_balanced_customer_invoice_on_account(
+        ctx,
+        fixture,
+        amount,
+        ar_id,
+        "Harness customer invoice",
+        post,
+    )
+}
+
+/// Create a second Receivable account that is *not* first-of-type for the company.
+/// Fixture AR remains the decoy first match for A4 fallback proofs.
+pub fn seed_distinctive_ar_account(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+) -> Result<u64, String> {
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let decoy_ar_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::AR)
+        .ok_or("Harness missing AR account")?;
+    let decoy = ctx
+        .db
+        .account_account()
+        .id()
+        .find(&decoy_ar_id)
+        .ok_or("Decoy AR account row missing")?;
+
+    let code = format!("1209{company_id}");
+    if ctx
+        .db
+        .account_account()
+        .iter()
+        .find(|a| a.organization_id == org_id && a.code == code)
+        .is_none()
+    {
+        create_account_account(
+            ctx,
+            org_id,
+            CreateAccountAccountParams {
+                company_id: Some(company_id),
+                code: code.clone(),
+                name: "Distinctive Trade Receivable".to_string(),
+                user_type_id: decoy.user_type_id,
+                currency_id: None,
+                internal_type: Some(AccountTypeInternal::Receivable),
+                internal_group: Some(AccountInternalGroup::Asset),
+                group_id: None,
+                reconcile: true,
+                tax_ids: vec![],
+                note: None,
+                opening_debit: 0.0,
+                opening_credit: 0.0,
+                allowed_journal_ids: vec![],
+                non_trade: false,
+                is_off_balance: false,
+                metadata: Some(r#"{"test":"distinctive_ar"}"#.to_string()),
+            },
+        )?;
+    }
+
+    let distinctive_id = ctx
+        .db
+        .account_account()
+        .iter()
+        .find(|a| a.organization_id == org_id && a.code == code)
+        .map(|a| a.id)
+        .ok_or("Distinctive AR account not found after create")?;
+
+    if distinctive_id == decoy_ar_id {
+        return Err("Distinctive AR must differ from fixture first-of-type AR".to_string());
+    }
+
+    // Sanity: company first-of-type Receivable must still be the decoy (A4 fallback).
+    let first_of_type = ctx
+        .db
+        .account_account()
+        .account_by_company()
+        .filter(&company_id)
+        .find(|a| {
+            !a.deprecated && a.internal_type.as_ref() == Some(&AccountTypeInternal::Receivable)
+        })
+        .map(|a| a.id)
+        .ok_or("No receivable account for company")?;
+    if first_of_type != decoy_ar_id {
+        return Err(format!(
+            "Expected fixture AR {decoy_ar_id} as first-of-type, got {first_of_type}"
+        ));
+    }
+
+    Ok(distinctive_id)
+}
+
+/// Balanced customer invoice on an explicit AR account with a unique move ref.
+pub fn create_balanced_customer_invoice_on_account(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    amount: f64,
+    ar_account_id: u64,
+    ref_label: &str,
+    post: bool,
+) -> Result<u64, String> {
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
     let revenue_id = *fixture
         .chart_account_ids
         .get(chart_keys::REVENUE)
@@ -87,6 +190,7 @@ pub fn create_balanced_customer_invoice(
             .ok_or("Test sales journal not found after create")?
     };
 
+    let ref_owned = ref_label.to_string();
     create_account_move(
         ctx,
         org_id,
@@ -96,7 +200,7 @@ pub fn create_balanced_customer_invoice(
             move_type: MoveType::OutInvoice,
             date: ctx.timestamp,
             name: String::new(),
-            ref_: Some("Harness customer invoice".to_string()),
+            ref_: Some(ref_owned.clone()),
             auto_post: false,
             to_check: false,
             is_storno: false,
@@ -128,7 +232,7 @@ pub fn create_balanced_customer_invoice(
         .iter()
         .find(|m| {
             m.organization_id == org_id
-                && m.ref_ == Some("Harness customer invoice".to_string())
+                && m.ref_ == Some(ref_owned.clone())
                 && m.state == AccountMoveState::Draft
         })
         .map(|m| m.id)
@@ -139,7 +243,7 @@ pub fn create_balanced_customer_invoice(
         org_id,
         move_id,
         AddAccountMoveLineParams {
-            account_id: ar_id,
+            account_id: ar_account_id,
             name: "Accounts Receivable".to_string(),
             debit: amount,
             credit: 0.0,

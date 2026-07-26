@@ -90,6 +90,10 @@ export function toCreateOperationalMessageParams(
   const contactId = optionalBigIntU64(field(formData, "contactId", "contact_id"))
   if (templateId === undefined || contactId === undefined) return null
 
+  const phoneIdentityId = optionalBigIntU64(field(formData, "phoneIdentityId", "phone_identity_id"))
+  const subjectId = optionalBigIntU64(field(formData, "subjectId", "subject_id"))
+  if (phoneIdentityId === undefined || subjectId === undefined) return null
+
   return {
     channel: unitEnumFromForm<MessageChannel>(field(formData, "channel", "channel"), ["Sms", "WhatsApp", "Email", "InApp"] as const, "Sms"),
     variables: objectArrayFromForm(field(formData, "variables", "variables")).map((row) => ({ key: String(row.key ?? ""), value: String(row.value ?? "") })),
@@ -97,9 +101,9 @@ export function toCreateOperationalMessageParams(
     companyId: optionalBigIntU64(field(formData, "companyId", "company_id")),
     templateId,
     contactId,
-    phoneIdentityId: optionalBigIntU64(field(formData, "phoneIdentityId", "phone_identity_id")) ?? 0n,
+    phoneIdentityId,
     subjectModel: optionalTrimmedString(field(formData, "subjectModel", "subject_model")) ?? "",
-    subjectId: optionalBigIntU64(field(formData, "subjectId", "subject_id")) ?? 0n,
+    subjectId,
     renderedSubject: optionalTrimmedString(field(formData, "renderedSubject", "rendered_subject")),
     renderedBody: optionalTrimmedString(field(formData, "renderedBody", "rendered_body")) ?? "",
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),

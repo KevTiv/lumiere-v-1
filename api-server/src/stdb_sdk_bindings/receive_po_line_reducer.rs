@@ -10,6 +10,7 @@ pub(super) struct ReceivePoLineArgs {
     pub organization_id: u64,
     pub line_id: u64,
     pub qty: f64,
+    pub lot_id: Option<u64>,
 }
 
 impl From<ReceivePoLineArgs> for super::Reducer {
@@ -18,6 +19,7 @@ impl From<ReceivePoLineArgs> for super::Reducer {
             organization_id: args.organization_id,
             line_id: args.line_id,
             qty: args.qty,
+            lot_id: args.lot_id,
         }
     }
 }
@@ -37,8 +39,14 @@ pub trait receive_po_line {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`receive_po_line:receive_po_line_then`] to run a callback after the reducer completes.
-    fn receive_po_line(&self, organization_id: u64, line_id: u64, qty: f64) -> __sdk::Result<()> {
-        self.receive_po_line_then(organization_id, line_id, qty, |_, _| {})
+    fn receive_po_line(
+        &self,
+        organization_id: u64,
+        line_id: u64,
+        qty: f64,
+        lot_id: Option<u64>,
+    ) -> __sdk::Result<()> {
+        self.receive_po_line_then(organization_id, line_id, qty, lot_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `receive_po_line` to run as soon as possible,
@@ -52,6 +60,7 @@ pub trait receive_po_line {
         organization_id: u64,
         line_id: u64,
         qty: f64,
+        lot_id: Option<u64>,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -65,6 +74,7 @@ impl receive_po_line for super::RemoteReducers {
         organization_id: u64,
         line_id: u64,
         qty: f64,
+        lot_id: Option<u64>,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -75,6 +85,7 @@ impl receive_po_line for super::RemoteReducers {
                 organization_id,
                 line_id,
                 qty,
+                lot_id,
             },
             callback,
         )

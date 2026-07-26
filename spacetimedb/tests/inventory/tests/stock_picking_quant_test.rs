@@ -193,7 +193,7 @@ pub fn test_receipt_increases_quant(ctx: &ReducerContext) -> Result<(), String> 
         .sum::<f64>();
 
     let qty_to_receive = line.product_qty;
-    receive_po_line(ctx, org_id, line.id, qty_to_receive)?;
+    receive_po_line(ctx, org_id, line.id, qty_to_receive, None)?;
 
     let updated_line = ctx
         .db

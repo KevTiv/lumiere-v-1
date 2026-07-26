@@ -19,6 +19,7 @@ fn domain_test_reducers_are_wasm_linked() {
     let _ = stringify!(run_sales_order_cancel_test);
     let _ = stringify!(run_accounting_payment_term_update_test);
     let _ = stringify!(run_accounting_payment_management_test);
+    let _ = stringify!(run_accounting_payment_multi_invoice_residual_test);
     let _ = stringify!(run_core_operational_messaging_test);
     let _ = stringify!(run_core_sod_test);
     let _ = stringify!(run_core_permissions_test);
@@ -52,6 +53,7 @@ fn run_sales_order_update_test() {}
 fn run_sales_order_cancel_test() {}
 fn run_accounting_payment_term_update_test() {}
 fn run_accounting_payment_management_test() {}
+fn run_accounting_payment_multi_invoice_residual_test() {}
 fn run_core_operational_messaging_test() {}
 fn run_core_sod_test() {}
 fn run_core_permissions_test() {}

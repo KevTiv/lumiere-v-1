@@ -177,8 +177,14 @@ pub struct StockMove {
     pub metadata: Option<String>,
 }
 
+/// SECTION 3.13: STOCK MOVE LINE
+///
+/// **QUARANTINED / SKIP (integrity readiness):** no production mutators create
+/// `StockMoveLine` rows outside seed/coverage. Operational stock posts through
+/// `StockMove` + `StockQuant` only. Do not wire FE or new reducers to this table
+/// until a real pack/split line model is implemented.
 // ══════════════════════════════════════════════════════════════════════════════
-// SECTION 3.13: STOCK MOVE LINE
+// SECTION 3.13: STOCK MOVE LINE (quarantined)
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[derive(Clone)]
@@ -525,6 +531,31 @@ pub(crate) fn resolve_warehouse_stock_location(
     warehouse_id
 }
 
+/// Partner/supplier virtual location for returns and inbound source legs.
+/// Fail-closed: never invent IDs via arithmetic on stock locations.
+pub(crate) fn resolve_supplier_stock_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+) -> Result<u64, String> {
+    ctx.db
+        .stock_location()
+        .iter()
+        .find(|loc| {
+            loc.organization_id == organization_id
+                && loc.active
+                && loc.usage == "supplier"
+                && (loc.company_id.is_none() || loc.company_id == Some(company_id))
+        })
+        .map(|loc| loc.id)
+        .ok_or_else(|| {
+            format!(
+                "No supplier stock location found for organization {} company {}",
+                organization_id, company_id
+            )
+        })
+}
+
 /// Storable / consumable products need ATP; services do not.
 pub(crate) fn product_requires_stock(ctx: &ReducerContext, product_id: u64) -> bool {
     ctx.db
@@ -663,7 +694,7 @@ fn find_lot_quant_at_location(
     })
 }
 
-fn ensure_lot_for_product(
+pub(crate) fn ensure_lot_for_product(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -2661,6 +2692,38 @@ pub fn assign_stock_picking(
 
     if picking.state != "confirmed" {
         return Err("Picking must be confirmed before assignment".to_string());
+    }
+
+    let is_incoming = picking.picking_code.as_deref() == Some("incoming");
+
+    // Outgoing / internal: reserve ATP so "assigned" honestly means reserved.
+    // Incoming receipts do not consume company ATP at assign time.
+    if !is_incoming {
+        for move_record in ctx
+            .db
+            .stock_move()
+            .move_by_picking()
+            .filter(&picking_id)
+        {
+            if move_record.state == "cancel" || move_record.state == "done" {
+                continue;
+            }
+            if !product_requires_stock(ctx, move_record.product_id) {
+                continue;
+            }
+            let residual = (move_record.product_uom_qty - move_record.quantity_done).max(0.0);
+            if residual <= 1e-9 {
+                continue;
+            }
+            reserve_quantity_at_location(
+                ctx,
+                organization_id,
+                company_id,
+                move_record.product_id,
+                move_record.location_id,
+                residual,
+            )?;
+        }
     }
 
     ctx.db.stock_picking().id().update(StockPicking {

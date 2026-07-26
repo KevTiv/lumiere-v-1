@@ -488,22 +488,19 @@ fn create_sale_order_line_internal(
     use crate::sales::oms_extensions::remap_taxes_for_fiscal_position;
     use crate::sales::pricelists::resolve_unit_price;
 
-    let product_result = ctx.db.product().id().find(&params.product_id);
-    let (product_name, product_type, product_cost, list_price): (Option<String>, String, f64, f64) =
-        match product_result {
-            Some(product) => (
-                product.display_name.clone(),
-                product.type_.clone(),
-                product.standard_price,
-                product.list_price,
-            ),
-            None => (
-                Some(format!("Product {}", params.product_id)),
-                "product".to_string(),
-                0.0,
-                0.0,
-            ),
-        };
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&params.product_id)
+        .ok_or("Product not found")?;
+    if product.organization_id != organization_id {
+        return Err("Product does not belong to this organization".to_string());
+    }
+    let product_name = product.display_name.clone();
+    let product_type = product.type_.clone();
+    let product_cost = product.standard_price;
+    let list_price = product.list_price;
 
     let price_unit = match params.price_unit {
         Some(p) => p,
@@ -534,9 +531,9 @@ fn create_sale_order_line_internal(
         id: 0,
         organization_id,
         order_id,
-        name: params.name.unwrap_or_else(|| {
-            product_name.unwrap_or_else(|| format!("Product {}", params.product_id))
-        }),
+        name: params
+            .name
+            .unwrap_or_else(|| product_name.unwrap_or_else(|| product.name.clone())),
         sequence: params.sequence,
         invoice_status: LineInvoiceStatus::No,
         price_unit,
@@ -623,8 +620,57 @@ pub fn create_sale_order(
         .find(&params.partner_id)
         .ok_or("Partner not found")?;
 
+    if partner.organization_id != organization_id {
+        return Err("Partner does not belong to this organization".to_string());
+    }
+    if let Some(partner_company) = partner.company_id {
+        if partner_company != company_id {
+            return Err("Partner does not belong to this company".to_string());
+        }
+    }
+
     if !partner.is_customer {
         return Err("Partner is not a customer".to_string());
+    }
+
+    for extra_partner_id in [params.partner_invoice_id, params.partner_shipping_id] {
+        let extra = ctx
+            .db
+            .contact()
+            .id()
+            .find(&extra_partner_id)
+            .ok_or("Invoice/shipping partner not found")?;
+        if extra.organization_id != organization_id {
+            return Err("Invoice/shipping partner does not belong to this organization".to_string());
+        }
+    }
+
+    let pl = ctx
+        .db
+        .product_pricelist()
+        .id()
+        .find(&params.pricelist_id)
+        .ok_or("Pricelist not found")?;
+    if pl.organization_id != organization_id {
+        return Err("Pricelist belongs to a different organization".to_string());
+    }
+
+    let wh = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&params.warehouse_id)
+        .ok_or("Warehouse not found")?;
+    if wh.company_id != company_id {
+        return Err("Warehouse does not belong to this company".to_string());
+    }
+
+    if params.currency_id == 0 {
+        return Err("Currency is required".to_string());
+    }
+    // Pricelist currency is authoritative when set; reject mismatched create payloads.
+    if pl.currency_id != 0 && pl.currency_id != params.currency_id {
+        return Err("Currency does not match pricelist currency".to_string());
     }
 
     if let Some(ref sp) = params.shipping_policy {

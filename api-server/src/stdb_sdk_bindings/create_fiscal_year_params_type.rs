@@ -17,7 +17,7 @@ pub struct CreateFiscalYearParams {
     pub name: String,
     pub date_from: __sdk::Timestamp,
     pub date_to: __sdk::Timestamp,
-    pub r#type: String,
+    pub type: String,
     pub state: FiscalYearState,
     pub carry_over_accounts: Vec::<u64>,
     pub closing_move_id: Option::<u64>,

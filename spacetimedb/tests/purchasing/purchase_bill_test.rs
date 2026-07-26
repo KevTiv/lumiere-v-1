@@ -168,7 +168,7 @@ pub fn test_po_confirm_to_balanced_bill(ctx: &ReducerContext) -> Result<(), Stri
         .next()
         .ok_or("Purchase order line not found")?;
 
-    receive_po_line(ctx, org_id, line.id, line.product_qty)?;
+    receive_po_line(ctx, org_id, line.id, line.product_qty, None)?;
 
     let ap_id = *fixture
         .chart_account_ids

@@ -125,10 +125,14 @@ export function toCreateHrGlobalAssignmentParams(
   const status = optionalTrimmedString(field(formData, "status", "status"))
   if (employeeId === undefined || !status) return null
 
+  const homeCompanyId = optionalBigIntU64(field(formData, "homeCompanyId", "home_company_id"))
+  const hostCompanyId = optionalBigIntU64(field(formData, "hostCompanyId", "host_company_id"))
+  if (homeCompanyId === undefined || hostCompanyId === undefined) return null
+
   return {
     employeeId,
-    homeCompanyId: optionalBigIntU64(field(formData, "homeCompanyId", "home_company_id")) ?? 0n,
-    hostCompanyId: optionalBigIntU64(field(formData, "hostCompanyId", "host_company_id")) ?? 0n,
+    homeCompanyId,
+    hostCompanyId,
     dateFrom: requiredTimestampFromForm(field(formData, "dateFrom", "date_from")) ?? stbTimestampFromDate(new Date()),
     dateTo: optionalTimestampFromForm(field(formData, "dateTo", "date_to")),
     status,

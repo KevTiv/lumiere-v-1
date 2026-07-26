@@ -31,6 +31,7 @@ pub fn run_all_sales_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_sales_dropship_confirm_test(ctx)?;
     run_sales_company_isolation_test(ctx)?;
     run_sales_exchange_from_return_test(ctx)?;
+    run_sales_ghost_product_fail_closed_test(ctx)?;
     log::info!("✅ run_all_sales_tests complete");
     Ok(())
 }
@@ -151,4 +152,10 @@ pub fn run_sales_company_isolation_test(ctx: &ReducerContext) -> Result<(), Stri
 pub fn run_sales_exchange_from_return_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_exchange_order_from_return(ctx)
         .map_err(|e| format!("exchange_from_return: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_sales_ghost_product_fail_closed_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_unknown_product_so_line_fail_closed(ctx)
+        .map_err(|e| format!("r1_ghost_product: {e}"))
 }

@@ -2,6 +2,7 @@
 
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -102,6 +103,7 @@ pub fn create_ai_chat_session(
     params: CreateAiChatSessionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_chat_session", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     let session_key = params.session_key.trim().to_string();
     if session_key.is_empty() {
@@ -161,6 +163,7 @@ pub fn append_ai_chat_message(
     params: AppendAiChatMessageParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_chat_message", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     let session_key = params.session_key.trim().to_string();
     if session_key.is_empty() {

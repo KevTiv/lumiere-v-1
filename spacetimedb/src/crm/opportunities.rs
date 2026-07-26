@@ -248,11 +248,15 @@ pub fn create_opportunity(
         return Err("Opportunity name cannot be empty".to_string());
     }
 
-    ctx.db
+    let stage = ctx
+        .db
         .opp_stage()
         .id()
         .find(&params.stage_id)
         .ok_or("Stage not found")?;
+    if stage.organization_id != organization_id {
+        return Err("Stage does not belong to this organization".to_string());
+    }
 
     let operating_company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
@@ -826,11 +830,16 @@ pub fn convert_opportunity_to_sale_order(
         .partner_id
         .ok_or("Opportunity has no partner — set a partner before converting")?;
 
-    let currency_id = opp.company_currency_id.unwrap_or(1);
+    let currency_id = opp
+        .company_currency_id
+        .ok_or("Opportunity has no company_currency_id — set currency before converting")?;
     let opp_company_id = resolve_opportunity_company_id(&opp, company_id)?;
 
     // Ensure the partner is flagged as a customer
     if let Some(partner) = ctx.db.contact().id().find(&partner_id) {
+        if partner.organization_id != organization_id {
+            return Err("Opportunity partner does not belong to this organization".to_string());
+        }
         if !partner.is_customer {
             ctx.db.contact().id().update(Contact {
                 is_customer: true,
@@ -847,30 +856,47 @@ pub fn convert_opportunity_to_sale_order(
         .filter(|l| l.opportunity_id == opportunity_id)
         .collect();
 
-    let order_lines: Vec<CreateSaleOrderLineParams> = opp_lines
-        .iter()
-        .filter_map(|l| {
-            let product_id = l.product_id?;
-            Some(CreateSaleOrderLineParams {
-                product_id,
-                quantity: l.quantity,
-                uom_id: l.uom_id.unwrap_or(1),
-                price_unit: Some(l.price_unit),
-                discount: l.discount,
-                tax_ids: l.tax_ids.clone(),
-                name: Some(l.name.clone()),
-                sequence: l.sequence as u32,
-                is_downpayment: false,
-                display_type: None,
-                product_variant_id: None,
-                packaging_id: None,
-                route_id: None,
-                analytic_tag_ids: vec![],
-                customer_lead: None,
-                metadata: None,
-            })
-        })
-        .collect();
+    let mut order_lines: Vec<CreateSaleOrderLineParams> = Vec::new();
+    for l in &opp_lines {
+        let Some(product_id) = l.product_id else {
+            continue;
+        };
+        let product = ctx
+            .db
+            .product()
+            .id()
+            .find(&product_id)
+            .ok_or_else(|| format!("Opportunity line product {product_id} not found"))?;
+        if product.organization_id != organization_id {
+            return Err(format!(
+                "Opportunity line product {product_id} does not belong to this organization"
+            ));
+        }
+        let uom_id = l.uom_id.unwrap_or(product.uom_id);
+        if uom_id == 0 {
+            return Err(format!(
+                "Opportunity line product {product_id} has no UoM — set uom before converting"
+            ));
+        }
+        order_lines.push(CreateSaleOrderLineParams {
+            product_id,
+            quantity: l.quantity,
+            uom_id,
+            price_unit: Some(l.price_unit),
+            discount: l.discount,
+            tax_ids: l.tax_ids.clone(),
+            name: Some(l.name.clone()),
+            sequence: l.sequence as u32,
+            is_downpayment: false,
+            display_type: None,
+            product_variant_id: None,
+            packaging_id: None,
+            route_id: None,
+            analytic_tag_ids: vec![],
+            customer_lead: None,
+            metadata: None,
+        });
+    }
 
     let so_params = CreateSaleOrderParams {
         company_id: Some(opp_company_id),

@@ -7,6 +7,7 @@ use crate::ai::action_draft_lifecycle::{
     on_draft_approved, on_draft_created, on_draft_expired, on_draft_rejected,
 };
 use crate::ai::reducer_allowlist::is_allowed_ai_reducer;
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::projects::tasks::{create_task, project_task, CreateTaskParams};
 use crate::purchasing::purchase_orders::{
@@ -107,6 +108,7 @@ pub fn create_ai_action_draft(
     params: CreateAiActionDraftParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_action_draft", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     let reducer_name = params.reducer_name.trim().to_string();
     if reducer_name.is_empty() {
@@ -697,16 +699,16 @@ fn build_create_sale_order_params(
         .and_then(json_u64)
         .ok_or("create_sale_order requires warehouse_id")?;
 
-    let order_lines = obj
-        .get("order_lines")
-        .and_then(Value::as_array)
-        .map(|lines| {
-            lines
-                .iter()
-                .filter_map(|line| build_create_sale_order_line_params(line))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
+    let order_lines = match obj.get("order_lines").and_then(Value::as_array) {
+        Some(lines) => {
+            let mut out = Vec::with_capacity(lines.len());
+            for line in lines {
+                out.push(build_create_sale_order_line_params(line)?);
+            }
+            out
+        }
+        None => Vec::new(),
+    };
 
     Ok(CreateSaleOrderParams {
         company_id: Some(company_id),
@@ -756,21 +758,30 @@ fn build_create_sale_order_params(
     })
 }
 
-fn build_create_sale_order_line_params(value: &Value) -> Option<CreateSaleOrderLineParams> {
-    let obj = value.as_object()?;
-    let product_id = obj.get("product_id").and_then(json_u64)?;
-    Some(CreateSaleOrderLineParams {
+fn build_create_sale_order_line_params(
+    value: &Value,
+) -> Result<CreateSaleOrderLineParams, String> {
+    let obj = value
+        .as_object()
+        .ok_or("sale order line must be a JSON object")?;
+    let product_id = obj
+        .get("product_id")
+        .and_then(json_u64)
+        .ok_or("sale order line requires product_id")?;
+    let uom_id = obj
+        .get("uom_id")
+        .or_else(|| obj.get("product_uom"))
+        .and_then(json_u64)
+        .filter(|&id| id != 0)
+        .ok_or("sale order line requires uom_id (no magic default)")?;
+    Ok(CreateSaleOrderLineParams {
         product_id,
         quantity: obj
             .get("quantity")
             .or_else(|| obj.get("product_uom_qty"))
             .and_then(|v| v.as_f64())
             .unwrap_or(1.0),
-        uom_id: obj
-            .get("uom_id")
-            .or_else(|| obj.get("product_uom"))
-            .and_then(json_u64)
-            .unwrap_or(1),
+        uom_id,
         price_unit: obj.get("price_unit").and_then(|v| v.as_f64()),
         discount: obj.get("discount").and_then(|v| v.as_f64()).unwrap_or(0.0),
         tax_ids: json_u64_vec(obj.get("tax_ids")),
@@ -813,16 +824,16 @@ fn build_create_purchase_order_params(
         .and_then(json_u64)
         .ok_or("create_purchase_order requires currency_id")?;
 
-    let line_params = obj
-        .get("order_lines")
-        .and_then(Value::as_array)
-        .map(|lines| {
-            lines
-                .iter()
-                .filter_map(|line| build_add_purchase_order_line_params(line))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
+    let line_params = match obj.get("order_lines").and_then(Value::as_array) {
+        Some(lines) => {
+            let mut out = Vec::with_capacity(lines.len());
+            for line in lines {
+                out.push(build_add_purchase_order_line_params(line)?);
+            }
+            out
+        }
+        None => Vec::new(),
+    };
 
     Ok((
         CreatePurchaseOrderParams {
@@ -850,21 +861,30 @@ fn build_create_purchase_order_params(
     ))
 }
 
-fn build_add_purchase_order_line_params(value: &Value) -> Option<AddPurchaseOrderLineParams> {
-    let obj = value.as_object()?;
-    let product_id = obj.get("product_id").and_then(json_u64)?;
-    Some(AddPurchaseOrderLineParams {
+fn build_add_purchase_order_line_params(
+    value: &Value,
+) -> Result<AddPurchaseOrderLineParams, String> {
+    let obj = value
+        .as_object()
+        .ok_or("purchase order line must be a JSON object")?;
+    let product_id = obj
+        .get("product_id")
+        .and_then(json_u64)
+        .ok_or("purchase order line requires product_id")?;
+    let uom_id = obj
+        .get("uom_id")
+        .or_else(|| obj.get("product_uom"))
+        .and_then(json_u64)
+        .filter(|&id| id != 0)
+        .ok_or("purchase order line requires uom_id (no magic default)")?;
+    Ok(AddPurchaseOrderLineParams {
         product_id,
         quantity: obj
             .get("quantity")
             .or_else(|| obj.get("product_qty"))
             .and_then(|v| v.as_f64())
             .unwrap_or(1.0),
-        uom_id: obj
-            .get("uom_id")
-            .or_else(|| obj.get("product_uom"))
-            .and_then(json_u64)
-            .unwrap_or(1),
+        uom_id,
         price_unit: obj
             .get("price_unit")
             .and_then(|v| v.as_f64())

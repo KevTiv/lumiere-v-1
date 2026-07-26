@@ -10,6 +10,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::core::organization::{company, company_id_from_scope};
 use crate::core::reference::{currency_rate, legacy_currency_code_for_id};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::hr::employees::hr_employee;
 use crate::projects::project_accounting::{
     maybe_post_wip_je_for_validated, refresh_project_margin_for_projects,
     refresh_resource_utilisation_snapshot, PostTimesheetWipParams,
@@ -297,6 +298,27 @@ fn timesheet_mutation_blocked(entry: &ProjectTimesheet) -> Result<(), String> {
     Ok(())
 }
 
+fn require_timesheet_employee(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    employee_id: u64,
+) -> Result<(), String> {
+    let employee = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&employee_id)
+        .ok_or("Employee not found")?;
+    if employee.organization_id != organization_id {
+        return Err("Employee belongs to a different organization".to_string());
+    }
+    if employee.company_id != company_id {
+        return Err("Employee does not belong to this company".to_string());
+    }
+    Ok(())
+}
+
 fn insert_approval_snapshot(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -384,6 +406,8 @@ pub fn log_timesheet(
         }
     }
 
+    require_timesheet_employee(ctx, organization_id, company_id, params.employee_id)?;
+
     let billable = project_is_billable(&project.bill_type);
     let (employee_cost, sell_rate) = resolve_timesheet_rates(
         ctx,
@@ -400,6 +424,16 @@ pub fn log_timesheet(
     )?;
     let amount = params.unit_amount * employee_cost;
     let revenue = params.unit_amount * sell_rate;
+
+    let (currency_rate, company_currency_id) = timesheet_exchange_rate_snapshot(
+        ctx,
+        organization_id,
+        company_id,
+        params.currency_id,
+    )?;
+    if company_currency_id == 0 {
+        return Err("Company currency is required for timesheet FX snapshot".to_string());
+    }
 
     let entry = ctx.db.project_timesheet().insert(ProjectTimesheet {
         id: 0,
@@ -425,10 +459,10 @@ pub fn log_timesheet(
         timesheet_invoice_type: resolved_invoice_type,
         timesheet_invoice_id: None,
         timesheet_revenue: revenue,
-        currency_rate: 0.0,
-        company_currency_id: 0,
-        amount_company: 0.0,
-        timesheet_revenue_company: 0.0,
+        currency_rate,
+        company_currency_id,
+        amount_company: amount * currency_rate,
+        timesheet_revenue_company: revenue * currency_rate,
         so_line: params.so_line,
         encoding_uom_id: params.encoding_uom_id,
         validation_status: "draft".to_string(),
@@ -561,6 +595,8 @@ pub fn start_timesheet_timer(
         );
     }
 
+    require_timesheet_employee(ctx, organization_id, company_id, params.employee_id)?;
+
     let billable = project_is_billable(&project.bill_type);
     let (employee_cost, sell_rate) = resolve_timesheet_rates(
         ctx,
@@ -575,6 +611,16 @@ pub fn start_timesheet_timer(
         params.employee_cost,
         params.sell_rate,
     )?;
+
+    let (currency_rate, company_currency_id) = timesheet_exchange_rate_snapshot(
+        ctx,
+        organization_id,
+        company_id,
+        params.currency_id,
+    )?;
+    if company_currency_id == 0 {
+        return Err("Company currency is required for timesheet FX snapshot".to_string());
+    }
 
     let entry = ctx.db.project_timesheet().insert(ProjectTimesheet {
         id: 0,
@@ -600,8 +646,8 @@ pub fn start_timesheet_timer(
         timesheet_invoice_type: resolved_invoice_type,
         timesheet_invoice_id: None,
         timesheet_revenue: 0.0,
-        currency_rate: 0.0,
-        company_currency_id: 0,
+        currency_rate,
+        company_currency_id,
         amount_company: 0.0,
         timesheet_revenue_company: 0.0,
         so_line: params.so_line,

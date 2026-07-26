@@ -38,9 +38,12 @@ export function toCreateFiscalPositionTaxParams(
   const fiscalPositionId = optionalBigIntU64(field(formData, "fiscalPositionId", "fiscal_position_id"))
   if (fiscalPositionId === undefined) return null
 
+  const taxSrcId = optionalBigIntU64(field(formData, "taxSrcId", "tax_src_id"))
+  if (taxSrcId === undefined) return null
+
   return {
     fiscalPositionId,
-    taxSrcId: optionalBigIntU64(field(formData, "taxSrcId", "tax_src_id")) ?? 0n,
+    taxSrcId,
     taxDestId: optionalBigIntU64(field(formData, "taxDestId", "tax_dest_id")),
     sequence: Math.trunc(num(field(formData, "sequence", "sequence"), 0)),
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
@@ -147,11 +150,14 @@ export function toCreateSaleOrderOptionParams(
   const name = optionalTrimmedString(field(formData, "name", "name"))
   if (productId === undefined || !name) return null
 
+  const uomId = optionalBigIntU64(field(formData, "uomId", "uom_id"))
+  if (uomId === undefined) return null
+
   return {
     productId,
     name,
     quantity: num(field(formData, "quantity", "quantity"), 0),
-    uomId: optionalBigIntU64(field(formData, "uomId", "uom_id")) ?? 0n,
+    uomId,
     priceUnit: num(field(formData, "priceUnit", "price_unit"), 0),
     discount: num(field(formData, "discount", "discount"), 0),
     isPresent: Boolean(field(formData, "isPresent", "is_present")),

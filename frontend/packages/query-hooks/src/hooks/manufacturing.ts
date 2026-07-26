@@ -174,11 +174,15 @@ export function useCreateWorkcenter(organizationId: bigint, companyId?: bigint) 
   })
 }
 
-export function useConfirmManufacturingOrder(organizationId: bigint) {
+export function useConfirmManufacturingOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('confirm_manufacturing_order', [organizationId, productionId])
+      const { urlPath, init } = manufacturingBffPost('confirm_manufacturing_order', [
+        organizationId,
+        companyId,
+        productionId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm manufacturing order')
     },
@@ -187,11 +191,15 @@ export function useConfirmManufacturingOrder(organizationId: bigint) {
   })
 }
 
-export function useStartManufacturingOrder(organizationId: bigint) {
+export function useStartManufacturingOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('start_manufacturing_order', [organizationId, productionId])
+      const { urlPath, init } = manufacturingBffPost('start_manufacturing_order', [
+        organizationId,
+        companyId,
+        productionId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start manufacturing order')
     },
@@ -200,11 +208,15 @@ export function useStartManufacturingOrder(organizationId: bigint) {
   })
 }
 
-export function useFinishManufacturingOrder(organizationId: bigint) {
+export function useFinishManufacturingOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('finish_manufacturing_order', [organizationId, productionId])
+      const { urlPath, init } = manufacturingBffPost('finish_manufacturing_order', [
+        organizationId,
+        companyId,
+        productionId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to finish manufacturing order')
     },
@@ -213,11 +225,15 @@ export function useFinishManufacturingOrder(organizationId: bigint) {
   })
 }
 
-export function useCancelManufacturingOrder(organizationId: bigint) {
+export function useCancelManufacturingOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('cancel_manufacturing_order', [organizationId, productionId])
+      const { urlPath, init } = manufacturingBffPost('cancel_manufacturing_order', [
+        organizationId,
+        companyId,
+        productionId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel manufacturing order')
     },
@@ -226,11 +242,15 @@ export function useCancelManufacturingOrder(organizationId: bigint) {
   })
 }
 
-export function useStartWorkorder(organizationId: bigint) {
+export function useStartWorkorder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (workorderId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('start_workorder', [organizationId, workorderId])
+      const { urlPath, init } = manufacturingBffPost('start_workorder', [
+        organizationId,
+        companyId,
+        workorderId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start workorder')
     },
@@ -239,11 +259,15 @@ export function useStartWorkorder(organizationId: bigint) {
   })
 }
 
-export function useFinishWorkorder(organizationId: bigint) {
+export function useFinishWorkorder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (workorderId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('finish_workorder', [organizationId, workorderId])
+      const { urlPath, init } = manufacturingBffPost('finish_workorder', [
+        organizationId,
+        companyId,
+        workorderId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to finish workorder')
     },
@@ -288,11 +312,15 @@ export function useUnblockWorkcenter(organizationId: bigint) {
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
-export function useCheckMoAvailability(organizationId: bigint) {
+export function useCheckMoAvailability(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (moId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('check_mo_availability', [organizationId, moId])
+      const { urlPath, init } = manufacturingBffPost('check_mo_availability', [
+        organizationId,
+        companyId,
+        moId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -301,11 +329,16 @@ export function useCheckMoAvailability(organizationId: bigint) {
   })
 }
 
-export function useProduceManufacturingOrder(organizationId: bigint) {
+export function useProduceManufacturingOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ moId, qty }: { moId: string | number | bigint; qty: number }) => {
-      const { urlPath, init } = manufacturingBffPost('produce_manufacturing_order', [organizationId, moId, qty])
+      const { urlPath, init } = manufacturingBffPost('produce_manufacturing_order', [
+        organizationId,
+        companyId,
+        moId,
+        qty,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -314,11 +347,15 @@ export function useProduceManufacturingOrder(organizationId: bigint) {
   })
 }
 
-export function useConsumeMoMaterials(organizationId: bigint) {
+export function useConsumeMoMaterials(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (moId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('consume_mo_materials', [organizationId, moId])
+      const { urlPath, init } = manufacturingBffPost('consume_mo_materials', [
+        organizationId,
+        companyId,
+        moId,
+      ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -556,16 +593,16 @@ export function useManufacturingMutations(organizationId: bigint, companyId: big
     createManufacturingOrder: useCreateManufacturingOrder(organizationId, companyId),
     createBom: useCreateBom(organizationId, companyId),
     createWorkcenter: useCreateWorkcenter(organizationId, companyId),
-    confirmMo: useConfirmManufacturingOrder(organizationId),
-    startMo: useStartManufacturingOrder(organizationId),
-    finishMo: useFinishManufacturingOrder(organizationId),
-    cancelMo: useCancelManufacturingOrder(organizationId),
-    checkMoAvailability: useCheckMoAvailability(organizationId),
-    produceMo: useProduceManufacturingOrder(organizationId),
-    consumeMoMaterials: useConsumeMoMaterials(organizationId),
+    confirmMo: useConfirmManufacturingOrder(organizationId, companyId),
+    startMo: useStartManufacturingOrder(organizationId, companyId),
+    finishMo: useFinishManufacturingOrder(organizationId, companyId),
+    cancelMo: useCancelManufacturingOrder(organizationId, companyId),
+    checkMoAvailability: useCheckMoAvailability(organizationId, companyId),
+    produceMo: useProduceManufacturingOrder(organizationId, companyId),
+    consumeMoMaterials: useConsumeMoMaterials(organizationId, companyId),
     createWorkorder: useCreateWorkorder(organizationId),
-    startWo: useStartWorkorder(organizationId),
-    finishWo: useFinishWorkorder(organizationId),
+    startWo: useStartWorkorder(organizationId, companyId),
+    finishWo: useFinishWorkorder(organizationId, companyId),
     blockWc: useBlockWorkcenter(organizationId),
     unblockWc: useUnblockWorkcenter(organizationId),
     updateBom: useUpdateBom(organizationId, companyId),

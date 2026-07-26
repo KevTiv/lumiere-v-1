@@ -7,8 +7,9 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
-    account_move, account_move_line, insert_draft_account_move_line, reconcile_payment_with_invoice,
-    AccountMove, AccountMoveLine, AddAccountMoveLineParams,
+    account_move, account_move_line, insert_draft_account_move_line,
+    is_receivable_or_payable_line_type, reconcile_payment_with_invoice, AccountMove,
+    AccountMoveLine, AddAccountMoveLineParams,
 };
 use crate::accounting::tax_management::account_tax;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
@@ -145,6 +146,7 @@ pub(crate) fn resolve_payment_clearing_account(
     ctx: &ReducerContext,
     company_id: u64,
     payment_type: PaymentType,
+    preferred_account_id: Option<u64>,
 ) -> Result<(u64, &'static str), String> {
     let want = match payment_type {
         PaymentType::InBound => AccountTypeInternal::Receivable,
@@ -155,6 +157,19 @@ pub(crate) fn resolve_payment_clearing_account(
         AccountTypeInternal::Payable => "payable",
         _ => "clearing",
     };
+
+    // A4: prefer the invoice's AR/AP account when provided and valid for company+type.
+    if let Some(pref) = preferred_account_id {
+        if let Some(acct) = ctx.db.account_account().id().find(&pref) {
+            if acct.company_id == company_id
+                && !acct.deprecated
+                && acct.internal_type.as_ref() == Some(&want)
+            {
+                return Ok((acct.id, label));
+            }
+        }
+    }
+
     let account_id = ctx
         .db
         .account_account()
@@ -166,6 +181,49 @@ pub(crate) fn resolve_payment_clearing_account(
             format!("No active {label} account found for company {company_id}")
         })?;
     Ok((account_id, label))
+}
+
+/// Prefer AR/AP account from an open invoice/bill for the payment partner (A4).
+fn preferred_clearing_account_for_partner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    partner_id: u64,
+    payment_type: &PaymentType,
+) -> Option<u64> {
+    let want_move_types: &[MoveType] = match payment_type {
+        PaymentType::InBound => &[MoveType::OutInvoice, MoveType::OutRefund],
+        PaymentType::OutBound => &[MoveType::InInvoice, MoveType::InRefund],
+    };
+    for move_row in ctx.db.account_move().iter() {
+        if move_row.organization_id != organization_id
+            || move_row.company_id != company_id
+            || move_row.partner_id != Some(partner_id)
+            || move_row.state != AccountMoveState::Posted
+            || move_row.amount_residual.abs() <= 0.01
+        {
+            continue;
+        }
+        if !want_move_types
+            .iter()
+            .any(|t| std::mem::discriminant(t) == std::mem::discriminant(&move_row.move_type))
+        {
+            continue;
+        }
+        if let Some(line) = ctx
+            .db
+            .account_move_line()
+            .move_line_by_move()
+            .filter(&move_row.id)
+            .find(|l| {
+                is_receivable_or_payable_line_type(l.account_internal_type.as_deref())
+                    && l.amount_residual.abs() > 0.01
+            })
+        {
+            return Some(line.account_id);
+        }
+    }
+    None
 }
 
 /// Insert liquidity + AR/AP clearing lines on a draft payment move and mark it Posted.
@@ -180,8 +238,19 @@ pub(crate) fn insert_balanced_payment_lines_and_post(
     let partner_id = payment.partner_id;
     let payment_id = payment.id;
     let liquidity_account_id = resolve_payment_liquidity_account(ctx, payment.journal_id)?;
-    let (clearing_account_id, clearing_label) =
-        resolve_payment_clearing_account(ctx, payment.company_id, payment_type.clone())?;
+    let preferred_clearing = preferred_clearing_account_for_partner(
+        ctx,
+        payment.organization_id,
+        payment.company_id,
+        partner_id,
+        &payment_type,
+    );
+    let (clearing_account_id, clearing_label) = resolve_payment_clearing_account(
+        ctx,
+        payment.company_id,
+        payment_type.clone(),
+        preferred_clearing,
+    )?;
 
     let (bank_debit, bank_credit, clear_debit, clear_credit) = match payment_type {
         PaymentType::InBound => (amount, 0.0, 0.0, amount),

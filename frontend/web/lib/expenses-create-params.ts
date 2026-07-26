@@ -111,7 +111,7 @@ export function toCreateExpenseParams(
     description: optionalString(formData.description),
     productId: optionalBigIntU64(formData.productId),
     taxIds: parseU64IdList(formData.taxIds),
-    accountId: undefined,
+    accountId: optionalBigIntU64(formData.accountId),
     analyticAccountId: optionalBigIntU64(formData.analyticAccountId),
     projectId: optionalBigIntU64(formData.projectId),
     lineKind,

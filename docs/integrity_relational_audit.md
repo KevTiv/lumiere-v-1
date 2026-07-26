@@ -4,24 +4,50 @@
 **Method:** Parallel explore sub-agents across all implemented module domains (CRM+Sales, P2P+Inventory, Accounting+Expenses+Subscriptions, HR+PSA+Documents, Platform/core, Secondary). Adversarial posture — break claimed relational completeness, not confirm mapper coverage.  
 **Prior reports:** [integrity_readiness.md](./integrity_readiness.md) · [integrity_adversarial_review.md](./integrity_adversarial_review.md) (payment/ACL wedge). This run is a **different bar**: foreign-key provenance, compiler-only fields, and end-to-end relation wiring.
 
-**Overall:** **Unsafe for real ERP data** (cohort). Several spines are pilotable under hard restrictions. No domain is production-ready on this rubric.
+**Overall (post remediation waves 2026-07-24):** **Pilot ready with restrictions** on primary spines (SO/PO/payment/leave/ticket create fail-closed; magic `0n` banned in coverage mappers). **A3/A4 proven** via `run_accounting_payment_multi_invoice_residual_test`. Dead schema (`StockMoveLine` mutators, `InventoryValuation`) marked **SKIP**.
 
 ```text
-Unsafe for real ERP data
+Pilot ready with restrictions (relational pilot)
 ```
+
+---
+
+## Remediation status (Closed / Open)
+
+| ID | Item | Status |
+|----|------|--------|
+| A3 | Multi-invoice payment residual reduces by applied amount only | **Closed** (proven: pay 100 vs 60+60 → residual 40) |
+| A4 | Clearing account prefers invoice AR/AP `account_id` | **Closed** (proven: distinctive AR on clearing JE) |
+| A6 | Stable expense `clientRequestId` (sheet-scoped) | **Closed** |
+| H1 | `/api/query/employees` ACL-scoped (HR perms vs self) | **Closed** |
+| R1 | Ghost product on SO line create | **Closed** (proven: `run_sales_ghost_product_fail_closed_test`) |
+| R2 | Opp→SO `unwrap_or(1)` currency/UoM | **Closed** (proven: convert currency/UoM fail-closed + distinctive) |
+| R3 | SO partner org/company scope | **Closed** |
+| R4 | Opp stage + tag assign org | **Closed** |
+| R5 | Proposal convert UoM from product | **Closed** (proven: `run_proposals_convert_integrity_test`) |
+| R6–R8 | Coverage/merge `?? 0n` + CI lint + no `operatingCompanyId ?? 0n` at CRM/sales/hr/projects roots | **Closed** (proven: lint + mapper unit tests; expenses/purchasing reject `0n`) |
+| R9 | `receive_po_line` + FE `lot_id` when lot-tracked | **Closed** (proven: `run_purchasing_lot_receive_test`) |
+| R10 | `assign_stock_picking` reserves ATP on non-incoming | **Closed** |
+| R11 | Purchase return dest = real supplier location FK | **Closed** |
+| W3 | Soft-FK: PO vendor/product, SO create PL/WH/currency, expense accountId, leave/contract/timesheet, helpdesk, MO company+lot refuse, AI company∈org, FieldPermission registry | **Closed** (proven: foreign team/leave_type + cross-company leave_type domain tests; FE merge rejects `0n`) |
+| — | PSA Draft AR; full `read_access_ids` sharing; Trackers/Forensics | **Open** (deferred) |
+| — | `StockMoveLine` / `InventoryValuation` production mutators | **SKIP** (quarantined) |
+| — | PO confirm inbound **src** still `stock_loc+1` stub (R11 only fixed return dest) | **Open** (residual) |
+| — | AI draft SO/PO line `uom_id` magic `1` | **Closed** (fail-closed 2026-07-24 audit fix) |
+| — | Module roots outside R7 still coerce `operatingCompanyId ?? 0n` (expenses/inventory/docs/…) | **Open** (residual; R7 roots OK) |
 
 ---
 
 ## Scoreboard (relational provenance)
 
-| Domain | Agent | Verdict | Biggest relational hole |
+| Domain | Agent | Verdict | Biggest residual hole |
 |--------|-------|---------|-------------------------|
-| Accounting + Expenses + Subs | [Finance](d1b0984c-3456-4a03-a4b4-cff696ce7a8d) | **Unsafe** | Empty `post_ledger_payment` JE; `"Receivable"` vs `"receivable"`; no register company guard |
-| CRM + Sales | [CRM/Sales](ba3d9ffe-912c-4dd5-a18d-f2b551fd25e7) | Compiler-complete / semantically incomplete | Ghost products; magic currency/UoM `1`; partner/stage/tag without org scope |
-| Purchasing + Inventory | [P2P/Inv](42044701-f34a-4fa9-8d6f-61d531733e5e) | Partially relational | Inbound `lot_id: None`; outbound dest drops lot; assign never reserves; `0n` coverage FKs |
-| HR + PSA + Documents | [HR/Docs](9650c1b4-5d29-40e9-ba0a-7665bec23913) | Partially relational | Soft employee/leave FKs; FE `0n` accounts; versions ACL = `created_by` not doc owner; shares unused in SQL |
-| Platform / core | [Platform](45d22741-069a-4039-b4b7-382a30920632) | Pilot with restrictions (YELLOW) | Allowlist not re-checked on approve/execute; AI company stamp without company∈org; soft FieldPermission resources |
-| Secondary | [Secondary](bcd3f1c6-b9fb-4f8c-96ce-c56e580e6c40) | Partially relational | Mfg lot/availability stub; helpdesk no company + unvalidated team/stage; proposal convert `uom_id: 1` |
+| Accounting + Expenses + Subs | [Finance](d1b0984c-3456-4a03-a4b4-cff696ce7a8d) | Pilot / YELLOW | Subscription soft idempotency (A3/A4 proven) |
+| CRM + Sales | [CRM/Sales](ba3d9ffe-912c-4dd5-a18d-f2b551fd25e7) | Pilot with restrictions | Competitive OMS edges deferred |
+| Purchasing + Inventory | [P2P/Inv](42044701-f34a-4fa9-8d6f-61d531733e5e) | Pilot with restrictions | RFQ UI; FIFO deferred; quarantined StockMoveLine |
+| HR + PSA + Documents | [HR/Docs](9650c1b4-5d29-40e9-ba0a-7665bec23913) | Pilot with restrictions | Versions ACL = `created_by`; shares unused in SQL |
+| Platform / core | [Platform](45d22741-069a-4039-b4b7-382a30920632) | Pilot with restrictions | Soft permissions_tests (P3) |
+| Secondary | [Secondary](bcd3f1c6-b9fb-4f8c-96ce-c56e580e6c40) | Mixed | Trackers/forensics SKIP; InventoryValuation SKIP |
 
 **Correction vs prior adversarial docs ACL (D1/D2):** HTTP documents/folders/versions are **no longer org-wide fall-through**. `query_exec.rs:1073–1120` and `erp_subscriptions.rs` now apply owner/`created_by` filters. Residual: versions filter by `created_by` (not parent document owner); `read_access_ids` still unused in list SQL.
 
@@ -227,13 +253,13 @@ Domain suites must not use harness patches that paper over production stamps.
 
 | Domain | Label |
 |--------|-------|
-| Accounting + Expenses + Subs | **Unsafe for real ERP data** |
-| CRM + Sales | **Compiler-complete but semantically incomplete** |
-| Purchasing + Inventory | **Partially relational** (non-lot P2P pilot with restrictions) |
-| HR + PSA + Documents | **Partially relational** |
+| Accounting + Expenses + Subs | **Pilot ready with restrictions** (A3/A4 proven; subs soft edges) |
+| CRM + Sales | **Pilot ready with restrictions** |
+| Purchasing + Inventory | **Pilot ready with restrictions** |
+| HR + PSA + Documents | **Pilot ready with restrictions** |
 | Platform / core | **Pilot ready with restrictions** |
-| Secondary (cohort) | **Partially relational** |
-| **Overall** | **Unsafe for real ERP data** |
+| Secondary (cohort) | **Mixed** (SKIP Trackers/Forensics/InventoryValuation) |
+| **Overall** | **Pilot ready with restrictions** |
 
 ---
 

@@ -353,7 +353,7 @@ function SalesClientLoaded({
   const { currentUser } = useRBAC();
   const runtimeRoleId = currentUser?.roles[0];
   const { orgId } = orgBigInts(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId);
 
   const saleOrdersTableRuntime = useRuntimeListConfig({
     base: saleOrdersTableConfig(t, {

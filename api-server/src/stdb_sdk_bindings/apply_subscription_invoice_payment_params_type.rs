@@ -21,7 +21,7 @@ pub struct ApplySubscriptionInvoicePaymentParams {
     pub payment_date: Option::<__sdk::Timestamp>,
     pub cogs_account_id: u64,
     pub inventory_account_id: u64,
-    pub r#ref: Option::<String>,
+    pub ref: Option::<String>,
     pub memo: Option::<String>,
 }
 

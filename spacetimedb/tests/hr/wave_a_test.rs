@@ -1,8 +1,9 @@
 //! HR Wave A — isolation, leave balance, payslip artifact, offboarding gate.
 use std::time::Duration;
 
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::ReducerContext;
 
+use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::hr::employees::{
     archive_employee, create_employee, hr_employee, CreateEmployeeParams,
 };
@@ -509,6 +510,120 @@ pub fn test_leave_must_be_submitted_before_approve(ctx: &ReducerContext) -> Resu
     );
     if early.is_ok() {
         return Err("draft leave approve should fail".into());
+    }
+    Ok(())
+}
+
+/// Soft-FK: leave create must reject a leave_type from another organization.
+pub fn test_leave_rejects_foreign_leave_type(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture_a = OrgFixture::seed_minimal(ctx)?;
+    let fixture_b = OrgFixture::seed_minimal(ctx)?;
+    let employee_a = seed_employee(ctx, &fixture_a, "Foreign LT Emp")?;
+    let leave_type_b = seed_leave_type(ctx, &fixture_b, "Foreign Leave Type", 10.0)?;
+
+    let err = create_leave_request(
+        ctx,
+        fixture_a.organization_id,
+        fixture_a.company_id,
+        CreateLeaveRequestParams {
+            employee_id: employee_a,
+            leave_type_id: leave_type_b,
+            date_from: ctx.timestamp,
+            date_to: ctx.timestamp + Duration::from_secs(86400),
+            number_of_days: 1.0,
+            notes: Some("foreign-lt".to_string()),
+            name: Some("foreign-lt".to_string()),
+            manager_id: None,
+        },
+    )
+    .expect_err("foreign leave_type must be rejected");
+
+    if !err.contains("different organization") && !err.contains("does not belong") {
+        return Err(format!("unexpected foreign leave_type error: {err}"));
+    }
+    Ok(())
+}
+
+/// Soft-FK: same-org cross-company leave_type must be rejected.
+pub fn test_leave_rejects_cross_company_leave_type(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    create_company(
+        ctx,
+        fixture.organization_id,
+        CreateCompanyParams {
+            name: "HR SoftFK Company B".to_string(),
+            code: format!("HRB-{}", fixture.company_id),
+            currency_id: 1,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: Some(r#"{"harness":"hr-soft-fk-b"}"#.to_string()),
+        },
+    )?;
+    let company_b = ctx
+        .db
+        .company()
+        .company_by_org()
+        .filter(&fixture.organization_id)
+        .map(|c| c.id)
+        .filter(|id| *id != fixture.company_id)
+        .max()
+        .ok_or_else(|| "sibling company B missing".to_string())?;
+
+    let employee_a = seed_employee(ctx, &fixture, "Cross Co Leave Emp")?;
+    create_leave_type(
+        ctx,
+        fixture.organization_id,
+        company_b,
+        CreateLeaveTypeParams {
+            name: "Sibling Co Leave Type".to_string(),
+            allocation_type: "fixed".to_string(),
+            max_leaves: 10.0,
+            code: None,
+            color: None,
+            validity_start: None,
+            validity_stop: None,
+            is_active: true,
+        },
+    )?;
+    let leave_type_b = ctx
+        .db
+        .hr_leave_type()
+        .leave_type_by_org()
+        .filter(&fixture.organization_id)
+        .find(|lt| lt.name == "Sibling Co Leave Type" && lt.company_id == company_b)
+        .map(|lt| lt.id)
+        .ok_or_else(|| "sibling leave type missing".to_string())?;
+
+    let err = create_leave_request(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        CreateLeaveRequestParams {
+            employee_id: employee_a,
+            leave_type_id: leave_type_b,
+            date_from: ctx.timestamp,
+            date_to: ctx.timestamp + Duration::from_secs(86400),
+            number_of_days: 1.0,
+            notes: Some("cross-co-lt".to_string()),
+            name: Some("cross-co-lt".to_string()),
+            manager_id: None,
+        },
+    )
+    .expect_err("cross-company leave_type must be rejected");
+
+    if !err.contains("does not belong to this company") {
+        return Err(format!("unexpected cross-company leave_type error: {err}"));
     }
     Ok(())
 }

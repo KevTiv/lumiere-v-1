@@ -39,9 +39,12 @@ export function toCreatePurchaseRequisitionLineParams(
   const productId = optionalBigIntU64(field(formData, "productId", "product_id"))
   if (productId === undefined) return null
 
+  const productUom = optionalBigIntU64(field(formData, "productUom", "product_uom"))
+  if (productUom === undefined) return null
+
   return {
     productId,
-    productUom: optionalBigIntU64(field(formData, "productUom", "product_uom")) ?? 0n,
+    productUom,
     productUomQty: num(field(formData, "productUomQty", "product_uom_qty"), 0),
     name: optionalTrimmedString(field(formData, "name", "name")),
     sequence: Math.trunc(num(field(formData, "sequence", "sequence"), 0)),
@@ -54,10 +57,13 @@ export function toCreatePurchaseReturnLineParams(
   const productId = optionalBigIntU64(field(formData, "productId", "product_id"))
   if (productId === undefined) return null
 
+  const productUom = optionalBigIntU64(field(formData, "productUom", "product_uom"))
+  if (productUom === undefined) return null
+
   return {
     purchaseOrderLineId: optionalBigIntU64(field(formData, "purchaseOrderLineId", "purchase_order_line_id")),
     productId,
-    productUom: optionalBigIntU64(field(formData, "productUom", "product_uom")) ?? 0n,
+    productUom,
     productUomQty: num(field(formData, "productUomQty", "product_uom_qty"), 0),
     priceUnit: num(field(formData, "priceUnit", "price_unit"), 0),
     toRefund: Boolean(field(formData, "toRefund", "to_refund")),
@@ -85,9 +91,12 @@ export function toCreatePurchaseRfqLineParams(
   const productId = optionalBigIntU64(field(formData, "productId", "product_id"))
   if (productId === undefined) return null
 
+  const productUom = optionalBigIntU64(field(formData, "productUom", "product_uom"))
+  if (productUom === undefined) return null
+
   return {
     productId,
-    productUom: optionalBigIntU64(field(formData, "productUom", "product_uom")) ?? 0n,
+    productUom,
     productUomQty: num(field(formData, "productUomQty", "product_uom_qty"), 0),
     name: optionalTrimmedString(field(formData, "name", "name")),
     sequence: Math.trunc(num(field(formData, "sequence", "sequence"), 0)),
@@ -102,11 +111,14 @@ export function toCreateConsignmentAgreementParams(
   const productId = optionalBigIntU64(field(formData, "productId", "product_id"))
   if (!name || partnerId === undefined || productId === undefined) return null
 
+  const warehouseId = optionalBigIntU64(field(formData, "warehouseId", "warehouse_id"))
+  if (warehouseId === undefined) return null
+
   return {
     name,
     partnerId,
     productId,
-    warehouseId: optionalBigIntU64(field(formData, "warehouseId", "warehouse_id")) ?? 0n,
+    warehouseId,
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }
@@ -206,16 +218,25 @@ export function toCreatePurchasingIntegrationIntentParams(
   }
 }
 
+function requiredFk(v: unknown): bigint | undefined {
+  const id = optionalBigIntU64(v)
+  return id === undefined || id === 0n ? undefined : id
+}
+
 export function toCreateVendorCreditFromPurchaseReturnParams(
   formData: Record<string, unknown>,
 ): CreateVendorCreditFromPurchaseReturnParams | null {
-  const journalId = optionalBigIntU64(field(formData, "journalId", "journal_id"))
+  const journalId = requiredFk(field(formData, "journalId", "journal_id"))
   if (journalId === undefined) return null
+
+  const expenseAccountId = requiredFk(field(formData, "expenseAccountId", "expense_account_id"))
+  const payableAccountId = requiredFk(field(formData, "payableAccountId", "payable_account_id"))
+  if (expenseAccountId === undefined || payableAccountId === undefined) return null
 
   return {
     journalId,
-    expenseAccountId: optionalBigIntU64(field(formData, "expenseAccountId", "expense_account_id")) ?? 0n,
-    payableAccountId: optionalBigIntU64(field(formData, "payableAccountId", "payable_account_id")) ?? 0n,
+    expenseAccountId,
+    payableAccountId,
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }

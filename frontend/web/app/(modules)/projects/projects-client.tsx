@@ -294,7 +294,7 @@ function ProjectsClientLoaded({
   useProjectsModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId)
   const [modal, setModal] = useState<ModalState>({ type: null })
   const [lifecycleModal, setLifecycleModal] = useState<LifecycleModalState>({ type: null })
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)

@@ -17,7 +17,7 @@ pub struct CreateStockProductionLotParams {
     pub name: String,
     pub product_id: u64,
     pub product_variant_id: Option::<u64>,
-    pub r#ref: Option::<String>,
+    pub ref: Option::<String>,
     pub note: Option::<String>,
     pub expiration_date: Option::<__sdk::Timestamp>,
     pub use_date: Option::<__sdk::Timestamp>,

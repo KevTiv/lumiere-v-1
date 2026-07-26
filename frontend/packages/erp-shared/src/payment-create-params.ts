@@ -36,14 +36,18 @@ export function toCreatePaymentAccountParams(
   const currencyId = optionalBigIntU64(field(formData, "currencyId", "currency_id"))
   if (!name || currencyId === undefined) return null
 
+  const companyId = optionalBigIntU64(field(formData, "companyId", "company_id"))
+  const accountJournalId = optionalBigIntU64(field(formData, "accountJournalId", "account_journal_id"))
+  if (companyId === undefined || accountJournalId === undefined) return null
+
   return {
     providerCode: unitEnumFromForm<PaymentProviderCode>(field(formData, "providerCode", "provider_code"), ["Mtn", "Orange", "Airtel", "Mpesa", "Moov", "Wave", "Cash", "Bank", "Other"] as const, "Mtn"),
-    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? 0n,
+    companyId,
     name,
     providerLabel: optionalTrimmedString(field(formData, "providerLabel", "provider_label")),
     referenceRaw: optionalTrimmedString(field(formData, "referenceRaw", "reference_raw")),
     currencyId,
-    accountJournalId: optionalBigIntU64(field(formData, "accountJournalId", "account_journal_id")) ?? 0n,
+    accountJournalId,
     feeAccountId: optionalBigIntU64(field(formData, "feeAccountId", "fee_account_id")),
     clearingAccountId: optionalBigIntU64(field(formData, "clearingAccountId", "clearing_account_id")),
     isPrimary: Boolean(field(formData, "isPrimary", "is_primary")),
@@ -57,10 +61,14 @@ export function toCreatePaymentFeeParams(
   const currencyId = optionalBigIntU64(field(formData, "currencyId", "currency_id"))
   if (currencyId === undefined) return null
 
+  const companyId = optionalBigIntU64(field(formData, "companyId", "company_id"))
+  const paymentTransactionId = optionalBigIntU64(field(formData, "paymentTransactionId", "payment_transaction_id"))
+  if (companyId === undefined || paymentTransactionId === undefined) return null
+
   return {
     bearer: unitEnumFromForm<PaymentFeeBearer>(field(formData, "bearer", "bearer"), ["Company", "Customer", "Supplier"] as const, "Company"),
-    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? 0n,
-    paymentTransactionId: optionalBigIntU64(field(formData, "paymentTransactionId", "payment_transaction_id")) ?? 0n,
+    companyId,
+    paymentTransactionId,
     amount: num(field(formData, "amount", "amount"), 0),
     currencyId,
     feeAccountId: optionalBigIntU64(field(formData, "feeAccountId", "fee_account_id")),
@@ -78,11 +86,15 @@ export function toCreatePaymentTransactionParams(
   const currencyId = optionalBigIntU64(field(formData, "currencyId", "currency_id"))
   if (partnerId === undefined || currencyId === undefined) return null
 
+  const companyId = optionalBigIntU64(field(formData, "companyId", "company_id"))
+  const paymentAccountId = optionalBigIntU64(field(formData, "paymentAccountId", "payment_account_id"))
+  if (companyId === undefined || paymentAccountId === undefined) return null
+
   return {
     direction: unitEnumFromForm<PaymentDirection>(field(formData, "direction", "direction"), ["Inbound", "Outbound"] as const, "Inbound"),
     partnerType: unitEnumFromForm<PartnerType>(field(formData, "partnerType", "partner_type"), ["Customer", "Supplier"] as const, "Customer"),
-    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? 0n,
-    paymentAccountId: optionalBigIntU64(field(formData, "paymentAccountId", "payment_account_id")) ?? 0n,
+    companyId,
+    paymentAccountId,
     partnerId,
     externalReference: optionalTrimmedString(field(formData, "externalReference", "external_reference")),
     grossExternalAmount: num(field(formData, "grossExternalAmount", "gross_external_amount"), 0),

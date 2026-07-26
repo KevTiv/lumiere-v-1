@@ -56,11 +56,14 @@ export function finalizeCreateLeadParams(
 export function finalizeCreateOpportunityParams(
   partial: Partial<CreateOpportunityParams>,
 ): CreateOpportunityParams {
+  if (partial.stageId == null || partial.stageId === 0n) {
+    throw new Error("stageId is required to create an opportunity")
+  }
   return {
     name: partial.name ?? "",
     expectedRevenue: partial.expectedRevenue ?? 0,
     probability: partial.probability ?? 0,
-    stageId: partial.stageId ?? 0n,
+    stageId: partial.stageId,
     priority: partial.priority ?? "Medium",
     isWon: partial.isWon ?? false,
     isLost: partial.isLost ?? false,

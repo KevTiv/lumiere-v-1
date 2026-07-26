@@ -16,7 +16,7 @@ pub struct CreateBarcodeRuleParams {
     pub name: String,
     pub encoding: String,
     pub pattern: String,
-    pub r#type: String,
+    pub type: String,
     pub description: Option::<String>,
     pub sequence: i32,
     pub alias: Option::<String>,

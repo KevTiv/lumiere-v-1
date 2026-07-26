@@ -18,6 +18,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::core::organization::require_company_in_organization;
 use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::product::product;
 use crate::projects::projects::{create_project, project_project, CreateProjectParams};
 use crate::sales::sales_core::{
     create_sale_order, sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
@@ -1913,27 +1914,46 @@ pub fn convert_proposal_to_sale_order(
         return Err("Proposal has no line items to convert".to_string());
     }
 
-    let order_lines: Vec<CreateSaleOrderLineParams> = lines
-        .iter()
-        .map(|l| CreateSaleOrderLineParams {
-            product_id: l.product_id,
-            quantity: l.quantity,
-            uom_id: 1,
-            price_unit: Some(l.price_unit),
-            discount: l.discount,
-            tax_ids: vec![],
-            name: Some(l.product_name.clone()),
-            sequence: l.sequence,
-            is_downpayment: false,
-            display_type: None,
-            product_variant_id: l.product_variant_id,
-            packaging_id: None,
-            route_id: None,
-            analytic_tag_ids: vec![],
-            customer_lead: None,
-            metadata: None,
-        })
-        .collect();
+    let order_lines: Vec<CreateSaleOrderLineParams> = {
+        let mut out = Vec::with_capacity(lines.len());
+        for l in &lines {
+            let Some(product) = ctx.db.product().id().find(&l.product_id) else {
+                return Err(format!("Proposal line product {} not found", l.product_id));
+            };
+            if product.organization_id != organization_id {
+                return Err(format!(
+                    "Proposal line product {} does not belong to this organization",
+                    l.product_id
+                ));
+            }
+            let uom_id = product.uom_id;
+            if uom_id == 0 {
+                return Err(format!(
+                    "Proposal line product {} has no UoM",
+                    l.product_id
+                ));
+            }
+            out.push(CreateSaleOrderLineParams {
+                product_id: l.product_id,
+                quantity: l.quantity,
+                uom_id,
+                price_unit: Some(l.price_unit),
+                discount: l.discount,
+                tax_ids: vec![],
+                name: Some(l.product_name.clone()),
+                sequence: l.sequence,
+                is_downpayment: false,
+                display_type: None,
+                product_variant_id: l.product_variant_id,
+                packaging_id: None,
+                route_id: None,
+                analytic_tag_ids: vec![],
+                customer_lead: None,
+                metadata: None,
+            });
+        }
+        out
+    };
 
     let so_params = CreateSaleOrderParams {
         company_id: Some(company_id),

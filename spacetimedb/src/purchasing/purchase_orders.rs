@@ -9,11 +9,12 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
+use crate::core::reference::uom;
 use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
 };
-use crate::inventory::product::product;
+use crate::inventory::product::{product, Product};
 use crate::types::{
     ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState,
 };
@@ -357,6 +358,51 @@ fn validate_order_in_organization(
     Ok(order)
 }
 
+fn require_vendor_in_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    partner_id: u64,
+) -> Result<Contact, String> {
+    let vendor = ctx
+        .db
+        .contact()
+        .id()
+        .find(&partner_id)
+        .ok_or("Vendor contact not found")?;
+    if vendor.organization_id != organization_id {
+        return Err("Vendor does not belong to this organization".to_string());
+    }
+    if !vendor.is_vendor {
+        return Err("Partner is not a vendor".to_string());
+    }
+    Ok(vendor)
+}
+
+fn require_product_and_uom_in_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    product_id: u64,
+    uom_id: u64,
+) -> Result<Product, String> {
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or("Product not found")?;
+    if product.organization_id != organization_id {
+        return Err("Product does not belong to this organization".to_string());
+    }
+    if uom_id == 0 {
+        return Err("UoM is required".to_string());
+    }
+    let uom_row = ctx.db.uom().id().find(&uom_id).ok_or("UoM not found")?;
+    if uom_row.organization_id != organization_id {
+        return Err("UoM does not belong to this organization".to_string());
+    }
+    Ok(product)
+}
+
 /// Effective qty match tolerance for a PO (`match_qty_tolerance` or default).
 pub fn qty_match_tolerance_for_order(order: &PurchaseOrder) -> f64 {
     order
@@ -564,15 +610,7 @@ pub fn create_purchase_order(
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
-    let vendor = ctx
-        .db
-        .contact()
-        .id()
-        .find(&params.partner_id)
-        .ok_or("Vendor contact not found")?;
-    if !vendor.is_vendor {
-        return Err("Partner is not a vendor".to_string());
-    }
+    require_vendor_in_organization(ctx, organization_id, params.partner_id)?;
 
     let invoice_count = params.invoice_ids.len() as u32;
     let picking_count = params.picking_ids.len() as u32;
@@ -1175,15 +1213,7 @@ pub fn update_purchase_order(
         updated.incoterm_location = Some(il.clone());
     }
     if let Some(pid) = params.partner_id {
-        let vendor = ctx
-            .db
-            .contact()
-            .id()
-            .find(&pid)
-            .ok_or("Vendor contact not found")?;
-        if !vendor.is_vendor {
-            return Err("Partner is not a vendor".to_string());
-        }
+        require_vendor_in_organization(ctx, organization_id, pid)?;
         updated.partner_id = pid;
     }
     if let Some(cid) = params.currency_id {
@@ -1319,6 +1349,13 @@ pub fn add_purchase_order_line(
     if order.state != PoState::Draft {
         return Err("Can only add lines to draft purchase orders".to_string());
     }
+
+    require_product_and_uom_in_organization(
+        ctx,
+        organization_id,
+        params.product_id,
+        params.uom_id,
+    )?;
 
     let subtotal = params.quantity * params.price_unit;
     let tax = calculate_tax(ctx, &params.tax_ids, subtotal);
@@ -1495,14 +1532,25 @@ pub fn update_purchase_order_line(
     let quantity = params.quantity.unwrap_or(line.product_qty);
     let uom_id = params.uom_id.unwrap_or(line.product_uom);
     let price_unit = params.price_unit.unwrap_or(line.price_unit);
-    let tax_ids = params.tax_ids.unwrap_or_default();
 
     if quantity <= 0.0 {
         return Err("Quantity must be greater than zero".to_string());
     }
 
+    require_product_and_uom_in_organization(ctx, organization_id, product_id, uom_id)?;
+
     let subtotal = quantity * price_unit;
-    let tax = calculate_tax(ctx, &tax_ids, subtotal);
+    // Preserve existing tax when caller omits tax_ids (do not wipe to []).
+    let tax = match &params.tax_ids {
+        Some(ids) => calculate_tax(ctx, ids, subtotal),
+        None => {
+            if line.price_subtotal.abs() > f64::EPSILON {
+                subtotal * (line.price_tax / line.price_subtotal)
+            } else {
+                line.price_tax
+            }
+        }
+    };
 
     let date_planned = params.date_planned.or(line.date_planned);
     let product_variant_id = params.product_variant_id.or(line.product_variant_id);
@@ -1881,12 +1929,15 @@ pub fn validate_three_way_match_po_lines(
 /// Receive quantity on a PO line. When an open IN picking/move exists, advances
 /// confirm→assign→validate (stock + `qty_received` atomically). Falls back to
 /// qty-only for service lines or legacy POs without pickings.
+///
+/// `lot_id` is required when the product's tracking mode is `lot`.
 #[reducer]
 pub fn receive_po_line(
     ctx: &ReducerContext,
     organization_id: u64,
     line_id: u64,
     qty: f64,
+    lot_id: Option<u64>,
 ) -> Result<(), String> {
     use crate::core::organization::CompanyScopeParams;
     use crate::inventory::stock::{
@@ -1922,6 +1973,31 @@ pub fn receive_po_line(
     let scope = CompanyScopeParams {
         company_id: Some(company_id),
     };
+
+    // Lot-tracked products must receive into a concrete lot.
+    if product_requires_stock(ctx, line.product_id) {
+        let product = ctx
+            .db
+            .product()
+            .id()
+            .find(&line.product_id)
+            .ok_or("Product not found for PO line")?;
+        if product.tracking == "lot" {
+            let Some(lot_id) = lot_id else {
+                return Err(format!(
+                    "Lot required to receive lot-tracked product {}",
+                    line.product_id
+                ));
+            };
+            crate::inventory::stock::ensure_lot_for_product(
+                ctx,
+                organization_id,
+                company_id,
+                line.product_id,
+                lot_id,
+            )?;
+        }
+    }
 
     // Prefer open inbound move linked to this PO line.
     let open_move = ctx.db.stock_move().iter().find(|m| {
@@ -1976,6 +2052,7 @@ pub fn receive_po_line(
             .update(crate::inventory::stock::StockMove {
                 quantity_done: target_done,
                 product_uom_qty_done: target_done,
+                lot_id: lot_id.or(mv.lot_id),
                 write_uid: ctx.sender(),
                 write_date: ctx.timestamp,
                 ..mv

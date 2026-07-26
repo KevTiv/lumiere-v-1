@@ -17,7 +17,7 @@ pub struct CreateAccountJournalParams {
     pub company_id: Option::<u64>,
     pub name: String,
     pub code: String,
-    pub r#type: JournalType,
+    pub type: JournalType,
     pub currency_id: Option::<u64>,
     pub default_account_id: Option::<u64>,
     pub suspense_account_id: Option::<u64>,

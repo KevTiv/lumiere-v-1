@@ -324,6 +324,32 @@ pub fn subscription_queries_for_resource(
         )]));
     }
 
+    // H1: org-wide employees only for HR roles; others get self (same SQL as my-employee).
+    if r == "employees" {
+        let Some(org) = ctx.organization_id else {
+            return Ok(None);
+        };
+        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
+            return Ok(None);
+        };
+        let id_lit = crate::field_policy::identity_sql_literal(id)?;
+        let cols = resolve_http_sql_columns("employees", ctx.field_access)?.join(", ");
+        let can_list_all = crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "read")
+            || crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "create")
+            || crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "update")
+            || crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "view_pii");
+        let sql = if can_list_all {
+            format!(
+                "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND is_active = true"
+            )
+        } else {
+            format!(
+                "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND user_id = {id_lit} AND is_active = true"
+            )
+        };
+        return Ok(Some(vec![sql]));
+    }
+
     if r == "employee-documents" {
         let Some(org) = ctx.organization_id else {
             return Ok(None);

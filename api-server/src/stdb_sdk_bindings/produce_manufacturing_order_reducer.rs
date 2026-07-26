@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub(super) struct ProduceManufacturingOrderArgs {
     pub organization_id: u64,
+    pub company_id: u64,
     pub mo_id: u64,
     pub qty_producing: f64,
 }
@@ -16,6 +17,7 @@ impl From<ProduceManufacturingOrderArgs> for super::Reducer {
     fn from(args: ProduceManufacturingOrderArgs) -> Self {
         Self::ProduceManufacturingOrder {
             organization_id: args.organization_id,
+            company_id: args.company_id,
             mo_id: args.mo_id,
             qty_producing: args.qty_producing,
         }
@@ -40,10 +42,17 @@ pub trait produce_manufacturing_order {
     fn produce_manufacturing_order(
         &self,
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
         qty_producing: f64,
     ) -> __sdk::Result<()> {
-        self.produce_manufacturing_order_then(organization_id, mo_id, qty_producing, |_, _| {})
+        self.produce_manufacturing_order_then(
+            organization_id,
+            company_id,
+            mo_id,
+            qty_producing,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `produce_manufacturing_order` to run as soon as possible,
@@ -55,6 +64,7 @@ pub trait produce_manufacturing_order {
     fn produce_manufacturing_order_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
         qty_producing: f64,
 
@@ -68,6 +78,7 @@ impl produce_manufacturing_order for super::RemoteReducers {
     fn produce_manufacturing_order_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
         qty_producing: f64,
 
@@ -78,6 +89,7 @@ impl produce_manufacturing_order for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             ProduceManufacturingOrderArgs {
                 organization_id,
+                company_id,
                 mo_id,
                 qty_producing,
             },

@@ -6155,6 +6155,7 @@ pub enum Reducer {
 }    ,
     CancelManufacturingOrder {
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
 }    ,
     CancelMessageBatch {
@@ -6243,6 +6244,7 @@ pub enum Reducer {
 }    ,
     CheckMoAvailability {
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
 }    ,
     ClaimAiSkillCertification {
@@ -6450,6 +6452,7 @@ pub enum Reducer {
 }    ,
     ConfirmManufacturingOrder {
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
 }    ,
     ConfirmPayslip {
@@ -6493,6 +6496,7 @@ pub enum Reducer {
 }    ,
     ConsumeMoMaterials {
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
 }    ,
     ConvertLeadToCustomer {
@@ -8184,10 +8188,12 @@ pub enum Reducer {
 }    ,
     FinishManufacturingOrder {
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
 }    ,
     FinishWorkorder {
         organization_id: u64,
+        company_id: u64,
         workorder_id: u64,
 }    ,
     FireWorkflowTimer {
@@ -8802,6 +8808,7 @@ pub enum Reducer {
 }    ,
     ProduceManufacturingOrder {
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
         qty_producing: f64,
 }    ,
@@ -8848,6 +8855,7 @@ pub enum Reducer {
         organization_id: u64,
         line_id: u64,
         qty: f64,
+        lot_id: Option::<u64>,
 }    ,
     RecognizeAmortizationLine {
         organization_id: u64,
@@ -9748,6 +9756,7 @@ pub enum Reducer {
 }    ,
     StartManufacturingOrder {
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
 }    ,
     StartOffboarding {
@@ -9774,6 +9783,7 @@ pub enum Reducer {
 }    ,
     StartWorkorder {
         organization_id: u64,
+        company_id: u64,
         workorder_id: u64,
 }    ,
     StopTimesheetTimer {
@@ -13026,9 +13036,11 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::CancelManufacturingOrder{
                 organization_id,
+                company_id,
                 mo_id,
 }             => __sats::bsatn::to_vec(&cancel_manufacturing_order_reducer::CancelManufacturingOrderArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 mo_id: mo_id.clone(),
 }),
             Reducer::CancelMessageBatch{
@@ -13183,9 +13195,11 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::CheckMoAvailability{
                 organization_id,
+                company_id,
                 mo_id,
 }             => __sats::bsatn::to_vec(&check_mo_availability_reducer::CheckMoAvailabilityArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 mo_id: mo_id.clone(),
 }),
             Reducer::ClaimAiSkillCertification{
@@ -13553,9 +13567,11 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::ConfirmManufacturingOrder{
                 organization_id,
+                company_id,
                 mo_id,
 }             => __sats::bsatn::to_vec(&confirm_manufacturing_order_reducer::ConfirmManufacturingOrderArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 mo_id: mo_id.clone(),
 }),
             Reducer::ConfirmPayslip{
@@ -13630,9 +13646,11 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::ConsumeMoMaterials{
                 organization_id,
+                company_id,
                 mo_id,
 }             => __sats::bsatn::to_vec(&consume_mo_materials_reducer::ConsumeMoMaterialsArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 mo_id: mo_id.clone(),
 }),
             Reducer::ConvertLeadToCustomer{
@@ -16649,16 +16667,20 @@ Reducer::ErrorIntercompanyTransaction{
 }),
             Reducer::FinishManufacturingOrder{
                 organization_id,
+                company_id,
                 mo_id,
 }             => __sats::bsatn::to_vec(&finish_manufacturing_order_reducer::FinishManufacturingOrderArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 mo_id: mo_id.clone(),
 }),
             Reducer::FinishWorkorder{
                 organization_id,
+                company_id,
                 workorder_id,
 }             => __sats::bsatn::to_vec(&finish_workorder_reducer::FinishWorkorderArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 workorder_id: workorder_id.clone(),
 }),
             Reducer::FireWorkflowTimer{
@@ -17752,10 +17774,12 @@ Reducer::MigrateWorkflowInstance{
 }),
             Reducer::ProduceManufacturingOrder{
                 organization_id,
+                company_id,
                 mo_id,
                 qty_producing,
 }             => __sats::bsatn::to_vec(&produce_manufacturing_order_reducer::ProduceManufacturingOrderArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 mo_id: mo_id.clone(),
                 qty_producing: qty_producing.clone(),
 }),
@@ -17833,10 +17857,12 @@ Reducer::MigrateWorkflowInstance{
                 organization_id,
                 line_id,
                 qty,
+                lot_id,
 }             => __sats::bsatn::to_vec(&receive_po_line_reducer::ReceivePoLineArgs {
                 organization_id: organization_id.clone(),
                 line_id: line_id.clone(),
                 qty: qty.clone(),
+                lot_id: lot_id.clone(),
 }),
             Reducer::RecognizeAmortizationLine{
                 organization_id,
@@ -19480,9 +19506,11 @@ Reducer::SeedHrCountryPackOverlays{
 }),
             Reducer::StartManufacturingOrder{
                 organization_id,
+                company_id,
                 mo_id,
 }             => __sats::bsatn::to_vec(&start_manufacturing_order_reducer::StartManufacturingOrderArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 mo_id: mo_id.clone(),
 }),
             Reducer::StartOffboarding{
@@ -19526,9 +19554,11 @@ Reducer::SeedHrCountryPackOverlays{
 }),
             Reducer::StartWorkorder{
                 organization_id,
+                company_id,
                 workorder_id,
 }             => __sats::bsatn::to_vec(&start_workorder_reducer::StartWorkorderArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 workorder_id: workorder_id.clone(),
 }),
             Reducer::StopTimesheetTimer{

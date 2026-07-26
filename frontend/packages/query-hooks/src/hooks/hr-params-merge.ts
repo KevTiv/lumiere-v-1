@@ -80,9 +80,15 @@ export function finalizeCreateEmployeeParams(
 export function finalizeCreateLeaveRequestParams(
   partial: Partial<CreateLeaveRequestParams>,
 ): CreateLeaveRequestParams {
+  if (partial.employeeId == null || partial.employeeId === 0n) {
+    throw new Error("employeeId is required to create a leave request")
+  }
+  if (partial.leaveTypeId == null || partial.leaveTypeId === 0n) {
+    throw new Error("leaveTypeId is required to create a leave request")
+  }
   return {
-    employeeId: partial.employeeId ?? 0n,
-    leaveTypeId: partial.leaveTypeId ?? 0n,
+    employeeId: partial.employeeId,
+    leaveTypeId: partial.leaveTypeId,
     dateFrom: partial.dateFrom ?? (UNIX_EPOCH_TIMESTAMP as CreateLeaveRequestParams["dateFrom"]),
     dateTo: partial.dateTo ?? (UNIX_EPOCH_TIMESTAMP as CreateLeaveRequestParams["dateTo"]),
     numberOfDays: partial.numberOfDays ?? 0,
@@ -95,13 +101,19 @@ export function finalizeCreateLeaveRequestParams(
 export function finalizeCreateContractParams(
   partial: Partial<CreateContractParams>,
 ): CreateContractParams {
+  if (partial.employeeId == null || partial.employeeId === 0n) {
+    throw new Error("employeeId is required to create a contract")
+  }
+  if (partial.currencyId == null || partial.currencyId === 0n) {
+    throw new Error("currencyId is required to create a contract")
+  }
   return {
     companyId: partial.companyId,
-    employeeId: partial.employeeId ?? 0n,
+    employeeId: partial.employeeId,
     name: partial.name ?? "",
     dateStart: partial.dateStart ?? (UNIX_EPOCH_TIMESTAMP as CreateContractParams["dateStart"]),
     wage: partial.wage ?? 0,
-    currencyId: partial.currencyId ?? 0n,
+    currencyId: partial.currencyId,
     jobId: partial.jobId,
     departmentId: partial.departmentId,
     dateEnd: partial.dateEnd,
@@ -112,10 +124,16 @@ export function finalizeCreateContractParams(
 export function finalizeCreatePayslipParams(
   partial: Partial<CreatePayslipParams>,
 ): CreatePayslipParams {
+  if (partial.employeeId == null || partial.employeeId === 0n) {
+    throw new Error("employeeId is required to create a payslip")
+  }
+  if (partial.structId == null || partial.structId === 0n) {
+    throw new Error("structId is required to create a payslip")
+  }
   return {
     companyId: partial.companyId,
-    employeeId: partial.employeeId ?? 0n,
-    structId: partial.structId ?? 0n,
+    employeeId: partial.employeeId,
+    structId: partial.structId,
     dateFrom: partial.dateFrom ?? (UNIX_EPOCH_TIMESTAMP as CreatePayslipParams["dateFrom"]),
     dateTo: partial.dateTo ?? (UNIX_EPOCH_TIMESTAMP as CreatePayslipParams["dateTo"]),
     basicWage: partial.basicWage ?? 0,

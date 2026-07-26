@@ -14,14 +14,20 @@ const OUT_OF_POCKET = { tag: "OutOfPocket" } as ExpensePaymentMode
 export function finalizeCreateExpenseParams(
   partial: Partial<CreateExpenseParams>,
 ): CreateExpenseParams {
+  if (partial.employeeId == null || partial.employeeId === 0n) {
+    throw new Error("employeeId is required to create an expense")
+  }
+  if (partial.currencyId == null || partial.currencyId === 0n) {
+    throw new Error("currencyId is required to create an expense")
+  }
   return {
     companyId: partial.companyId,
-    employeeId: partial.employeeId ?? 0n,
+    employeeId: partial.employeeId,
     name: partial.name ?? "",
     date: partial.date ?? (UNIX_EPOCH_TIMESTAMP as CreateExpenseParams["date"]),
     unitAmount: partial.unitAmount ?? 0,
     quantity: partial.quantity ?? 1,
-    currencyId: partial.currencyId ?? 0n,
+    currencyId: partial.currencyId,
     productId: partial.productId,
     description: partial.description,
     taxIds: partial.taxIds ?? [],
@@ -44,11 +50,17 @@ export function finalizeCreateExpenseParams(
 export function finalizeCreateExpenseSheetParams(
   partial: Partial<CreateExpenseSheetParams>,
 ): CreateExpenseSheetParams {
+  if (partial.employeeId == null || partial.employeeId === 0n) {
+    throw new Error("employeeId is required to create an expense sheet")
+  }
+  if (partial.currencyId == null || partial.currencyId === 0n) {
+    throw new Error("currencyId is required to create an expense sheet")
+  }
   return {
     companyId: partial.companyId,
-    employeeId: partial.employeeId ?? 0n,
+    employeeId: partial.employeeId,
     name: partial.name ?? "",
-    currencyId: partial.currencyId ?? 0n,
+    currencyId: partial.currencyId,
     notes: partial.notes,
     accountingDate: partial.accountingDate,
   }

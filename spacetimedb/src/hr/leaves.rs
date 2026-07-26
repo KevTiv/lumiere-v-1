@@ -372,6 +372,33 @@ pub fn create_leave_request(
     if params.number_of_days <= 0.0 {
         return Err("Number of days must be positive".to_string());
     }
+
+    let employee = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&params.employee_id)
+        .ok_or("Employee not found")?;
+    if employee.organization_id != organization_id {
+        return Err("Employee belongs to a different organization".to_string());
+    }
+    if employee.company_id != company_id {
+        return Err("Employee does not belong to this company".to_string());
+    }
+
+    let leave_type = ctx
+        .db
+        .hr_leave_type()
+        .id()
+        .find(&params.leave_type_id)
+        .ok_or("Leave type not found")?;
+    if leave_type.organization_id != organization_id {
+        return Err("Leave type belongs to a different organization".to_string());
+    }
+    if leave_type.company_id != company_id {
+        return Err("Leave type does not belong to this company".to_string());
+    }
+
     let leave = ctx.db.hr_leave().insert(HrLeave {
         id: 0,
         organization_id,

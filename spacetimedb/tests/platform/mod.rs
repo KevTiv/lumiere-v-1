@@ -26,7 +26,10 @@ pub fn run_all_platform_tests(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer]
 pub fn run_helpdesk_ticket_test(ctx: &ReducerContext) -> Result<(), String> {
-    platform_smoke::test_helpdesk_ticket_create(ctx).map_err(|e| format!("helpdesk: {e}"))
+    platform_smoke::test_helpdesk_ticket_create(ctx).map_err(|e| format!("helpdesk: {e}"))?;
+    platform_smoke::test_helpdesk_rejects_foreign_team(ctx)
+        .map_err(|e| format!("helpdesk foreign team: {e}"))?;
+    Ok(())
 }
 
 #[spacetimedb::reducer]

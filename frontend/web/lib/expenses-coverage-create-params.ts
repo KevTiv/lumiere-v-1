@@ -28,10 +28,15 @@ import {
   stbTimestampFromDate,
 } from "@lumiere/erp-shared/create-params-helpers"
 
+function requiredFk(v: unknown): bigint | undefined {
+  const id = optionalBigIntU64(v)
+  return id === undefined || id === 0n ? undefined : id
+}
+
 export function toCreateExpenseCardStatementLineParams(
   formData: Record<string, unknown>,
 ): CreateExpenseCardStatementLineParams | null {
-  const currencyId = optionalBigIntU64(field(formData, "currencyId", "currency_id"))
+  const currencyId = requiredFk(field(formData, "currencyId", "currency_id"))
   if (currencyId === undefined) return null
 
   return {
@@ -49,10 +54,15 @@ export function toCreateExpenseCardStatementLineParams(
 export function toCreateExpenseAdvanceParams(
   formData: Record<string, unknown>,
 ): CreateExpenseAdvanceParams | null {
-  const employeeId = optionalBigIntU64(field(formData, "employeeId", "employee_id"))
+  const employeeId = requiredFk(field(formData, "employeeId", "employee_id"))
   const name = optionalTrimmedString(field(formData, "name", "name"))
-  const currencyId = optionalBigIntU64(field(formData, "currencyId", "currency_id"))
+  const currencyId = requiredFk(field(formData, "currencyId", "currency_id"))
   if (employeeId === undefined || !name || currencyId === undefined) return null
+
+  const journalId = requiredFk(field(formData, "journalId", "journal_id"))
+  const cashAccountId = requiredFk(field(formData, "cashAccountId", "cash_account_id"))
+  const advanceAccountId = requiredFk(field(formData, "advanceAccountId", "advance_account_id"))
+  if (journalId === undefined || cashAccountId === undefined || advanceAccountId === undefined) return null
 
   return {
     companyId: optionalBigIntU64(field(formData, "companyId", "company_id")),
@@ -60,9 +70,9 @@ export function toCreateExpenseAdvanceParams(
     name,
     amount: num(field(formData, "amount", "amount"), 0),
     currencyId,
-    journalId: optionalBigIntU64(field(formData, "journalId", "journal_id")) ?? 0n,
-    cashAccountId: optionalBigIntU64(field(formData, "cashAccountId", "cash_account_id")) ?? 0n,
-    advanceAccountId: optionalBigIntU64(field(formData, "advanceAccountId", "advance_account_id")) ?? 0n,
+    journalId,
+    cashAccountId,
+    advanceAccountId,
     accountingDate: requiredTimestampFromForm(field(formData, "accountingDate", "accounting_date")) ?? stbTimestampFromDate(new Date()),
     clientRequestId: optionalTrimmedString(field(formData, "clientRequestId", "client_request_id")),
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
@@ -90,13 +100,17 @@ export function toCreateExpenseIntegrationIntentParams(
 export function toCreateExpenseProjectRebillParams(
   formData: Record<string, unknown>,
 ): CreateExpenseProjectRebillParams | null {
-  const journalId = optionalBigIntU64(field(formData, "journalId", "journal_id"))
+  const journalId = requiredFk(field(formData, "journalId", "journal_id"))
   if (journalId === undefined) return null
+
+  const receivableAccountId = requiredFk(field(formData, "receivableAccountId", "receivable_account_id"))
+  const incomeAccountId = requiredFk(field(formData, "incomeAccountId", "income_account_id"))
+  if (receivableAccountId === undefined || incomeAccountId === undefined) return null
 
   return {
     journalId,
-    receivableAccountId: optionalBigIntU64(field(formData, "receivableAccountId", "receivable_account_id")) ?? 0n,
-    incomeAccountId: optionalBigIntU64(field(formData, "incomeAccountId", "income_account_id")) ?? 0n,
+    receivableAccountId,
+    incomeAccountId,
     invoiceDate: requiredTimestampFromForm(field(formData, "invoiceDate", "invoice_date")) ?? stbTimestampFromDate(new Date()),
     partnerId: optionalBigIntU64(field(formData, "partnerId", "partner_id")),
     fiscalPositionId: optionalBigIntU64(field(formData, "fiscalPositionId", "fiscal_position_id")),
@@ -107,7 +121,7 @@ export function toCreateExpenseProjectRebillParams(
 export function toCreateExpenseReceiptParams(
   formData: Record<string, unknown>,
 ): CreateExpenseReceiptParams | null {
-  const employeeId = optionalBigIntU64(field(formData, "employeeId", "employee_id"))
+  const employeeId = requiredFk(field(formData, "employeeId", "employee_id"))
   const storageKey = optionalTrimmedString(field(formData, "storageKey", "storage_key"))
   if (employeeId === undefined || !storageKey) return null
 
@@ -125,13 +139,17 @@ export function toCreateExpenseReceiptParams(
 export function toCreateExpenseReimbursementParams(
   formData: Record<string, unknown>,
 ): CreateExpenseReimbursementParams | null {
-  const journalId = optionalBigIntU64(field(formData, "journalId", "journal_id"))
+  const journalId = requiredFk(field(formData, "journalId", "journal_id"))
   if (journalId === undefined) return null
+
+  const liquidityAccountId = requiredFk(field(formData, "liquidityAccountId", "liquidity_account_id"))
+  const payableAccountId = requiredFk(field(formData, "payableAccountId", "payable_account_id"))
+  if (liquidityAccountId === undefined || payableAccountId === undefined) return null
 
   return {
     journalId,
-    liquidityAccountId: optionalBigIntU64(field(formData, "liquidityAccountId", "liquidity_account_id")) ?? 0n,
-    payableAccountId: optionalBigIntU64(field(formData, "payableAccountId", "payable_account_id")) ?? 0n,
+    liquidityAccountId,
+    payableAccountId,
     paymentDate: requiredTimestampFromForm(field(formData, "paymentDate", "payment_date")) ?? stbTimestampFromDate(new Date()),
     amount: num(field(formData, "amount", "amount"), 0),
     clientRequestId: optionalTrimmedString(field(formData, "clientRequestId", "client_request_id")),

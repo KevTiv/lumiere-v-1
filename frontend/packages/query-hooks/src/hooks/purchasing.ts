@@ -390,11 +390,22 @@ export function useReceivePurchaseOrderLine(organizationId: bigint) {
     mutationFn: async ({
       lineId,
       qty,
+      lotId,
     }: {
       lineId: bigint | number | string
       qty: number
+      lotId?: bigint | number | string | null
     }) => {
-      const { urlPath, init } = purchasingBffPost("receive_po_line", [organizationId, toScalarU64(lineId), qty])
+      const lotArg =
+        lotId == null || lotId === ""
+          ? null
+          : toScalarU64(lotId)
+      const { urlPath, init } = purchasingBffPost("receive_po_line", [
+        organizationId,
+        toScalarU64(lineId),
+        qty,
+        lotArg,
+      ])
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to receive purchase order line')

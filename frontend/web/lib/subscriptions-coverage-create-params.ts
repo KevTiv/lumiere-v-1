@@ -70,10 +70,13 @@ export function toCreateSubscriptionTaxSettleIntentParams(
   const packCode = optionalTrimmedString(field(formData, "packCode", "pack_code"))
   if (!intentType || !idempotencyKey || !packCode) return null
 
+  const invoiceMoveId = optionalBigIntU64(field(formData, "invoiceMoveId", "invoice_move_id"))
+  if (invoiceMoveId === undefined) return null
+
   return {
     intentType,
     idempotencyKey,
-    invoiceMoveId: optionalBigIntU64(field(formData, "invoiceMoveId", "invoice_move_id")) ?? 0n,
+    invoiceMoveId,
     paymentId: optionalBigIntU64(field(formData, "paymentId", "payment_id")),
     packCode,
     payload: optionalTrimmedString(field(formData, "payload", "payload")) ?? "",

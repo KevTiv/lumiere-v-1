@@ -2,8 +2,13 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
-use crate::inventory::product::product;
-use crate::inventory::stock::stock_picking;
+use crate::inventory::product::{create_product, product, CreateProductParams};
+use crate::inventory::stock::{
+    resolve_warehouse_stock_location, stock_picking, stock_quant,
+};
+use crate::inventory::tracking::{
+    create_stock_production_lot, stock_production_lot, CreateStockProductionLotParams,
+};
 use crate::purchasing::purchase_orders::{
     add_purchase_order_line, confirm_purchase_order, create_purchase_order, purchase_order,
     purchase_order_line, receive_po_line, AddPurchaseOrderLineParams, CreatePurchaseOrderParams,
@@ -221,7 +226,7 @@ pub fn test_confirm_creates_incoming_picking(ctx: &ReducerContext) -> Result<(),
         .map(|l| l.id)
         .ok_or("line missing")?;
 
-    receive_po_line(ctx, org_id, line_id, 1.5)?;
+    receive_po_line(ctx, org_id, line_id, 1.5, None)?;
     let line = ctx
         .db
         .purchase_order_line()
@@ -425,6 +430,297 @@ pub fn test_rfq_award_and_purchase_return_smoke(ctx: &ReducerContext) -> Result<
         .ok_or("return picking missing")?;
     if picking.picking_code.as_deref() != Some("outgoing") {
         return Err("expected outgoing picking for purchase return".into());
+    }
+
+    Ok(())
+}
+
+fn create_lot_tracked_product(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    code: &str,
+) -> Result<u64, String> {
+    let base = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found")?;
+
+    create_product(
+        ctx,
+        fixture.organization_id,
+        CreateProductParams {
+            name: format!("Lot Product {code}"),
+            categ_id: base.categ_id,
+            type_: "storable".to_string(),
+            uom_id: base.uom_id,
+            uom_po_id: base.uom_po_id,
+            standard_price: 10.0,
+            list_price: 20.0,
+            currency_id: 1,
+            default_code: Some(code.to_string()),
+            barcode: None,
+            description: None,
+            sale_ok: Some(true),
+            purchase_ok: Some(true),
+            display_name: None,
+            cost_method: None,
+            valuation: None,
+            volume: None,
+            weight: None,
+            can_be_expensed: None,
+            available_in_pos: None,
+            invoicing_policy: None,
+            expense_policy: None,
+            priority: None,
+            is_published: None,
+            description_purchase: None,
+            description_sale: None,
+            service_type: None,
+            service_tracking: None,
+            image_1920_url: None,
+            image_128_url: None,
+            color: None,
+            responsible_id: None,
+            pricelist_id: None,
+            description_picking: None,
+            description_pickingout: None,
+            description_pickingin: None,
+            location_id: None,
+            warehouse_id: None,
+            tracking: Some("lot".to_string()),
+            has_configurable_attributes: None,
+            taxes_id: None,
+            supplier_taxes_id: None,
+            route_ids: None,
+            route_from_categ_ids: None,
+            property_account_income_id: base.property_account_income_id,
+            property_account_expense_id: None,
+            variant_attribute_ids: None,
+            attribute_line_ids: None,
+            metadata: Some(r#"{"test":"lot_receive"}"#.to_string()),
+        },
+    )?;
+
+    ctx.db
+        .product()
+        .product_by_org()
+        .filter(&fixture.organization_id)
+        .find(|p| p.default_code == Some(code.to_string()))
+        .map(|p| p.id)
+        .ok_or_else(|| format!("lot-tracked product {code} missing"))
+}
+
+/// Lot-tracked PO line: receive without lot fails; with lot stamps dest quant.
+pub fn test_receive_po_line_lot_required(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = create_lot_tracked_product(ctx, &fixture, "LOT-RCV")?;
+
+    create_contact(
+        ctx,
+        org_id,
+        CreateContactParams {
+            name: "Lot Receive Vendor".to_string(),
+            type_: "contact".to_string(),
+            email: None,
+            phone: None,
+            mobile: None,
+            company_id: Some(company_id),
+            is_customer: false,
+            is_vendor: true,
+            is_employee: false,
+            is_prospect: false,
+            is_partner: false,
+            customer_rank: 0,
+            supplier_rank: 1,
+            display_name: Some("Lot Receive Vendor".to_string()),
+            first_name: None,
+            last_name: None,
+            title: None,
+            email_secondary: None,
+            fax: None,
+            website: None,
+            street: None,
+            street2: None,
+            city: None,
+            state_code: None,
+            zip: None,
+            country_code: None,
+            tax_id: None,
+            company_registry: None,
+            industry: None,
+            employees_count: None,
+            annual_revenue: None,
+            description: None,
+            salesperson_id: None,
+            assigned_user_id: None,
+            parent_id: None,
+            user_id: None,
+            color: None,
+            metadata: Some(r#"{"test":"lot_receive"}"#.to_string()),
+        },
+    )?;
+
+    let vendor_id = ctx
+        .db
+        .contact()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.display_name == "Lot Receive Vendor")
+        .map(|c| c.id)
+        .ok_or("Lot receive vendor missing")?;
+
+    let product_row = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or("Lot product missing")?;
+
+    create_purchase_order(
+        ctx,
+        org_id,
+        CreatePurchaseOrderParams {
+            company_id: Some(company_id),
+            partner_id: vendor_id,
+            currency_id: 1,
+            origin: Some("Lot receive PO".to_string()),
+            partner_ref: Some("LOT-RCV-PO".to_string()),
+            notes: None,
+            date_planned: None,
+            payment_term_id: None,
+            fiscal_position_id: None,
+            incoterm_id: None,
+            incoterm_location: None,
+            user_id: None,
+            invoice_ids: vec![],
+            picking_ids: vec![],
+            message_follower_ids: vec![],
+            message_ids: vec![],
+            activity_ids: vec![],
+            is_quantity_copy: None,
+            metadata: Some(r#"{"test":"lot_receive"}"#.to_string()),
+        },
+    )?;
+
+    let order = ctx
+        .db
+        .purchase_order()
+        .iter()
+        .find(|o| {
+            o.organization_id == org_id && o.partner_ref == Some("LOT-RCV-PO".to_string())
+        })
+        .ok_or("Lot receive PO missing")?;
+
+    add_purchase_order_line(
+        ctx,
+        org_id,
+        order.id,
+        AddPurchaseOrderLineParams {
+            product_id,
+            quantity: 2.0,
+            uom_id: product_row.uom_id,
+            price_unit: product_row.standard_price,
+            discount: 0.0,
+            tax_ids: vec![],
+            name: None,
+            sequence: Some(1),
+            display_type: None,
+            product_variant_id: None,
+            account_analytic_id: None,
+            date_planned: None,
+            propagate_cancel: None,
+            lot_id: None,
+            metadata: None,
+        },
+    )?;
+
+    confirm_purchase_order(ctx, org_id, order.id)?;
+
+    let line = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&order.id)
+        .next()
+        .ok_or("Lot receive PO line missing")?;
+
+    match receive_po_line(ctx, org_id, line.id, 1.0, None) {
+        Err(msg) if msg.to_lowercase().contains("lot") => {}
+        Err(msg) => return Err(format!("Expected lot-required error, got: {msg}")),
+        Ok(()) => return Err("lot receive fail-closed failed: accepted without lot_id".into()),
+    }
+
+    create_stock_production_lot(
+        ctx,
+        org_id,
+        CreateStockProductionLotParams {
+            company_id: Some(company_id),
+            name: "LOT-RCV-A".to_string(),
+            product_id,
+            product_variant_id: None,
+            ref_: None,
+            note: None,
+            expiration_date: None,
+            use_date: None,
+            removal_date: None,
+            alert_date: None,
+            product_qty: 2.0,
+            location_id: Some(fixture.warehouse_id),
+            package_id: None,
+            owner_id: None,
+            is_scrap: false,
+            is_locked: false,
+            metadata: None,
+        },
+    )?;
+    let lot_id = ctx
+        .db
+        .stock_production_lot()
+        .iter()
+        .find(|l| {
+            l.organization_id == org_id && l.name == "LOT-RCV-A" && l.product_id == product_id
+        })
+        .map(|l| l.id)
+        .ok_or("lot missing after create")?;
+
+    receive_po_line(ctx, org_id, line.id, 1.0, Some(lot_id))?;
+
+    let stock_loc = resolve_warehouse_stock_location(ctx, fixture.warehouse_id);
+    let dest_quant = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .find(|q| {
+            q.organization_id == org_id
+                && q.company_id == company_id
+                && q.product_id == product_id
+                && q.location_id == stock_loc
+                && q.lot_id == Some(lot_id)
+        })
+        .ok_or("dest quant missing lot_id stamp after receive")?;
+
+    if dest_quant.quantity <= 0.0 {
+        return Err(format!(
+            "expected positive dest quant qty, got {}",
+            dest_quant.quantity
+        ));
+    }
+
+    let updated_line = ctx
+        .db
+        .purchase_order_line()
+        .id()
+        .find(&line.id)
+        .ok_or("PO line missing after lot receive")?;
+    if (updated_line.qty_received - 1.0).abs() > 0.001 {
+        return Err(format!(
+            "expected qty_received 1.0, got {}",
+            updated_line.qty_received
+        ));
     }
 
     Ok(())

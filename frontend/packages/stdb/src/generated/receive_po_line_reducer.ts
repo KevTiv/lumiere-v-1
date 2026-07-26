@@ -14,4 +14,5 @@ export default {
   organizationId: __t.u64(),
   lineId: __t.u64(),
   qty: __t.f64(),
+  lotId: __t.option(__t.u64()),
 };

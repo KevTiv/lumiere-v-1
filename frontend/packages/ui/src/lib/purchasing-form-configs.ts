@@ -380,6 +380,16 @@ export const receivePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
           required: true,
           width: "1/2",
         },
+        {
+          id: "lotId",
+          name: "lotId",
+          type: "number",
+          label: t("purchasing.forms.receivePurchaseOrderLine.fields.lotId", {
+            defaultValue: "Lot ID",
+          }),
+          required: false,
+          width: "1/2",
+        },
       ],
     },
   ],

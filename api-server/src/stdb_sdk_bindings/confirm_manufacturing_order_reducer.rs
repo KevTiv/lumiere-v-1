@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub(super) struct ConfirmManufacturingOrderArgs {
     pub organization_id: u64,
+    pub company_id: u64,
     pub mo_id: u64,
 }
 
@@ -15,6 +16,7 @@ impl From<ConfirmManufacturingOrderArgs> for super::Reducer {
     fn from(args: ConfirmManufacturingOrderArgs) -> Self {
         Self::ConfirmManufacturingOrder {
             organization_id: args.organization_id,
+            company_id: args.company_id,
             mo_id: args.mo_id,
         }
     }
@@ -35,8 +37,13 @@ pub trait confirm_manufacturing_order {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`confirm_manufacturing_order:confirm_manufacturing_order_then`] to run a callback after the reducer completes.
-    fn confirm_manufacturing_order(&self, organization_id: u64, mo_id: u64) -> __sdk::Result<()> {
-        self.confirm_manufacturing_order_then(organization_id, mo_id, |_, _| {})
+    fn confirm_manufacturing_order(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        mo_id: u64,
+    ) -> __sdk::Result<()> {
+        self.confirm_manufacturing_order_then(organization_id, company_id, mo_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `confirm_manufacturing_order` to run as soon as possible,
@@ -48,6 +55,7 @@ pub trait confirm_manufacturing_order {
     fn confirm_manufacturing_order_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -60,6 +68,7 @@ impl confirm_manufacturing_order for super::RemoteReducers {
     fn confirm_manufacturing_order_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         mo_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -69,6 +78,7 @@ impl confirm_manufacturing_order for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             ConfirmManufacturingOrderArgs {
                 organization_id,
+                company_id,
                 mo_id,
             },
             callback,

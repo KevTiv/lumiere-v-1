@@ -8,9 +8,9 @@ use serde_json::Value;
 
 use crate::error::ApiError;
 use stdb_auth::{
-    erp_org_extra_where, hr_fields_require_read_audit, identity_sql_literal, is_hr_pii_resource,
-    purpose_for_hr_resource, registry_get, resolve_http_sql_columns, select_company_scoped_sql,
-    select_org_scoped_sql, FieldAccessContext,
+    erp_org_extra_where, has_hr_permission, hr_fields_require_read_audit, identity_sql_literal,
+    is_hr_pii_resource, purpose_for_hr_resource, registry_get, resolve_http_sql_columns,
+    select_company_scoped_sql, select_org_scoped_sql, FieldAccessContext,
 };
 use stdb_client::StdbClient;
 use stdb_config::runtime_is_production;
@@ -1065,6 +1065,43 @@ pub async fn execute_resource_query(
             &cols,
             rows.len() as u32,
             0,
+        )
+        .await;
+        return Ok(rows);
+    }
+
+    // H1: org-wide `employees` only for HR roles; others get self row only (same as my-employee).
+    if resource == "employees" {
+        let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+        let cols = resolve_http_sql_columns("employees", fa).map_err(ApiError::Internal)?;
+        let col_part = cols.join(", ");
+        let can_list_all = has_hr_permission(fa, "hr_employee", "read")
+            || has_hr_permission(fa, "hr_employee", "create")
+            || has_hr_permission(fa, "hr_employee", "update")
+            || has_hr_permission(fa, "hr_employee", "view_pii");
+        let sql = if can_list_all {
+            format!(
+                "SELECT {col_part} FROM hr_employee WHERE organization_id = {organization_id} AND is_active = true"
+            )
+        } else {
+            format!(
+                "SELECT {col_part} FROM hr_employee WHERE organization_id = {organization_id} AND user_id = {id} AND is_active = true"
+            )
+        };
+        let rows = client
+            .query_sql(&sql)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        maybe_log_hr_pii_read(
+            client,
+            organization_id,
+            resource,
+            "hr_employee",
+            &cols,
+            rows.len() as u32,
+            rows.first()
+                .and_then(|r| r.get("id").and_then(|v| v.as_u64()))
+                .unwrap_or(0),
         )
         .await;
         return Ok(rows);

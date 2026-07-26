@@ -759,17 +759,25 @@ pub fn assign_tag_to_contact(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact_tag", "write")?;
 
-    ctx.db
+    let contact = ctx
+        .db
         .contact()
         .id()
         .find(&contact_id)
         .ok_or("Contact not found")?;
+    if contact.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
 
-    ctx.db
+    let tag = ctx
+        .db
         .contact_tag()
         .id()
         .find(&tag_id)
         .ok_or("Tag not found")?;
+    if tag.organization_id != organization_id {
+        return Err("Tag does not belong to this organization".to_string());
+    }
 
     let already_assigned = ctx.db.contact_tag_assignment().iter().any(|a| {
         a.contact_id == contact_id && a.tag_id == tag_id && a.organization_id == organization_id

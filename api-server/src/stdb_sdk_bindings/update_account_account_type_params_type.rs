@@ -16,7 +16,7 @@ use super::account_internal_group_type::AccountInternalGroup;
 pub struct UpdateAccountAccountTypeParams {
     pub company_id: Option::<u64>,
     pub name: Option::<String>,
-    pub r#type: Option::<String>,
+    pub type: Option::<String>,
     pub internal_group: Option::<AccountInternalGroup>,
     pub include_initial_balance: Option::<bool>,
     pub is_deprecated: Option::<bool>,

@@ -16,7 +16,7 @@ use super::bom_line_input_type::BomLineInput;
 #[sats(crate = __lib)]
 pub struct CreateBomParams {
     pub company_id: Option::<u64>,
-    pub r#type: BomType,
+    pub type: BomType,
     pub product_id: u64,
     pub product_tmpl_id: u64,
     pub product_qty: f64,

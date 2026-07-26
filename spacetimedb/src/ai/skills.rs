@@ -3,6 +3,7 @@
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::ai::agents::ai_team_member;
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 const MAX_PROMPT_TEMPLATE_LEN: usize = 32_000;
@@ -717,6 +718,7 @@ pub fn create_ai_agent_run(
     if params.company_id == 0 {
         return Err("company_id is required".to_string());
     }
+    require_company_in_organization(ctx, organization_id, params.company_id)?;
     let run_key = params.run_key.trim().to_string();
     if run_key.is_empty() {
         return Err("run_key is required".to_string());

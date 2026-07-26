@@ -155,16 +155,22 @@ export function toCreateProjectRevenueScheduleParams(
   const recognitionMethod = optionalTrimmedString(field(formData, "recognitionMethod", "recognition_method"))
   if (projectId === undefined || !name || !recognitionMethod) return null
 
+  const currencyId = optionalBigIntU64(field(formData, "currencyId", "currency_id"))
+  const journalId = optionalBigIntU64(field(formData, "journalId", "journal_id"))
+  const deferredAccountId = optionalBigIntU64(field(formData, "deferredAccountId", "deferred_account_id"))
+  const incomeAccountId = optionalBigIntU64(field(formData, "incomeAccountId", "income_account_id"))
+  if (currencyId === undefined || journalId === undefined || deferredAccountId === undefined || incomeAccountId === undefined) return null
+
   return {
     projectId,
     milestoneId: optionalBigIntU64(field(formData, "milestoneId", "milestone_id")),
     name,
     recognitionMethod,
     totalAmount: num(field(formData, "totalAmount", "total_amount"), 0),
-    currencyId: optionalBigIntU64(field(formData, "currencyId", "currency_id")) ?? 0n,
-    journalId: optionalBigIntU64(field(formData, "journalId", "journal_id")) ?? 0n,
-    deferredAccountId: optionalBigIntU64(field(formData, "deferredAccountId", "deferred_account_id")) ?? 0n,
-    incomeAccountId: optionalBigIntU64(field(formData, "incomeAccountId", "income_account_id")) ?? 0n,
+    currencyId,
+    journalId,
+    deferredAccountId,
+    incomeAccountId,
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }

@@ -7,7 +7,7 @@
 /// | **MrpWorkorder** | Work order operations |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company_id_from_scope;
+use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
@@ -238,6 +238,42 @@ fn get_stock_location(mo: &MrpProduction) -> u64 {
     mo.location_dest_id
 }
 
+fn require_mo_in_company(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    mo_id: u64,
+) -> Result<MrpProduction, String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let mo = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&mo_id)
+        .ok_or("Manufacturing order not found")?;
+    if mo.organization_id != organization_id {
+        return Err("MO does not belong to this organization".to_string());
+    }
+    if mo.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+    Ok(mo)
+}
+
+fn require_lot_when_tracked(tracking: &str, lot_id: Option<u64>, context: &str) -> Result<(), String> {
+    match tracking {
+        "lot" | "serial" => {
+            if lot_id.is_none() {
+                return Err(format!(
+                    "{context}: lot_id is required when product tracking is '{tracking}'"
+                ));
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
 fn upsert_stock_quant(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -345,6 +381,9 @@ pub fn create_manufacturing_order(
         .id()
         .find(&params.product_id)
         .ok_or("Product not found")?;
+    if product.organization_id != organization_id {
+        return Err("Product does not belong to this organization".to_string());
+    }
 
     let mo = ctx.db.mrp_production().insert(MrpProduction {
         id: 0,
@@ -444,22 +483,12 @@ pub fn create_manufacturing_order(
 pub fn confirm_manufacturing_order(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
 
-    let mo = ctx
-        .db
-        .mrp_production()
-        .id()
-        .find(&mo_id)
-        .ok_or("Manufacturing order not found")?;
-
-    if mo.organization_id != organization_id {
-        return Err("MO does not belong to this organization".to_string());
-    }
-
-    let company_id = mo.company_id;
+    let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
 
     match mo.state {
         MoState::Draft => {
@@ -492,57 +521,21 @@ pub fn confirm_manufacturing_order(
     }
 }
 
-/// Check availability of components for a manufacturing order
+/// Check availability of components for a manufacturing order.
+/// Stub removed: callers must not treat this as ATP until real reservation lands.
 #[reducer]
 pub fn check_mo_availability(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
-
-    let mo = ctx
-        .db
-        .mrp_production()
-        .id()
-        .find(&mo_id)
-        .ok_or("Manufacturing order not found")?;
-
-    if mo.organization_id != organization_id {
-        return Err("MO does not belong to this organization".to_string());
-    }
-
-    let company_id = mo.company_id;
-
-    let availability = "available".to_string();
-
-    ctx.db.mrp_production().id().update(MrpProduction {
-        availability: availability.clone(),
-        components_availability: availability,
-        components_availability_state: "available".to_string(),
-        reservation_state: "available".to_string(),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..mo
-    });
-
-    write_audit_log_v2(
-        ctx,
-        organization_id,
-        AuditLogParams {
-            company_id: Some(company_id),
-            table_name: "mrp_production",
-            record_id: mo_id,
-            action: "UPDATE",
-            old_values: None,
-            new_values: Some(serde_json::json!({ "reservation_state": "available" }).to_string()),
-            changed_fields: vec!["availability".to_string(), "reservation_state".to_string()],
-            metadata: None,
-        },
-    );
-
-    log::info!("MO availability checked: id={}", mo_id);
-    Ok(())
+    let _mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
+    Err(
+        "MO availability check is not implemented — refusing to mark components available"
+            .to_string(),
+    )
 }
 
 /// Start production (mark as in progress)
@@ -550,22 +543,12 @@ pub fn check_mo_availability(
 pub fn start_manufacturing_order(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
 
-    let mo = ctx
-        .db
-        .mrp_production()
-        .id()
-        .find(&mo_id)
-        .ok_or("Manufacturing order not found")?;
-
-    if mo.organization_id != organization_id {
-        return Err("MO does not belong to this organization".to_string());
-    }
-
-    let company_id = mo.company_id;
+    let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
 
     match mo.state {
         MoState::Confirmed | MoState::Planned => {
@@ -604,23 +587,13 @@ pub fn start_manufacturing_order(
 pub fn produce_manufacturing_order(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     mo_id: u64,
     qty_producing: f64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
 
-    let mo = ctx
-        .db
-        .mrp_production()
-        .id()
-        .find(&mo_id)
-        .ok_or("Manufacturing order not found")?;
-
-    if mo.organization_id != organization_id {
-        return Err("MO does not belong to this organization".to_string());
-    }
-
-    let company_id = mo.company_id;
+    let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
 
     if qty_producing <= 0.0 {
         return Err("Quantity must be greater than 0".to_string());
@@ -673,22 +646,12 @@ pub fn produce_manufacturing_order(
 pub fn consume_mo_materials(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
 
-    let mo = ctx
-        .db
-        .mrp_production()
-        .id()
-        .find(&mo_id)
-        .ok_or("Manufacturing order not found")?;
-
-    if mo.organization_id != organization_id {
-        return Err("MO does not belong to this organization".to_string());
-    }
-
-    let company_id = mo.company_id;
+    let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
 
     if mo.state != MoState::Progress && mo.state != MoState::ToClose {
         return Err(
@@ -711,6 +674,17 @@ pub fn consume_mo_materials(
 
         for (seq_idx, line) in bom_lines.into_iter().enumerate() {
             let required_qty = line.product_qty * mo.product_qty.max(1.0);
+            let component = ctx
+                .db
+                .product()
+                .id()
+                .find(&line.product_id)
+                .ok_or("BOM component product not found")?;
+            require_lot_when_tracked(
+                &component.tracking,
+                None,
+                &format!("MO {} consume component {}", mo.id, line.product_id),
+            )?;
 
             create_stock_move(
                 ctx,
@@ -850,25 +824,20 @@ pub fn consume_mo_materials(
 pub fn finish_manufacturing_order(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
 
-    let mo = ctx
-        .db
-        .mrp_production()
-        .id()
-        .find(&mo_id)
-        .ok_or("Manufacturing order not found")?;
-
-    if mo.organization_id != organization_id {
-        return Err("MO does not belong to this organization".to_string());
-    }
-
-    let company_id = mo.company_id;
+    let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
 
     match mo.state {
         MoState::Progress | MoState::ToClose => {
+            require_lot_when_tracked(
+                &mo.product_tracking,
+                mo.lot_producing_id,
+                &format!("MO {} finish", mo.id),
+            )?;
             let dest_location_id = get_stock_location(&mo);
             let finished_qty = if mo.qty_produced > 0.0 {
                 mo.qty_produced
@@ -1093,22 +1062,12 @@ pub fn finish_manufacturing_order(
 pub fn cancel_manufacturing_order(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
 
-    let mo = ctx
-        .db
-        .mrp_production()
-        .id()
-        .find(&mo_id)
-        .ok_or("Manufacturing order not found")?;
-
-    if mo.organization_id != organization_id {
-        return Err("MO does not belong to this organization".to_string());
-    }
-
-    let company_id = mo.company_id;
+    let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
 
     match mo.state {
         MoState::Done => Err("Cannot cancel a completed manufacturing order".to_string()),
@@ -1261,9 +1220,11 @@ pub fn create_workorder(
 pub fn start_workorder(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     workorder_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workorder", "write")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     let wo = ctx
         .db
@@ -1275,8 +1236,9 @@ pub fn start_workorder(
     if wo.organization_id != organization_id {
         return Err("Work order does not belong to this organization".to_string());
     }
-
-    let company_id = wo.company_id;
+    if wo.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
 
     match wo.state {
         WorkorderState::Pending | WorkorderState::Ready => {
@@ -1316,9 +1278,11 @@ pub fn start_workorder(
 pub fn finish_workorder(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     workorder_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workorder", "write")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     let wo = ctx
         .db
@@ -1330,8 +1294,9 @@ pub fn finish_workorder(
     if wo.organization_id != organization_id {
         return Err("Work order does not belong to this organization".to_string());
     }
-
-    let company_id = wo.company_id;
+    if wo.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
 
     match wo.state {
         WorkorderState::Progress => {

@@ -469,3 +469,83 @@ pub fn test_exchange_order_from_return(ctx: &ReducerContext) -> Result<(), Strin
     }
     Ok(())
 }
+
+/// R1: unknown product on SO line create → Err; no fabricated `"Product {id}"` row.
+pub fn test_unknown_product_so_line_fail_closed(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let ghost_product_id = 9_000_041u64;
+    let ghost_name = format!("Product {ghost_product_id}");
+
+    let order_id = seed_so(ctx, &fixture, "R1 Ghost PL", 1.0, 10.0, None, 1)?;
+    let lines_before = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&order_id)
+        .count();
+    let products_before = ctx.db.product().iter().count();
+
+    let err = create_sale_order_line(
+        ctx,
+        org_id,
+        order_id,
+        CreateSaleOrderLineParams {
+            product_id: ghost_product_id,
+            quantity: 1.0,
+            uom_id: 1,
+            price_unit: Some(99.0),
+            discount: 0.0,
+            tax_ids: vec![],
+            name: None,
+            sequence: 99,
+            is_downpayment: false,
+            display_type: None,
+            product_variant_id: None,
+            packaging_id: None,
+            route_id: None,
+            analytic_tag_ids: vec![],
+            customer_lead: None,
+            metadata: Some(r#"{"test":"r1_ghost_product"}"#.to_string()),
+        },
+    )
+    .expect_err("unknown product must fail closed");
+
+    if !err.contains("Product not found") {
+        return Err(format!("Expected 'Product not found', got: {err}"));
+    }
+
+    let lines_after = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&order_id)
+        .count();
+    if lines_after != lines_before {
+        return Err(format!(
+            "Ghost SO line inserted: before={lines_before} after={lines_after}"
+        ));
+    }
+
+    let ghost_line = ctx
+        .db
+        .sale_order_line()
+        .iter()
+        .any(|l| l.product_id == ghost_product_id || l.name == ghost_name);
+    if ghost_line {
+        return Err(format!(
+            "Fabricated '{ghost_name}' sale_order_line row persisted"
+        ));
+    }
+
+    let products_after = ctx.db.product().iter().count();
+    if products_after != products_before {
+        return Err("Ghost product row was fabricated".into());
+    }
+    if ctx.db.product().id().find(&ghost_product_id).is_some() {
+        return Err("Ghost product id unexpectedly exists".into());
+    }
+
+    Ok(())
+}

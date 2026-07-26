@@ -57,6 +57,7 @@ export function toCreateTicketParams(formData: Record<string, unknown>): Partial
     name,
     description: optionalTrimmedString(formData.description),
     priority: toTicketPriority(formData.priority),
+    partnerId: parseU64Field(formData.partnerId) ?? undefined,
     partnerName: optionalTrimmedString(formData.partnerName),
     partnerEmail: optionalTrimmedString(formData.partnerEmail),
     slaId: parseU64Field(formData.slaId) ?? undefined,

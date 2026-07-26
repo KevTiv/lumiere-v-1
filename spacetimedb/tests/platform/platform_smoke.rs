@@ -64,16 +64,17 @@ use crate::workflow::definitions::{
     WorkflowVersionStatus,
 };
 
-pub fn test_helpdesk_ticket_create(ctx: &ReducerContext) -> Result<(), String> {
-    ensure_test_superuser(ctx)?;
-    let fixture = OrgFixture::seed_minimal(ctx)?;
-    let org_id = fixture.organization_id;
-
+fn seed_helpdesk_team_and_stage(
+    ctx: &ReducerContext,
+    org_id: u64,
+    team_name: &str,
+    stage_name: &str,
+) -> Result<(u64, u64), String> {
     create_helpdesk_team(
         ctx,
         org_id,
         CreateHelpdeskTeamParams {
-            name: "Harness Support".to_string(),
+            name: team_name.to_string(),
             description: Some("Domain test team".to_string()),
             is_active: true,
         },
@@ -83,7 +84,7 @@ pub fn test_helpdesk_ticket_create(ctx: &ReducerContext) -> Result<(), String> {
         .db
         .helpdesk_team()
         .iter()
-        .find(|t| t.organization_id == org_id && t.name == "Harness Support")
+        .find(|t| t.organization_id == org_id && t.name == team_name)
         .map(|t| t.id)
         .ok_or("Helpdesk team not found")?;
 
@@ -91,7 +92,7 @@ pub fn test_helpdesk_ticket_create(ctx: &ReducerContext) -> Result<(), String> {
         ctx,
         org_id,
         CreateHelpdeskStageParams {
-            name: "New".to_string(),
+            name: stage_name.to_string(),
             team_id: Some(team_id),
             sequence: 1,
             is_closed: false,
@@ -104,9 +105,20 @@ pub fn test_helpdesk_ticket_create(ctx: &ReducerContext) -> Result<(), String> {
         .db
         .helpdesk_stage()
         .iter()
-        .find(|s| s.organization_id == org_id && s.name == "New")
+        .find(|s| s.organization_id == org_id && s.name == stage_name && s.team_id == Some(team_id))
         .map(|s| s.id)
         .ok_or("Helpdesk stage not found")?;
+
+    Ok((team_id, stage_id))
+}
+
+pub fn test_helpdesk_ticket_create(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+
+    let (team_id, stage_id) =
+        seed_helpdesk_team_and_stage(ctx, org_id, "Harness Support", "New")?;
 
     create_ticket(
         ctx,
@@ -183,6 +195,43 @@ pub fn test_helpdesk_ticket_create(ctx: &ReducerContext) -> Result<(), String> {
         return Err("Ticket priority not updated".to_string());
     }
 
+    Ok(())
+}
+
+/// Soft-FK: ticket create must reject a team from another organization.
+pub fn test_helpdesk_rejects_foreign_team(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture_a = OrgFixture::seed_minimal(ctx)?;
+    let fixture_b = OrgFixture::seed_minimal(ctx)?;
+
+    let (foreign_team_id, foreign_stage_id) = seed_helpdesk_team_and_stage(
+        ctx,
+        fixture_b.organization_id,
+        "Foreign Org Team",
+        "Foreign Stage",
+    )?;
+
+    let err = create_ticket(
+        ctx,
+        fixture_a.organization_id,
+        CreateTicketParams {
+            team_id: foreign_team_id,
+            stage_id: foreign_stage_id,
+            name: "Cross-org ticket".to_string(),
+            description: None,
+            priority: TicketPriority::Normal,
+            partner_id: None,
+            partner_name: None,
+            partner_email: None,
+            sla_id: None,
+            sla_deadline: None,
+        },
+    )
+    .expect_err("foreign team must be rejected");
+
+    if !err.contains("does not belong") && !err.contains("not found") {
+        return Err(format!("unexpected foreign-team error: {err}"));
+    }
     Ok(())
 }
 

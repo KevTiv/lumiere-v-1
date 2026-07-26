@@ -1811,6 +1811,28 @@ export function subscriptionQueriesForResource(
     ];
   }
 
+  // H1: org-wide employees only for HR roles; others get self (same as my-employee).
+  if (r === "employees") {
+    if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
+    const org = ctx.organizationId;
+    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
+    const idLit = identitySqlLiteral(ctx.identityHex);
+    const cols = resolveHttpSqlColumns("employees", ctx.fieldAccess).join(", ");
+    const canListAll =
+      hasHrPermission(ctx.fieldAccess, "hr_employee", "read") ||
+      hasHrPermission(ctx.fieldAccess, "hr_employee", "create") ||
+      hasHrPermission(ctx.fieldAccess, "hr_employee", "update") ||
+      hasHrPermission(ctx.fieldAccess, "hr_employee", "view_pii");
+    if (canListAll) {
+      return [
+        `SELECT ${cols} FROM hr_employee WHERE organization_id = ${Number(org)} AND is_active = true`,
+      ];
+    }
+    return [
+      `SELECT ${cols} FROM hr_employee WHERE organization_id = ${Number(org)} AND user_id = ${idLit} AND is_active = true`,
+    ];
+  }
+
   if (r === "employee-documents") {
     const org = ctx.organizationId;
     if (org === undefined || org === null || Number.isNaN(Number(org))) return null;

@@ -11,6 +11,10 @@ pub fn run_hr_wave_a_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("leave_balance: {e}"))?;
     wave_a_test::test_leave_must_be_submitted_before_approve(ctx)
         .map_err(|e| format!("leave_submit_gate: {e}"))?;
+    wave_a_test::test_leave_rejects_foreign_leave_type(ctx)
+        .map_err(|e| format!("leave_foreign_type: {e}"))?;
+    wave_a_test::test_leave_rejects_cross_company_leave_type(ctx)
+        .map_err(|e| format!("leave_cross_company_type: {e}"))?;
     wave_a_test::test_payslip_done_requires_artifact(ctx)
         .map_err(|e| format!("payslip_artifact: {e}"))?;
     wave_a_test::test_offboarding_gates_archive(ctx)

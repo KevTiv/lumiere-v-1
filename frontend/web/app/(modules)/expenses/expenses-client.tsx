@@ -787,9 +787,8 @@ function ExpensesClientLoaded({
           payableAccountId: BigInt(String(payableAccountId)),
           defaultExpenseAccountId: BigInt(String(defaultExpenseAccountId)),
           clientRequestId:
-            typeof crypto !== "undefined" && "randomUUID" in crypto
-              ? `exp-post-${crypto.randomUUID()}`
-              : `exp-post-${Date.now()}`,
+            // A6: stable per sheet so retries are idempotent (not a new UUID each click).
+            `exp-post-${rowId(workflowForm.row)}`,
           defaultTaxAccountId:
             defaultTaxAccountId != null && String(defaultTaxAccountId).trim() !== ""
               ? BigInt(String(defaultTaxAccountId))

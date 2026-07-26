@@ -237,18 +237,27 @@ export function toAddPurchaseOrderLineParams(
 export function toReceivePoLineArgs(formData: Record<string, unknown>): {
   lineId: number
   qty: number
+  lotId?: number
 } | null {
   const lineId = Number(formData.lineId)
   const qty = Number(formData.qty)
   if (!Number.isFinite(lineId) || lineId <= 0 || !Number.isFinite(qty) || qty <= 0) return null
-  return { lineId, qty }
+  const lotRaw = formData.lotId
+  const lotId =
+    lotRaw == null || String(lotRaw).trim() === ""
+      ? undefined
+      : Number(lotRaw)
+  if (lotId !== undefined && (!Number.isFinite(lotId) || lotId <= 0)) return null
+  return lotId === undefined ? { lineId, qty } : { lineId, qty, lotId }
 }
 
 export function toInvoicePoLineArgs(formData: Record<string, unknown>): {
   lineId: number
   qty: number
 } | null {
-  return toReceivePoLineArgs(formData)
+  const args = toReceivePoLineArgs(formData)
+  if (!args) return null
+  return { lineId: args.lineId, qty: args.qty }
 }
 
 /** Params for `update_purchase_order_line` (optional fields — only sent when set). */
@@ -268,13 +277,28 @@ export function toUpdatePurchaseOrderLineParams(
   const productIdValue = productId !== "" && productId != null ? Number(productId) : undefined
   const uomIdValue = uomId !== "" && uomId != null ? Number(uomId) : undefined
 
-  return {
+  const params: Record<string, unknown> = {
     quantity,
     priceUnit,
-    taxIds: [] as number[],
     productId: productIdValue,
     uomId: uomIdValue,
   }
+
+  // Only send taxIds when the caller provided them — never force [] (wipes PO line tax).
+  if (formData.taxIds != null) {
+    const raw = formData.taxIds
+    const taxIds = Array.isArray(raw)
+      ? raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)
+      : String(raw)
+          .split(/[,\s]+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map((s) => Number(s))
+          .filter((n) => Number.isFinite(n) && n > 0)
+    params.taxIds = taxIds
+  }
+
+  return params
 }
 
 export function toCreateLandedCostParams(

@@ -86,5 +86,11 @@ pub fn run_crm_opportunity_convert_test(ctx: &ReducerContext) -> Result<(), Stri
     opportunity_lifecycle_test::test_create_opportunity_line_on_unscoped_opportunity(ctx)
         .map_err(|e| format!("create_opportunity_line_on_unscoped_opportunity: {e}"))?;
     opportunity_lifecycle_test::test_opportunity_stage_transition(ctx)
-        .map_err(|e| format!("opportunity_stage_transition: {e}"))
+        .map_err(|e| format!("opportunity_stage_transition: {e}"))?;
+    opportunity_lifecycle_test::test_convert_opp_missing_currency_fail_closed(ctx)
+        .map_err(|e| format!("r2_missing_currency: {e}"))?;
+    opportunity_lifecycle_test::test_convert_opp_missing_uom_fail_closed(ctx)
+        .map_err(|e| format!("r2_missing_uom: {e}"))?;
+    opportunity_lifecycle_test::test_convert_opp_distinctive_currency_uom(ctx)
+        .map_err(|e| format!("r2_distinctive_currency_uom: {e}"))
 }

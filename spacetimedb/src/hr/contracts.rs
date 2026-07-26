@@ -6,6 +6,7 @@ use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::compensation::append_compensation_event;
+use crate::hr::employees::{hr_department, hr_employee, hr_job_position};
 use crate::types::ContractState;
 
 // ── Table ─────────────────────────────────────────────────────────────────────
@@ -66,6 +67,50 @@ pub struct UpdateContractParams {
     pub wage_effective_from: Option<Timestamp>,
 }
 
+// ── Soft-FK helpers ───────────────────────────────────────────────────────────
+
+fn assert_job_in_company(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    job_id: u64,
+) -> Result<(), String> {
+    let job = ctx
+        .db
+        .hr_job_position()
+        .id()
+        .find(&job_id)
+        .ok_or("Job position not found")?;
+    if job.organization_id != organization_id {
+        return Err("Job position belongs to a different organization".to_string());
+    }
+    if job.company_id != company_id {
+        return Err("Job position does not belong to this company".to_string());
+    }
+    Ok(())
+}
+
+fn assert_department_in_company(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    department_id: u64,
+) -> Result<(), String> {
+    let dept = ctx
+        .db
+        .hr_department()
+        .id()
+        .find(&department_id)
+        .ok_or("Department not found")?;
+    if dept.organization_id != organization_id {
+        return Err("Department belongs to a different organization".to_string());
+    }
+    if dept.company_id != company_id {
+        return Err("Department does not belong to this company".to_string());
+    }
+    Ok(())
+}
+
 // ── Reducers ──────────────────────────────────────────────────────────────────
 
 #[reducer]
@@ -82,6 +127,26 @@ pub fn create_contract(
     if params.wage < 0.0 {
         return Err("Wage cannot be negative".to_string());
     }
+
+    let employee = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&params.employee_id)
+        .ok_or("Employee not found")?;
+    if employee.organization_id != organization_id {
+        return Err("Employee belongs to a different organization".to_string());
+    }
+    if employee.company_id != company_id {
+        return Err("Employee does not belong to this company".to_string());
+    }
+    if let Some(job_id) = params.job_id {
+        assert_job_in_company(ctx, organization_id, company_id, job_id)?;
+    }
+    if let Some(department_id) = params.department_id {
+        assert_department_in_company(ctx, organization_id, company_id, department_id)?;
+    }
+
     let contract = ctx.db.hr_contract().insert(HrContract {
         id: 0,
         organization_id,
@@ -135,6 +200,12 @@ pub fn update_contract(
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if contract.company_id != company_id {
         return Err("Contract does not belong to this company".to_string());
+    }
+    if let Some(job_id) = params.job_id {
+        assert_job_in_company(ctx, organization_id, company_id, job_id)?;
+    }
+    if let Some(department_id) = params.department_id {
+        assert_department_in_company(ctx, organization_id, company_id, department_id)?;
     }
     let new_wage = params.wage.unwrap_or(contract.wage);
     if let Some(w) = params.wage {

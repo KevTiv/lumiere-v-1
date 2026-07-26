@@ -2,6 +2,9 @@
 ///
 /// Tables:
 ///   - InventoryValuation
+///
+/// **QUARANTINED / SKIP (integrity readiness):** schema-only — no create/update/
+/// delete reducers. Treat as dead until a valuation engine lands; do not score GREEN.
 use spacetimedb::{Identity, Timestamp};
 
 /// Inventory Valuation

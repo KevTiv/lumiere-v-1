@@ -40,6 +40,17 @@ describe("finalizeCreateOpportunityParams", () => {
     assert.equal(params.isLost, false)
     assert.deepEqual(params.tagIds, [])
   })
+
+  it("rejects missing or zero stageId", () => {
+    assert.throws(
+      () => finalizeCreateOpportunityParams({ name: "No Stage" }),
+      /stageId is required/,
+    )
+    assert.throws(
+      () => finalizeCreateOpportunityParams({ name: "Zero Stage", stageId: 0n }),
+      /stageId is required/,
+    )
+  })
 })
 
 describe("finalizeCreateContactParams", () => {

@@ -18,6 +18,7 @@ use spacetimedb::ReducerContext;
 pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_accounting_post_invoice_test(ctx)?;
     run_accounting_payment_reconcile_test(ctx)?;
+    run_accounting_payment_multi_invoice_residual_test(ctx)?;
     run_accounting_payment_cancel_test(ctx)?;
     run_accounting_payment_term_update_test(ctx)?;
     run_accounting_period_lock_test(ctx)?;
@@ -40,6 +41,14 @@ pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), Stri
 pub fn run_accounting_payment_reconcile_test(ctx: &ReducerContext) -> Result<(), String> {
     payments_test::test_payment_reconciles_invoice(ctx)
         .map_err(|e| format!("payment_reconciles_invoice: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_payment_multi_invoice_residual_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    payments_test::test_payment_multi_invoice_residual_and_clearing_account(ctx)
+        .map_err(|e| format!("payment_multi_invoice_residual_and_clearing: {e}"))
 }
 
 #[spacetimedb::reducer]

@@ -656,6 +656,37 @@ pub(crate) fn ensure_delegated_admin_may_grant_permission(
     Ok(())
 }
 
+/// Field-permission resources must exist in the canonical query resource registry
+/// (`crates/stdb-auth/assets/resource_registry.json`), including aliases.
+fn ensure_field_permission_resource_registered(resource: &str) -> Result<(), String> {
+    if resource == "*" {
+        return Ok(());
+    }
+    let registry: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../crates/stdb-auth/assets/resource_registry.json"
+    ))
+    .map_err(|e| format!("resource registry parse error: {e}"))?;
+    let obj = registry
+        .as_object()
+        .ok_or_else(|| "resource registry must be a JSON object".to_string())?;
+    if obj.contains_key(resource) {
+        return Ok(());
+    }
+    for entry in obj.values() {
+        if let Some(aliases) = entry.get("aliases").and_then(|a| a.as_array()) {
+            if aliases
+                .iter()
+                .any(|alias| alias.as_str() == Some(resource))
+            {
+                return Ok(());
+            }
+        }
+    }
+    Err(format!(
+        "Unknown field-permission resource '{resource}' — must be a registry key or alias"
+    ))
+}
+
 /// When field write allowlists exist for the caller, changed fields must stay in the allow-list.
 pub(crate) fn ensure_resource_fields_writable(
     ctx: &ReducerContext,
@@ -857,6 +888,7 @@ pub fn grant_field_permission(
     if params.resource.is_empty() {
         return Err("resource cannot be empty".to_string());
     }
+    ensure_field_permission_resource_registered(&params.resource)?;
     if params.allowed_fields.is_empty() {
         return Err("allowed_fields cannot be empty".to_string());
     }

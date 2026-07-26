@@ -43,6 +43,7 @@ LOCAL      := $(STDB_HOST)
 E2E_DOMAIN_TEST_REDUCERS := \
 	run_accounting_post_invoice_test \
 	run_accounting_payment_reconcile_test \
+	run_accounting_payment_multi_invoice_residual_test \
 	run_accounting_payment_cancel_test \
 	run_accounting_payment_term_update_test \
 	run_inventory_product_category_test \
@@ -55,7 +56,9 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_sales_order_invoice_test \
 	run_sales_order_delivery_test \
 	run_sales_order_update_test \
+	run_sales_ghost_product_fail_closed_test \
 	run_crm_opportunity_convert_test \
+	run_proposals_convert_integrity_test \
 	run_crm_contact_update_delete_test \
 	run_crm_contact_identity_test \
 	run_accounting_payment_management_test \
@@ -67,6 +70,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_accounting_ic_consolidation_test \
 	run_accounting_fx_revaluation_test \
 	run_purchasing_bill_balanced_test \
+	run_purchasing_lot_receive_test \
 	run_helpdesk_ticket_test \
 	run_hr_leave_type_test \
 	run_hr_wave_a_test \
@@ -98,6 +102,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	init-stack docker-dev docker-dev-iot \
 	codegen check-codegen api-server-run \
+	lint-no-magic-fk-zero \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
 	module-check module-build module-generate-ts module-generate-rust \
 	local-start local-stop local-publish local-reset local-test local-logs \
@@ -847,6 +852,10 @@ check-codegen: codegen
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json || \
 		(echo "Generated artifacts are out of date. Run: make generate-stdb-ts-sdk && make codegen" && exit 1)
+
+# Fail if coverage/create-params mappers use magic FK sentinels (`?? 0n` / `|| 0n`).
+lint-no-magic-fk-zero:
+	bash scripts/lint-no-magic-fk-zero.sh
 
 # Starts only the Rust API with its service-local environment file.
 api-server-run:

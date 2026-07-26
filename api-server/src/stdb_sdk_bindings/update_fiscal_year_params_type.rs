@@ -16,7 +16,7 @@ pub struct UpdateFiscalYearParams {
     pub name: Option::<String>,
     pub date_from: Option::<__sdk::Timestamp>,
     pub date_to: Option::<__sdk::Timestamp>,
-    pub r#type: Option::<String>,
+    pub type: Option::<String>,
     pub carry_over_accounts: Option::<Vec::<u64>>,
     pub closing_move_id: Option::<Option::<u64>>,
     pub opening_move_id: Option::<Option::<u64>>,

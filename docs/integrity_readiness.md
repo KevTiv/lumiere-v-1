@@ -5,7 +5,7 @@
 **Rubric:** Backend spine → FE wire (form→mapper→hook→reducer) → company/org scoping + audit → E2E proven → known integrity holes.  
 **Scores:** GREEN = pilot-integrity ready · YELLOW = wired but holes · RED = integrity-breaking · SKIP = non-pilot shell.
 
-**Overall:** **YELLOW** (post Wave 0–2 remediation 2026-07-24) — Accounting off RED; Inv/CRM company+lot P0s closed. See [integrity_adversarial_review.md](./integrity_adversarial_review.md) and [integrity_remediation_plan.md](./integrity_remediation_plan.md).
+**Overall:** **YELLOW** (post relational remediation waves 2026-07-24) — A3/A4 distinctive-value proven; A6/H1 + R1–R11 + soft-FK pilot spines closed. See [integrity_relational_audit.md](./integrity_relational_audit.md).
 
 ---
 
@@ -13,12 +13,12 @@
 
 | Domain | Verdict | Spine | Biggest integrity hole |
 |--------|---------|-------|------------------------|
-| Platform / core | YELLOW | Allowlist on create/approve/execute; field-perms FULL_CLIENT | Soft `permissions_tests` (P3) |
-| CRM + Sales | GREEN | Lead convert fail-closed; confirm + SO line company guard | Competitive OMS edges deferred |
-| Purchasing + Inventory | GREEN | P2P @p0; inbound+outbound lot continuity | RFQ UI / outbound FIFO deferred |
-| Accounting + Expenses + Subs | YELLOW | Period lock; balanced pay; case-insensitive reconcile; PostPayment on sub | Multi-invoice residual (A3); clearing acct (A4); expense idempotency (A6) |
-| HR + PSA + Documents | YELLOW | Leave reserve; docs owner-only WS+HTTP | Org-wide employees HTTP (H1); PSA Draft AR deferred |
-| Secondary | Mixed | Mfg / helpdesk / proposals / workflow GREEN | Trackers/forensics SKIP; IoT/POS/fleet thin E2E |
+| Platform / core | YELLOW | Allowlist re-check; FieldPermission registry on grant; AI company∈org | Soft `permissions_tests` (P3) |
+| CRM + Sales | GREEN | Lead convert fail-closed; ghost product Err; partner/stage/UoM fail-closed | Competitive OMS edges deferred |
+| Purchasing + Inventory | GREEN | P2P @p0; receive lot API; assign reserves ATP; supplier location FK | RFQ UI; StockMoveLine SKIP; InventoryValuation SKIP |
+| Accounting + Expenses + Subs | YELLOW | Period lock; balanced pay; A3/A4 proven; A6 sheet idempotency | Subscription soft idempotency / Draft AR edges |
+| HR + PSA + Documents | YELLOW | Leave/contract soft-FK; docs owner-only; employees ACL (H1) | PSA Draft AR deferred; versions `created_by` |
+| Secondary | Mixed | Helpdesk/MO/proposal convert fail-closed | Trackers/forensics SKIP |
 
 ---
 
@@ -78,19 +78,19 @@
 |------|-------|-------|
 | PO confirm → receive → bill → 3-way | GREEN | Fail-closed match; `mvp-procure-to-pay.spec.ts` @p0 |
 | RFQ → PO | YELLOW | Backend+hooks; Ops `prompt` UI; no RFQ E2E |
-| Lots / quants / valuation | YELLOW | **lot_id not stamped on inbound quants**; valuation table dead; outbound FIFO consumption open |
+| Lots / quants / valuation | YELLOW | Receive lot API closed; outbound lot continuity prior; InventoryValuation SKIP; StockMoveLine SKIP |
 
 ---
 
 ## Accounting + Expenses + Subscriptions
 
-**Verdict: YELLOW** — not unsupervised-close-ready.
+**Verdict: YELLOW** — not unsupervised-close-ready. A2 balanced pay + A3/A4 multi-invoice residual/clearing **proven** (`run_accounting_payment_multi_invoice_residual_test`) + A6 sheet idempotency landed; subscription soft idempotency remains.
 
 | Workflow | Score | Notes |
 |----------|-------|-------|
 | Period locks | GREEN | Shared gate on post paths; domain + expense tests |
-| GL post idempotency | YELLOW | Draft-only re-post; billing_run_key not `#[unique]`; expense UI omits `client_request_id` |
-| Payment registration | **RED** | Empty Posted move; register without reconcile leaves AR residual |
+| GL post idempotency | YELLOW | Draft-only re-post; expense post uses sheet-scoped `clientRequestId` (A6) |
+| Payment registration | GREEN | Balanced lines + register→reconcile; A3/A4 multi-invoice residual/clearing **proven** |
 | Expense approve→post | GREEN | SoD + balanced JE + period lock |
 | Subscription invoice gen | YELLOW | Draft AR solid; soft idempotency; Playwright smoke only |
 
@@ -163,7 +163,7 @@ Prefer **gap-fix Done checklists + code** over investigation intros (CRM/Sales/E
 
 ### 1. Accounting + Expenses + Subscriptions → GREEN
 
-**Exit criteria:** Payment posts balanced JEs and settles AR residual; billing-run key unique; expense post sends idempotency key.
+**Exit criteria:** Payment posts balanced JEs and settles AR residual; billing-run key unique; expense post sends idempotency key. **Plus** A3/A4 distinctive-value proof (pay 100 vs inv 60+60; clearing from invoice AR/AP).
 
 | Item | Status | Notes |
 |------|--------|-------|
@@ -171,10 +171,12 @@ Prefer **gap-fix Done checklists + code** over investigation intros (CRM/Sales/E
 | Register settles residual | [x] | `register_payment_on_invoice` calls `reconcile_payment_with_invoice` |
 | Sub pay no empty second JE | [x] | Links payment to existing balanced move |
 | `billing_run_key` `#[unique]` | [x] | `subscriptions/tables.rs` |
-| Expense `client_request_id` | [x] | Generated on post in `expenses-client.tsx` |
-| Domain proof | [x] | `payments_test.rs` asserts lines + residual clear |
+| Expense `client_request_id` | [x] | Sheet-scoped `exp-post-${sheetId}` on post (A6) |
+| A3 multi-invoice residual | [x] impl / [x] proof | `run_accounting_payment_multi_invoice_residual_test` — pay 100 vs 60+60 → residual 40 |
+| A4 clearing from invoice AR/AP | [x] impl / [x] proof | Distinctive AR on clearing JE (same test) |
+| Domain proof (A3/A4) | [x] | Persisted-row assertions pass |
 
-**Rescore:** **GREEN** (pilot). Full subscription activate→bill→pay Playwright still deferred.
+**Rescore:** Payment registration **GREEN**. Domain overall stays **YELLOW** while subscription soft idempotency / Draft AR edges remain.
 
 ### 2. Platform / core → GREEN
 
@@ -238,7 +240,7 @@ Prefer **gap-fix Done checklists + code** over investigation intros (CRM/Sales/E
 | Platform / core | YELLOW | GREEN | **YELLOW** |
 | CRM + Sales | YELLOW | GREEN | **YELLOW** |
 | Purchasing + Inventory | YELLOW | GREEN | **YELLOW** |
-| Accounting + Expenses + Subs | YELLOW | GREEN | **RED** |
+| Accounting + Expenses + Subs | YELLOW | GREEN | **YELLOW** (A3/A4 proven; subs soft) |
 | HR + PSA + Documents | YELLOW | GREEN | **YELLOW** |
 | Secondary | Mixed | Unchanged | Hold |
 

@@ -44,14 +44,20 @@ export function toCreateWorkflowDelegationParams(
 export function toCreateWorkflowMigrationPlanParams(
   formData: Record<string, unknown>,
 ): CreateWorkflowMigrationPlanParams | null {
+  const companyId = optionalBigIntU64(field(formData, "companyId", "company_id"))
+  const workflowId = optionalBigIntU64(field(formData, "workflowId", "workflow_id"))
+  const sourceWorkflowVersionId = optionalBigIntU64(field(formData, "sourceWorkflowVersionId", "source_workflow_version_id"))
+  const targetWorkflowVersionId = optionalBigIntU64(field(formData, "targetWorkflowVersionId", "target_workflow_version_id"))
+  if (companyId === undefined || workflowId === undefined || sourceWorkflowVersionId === undefined || targetWorkflowVersionId === undefined) return null
+
   return {
     nodeMappings: objectArrayFromForm(field(formData, "nodeMappings", "node_mappings")).map((row) => ({ fromNodeKey: String(row.fromNodeKey ?? row.from_node_key ?? ""), toNodeKey: String(row.toNodeKey ?? row.to_node_key ?? "") })),
     forkMappings: objectArrayFromForm(field(formData, "forkMappings", "fork_mappings")).map((row) => ({ fromForkNodeKey: String(row.fromForkNodeKey ?? row.from_fork_node_key ?? ""), toForkNodeKey: String(row.toForkNodeKey ?? row.to_fork_node_key ?? ""), branchKeyMappings: objectArrayFromForm(row.branchKeyMappings ?? row.branch_key_mappings).map((b) => ({ fromBranchKey: String(b.fromBranchKey ?? b.from_branch_key ?? ""), toBranchKey: String(b.toBranchKey ?? b.to_branch_key ?? "") })) })),
     edgeMappings: objectArrayFromForm(field(formData, "edgeMappings", "edge_mappings")).map((row) => ({ fromEdgeKey: String(row.fromEdgeKey ?? row.from_edge_key ?? ""), toEdgeKey: String(row.toEdgeKey ?? row.to_edge_key ?? "") })),
-    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? 0n,
-    workflowId: optionalBigIntU64(field(formData, "workflowId", "workflow_id")) ?? 0n,
-    sourceWorkflowVersionId: optionalBigIntU64(field(formData, "sourceWorkflowVersionId", "source_workflow_version_id")) ?? 0n,
-    targetWorkflowVersionId: optionalBigIntU64(field(formData, "targetWorkflowVersionId", "target_workflow_version_id")) ?? 0n,
+    companyId,
+    workflowId,
+    sourceWorkflowVersionId,
+    targetWorkflowVersionId,
     active: field(formData, "active", "active") !== false,
   }
 }
@@ -64,12 +70,19 @@ export function toCreateWorkflowOutboxParams(
   const semanticKey = optionalTrimmedString(field(formData, "semanticKey", "semantic_key"))
   if (!actionKey || !payload || !semanticKey) return null
 
+  const companyId = optionalBigIntU64(field(formData, "companyId", "company_id"))
+  const instanceId = optionalBigIntU64(field(formData, "instanceId", "instance_id"))
+  const tokenId = optionalBigIntU64(field(formData, "tokenId", "token_id"))
+  const expectedTokenRevision = optionalBigIntU64(field(formData, "expectedTokenRevision", "expected_token_revision"))
+  const edgeId = optionalBigIntU64(field(formData, "edgeId", "edge_id"))
+  if (companyId === undefined || instanceId === undefined || tokenId === undefined || expectedTokenRevision === undefined || edgeId === undefined) return null
+
   return {
-    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? 0n,
-    instanceId: optionalBigIntU64(field(formData, "instanceId", "instance_id")) ?? 0n,
-    tokenId: optionalBigIntU64(field(formData, "tokenId", "token_id")) ?? 0n,
-    expectedTokenRevision: optionalBigIntU64(field(formData, "expectedTokenRevision", "expected_token_revision")) ?? 0n,
-    edgeId: optionalBigIntU64(field(formData, "edgeId", "edge_id")) ?? 0n,
+    companyId,
+    instanceId,
+    tokenId,
+    expectedTokenRevision,
+    edgeId,
     actionKey,
     payload,
     semanticKey,
@@ -91,12 +104,19 @@ export function toCreateWorkflowTimerParams(
   const correlationId = optionalTrimmedString(field(formData, "correlationId", "correlation_id"))
   if (!semanticKey || !correlationId) return null
 
+  const companyId = optionalBigIntU64(field(formData, "companyId", "company_id"))
+  const instanceId = optionalBigIntU64(field(formData, "instanceId", "instance_id"))
+  const tokenId = optionalBigIntU64(field(formData, "tokenId", "token_id"))
+  const expectedTokenRevision = optionalBigIntU64(field(formData, "expectedTokenRevision", "expected_token_revision"))
+  const edgeId = optionalBigIntU64(field(formData, "edgeId", "edge_id"))
+  if (companyId === undefined || instanceId === undefined || tokenId === undefined || expectedTokenRevision === undefined || edgeId === undefined) return null
+
   return {
-    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? 0n,
-    instanceId: optionalBigIntU64(field(formData, "instanceId", "instance_id")) ?? 0n,
-    tokenId: optionalBigIntU64(field(formData, "tokenId", "token_id")) ?? 0n,
-    expectedTokenRevision: optionalBigIntU64(field(formData, "expectedTokenRevision", "expected_token_revision")) ?? 0n,
-    edgeId: optionalBigIntU64(field(formData, "edgeId", "edge_id")) ?? 0n,
+    companyId,
+    instanceId,
+    tokenId,
+    expectedTokenRevision,
+    edgeId,
     dueAt: requiredTimestampFromForm(field(formData, "dueAt", "due_at")) ?? stbTimestampFromDate(new Date()),
     semanticKey,
     correlationId,

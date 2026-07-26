@@ -4,6 +4,7 @@
 /// tickets are assigned to agents within teams.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{HelpdeskTicketState, TicketPriority};
 
@@ -283,6 +284,59 @@ pub fn create_ticket(
     if params.name.is_empty() {
         return Err("Ticket subject cannot be empty".to_string());
     }
+
+    let team = ctx
+        .db
+        .helpdesk_team()
+        .id()
+        .find(&params.team_id)
+        .ok_or("Helpdesk team not found")?;
+    if team.organization_id != organization_id {
+        return Err("Helpdesk team does not belong to this organization".to_string());
+    }
+
+    let stage = ctx
+        .db
+        .helpdesk_stage()
+        .id()
+        .find(&params.stage_id)
+        .ok_or("Helpdesk stage not found")?;
+    if stage.organization_id != organization_id {
+        return Err("Helpdesk stage does not belong to this organization".to_string());
+    }
+    if let Some(stage_team) = stage.team_id {
+        if stage_team != params.team_id {
+            return Err("Helpdesk stage does not belong to this team".to_string());
+        }
+    }
+
+    if let Some(sla_id) = params.sla_id {
+        let sla = ctx
+            .db
+            .helpdesk_sla()
+            .id()
+            .find(&sla_id)
+            .ok_or("Helpdesk SLA not found")?;
+        if sla.organization_id != organization_id {
+            return Err("Helpdesk SLA does not belong to this organization".to_string());
+        }
+        if sla.team_id != params.team_id {
+            return Err("Helpdesk SLA does not belong to this team".to_string());
+        }
+    }
+
+    if let Some(partner_id) = params.partner_id {
+        let partner = ctx
+            .db
+            .contact()
+            .id()
+            .find(&partner_id)
+            .ok_or("Partner not found")?;
+        if partner.organization_id != organization_id {
+            return Err("Partner does not belong to this organization".to_string());
+        }
+    }
+
     let ticket = ctx.db.helpdesk_ticket().insert(HelpdeskTicket {
         id: 0,
         organization_id,

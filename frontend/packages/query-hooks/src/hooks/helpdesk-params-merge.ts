@@ -14,9 +14,15 @@ const defaultTicketPriority: CreateTicketParams["priority"] = { tag: "Normal" }
 export function finalizeCreateTicketParams(
   partial: Partial<CreateTicketParams>,
 ): CreateTicketParams {
+  if (partial.teamId == null || partial.teamId === 0n) {
+    throw new Error("teamId is required to create a ticket")
+  }
+  if (partial.stageId == null || partial.stageId === 0n) {
+    throw new Error("stageId is required to create a ticket")
+  }
   return {
-    teamId: partial.teamId ?? 0n,
-    stageId: partial.stageId ?? 0n,
+    teamId: partial.teamId,
+    stageId: partial.stageId,
     name: partial.name ?? "",
     description: partial.description,
     priority: partial.priority ?? defaultTicketPriority,
@@ -54,10 +60,16 @@ export function finalizeCreateHelpdeskStageParams(
 export function finalizeCreateHelpdeskSlaParams(
   partial: Partial<CreateHelpdeskSlaParams>,
 ): CreateHelpdeskSlaParams {
+  if (partial.teamId == null || partial.teamId === 0n) {
+    throw new Error("teamId is required to create a helpdesk SLA")
+  }
+  if (partial.stageId == null || partial.stageId === 0n) {
+    throw new Error("stageId is required to create a helpdesk SLA")
+  }
   return {
     name: partial.name ?? "",
-    teamId: partial.teamId ?? 0n,
-    stageId: partial.stageId ?? 0n,
+    teamId: partial.teamId,
+    stageId: partial.stageId,
     priority: partial.priority ?? defaultTicketPriority,
     timeDays: partial.timeDays ?? 0,
     timeHours: partial.timeHours ?? 0,

@@ -179,7 +179,11 @@ fn create_outgoing_return_picking(
 
     let stock_location =
         crate::inventory::stock::resolve_warehouse_stock_location(ctx, warehouse_id);
-    let vendor_location = stock_location.saturating_add(2);
+    let vendor_location = crate::inventory::stock::resolve_supplier_stock_location(
+        ctx,
+        organization_id,
+        company_id,
+    )?;
     let order_label = purchase_return.name.clone();
 
     create_stock_picking(

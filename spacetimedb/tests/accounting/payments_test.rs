@@ -11,7 +11,11 @@ use crate::core::audit::audit_log;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{PaymentState, PaymentType};
 
-use super::helpers::{create_balanced_customer_invoice, seed_bank_journal};
+use super::helpers::{
+    create_balanced_customer_invoice, create_balanced_customer_invoice_on_account,
+    seed_bank_journal, seed_distinctive_ar_account,
+};
+use crate::test_harness::chart_keys;
 
 pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -208,6 +212,236 @@ pub fn test_cancel_payment_audited(ctx: &ReducerContext) -> Result<(), String> {
 
     if !has_cancel_audit {
         return Err("Expected CANCEL audit row for payment".to_string());
+    }
+
+    Ok(())
+}
+
+/// A3 + A4 distinctive-value proof:
+/// - Pay 100 vs invoices 60+60 → after first register, payment residual stays partial;
+///   second invoice residual untouched.
+/// - Clearing JE `account_id` matches the invoice AR line (not fixture first-of-type).
+pub fn test_payment_multi_invoice_residual_and_clearing_account(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let decoy_ar_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::AR)
+        .ok_or("Harness missing AR account")?;
+    let distinctive_ar_id = seed_distinctive_ar_account(ctx, &fixture)?;
+
+    let inv1 = create_balanced_customer_invoice_on_account(
+        ctx,
+        &fixture,
+        60.0,
+        distinctive_ar_id,
+        "A3 inv 60a",
+        true,
+    )?;
+    let inv2 = create_balanced_customer_invoice_on_account(
+        ctx,
+        &fixture,
+        60.0,
+        distinctive_ar_id,
+        "A3 inv 60b",
+        true,
+    )?;
+
+    let invoice_ar_line_account = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&inv1)
+        .find(|l| l.account_id == distinctive_ar_id)
+        .map(|l| l.account_id)
+        .ok_or("Invoice 1 missing distinctive AR line")?;
+    if invoice_ar_line_account != distinctive_ar_id {
+        return Err("Invoice AR line account mismatch before payment".to_string());
+    }
+
+    let (bank_journal_id, _) = seed_bank_journal(ctx, &fixture)?;
+    create_payment(
+        ctx,
+        org_id,
+        CreatePaymentParams {
+            company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: crate::types::PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount: 100.0,
+            currency_id: 1,
+            date: None,
+            journal_id: bank_journal_id,
+            ref_: Some("A3 multi-invoice payment".to_string()),
+            memo: Some("100 vs 60+60".to_string()),
+        },
+    )?;
+
+    let payment_id = ctx
+        .db
+        .account_payment()
+        .iter()
+        .find(|p| {
+            p.organization_id == org_id
+                && p.ref_ == Some("A3 multi-invoice payment".to_string())
+        })
+        .map(|p| p.id)
+        .ok_or("Payment not found after create")?;
+
+    post_payment(ctx, org_id, payment_id)?;
+
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("Payment not found after post")?;
+    let payment_move_id = payment
+        .move_id
+        .ok_or("post_payment did not link a journal move")?;
+
+    // A4: clearing receivable line must use invoice AR, not first-of-type decoy.
+    let clearing_line = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+        .find(|l| {
+            l.account_internal_type
+                .as_deref()
+                .is_some_and(|t| t.eq_ignore_ascii_case("receivable"))
+        })
+        .ok_or("Payment missing receivable clearing line")?;
+
+    if clearing_line.account_id == decoy_ar_id {
+        return Err(format!(
+            "A4 fail: clearing used first-of-type decoy AR {decoy_ar_id}"
+        ));
+    }
+    if clearing_line.account_id != distinctive_ar_id {
+        return Err(format!(
+            "A4 fail: clearing account_id {} != invoice AR {}",
+            clearing_line.account_id, distinctive_ar_id
+        ));
+    }
+    if (clearing_line.amount_residual.abs() - 100.0).abs() > 0.01 {
+        return Err(format!(
+            "Expected payment clearing residual 100 before reconcile, got {}",
+            clearing_line.amount_residual
+        ));
+    }
+
+    // A3: register against first invoice only — payment residual must stay partial.
+    register_payment_on_invoice(ctx, org_id, payment_id, vec![inv1], false)?;
+
+    let payment_after = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&payment_move_id)
+        .ok_or("Payment move missing after first reconcile")?;
+    if (payment_after.amount_residual - 40.0).abs() > 0.01 {
+        return Err(format!(
+            "A3 fail: after first reconcile expected payment residual 40, got {}",
+            payment_after.amount_residual
+        ));
+    }
+    if payment_after.payment_state != PaymentState::Partial {
+        return Err(format!(
+            "A3 fail: expected Partial payment_state, got {:?}",
+            payment_after.payment_state
+        ));
+    }
+
+    let inv1_after = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&inv1)
+        .ok_or("Invoice 1 missing after first reconcile")?;
+    if inv1_after.amount_residual.abs() > 0.01 {
+        return Err(format!(
+            "A3 fail: invoice 1 residual should be 0, got {}",
+            inv1_after.amount_residual
+        ));
+    }
+
+    let inv2_after = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&inv2)
+        .ok_or("Invoice 2 missing after first reconcile")?;
+    if (inv2_after.amount_residual - 60.0).abs() > 0.01 {
+        return Err(format!(
+            "A3 fail: invoice 2 residual should remain 60, got {}",
+            inv2_after.amount_residual
+        ));
+    }
+
+    let inv2_ar_line_residual = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&inv2)
+        .find(|l| l.account_id == distinctive_ar_id)
+        .map(|l| l.amount_residual.abs())
+        .ok_or("Invoice 2 AR line missing after first reconcile")?;
+    if (inv2_ar_line_residual - 60.0).abs() > 0.01 {
+        return Err(format!(
+            "A3 fail: invoice 2 AR line residual should remain 60, got {inv2_ar_line_residual}"
+        ));
+    }
+
+    let payment_line_residual: f64 = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+        .filter(|l| {
+            l.account_internal_type
+                .as_deref()
+                .is_some_and(|t| t.eq_ignore_ascii_case("receivable"))
+        })
+        .map(|l| l.amount_residual.abs())
+        .sum();
+    if (payment_line_residual - 40.0).abs() > 0.01 {
+        return Err(format!(
+            "A3 fail: payment AR line residual expected 40, got {payment_line_residual}"
+        ));
+    }
+
+    // Second register consumes remaining 40 against inv2 (partial settle).
+    register_payment_on_invoice(ctx, org_id, payment_id, vec![inv2], false)?;
+
+    let payment_final = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&payment_move_id)
+        .ok_or("Payment move missing after second reconcile")?;
+    if payment_final.amount_residual.abs() > 0.01 {
+        return Err(format!(
+            "After second reconcile expected payment residual 0, got {}",
+            payment_final.amount_residual
+        ));
+    }
+
+    let inv2_final = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&inv2)
+        .ok_or("Invoice 2 missing after second reconcile")?;
+    if (inv2_final.amount_residual - 20.0).abs() > 0.01 {
+        return Err(format!(
+            "After second reconcile expected invoice 2 residual 20, got {}",
+            inv2_final.amount_residual
+        ));
     }
 
     Ok(())

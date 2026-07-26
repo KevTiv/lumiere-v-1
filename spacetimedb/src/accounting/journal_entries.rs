@@ -393,7 +393,10 @@ fn compute_invoice_totals_internal(ctx: &ReducerContext, move_id: u64) -> Result
         }
 
         amount_total += line.balance.abs();
-        amount_residual += line.amount_residual.abs();
+        // Open residual is AR/AP only — P&L lines must not inflate invoice residual (A3).
+        if is_receivable_or_payable_line_type(line.account_internal_type.as_deref()) {
+            amount_residual += line.amount_residual.abs();
+        }
     }
 
     move_record.amount_untaxed = amount_untaxed;
@@ -2609,7 +2612,7 @@ pub fn create_credit_note_from_invoice(
 }
 
 /// Match Debug (`Receivable`) or snake (`receivable`) stamps on move lines.
-fn is_receivable_or_payable_line_type(account_internal_type: Option<&str>) -> bool {
+pub(crate) fn is_receivable_or_payable_line_type(account_internal_type: Option<&str>) -> bool {
     account_internal_type.is_some_and(|t| {
         t.eq_ignore_ascii_case("receivable") || t.eq_ignore_ascii_case("payable")
     })
@@ -2697,9 +2700,16 @@ pub fn reconcile_payment_with_invoice(
         let new_residual = (line.amount_residual.abs() - apply).max(0.0);
         remaining_payment -= apply;
 
+        // Preserve debit/credit sign on residual (AR usually debit-positive).
+        let signed_residual = if line.amount_residual < 0.0 {
+            -new_residual
+        } else {
+            new_residual
+        };
+
         ctx.db.account_move_line().id().update(AccountMoveLine {
-            amount_residual: new_residual,
-            amount_residual_currency: new_residual,
+            amount_residual: signed_residual,
+            amount_residual_currency: signed_residual,
             matching_number: Some(matching_number.clone()),
             is_matching: new_residual == 0.0,
             write_uid: Some(ctx.sender()),
@@ -2708,13 +2718,25 @@ pub fn reconcile_payment_with_invoice(
         });
     }
 
-    // Mark payment lines as matched
+    // A3: reduce payment residual by amount applied to this invoice only — never zero
+    // the full payment when registering against the first of several invoices.
+    let applied_to_invoices = (payment_amount - remaining_payment.max(0.0)).max(0.0);
+    let mut remaining_apply_on_payment = applied_to_invoices;
     for line in &payment_lines {
+        let current = line.amount_residual.abs();
+        let apply = remaining_apply_on_payment.min(current);
+        let new_residual = (current - apply).max(0.0);
+        remaining_apply_on_payment = (remaining_apply_on_payment - apply).max(0.0);
+        let signed_residual = if line.amount_residual < 0.0 {
+            -new_residual
+        } else {
+            new_residual
+        };
         ctx.db.account_move_line().id().update(AccountMoveLine {
             matching_number: Some(matching_number.clone()),
-            is_matching: true,
-            amount_residual: 0.0,
-            amount_residual_currency: 0.0,
+            is_matching: new_residual == 0.0,
+            amount_residual: signed_residual,
+            amount_residual_currency: signed_residual,
             write_uid: Some(ctx.sender()),
             write_date: Some(ctx.timestamp),
             ..(*line).clone()
@@ -2764,6 +2786,28 @@ pub fn reconcile_payment_with_invoice(
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
         ..invoice_move
+    });
+
+    // Keep payment move residual in sync with line residuals (partial multi-invoice).
+    let remaining_payment_residual: f64 = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+        .filter(|l| is_receivable_or_payable_line_type(l.account_internal_type.as_deref()))
+        .map(|l| l.amount_residual.abs())
+        .sum();
+    ctx.db.account_move().id().update(AccountMove {
+        amount_residual: remaining_payment_residual,
+        amount_residual_signed: remaining_payment_residual,
+        payment_state: if remaining_payment_residual <= 0.01 {
+            PaymentState::Paid
+        } else {
+            PaymentState::Partial
+        },
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..payment_move
     });
 
     write_audit_log_v2(
@@ -2877,6 +2921,24 @@ pub fn bill_timesheets(
         // Snapshot FX at bill if validate did not (e.g. legacy rows)
         let ts = ensure_timesheet_fx_snapshot(ctx, organization_id, ts)?;
         billable_sheets.push(ts);
+    }
+
+    // Bill partner must match project partner when the project has one.
+    for ts in &billable_sheets {
+        let project = ctx
+            .db
+            .project_project()
+            .id()
+            .find(&ts.project_id)
+            .ok_or_else(|| format!("Project for timesheet {} not found", ts.id))?;
+        if let Some(project_partner) = project.partner_id {
+            if project_partner != params.partner_id {
+                return Err(format!(
+                    "Bill partner does not match project {} partner",
+                    project.id
+                ));
+            }
+        }
     }
 
     // billable_sheets is guaranteed non-empty (checked above)
@@ -3170,6 +3232,11 @@ pub fn bill_project_milestone(
         .partner_id
         .or(project.partner_id)
         .ok_or("Milestone bill requires partner_id (project or params)")?;
+    if let (Some(param_partner), Some(project_partner)) = (params.partner_id, project.partner_id) {
+        if param_partner != project_partner {
+            return Err("Bill partner does not match project partner".to_string());
+        }
+    }
 
     let inv_date = params.invoice_date.unwrap_or(ctx.timestamp);
     ensure_accounting_period_open_for_date(ctx, company_id, inv_date)?;

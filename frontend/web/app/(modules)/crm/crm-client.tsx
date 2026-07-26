@@ -353,7 +353,7 @@ function CrmClientLoaded({
     roleId: runtimeRoleId,
     listViewKey: `list-filters:crm:opportunities:${organizationId}`,
   })
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId)
 
   async function persistCrmCustomFields(args: {
     model: "lead" | "contact" | "opportunity"

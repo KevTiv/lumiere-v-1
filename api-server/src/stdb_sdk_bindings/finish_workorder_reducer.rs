@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub(super) struct FinishWorkorderArgs {
     pub organization_id: u64,
+    pub company_id: u64,
     pub workorder_id: u64,
 }
 
@@ -15,6 +16,7 @@ impl From<FinishWorkorderArgs> for super::Reducer {
     fn from(args: FinishWorkorderArgs) -> Self {
         Self::FinishWorkorder {
             organization_id: args.organization_id,
+            company_id: args.company_id,
             workorder_id: args.workorder_id,
         }
     }
@@ -35,8 +37,13 @@ pub trait finish_workorder {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`finish_workorder:finish_workorder_then`] to run a callback after the reducer completes.
-    fn finish_workorder(&self, organization_id: u64, workorder_id: u64) -> __sdk::Result<()> {
-        self.finish_workorder_then(organization_id, workorder_id, |_, _| {})
+    fn finish_workorder(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        workorder_id: u64,
+    ) -> __sdk::Result<()> {
+        self.finish_workorder_then(organization_id, company_id, workorder_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `finish_workorder` to run as soon as possible,
@@ -48,6 +55,7 @@ pub trait finish_workorder {
     fn finish_workorder_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         workorder_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -60,6 +68,7 @@ impl finish_workorder for super::RemoteReducers {
     fn finish_workorder_then(
         &self,
         organization_id: u64,
+        company_id: u64,
         workorder_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -69,6 +78,7 @@ impl finish_workorder for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             FinishWorkorderArgs {
                 organization_id,
+                company_id,
                 workorder_id,
             },
             callback,

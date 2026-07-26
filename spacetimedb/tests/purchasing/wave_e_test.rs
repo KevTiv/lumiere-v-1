@@ -228,7 +228,7 @@ pub fn test_company_isolation_on_receive_and_bill(ctx: &ReducerContext) -> Resul
         .map(|l| l.id)
         .ok_or("line missing")?;
 
-    match receive_po_line(ctx, fixture_b.organization_id, line_id, 1.0) {
+    match receive_po_line(ctx, fixture_b.organization_id, line_id, 1.0, None) {
         Err(_) => {}
         Ok(()) => {
             return Err(
@@ -237,7 +237,7 @@ pub fn test_company_isolation_on_receive_and_bill(ctx: &ReducerContext) -> Resul
         }
     }
 
-    receive_po_line(ctx, org_a, line_id, 1.0)?;
+    receive_po_line(ctx, org_a, line_id, 1.0, None)?;
 
     let (expense_id, ap_id) = expense_and_ap(&fixture_a)?;
     let journal_code = format!("WB{org_a}");
@@ -358,7 +358,7 @@ pub fn test_price_match_blocks_post_invoice(ctx: &ReducerContext) -> Result<(), 
         .next()
         .map(|l| l.id)
         .ok_or("line missing")?;
-    receive_po_line(ctx, org_id, line_id, 3.0)?;
+    receive_po_line(ctx, org_id, line_id, 3.0, None)?;
 
     let (expense_id, ap_id) = expense_and_ap(&fixture)?;
     let journal_code = format!("PM{org_id}");

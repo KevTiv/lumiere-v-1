@@ -41,11 +41,18 @@ pub fn run_purchasing_wave_e_test(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_purchasing_lot_receive_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_receive_po_line_lot_required(ctx)
+        .map_err(|e| format!("receive_po_line_lot_required: {e}"))
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_purchasing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_purchasing_bill_balanced_test(ctx)?;
     run_purchasing_incoming_picking_test(ctx)?;
     run_purchasing_company_isolation_test(ctx)?;
     run_purchasing_wave_c_smoke_test(ctx)?;
     run_purchasing_wave_e_test(ctx)?;
+    run_purchasing_lot_receive_test(ctx)?;
     Ok(())
 }
