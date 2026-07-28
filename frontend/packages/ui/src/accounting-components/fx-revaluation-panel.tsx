@@ -24,6 +24,7 @@ export interface FxRevaluationPanelProps {
   batchPending?: boolean
   realizedPending?: boolean
   journalSelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
+  currencySelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
   accountSelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
   paymentSelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
   moveSelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
@@ -39,6 +40,7 @@ export function FxRevaluationPanel({
   batchPending,
   realizedPending,
   journalSelectOptions = [],
+  currencySelectOptions = [],
   accountSelectOptions = [],
   paymentSelectOptions = [],
   moveSelectOptions = [],
@@ -55,22 +57,24 @@ export function FxRevaluationPanel({
   const runFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(runFxRevaluationForm(t), {
+        currencyId: currencySelectOptions,
         journalId: journalSelectOptions,
         accountId: accountSelectOptions,
         gainAccountId: accountSelectOptions,
         lossAccountId: accountSelectOptions,
       }),
-    [t, journalSelectOptions, accountSelectOptions],
+    [t, currencySelectOptions, journalSelectOptions, accountSelectOptions],
   )
 
   const batchFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(runFxRevaluationBatchForm(t), {
+        currencyId: currencySelectOptions,
         journalId: journalSelectOptions,
         gainAccountId: accountSelectOptions,
         lossAccountId: accountSelectOptions,
       }),
-    [t, journalSelectOptions, accountSelectOptions],
+    [t, currencySelectOptions, journalSelectOptions, accountSelectOptions],
   )
 
   const realizedFormConfig = useMemo(

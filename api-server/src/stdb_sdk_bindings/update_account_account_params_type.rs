@@ -14,7 +14,7 @@ pub struct UpdateAccountAccountParams {
     pub name: Option<String>,
     pub code: Option<String>,
     pub deprecated: Option<bool>,
-    pub currency_id: Option<u64>,
+    pub currency_id: Option<Option<u64>>,
     pub internal_type: Option<AccountTypeInternal>,
     pub internal_group: Option<AccountInternalGroup>,
     pub group_id: Option<Option<u64>>,
@@ -23,7 +23,7 @@ pub struct UpdateAccountAccountParams {
     pub note: Option<Option<String>>,
     pub allowed_journal_ids: Option<Vec<u64>>,
     pub non_trade: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateAccountAccountParams {

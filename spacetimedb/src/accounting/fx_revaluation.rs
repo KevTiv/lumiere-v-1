@@ -1,12 +1,18 @@
 /// FX revaluation — post unrealized currency adjustments (A10).
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::chart_of_accounts::{
+    account_account, account_journal, AccountAccount, AccountJournal,
+};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
-use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, AccountMove, AccountMoveLine,
+};
 use crate::accounting::payments::account_payment;
-use crate::core::organization::require_company_in_organization;
+use crate::core::organization::{company, require_company_in_organization};
+use crate::core::reference::{legacy_currency_code_for_id, require_currency_row};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
-use crate::types::{AccountMoveState, PaymentState};
+use crate::types::{AccountInternalGroup, AccountMoveState, JournalType, PaymentState};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -22,7 +28,12 @@ pub struct FxRevaluationRun {
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
+    pub currency_id: u64,
     pub currency_code: String,
+    pub company_currency_id: u64,
+    pub rate: f64,
+    pub rate_source: String,
+    pub rate_effective_date: Timestamp,
     pub as_of_date: Timestamp,
     pub move_id: u64,
     pub journal_id: u64,
@@ -46,8 +57,12 @@ pub struct FxRevaluationLineParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct RunFxRevaluationParams {
-    pub currency_code: String,
+    pub currency_id: u64,
     pub as_of_date: Timestamp,
+    /// Functional currency units per 1.0 foreign currency unit.
+    pub rate: f64,
+    pub rate_source: String,
+    pub rate_effective_date: Timestamp,
     pub journal_id: u64,
     pub gain_account_id: u64,
     pub loss_account_id: u64,
@@ -59,13 +74,15 @@ pub struct RunFxRevaluationParams {
 /// Auto-scan open AR/AP foreign-currency residuals and revalue at `rate`.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct RunFxRevaluationBatchParams {
-    pub currency_code: String,
+    pub currency_id: u64,
     pub as_of_date: Timestamp,
     pub journal_id: u64,
     pub gain_account_id: u64,
     pub loss_account_id: u64,
     /// Functional currency units per 1.0 foreign currency unit.
     pub rate: f64,
+    pub rate_source: String,
+    pub rate_effective_date: Timestamp,
     pub reference: Option<String>,
     pub metadata: Option<String>,
 }
@@ -87,6 +104,127 @@ pub struct PostRealizedFxParams {
     pub metadata: Option<String>,
 }
 
+struct FxScope {
+    currency_id: u64,
+    currency_code: String,
+    company_currency_id: u64,
+    journal: AccountJournal,
+    gain_account: AccountAccount,
+    loss_account: AccountAccount,
+}
+
+fn load_fx_account(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    account_id: u64,
+    role: &str,
+) -> Result<AccountAccount, String> {
+    let account = ctx
+        .db
+        .account_account()
+        .id()
+        .find(&account_id)
+        .ok_or_else(|| format!("{role} account not found"))?;
+    if account.organization_id != organization_id || account.company_id != company_id {
+        return Err(format!(
+            "{role} account does not belong to this organization and company"
+        ));
+    }
+    if account.deprecated {
+        return Err(format!("{role} account is deprecated"));
+    }
+    Ok(account)
+}
+
+fn load_fx_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    currency_id: u64,
+    journal_id: u64,
+    gain_account_id: u64,
+    loss_account_id: u64,
+) -> Result<FxScope, String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("company not found")?;
+
+    if !(1..=9).contains(&currency_id) {
+        return Err("currency_id does not map to a supported currency".to_string());
+    }
+    if !(1..=9).contains(&company.currency_id) {
+        return Err("company currency_id does not map to a supported currency".to_string());
+    }
+    if currency_id == company.currency_id {
+        return Err("revaluation currency must differ from company currency".to_string());
+    }
+    let currency = require_currency_row(ctx, legacy_currency_code_for_id(currency_id))?;
+    if !currency.active {
+        return Err("revaluation currency is inactive".to_string());
+    }
+    let company_currency =
+        require_currency_row(ctx, legacy_currency_code_for_id(company.currency_id))?;
+    if !company_currency.active {
+        return Err("company currency is inactive".to_string());
+    }
+
+    let journal = ctx
+        .db
+        .account_journal()
+        .id()
+        .find(&journal_id)
+        .ok_or("journal not found")?;
+    if journal.organization_id != organization_id || journal.company_id != company_id {
+        return Err("journal does not belong to this organization and company".to_string());
+    }
+    if !journal.active {
+        return Err("journal is inactive".to_string());
+    }
+    if journal.type_ != JournalType::General {
+        return Err("FX revaluation requires a general journal".to_string());
+    }
+    if journal
+        .currency_id
+        .is_some_and(|id| id != currency_id && id != company.currency_id)
+    {
+        return Err("journal currency is incompatible with this revaluation".to_string());
+    }
+
+    let gain_account = load_fx_account(ctx, organization_id, company_id, gain_account_id, "gain")?;
+    if gain_account.internal_group != Some(AccountInternalGroup::Income) {
+        return Err("gain account must be an income account".to_string());
+    }
+    let loss_account = load_fx_account(ctx, organization_id, company_id, loss_account_id, "loss")?;
+    if loss_account.internal_group != Some(AccountInternalGroup::Expense) {
+        return Err("loss account must be an expense account".to_string());
+    }
+
+    Ok(FxScope {
+        currency_id,
+        currency_code: currency.code,
+        company_currency_id: company.currency_id,
+        journal,
+        gain_account,
+        loss_account,
+    })
+}
+
+fn validate_rate(rate: f64, source: &str) -> Result<String, String> {
+    if !rate.is_finite() || rate <= 0.0 {
+        return Err("rate must be a positive finite number".to_string());
+    }
+    let source = source.trim();
+    if source.is_empty() {
+        return Err("rate_source cannot be empty".to_string());
+    }
+    Ok(source.to_string())
+}
+
 fn insert_move_line(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -95,6 +233,7 @@ fn insert_move_line(
     journal_id: u64,
     company_id: u64,
     currency_id: u64,
+    company_currency_id: u64,
     account_id: u64,
     line_name: &str,
     debit: f64,
@@ -112,7 +251,7 @@ fn insert_move_line(
         parent_state: AccountMoveState::Posted,
         journal_id,
         company_id,
-        company_currency_id: currency_id,
+        company_currency_id,
         sequence,
         name: line_name.to_string(),
         quantity: 0.0,
@@ -180,21 +319,54 @@ pub fn run_fx_revaluation(
     params: RunFxRevaluationParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "create")?;
-    require_company_in_organization(ctx, organization_id, company_id)?;
+    let scope = load_fx_scope(
+        ctx,
+        organization_id,
+        company_id,
+        params.currency_id,
+        params.journal_id,
+        params.gain_account_id,
+        params.loss_account_id,
+    )?;
     ensure_accounting_period_open_for_date(ctx, company_id, params.as_of_date)?;
+    let rate_source = validate_rate(params.rate, &params.rate_source)?;
+    if params.rate_effective_date.to_micros_since_unix_epoch()
+        > params.as_of_date.to_micros_since_unix_epoch()
+    {
+        return Err("rate_effective_date cannot be after as_of_date".to_string());
+    }
 
     if params.lines.is_empty() {
         return Err("At least one revaluation line is required".to_string());
     }
 
-    let currency_code = params.currency_code.trim().to_uppercase();
-    if currency_code.is_empty() {
-        return Err("currency_code cannot be empty".to_string());
-    }
-
     let mut total_gain = 0.0;
     let mut total_loss = 0.0;
     for line in &params.lines {
+        let account = load_fx_account(
+            ctx,
+            organization_id,
+            company_id,
+            line.account_id,
+            "revaluation line",
+        )?;
+        if !matches!(
+            account.internal_group,
+            Some(AccountInternalGroup::Asset | AccountInternalGroup::Liability)
+        ) {
+            return Err(
+                "revaluation line account must be an asset or liability account".to_string(),
+            );
+        }
+        if account
+            .currency_id
+            .is_some_and(|id| id != scope.currency_id)
+        {
+            return Err(
+                "revaluation line account currency is incompatible with this revaluation"
+                    .to_string(),
+            );
+        }
         if line.adjustment.abs() < 0.000_000_1 {
             continue;
         }
@@ -211,7 +383,6 @@ pub fn run_fx_revaluation(
 
     let net = total_gain - total_loss;
     let name = next_doc_number(ctx, "FXREVAL");
-    let currency_id = 1_u64;
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
@@ -242,9 +413,9 @@ pub fn run_fx_revaluation(
         source_id: None,
         medium_id: None,
         company_id,
-        journal_id: params.journal_id,
-        currency_id,
-        company_currency_id: currency_id,
+        journal_id: scope.journal.id,
+        currency_id: scope.currency_id,
+        company_currency_id: scope.company_currency_id,
         amount_untaxed: net.abs(),
         amount_tax: 0.0,
         amount_total: net.abs(),
@@ -285,7 +456,8 @@ pub fn run_fx_revaluation(
                 &name,
                 params.journal_id,
                 company_id,
-                currency_id,
+                scope.currency_id,
+                scope.company_currency_id,
                 line.account_id,
                 "FX revaluation gain",
                 line.adjustment,
@@ -303,7 +475,8 @@ pub fn run_fx_revaluation(
                 &name,
                 params.journal_id,
                 company_id,
-                currency_id,
+                scope.currency_id,
+                scope.company_currency_id,
                 line.account_id,
                 "FX revaluation loss",
                 0.0,
@@ -324,8 +497,9 @@ pub fn run_fx_revaluation(
             &name,
             params.journal_id,
             company_id,
-            currency_id,
-            params.gain_account_id,
+            scope.currency_id,
+            scope.company_currency_id,
+            scope.gain_account.id,
             "FX unrealized gain",
             0.0,
             net,
@@ -342,8 +516,9 @@ pub fn run_fx_revaluation(
             &name,
             params.journal_id,
             company_id,
-            currency_id,
-            params.loss_account_id,
+            scope.currency_id,
+            scope.company_currency_id,
+            scope.loss_account.id,
             "FX unrealized loss",
             amount,
             0.0,
@@ -363,7 +538,12 @@ pub fn run_fx_revaluation(
         id: 0,
         organization_id,
         company_id,
-        currency_code: currency_code.clone(),
+        currency_id: scope.currency_id,
+        currency_code: scope.currency_code.clone(),
+        company_currency_id: scope.company_currency_id,
+        rate: params.rate,
+        rate_source: rate_source.clone(),
+        rate_effective_date: params.rate_effective_date,
         as_of_date: params.as_of_date,
         move_id: move_record.id,
         journal_id: params.journal_id,
@@ -387,14 +567,26 @@ pub fn run_fx_revaluation(
             old_values: None,
             new_values: Some(
                 serde_json::json!({
-                    "currency_code": currency_code,
+                    "currency_id": scope.currency_id,
+                    "currency_code": scope.currency_code,
+                    "company_currency_id": scope.company_currency_id,
+                    "rate": params.rate,
+                    "rate_source": rate_source,
+                    "rate_effective_date_micros": params
+                        .rate_effective_date
+                        .to_micros_since_unix_epoch(),
                     "move_id": move_record.id,
                     "net_adjustment": net,
                 })
                 .to_string(),
             ),
             changed_fields: vec![
+                "currency_id".to_string(),
                 "currency_code".to_string(),
+                "company_currency_id".to_string(),
+                "rate".to_string(),
+                "rate_source".to_string(),
+                "rate_effective_date".to_string(),
                 "move_id".to_string(),
                 "net_adjustment".to_string(),
             ],
@@ -414,19 +606,24 @@ pub fn run_fx_revaluation_batch(
     params: RunFxRevaluationBatchParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "create")?;
-    require_company_in_organization(ctx, organization_id, company_id)?;
-
-    if params.rate <= 0.0 {
-        return Err("rate must be positive".to_string());
-    }
-
-    let currency_code = params.currency_code.trim().to_uppercase();
+    let scope = load_fx_scope(
+        ctx,
+        organization_id,
+        company_id,
+        params.currency_id,
+        params.journal_id,
+        params.gain_account_id,
+        params.loss_account_id,
+    )?;
+    validate_rate(params.rate, &params.rate_source)?;
     let mut lines: Vec<FxRevaluationLineParams> = Vec::new();
 
     for mv in ctx.db.account_move().iter() {
         if mv.organization_id != organization_id
             || mv.company_id != company_id
             || mv.state != AccountMoveState::Posted
+            || mv.currency_id != scope.currency_id
+            || mv.company_currency_id != scope.company_currency_id
         {
             continue;
         }
@@ -478,7 +675,8 @@ pub fn run_fx_revaluation_batch(
 
     if lines.is_empty() {
         return Err(format!(
-            "No open AR/AP residuals found for currency {currency_code}"
+            "No open AR/AP residuals found for currency {}",
+            scope.currency_code
         ));
     }
 
@@ -487,8 +685,11 @@ pub fn run_fx_revaluation_batch(
         organization_id,
         company_id,
         RunFxRevaluationParams {
-            currency_code,
+            currency_id: scope.currency_id,
             as_of_date: params.as_of_date,
+            rate: params.rate,
+            rate_source: params.rate_source,
+            rate_effective_date: params.rate_effective_date,
             journal_id: params.journal_id,
             gain_account_id: params.gain_account_id,
             loss_account_id: params.loss_account_id,
@@ -525,6 +726,9 @@ pub fn post_realized_fx_gain_loss(
     if payment.organization_id != organization_id || payment.company_id != company_id {
         return Err("Payment does not belong to this company".to_string());
     }
+    if payment.state != PaymentState::Paid {
+        return Err("Payment must be posted".to_string());
+    }
 
     let invoice = ctx
         .db
@@ -535,9 +739,37 @@ pub fn post_realized_fx_gain_loss(
     if invoice.organization_id != organization_id || invoice.company_id != company_id {
         return Err("Invoice does not belong to this company".to_string());
     }
+    if invoice.state != AccountMoveState::Posted {
+        return Err("Invoice must be posted".to_string());
+    }
+    if invoice.currency_id != payment.currency_id {
+        return Err("Payment and invoice currencies do not match".to_string());
+    }
+
+    let scope = load_fx_scope(
+        ctx,
+        organization_id,
+        company_id,
+        payment.currency_id,
+        params.journal_id,
+        params.gain_account_id,
+        params.loss_account_id,
+    )?;
+    let clearing_account = load_fx_account(
+        ctx,
+        organization_id,
+        company_id,
+        params.clearing_account_id,
+        "clearing",
+    )?;
+    if !matches!(
+        clearing_account.internal_group,
+        Some(AccountInternalGroup::Asset | AccountInternalGroup::Liability)
+    ) {
+        return Err("clearing account must be an asset or liability account".to_string());
+    }
 
     let name = next_doc_number(ctx, "FXREAL");
-    let currency_id = payment.currency_id;
     let abs = difference.abs();
 
     let move_record = ctx.db.account_move().insert(AccountMove {
@@ -572,9 +804,9 @@ pub fn post_realized_fx_gain_loss(
         source_id: None,
         medium_id: None,
         company_id,
-        journal_id: params.journal_id,
-        currency_id,
-        company_currency_id: currency_id,
+        journal_id: scope.journal.id,
+        currency_id: scope.currency_id,
+        company_currency_id: scope.company_currency_id,
         amount_untaxed: abs,
         amount_tax: 0.0,
         amount_total: abs,
@@ -608,8 +840,9 @@ pub fn post_realized_fx_gain_loss(
             &name,
             params.journal_id,
             company_id,
-            currency_id,
-            params.clearing_account_id,
+            scope.currency_id,
+            scope.company_currency_id,
+            clearing_account.id,
             "FX realized settlement",
             abs,
             0.0,
@@ -623,8 +856,9 @@ pub fn post_realized_fx_gain_loss(
             &name,
             params.journal_id,
             company_id,
-            currency_id,
-            params.gain_account_id,
+            scope.currency_id,
+            scope.company_currency_id,
+            scope.gain_account.id,
             "FX realized gain",
             0.0,
             abs,
@@ -640,8 +874,9 @@ pub fn post_realized_fx_gain_loss(
             &name,
             params.journal_id,
             company_id,
-            currency_id,
-            params.loss_account_id,
+            scope.currency_id,
+            scope.company_currency_id,
+            scope.loss_account.id,
             "FX realized loss",
             abs,
             0.0,
@@ -655,8 +890,9 @@ pub fn post_realized_fx_gain_loss(
             &name,
             params.journal_id,
             company_id,
-            currency_id,
-            params.clearing_account_id,
+            scope.currency_id,
+            scope.company_currency_id,
+            clearing_account.id,
             "FX realized settlement",
             0.0,
             abs,

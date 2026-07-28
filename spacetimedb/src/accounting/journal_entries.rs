@@ -11,8 +11,9 @@ use crate::accounting::budgeting::{
 };
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::accounting::relations::require_explicit_company_id;
 use crate::accounting::tax_management::account_tax;
-use crate::core::organization::{company, company_id_from_scope, require_company_in_organization};
+use crate::core::organization::{company, require_company_in_organization};
 use crate::crm::contacts::contact;
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
@@ -361,20 +362,82 @@ pub struct DeleteAccountMoveLineParams {
 
 // ── Accounting helpers and invoice posting ───────────────────────────────────
 
-fn compute_invoice_totals_internal(ctx: &ReducerContext, move_id: u64) -> Result<(), String> {
-    let mut move_record = ctx
+fn load_active_journal_in_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    journal_id: u64,
+) -> Result<crate::accounting::chart_of_accounts::AccountJournal, String> {
+    let journal = ctx
+        .db
+        .account_journal()
+        .id()
+        .find(&journal_id)
+        .ok_or("journal not found")?;
+    if journal.organization_id != organization_id || journal.company_id != company_id {
+        return Err("journal does not match the organization and company".to_string());
+    }
+    if !journal.active {
+        return Err("journal is inactive".to_string());
+    }
+    Ok(journal)
+}
+
+fn load_account_move_in_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    move_id: u64,
+) -> Result<AccountMove, String> {
+    let move_record = ctx
         .db
         .account_move()
         .id()
         .find(&move_id)
-        .ok_or("Move not found")?;
+        .ok_or("move not found")?;
+    if move_record.organization_id != organization_id {
+        return Err("move does not belong to this organization".to_string());
+    }
+    require_company_in_organization(ctx, organization_id, move_record.company_id)?;
+    load_active_journal_in_scope(
+        ctx,
+        organization_id,
+        move_record.company_id,
+        move_record.journal_id,
+    )?;
+    Ok(move_record)
+}
 
+fn load_move_lines_in_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    move_record: &AccountMove,
+) -> Result<Vec<AccountMoveLine>, String> {
     let lines: Vec<_> = ctx
         .db
         .account_move_line()
         .move_line_by_move()
-        .filter(&move_id)
+        .filter(&move_record.id)
         .collect();
+    if lines.iter().any(|line| {
+        line.organization_id != organization_id
+            || line.company_id != move_record.company_id
+            || line.journal_id != move_record.journal_id
+    }) {
+        return Err(
+            "move lines do not match the move organization, company, and journal".to_string(),
+        );
+    }
+    Ok(lines)
+}
+
+fn compute_invoice_totals_internal(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    move_id: u64,
+) -> Result<(), String> {
+    let mut move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
+
+    let lines = load_move_lines_in_scope(ctx, organization_id, &move_record)?;
 
     if lines.is_empty() {
         return Err("Cannot compute totals for a move without lines".to_string());
@@ -580,12 +643,26 @@ fn post_cogs_entries(
     cogs_account_id: u64,
     inventory_account_id: u64,
 ) -> Result<(), String> {
-    let lines: Vec<_> = ctx
-        .db
-        .account_move_line()
-        .move_line_by_move()
-        .filter(&move_record.id)
-        .collect();
+    for account_id in [cogs_account_id, inventory_account_id] {
+        let account = ctx
+            .db
+            .account_account()
+            .id()
+            .find(&account_id)
+            .ok_or("COGS account not found")?;
+        if account.organization_id != organization_id
+            || account.company_id != move_record.company_id
+        {
+            return Err(
+                "COGS account does not match the move organization and company".to_string(),
+            );
+        }
+        if account.deprecated {
+            return Err("COGS account is deprecated".to_string());
+        }
+    }
+
+    let lines = load_move_lines_in_scope(ctx, organization_id, move_record)?;
 
     let mut sequence: u32 = lines.iter().map(|l| l.sequence).max().unwrap_or(0) + 1;
     let mut total_cogs = 0.0f64;
@@ -765,12 +842,7 @@ pub fn compute_invoice_totals(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "write")?;
 
-    let move_record = ctx
-        .db
-        .account_move()
-        .id()
-        .find(&move_id)
-        .ok_or("Move not found")?;
+    let move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
 
     match move_record.move_type {
         MoveType::OutInvoice | MoveType::InInvoice | MoveType::OutRefund | MoveType::InRefund => {}
@@ -779,7 +851,7 @@ pub fn compute_invoice_totals(
         }
     }
 
-    compute_invoice_totals_internal(ctx, move_id)?;
+    compute_invoice_totals_internal(ctx, organization_id, move_id)?;
 
     write_audit_log_v2(
         ctx,
@@ -920,12 +992,7 @@ pub fn post_invoice(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "write")?;
 
-    let move_record = ctx
-        .db
-        .account_move()
-        .id()
-        .find(&move_id)
-        .ok_or("Invoice not found")?;
+    let move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
 
     if move_record.state != AccountMoveState::Draft {
         return Err("Invoice is not in draft state".to_string());
@@ -950,7 +1017,7 @@ pub fn post_invoice(
         move_record.amount_total,
     )?;
 
-    compute_invoice_totals_internal(ctx, move_id)?;
+    compute_invoice_totals_internal(ctx, organization_id, move_id)?;
     post_cogs_entries(
         ctx,
         organization_id,
@@ -959,12 +1026,7 @@ pub fn post_invoice(
         inventory_account_id,
     )?;
 
-    let lines: Vec<_> = ctx
-        .db
-        .account_move_line()
-        .move_line_by_move()
-        .filter(&move_id)
-        .collect();
+    let lines = load_move_lines_in_scope(ctx, organization_id, &move_record)?;
 
     let total_debit: f64 = lines.iter().map(|l| l.debit).sum();
     let total_credit: f64 = lines.iter().map(|l| l.credit).sum();
@@ -981,12 +1043,7 @@ pub fn post_invoice(
 
     mark_move_lines_posted(ctx, move_id, &name)?;
 
-    let refreshed = ctx
-        .db
-        .account_move()
-        .id()
-        .find(&move_id)
-        .ok_or("Invoice not found after totals computation")?;
+    let refreshed = load_account_move_in_scope(ctx, organization_id, move_id)?;
 
     ctx.db.account_move().id().update(AccountMove {
         state: AccountMoveState::Posted,
@@ -1034,19 +1091,11 @@ pub fn create_account_move(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "create")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id =
+        require_explicit_company_id(ctx, organization_id, params.company_id, "move creation")?;
 
-    // Validate journal exists and belongs to company
-    let journal = ctx
-        .db
-        .account_journal()
-        .id()
-        .find(&params.journal_id)
-        .ok_or("Journal not found")?;
-
-    if journal.company_id != company_id {
-        return Err("Journal does not belong to the specified company".to_string());
-    }
+    let journal =
+        load_active_journal_in_scope(ctx, organization_id, company_id, params.journal_id)?;
 
     // Get company for currency
     let company = ctx
@@ -1156,6 +1205,14 @@ pub(crate) fn insert_draft_account_move_line(
         .id()
         .find(&params.account_id)
         .ok_or("Account not found")?;
+    if account.organization_id != move_record.organization_id
+        || account.company_id != move_record.company_id
+    {
+        return Err("account does not match the move organization and company".to_string());
+    }
+    if account.deprecated {
+        return Err("account is deprecated".to_string());
+    }
 
     let balance = params.debit - params.credit;
     let subtotal = params.quantity * params.price_unit * (1.0 - params.discount / 100.0);
@@ -1241,12 +1298,7 @@ pub fn add_account_move_line(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move_line", "create")?;
 
-    let move_record = ctx
-        .db
-        .account_move()
-        .id()
-        .find(&move_id)
-        .ok_or("Move not found")?;
+    let move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
 
     if move_record.state != AccountMoveState::Draft {
         return Err("Cannot add lines to a posted move".to_string());
@@ -1300,17 +1352,7 @@ pub fn post_account_move_impl(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "write")?;
 
-    let move_record = ctx
-        .db
-        .account_move()
-        .id()
-        .find(&move_id)
-        .ok_or("Move not found")?;
-
-    if move_record.organization_id != organization_id {
-        return Err("Move belongs to a different organization".to_string());
-    }
-    require_company_in_organization(ctx, organization_id, move_record.company_id)?;
+    let move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
 
     if move_record.state != AccountMoveState::Draft {
         return Err("Only draft moves can be posted".to_string());
@@ -1343,18 +1385,7 @@ pub fn post_account_move_impl(
     }
 
     // Check balance - sum of debit must equal sum of credit
-    let lines: Vec<_> = ctx
-        .db
-        .account_move_line()
-        .move_line_by_move()
-        .filter(&move_id)
-        .collect();
-
-    if lines.iter().any(|line| {
-        line.organization_id != organization_id || line.company_id != move_record.company_id
-    }) {
-        return Err("Move lines do not match the move organization and company".to_string());
-    }
+    let lines = load_move_lines_in_scope(ctx, organization_id, &move_record)?;
 
     let total_debit: f64 = lines.iter().map(|l| l.debit).sum();
     let total_credit: f64 = lines.iter().map(|l| l.credit).sum();
@@ -1385,12 +1416,7 @@ pub fn post_account_move_impl(
     mark_move_lines_posted(ctx, move_id, &name)?;
 
     // Update move to posted
-    let move_record = ctx
-        .db
-        .account_move()
-        .id()
-        .find(&move_id)
-        .ok_or("Move not found before state update")?;
+    let move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
 
     ctx.db.account_move().id().update(AccountMove {
         state: AccountMoveState::Posted,
@@ -1515,12 +1541,7 @@ pub fn cancel_account_move(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "write")?;
 
-    let move_record = ctx
-        .db
-        .account_move()
-        .id()
-        .find(&move_id)
-        .ok_or("Move not found")?;
+    let move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
 
     if move_record.state != AccountMoveState::Draft && move_record.state != AccountMoveState::Posted
     {
@@ -1530,12 +1551,7 @@ pub fn cancel_account_move(
     let old_state = format!("{:?}", move_record.state);
 
     // Update all lines
-    let lines: Vec<_> = ctx
-        .db
-        .account_move_line()
-        .move_line_by_move()
-        .filter(&move_id)
-        .collect();
+    let lines = load_move_lines_in_scope(ctx, organization_id, &move_record)?;
 
     for line in lines {
         ctx.db.account_move_line().id().update(AccountMoveLine {
@@ -1578,7 +1594,8 @@ pub fn update_account_move_line(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move_line", "write")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id =
+        require_explicit_company_id(ctx, organization_id, params.company_id, "move-line update")?;
 
     let line = ctx
         .db
@@ -1686,7 +1703,12 @@ pub fn delete_account_move_line(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move_line", "delete")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id = require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "move-line deletion",
+    )?;
 
     let line = ctx
         .db
@@ -1803,12 +1825,8 @@ pub fn create_invoice_from_sale_order(
         return Err("No lines to invoice on this sale order".to_string());
     }
 
-    let journal = ctx
-        .db
-        .account_journal()
-        .id()
-        .find(&params.journal_id)
-        .ok_or("Journal not found")?;
+    let journal =
+        load_active_journal_in_scope(ctx, organization_id, order.company_id, params.journal_id)?;
 
     let company = ctx
         .db
@@ -2079,12 +2097,8 @@ pub fn create_bill_from_purchase_order(
         return Err("No received quantity to bill on this purchase order".to_string());
     }
 
-    let journal = ctx
-        .db
-        .account_journal()
-        .id()
-        .find(&params.journal_id)
-        .ok_or("Journal not found")?;
+    let journal =
+        load_active_journal_in_scope(ctx, organization_id, po.company_id, params.journal_id)?;
 
     let company = ctx
         .db
@@ -2613,9 +2627,8 @@ pub fn create_credit_note_from_invoice(
 
 /// Match Debug (`Receivable`) or snake (`receivable`) stamps on move lines.
 pub(crate) fn is_receivable_or_payable_line_type(account_internal_type: Option<&str>) -> bool {
-    account_internal_type.is_some_and(|t| {
-        t.eq_ignore_ascii_case("receivable") || t.eq_ignore_ascii_case("payable")
-    })
+    account_internal_type
+        .is_some_and(|t| t.eq_ignore_ascii_case("receivable") || t.eq_ignore_ascii_case("payable"))
 }
 
 /// Reconcile a payment AccountMove against an invoice AccountMove.
@@ -2882,13 +2895,16 @@ pub fn bill_timesheets(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "create")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id =
+        require_explicit_company_id(ctx, organization_id, params.company_id, "timesheet billing")?;
 
     if params.timesheet_ids.is_empty() {
         return Err("No timesheets provided".to_string());
     }
 
-    let inv_date = params.invoice_date.unwrap_or(ctx.timestamp);
+    let inv_date = params
+        .invoice_date
+        .ok_or_else(|| "invoice_date is required for timesheet billing".to_string())?;
     ensure_accounting_period_open_for_date(ctx, company_id, inv_date)?;
 
     // Fetch and validate all timesheets upfront
@@ -3173,7 +3189,7 @@ pub fn bill_project_milestone(
     params: BillProjectMilestoneParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "create")?;
-    let _ = company_id_from_scope(ctx, organization_id, Some(company_id))?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     let milestone = ctx
         .db
@@ -3238,7 +3254,9 @@ pub fn bill_project_milestone(
         }
     }
 
-    let inv_date = params.invoice_date.unwrap_or(ctx.timestamp);
+    let inv_date = params
+        .invoice_date
+        .ok_or_else(|| "invoice_date is required for milestone billing".to_string())?;
     ensure_accounting_period_open_for_date(ctx, company_id, inv_date)?;
 
     let tax_ids = resolve_timesheet_bill_tax_ids(ctx, organization_id, company_id, &params.tax_ids);

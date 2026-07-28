@@ -16,11 +16,11 @@ use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
 use crate::projects::projects::{create_project, project_project, CreateProjectParams};
 use crate::projects::tasks::{create_task, project_task, CreateTaskParams};
 use crate::projects::timesheets::{
-    log_timesheet, project_timesheet, stop_timesheet_timer, validate_timesheets, LogTimesheetParams,
-    ValidateTimesheetsParams,
+    log_timesheet, project_timesheet, stop_timesheet_timer, validate_timesheets,
+    LogTimesheetParams, ValidateTimesheetsParams,
 };
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
-use crate::types::{EmploymentType, JournalType, PeriodState, TaskState};
+use crate::types::{EmploymentType, JournalType, TaskState};
 
 fn seed_sale_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
     let org_id = fixture.organization_id;
@@ -319,10 +319,13 @@ fn reassign_logger_to_dummy(ctx: &ReducerContext, timesheet_id: u64) -> Result<(
         .id()
         .find(&timesheet_id)
         .ok_or("timesheet for logger rewrite")?;
-    ctx.db.project_timesheet().id().update(crate::projects::timesheets::ProjectTimesheet {
-        user_id: Identity::__dummy(),
-        ..entry
-    });
+    ctx.db
+        .project_timesheet()
+        .id()
+        .update(crate::projects::timesheets::ProjectTimesheet {
+            user_id: Identity::__dummy(),
+            ..entry
+        });
     Ok(())
 }
 
@@ -571,7 +574,6 @@ pub fn test_period_lock_rejects_bill(ctx: &ReducerContext) -> Result<(), String>
             date_from: ctx.timestamp,
             date_to: ctx.timestamp + Duration::from_secs(86_400),
             fiscal_year_id: fixture.fiscal_year_id,
-            state: PeriodState::Open,
             is_adjustment: false,
             notes: None,
             metadata: None,
@@ -584,12 +586,7 @@ pub fn test_period_lock_rejects_bill(ctx: &ReducerContext) -> Result<(), String>
         .find(|p| p.company_id == fixture.company_id && p.code == "PSCL")
         .map(|p| p.id)
         .ok_or("period missing")?;
-    close_account_period(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        period_id,
-    )?;
+    close_account_period(ctx, fixture.organization_id, fixture.company_id, period_id)?;
 
     let employee_id = seed_employee(ctx, &fixture, "Lock Emp")?;
     let project_id = seed_billable_project(ctx, &fixture, "Lock Project")?;
@@ -623,7 +620,9 @@ pub fn test_period_lock_rejects_bill(ctx: &ReducerContext) -> Result<(), String>
     );
     match result {
         Ok(()) => Err("bill in closed period should fail".into()),
-        Err(msg) if msg.to_lowercase().contains("closed") || msg.to_lowercase().contains("period") => {
+        Err(msg)
+            if msg.to_lowercase().contains("closed") || msg.to_lowercase().contains("period") =>
+        {
             Ok(())
         }
         Err(msg) => Err(format!("unexpected period-lock error: {msg}")),

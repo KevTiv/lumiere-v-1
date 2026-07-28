@@ -4,17 +4,30 @@
 /// It extends but does not replace `accounting::payments::AccountPayment`, which
 /// remains the ledger authority. A posted `PaymentTransaction` links to one
 /// `AccountPayment` and its `AccountMove`.
+use std::collections::HashSet;
+
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::account_journal;
-use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove};
-use crate::accounting::payments::{
-    account_payment, insert_balanced_payment_lines_and_post, AccountPayment,
+use crate::accounting::chart_of_accounts::account_account;
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, insert_draft_account_move_line,
+    is_receivable_or_payable_line_type, AccountMove, AccountMoveLine,
 };
+use crate::accounting::payments::{
+    account_payment, insert_balanced_payment_lines_and_post, payment_line_params, AccountPayment,
+};
+use crate::accounting::relations::{
+    require_active_account, require_active_currency_id, require_active_journal,
+};
+use crate::core::organization::require_company_in_organization;
+use crate::core::reference::{legacy_currency_code_for_id, require_currency_row};
+use crate::crm::contacts::contact;
+use crate::documents::documents::document;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::types::{
-    AccountMoveState, MoveType, PartnerType, PaymentDirection, PaymentFeeBearer,
-    PaymentProviderCode, PaymentState, PaymentTransactionStatus, PaymentType,
+    AccountInternalGroup, AccountMoveState, AccountTypeInternal, MoveType, PartnerType,
+    PaymentDirection, PaymentFeeBearer, PaymentProviderCode, PaymentState,
+    PaymentTransactionStatus, PaymentType,
 };
 use crate::workflow::action_registry::{
     GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
@@ -145,6 +158,7 @@ pub struct PaymentFee {
     index(accessor = reconciliation_by_move_line, btree(columns = [allocated_move_line_id])),
     index(accessor = reconciliation_by_org, btree(columns = [organization_id]))
 )]
+#[derive(Clone)]
 pub struct PaymentReconciliation {
     #[primary_key]
     #[auto_inc]
@@ -160,6 +174,7 @@ pub struct PaymentReconciliation {
     pub residual_after: f64,
     pub write_off_amount: f64,
     pub write_off_account_id: Option<u64>,
+    pub write_off_move_id: Option<u64>,
     pub is_reversal: bool,
     pub reversed_reconciliation_id: Option<u64>,
     pub created_at: Timestamp,
@@ -255,7 +270,6 @@ pub struct CreatePaymentFeeParams {
     pub payment_transaction_id: u64,
     pub bearer: PaymentFeeBearer,
     pub amount: f64,
-    pub currency_id: u64,
     pub fee_account_id: Option<u64>,
     pub tax_account_id: Option<u64>,
     pub tax_amount: f64,
@@ -263,7 +277,7 @@ pub struct CreatePaymentFeeParams {
     pub metadata: Option<String>,
 }
 
-#[derive(SpacetimeType)]
+#[derive(SpacetimeType, Clone)]
 pub struct AllocatePaymentParams {
     pub company_id: u64,
     pub payment_transaction_id: u64,
@@ -307,6 +321,36 @@ fn fingerprint_reference(raw: &Option<String>) -> String {
     raw.as_ref()
         .map(|r| r.trim().to_lowercase().replace([' ', '-', '_'], ""))
         .unwrap_or_default()
+}
+
+fn validate_payment_evidence_documents(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    document_ids: &[u64],
+) -> Result<(), String> {
+    let mut seen = HashSet::with_capacity(document_ids.len());
+    for document_id in document_ids {
+        if !seen.insert(*document_id) {
+            return Err("evidence_document_ids contains duplicates".to_string());
+        }
+        let document = ctx
+            .db
+            .document()
+            .id()
+            .find(document_id)
+            .ok_or("Payment evidence document not found")?;
+        if document.organization_id != organization_id
+            || document.company_id.is_some_and(|id| id != company_id)
+            || document.is_deleted
+        {
+            return Err(
+                "Payment evidence document is not active in this organization and company"
+                    .to_string(),
+            );
+        }
+    }
+    Ok(())
 }
 
 fn validate_payment_transaction_invariants(
@@ -480,18 +524,56 @@ pub fn create_payment_account(
     params: CreatePaymentAccountParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_account", "create")?;
+    require_company_in_organization(ctx, organization_id, params.company_id)?;
 
-    let journal = ctx
-        .db
-        .account_journal()
-        .id()
-        .find(&params.account_journal_id)
-        .ok_or("Account journal not found")?;
-    if journal.organization_id != organization_id || journal.company_id != params.company_id {
-        return Err("Journal belongs to a different organization or company".to_string());
+    let journal = require_active_journal(
+        ctx,
+        organization_id,
+        params.company_id,
+        params.account_journal_id,
+        "payment account",
+    )?;
+    require_active_currency_id(ctx, params.currency_id, "payment account")?;
+    if journal
+        .currency_id
+        .is_some_and(|id| id != params.currency_id)
+    {
+        return Err("payment account currency does not match its journal".to_string());
+    }
+    if let Some(account_id) = params.fee_account_id {
+        let account = require_active_account(
+            ctx,
+            organization_id,
+            params.company_id,
+            account_id,
+            "payment fee",
+        )?;
+        if account.internal_group != Some(AccountInternalGroup::Expense) {
+            return Err("payment fee account must be an expense account".to_string());
+        }
+    }
+    if let Some(account_id) = params.clearing_account_id {
+        let account = require_active_account(
+            ctx,
+            organization_id,
+            params.company_id,
+            account_id,
+            "payment clearing",
+        )?;
+        if account.internal_group != Some(AccountInternalGroup::Asset)
+            && account.internal_group != Some(AccountInternalGroup::Liability)
+        {
+            return Err(
+                "payment clearing account must be an asset or liability account".to_string(),
+            );
+        }
     }
 
-    if matches!(params.provider_code, PaymentProviderCode::Other) && params.provider_label.is_none()
+    if matches!(params.provider_code, PaymentProviderCode::Other)
+        && params
+            .provider_label
+            .as_deref()
+            .is_none_or(|label| label.trim().is_empty())
     {
         return Err("provider_label is required when provider_code is Other".to_string());
     }
@@ -657,6 +739,7 @@ pub fn create_payment_transaction(
     params: CreatePaymentTransactionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_transaction", "create")?;
+    require_company_in_organization(ctx, organization_id, params.company_id)?;
 
     let account = ctx
         .db
@@ -670,6 +753,42 @@ pub fn create_payment_transaction(
     if account.archived_at.is_some() {
         return Err("Cannot create transactions on an archived payment account".to_string());
     }
+    require_active_currency_id(ctx, params.currency_id, "payment transaction")?;
+    if account.currency_id != params.currency_id {
+        return Err("Payment transaction currency does not match its payment account".to_string());
+    }
+    let partner = ctx
+        .db
+        .contact()
+        .id()
+        .find(&params.partner_id)
+        .ok_or("Payment transaction partner not found")?;
+    if partner.organization_id != organization_id
+        || partner.company_id.is_some_and(|id| id != params.company_id)
+    {
+        return Err(
+            "Payment transaction partner belongs to a different organization or company"
+                .to_string(),
+        );
+    }
+    match params.partner_type {
+        PartnerType::Customer if !partner.is_customer => {
+            return Err("Payment transaction partner is not a customer".to_string());
+        }
+        PartnerType::Supplier if !partner.is_vendor => {
+            return Err("Payment transaction partner is not a supplier".to_string());
+        }
+        _ => {}
+    }
+    if params.source_entity.is_some() != params.source_entity_id.is_some() {
+        return Err("source_entity and source_entity_id must be supplied together".to_string());
+    }
+    validate_payment_evidence_documents(
+        ctx,
+        organization_id,
+        params.company_id,
+        &params.evidence_document_ids,
+    )?;
 
     if params.gross_external_amount <= 0.0 {
         return Err("gross_external_amount must be positive".to_string());
@@ -680,6 +799,9 @@ pub fn create_payment_transaction(
     if params.net_account_amount < 0.0 {
         return Err("net_account_amount must be non-negative".to_string());
     }
+    let occurred_at = params
+        .occurred_at
+        .ok_or_else(|| "occurred_at is required".to_string())?;
 
     let reference_fingerprint = fingerprint_reference(&params.external_reference);
 
@@ -712,7 +834,7 @@ pub fn create_payment_transaction(
         settlement_amount: params.settlement_amount,
         net_account_amount: params.net_account_amount,
         currency_id: params.currency_id,
-        occurred_at: params.occurred_at.unwrap_or(ctx.timestamp),
+        occurred_at,
         status: PaymentTransactionStatus::Draft,
         account_payment_id: None,
         source_entity: params.source_entity,
@@ -763,6 +885,14 @@ pub fn update_payment_transaction(
     }
     if transaction.status != PaymentTransactionStatus::Draft {
         return Err("Only draft transactions can be updated".to_string());
+    }
+    if let Some(ref document_ids) = params.evidence_document_ids {
+        validate_payment_evidence_documents(
+            ctx,
+            organization_id,
+            transaction.company_id,
+            document_ids,
+        )?;
     }
 
     let external_reference = params
@@ -1027,6 +1157,43 @@ pub fn create_payment_fee(
     if params.amount < 0.0 {
         return Err("Fee amount must be non-negative".to_string());
     }
+    if params.tax_amount < 0.0 {
+        return Err("Fee tax amount must be non-negative".to_string());
+    }
+    let payment_account = ctx
+        .db
+        .payment_account()
+        .id()
+        .find(&transaction.payment_account_id)
+        .ok_or("Payment account not found")?;
+    let fee_account_id = params.fee_account_id.or(payment_account.fee_account_id);
+    if params.amount > 0.0 && fee_account_id.is_none() {
+        return Err("fee_account_id is required when fee amount is nonzero".to_string());
+    }
+    if params.tax_amount > 0.0 && params.tax_account_id.is_none() {
+        return Err("tax_account_id is required when fee tax amount is nonzero".to_string());
+    }
+    if let Some(account_id) = fee_account_id {
+        let account = require_active_account(
+            ctx,
+            organization_id,
+            params.company_id,
+            account_id,
+            "payment fee",
+        )?;
+        if account.internal_group != Some(AccountInternalGroup::Expense) {
+            return Err("payment fee account must be an expense account".to_string());
+        }
+    }
+    if let Some(account_id) = params.tax_account_id {
+        require_active_account(
+            ctx,
+            organization_id,
+            params.company_id,
+            account_id,
+            "payment fee tax",
+        )?;
+    }
 
     let fee = ctx.db.payment_fee().insert(PaymentFee {
         id: 0,
@@ -1035,8 +1202,8 @@ pub fn create_payment_fee(
         payment_transaction_id: params.payment_transaction_id,
         bearer: params.bearer,
         amount: params.amount,
-        currency_id: params.currency_id,
-        fee_account_id: params.fee_account_id,
+        currency_id: transaction.currency_id,
+        fee_account_id,
         tax_account_id: params.tax_account_id,
         tax_amount: params.tax_amount,
         provider_reference: params.provider_reference,
@@ -1064,6 +1231,431 @@ pub fn create_payment_fee(
 
 // ── Allocation / reconciliation reducers ──────────────────────────────────────
 
+const RECONCILIATION_EPSILON: f64 = 0.000_001;
+
+fn recompute_move_residual(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    move_record: AccountMove,
+) -> Result<AccountMove, String> {
+    let lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_record.id)
+        .collect();
+    if lines.iter().any(|line| {
+        line.organization_id != organization_id
+            || line.company_id != move_record.company_id
+            || line.journal_id != move_record.journal_id
+    }) {
+        return Err("move lines do not match the parent move scope".to_string());
+    }
+    let residual: f64 = lines
+        .iter()
+        .filter(|line| is_receivable_or_payable_line_type(line.account_internal_type.as_deref()))
+        .map(|line| line.amount_residual.abs())
+        .sum();
+    Ok(ctx.db.account_move().id().update(AccountMove {
+        amount_residual: residual,
+        amount_residual_signed: residual,
+        payment_state: if residual <= RECONCILIATION_EPSILON {
+            PaymentState::Paid
+        } else {
+            PaymentState::Partial
+        },
+        invoice_has_outstanding: residual > RECONCILIATION_EPSILON,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..move_record
+    }))
+}
+
+fn set_line_residual(
+    ctx: &ReducerContext,
+    line: AccountMoveLine,
+    residual_abs: f64,
+    matching_number: &str,
+) -> AccountMoveLine {
+    let signed = if line.amount_residual < 0.0 {
+        -residual_abs
+    } else {
+        residual_abs
+    };
+    ctx.db.account_move_line().id().update(AccountMoveLine {
+        amount_residual: signed,
+        amount_residual_currency: signed,
+        matching_number: Some(matching_number.to_string()),
+        is_matching: residual_abs <= RECONCILIATION_EPSILON,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..line
+    })
+}
+
+fn adjust_payment_clearing_residual(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+    amount: f64,
+    restore: bool,
+    matching_number: &str,
+) -> Result<AccountMove, String> {
+    let payment_move_id = payment.move_id.ok_or("ledger payment has no linked move")?;
+    let payment_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&payment_move_id)
+        .ok_or("linked payment move not found")?;
+    if payment_move.organization_id != payment.organization_id
+        || payment_move.company_id != payment.company_id
+        || payment_move.state != AccountMoveState::Posted
+    {
+        return Err("linked payment move is not a posted move in payment scope".to_string());
+    }
+
+    let mut clearing_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move.id)
+        .filter(|line| {
+            line.organization_id == payment.organization_id
+                && line.company_id == payment.company_id
+                && line.partner_id == Some(payment.partner_id)
+                && is_receivable_or_payable_line_type(line.account_internal_type.as_deref())
+        })
+        .collect();
+    if clearing_lines.is_empty() {
+        return Err("linked payment move has no receivable/payable clearing line".to_string());
+    }
+
+    if restore {
+        let line = clearing_lines.remove(0);
+        let restored = line.amount_residual.abs() + amount;
+        if restored > payment.amount + RECONCILIATION_EPSILON {
+            return Err("payment clearing residual would exceed payment amount".to_string());
+        }
+        set_line_residual(ctx, line, restored, matching_number);
+    } else {
+        let available: f64 = clearing_lines
+            .iter()
+            .map(|line| line.amount_residual.abs())
+            .sum();
+        if amount > available + RECONCILIATION_EPSILON {
+            return Err("allocation exceeds the linked payment residual".to_string());
+        }
+        let mut remaining = amount;
+        for line in clearing_lines {
+            if remaining <= RECONCILIATION_EPSILON {
+                break;
+            }
+            let current = line.amount_residual.abs();
+            let applied = remaining.min(current);
+            set_line_residual(ctx, line, (current - applied).max(0.0), matching_number);
+            remaining = (remaining - applied).max(0.0);
+        }
+    }
+
+    recompute_move_residual(ctx, payment.organization_id, payment_move)
+}
+
+fn post_write_off_move(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+    payment_move: &AccountMove,
+    target_line: &AccountMoveLine,
+    write_off_account_id: u64,
+    amount: f64,
+    reconciliation_id: u64,
+) -> Result<u64, String> {
+    let name = next_doc_number(ctx, "PAYWO");
+    let write_off_move = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        name: name.clone(),
+        ref_: Some(format!("payment reconciliation {reconciliation_id}")),
+        state: AccountMoveState::Draft,
+        date: ctx.timestamp,
+        invoice_origin: Some(format!("payment-reconciliation:{reconciliation_id}")),
+        payment_reference: Some(format!("payment reconciliation {reconciliation_id}")),
+        partner_id: Some(payment.partner_id),
+        commercial_partner_id: Some(payment.partner_id),
+        amount_untaxed: amount,
+        amount_tax: 0.0,
+        amount_total: amount,
+        amount_residual: 0.0,
+        amount_untaxed_signed: amount,
+        amount_tax_signed: 0.0,
+        amount_total_signed: amount,
+        amount_total_in_currency_signed: amount,
+        amount_residual_signed: 0.0,
+        posted_before: false,
+        payment_state: PaymentState::Paid,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some(
+            serde_json::json!({ "payment_reconciliation_id": reconciliation_id }).to_string(),
+        ),
+        ..payment_move.clone()
+    });
+
+    let target_is_debit = target_line.balance >= 0.0;
+    let (write_off_debit, write_off_credit, target_debit, target_credit) = if target_is_debit {
+        (amount, 0.0, 0.0, amount)
+    } else {
+        (0.0, amount, amount, 0.0)
+    };
+    for (sequence, account_id, line_name, debit, credit) in [
+        (
+            1,
+            write_off_account_id,
+            "Payment write-off",
+            write_off_debit,
+            write_off_credit,
+        ),
+        (
+            2,
+            target_line.account_id,
+            "Payment write-off clearing",
+            target_debit,
+            target_credit,
+        ),
+    ] {
+        let line = insert_draft_account_move_line(
+            ctx,
+            &write_off_move,
+            payment_line_params(
+                account_id,
+                line_name.to_string(),
+                debit,
+                credit,
+                sequence,
+                payment.partner_id,
+                payment.id,
+            ),
+        )?;
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            parent_state: AccountMoveState::Posted,
+            amount_residual: 0.0,
+            amount_residual_currency: 0.0,
+            is_matching: true,
+            ..line
+        });
+    }
+    let write_off_move_id = write_off_move.id;
+    ctx.db.account_move().id().update(AccountMove {
+        state: AccountMoveState::Posted,
+        posted_before: true,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..write_off_move
+    });
+    Ok(write_off_move_id)
+}
+
+fn reverse_write_off_move(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+    original_move_id: u64,
+    reconciliation_id: u64,
+) -> Result<u64, String> {
+    let original = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&original_move_id)
+        .ok_or("write-off move not found")?;
+    if original.organization_id != payment.organization_id
+        || original.company_id != payment.company_id
+        || original.state != AccountMoveState::Posted
+    {
+        return Err("write-off move is not posted in payment scope".to_string());
+    }
+    let original_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&original.id)
+        .collect();
+    if original_lines.len() != 2 {
+        return Err("write-off move must have exactly two lines".to_string());
+    }
+
+    let name = next_doc_number(ctx, "PAYWOR");
+    let reversal = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        name,
+        ref_: Some(format!("reversal of write-off move {original_move_id}")),
+        state: AccountMoveState::Draft,
+        date: ctx.timestamp,
+        invoice_origin: Some(format!(
+            "reversal-payment-reconciliation:{reconciliation_id}"
+        )),
+        posted_before: false,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some(
+            serde_json::json!({ "reverses_write_off_move_id": original_move_id }).to_string(),
+        ),
+        ..original
+    });
+    for (sequence, line) in original_lines.into_iter().enumerate() {
+        let inserted = insert_draft_account_move_line(
+            ctx,
+            &reversal,
+            payment_line_params(
+                line.account_id,
+                format!("Reversal: {}", line.name),
+                line.credit,
+                line.debit,
+                (sequence + 1) as u32,
+                payment.partner_id,
+                payment.id,
+            ),
+        )?;
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            parent_state: AccountMoveState::Posted,
+            amount_residual: 0.0,
+            amount_residual_currency: 0.0,
+            is_matching: true,
+            ..inserted
+        });
+    }
+    let reversal_id = reversal.id;
+    ctx.db.account_move().id().update(AccountMove {
+        state: AccountMoveState::Posted,
+        posted_before: true,
+        ..reversal
+    });
+    Ok(reversal_id)
+}
+
+fn reverse_payment_allocations(
+    ctx: &ReducerContext,
+    transaction: &PaymentTransaction,
+    account_payment_id: u64,
+) -> Result<(), String> {
+    let mut ledger_payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&account_payment_id)
+        .ok_or("original ledger payment not found")?;
+    if ledger_payment.organization_id != transaction.organization_id
+        || ledger_payment.company_id != transaction.company_id
+        || ledger_payment.partner_id != transaction.partner_id
+    {
+        return Err("original ledger payment does not match transaction scope".to_string());
+    }
+
+    let all_rows: Vec<_> = ctx
+        .db
+        .payment_reconciliation()
+        .iter()
+        .filter(|row| row.payment_transaction_id == transaction.id)
+        .collect();
+    if all_rows.iter().any(|row| {
+        row.organization_id != transaction.organization_id
+            || row.company_id != transaction.company_id
+            || row.account_payment_id != account_payment_id
+    }) {
+        return Err("reconciliation rows do not match transaction scope".to_string());
+    }
+    let active_rows: Vec<_> = all_rows
+        .iter()
+        .filter(|row| {
+            !row.is_reversal
+                && !all_rows.iter().any(|candidate| {
+                    candidate.is_reversal && candidate.reversed_reconciliation_id == Some(row.id)
+                })
+        })
+        .cloned()
+        .collect();
+
+    for row in active_rows {
+        let line = ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(&row.allocated_move_line_id)
+            .ok_or("allocated move line not found during reversal")?;
+        let parent = ctx
+            .db
+            .account_move()
+            .id()
+            .find(&line.move_id)
+            .ok_or("allocated parent move not found during reversal")?;
+        if line.organization_id != transaction.organization_id
+            || line.company_id != transaction.company_id
+            || parent.organization_id != transaction.organization_id
+            || parent.company_id != transaction.company_id
+            || parent.journal_id != line.journal_id
+            || parent.state != AccountMoveState::Posted
+            || line.partner_id != Some(transaction.partner_id)
+        {
+            return Err("allocated ledger rows do not match reversal scope".to_string());
+        }
+        if (line.amount_residual.abs() - row.residual_after).abs() > RECONCILIATION_EPSILON {
+            return Err("allocated move line residual changed after reconciliation".to_string());
+        }
+
+        let matching_number = format!("REV-PAYMENT-TXN-{}", transaction.id);
+        let residual_before = line.amount_residual.abs();
+        set_line_residual(ctx, line, row.residual_before, &matching_number);
+        recompute_move_residual(ctx, transaction.organization_id, parent)?;
+        adjust_payment_clearing_residual(
+            ctx,
+            &ledger_payment,
+            row.allocated_amount,
+            true,
+            &matching_number,
+        )?;
+
+        let reversal_write_off_move_id = match row.write_off_move_id {
+            Some(move_id) => Some(reverse_write_off_move(
+                ctx,
+                &ledger_payment,
+                move_id,
+                row.id,
+            )?),
+            None => None,
+        };
+        ctx.db
+            .payment_reconciliation()
+            .insert(PaymentReconciliation {
+                id: 0,
+                organization_id: transaction.organization_id,
+                company_id: transaction.company_id,
+                payment_transaction_id: transaction.id,
+                account_payment_id,
+                allocated_move_line_id: row.allocated_move_line_id,
+                allocated_amount: -row.allocated_amount,
+                currency_id: row.currency_id,
+                residual_before,
+                residual_after: row.residual_before,
+                write_off_amount: -row.write_off_amount,
+                write_off_account_id: row.write_off_account_id,
+                write_off_move_id: reversal_write_off_move_id,
+                is_reversal: true,
+                reversed_reconciliation_id: Some(row.id),
+                created_at: ctx.timestamp,
+                created_by: ctx.sender(),
+                metadata: Some(
+                    serde_json::json!({ "reversal_of_reconciliation_id": row.id }).to_string(),
+                ),
+            });
+    }
+
+    ledger_payment.reconciled_invoice_ids.clear();
+    ledger_payment.reconciled_bill_ids.clear();
+    ctx.db.account_payment().id().update(ledger_payment);
+    Ok(())
+}
+
 /// Allocate a posted payment transaction to a receivable/payable move line.
 #[reducer]
 pub fn allocate_payment_transaction(
@@ -1072,80 +1664,313 @@ pub fn allocate_payment_transaction(
     params: AllocatePaymentParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_reconciliation", "create")?;
+    require_company_in_organization(ctx, organization_id, params.company_id)?;
+    if params.allocated_amount <= 0.0 {
+        return Err("allocated amount must be positive".to_string());
+    }
+    if params.write_off_amount < 0.0 {
+        return Err("write-off amount cannot be negative".to_string());
+    }
+
     let transaction = ctx
         .db
         .payment_transaction()
         .id()
         .find(&params.payment_transaction_id)
-        .ok_or("Payment transaction not found")?;
+        .ok_or("payment transaction not found")?;
     if transaction.organization_id != organization_id || transaction.company_id != params.company_id
     {
-        return Err(
-            "Payment transaction belongs to a different organization or company".to_string(),
-        );
+        return Err("payment transaction does not match organization and company".to_string());
     }
     if transaction.status != PaymentTransactionStatus::Posted {
-        return Err("Only posted transactions can be allocated".to_string());
+        return Err("only posted transactions can be allocated".to_string());
     }
     let account_payment_id = transaction
         .account_payment_id
-        .ok_or("Payment transaction has no linked ledger payment")?;
+        .ok_or("payment transaction has no linked ledger payment")?;
+    let operational_account = ctx
+        .db
+        .payment_account()
+        .id()
+        .find(&transaction.payment_account_id)
+        .ok_or("payment account not found")?;
+    if operational_account.organization_id != organization_id
+        || operational_account.company_id != params.company_id
+        || operational_account.archived_at.is_some()
+    {
+        return Err("payment account is not active in transaction scope".to_string());
+    }
+    let mut ledger_payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&account_payment_id)
+        .ok_or("linked ledger payment not found")?;
+    if ledger_payment.organization_id != organization_id
+        || ledger_payment.company_id != params.company_id
+        || ledger_payment.partner_id != transaction.partner_id
+        || ledger_payment.partner_type != transaction.partner_type
+        || ledger_payment.state != PaymentState::Paid
+    {
+        return Err("linked ledger payment does not match the posted transaction".to_string());
+    }
+    let expected_payment_type = match transaction.direction {
+        PaymentDirection::Inbound => PaymentType::InBound,
+        PaymentDirection::Outbound => PaymentType::OutBound,
+    };
+    if ledger_payment.payment_type != expected_payment_type {
+        return Err("ledger payment direction does not match the transaction".to_string());
+    }
 
     let move_line = ctx
         .db
         .account_move_line()
         .id()
         .find(&params.allocated_move_line_id)
-        .ok_or("Account move line not found")?;
-    if move_line.company_id != params.company_id {
-        return Err("Move line belongs to a different company".to_string());
+        .ok_or("account move line not found")?;
+    if move_line.organization_id != organization_id || move_line.company_id != params.company_id {
+        return Err("move line does not match organization and company".to_string());
+    }
+    let parent_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_line.move_id)
+        .ok_or("parent move not found")?;
+    if parent_move.organization_id != organization_id
+        || parent_move.company_id != params.company_id
+        || parent_move.journal_id != move_line.journal_id
+        || parent_move.state != AccountMoveState::Posted
+    {
+        return Err("move line parent is not a posted move in allocation scope".to_string());
+    }
+    if !matches!(
+        parent_move.move_type,
+        MoveType::OutInvoice | MoveType::OutRefund | MoveType::InInvoice | MoveType::InRefund
+    ) {
+        return Err("target move is not an invoice or bill".to_string());
+    }
+    if parent_move.partner_id != Some(transaction.partner_id)
+        || move_line.partner_id != Some(transaction.partner_id)
+        || ledger_payment.partner_id != transaction.partner_id
+    {
+        return Err("payment and target move line must have the same partner".to_string());
+    }
+    let partner = ctx
+        .db
+        .contact()
+        .id()
+        .find(&transaction.partner_id)
+        .ok_or("payment partner not found")?;
+    if partner.organization_id != organization_id
+        || partner
+            .company_id
+            .is_some_and(|company_id| company_id != params.company_id)
+        || partner.deleted_at.is_some()
+        || partner.merge_target_id.is_some()
+    {
+        return Err("payment partner is not active in allocation scope".to_string());
+    }
+    match transaction.partner_type {
+        PartnerType::Customer if !partner.is_customer => {
+            return Err("payment partner is not a customer".to_string())
+        }
+        PartnerType::Supplier if !partner.is_vendor => {
+            return Err("payment partner is not a supplier".to_string())
+        }
+        _ => {}
     }
 
-    if params.allocated_amount <= 0.0 {
-        return Err("Allocated amount must be positive".to_string());
+    let target_account = ctx
+        .db
+        .account_account()
+        .id()
+        .find(&move_line.account_id)
+        .ok_or("target account not found")?;
+    if target_account.organization_id != organization_id
+        || target_account.company_id != params.company_id
+        || target_account.deprecated
+    {
+        return Err("target account is not active in allocation scope".to_string());
+    }
+    let expected_account_type = match transaction.partner_type {
+        PartnerType::Customer => AccountTypeInternal::Receivable,
+        PartnerType::Supplier => AccountTypeInternal::Payable,
+    };
+    if target_account.internal_type.as_ref() != Some(&expected_account_type) {
+        return Err("target line is not on the required receivable/payable account".to_string());
     }
 
-    // Sum existing allocations for this transaction.
+    if !(1..=9).contains(&transaction.currency_id) {
+        return Err("payment currency is not supported".to_string());
+    }
+    let currency = require_currency_row(ctx, legacy_currency_code_for_id(transaction.currency_id))?;
+    if !currency.active
+        || params.currency_id != transaction.currency_id
+        || ledger_payment.currency_id != transaction.currency_id
+        || operational_account.currency_id != transaction.currency_id
+        || parent_move.currency_id != transaction.currency_id
+        || move_line.currency_id != transaction.currency_id
+    {
+        return Err(
+            "allocation currency does not match payment and target ledger rows".to_string(),
+        );
+    }
+
+    let write_off_account = match (
+        params.write_off_amount > RECONCILIATION_EPSILON,
+        params.write_off_account_id,
+    ) {
+        (true, Some(account_id)) => {
+            let account = ctx
+                .db
+                .account_account()
+                .id()
+                .find(&account_id)
+                .ok_or("write-off account not found")?;
+            if account.organization_id != organization_id
+                || account.company_id != params.company_id
+                || account.deprecated
+            {
+                return Err("write-off account is not active in allocation scope".to_string());
+            }
+            let expected_group = match transaction.partner_type {
+                PartnerType::Customer => AccountInternalGroup::Expense,
+                PartnerType::Supplier => AccountInternalGroup::Income,
+            };
+            if account.internal_group.as_ref() != Some(&expected_group) {
+                return Err("write-off account has an incompatible account role".to_string());
+            }
+            Some(account)
+        }
+        (true, None) => {
+            return Err("write-off account is required for a nonzero write-off".to_string())
+        }
+        (false, Some(_)) => {
+            return Err("write-off account requires a nonzero write-off".to_string())
+        }
+        (false, None) => None,
+    };
+
     let existing: Vec<PaymentReconciliation> = ctx
         .db
         .payment_reconciliation()
         .iter()
         .filter(|r| r.payment_transaction_id == params.payment_transaction_id)
         .collect();
-    let allocated_total: f64 =
-        existing.iter().map(|r| r.allocated_amount).sum::<f64>() + params.allocated_amount;
-    if allocated_total > transaction.settlement_amount + 1e-6 {
-        return Err(format!(
-            "Total allocations {:.2} exceed settlement amount {:.2}",
-            allocated_total, transaction.settlement_amount
-        ));
+    if existing
+        .iter()
+        .any(|row| row.organization_id != organization_id || row.company_id != params.company_id)
+    {
+        return Err("existing reconciliation rows do not match transaction scope".to_string());
+    }
+    if let Some(previous) = existing.iter().find(|row| {
+        !row.is_reversal
+            && row.allocated_move_line_id == params.allocated_move_line_id
+            && !existing.iter().any(|candidate| {
+                candidate.is_reversal && candidate.reversed_reconciliation_id == Some(row.id)
+            })
+    }) {
+        if (previous.allocated_amount - params.allocated_amount).abs() <= RECONCILIATION_EPSILON
+            && (previous.write_off_amount - params.write_off_amount).abs() <= RECONCILIATION_EPSILON
+            && previous.currency_id == params.currency_id
+            && previous.write_off_account_id == params.write_off_account_id
+        {
+            return Ok(());
+        }
+        return Err(
+            "payment transaction already has an active allocation for this move line".to_string(),
+        );
+    }
+    let already_allocated: f64 = existing.iter().map(|row| row.allocated_amount).sum();
+    let available_payment = (transaction.settlement_amount - already_allocated).max(0.0);
+    if params.allocated_amount > available_payment + RECONCILIATION_EPSILON {
+        return Err("allocation exceeds the available payment amount".to_string());
     }
 
-    let residual_before = move_line.amount_residual;
-    let residual_after = residual_before - params.allocated_amount;
+    let residual_before = move_line.amount_residual.abs();
+    let target_reduction = params.allocated_amount + params.write_off_amount;
+    if target_reduction > residual_before + RECONCILIATION_EPSILON {
+        return Err("allocation and write-off exceed the target residual".to_string());
+    }
+    let residual_after = (residual_before - target_reduction).max(0.0);
+    let matching_number = format!("PAYMENT-TXN-{}", transaction.id);
 
-    let reconciliation = ctx
+    let mut reconciliation = ctx
         .db
         .payment_reconciliation()
         .insert(PaymentReconciliation {
             id: 0,
             organization_id,
-            company_id: params.company_id,
-            payment_transaction_id: params.payment_transaction_id,
+            company_id: transaction.company_id,
+            payment_transaction_id: transaction.id,
             account_payment_id,
-            allocated_move_line_id: params.allocated_move_line_id,
+            allocated_move_line_id: move_line.id,
             allocated_amount: params.allocated_amount,
-            currency_id: params.currency_id,
+            currency_id: transaction.currency_id,
             residual_before,
             residual_after,
             write_off_amount: params.write_off_amount,
             write_off_account_id: params.write_off_account_id,
+            write_off_move_id: None,
             is_reversal: false,
             reversed_reconciliation_id: None,
             created_at: ctx.timestamp,
             created_by: ctx.sender(),
             metadata: params.metadata,
         });
+
+    let payment_move = adjust_payment_clearing_residual(
+        ctx,
+        &ledger_payment,
+        params.allocated_amount,
+        false,
+        &matching_number,
+    )?;
+    set_line_residual(ctx, move_line, residual_after, &matching_number);
+    recompute_move_residual(ctx, organization_id, parent_move.clone())?;
+
+    if let Some(write_off_account) = write_off_account {
+        let write_off_move_id = post_write_off_move(
+            ctx,
+            &ledger_payment,
+            &payment_move,
+            &ctx.db
+                .account_move_line()
+                .id()
+                .find(&params.allocated_move_line_id)
+                .ok_or("target move line missing after residual update")?,
+            write_off_account.id,
+            params.write_off_amount,
+            reconciliation.id,
+        )?;
+        reconciliation = ctx
+            .db
+            .payment_reconciliation()
+            .id()
+            .update(PaymentReconciliation {
+                write_off_move_id: Some(write_off_move_id),
+                ..reconciliation
+            });
+    }
+
+    match parent_move.move_type {
+        MoveType::OutInvoice | MoveType::OutRefund => {
+            if !ledger_payment
+                .reconciled_invoice_ids
+                .contains(&parent_move.id)
+            {
+                ledger_payment.reconciled_invoice_ids.push(parent_move.id);
+            }
+        }
+        MoveType::InInvoice | MoveType::InRefund => {
+            if !ledger_payment.reconciled_bill_ids.contains(&parent_move.id) {
+                ledger_payment.reconciled_bill_ids.push(parent_move.id);
+            }
+        }
+        _ => return Err("target move is not an invoice or bill".to_string()),
+    }
+    ctx.db.account_payment().id().update(ledger_payment);
 
     write_audit_log_v2(
         ctx,
@@ -1156,8 +1981,17 @@ pub fn allocate_payment_transaction(
             record_id: reconciliation.id,
             action: "CREATE",
             old_values: None,
-            new_values: None,
-            changed_fields: vec![],
+            new_values: Some(
+                serde_json::json!({
+                    "payment_transaction_id": transaction.id,
+                    "move_line_id": params.allocated_move_line_id,
+                    "residual_before": residual_before,
+                    "residual_after": residual_after,
+                    "write_off_move_id": reconciliation.write_off_move_id,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["amount_residual".to_string(), "payment_state".to_string()],
             metadata: None,
         },
     );
@@ -1210,6 +2044,12 @@ pub fn reverse_payment_transaction_impl(
         .id()
         .find(&original.payment_account_id)
         .ok_or("Payment account not found")?;
+    if account.organization_id != organization_id
+        || account.company_id != original.company_id
+        || account.archived_at.is_some()
+    {
+        return Err("Payment account is not active in transaction scope".to_string());
+    }
 
     if !skip_approval_check {
         if matches!(
@@ -1284,6 +2124,8 @@ pub fn reverse_payment_transaction_impl(
             account_payment_id: Some(correcting_account_payment_id),
             ..correcting
         });
+
+    reverse_payment_allocations(ctx, &original, original_account_payment_id)?;
 
     // Mark original as reversed.
     ctx.db

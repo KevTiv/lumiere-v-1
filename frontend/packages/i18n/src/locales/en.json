@@ -1049,6 +1049,9 @@
         },
         "fields": {
           "currencyCode": "Currency code",
+          "currencyId": "Foreign currency",
+          "rateSource": "Rate source",
+          "rateEffectiveDate": "Rate effective date",
           "asOfDate": "As of",
           "journalId": "Journal",
           "accountId": "Revalued account",
@@ -1780,6 +1783,7 @@
         "supplier": "Supplier",
         "partner": "Partner",
         "reference": "Provider reference",
+        "occurredAt": "Provider event time",
         "gross": "Gross external amount",
         "settlement": "Settlement amount",
         "net": "Net account amount",

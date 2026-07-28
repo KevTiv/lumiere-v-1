@@ -11,7 +11,7 @@
 /// - `BudgetPost` — Budget positions for categorization
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company_id_from_scope;
+use crate::accounting::relations::require_explicit_company_id;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::projects::projects::project_project;
 use crate::types::BudgetState;
@@ -121,12 +121,6 @@ pub struct CreateCrossoveredBudgetParams {
     pub description: Option<String>,
     pub date_from: Timestamp,
     pub date_to: Timestamp,
-    pub state: BudgetState,
-    pub crossovered_budget_line: Vec<u64>,
-    pub total_planned: f64,
-    pub total_practical: f64,
-    pub total_theoretical: f64,
-    pub variance_percentage: f64,
     pub metadata: Option<String>,
 }
 
@@ -206,7 +200,8 @@ pub fn create_crossovered_budget(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "crossovered_budget", "create")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id =
+        require_explicit_company_id(ctx, organization_id, params.company_id, "budget creation")?;
 
     if params.name.is_empty() {
         return Err("Budget name is required".to_string());
@@ -223,13 +218,13 @@ pub fn create_crossovered_budget(
         description: params.description,
         date_from: params.date_from,
         date_to: params.date_to,
-        state: params.state,
+        state: BudgetState::Draft,
         company_id,
-        crossovered_budget_line: params.crossovered_budget_line,
-        total_planned: params.total_planned,
-        total_practical: params.total_practical,
-        total_theoretical: params.total_theoretical,
-        variance_percentage: params.variance_percentage,
+        crossovered_budget_line: vec![],
+        total_planned: 0.0,
+        total_practical: 0.0,
+        total_theoretical: 0.0,
+        variance_percentage: 0.0,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
@@ -287,7 +282,8 @@ pub fn update_crossovered_budget(
         return Err("Budget does not belong to this organization".to_string());
     }
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id =
+        require_explicit_company_id(ctx, organization_id, params.company_id, "budget update")?;
     if budget.company_id != company_id {
         return Err("Budget does not belong to this company".to_string());
     }
@@ -880,7 +876,12 @@ pub fn create_budget_post(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "budget_post", "create")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id = require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "budget-post creation",
+    )?;
 
     if params.name.is_empty() {
         return Err("Budget post name is required".to_string());
@@ -941,7 +942,12 @@ pub fn update_budget_post(
         return Err("Budget post does not belong to this organization".to_string());
     }
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id = require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "budget-post update",
+    )?;
     if post.company_id != company_id {
         return Err("Budget post does not belong to this company".to_string());
     }

@@ -123,7 +123,11 @@ import AssignTeamMemberSkillReducer from "./assign_team_member_skill_reducer";
 import AssignTicketReducer from "./assign_ticket_reducer";
 import AssignUserToPickingReducer from "./assign_user_to_picking_reducer";
 import AwardPurchaseRfqBidReducer from "./award_purchase_rfq_bid_reducer";
+import BackfillConsolidationOrganizationOwnershipReducer from "./backfill_consolidation_organization_ownership_reducer";
 import BackfillExternalIdsReducer from "./backfill_external_ids_reducer";
+import BackfillFiscalPeriodOrganizationOwnershipReducer from "./backfill_fiscal_period_organization_ownership_reducer";
+import BackfillFixedAssetOrganizationOwnershipReducer from "./backfill_fixed_asset_organization_ownership_reducer";
+import BackfillIntercompanyOrganizationOwnershipReducer from "./backfill_intercompany_organization_ownership_reducer";
 import BillProjectMilestoneReducer from "./bill_project_milestone_reducer";
 import BillTimesheetsReducer from "./bill_timesheets_reducer";
 import BlockSerialReducer from "./block_serial_reducer";
@@ -815,6 +819,7 @@ import RevokeSubscriptionEntitlementReducer from "./revoke_subscription_entitlem
 import RevokeWorkflowDelegationReducer from "./revoke_workflow_delegation_reducer";
 import RollbackAiSkillReleaseReducer from "./rollback_ai_skill_release_reducer";
 import RollbackImportJobReducer from "./rollback_import_job_reducer";
+import RunAccountingFixedAssetOwnershipTestReducer from "./run_accounting_fixed_asset_ownership_test_reducer";
 import RunAccountingFxRevaluationTestReducer from "./run_accounting_fx_revaluation_test_reducer";
 import RunAccountingIcConsolidationTestReducer from "./run_accounting_ic_consolidation_test_reducer";
 import RunAccountingPaymentCancelTestReducer from "./run_accounting_payment_cancel_test_reducer";
@@ -1773,6 +1778,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'asset_by_organization', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'asset_by_parent', algorithm: 'btree', columns: [
         'parentId',
       ] },
@@ -1798,6 +1806,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'depreciation_line_by_move', algorithm: 'btree', columns: [
         'moveId',
+      ] },
+      { name: 'depreciation_line_by_organization', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
     ],
     constraints: [
@@ -1893,6 +1904,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'fiscal_year_by_organization', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'fiscal_year_by_state', algorithm: 'btree', columns: [
         'state',
@@ -2081,6 +2095,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'period_by_organization', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'period_by_state', algorithm: 'btree', columns: [
         'state',
@@ -3083,6 +3100,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'consolidation_account_by_organization', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
     ],
     constraints: [
       { name: 'consolidation_account_id_key', constraint: 'unique', columns: ['id'] },
@@ -3096,6 +3116,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'company_rate_by_organization', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'company_rate_by_period', algorithm: 'btree', columns: [
         'periodId',
@@ -3120,6 +3143,9 @@ const tablesSchema = __schema({
       { name: 'elimination_by_journal', algorithm: 'btree', columns: [
         'journalId',
       ] },
+      { name: 'elimination_by_organization', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
     ],
     constraints: [
       { name: 'consolidation_elimination_entry_id_key', constraint: 'unique', columns: ['id'] },
@@ -3133,6 +3159,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'consolidation_journal_by_organization', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'consolidation_journal_by_period', algorithm: 'btree', columns: [
         'periodId',
@@ -5019,6 +5048,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'intercompany_rule_by_organization', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'intercompany_rule_by_type', algorithm: 'btree', columns: [
         'ruleType',
       ] },
@@ -5038,6 +5070,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'intercompany_by_organization', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'intercompany_by_origin', algorithm: 'btree', columns: [
         'originCompanyId',
@@ -9078,7 +9113,11 @@ const reducersSchema = __reducers(
   __reducerSchema("assign_ticket", AssignTicketReducer),
   __reducerSchema("assign_user_to_picking", AssignUserToPickingReducer),
   __reducerSchema("award_purchase_rfq_bid", AwardPurchaseRfqBidReducer),
+  __reducerSchema("backfill_consolidation_organization_ownership", BackfillConsolidationOrganizationOwnershipReducer),
   __reducerSchema("backfill_external_ids", BackfillExternalIdsReducer),
+  __reducerSchema("backfill_fiscal_period_organization_ownership", BackfillFiscalPeriodOrganizationOwnershipReducer),
+  __reducerSchema("backfill_fixed_asset_organization_ownership", BackfillFixedAssetOrganizationOwnershipReducer),
+  __reducerSchema("backfill_intercompany_organization_ownership", BackfillIntercompanyOrganizationOwnershipReducer),
   __reducerSchema("bill_project_milestone", BillProjectMilestoneReducer),
   __reducerSchema("bill_timesheets", BillTimesheetsReducer),
   __reducerSchema("block_serial", BlockSerialReducer),
@@ -9770,6 +9809,7 @@ const reducersSchema = __reducers(
   __reducerSchema("revoke_workflow_delegation", RevokeWorkflowDelegationReducer),
   __reducerSchema("rollback_ai_skill_release", RollbackAiSkillReleaseReducer),
   __reducerSchema("rollback_import_job", RollbackImportJobReducer),
+  __reducerSchema("run_accounting_fixed_asset_ownership_test", RunAccountingFixedAssetOwnershipTestReducer),
   __reducerSchema("run_accounting_fx_revaluation_test", RunAccountingFxRevaluationTestReducer),
   __reducerSchema("run_accounting_ic_consolidation_test", RunAccountingIcConsolidationTestReducer),
   __reducerSchema("run_accounting_payment_cancel_test", RunAccountingPaymentCancelTestReducer),
@@ -10237,4 +10277,3 @@ export class DbConnection extends __DbConnectionImpl<typeof REMOTE_MODULE> {
     return new SubscriptionBuilder(this);
   };
 }
-

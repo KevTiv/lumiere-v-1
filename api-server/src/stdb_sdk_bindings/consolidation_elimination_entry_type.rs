@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct ConsolidationEliminationEntry {
     pub id: u64,
+    pub organization_id: Option<u64>,
     pub journal_id: u64,
     pub sequence: u32,
     pub name: String,
@@ -39,6 +40,7 @@ impl __sdk::InModule for ConsolidationEliminationEntry {
 /// Provides typed access to columns for query building.
 pub struct ConsolidationEliminationEntryCols {
     pub id: __sdk::__query_builder::Col<ConsolidationEliminationEntry, u64>,
+    pub organization_id: __sdk::__query_builder::Col<ConsolidationEliminationEntry, Option<u64>>,
     pub journal_id: __sdk::__query_builder::Col<ConsolidationEliminationEntry, u64>,
     pub sequence: __sdk::__query_builder::Col<ConsolidationEliminationEntry, u32>,
     pub name: __sdk::__query_builder::Col<ConsolidationEliminationEntry, String>,
@@ -67,6 +69,7 @@ impl __sdk::__query_builder::HasCols for ConsolidationEliminationEntry {
     fn cols(table_name: &'static str) -> Self::Cols {
         ConsolidationEliminationEntryCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             journal_id: __sdk::__query_builder::Col::new(table_name, "journal_id"),
             sequence: __sdk::__query_builder::Col::new(table_name, "sequence"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
@@ -102,6 +105,7 @@ pub struct ConsolidationEliminationEntryIxCols {
     pub company_id: __sdk::__query_builder::IxCol<ConsolidationEliminationEntry, u64>,
     pub id: __sdk::__query_builder::IxCol<ConsolidationEliminationEntry, u64>,
     pub journal_id: __sdk::__query_builder::IxCol<ConsolidationEliminationEntry, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<ConsolidationEliminationEntry, Option<u64>>,
 }
 
 impl __sdk::__query_builder::HasIxCols for ConsolidationEliminationEntry {
@@ -112,6 +116,7 @@ impl __sdk::__query_builder::HasIxCols for ConsolidationEliminationEntry {
             company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             journal_id: __sdk::__query_builder::IxCol::new(table_name, "journal_id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
         }
     }
 }

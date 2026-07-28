@@ -11,12 +11,14 @@
 /// - `TrialBalance` — Trial balance entries per account
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::account_account;
+use crate::accounting::analytic_accounting::account_analytic_account;
+use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::accounting::journal_entries::{account_move, account_move_line};
+use crate::core::organization::require_company_in_organization;
+use crate::core::reference::{legacy_currency_code_for_id, require_currency_row};
+use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::{
-    AccountInternalGroup, AccountMoveState, MoveType, ReportState, ReportType,
-};
+use crate::types::{AccountInternalGroup, AccountMoveState, MoveType, ReportState, ReportType};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -278,6 +280,149 @@ pub struct ExportFinancialReportParams {
     pub export_format: String,
 }
 
+fn validate_report_currency_id(ctx: &ReducerContext, currency_id: u64) -> Result<(), String> {
+    if !(1..=9).contains(&currency_id) {
+        return Err("currency is not supported".to_string());
+    }
+    let currency = require_currency_row(ctx, legacy_currency_code_for_id(currency_id))?;
+    if !currency.active {
+        return Err("currency is inactive".to_string());
+    }
+    Ok(())
+}
+
+struct ReportFilterRefs<'a> {
+    currency_id: u64,
+    result_currency_id: u64,
+    analytic_account_ids: &'a [u64],
+    account_ids: &'a [u64],
+    partner_ids: &'a [u64],
+    journal_ids: &'a [u64],
+}
+
+fn validate_report_filters(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    filters: ReportFilterRefs<'_>,
+) -> Result<(), String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    validate_report_currency_id(ctx, filters.currency_id)?;
+    validate_report_currency_id(ctx, filters.result_currency_id)?;
+
+    for account_id in filters.account_ids {
+        let account = ctx
+            .db
+            .account_account()
+            .id()
+            .find(account_id)
+            .ok_or("account filter not found")?;
+        if account.organization_id != organization_id || account.company_id != company_id {
+            return Err(
+                "account filter does not belong to this organization and company".to_string(),
+            );
+        }
+        if account.deprecated {
+            return Err("account filter is deprecated".to_string());
+        }
+    }
+
+    for analytic_account_id in filters.analytic_account_ids {
+        let analytic_account = ctx
+            .db
+            .account_analytic_account()
+            .id()
+            .find(analytic_account_id)
+            .ok_or("analytic account filter not found")?;
+        if analytic_account.organization_id != organization_id
+            || analytic_account.company_id != company_id
+        {
+            return Err(
+                "analytic account filter does not belong to this organization and company"
+                    .to_string(),
+            );
+        }
+        if !analytic_account.active {
+            return Err("analytic account filter is inactive".to_string());
+        }
+    }
+
+    for partner_id in filters.partner_ids {
+        let partner = ctx
+            .db
+            .contact()
+            .id()
+            .find(partner_id)
+            .ok_or("partner filter not found")?;
+        if partner.organization_id != organization_id
+            || partner
+                .company_id
+                .is_some_and(|partner_company_id| partner_company_id != company_id)
+        {
+            return Err(
+                "partner filter does not belong to this organization and company".to_string(),
+            );
+        }
+        if partner.deleted_at.is_some() || partner.merge_target_id.is_some() {
+            return Err("partner filter is inactive".to_string());
+        }
+    }
+
+    for journal_id in filters.journal_ids {
+        let journal = ctx
+            .db
+            .account_journal()
+            .id()
+            .find(journal_id)
+            .ok_or("journal filter not found")?;
+        if journal.organization_id != organization_id || journal.company_id != company_id {
+            return Err(
+                "journal filter does not belong to this organization and company".to_string(),
+            );
+        }
+        if !journal.active {
+            return Err("journal filter is inactive".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+fn line_matches_report_filters(
+    line: &crate::accounting::journal_entries::AccountMoveLine,
+    report: &FinancialReport,
+) -> bool {
+    (report.filter_account_ids.is_empty() || report.filter_account_ids.contains(&line.account_id))
+        && (report.filter_analytic_account_ids.is_empty()
+            || line
+                .analytic_account_id
+                .is_some_and(|id| report.filter_analytic_account_ids.contains(&id)))
+        && (report.filter_partner_ids.is_empty()
+            || line
+                .partner_id
+                .is_some_and(|id| report.filter_partner_ids.contains(&id)))
+        && (report.filter_journal_ids.is_empty()
+            || report.filter_journal_ids.contains(&line.journal_id))
+}
+
+fn scoped_parent_move_for_report(
+    ctx: &ReducerContext,
+    line: &crate::accounting::journal_entries::AccountMoveLine,
+    report: &FinancialReport,
+) -> Option<crate::accounting::journal_entries::AccountMove> {
+    if line.organization_id != report.organization_id || line.company_id != report.company_id {
+        return None;
+    }
+    let parent = ctx.db.account_move().id().find(&line.move_id)?;
+    if parent.organization_id != report.organization_id
+        || parent.company_id != report.company_id
+        || parent.journal_id != line.journal_id
+    {
+        return None;
+    }
+    Some(parent)
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 /// Create a new financial report configuration
@@ -289,6 +434,19 @@ pub fn create_financial_report(
     params: CreateFinancialReportParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "financial_report", "create")?;
+    validate_report_filters(
+        ctx,
+        organization_id,
+        company_id,
+        ReportFilterRefs {
+            currency_id: params.currency_id,
+            result_currency_id: params.result_currency_id,
+            analytic_account_ids: &params.filter_analytic_account_ids,
+            account_ids: &params.filter_account_ids,
+            partner_ids: &params.filter_partner_ids,
+            journal_ids: &params.filter_journal_ids,
+        },
+    )?;
 
     if params.name.is_empty() {
         return Err("Report name is required".to_string());
@@ -408,6 +566,32 @@ pub fn update_financial_report(
     if report.state != ReportState::Draft {
         return Err("Can only modify reports in Draft state".to_string());
     }
+
+    validate_report_filters(
+        ctx,
+        report.organization_id,
+        report.company_id,
+        ReportFilterRefs {
+            currency_id: report.currency_id,
+            result_currency_id: report.result_currency_id,
+            analytic_account_ids: params
+                .filter_analytic_account_ids
+                .as_deref()
+                .unwrap_or(&report.filter_analytic_account_ids),
+            account_ids: params
+                .filter_account_ids
+                .as_deref()
+                .unwrap_or(&report.filter_account_ids),
+            partner_ids: params
+                .filter_partner_ids
+                .as_deref()
+                .unwrap_or(&report.filter_partner_ids),
+            journal_ids: params
+                .filter_journal_ids
+                .as_deref()
+                .unwrap_or(&report.filter_journal_ids),
+        },
+    )?;
 
     let mut changed_fields = Vec::new();
 
@@ -561,6 +745,22 @@ pub fn generate_financial_report(
         return Err("Report must be in Draft state to generate".to_string());
     }
 
+    validate_report_filters(
+        ctx,
+        report.organization_id,
+        report.company_id,
+        ReportFilterRefs {
+            currency_id: report.currency_id,
+            result_currency_id: report.result_currency_id,
+            analytic_account_ids: &report.filter_analytic_account_ids,
+            account_ids: &report.filter_account_ids,
+            partner_ids: &report.filter_partner_ids,
+            journal_ids: &report.filter_journal_ids,
+        },
+    )?;
+    let organization_id = report.organization_id;
+    let company_id = report.company_id;
+
     // Remove existing trial balance rows for this report before regenerating
     let existing_entries: Vec<_> = ctx
         .db
@@ -588,40 +788,29 @@ pub fn generate_financial_report(
         std::collections::BTreeMap::new();
 
     for line in ctx.db.account_move_line().iter() {
-        if line.company_id != company_id {
+        let Some(parent_move) = scoped_parent_move_for_report(ctx, &line, &report) else {
             continue;
-        }
+        };
 
         // target_move filter
-        if report.target_move == "posted" && line.parent_state != AccountMoveState::Posted {
+        if report.target_move == "posted" && parent_move.state != AccountMoveState::Posted {
             continue;
         }
 
-        // account filter
-        if !report.filter_account_ids.is_empty()
-            && !report.filter_account_ids.contains(&line.account_id)
-        {
-            continue;
-        }
-
-        // partner filter
-        if !report.filter_partner_ids.is_empty() {
-            match line.partner_id {
-                Some(pid) if report.filter_partner_ids.contains(&pid) => {}
-                _ => continue,
-            }
-        }
-
-        // journal filter
-        if !report.filter_journal_ids.is_empty()
-            && !report.filter_journal_ids.contains(&line.journal_id)
-        {
+        if !line_matches_report_filters(&line, &report) {
             continue;
         }
 
         let account = match ctx.db.account_account().id().find(&line.account_id) {
-            Some(acc) => acc,
+            Some(acc)
+                if acc.organization_id == organization_id
+                    && acc.company_id == company_id
+                    && !acc.deprecated =>
+            {
+                acc
+            }
             None => continue,
+            Some(_) => continue,
         };
 
         let bucket = buckets
@@ -750,26 +939,20 @@ pub fn generate_financial_report(
 
     let statement_extra = match report.report_type {
         ReportType::BalanceSheet => {
-            populate_balance_sheet_from_trial_balance(ctx, organization_id, company_id, &report)?;
+            populate_balance_sheet_from_trial_balance(ctx, &report)?;
             serde_json::json!({ "statement": "balance_sheet" })
         }
         ReportType::ProfitAndLoss => {
-            populate_profit_loss_from_trial_balance(ctx, organization_id, company_id, &report)?;
+            populate_profit_loss_from_trial_balance(ctx, &report)?;
             serde_json::json!({ "statement": "profit_and_loss" })
         }
         ReportType::CashFlow => {
-            populate_cash_flow_from_trial_balance(ctx, organization_id, company_id, &report)?;
+            populate_cash_flow_from_trial_balance(ctx, &report)?;
             serde_json::json!({ "statement": "cash_flow" })
         }
-        ReportType::AgedReceivable => {
-            build_aging_report_data(ctx, company_id, &report, true)?
-        }
-        ReportType::AgedPayable => {
-            build_aging_report_data(ctx, company_id, &report, false)?
-        }
-        ReportType::PartnerBalance => {
-            build_partner_balance_data(ctx, company_id, &report)?
-        }
+        ReportType::AgedReceivable => build_aging_report_data(ctx, &report, true)?,
+        ReportType::AgedPayable => build_aging_report_data(ctx, &report, false)?,
+        ReportType::PartnerBalance => build_partner_balance_data(ctx, &report)?,
         ReportType::TrialBalance | ReportType::GeneralLedger | ReportType::VatReturn => {
             serde_json::json!({})
         }
@@ -832,8 +1015,6 @@ fn closing_net(debit: f64, credit: f64) -> f64 {
 
 fn populate_balance_sheet_from_trial_balance(
     ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
     report: &FinancialReport,
 ) -> Result<(), String> {
     let mut sequence = 1_u32;
@@ -864,7 +1045,7 @@ fn populate_balance_sheet_from_trial_balance(
         };
         ctx.db.balance_sheet_line().insert(BalanceSheetLine {
             id: 0,
-            organization_id,
+            organization_id: report.organization_id,
             report_id: report.id,
             sequence,
             name: tb.account_name.clone(),
@@ -878,7 +1059,7 @@ fn populate_balance_sheet_from_trial_balance(
             comparison_amount: 0.0,
             variance: 0.0,
             variance_percentage: 0.0,
-            company_id,
+            company_id: report.company_id,
             currency_id: report.result_currency_id,
             create_uid: Some(ctx.sender()),
             create_date: Some(ctx.timestamp),
@@ -893,8 +1074,6 @@ fn populate_balance_sheet_from_trial_balance(
 
 fn populate_profit_loss_from_trial_balance(
     ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
     report: &FinancialReport,
 ) -> Result<(), String> {
     let mut sequence = 1_u32;
@@ -919,14 +1098,12 @@ fn populate_profit_loss_from_trial_balance(
             _ => continue,
         };
         let amount = match group {
-            AccountInternalGroup::Income => {
-                closing_net(tb.period_credit, tb.period_debit)
-            }
+            AccountInternalGroup::Income => closing_net(tb.period_credit, tb.period_debit),
             _ => closing_net(tb.period_debit, tb.period_credit),
         };
         ctx.db.profit_loss_line().insert(ProfitLossLine {
             id: 0,
-            organization_id,
+            organization_id: report.organization_id,
             report_id: report.id,
             sequence,
             name: tb.account_name.clone(),
@@ -940,7 +1117,7 @@ fn populate_profit_loss_from_trial_balance(
             comparison_amount: 0.0,
             variance: 0.0,
             variance_percentage: 0.0,
-            company_id,
+            company_id: report.company_id,
             currency_id: report.result_currency_id,
             create_uid: Some(ctx.sender()),
             create_date: Some(ctx.timestamp),
@@ -955,8 +1132,6 @@ fn populate_profit_loss_from_trial_balance(
 
 fn populate_cash_flow_from_trial_balance(
     ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
     report: &FinancialReport,
 ) -> Result<(), String> {
     // Indirect cash flow: period net by liquidity vs P&L proxies from trial balance.
@@ -974,7 +1149,10 @@ fn populate_cash_flow_from_trial_balance(
             None => continue,
         };
         let period_net = closing_net(tb.period_debit, tb.period_credit);
-        match account.internal_group.unwrap_or(AccountInternalGroup::Other) {
+        match account
+            .internal_group
+            .unwrap_or(AccountInternalGroup::Other)
+        {
             AccountInternalGroup::Income | AccountInternalGroup::Expense => {
                 operating += -period_net;
             }
@@ -998,7 +1176,7 @@ fn populate_cash_flow_from_trial_balance(
     for (i, (line_type, amount)) in sections.iter().enumerate() {
         ctx.db.cash_flow_line().insert(CashFlowLine {
             id: 0,
-            organization_id,
+            organization_id: report.organization_id,
             report_id: report.id,
             sequence: (i as u32) + 1,
             name: line_type.to_string(),
@@ -1010,7 +1188,7 @@ fn populate_cash_flow_from_trial_balance(
             comparison_amount: 0.0,
             variance: 0.0,
             variance_percentage: 0.0,
-            company_id,
+            company_id: report.company_id,
             currency_id: report.result_currency_id,
             create_uid: Some(ctx.sender()),
             create_date: Some(ctx.timestamp),
@@ -1024,7 +1202,6 @@ fn populate_cash_flow_from_trial_balance(
 
 fn build_aging_report_data(
     ctx: &ReducerContext,
-    company_id: u64,
     report: &FinancialReport,
     receivable: bool,
 ) -> Result<serde_json::Value, String> {
@@ -1037,7 +1214,10 @@ fn build_aging_report_data(
         .as_secs();
 
     for mv in ctx.db.account_move().iter() {
-        if mv.company_id != company_id || mv.state != AccountMoveState::Posted {
+        if mv.organization_id != report.organization_id
+            || mv.company_id != report.company_id
+            || mv.state != AccountMoveState::Posted
+        {
             continue;
         }
         let is_ar = matches!(mv.move_type, MoveType::OutInvoice | MoveType::OutRefund);
@@ -1052,7 +1232,32 @@ fn build_aging_report_data(
         if residual < 0.000_001 {
             continue;
         }
-        let partner_id = mv.partner_id.unwrap_or(0);
+        let Some(partner_id) = mv.partner_id else {
+            continue;
+        };
+        if !report.filter_partner_ids.is_empty() && !report.filter_partner_ids.contains(&partner_id)
+        {
+            continue;
+        }
+        if !report.filter_journal_ids.is_empty()
+            && !report.filter_journal_ids.contains(&mv.journal_id)
+        {
+            continue;
+        }
+        if (!report.filter_account_ids.is_empty() || !report.filter_analytic_account_ids.is_empty())
+            && !ctx
+                .db
+                .account_move_line()
+                .move_line_by_move()
+                .filter(&mv.id)
+                .any(|line| {
+                    line.organization_id == report.organization_id
+                        && line.company_id == report.company_id
+                        && line_matches_report_filters(&line, report)
+                })
+        {
+            continue;
+        }
         let due = mv.invoice_date_due.unwrap_or(mv.date);
         let due_secs = due
             .to_duration_since_unix_epoch()
@@ -1097,18 +1302,20 @@ fn build_aging_report_data(
 
 fn build_partner_balance_data(
     ctx: &ReducerContext,
-    company_id: u64,
     report: &FinancialReport,
 ) -> Result<serde_json::Value, String> {
     let mut by_partner: std::collections::BTreeMap<u64, f64> = std::collections::BTreeMap::new();
     for line in ctx.db.account_move_line().iter() {
-        if line.company_id != company_id {
+        let Some(parent_move) = scoped_parent_move_for_report(ctx, &line, report) else {
             continue;
-        }
-        if report.target_move == "posted" && line.parent_state != AccountMoveState::Posted {
+        };
+        if report.target_move == "posted" && parent_move.state != AccountMoveState::Posted {
             continue;
         }
         if line.date < report.date_from || line.date > report.date_to {
+            continue;
+        }
+        if !line_matches_report_filters(&line, report) {
             continue;
         }
         let Some(partner_id) = line.partner_id else {
@@ -1255,14 +1462,7 @@ pub fn create_trial_balance_entry(
     params: CreateTrialBalanceEntryParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "financial_report", "create")?;
-
-    if params.account_code.is_empty() {
-        return Err("Account code is required".to_string());
-    }
-
-    if params.account_name.is_empty() {
-        return Err("Account name is required".to_string());
-    }
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     if params.level > 9 {
         return Err("Level must be between 0 and 9".to_string());
@@ -1283,6 +1483,36 @@ pub fn create_trial_balance_entry(
         return Err("Report does not belong to this company".to_string());
     }
 
+    let account = ctx
+        .db
+        .account_account()
+        .id()
+        .find(&params.account_id)
+        .ok_or("account not found")?;
+    if account.organization_id != parent_report.organization_id
+        || account.company_id != parent_report.company_id
+    {
+        return Err("account does not belong to the report organization and company".to_string());
+    }
+    validate_report_currency_id(ctx, params.currency_id)?;
+    if params.currency_id != parent_report.result_currency_id {
+        return Err("trial balance currency must match the report currency".to_string());
+    }
+    if let Some(parent_id) = params.parent_id {
+        let parent = ctx
+            .db
+            .trial_balance()
+            .id()
+            .find(&parent_id)
+            .ok_or("parent trial balance entry not found")?;
+        if parent.report_id != parent_report.id
+            || parent.organization_id != parent_report.organization_id
+            || parent.company_id != parent_report.company_id
+        {
+            return Err("parent trial balance entry does not belong to the report".to_string());
+        }
+    }
+
     let closing_debit = if params.opening_debit + params.period_debit
         > params.opening_credit + params.period_credit
     {
@@ -1301,22 +1531,22 @@ pub fn create_trial_balance_entry(
 
     let entry = ctx.db.trial_balance().insert(TrialBalance {
         id: 0,
-        organization_id,
+        organization_id: parent_report.organization_id,
         report_id: params.report_id,
         account_id: params.account_id,
-        account_code: params.account_code.clone(),
-        account_name: params.account_name,
+        account_code: account.code.clone(),
+        account_name: account.name,
         opening_debit: params.opening_debit,
         opening_credit: params.opening_credit,
         period_debit: params.period_debit,
         period_credit: params.period_credit,
         closing_debit,
         closing_credit,
-        currency_id: params.currency_id,
+        currency_id: parent_report.result_currency_id,
         parent_id: params.parent_id,
         level: params.level,
         is_leaf: params.is_leaf,
-        company_id,
+        company_id: parent_report.company_id,
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
@@ -1336,7 +1566,7 @@ pub fn create_trial_balance_entry(
             new_values: Some(
                 serde_json::json!({
                     "report_id": params.report_id,
-                    "account_code": params.account_code,
+                    "account_code": account.code,
                     "period_debit": params.period_debit,
                     "period_credit": params.period_credit
                 })
@@ -1434,6 +1664,8 @@ pub fn generate_eu_vat_report(
     params: GenerateEuVatReportParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "financial_report", "write")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    validate_report_currency_id(ctx, params.currency_id)?;
 
     if params.date_from >= params.date_to {
         return Err("End date must be after start date".to_string());

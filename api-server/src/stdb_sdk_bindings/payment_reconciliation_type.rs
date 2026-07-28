@@ -19,6 +19,7 @@ pub struct PaymentReconciliation {
     pub residual_after: f64,
     pub write_off_amount: f64,
     pub write_off_account_id: Option<u64>,
+    pub write_off_move_id: Option<u64>,
     pub is_reversal: bool,
     pub reversed_reconciliation_id: Option<u64>,
     pub created_at: __sdk::Timestamp,
@@ -46,6 +47,7 @@ pub struct PaymentReconciliationCols {
     pub residual_after: __sdk::__query_builder::Col<PaymentReconciliation, f64>,
     pub write_off_amount: __sdk::__query_builder::Col<PaymentReconciliation, f64>,
     pub write_off_account_id: __sdk::__query_builder::Col<PaymentReconciliation, Option<u64>>,
+    pub write_off_move_id: __sdk::__query_builder::Col<PaymentReconciliation, Option<u64>>,
     pub is_reversal: __sdk::__query_builder::Col<PaymentReconciliation, bool>,
     pub reversed_reconciliation_id: __sdk::__query_builder::Col<PaymentReconciliation, Option<u64>>,
     pub created_at: __sdk::__query_builder::Col<PaymentReconciliation, __sdk::Timestamp>,
@@ -78,6 +80,7 @@ impl __sdk::__query_builder::HasCols for PaymentReconciliation {
                 table_name,
                 "write_off_account_id",
             ),
+            write_off_move_id: __sdk::__query_builder::Col::new(table_name, "write_off_move_id"),
             is_reversal: __sdk::__query_builder::Col::new(table_name, "is_reversal"),
             reversed_reconciliation_id: __sdk::__query_builder::Col::new(
                 table_name,

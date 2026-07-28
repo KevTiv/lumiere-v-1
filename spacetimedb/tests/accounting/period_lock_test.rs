@@ -3,14 +3,128 @@ use std::time::Duration;
 use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::fiscal_periods::{
-    account_period, close_account_period, create_account_period, CreateAccountPeriodParams,
+    account_fiscal_year, account_period, accounting_ownership_backfill_issue,
+    backfill_fiscal_period_organization_ownership, close_account_period, create_account_period,
+    update_fiscal_year, AccountFiscalYear, CreateAccountPeriodParams, UpdateFiscalYearParams,
 };
 use crate::accounting::journal_entries::post_invoice;
-use crate::accounting::payments::{account_payment, create_payment, post_payment, CreatePaymentParams};
+use crate::accounting::payments::{
+    account_payment, create_payment, post_payment, CreatePaymentParams,
+};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
-use crate::types::{PartnerType, PaymentState, PaymentType, PeriodState};
+use crate::types::{PartnerType, PaymentState, PaymentType};
 
 use super::helpers::{create_balanced_customer_invoice, seed_bank_journal};
+
+pub fn test_fiscal_ownership_is_derived_and_tenant_scoped(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture_a = OrgFixture::seed_minimal(ctx)?;
+    let fixture_b = OrgFixture::seed_minimal(ctx)?;
+
+    let fiscal_year_a = ctx
+        .db
+        .account_fiscal_year()
+        .id()
+        .find(&fixture_a.fiscal_year_id)
+        .ok_or("organization A fiscal year missing")?;
+    let fiscal_year_b = ctx
+        .db
+        .account_fiscal_year()
+        .id()
+        .find(&fixture_b.fiscal_year_id)
+        .ok_or("organization B fiscal year missing")?;
+
+    let cross_tenant_update = update_fiscal_year(
+        ctx,
+        fixture_b.organization_id,
+        fixture_b.company_id,
+        fiscal_year_a.id,
+        UpdateFiscalYearParams {
+            name: Some("cross-tenant overwrite".to_string()),
+            date_from: None,
+            date_to: None,
+            type_: None,
+            carry_over_accounts: None,
+            closing_move_id: None,
+            opening_move_id: None,
+            is_adjustment: None,
+            notes: None,
+            metadata: None,
+        },
+    );
+    match cross_tenant_update {
+        Err(error) if error.contains("organization") => {}
+        Err(error) => return Err(format!("unexpected cross-tenant update error: {error}")),
+        Ok(()) => return Err("cross-tenant fiscal year update succeeded".to_string()),
+    }
+
+    ctx.db.account_fiscal_year().id().update(AccountFiscalYear {
+        organization_id: Some(fixture_b.organization_id),
+        ..fiscal_year_a
+    });
+    ctx.db.account_fiscal_year().id().update(AccountFiscalYear {
+        organization_id: None,
+        ..fiscal_year_b
+    });
+
+    backfill_fiscal_period_organization_ownership(ctx)?;
+
+    let quarantined = ctx
+        .db
+        .account_fiscal_year()
+        .id()
+        .find(&fixture_a.fiscal_year_id)
+        .ok_or("quarantined fiscal year missing")?;
+    if quarantined.organization_id.is_some() {
+        return Err("conflicting fiscal year ownership was not quarantined".to_string());
+    }
+    if !ctx
+        .db
+        .accounting_ownership_backfill_issue()
+        .iter()
+        .any(|issue| {
+            issue.table_name == "account_fiscal_year" && issue.record_id == fixture_a.fiscal_year_id
+        })
+    {
+        return Err("conflicting fiscal year ownership was not reported".to_string());
+    }
+
+    let backfilled = ctx
+        .db
+        .account_fiscal_year()
+        .id()
+        .find(&fixture_b.fiscal_year_id)
+        .ok_or("backfilled fiscal year missing")?;
+    if backfilled.organization_id != Some(fixture_b.organization_id) {
+        return Err("missing fiscal year ownership was not derived from company".to_string());
+    }
+
+    let quarantined_update = update_fiscal_year(
+        ctx,
+        fixture_a.organization_id,
+        fixture_a.company_id,
+        fixture_a.fiscal_year_id,
+        UpdateFiscalYearParams {
+            name: Some("must remain quarantined".to_string()),
+            date_from: None,
+            date_to: None,
+            type_: None,
+            carry_over_accounts: None,
+            closing_move_id: None,
+            opening_move_id: None,
+            is_adjustment: None,
+            notes: None,
+            metadata: None,
+        },
+    );
+    if quarantined_update.is_ok() {
+        return Err("quarantined fiscal year remained mutable".to_string());
+    }
+
+    Ok(())
+}
 
 fn seed_closed_period(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(), String> {
     create_account_period(
@@ -23,7 +137,6 @@ fn seed_closed_period(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(), 
             date_from: ctx.timestamp,
             date_to: ctx.timestamp + Duration::from_secs(86_400),
             fiscal_year_id: fixture.fiscal_year_id,
-            state: PeriodState::Open,
             is_adjustment: false,
             notes: None,
             metadata: None,
@@ -38,12 +151,7 @@ fn seed_closed_period(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(), 
         .map(|p| p.id)
         .ok_or("Period not found after create")?;
 
-    close_account_period(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        period_id,
-    )?;
+    close_account_period(ctx, fixture.organization_id, fixture.company_id, period_id)?;
 
     Ok(())
 }

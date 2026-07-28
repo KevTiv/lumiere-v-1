@@ -3,16 +3,13 @@ use std::time::Duration;
 
 use spacetimedb::{ReducerContext, Table};
 
-use crate::accounting::fiscal_periods::{
-    create_fiscal_year, CreateFiscalYearParams,
-};
+use crate::accounting::fiscal_periods::{create_fiscal_year, CreateFiscalYearParams};
 use crate::core::audit::audit_log;
 use crate::core::organization::{
-    company, create_company, insert_organization_with_owner, organization,
-    CreateCompanyParams, CreateOrganizationParams,
+    company, create_company, insert_organization_with_owner, organization, CreateCompanyParams,
+    CreateOrganizationParams,
 };
 use crate::test_harness::ensure_test_superuser;
-use crate::types::FiscalYearState;
 
 pub fn test_cross_tenant_company_scope_blocked(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -95,10 +92,6 @@ pub fn test_cross_tenant_company_scope_blocked(ctx: &ReducerContext) -> Result<(
             date_from: ctx.timestamp,
             date_to: ctx.timestamp + Duration::from_secs(86_400),
             type_: "standard".to_string(),
-            state: FiscalYearState::Running,
-            carry_over_accounts: vec![],
-            closing_move_id: None,
-            opening_move_id: None,
             is_adjustment: false,
             notes: None,
             metadata: None,
@@ -109,9 +102,7 @@ pub fn test_cross_tenant_company_scope_blocked(ctx: &ReducerContext) -> Result<(
         Ok(()) => return Err("Expected cross-tenant fiscal year create to fail".to_string()),
         Err(msg) if msg.contains("does not belong") => {}
         Err(msg) => {
-            return Err(format!(
-                "Expected company scope error, got: {msg}"
-            ));
+            return Err(format!("Expected company scope error, got: {msg}"));
         }
     }
 
@@ -120,8 +111,18 @@ pub fn test_cross_tenant_company_scope_blocked(ctx: &ReducerContext) -> Result<(
         return Err("Tenant B company count changed after blocked mutation".to_string());
     }
 
-    let org_a_count = ctx.db.organization().iter().filter(|o| o.id == org_a.id).count();
-    let org_b_count = ctx.db.organization().iter().filter(|o| o.id == org_b.id).count();
+    let org_a_count = ctx
+        .db
+        .organization()
+        .iter()
+        .filter(|o| o.id == org_a.id)
+        .count();
+    let org_b_count = ctx
+        .db
+        .organization()
+        .iter()
+        .filter(|o| o.id == org_b.id)
+        .count();
     if org_a_count != 1 || org_b_count != 1 {
         return Err("Organization rows corrupted after blocked mutation".to_string());
     }

@@ -10,6 +10,7 @@ use super::depreciation_method_type::DepreciationMethod;
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateAccountAssetParams {
+    pub idempotency_key: String,
     pub code: String,
     pub name: String,
     pub active: bool,
@@ -36,22 +37,11 @@ pub struct CreateAccountAssetParams {
     pub first_depreciation_date: Option<__sdk::Timestamp>,
     pub first_depreciation_date_manual: Option<__sdk::Timestamp>,
     pub already_depreciated_amount_import: f64,
-    pub original_move_line_ids: Vec<u64>,
     pub is_imported: bool,
     pub account_analytic_tag_ids: Vec<u64>,
-    pub children_ids: Vec<u64>,
-    pub analytic_line_ids: Vec<u64>,
-    pub depreciation_move_ids: Vec<u64>,
     pub asset_lifetime_days: u32,
     pub asset_paused_days: u32,
-    pub depreciation_sequence: u32,
-    pub salvage_move_id: Option<u64>,
     pub depreciation_schedule: Option<String>,
-    pub depreciation_board_ids: Vec<u64>,
-    pub modification_ids: Vec<u64>,
-    pub activity_ids: Vec<u64>,
-    pub message_follower_ids: Vec<u64>,
-    pub message_ids: Vec<u64>,
     pub metadata: Option<String>,
 }
 

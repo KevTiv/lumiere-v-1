@@ -13,7 +13,7 @@ pub struct UpdateAccountPeriodParams {
     pub date_to: Option<__sdk::Timestamp>,
     pub is_adjustment: Option<bool>,
     pub notes: Option<Option<String>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateAccountPeriodParams {

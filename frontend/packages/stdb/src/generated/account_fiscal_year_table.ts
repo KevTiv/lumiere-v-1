@@ -19,6 +19,7 @@ export default __t.row({
   name: __t.string(),
   dateFrom: __t.timestamp().name("date_from"),
   dateTo: __t.timestamp().name("date_to"),
+  organizationId: __t.option(__t.u64()).name("organization_id"),
   companyId: __t.u64().name("company_id"),
   get state() {
     return FiscalYearState;

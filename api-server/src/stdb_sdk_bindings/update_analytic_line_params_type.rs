@@ -10,12 +10,12 @@ pub struct UpdateAnalyticLineParams {
     pub name: Option<String>,
     pub amount: Option<f64>,
     pub unit_amount: Option<f64>,
-    pub partner_id: Option<u64>,
-    pub project_id: Option<u64>,
-    pub task_id: Option<u64>,
-    pub category: Option<String>,
+    pub partner_id: Option<Option<u64>>,
+    pub project_id: Option<Option<u64>>,
+    pub task_id: Option<Option<u64>>,
+    pub category: Option<Option<String>>,
     pub tag_ids: Option<Vec<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateAnalyticLineParams {

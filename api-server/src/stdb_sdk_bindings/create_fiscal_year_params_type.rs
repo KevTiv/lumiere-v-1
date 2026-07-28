@@ -9,7 +9,6 @@ use spacetimedb_sdk::__codegen::{
 	__ws,
 };
 
-use super::fiscal_year_state_type::FiscalYearState;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
@@ -17,11 +16,7 @@ pub struct CreateFiscalYearParams {
     pub name: String,
     pub date_from: __sdk::Timestamp,
     pub date_to: __sdk::Timestamp,
-    pub type: String,
-    pub state: FiscalYearState,
-    pub carry_over_accounts: Vec::<u64>,
-    pub closing_move_id: Option::<u64>,
-    pub opening_move_id: Option::<u64>,
+    pub r#type: String,
     pub is_adjustment: bool,
     pub notes: Option::<String>,
     pub metadata: Option::<String>,

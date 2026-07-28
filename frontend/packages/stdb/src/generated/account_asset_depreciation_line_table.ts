@@ -12,6 +12,8 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.option(__t.u64()).name("organization_id"),
+  companyId: __t.option(__t.u64()).name("company_id"),
   assetId: __t.u64().name("asset_id"),
   name: __t.option(__t.string()),
   sequence: __t.u32(),

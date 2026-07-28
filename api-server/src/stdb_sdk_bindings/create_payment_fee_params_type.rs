@@ -13,7 +13,6 @@ pub struct CreatePaymentFeeParams {
     pub payment_transaction_id: u64,
     pub bearer: PaymentFeeBearer,
     pub amount: f64,
-    pub currency_id: u64,
     pub fee_account_id: Option<u64>,
     pub tax_account_id: Option<u64>,
     pub tax_amount: f64,

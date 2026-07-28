@@ -139,6 +139,7 @@
     "code",
     "name",
     "active",
+    "organization_id",
     "company_id",
     "state",
     "asset_type",
@@ -194,6 +195,8 @@
   ],
   "AccountAssetDepreciationLine": [
     "id",
+    "organization_id",
+    "company_id",
     "asset_id",
     "name",
     "sequence",
@@ -290,6 +293,7 @@
     "name",
     "date_from",
     "date_to",
+    "organization_id",
     "company_id",
     "state",
     "type",
@@ -538,6 +542,7 @@
     "code",
     "date_from",
     "date_to",
+    "organization_id",
     "company_id",
     "fiscal_year_id",
     "state",
@@ -606,6 +611,36 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "AccountingOperationReceipt": [
+    "id",
+    "organization_id",
+    "company_id",
+    "action_kind",
+    "idempotency_key",
+    "payload_fingerprint",
+    "result_table",
+    "result_id",
+    "created_at",
+    "created_by"
+  ],
+  "AccountingOwnershipBackfillIssue": [
+    "id",
+    "table_name",
+    "record_id",
+    "company_id",
+    "parent_id",
+    "issue",
+    "detected_at"
+  ],
+  "AccountingOwnershipBackfillRun": [
+    "id",
+    "scope",
+    "scanned_rows",
+    "backfilled_rows",
+    "unresolved_rows",
+    "completed_at",
+    "completed_by"
   ],
   "AccrueSaleCommissionParams": [
     "rate_percent"
@@ -1970,6 +2005,7 @@
   ],
   "ConsolidationAccount": [
     "id",
+    "organization_id",
     "name",
     "code",
     "account_type",
@@ -1989,6 +2025,7 @@
   ],
   "ConsolidationCompanyRate": [
     "id",
+    "organization_id",
     "company_id",
     "period_id",
     "currency_id",
@@ -2001,6 +2038,7 @@
   ],
   "ConsolidationEliminationEntry": [
     "id",
+    "organization_id",
     "journal_id",
     "sequence",
     "name",
@@ -2024,6 +2062,7 @@
   ],
   "ConsolidationJournal": [
     "id",
+    "organization_id",
     "name",
     "period_id",
     "period_name",
@@ -2325,6 +2364,7 @@
     "metadata"
   ],
   "CreateAccountAssetParams": [
+    "idempotency_key",
     "code",
     "name",
     "active",
@@ -2351,22 +2391,11 @@
     "first_depreciation_date",
     "first_depreciation_date_manual",
     "already_depreciated_amount_import",
-    "original_move_line_ids",
     "is_imported",
     "account_analytic_tag_ids",
-    "children_ids",
-    "analytic_line_ids",
-    "depreciation_move_ids",
     "asset_lifetime_days",
     "asset_paused_days",
-    "depreciation_sequence",
-    "salvage_move_id",
     "depreciation_schedule",
-    "depreciation_board_ids",
-    "modification_ids",
-    "activity_ids",
-    "message_follower_ids",
-    "message_ids",
     "metadata"
   ],
   "CreateAccountBankStatementLineParams": [
@@ -2393,15 +2422,6 @@
     "date",
     "balance_start",
     "currency_id",
-    "state",
-    "line_ids",
-    "move_line_ids",
-    "total_entry_encoding",
-    "total_amount",
-    "total_amount_currency",
-    "date_done",
-    "is_valid_balance_start",
-    "is_valid_balance_end",
     "metadata"
   ],
   "CreateAccountGroupParams": [
@@ -2482,7 +2502,6 @@
     "date_from",
     "date_to",
     "fiscal_year_id",
-    "state",
     "is_adjustment",
     "notes",
     "metadata"
@@ -2711,14 +2730,6 @@
     "is_required_in_move_lines",
     "is_required_in_distribution",
     "is_root_plan",
-    "line_ids",
-    "child_ids",
-    "message_follower_ids",
-    "activity_ids",
-    "message_ids",
-    "balance",
-    "debit",
-    "credit",
     "metadata"
   ],
   "CreateAnalyticDistributionModelParams": [
@@ -3084,12 +3095,6 @@
     "description",
     "date_from",
     "date_to",
-    "state",
-    "crossovered_budget_line",
-    "total_planned",
-    "total_practical",
-    "total_theoretical",
-    "variance_percentage",
     "metadata"
   ],
   "CreateCurrencyParams": [
@@ -3231,6 +3236,7 @@
     "color"
   ],
   "CreateDepreciationLineParams": [
+    "idempotency_key",
     "asset_id",
     "amount",
     "depreciation_date",
@@ -3477,10 +3483,6 @@
     "date_from",
     "date_to",
     "type",
-    "state",
-    "carry_over_accounts",
-    "closing_move_id",
-    "opening_move_id",
     "is_adjustment",
     "notes",
     "metadata"
@@ -4018,7 +4020,6 @@
     "payment_transaction_id",
     "bearer",
     "amount",
-    "currency_id",
     "fee_account_id",
     "tax_account_id",
     "tax_amount",
@@ -6603,7 +6604,12 @@
     "id",
     "organization_id",
     "company_id",
+    "currency_id",
     "currency_code",
+    "company_currency_id",
+    "rate",
+    "rate_source",
+    "rate_effective_date",
     "as_of_date",
     "move_id",
     "journal_id",
@@ -7508,6 +7514,7 @@
   ],
   "IntercompanyRule": [
     "id",
+    "organization_id",
     "name",
     "rule_type",
     "source_company_id",
@@ -7529,6 +7536,7 @@
   ],
   "IntercompanyTransaction": [
     "id",
+    "organization_id",
     "name",
     "origin_company_id",
     "destination_company_id",
@@ -8754,6 +8762,7 @@
     "residual_after",
     "write_off_amount",
     "write_off_account_id",
+    "write_off_move_id",
     "is_reversal",
     "reversed_reconciliation_id",
     "created_at",
@@ -10226,6 +10235,7 @@
     "move_dest_ids",
     "move_ids",
     "match_state",
+    "lot_id",
     "create_uid",
     "create_date",
     "write_uid",
@@ -10997,7 +11007,8 @@
     "product_uom",
     "product_uom_qty",
     "price_unit",
-    "to_refund"
+    "to_refund",
+    "lot_id"
   ],
   "RevenueRecognitionRule": [
     "id",
@@ -11046,18 +11057,23 @@
     "metadata"
   ],
   "RunFxRevaluationBatchParams": [
-    "currency_code",
+    "currency_id",
     "as_of_date",
     "journal_id",
     "gain_account_id",
     "loss_account_id",
     "rate",
+    "rate_source",
+    "rate_effective_date",
     "reference",
     "metadata"
   ],
   "RunFxRevaluationParams": [
-    "currency_code",
+    "currency_id",
     "as_of_date",
+    "rate",
+    "rate_source",
+    "rate_effective_date",
     "journal_id",
     "gain_account_id",
     "loss_account_id",

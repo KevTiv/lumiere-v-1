@@ -15,7 +15,7 @@ use spacetimedb_sdk::__codegen::{
 pub struct UpdateStockProductionSerialParams {
     pub company_id: Option::<u64>,
     pub name: Option::<String>,
-    pub ref: Option::<String>,
+    pub r#ref: Option::<String>,
     pub note: Option::<String>,
     pub state: Option::<String>,
     pub expiration_date: Option::<__sdk::Timestamp>,

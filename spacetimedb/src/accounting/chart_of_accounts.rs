@@ -3,11 +3,15 @@
 /// # 7.1 Chart of Accounts
 ///
 /// Tables for managing the chart of accounts, account types, groups, and journals.
+use std::collections::HashSet;
+
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::{
-    company_id_from_scope, default_company_id_for_organization, require_company_in_organization,
+use crate::accounting::relations::{
+    require_active_account, require_active_currency_id, require_active_journal,
+    require_explicit_company_id,
 };
+use crate::accounting::tax_management::account_tax;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{AccountInternalGroup, AccountTypeInternal, JournalType};
 
@@ -179,7 +183,7 @@ pub struct UpdateAccountAccountTypeParams {
     pub internal_group: Option<AccountInternalGroup>,
     pub include_initial_balance: Option<bool>,
     pub is_deprecated: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -199,11 +203,11 @@ pub struct UpdateAccountGroupParams {
     /// Company scope for the update (must match the group’s company).
     pub company_id: Option<u64>,
     pub name: Option<String>,
-    pub code_prefix_start: Option<String>,
-    pub code_prefix_end: Option<String>,
+    pub code_prefix_start: Option<Option<String>>,
+    pub code_prefix_end: Option<Option<String>>,
     pub level: Option<u32>,
     pub parent_id: Option<Option<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -235,7 +239,7 @@ pub struct UpdateAccountAccountParams {
     pub name: Option<String>,
     pub code: Option<String>,
     pub deprecated: Option<bool>,
-    pub currency_id: Option<u64>,
+    pub currency_id: Option<Option<u64>>,
     pub internal_type: Option<AccountTypeInternal>,
     pub internal_group: Option<AccountInternalGroup>,
     pub group_id: Option<Option<u64>>,
@@ -244,7 +248,7 @@ pub struct UpdateAccountAccountParams {
     pub note: Option<Option<String>>,
     pub allowed_journal_ids: Option<Vec<u64>>,
     pub non_trade: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -289,7 +293,7 @@ pub struct UpdateAccountJournalParams {
     pub name: Option<String>,
     pub code: Option<String>,
     pub active: Option<bool>,
-    pub currency_id: Option<u64>,
+    pub currency_id: Option<Option<u64>>,
     pub default_account_id: Option<Option<u64>>,
     pub suspense_account_id: Option<Option<u64>>,
     pub loss_account_id: Option<Option<u64>>,
@@ -300,7 +304,7 @@ pub struct UpdateAccountJournalParams {
     pub alias_name: Option<Option<String>>,
     pub alias_domain: Option<Option<String>>,
     pub restrict_mode_hash_table: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -319,13 +323,12 @@ pub fn create_account_account_type(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account_type", "create")?;
 
-    let company_id: Option<u64> = match params.company_id {
-        Some(id) => {
-            require_company_in_organization(ctx, organization_id, id)?;
-            Some(id)
-        }
-        None => Some(default_company_id_for_organization(ctx, organization_id)?),
-    };
+    let company_id = Some(require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "account-type creation",
+    )?);
 
     let account_type = ctx.db.account_account_type().insert(AccountAccountType {
         id: 0,
@@ -372,7 +375,12 @@ pub fn update_account_account_type(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account_type", "write")?;
 
-    let scope_company = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let scope_company = require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "account-type update",
+    )?;
 
     let account_type = ctx
         .db
@@ -400,7 +408,7 @@ pub fn update_account_account_type(
             is_deprecated: params.is_deprecated.unwrap_or(account_type.is_deprecated),
             write_uid: Some(ctx.sender()),
             write_date: Some(ctx.timestamp),
-            metadata: params.metadata.or(account_type.metadata),
+            metadata: params.metadata.unwrap_or(account_type.metadata),
             ..account_type
         });
 
@@ -430,7 +438,12 @@ pub fn create_account_group(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_group", "create")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id = require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "account-group creation",
+    )?;
 
     if let Some(pid) = params.parent_id {
         ctx.db
@@ -485,7 +498,12 @@ pub fn update_account_group(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_group", "write")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id = require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "account-group update",
+    )?;
 
     let group = ctx
         .db
@@ -508,13 +526,13 @@ pub fn update_account_group(
 
     ctx.db.account_group().id().update(AccountGroup {
         name: params.name.unwrap_or(group.name),
-        code_prefix_start: params.code_prefix_start.or(group.code_prefix_start),
-        code_prefix_end: params.code_prefix_end.or(group.code_prefix_end),
+        code_prefix_start: params.code_prefix_start.unwrap_or(group.code_prefix_start),
+        code_prefix_end: params.code_prefix_end.unwrap_or(group.code_prefix_end),
         level: params.level.unwrap_or(group.level),
         parent_id: params.parent_id.unwrap_or(group.parent_id),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.or(group.metadata),
+        metadata: params.metadata.unwrap_or(group.metadata),
         ..group
     });
 
@@ -536,6 +554,95 @@ pub fn update_account_group(
     Ok(())
 }
 
+fn validate_account_type_relation(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    account_type_id: u64,
+) -> Result<(), String> {
+    let account_type = ctx
+        .db
+        .account_account_type()
+        .id()
+        .find(&account_type_id)
+        .ok_or("Account type not found")?;
+    if account_type.organization_id != organization_id
+        || account_type.company_id.is_some_and(|id| id != company_id)
+    {
+        return Err("Account type does not belong to this organization and company".to_string());
+    }
+    if account_type.is_deprecated {
+        return Err("Account type is deprecated".to_string());
+    }
+    Ok(())
+}
+
+fn validate_account_group_relation(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    group_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(group_id) = group_id else {
+        return Ok(());
+    };
+    let group = ctx
+        .db
+        .account_group()
+        .id()
+        .find(&group_id)
+        .ok_or("Account group not found")?;
+    if group.organization_id != organization_id || group.company_id != company_id {
+        return Err("Account group does not belong to this organization and company".to_string());
+    }
+    Ok(())
+}
+
+fn validate_account_journal_ids(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    journal_ids: &[u64],
+) -> Result<(), String> {
+    let mut seen = HashSet::with_capacity(journal_ids.len());
+    for journal_id in journal_ids {
+        if !seen.insert(*journal_id) {
+            return Err(format!("Allowed journal {journal_id} is duplicated"));
+        }
+        require_active_journal(ctx, organization_id, company_id, *journal_id, "allowed")?;
+    }
+    Ok(())
+}
+
+fn validate_account_tax_ids(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    tax_ids: &[u64],
+) -> Result<(), String> {
+    let mut seen = HashSet::with_capacity(tax_ids.len());
+    for tax_id in tax_ids {
+        if !seen.insert(*tax_id) {
+            return Err(format!("Tax {tax_id} is duplicated"));
+        }
+        let tax = ctx
+            .db
+            .account_tax()
+            .id()
+            .find(tax_id)
+            .ok_or_else(|| format!("Tax {tax_id} not found"))?;
+        if tax.organization_id != organization_id || tax.company_id != company_id {
+            return Err(format!(
+                "Tax {tax_id} does not belong to this organization and company"
+            ));
+        }
+        if !tax.active {
+            return Err(format!("Tax {tax_id} is inactive"));
+        }
+    }
+    Ok(())
+}
+
 #[spacetimedb::reducer]
 pub fn create_account_account(
     ctx: &ReducerContext,
@@ -544,13 +651,21 @@ pub fn create_account_account(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account", "create")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id =
+        require_explicit_company_id(ctx, organization_id, params.company_id, "account creation")?;
 
-    ctx.db
-        .account_account_type()
-        .id()
-        .find(&params.user_type_id)
-        .ok_or("Account type not found")?;
+    validate_account_type_relation(ctx, organization_id, company_id, params.user_type_id)?;
+    if let Some(currency_id) = params.currency_id {
+        require_active_currency_id(ctx, currency_id, "account")?;
+    }
+    validate_account_group_relation(ctx, organization_id, company_id, params.group_id)?;
+    validate_account_journal_ids(
+        ctx,
+        organization_id,
+        company_id,
+        &params.allowed_journal_ids,
+    )?;
+    validate_account_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
 
     let opening_balance = params.opening_debit - params.opening_credit;
 
@@ -617,7 +732,8 @@ pub fn update_account_account(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account", "write")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id =
+        require_explicit_company_id(ctx, organization_id, params.company_id, "account update")?;
 
     let account = ctx
         .db
@@ -626,8 +742,20 @@ pub fn update_account_account(
         .find(&account_id)
         .ok_or("Account not found")?;
 
-    if account.company_id != company_id {
-        return Err("Account does not belong to this company".to_string());
+    if account.organization_id != organization_id || account.company_id != company_id {
+        return Err("Account does not belong to this organization and company".to_string());
+    }
+    if let Some(Some(currency_id)) = params.currency_id {
+        require_active_currency_id(ctx, currency_id, "account")?;
+    }
+    if let Some(group_id) = params.group_id {
+        validate_account_group_relation(ctx, organization_id, company_id, group_id)?;
+    }
+    if let Some(ref journal_ids) = params.allowed_journal_ids {
+        validate_account_journal_ids(ctx, organization_id, company_id, journal_ids)?;
+    }
+    if let Some(ref tax_ids) = params.tax_ids {
+        validate_account_tax_ids(ctx, organization_id, company_id, tax_ids)?;
     }
 
     let is_bank_account = if let Some(ref it) = params.internal_type {
@@ -640,7 +768,7 @@ pub fn update_account_account(
         name: params.name.unwrap_or(account.name),
         code: params.code.unwrap_or(account.code),
         deprecated: params.deprecated.unwrap_or(account.deprecated),
-        currency_id: params.currency_id.or(account.currency_id),
+        currency_id: params.currency_id.unwrap_or(account.currency_id),
         internal_type: params.internal_type.or(account.internal_type),
         internal_group: params.internal_group.or(account.internal_group),
         group_id: params.group_id.unwrap_or(account.group_id),
@@ -654,7 +782,7 @@ pub fn update_account_account(
         is_bank_account,
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.or(account.metadata),
+        metadata: params.metadata.unwrap_or(account.metadata),
         ..account
     });
 
@@ -684,21 +812,23 @@ pub fn create_account_journal(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_journal", "create")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id =
+        require_explicit_company_id(ctx, organization_id, params.company_id, "journal creation")?;
 
-    for maybe_id in [
-        params.default_account_id,
-        params.suspense_account_id,
-        params.loss_account_id,
-        params.profit_account_id,
-        params.bank_account_id,
+    if let Some(currency_id) = params.currency_id {
+        require_active_currency_id(ctx, currency_id, "journal")?;
+    }
+    for (maybe_id, role) in [
+        (params.default_account_id, "journal default"),
+        (params.suspense_account_id, "journal suspense"),
+        (params.loss_account_id, "journal loss"),
+        (params.profit_account_id, "journal profit"),
+        (params.bank_account_id, "journal bank"),
+        (params.payment_credit_account_id, "journal payment credit"),
+        (params.payment_debit_account_id, "journal payment debit"),
     ] {
         if let Some(id) = maybe_id {
-            ctx.db
-                .account_account()
-                .id()
-                .find(&id)
-                .ok_or("Referenced account not found")?;
+            require_active_account(ctx, organization_id, company_id, id, role)?;
         }
     }
 
@@ -771,7 +901,8 @@ pub fn update_account_journal(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_journal", "write")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id =
+        require_explicit_company_id(ctx, organization_id, params.company_id, "journal update")?;
 
     let journal = ctx
         .db
@@ -780,23 +911,30 @@ pub fn update_account_journal(
         .find(&journal_id)
         .ok_or("Journal not found")?;
 
-    if journal.company_id != company_id {
-        return Err("Journal does not belong to this company".to_string());
+    if journal.organization_id != organization_id || journal.company_id != company_id {
+        return Err("Journal does not belong to this organization and company".to_string());
+    }
+    if let Some(Some(currency_id)) = params.currency_id {
+        require_active_currency_id(ctx, currency_id, "journal")?;
     }
 
-    for maybe_id in [
-        params.default_account_id.flatten(),
-        params.suspense_account_id.flatten(),
-        params.loss_account_id.flatten(),
-        params.profit_account_id.flatten(),
-        params.bank_account_id.flatten(),
+    for (maybe_id, role) in [
+        (params.default_account_id.flatten(), "journal default"),
+        (params.suspense_account_id.flatten(), "journal suspense"),
+        (params.loss_account_id.flatten(), "journal loss"),
+        (params.profit_account_id.flatten(), "journal profit"),
+        (params.bank_account_id.flatten(), "journal bank"),
+        (
+            params.payment_credit_account_id.flatten(),
+            "journal payment credit",
+        ),
+        (
+            params.payment_debit_account_id.flatten(),
+            "journal payment debit",
+        ),
     ] {
         if let Some(id) = maybe_id {
-            ctx.db
-                .account_account()
-                .id()
-                .find(&id)
-                .ok_or("Referenced account not found")?;
+            require_active_account(ctx, organization_id, company_id, id, role)?;
         }
     }
 
@@ -804,7 +942,7 @@ pub fn update_account_journal(
         name: params.name.unwrap_or(journal.name),
         code: params.code.unwrap_or(journal.code),
         active: params.active.unwrap_or(journal.active),
-        currency_id: params.currency_id.or(journal.currency_id),
+        currency_id: params.currency_id.unwrap_or(journal.currency_id),
         default_account_id: params
             .default_account_id
             .unwrap_or(journal.default_account_id),
@@ -829,7 +967,7 @@ pub fn update_account_journal(
             .unwrap_or(journal.restrict_mode_hash_table),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.or(journal.metadata),
+        metadata: params.metadata.unwrap_or(journal.metadata),
         ..journal
     });
 
@@ -860,7 +998,12 @@ pub fn deprecate_account_account(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_account", "write")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id = require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "account deprecation",
+    )?;
 
     let account = ctx
         .db
@@ -869,8 +1012,8 @@ pub fn deprecate_account_account(
         .find(&account_id)
         .ok_or("Account not found")?;
 
-    if account.company_id != company_id {
-        return Err("Account does not belong to this company".to_string());
+    if account.organization_id != organization_id || account.company_id != company_id {
+        return Err("Account does not belong to this organization and company".to_string());
     }
 
     ctx.db.account_account().id().update(AccountAccount {

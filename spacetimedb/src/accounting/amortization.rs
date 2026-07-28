@@ -2,10 +2,15 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
-use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, AccountMove, AccountMoveLine,
+};
+use crate::accounting::relations::{
+    require_active_account, require_active_currency_id, require_active_journal,
+};
 use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
-use crate::types::{AccountMoveState, PaymentState};
+use crate::types::{AccountInternalGroup, AccountMoveState, JournalType, PaymentState};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -109,11 +114,60 @@ pub fn create_amortization_schedule(
     if params.total_amount <= 0.0 {
         return Err("total_amount must be positive".to_string());
     }
+    if params.start_date.to_micros_since_unix_epoch() > params.end_date.to_micros_since_unix_epoch()
+    {
+        return Err("start_date cannot be after end_date".to_string());
+    }
     if !matches!(
         params.recognition_period.as_str(),
         "month" | "quarter" | "year"
     ) {
         return Err("Invalid recognition_period".to_string());
+    }
+    let journal = require_active_journal(
+        ctx,
+        organization_id,
+        company_id,
+        params.journal_id,
+        "amortization",
+    )?;
+    if journal.type_ != JournalType::General {
+        return Err("amortization requires a general journal".to_string());
+    }
+    require_active_currency_id(ctx, params.currency_id, "amortization")?;
+    if journal
+        .currency_id
+        .is_some_and(|currency_id| currency_id != params.currency_id)
+    {
+        return Err("amortization currency is incompatible with the journal".to_string());
+    }
+    let balance_account = require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        params.balance_sheet_account_id,
+        "amortization balance sheet",
+    )?;
+    let expected_balance_group = if params.schedule_kind == "prepaid" {
+        AccountInternalGroup::Asset
+    } else {
+        AccountInternalGroup::Liability
+    };
+    if balance_account.internal_group != Some(expected_balance_group) {
+        return Err("amortization balance sheet account has the wrong role".to_string());
+    }
+    let pl_account = require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        params.pl_account_id,
+        "amortization P&L",
+    )?;
+    if !matches!(
+        pl_account.internal_group,
+        Some(AccountInternalGroup::Income | AccountInternalGroup::Expense)
+    ) {
+        return Err("amortization P&L account must be income or expense".to_string());
     }
 
     let inserted = ctx.db.amortization_schedule().insert(AmortizationSchedule {
@@ -234,10 +288,8 @@ pub fn recognize_amortization_line(
 
     // Accrual: Dr expense / Cr accrual liability
     // Prepaid: Dr expense / Cr prepaid asset
-    let (debit_account, credit_account) = (
-        schedule.pl_account_id,
-        schedule.balance_sheet_account_id,
-    );
+    let (debit_account, credit_account) =
+        (schedule.pl_account_id, schedule.balance_sheet_account_id);
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,

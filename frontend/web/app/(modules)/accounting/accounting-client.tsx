@@ -590,6 +590,10 @@ type AccountingClientLoadedProps = Omit<AccountingClientProps, "organizationId">
   organizationId: number
 }
 
+type AccountingClientReadyProps = AccountingClientLoadedProps & {
+  operatingCompanyId: bigint
+}
+
 export function AccountingClient(props: AccountingClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
@@ -597,7 +601,19 @@ export function AccountingClient(props: AccountingClientProps) {
   return <AccountingClientLoaded {...props} organizationId={props.organizationId} />
 }
 
-function AccountingClientLoaded({
+function AccountingClientLoaded(props: AccountingClientLoadedProps) {
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(props.organizationId)
+  if (operatingCompanyId == null) {
+    return (
+      <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">
+        Select an active company to open the accounting workspace.
+      </div>
+    )
+  }
+  return <AccountingClientReady {...props} operatingCompanyId={operatingCompanyId} />
+}
+
+function AccountingClientReady({
   initialAccounts,
   initialMoves,
   initialTaxes,
@@ -607,7 +623,8 @@ function AccountingClientLoaded({
   initialFiscalYears,
   initialAccountPeriods,
   organizationId,
-}: AccountingClientLoadedProps) {
+  operatingCompanyId,
+}: AccountingClientReadyProps) {
   useAccountingModuleSubscription()
   const { t } = useTranslation()
   const { toast } = useToast()
@@ -616,10 +633,7 @@ function AccountingClientLoaded({
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   /** BigInt organization id for `useStdbQuery` cache keys (not SpacetimeDB `company_id` reducers). */
   const { orgId } = orgBigInts(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
-
   async function persistAccountMoveCustomFieldsAfterCreate(metadata: unknown, displayName: string) {
-    if (operatingCompanyId === 0n) return
     if (customFieldEntriesFromMetadata(metadata).length === 0) return
     let row: Record<string, unknown> | undefined
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -806,10 +820,31 @@ function AccountingClientLoaded({
         ...row,
         stateLabel: accountPeriodStateTag(row),
         fiscalYearLabel:
-          fiscalYearNameById.get(String(row.fiscalYearId ?? "")) ?? String(row.fiscalYearId ?? ""),
+          fiscalYearNameById.get(String(row.fiscalYearId ?? "")) ??
+          `Missing fiscal year #${String(row.fiscalYearId ?? "")}`,
       })),
     [accountPeriodsRaw, fiscalYearNameById],
   )
+
+  const paymentTermLinesDisplay = useMemo(() => {
+    const terms = new Map<string, { name: string; isActive: boolean }>()
+    for (const term of paymentTerms as Record<string, unknown>[]) {
+      terms.set(String(term.id ?? ""), {
+        name: String(term.name ?? `Payment term #${String(term.id ?? "")}`),
+        isActive: paymentTermIsActive(term),
+      })
+    }
+    return (paymentTermLines as Record<string, unknown>[]).map((line) => {
+      const paymentTermId = String(line.paymentTermId ?? line.payment_term_id ?? "")
+      const term = terms.get(paymentTermId)
+      return {
+        ...line,
+        paymentTermLabel: term
+          ? `${term.name}${term.isActive ? "" : " (inactive)"}`
+          : `Missing payment term #${paymentTermId}`,
+      }
+    })
+  }, [paymentTermLines, paymentTerms])
 
   const fiscalYearSelectOptionsForPeriods = useMemo(() => {
     const companyKey = operatingCompanyId > 0n ? String(operatingCompanyId) : null
@@ -915,8 +950,12 @@ function AccountingClientLoaded({
       const cid = j.currencyId
       if (cid != null) ids.add(String(cid))
     }
+    for (const account of accounts as Record<string, unknown>[]) {
+      const cid = account.currencyId
+      if (cid != null) ids.add(String(cid))
+    }
     return [...ids].map((id) => ({ value: id, label: `Currency ${id}` }))
-  }, [journals, defaultCurrencyId])
+  }, [accounts, journals, defaultCurrencyId])
 
   const companySelectOptions = useMemo(
     () => companyRowsToSelectOptions(companies as Record<string, unknown>[]),
@@ -2839,7 +2878,7 @@ function AccountingClientLoaded({
         accountTypes={accountTypes as unknown as Record<string, unknown>[]}
         accountGroups={accountGroups as unknown as Record<string, unknown>[]}
         onCreateAccountType={async (fd) => {
-          const p = toCreateAccountAccountTypeParams(fd)
+          const p = toCreateAccountAccountTypeParams(fd, operatingCompanyId)
           if (p.name.trim() && p.type.trim()) {
             await createAccountType.mutateAsync(p as unknown as Record<string, unknown>)
           }
@@ -2847,7 +2886,10 @@ function AccountingClientLoaded({
         onUpdateAccountType={async (typeId, fd) => {
           await updateAccountType.mutateAsync({
             typeId,
-            params: toUpdateAccountAccountTypeParams(fd) as unknown as Record<string, unknown>,
+            params: toUpdateAccountAccountTypeParams(
+              fd,
+              operatingCompanyId,
+            ) as unknown as Record<string, unknown>,
           })
         }}
         onCreateAccountGroup={async (fd) => {
@@ -2883,11 +2925,12 @@ function AccountingClientLoaded({
   ) => {
     if (action === "createAccount") {
       const p = toCreateAccountAccountParams(formData, {
+        companyId: operatingCompanyId,
         accountTypes: accountTypes as Record<string, unknown>[],
       })
       if (p) await createAccount.mutateAsync([organizationId, createAccountAccountParamsToStdbHttpJson(p)])
     } else if (action === "createMove") {
-      const p = toCreateAccountMoveParams(formData)
+      const p = toCreateAccountMoveParams(formData, operatingCompanyId)
       if (p) await createMove.mutateAsync([organizationId, accountingParamsToJson(p, "CreateAccountMoveParams")])
     } else if (action === "createTax") {
       await createTax.mutateAsync([
@@ -2896,7 +2939,7 @@ function AccountingClientLoaded({
         createAccountTaxParamsToStdbHttpJson(toCreateAccountTaxParams(formData)),
       ])
     } else if (action === "createBudget") {
-      await createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(formData), "CreateCrossoveredBudgetParams"))
+      await createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(formData, operatingCompanyId), "CreateCrossoveredBudgetParams"))
     } else if (action === "createAnalyticAccount") {
       const fd = { ...formData }
       if (fd.currencyId === "" || fd.currencyId == null) {
@@ -3072,6 +3115,7 @@ function AccountingClientLoaded({
                     onAccountClick={(account) => setGlDrilldownAccount(account)}
                     onCreate={async (data) => {
                       const p = toCreateAccountAccountParams(data as Record<string, unknown>, {
+                        companyId: operatingCompanyId,
                         accountTypes: accountTypes as Record<string, unknown>[],
                       })
                       if (p) await createAccount.mutateAsync([organizationId, createAccountAccountParamsToStdbHttpJson(p)])
@@ -3125,7 +3169,7 @@ function AccountingClientLoaded({
                       budgetLines={budgetLines as unknown as Record<string, unknown>[]}
                       budgetPosts={budgetPosts as unknown as Record<string, unknown>[]}
                       onCreateBudget={(params) =>
-                        createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(params), "CreateCrossoveredBudgetParams"))
+                        createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(params, operatingCompanyId), "CreateCrossoveredBudgetParams"))
                       }
                       onUpdateBudget={(budgetId, params) =>
                         updateBudget.mutateAsync([
@@ -3157,12 +3201,18 @@ function AccountingClientLoaded({
                         updateBudgetLineActuals.mutateAsync({ lineId, params })
                       }
                       onCreateBudgetPost={(params) =>
-                        createBudgetPost.mutateAsync(stdbParamsToJson(toCreateBudgetPostParams(params)))
+                        createBudgetPost.mutateAsync(
+                          stdbParamsToJson(
+                            toCreateBudgetPostParams(params, operatingCompanyId),
+                          ),
+                        )
                       }
                       onUpdateBudgetPost={(postId, params) =>
                         updateBudgetPost.mutateAsync({
                           postId,
-                          params: stdbParamsToJson(toUpdateBudgetPostParams(params)),
+                          params: stdbParamsToJson(
+                            toUpdateBudgetPostParams(params, operatingCompanyId),
+                          ),
                         })
                       }
                       workflowPending={
@@ -3290,6 +3340,7 @@ function AccountingClientLoaded({
                     defaultCurrencyId={defaultCurrencyId}
                     currencyOptions={currencySelectOptions}
                     journalOptions={journalFieldOptionsForModularForm}
+                    glAccountOptions={glAccountFieldOptions}
                     partnerOptions={partnerSelectOptions}
                     moveLines={accountMoveLines as Record<string, unknown>[]}
                   />
@@ -3360,6 +3411,7 @@ function AccountingClientLoaded({
                 customContent: (
                   <FxRevaluationPanel
                     runs={fxRevaluationRuns as unknown as Record<string, unknown>[]}
+                    currencySelectOptions={currencySelectOptions}
                     journalSelectOptions={journalFieldOptionsForModularForm}
                     accountSelectOptions={glAccountFieldOptions}
                     paymentSelectOptions={paymentSelectOptions}
@@ -3685,7 +3737,7 @@ function AccountingClientLoaded({
       payments: accountPayments as unknown as Record<string, unknown>[],
       "bank-statements": bankStatements as unknown as Record<string, unknown>[],
       "payment-terms": paymentTerms as unknown as Record<string, unknown>[],
-      "payment-term-lines": paymentTermLines as unknown as Record<string, unknown>[],
+      "payment-term-lines": paymentTermLinesDisplay,
       "account-journals": journals as unknown as Record<string, unknown>[],
       "move-lines": accountMoveLines as unknown as Record<string, unknown>[],
     }),
@@ -3700,7 +3752,7 @@ function AccountingClientLoaded({
       accountPayments,
       bankStatements,
       paymentTerms,
-      paymentTermLines,
+      paymentTermLinesDisplay,
       journals,
       accountMoveLines,
       fiscalYearsDisplay,
@@ -4005,6 +4057,7 @@ function AccountingClientLoaded({
             "OutInvoice",
             jid,
             "Customer Invoice",
+            operatingCompanyId,
           )
           await createMove.mutateAsync([
             organizationId,
@@ -4048,6 +4101,7 @@ function AccountingClientLoaded({
             "InInvoice",
             jid,
             "Vendor Bill",
+            operatingCompanyId,
           )
           await createMove.mutateAsync([
             organizationId,

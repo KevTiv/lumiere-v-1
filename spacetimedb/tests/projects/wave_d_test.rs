@@ -28,7 +28,7 @@ use crate::projects::timesheets::{
     ValidateTimesheetsParams,
 };
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
-use crate::types::{BudgetState, EmploymentType, JournalType, TaskState};
+use crate::types::{EmploymentType, JournalType, TaskState};
 
 fn seed_sale_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
     let org_id = fixture.organization_id;
@@ -316,10 +316,13 @@ fn log_and_validate(
         .ok_or("timesheet missing")?;
     // SoD: reassign logger away from validator (superuser)
     let ts = ctx.db.project_timesheet().id().find(&ts_id).ok_or("ts")?;
-    ctx.db.project_timesheet().id().update(crate::projects::timesheets::ProjectTimesheet {
-        user_id: Identity::__dummy(),
-        ..ts
-    });
+    ctx.db
+        .project_timesheet()
+        .id()
+        .update(crate::projects::timesheets::ProjectTimesheet {
+            user_id: Identity::__dummy(),
+            ..ts
+        });
     validate_timesheets(
         ctx,
         fixture.organization_id,
@@ -409,10 +412,16 @@ pub fn test_margin_math_on_validate_and_bill(ctx: &ReducerContext) -> Result<(),
     }
     // margin = 200 - 100 - 0 = 100 → 50%
     if (snap.margin_amount - 100.0).abs() > 0.01 {
-        return Err(format!("expected margin_amount 100, got {}", snap.margin_amount));
+        return Err(format!(
+            "expected margin_amount 100, got {}",
+            snap.margin_amount
+        ));
     }
     if (snap.margin_percent - 50.0).abs() > 0.01 {
-        return Err(format!("expected margin_percent 50, got {}", snap.margin_percent));
+        return Err(format!(
+            "expected margin_percent 50, got {}",
+            snap.margin_percent
+        ));
     }
 
     // Budget line link
@@ -426,12 +435,6 @@ pub fn test_margin_math_on_validate_and_bill(ctx: &ReducerContext) -> Result<(),
             description: None,
             date_from: ctx.timestamp,
             date_to,
-            state: BudgetState::Draft,
-            crossovered_budget_line: vec![],
-            total_planned: 0.0,
-            total_practical: 0.0,
-            total_theoretical: 0.0,
-            variance_percentage: 0.0,
             metadata: None,
         },
     )?;
@@ -466,12 +469,7 @@ pub fn test_margin_math_on_validate_and_bill(ctx: &ReducerContext) -> Result<(),
             metadata: None,
         },
     )?;
-    refresh_project_margin_snapshot(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        project_id,
-    );
+    refresh_project_margin_snapshot(ctx, fixture.organization_id, fixture.company_id, project_id);
     let snap = ctx
         .db
         .project_margin_snapshot()
@@ -608,7 +606,10 @@ pub fn test_milestone_bill_updates_margin(ctx: &ReducerContext) -> Result<(), St
         return Err("milestone invoice_move_id not set".into());
     }
     if (ms.billed_amount - 500.0).abs() > 0.01 {
-        return Err(format!("expected billed_amount 500, got {}", ms.billed_amount));
+        return Err(format!(
+            "expected billed_amount 500, got {}",
+            ms.billed_amount
+        ));
     }
     let move_id = ms.invoice_move_id.unwrap();
     let mv = ctx

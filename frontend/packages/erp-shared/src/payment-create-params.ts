@@ -58,9 +58,6 @@ export function toCreatePaymentAccountParams(
 export function toCreatePaymentFeeParams(
   formData: Record<string, unknown>,
 ): CreatePaymentFeeParams | null {
-  const currencyId = optionalBigIntU64(field(formData, "currencyId", "currency_id"))
-  if (currencyId === undefined) return null
-
   const companyId = optionalBigIntU64(field(formData, "companyId", "company_id"))
   const paymentTransactionId = optionalBigIntU64(field(formData, "paymentTransactionId", "payment_transaction_id"))
   if (companyId === undefined || paymentTransactionId === undefined) return null
@@ -70,7 +67,6 @@ export function toCreatePaymentFeeParams(
     companyId,
     paymentTransactionId,
     amount: num(field(formData, "amount", "amount"), 0),
-    currencyId,
     feeAccountId: optionalBigIntU64(field(formData, "feeAccountId", "fee_account_id")),
     taxAccountId: optionalBigIntU64(field(formData, "taxAccountId", "tax_account_id")),
     taxAmount: num(field(formData, "taxAmount", "tax_amount"), 0),
@@ -108,4 +104,3 @@ export function toCreatePaymentTransactionParams(
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }
-

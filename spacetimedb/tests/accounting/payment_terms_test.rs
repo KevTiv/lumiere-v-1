@@ -78,13 +78,7 @@ pub fn test_payment_term_update_and_delete(ctx: &ReducerContext) -> Result<(), S
 
     delete_payment_term(ctx, org_id, term.id)?;
 
-    if ctx
-        .db
-        .account_payment_term()
-        .id()
-        .find(&term.id)
-        .is_some()
-    {
+    if ctx.db.account_payment_term().id().find(&term.id).is_some() {
         return Err("Payment term row should be deleted".to_string());
     }
 

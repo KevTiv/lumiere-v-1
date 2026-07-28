@@ -4,8 +4,6 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::budget_state_type::BudgetState;
-
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateCrossoveredBudgetParams {
@@ -14,12 +12,6 @@ pub struct CreateCrossoveredBudgetParams {
     pub description: Option<String>,
     pub date_from: __sdk::Timestamp,
     pub date_to: __sdk::Timestamp,
-    pub state: BudgetState,
-    pub crossovered_budget_line: Vec<u64>,
-    pub total_planned: f64,
-    pub total_practical: f64,
-    pub total_theoretical: f64,
-    pub variance_percentage: f64,
     pub metadata: Option<String>,
 }
 

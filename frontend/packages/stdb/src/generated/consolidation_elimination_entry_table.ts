@@ -12,6 +12,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.option(__t.u64()).name("organization_id"),
   journalId: __t.u64().name("journal_id"),
   sequence: __t.u32(),
   name: __t.string(),

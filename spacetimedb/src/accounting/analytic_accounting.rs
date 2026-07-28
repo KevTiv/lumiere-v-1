@@ -12,7 +12,7 @@
 /// - `AccountAnalyticDistributionModel` — Auto-distribution rules for analytic accounts
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company_id_from_scope;
+use crate::accounting::relations::require_explicit_company_id;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -158,14 +158,6 @@ pub struct CreateAnalyticAccountParams {
     pub is_required_in_move_lines: bool,
     pub is_required_in_distribution: bool,
     pub is_root_plan: bool,
-    pub line_ids: Vec<u64>,
-    pub child_ids: Vec<u64>,
-    pub message_follower_ids: Vec<u64>,
-    pub activity_ids: Vec<u64>,
-    pub message_ids: Vec<u64>,
-    pub balance: f64,
-    pub debit: f64,
-    pub credit: f64,
     pub metadata: Option<String>,
 }
 
@@ -173,13 +165,13 @@ pub struct CreateAnalyticAccountParams {
 pub struct UpdateAnalyticAccountParams {
     pub company_id: Option<u64>,
     pub name: Option<String>,
-    pub code: Option<String>,
-    pub partner_id: Option<u64>,
-    pub plan_id: Option<u64>,
-    pub group_id: Option<u64>,
-    pub color: Option<u8>,
+    pub code: Option<Option<String>>,
+    pub partner_id: Option<Option<u64>>,
+    pub plan_id: Option<Option<u64>>,
+    pub group_id: Option<Option<u64>>,
+    pub color: Option<Option<u8>>,
     pub is_required_in_move_lines: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -216,12 +208,12 @@ pub struct UpdateAnalyticLineParams {
     pub name: Option<String>,
     pub amount: Option<f64>,
     pub unit_amount: Option<f64>,
-    pub partner_id: Option<u64>,
-    pub project_id: Option<u64>,
-    pub task_id: Option<u64>,
-    pub category: Option<String>,
+    pub partner_id: Option<Option<u64>>,
+    pub project_id: Option<Option<u64>>,
+    pub task_id: Option<Option<u64>>,
+    pub category: Option<Option<String>>,
     pub tag_ids: Option<Vec<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -260,7 +252,12 @@ pub fn create_analytic_account(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_analytic_account", "create")?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id = require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "analytic-account creation",
+    )?;
 
     if params.name.is_empty() {
         return Err("Analytic account name is required".to_string());
@@ -278,10 +275,10 @@ pub fn create_analytic_account(
             company_id,
             partner_id: params.partner_id,
             group_id: params.group_id,
-            line_ids: params.line_ids,
-            balance: params.balance,
-            debit: params.debit,
-            credit: params.credit,
+            line_ids: vec![],
+            balance: 0.0,
+            debit: 0.0,
+            credit: 0.0,
             currency_id: params.currency_id,
             root_plan_id: params.plan_id,
             plan_id: params.plan_id,
@@ -290,10 +287,10 @@ pub fn create_analytic_account(
             is_required_in_distribution: params.is_required_in_distribution,
             color: params.color,
             parent_id: params.parent_id,
-            child_ids: params.child_ids,
-            message_follower_ids: params.message_follower_ids,
-            activity_ids: params.activity_ids,
-            message_ids: params.message_ids,
+            child_ids: vec![],
+            message_follower_ids: vec![],
+            activity_ids: vec![],
+            message_ids: vec![],
             is_company_root: params.parent_id.is_none(),
             is_root_plan: params.is_root_plan,
             create_uid: Some(ctx.sender()),
@@ -352,7 +349,12 @@ pub fn update_analytic_account(
         return Err("Analytic account does not belong to this organization".to_string());
     }
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id = require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "analytic-account update",
+    )?;
     if account.company_id != company_id {
         return Err("Analytic account does not belong to this company".to_string());
     }
@@ -372,29 +374,29 @@ pub fn update_analytic_account(
         changed_fields.push("name".to_string());
     }
 
-    if params.code.is_some() {
-        account.code = params.code;
+    if let Some(code) = params.code {
+        account.code = code;
         changed_fields.push("code".to_string());
     }
 
-    if params.partner_id.is_some() {
-        account.partner_id = params.partner_id;
+    if let Some(partner_id) = params.partner_id {
+        account.partner_id = partner_id;
         changed_fields.push("partner_id".to_string());
     }
 
-    if params.plan_id.is_some() {
-        account.plan_id = params.plan_id;
-        account.root_plan_id = params.plan_id;
+    if let Some(plan_id) = params.plan_id {
+        account.plan_id = plan_id;
+        account.root_plan_id = plan_id;
         changed_fields.push("plan_id".to_string());
     }
 
-    if params.group_id.is_some() {
-        account.group_id = params.group_id;
+    if let Some(group_id) = params.group_id {
+        account.group_id = group_id;
         changed_fields.push("group_id".to_string());
     }
 
-    if let Some(c) = params.color {
-        account.color = Some(c);
+    if let Some(color) = params.color {
+        account.color = color;
         changed_fields.push("color".to_string());
     }
 
@@ -403,8 +405,8 @@ pub fn update_analytic_account(
         changed_fields.push("is_required_in_move_lines".to_string());
     }
 
-    if let Some(m) = params.metadata {
-        account.metadata = Some(m);
+    if let Some(metadata) = params.metadata {
+        account.metadata = metadata;
         changed_fields.push("metadata".to_string());
     }
 
@@ -581,23 +583,23 @@ pub fn update_analytic_line(
         changed_fields.push("unit_amount".to_string());
     }
 
-    if params.partner_id.is_some() {
-        line.partner_id = params.partner_id;
+    if let Some(partner_id) = params.partner_id {
+        line.partner_id = partner_id;
         changed_fields.push("partner_id".to_string());
     }
 
-    if params.project_id.is_some() {
-        line.project_id = params.project_id;
+    if let Some(project_id) = params.project_id {
+        line.project_id = project_id;
         changed_fields.push("project_id".to_string());
     }
 
-    if params.task_id.is_some() {
-        line.task_id = params.task_id;
+    if let Some(task_id) = params.task_id {
+        line.task_id = task_id;
         changed_fields.push("task_id".to_string());
     }
 
-    if params.category.is_some() {
-        line.category = params.category;
+    if let Some(category) = params.category {
+        line.category = category;
         changed_fields.push("category".to_string());
     }
 
@@ -606,8 +608,8 @@ pub fn update_analytic_line(
         changed_fields.push("tag_ids".to_string());
     }
 
-    if let Some(m) = params.metadata {
-        line.metadata = Some(m);
+    if let Some(metadata) = params.metadata {
+        line.metadata = metadata;
         changed_fields.push("metadata".to_string());
     }
 
@@ -740,7 +742,12 @@ pub fn create_analytic_distribution_model(
         "create",
     )?;
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id = require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "analytic-distribution creation",
+    )?;
 
     // Validate distribution JSON
     let parsed: Vec<serde_json::Value> = serde_json::from_str(&params.analytic_distribution)
@@ -837,7 +844,12 @@ pub fn update_analytic_distribution_model(
         return Err("Distribution model does not belong to this organization".to_string());
     }
 
-    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_id = require_explicit_company_id(
+        ctx,
+        organization_id,
+        params.company_id,
+        "analytic-distribution update",
+    )?;
     if model.company_id != company_id {
         return Err("Distribution model does not belong to this company".to_string());
     }

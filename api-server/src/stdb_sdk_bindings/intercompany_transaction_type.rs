@@ -11,6 +11,7 @@ use super::rule_type_type::RuleType;
 #[sats(crate = __lib)]
 pub struct IntercompanyTransaction {
     pub id: u64,
+    pub organization_id: Option<u64>,
     pub name: String,
     pub origin_company_id: u64,
     pub destination_company_id: u64,
@@ -44,6 +45,7 @@ impl __sdk::InModule for IntercompanyTransaction {
 /// Provides typed access to columns for query building.
 pub struct IntercompanyTransactionCols {
     pub id: __sdk::__query_builder::Col<IntercompanyTransaction, u64>,
+    pub organization_id: __sdk::__query_builder::Col<IntercompanyTransaction, Option<u64>>,
     pub name: __sdk::__query_builder::Col<IntercompanyTransaction, String>,
     pub origin_company_id: __sdk::__query_builder::Col<IntercompanyTransaction, u64>,
     pub destination_company_id: __sdk::__query_builder::Col<IntercompanyTransaction, u64>,
@@ -75,6 +77,7 @@ impl __sdk::__query_builder::HasCols for IntercompanyTransaction {
     fn cols(table_name: &'static str) -> Self::Cols {
         IntercompanyTransactionCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             origin_company_id: __sdk::__query_builder::Col::new(table_name, "origin_company_id"),
             destination_company_id: __sdk::__query_builder::Col::new(
@@ -119,6 +122,7 @@ impl __sdk::__query_builder::HasCols for IntercompanyTransaction {
 pub struct IntercompanyTransactionIxCols {
     pub destination_company_id: __sdk::__query_builder::IxCol<IntercompanyTransaction, u64>,
     pub id: __sdk::__query_builder::IxCol<IntercompanyTransaction, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<IntercompanyTransaction, Option<u64>>,
     pub origin_company_id: __sdk::__query_builder::IxCol<IntercompanyTransaction, u64>,
     pub origin_document_model: __sdk::__query_builder::IxCol<IntercompanyTransaction, String>,
     pub state: __sdk::__query_builder::IxCol<IntercompanyTransaction, IntercompanyState>,
@@ -133,6 +137,7 @@ impl __sdk::__query_builder::HasIxCols for IntercompanyTransaction {
                 "destination_company_id",
             ),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             origin_company_id: __sdk::__query_builder::IxCol::new(table_name, "origin_company_id"),
             origin_document_model: __sdk::__query_builder::IxCol::new(
                 table_name,

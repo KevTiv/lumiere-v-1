@@ -1639,29 +1639,36 @@ function subscriptionSqlForCompanyScopedResource(
   const ids = ctx.companyIds
   const fa = ctx.fieldAccess
   if (resource === "fixed-assets") {
-    if (!ids?.length) return null
+    if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("fixed-assets", fa).join(", ")
     const filter = companyIdsEqualityOr("company_id", ids)
-    return [`SELECT ${c} FROM account_asset WHERE ${filter}`]
+    return [
+      `SELECT ${c} FROM account_asset WHERE organization_id = ${ctx.organizationId} AND (${filter})`,
+    ]
   }
   if (resource === "intercompany-rules") {
-    if (!ids?.length) return null
+    if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("intercompany-rules", fa).join(", ")
     const filter = companyIdsDualFieldOr("source_company_id", "destination_company_id", ids)
     return [
-      `SELECT ${c} FROM intercompany_rule WHERE ${filter} ORDER BY sequence ASC`,
+      `SELECT ${c} FROM intercompany_rule WHERE organization_id = ${ctx.organizationId} AND (${filter}) ORDER BY sequence ASC`,
     ]
   }
   if (resource === "intercompany-transactions") {
-    if (!ids?.length) return null
+    if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("intercompany-transactions", fa).join(", ")
     const filter = companyIdsDualFieldOr("origin_company_id", "destination_company_id", ids)
     return [
-      `SELECT ${c} FROM intercompany_transaction WHERE ${filter} ORDER BY id DESC`,
+      `SELECT ${c} FROM intercompany_transaction WHERE organization_id = ${ctx.organizationId} AND (${filter}) ORDER BY id DESC`,
     ]
   }
   if (resource === "depreciation-lines") {
-    return null
+    if (ctx.organizationId == null || !ids?.length) return null
+    const c = resolveHttpSqlColumns("depreciation-lines", fa).join(", ")
+    const filter = companyIdsEqualityOr("company_id", ids)
+    return [
+      `SELECT ${c} FROM account_asset_depreciation_line WHERE organization_id = ${ctx.organizationId} AND (${filter})`,
+    ]
   }
   if (resource === "pos-configs") {
     if (!ids?.length) return null
@@ -1716,29 +1723,42 @@ function subscriptionSqlForCompanyScopedResource(
     return null
   }
   if (resource === "fiscal-years") {
-    if (!ids?.length) return null
+    if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("fiscal-years", fa).join(", ")
     const filter = companyIdsEqualityOr("company_id", ids)
-    return [`SELECT ${c} FROM account_fiscal_year WHERE ${filter}`]
+    return [
+      `SELECT ${c} FROM account_fiscal_year WHERE organization_id = ${ctx.organizationId} AND (${filter})`,
+    ]
   }
   if (resource === "account-periods") {
-    if (!ids?.length) return null
+    if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("account-periods", fa).join(", ")
     const filter = companyIdsEqualityOr("company_id", ids)
-    return [`SELECT ${c} FROM account_period WHERE ${filter}`]
+    return [
+      `SELECT ${c} FROM account_period WHERE organization_id = ${ctx.organizationId} AND (${filter})`,
+    ]
   }
   if (resource === "consolidation-elimination-entries") {
-    if (!ids?.length) return null
+    if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("consolidation-elimination-entries", fa).join(", ")
     const filter = companyIdsEqualityOr("company_id", ids)
-    return [`SELECT ${c} FROM consolidation_elimination_entry WHERE ${filter}`]
+    return [
+      `SELECT ${c} FROM consolidation_elimination_entry WHERE organization_id = ${ctx.organizationId} AND (${filter})`,
+    ]
   }
   if (resource === "consolidation-journals") {
-    // Indexed company_ids vector — mirror journals that touch selected companies via elimination.
-    return null
+    if (ctx.organizationId == null) return null
+    const c = resolveHttpSqlColumns("consolidation-journals", fa).join(", ")
+    return [
+      `SELECT ${c} FROM consolidation_journal WHERE organization_id = ${ctx.organizationId}`,
+    ]
   }
   if (resource === "consolidation-accounts") {
-    return null
+    if (ctx.organizationId == null) return null
+    const c = resolveHttpSqlColumns("consolidation-accounts", fa).join(", ")
+    return [
+      `SELECT ${c} FROM consolidation_account WHERE organization_id = ${ctx.organizationId}`,
+    ]
   }
   return undefined
 }

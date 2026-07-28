@@ -53,7 +53,7 @@ use crate::inventory::product_category::{
 };
 use crate::inventory::stock::{stock_quant, StockQuant};
 use crate::inventory::warehouse::{stock_location, warehouse, StockLocation, Warehouse};
-use crate::types::{AccountInternalGroup, AccountTypeInternal, FiscalYearState, PeriodState};
+use crate::types::{AccountInternalGroup, AccountTypeInternal};
 
 /// Alias for mission docs — domain tests receive a live `ReducerContext` from SpacetimeDB.
 pub type TestContext = ReducerContext;
@@ -150,10 +150,6 @@ impl OrgFixture {
                 date_from: year_start,
                 date_to: year_end,
                 type_: "standard".to_string(),
-                state: FiscalYearState::Running,
-                carry_over_accounts: vec![],
-                closing_move_id: None,
-                opening_move_id: None,
                 is_adjustment: false,
                 notes: None,
                 metadata: None,
@@ -179,7 +175,6 @@ impl OrgFixture {
                 date_from: year_start,
                 date_to: year_end,
                 fiscal_year_id,
-                state: PeriodState::Open,
                 is_adjustment: false,
                 notes: None,
                 metadata: None,

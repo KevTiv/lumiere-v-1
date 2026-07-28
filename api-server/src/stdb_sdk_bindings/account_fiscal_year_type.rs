@@ -18,9 +18,10 @@ pub struct AccountFiscalYear {
     pub name: String,
     pub date_from: __sdk::Timestamp,
     pub date_to: __sdk::Timestamp,
+    pub organization_id: Option::<u64>,
     pub company_id: u64,
     pub state: FiscalYearState,
-    pub type: String,
+    pub r#type: String,
     pub carry_over_accounts: Vec::<u64>,
     pub closing_move_id: Option::<u64>,
     pub opening_move_id: Option::<u64>,
@@ -47,9 +48,10 @@ pub struct AccountFiscalYearCols {
     pub name: __sdk::__query_builder::Col<AccountFiscalYear, String>,
     pub date_from: __sdk::__query_builder::Col<AccountFiscalYear, __sdk::Timestamp>,
     pub date_to: __sdk::__query_builder::Col<AccountFiscalYear, __sdk::Timestamp>,
+    pub organization_id: __sdk::__query_builder::Col<AccountFiscalYear, Option::<u64>>,
     pub company_id: __sdk::__query_builder::Col<AccountFiscalYear, u64>,
     pub state: __sdk::__query_builder::Col<AccountFiscalYear, FiscalYearState>,
-    pub type: __sdk::__query_builder::Col<AccountFiscalYear, String>,
+    pub r#type: __sdk::__query_builder::Col<AccountFiscalYear, String>,
     pub carry_over_accounts: __sdk::__query_builder::Col<AccountFiscalYear, Vec::<u64>>,
     pub closing_move_id: __sdk::__query_builder::Col<AccountFiscalYear, Option::<u64>>,
     pub opening_move_id: __sdk::__query_builder::Col<AccountFiscalYear, Option::<u64>>,
@@ -70,9 +72,10 @@ impl __sdk::__query_builder::HasCols for AccountFiscalYear {
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             date_from: __sdk::__query_builder::Col::new(table_name, "date_from"),
             date_to: __sdk::__query_builder::Col::new(table_name, "date_to"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             state: __sdk::__query_builder::Col::new(table_name, "state"),
-            type: __sdk::__query_builder::Col::new(table_name, "type"),
+            r#type: __sdk::__query_builder::Col::new(table_name, "type"),
             carry_over_accounts: __sdk::__query_builder::Col::new(table_name, "carry_over_accounts"),
             closing_move_id: __sdk::__query_builder::Col::new(table_name, "closing_move_id"),
             opening_move_id: __sdk::__query_builder::Col::new(table_name, "opening_move_id"),
@@ -94,6 +97,7 @@ impl __sdk::__query_builder::HasCols for AccountFiscalYear {
 pub struct AccountFiscalYearIxCols {
     pub company_id: __sdk::__query_builder::IxCol<AccountFiscalYear, u64>,
     pub id: __sdk::__query_builder::IxCol<AccountFiscalYear, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<AccountFiscalYear, Option::<u64>>,
     pub state: __sdk::__query_builder::IxCol<AccountFiscalYear, FiscalYearState>,
 }
 
@@ -103,6 +107,7 @@ impl __sdk::__query_builder::HasIxCols for AccountFiscalYear {
         AccountFiscalYearIxCols {
             company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             state: __sdk::__query_builder::IxCol::new(table_name, "state"),
 
         }

@@ -10,6 +10,7 @@ use super::consolidation_state_type::ConsolidationState;
 #[sats(crate = __lib)]
 pub struct ConsolidationJournal {
     pub id: u64,
+    pub organization_id: Option<u64>,
     pub name: String,
     pub period_id: u64,
     pub period_name: String,
@@ -45,6 +46,7 @@ impl __sdk::InModule for ConsolidationJournal {
 /// Provides typed access to columns for query building.
 pub struct ConsolidationJournalCols {
     pub id: __sdk::__query_builder::Col<ConsolidationJournal, u64>,
+    pub organization_id: __sdk::__query_builder::Col<ConsolidationJournal, Option<u64>>,
     pub name: __sdk::__query_builder::Col<ConsolidationJournal, String>,
     pub period_id: __sdk::__query_builder::Col<ConsolidationJournal, u64>,
     pub period_name: __sdk::__query_builder::Col<ConsolidationJournal, String>,
@@ -77,6 +79,7 @@ impl __sdk::__query_builder::HasCols for ConsolidationJournal {
     fn cols(table_name: &'static str) -> Self::Cols {
         ConsolidationJournalCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             period_id: __sdk::__query_builder::Col::new(table_name, "period_id"),
             period_name: __sdk::__query_builder::Col::new(table_name, "period_name"),
@@ -114,6 +117,7 @@ impl __sdk::__query_builder::HasCols for ConsolidationJournal {
 pub struct ConsolidationJournalIxCols {
     pub currency_id: __sdk::__query_builder::IxCol<ConsolidationJournal, u64>,
     pub id: __sdk::__query_builder::IxCol<ConsolidationJournal, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<ConsolidationJournal, Option<u64>>,
     pub period_id: __sdk::__query_builder::IxCol<ConsolidationJournal, u64>,
     pub state: __sdk::__query_builder::IxCol<ConsolidationJournal, ConsolidationState>,
 }
@@ -124,6 +128,7 @@ impl __sdk::__query_builder::HasIxCols for ConsolidationJournal {
         ConsolidationJournalIxCols {
             currency_id: __sdk::__query_builder::IxCol::new(table_name, "currency_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             period_id: __sdk::__query_builder::IxCol::new(table_name, "period_id"),
             state: __sdk::__query_builder::IxCol::new(table_name, "state"),
         }

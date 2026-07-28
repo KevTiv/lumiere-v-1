@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct ConsolidationAccount {
     pub id: u64,
+    pub organization_id: Option<u64>,
     pub name: String,
     pub code: String,
     pub account_type: String,
@@ -35,6 +36,7 @@ impl __sdk::InModule for ConsolidationAccount {
 /// Provides typed access to columns for query building.
 pub struct ConsolidationAccountCols {
     pub id: __sdk::__query_builder::Col<ConsolidationAccount, u64>,
+    pub organization_id: __sdk::__query_builder::Col<ConsolidationAccount, Option<u64>>,
     pub name: __sdk::__query_builder::Col<ConsolidationAccount, String>,
     pub code: __sdk::__query_builder::Col<ConsolidationAccount, String>,
     pub account_type: __sdk::__query_builder::Col<ConsolidationAccount, String>,
@@ -58,6 +60,7 @@ impl __sdk::__query_builder::HasCols for ConsolidationAccount {
     fn cols(table_name: &'static str) -> Self::Cols {
         ConsolidationAccountCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             code: __sdk::__query_builder::Col::new(table_name, "code"),
             account_type: __sdk::__query_builder::Col::new(table_name, "account_type"),
@@ -89,6 +92,7 @@ pub struct ConsolidationAccountIxCols {
     pub code: __sdk::__query_builder::IxCol<ConsolidationAccount, String>,
     pub currency_id: __sdk::__query_builder::IxCol<ConsolidationAccount, u64>,
     pub id: __sdk::__query_builder::IxCol<ConsolidationAccount, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<ConsolidationAccount, Option<u64>>,
 }
 
 impl __sdk::__query_builder::HasIxCols for ConsolidationAccount {
@@ -99,6 +103,7 @@ impl __sdk::__query_builder::HasIxCols for ConsolidationAccount {
             code: __sdk::__query_builder::IxCol::new(table_name, "code"),
             currency_id: __sdk::__query_builder::IxCol::new(table_name, "currency_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
         }
     }
 }

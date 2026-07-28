@@ -10,6 +10,7 @@ use super::rule_type_type::RuleType;
 #[sats(crate = __lib)]
 pub struct IntercompanyRule {
     pub id: u64,
+    pub organization_id: Option<u64>,
     pub name: String,
     pub rule_type: RuleType,
     pub source_company_id: u64,
@@ -39,6 +40,7 @@ impl __sdk::InModule for IntercompanyRule {
 /// Provides typed access to columns for query building.
 pub struct IntercompanyRuleCols {
     pub id: __sdk::__query_builder::Col<IntercompanyRule, u64>,
+    pub organization_id: __sdk::__query_builder::Col<IntercompanyRule, Option<u64>>,
     pub name: __sdk::__query_builder::Col<IntercompanyRule, String>,
     pub rule_type: __sdk::__query_builder::Col<IntercompanyRule, RuleType>,
     pub source_company_id: __sdk::__query_builder::Col<IntercompanyRule, u64>,
@@ -64,6 +66,7 @@ impl __sdk::__query_builder::HasCols for IntercompanyRule {
     fn cols(table_name: &'static str) -> Self::Cols {
         IntercompanyRuleCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             rule_type: __sdk::__query_builder::Col::new(table_name, "rule_type"),
             source_company_id: __sdk::__query_builder::Col::new(table_name, "source_company_id"),
@@ -98,6 +101,7 @@ impl __sdk::__query_builder::HasCols for IntercompanyRule {
 pub struct IntercompanyRuleIxCols {
     pub destination_company_id: __sdk::__query_builder::IxCol<IntercompanyRule, u64>,
     pub id: __sdk::__query_builder::IxCol<IntercompanyRule, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<IntercompanyRule, Option<u64>>,
     pub rule_type: __sdk::__query_builder::IxCol<IntercompanyRule, RuleType>,
     pub source_company_id: __sdk::__query_builder::IxCol<IntercompanyRule, u64>,
 }
@@ -111,6 +115,7 @@ impl __sdk::__query_builder::HasIxCols for IntercompanyRule {
                 "destination_company_id",
             ),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             rule_type: __sdk::__query_builder::IxCol::new(table_name, "rule_type"),
             source_company_id: __sdk::__query_builder::IxCol::new(table_name, "source_company_id"),
         }

@@ -5,7 +5,8 @@
 /// Tables for managing fiscal years and accounting periods.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::require_company_in_organization;
+use crate::core::organization::{company, require_company_in_organization};
+use crate::core::users::user_profile;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{FiscalYearState, PeriodState};
 
@@ -14,10 +15,12 @@ use crate::types::{FiscalYearState, PeriodState};
 #[spacetimedb::table(
     accessor = account_fiscal_year,
     public,
+    index(accessor = fiscal_year_by_organization, btree(columns = [organization_id])),
     index(accessor = fiscal_year_by_company, btree(columns = [company_id])),
     index(accessor = fiscal_year_by_dates, btree(columns = [date_from, date_to])),
     index(accessor = fiscal_year_by_state, btree(columns = [state]))
 )]
+#[derive(Clone)]
 pub struct AccountFiscalYear {
     #[primary_key]
     #[auto_inc]
@@ -25,6 +28,8 @@ pub struct AccountFiscalYear {
     pub name: String,
     pub date_from: Timestamp,
     pub date_to: Timestamp,
+    /// Nullable only during the legacy ownership backfill.
+    pub organization_id: Option<u64>,
     pub company_id: u64,
     pub state: FiscalYearState,
     pub type_: String,
@@ -43,11 +48,13 @@ pub struct AccountFiscalYear {
 #[spacetimedb::table(
     accessor = account_period,
     public,
+    index(accessor = period_by_organization, btree(columns = [organization_id])),
     index(accessor = period_by_company, btree(columns = [company_id])),
     index(accessor = period_by_dates, btree(columns = [date_from, date_to])),
     index(accessor = period_by_fiscal_year, btree(columns = [fiscal_year_id])),
     index(accessor = period_by_state, btree(columns = [state]))
 )]
+#[derive(Clone)]
 pub struct AccountPeriod {
     #[primary_key]
     #[auto_inc]
@@ -56,6 +63,8 @@ pub struct AccountPeriod {
     pub code: String,
     pub date_from: Timestamp,
     pub date_to: Timestamp,
+    /// Nullable only during the legacy ownership backfill.
+    pub organization_id: Option<u64>,
     pub company_id: u64,
     pub fiscal_year_id: u64,
     pub state: PeriodState,
@@ -68,6 +77,37 @@ pub struct AccountPeriod {
     pub metadata: Option<String>,
 }
 
+/// Server-only record of a legacy row whose ownership could not be derived safely.
+#[spacetimedb::table(
+    accessor = accounting_ownership_backfill_issue,
+    index(accessor = ownership_issue_by_table, btree(columns = [table_name]))
+)]
+pub struct AccountingOwnershipBackfillIssue {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub table_name: String,
+    pub record_id: u64,
+    pub company_id: Option<u64>,
+    pub parent_id: Option<u64>,
+    pub issue: String,
+    pub detected_at: Timestamp,
+}
+
+/// Server-only summary proving how many legacy rows remain quarantined.
+#[spacetimedb::table(accessor = accounting_ownership_backfill_run)]
+pub struct AccountingOwnershipBackfillRun {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub scope: String,
+    pub scanned_rows: u64,
+    pub backfilled_rows: u64,
+    pub unresolved_rows: u64,
+    pub completed_at: Timestamp,
+    pub completed_by: Identity,
+}
+
 // ── Input Params ─────────────────────────────────────────────────────────────
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -76,10 +116,6 @@ pub struct CreateFiscalYearParams {
     pub date_from: Timestamp,
     pub date_to: Timestamp,
     pub type_: String,
-    pub state: FiscalYearState,
-    pub carry_over_accounts: Vec<u64>,
-    pub closing_move_id: Option<u64>,
-    pub opening_move_id: Option<u64>,
     pub is_adjustment: bool,
     pub notes: Option<String>,
     pub metadata: Option<String>,
@@ -96,7 +132,7 @@ pub struct UpdateFiscalYearParams {
     pub opening_move_id: Option<Option<u64>>,
     pub is_adjustment: Option<bool>,
     pub notes: Option<Option<String>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -106,7 +142,6 @@ pub struct CreateAccountPeriodParams {
     pub date_from: Timestamp,
     pub date_to: Timestamp,
     pub fiscal_year_id: u64,
-    pub state: PeriodState,
     pub is_adjustment: bool,
     pub notes: Option<String>,
     pub metadata: Option<String>,
@@ -120,7 +155,63 @@ pub struct UpdateAccountPeriodParams {
     pub date_to: Option<Timestamp>,
     pub is_adjustment: Option<bool>,
     pub notes: Option<Option<String>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
+}
+
+fn load_fiscal_year_in_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    fiscal_year_id: u64,
+) -> Result<AccountFiscalYear, String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+
+    let fiscal_year = ctx
+        .db
+        .account_fiscal_year()
+        .id()
+        .find(&fiscal_year_id)
+        .ok_or("fiscal year not found")?;
+
+    if fiscal_year.organization_id != Some(organization_id) {
+        return Err("fiscal year does not belong to this organization".to_string());
+    }
+    if fiscal_year.company_id != company_id {
+        return Err("fiscal year does not belong to this company".to_string());
+    }
+
+    Ok(fiscal_year)
+}
+
+fn load_period_in_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    period_id: u64,
+) -> Result<AccountPeriod, String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+
+    let period = ctx
+        .db
+        .account_period()
+        .id()
+        .find(&period_id)
+        .ok_or("period not found")?;
+
+    if period.organization_id != Some(organization_id) {
+        return Err("period does not belong to this organization".to_string());
+    }
+    if period.company_id != company_id {
+        return Err("period does not belong to this company".to_string());
+    }
+
+    let fiscal_year =
+        load_fiscal_year_in_scope(ctx, organization_id, company_id, period.fiscal_year_id)?;
+    if fiscal_year.id != period.fiscal_year_id {
+        return Err("period fiscal year is inconsistent".to_string());
+    }
+
+    Ok(period)
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -145,9 +236,10 @@ pub fn create_fiscal_year(
         .fiscal_year_by_company()
         .filter(&company_id)
         .filter(|fy| {
-            (params.date_from >= fy.date_from && params.date_from <= fy.date_to)
-                || (params.date_to >= fy.date_from && params.date_to <= fy.date_to)
-                || (params.date_from <= fy.date_from && params.date_to >= fy.date_to)
+            fy.organization_id == Some(organization_id)
+                && ((params.date_from >= fy.date_from && params.date_from <= fy.date_to)
+                    || (params.date_to >= fy.date_from && params.date_to <= fy.date_to)
+                    || (params.date_from <= fy.date_from && params.date_to >= fy.date_to))
         })
         .collect();
 
@@ -160,12 +252,13 @@ pub fn create_fiscal_year(
         name: params.name.clone(),
         date_from: params.date_from,
         date_to: params.date_to,
+        organization_id: Some(organization_id),
         company_id,
-        state: params.state,
+        state: FiscalYearState::Draft,
         type_: params.type_,
-        carry_over_accounts: params.carry_over_accounts,
-        closing_move_id: params.closing_move_id,
-        opening_move_id: params.opening_move_id,
+        carry_over_accounts: vec![],
+        closing_move_id: None,
+        opening_move_id: None,
         is_adjustment: params.is_adjustment,
         notes: params.notes,
         create_uid: Some(ctx.sender()),
@@ -214,16 +307,7 @@ pub fn update_fiscal_year(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_fiscal_year", "write")?;
 
-    let fiscal_year = ctx
-        .db
-        .account_fiscal_year()
-        .id()
-        .find(&fiscal_year_id)
-        .ok_or("Fiscal year not found")?;
-
-    if fiscal_year.company_id != company_id {
-        return Err("Fiscal year does not belong to this company".to_string());
-    }
+    let fiscal_year = load_fiscal_year_in_scope(ctx, organization_id, company_id, fiscal_year_id)?;
 
     if fiscal_year.state == FiscalYearState::Closed {
         return Err("Cannot modify a closed fiscal year".to_string());
@@ -293,7 +377,7 @@ pub fn update_fiscal_year(
         notes: params.notes.unwrap_or(fiscal_year.notes),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.or(fiscal_year.metadata),
+        metadata: params.metadata.unwrap_or(fiscal_year.metadata),
         ..fiscal_year
     });
 
@@ -324,16 +408,7 @@ pub fn delete_fiscal_year(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_fiscal_year", "delete")?;
 
-    let fiscal_year = ctx
-        .db
-        .account_fiscal_year()
-        .id()
-        .find(&fiscal_year_id)
-        .ok_or("Fiscal year not found")?;
-
-    if fiscal_year.company_id != company_id {
-        return Err("Fiscal year does not belong to this company".to_string());
-    }
+    let fiscal_year = load_fiscal_year_in_scope(ctx, organization_id, company_id, fiscal_year_id)?;
 
     if fiscal_year.state == FiscalYearState::Running {
         return Err("Cannot delete a running fiscal year".to_string());
@@ -379,16 +454,7 @@ pub fn open_fiscal_year(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_fiscal_year", "write")?;
 
-    let fiscal_year = ctx
-        .db
-        .account_fiscal_year()
-        .id()
-        .find(&fiscal_year_id)
-        .ok_or("Fiscal year not found")?;
-
-    if fiscal_year.company_id != company_id {
-        return Err("Fiscal year does not belong to this company".to_string());
-    }
+    let fiscal_year = load_fiscal_year_in_scope(ctx, organization_id, company_id, fiscal_year_id)?;
 
     if fiscal_year.state != FiscalYearState::Draft {
         return Err("Only draft fiscal years can be opened".to_string());
@@ -428,16 +494,7 @@ pub fn close_fiscal_year(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_fiscal_year", "write")?;
 
-    let fiscal_year = ctx
-        .db
-        .account_fiscal_year()
-        .id()
-        .find(&fiscal_year_id)
-        .ok_or("Fiscal year not found")?;
-
-    if fiscal_year.company_id != company_id {
-        return Err("Fiscal year does not belong to this company".to_string());
-    }
+    let fiscal_year = load_fiscal_year_in_scope(ctx, organization_id, company_id, fiscal_year_id)?;
 
     if fiscal_year.state != FiscalYearState::Running {
         return Err("Only open fiscal years can be closed".to_string());
@@ -492,16 +549,8 @@ pub fn create_account_period(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_period", "create")?;
 
-    let fiscal_year = ctx
-        .db
-        .account_fiscal_year()
-        .id()
-        .find(&params.fiscal_year_id)
-        .ok_or("Fiscal year not found")?;
-
-    if fiscal_year.company_id != company_id {
-        return Err("Fiscal year does not belong to the specified company".to_string());
-    }
+    let fiscal_year =
+        load_fiscal_year_in_scope(ctx, organization_id, company_id, params.fiscal_year_id)?;
 
     if params.date_from < fiscal_year.date_from || params.date_to > fiscal_year.date_to {
         return Err("Period dates must be within fiscal year dates".to_string());
@@ -517,9 +566,10 @@ pub fn create_account_period(
         .period_by_company()
         .filter(&company_id)
         .filter(|p| {
-            (params.date_from >= p.date_from && params.date_from <= p.date_to)
-                || (params.date_to >= p.date_from && params.date_to <= p.date_to)
-                || (params.date_from <= p.date_from && params.date_to >= p.date_to)
+            p.organization_id == Some(organization_id)
+                && ((params.date_from >= p.date_from && params.date_from <= p.date_to)
+                    || (params.date_to >= p.date_from && params.date_to <= p.date_to)
+                    || (params.date_from <= p.date_from && params.date_to >= p.date_to))
         })
         .collect();
 
@@ -533,9 +583,10 @@ pub fn create_account_period(
         code: params.code.clone(),
         date_from: params.date_from,
         date_to: params.date_to,
+        organization_id: Some(organization_id),
         company_id,
         fiscal_year_id: params.fiscal_year_id,
-        state: params.state,
+        state: PeriodState::Draft,
         is_adjustment: params.is_adjustment,
         notes: params.notes,
         create_uid: Some(ctx.sender()),
@@ -584,16 +635,7 @@ pub fn update_account_period(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_period", "write")?;
 
-    let period = ctx
-        .db
-        .account_period()
-        .id()
-        .find(&period_id)
-        .ok_or("Period not found")?;
-
-    if period.company_id != company_id {
-        return Err("Period does not belong to this company".to_string());
-    }
+    let period = load_period_in_scope(ctx, organization_id, company_id, period_id)?;
 
     if period.state == PeriodState::Closed {
         return Err("Cannot modify a closed period".to_string());
@@ -606,12 +648,8 @@ pub fn update_account_period(
         return Err("Period start date must be before end date".to_string());
     }
 
-    let fiscal_year = ctx
-        .db
-        .account_fiscal_year()
-        .id()
-        .find(&period.fiscal_year_id)
-        .ok_or("Fiscal year not found")?;
+    let fiscal_year =
+        load_fiscal_year_in_scope(ctx, organization_id, company_id, period.fiscal_year_id)?;
 
     if new_date_from < fiscal_year.date_from || new_date_to > fiscal_year.date_to {
         return Err("Period dates must be within fiscal year dates".to_string());
@@ -655,7 +693,7 @@ pub fn update_account_period(
         notes: params.notes.unwrap_or(period.notes),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.or(period.metadata),
+        metadata: params.metadata.unwrap_or(period.metadata),
         ..period
     });
 
@@ -686,16 +724,7 @@ pub fn delete_account_period(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_period", "delete")?;
 
-    let period = ctx
-        .db
-        .account_period()
-        .id()
-        .find(&period_id)
-        .ok_or("Period not found")?;
-
-    if period.company_id != company_id {
-        return Err("Period does not belong to this company".to_string());
-    }
+    let period = load_period_in_scope(ctx, organization_id, company_id, period_id)?;
 
     if period.state == PeriodState::Closed {
         return Err("Cannot delete a closed period".to_string());
@@ -732,27 +761,14 @@ pub fn open_account_period(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_period", "write")?;
 
-    let period = ctx
-        .db
-        .account_period()
-        .id()
-        .find(&period_id)
-        .ok_or("Period not found")?;
-
-    if period.company_id != company_id {
-        return Err("Period does not belong to this company".to_string());
-    }
+    let period = load_period_in_scope(ctx, organization_id, company_id, period_id)?;
 
     if period.state != PeriodState::Draft {
         return Err("Only draft periods can be opened".to_string());
     }
 
-    let fiscal_year = ctx
-        .db
-        .account_fiscal_year()
-        .id()
-        .find(&period.fiscal_year_id)
-        .ok_or("Fiscal year not found")?;
+    let fiscal_year =
+        load_fiscal_year_in_scope(ctx, organization_id, company_id, period.fiscal_year_id)?;
 
     if fiscal_year.state != FiscalYearState::Running {
         return Err("Fiscal year must be open to open a period".to_string());
@@ -792,16 +808,7 @@ pub fn close_account_period(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_period", "write")?;
 
-    let period = ctx
-        .db
-        .account_period()
-        .id()
-        .find(&period_id)
-        .ok_or("Period not found")?;
-
-    if period.company_id != company_id {
-        return Err("Period does not belong to this company".to_string());
-    }
+    let period = load_period_in_scope(ctx, organization_id, company_id, period_id)?;
 
     if period.state != PeriodState::Open {
         return Err("Only open periods can be closed".to_string());
@@ -838,18 +845,27 @@ pub fn ensure_accounting_period_open_for_date(
     company_id: u64,
     move_date: Timestamp,
 ) -> Result<(), String> {
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("company not found")?;
+
     let covering: Vec<_> = ctx
         .db
         .account_period()
         .period_by_company()
         .filter(&company_id)
-        .filter(|period| move_date >= period.date_from && move_date <= period.date_to)
+        .filter(|period| {
+            period.organization_id == Some(company.organization_id)
+                && move_date >= period.date_from
+                && move_date <= period.date_to
+        })
         .collect();
 
     if covering.is_empty() {
-        return Err(
-            "No open accounting period covers this date; cannot post".to_string(),
-        );
+        return Err("No open accounting period covers this date; cannot post".to_string());
     }
 
     if let Some(closed) = covering
@@ -870,6 +886,189 @@ pub fn ensure_accounting_period_open_for_date(
     }
 
     Err("No open accounting period covers this date; cannot post".to_string())
+}
+
+pub(crate) fn record_ownership_issue(
+    ctx: &ReducerContext,
+    table_name: &str,
+    record_id: u64,
+    company_id: Option<u64>,
+    parent_id: Option<u64>,
+    issue: &str,
+) {
+    ctx.db
+        .accounting_ownership_backfill_issue()
+        .insert(AccountingOwnershipBackfillIssue {
+            id: 0,
+            table_name: table_name.to_string(),
+            record_id,
+            company_id,
+            parent_id,
+            issue: issue.to_string(),
+            detected_at: ctx.timestamp,
+        });
+}
+
+/// Backfill the first ACC-RI-001 ownership slice from company and parent relations.
+///
+/// Rows with missing or conflicting provenance remain at `organization_id = None`.
+/// Every mutation loader rejects those quarantined rows.
+#[spacetimedb::reducer]
+pub fn backfill_fiscal_period_organization_ownership(ctx: &ReducerContext) -> Result<(), String> {
+    let user = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(ctx.sender())
+        .ok_or("user not found")?;
+    if !user.is_superuser {
+        return Err("only superusers may backfill accounting ownership".to_string());
+    }
+
+    let stale_issue_ids: Vec<_> = ctx
+        .db
+        .accounting_ownership_backfill_issue()
+        .iter()
+        .filter(|issue| {
+            issue.table_name == "account_fiscal_year" || issue.table_name == "account_period"
+        })
+        .map(|issue| issue.id)
+        .collect();
+    for issue_id in stale_issue_ids {
+        ctx.db
+            .accounting_ownership_backfill_issue()
+            .id()
+            .delete(&issue_id);
+    }
+
+    let mut scanned_rows = 0_u64;
+    let mut backfilled_rows = 0_u64;
+    let mut unresolved_rows = 0_u64;
+
+    let fiscal_years: Vec<_> = ctx.db.account_fiscal_year().iter().collect();
+    for fiscal_year in fiscal_years {
+        scanned_rows += 1;
+        let Some(company) = ctx.db.company().id().find(&fiscal_year.company_id) else {
+            unresolved_rows += 1;
+            if fiscal_year.organization_id.is_some() {
+                ctx.db.account_fiscal_year().id().update(AccountFiscalYear {
+                    organization_id: None,
+                    ..fiscal_year.clone()
+                });
+            }
+            record_ownership_issue(
+                ctx,
+                "account_fiscal_year",
+                fiscal_year.id,
+                Some(fiscal_year.company_id),
+                None,
+                "company not found",
+            );
+            continue;
+        };
+
+        match fiscal_year.organization_id {
+            None => {
+                ctx.db.account_fiscal_year().id().update(AccountFiscalYear {
+                    organization_id: Some(company.organization_id),
+                    ..fiscal_year
+                });
+                backfilled_rows += 1;
+            }
+            Some(organization_id) if organization_id == company.organization_id => {}
+            Some(_) => {
+                unresolved_rows += 1;
+                ctx.db.account_fiscal_year().id().update(AccountFiscalYear {
+                    organization_id: None,
+                    ..fiscal_year.clone()
+                });
+                record_ownership_issue(
+                    ctx,
+                    "account_fiscal_year",
+                    fiscal_year.id,
+                    Some(fiscal_year.company_id),
+                    None,
+                    "stored organization conflicts with company organization",
+                );
+            }
+        }
+    }
+
+    let periods: Vec<_> = ctx.db.account_period().iter().collect();
+    for period in periods {
+        scanned_rows += 1;
+        let company = ctx.db.company().id().find(&period.company_id);
+        let fiscal_year = ctx
+            .db
+            .account_fiscal_year()
+            .id()
+            .find(&period.fiscal_year_id);
+
+        let derived_organization_id = match (company, fiscal_year) {
+            (None, _) => Err("company not found"),
+            (_, None) => Err("parent fiscal year not found"),
+            (Some(company), Some(fiscal_year)) if fiscal_year.company_id != period.company_id => {
+                Err("period company conflicts with parent fiscal year company")
+            }
+            (Some(_), Some(fiscal_year)) if fiscal_year.organization_id.is_none() => {
+                Err("parent fiscal year ownership is unresolved")
+            }
+            (Some(company), Some(fiscal_year))
+                if fiscal_year.organization_id != Some(company.organization_id) =>
+            {
+                Err("parent fiscal year organization conflicts with company organization")
+            }
+            (Some(company), Some(_)) => Ok(company.organization_id),
+        };
+
+        match derived_organization_id {
+            Ok(organization_id) if period.organization_id == Some(organization_id) => {}
+            Ok(organization_id) if period.organization_id.is_none() => {
+                ctx.db.account_period().id().update(AccountPeriod {
+                    organization_id: Some(organization_id),
+                    ..period
+                });
+                backfilled_rows += 1;
+            }
+            Ok(_) | Err(_) => {
+                unresolved_rows += 1;
+                let issue = derived_organization_id
+                    .err()
+                    .unwrap_or("stored organization conflicts with derived organization");
+                if period.organization_id.is_some() {
+                    ctx.db.account_period().id().update(AccountPeriod {
+                        organization_id: None,
+                        ..period.clone()
+                    });
+                }
+                record_ownership_issue(
+                    ctx,
+                    "account_period",
+                    period.id,
+                    Some(period.company_id),
+                    Some(period.fiscal_year_id),
+                    issue,
+                );
+            }
+        }
+    }
+
+    ctx.db
+        .accounting_ownership_backfill_run()
+        .insert(AccountingOwnershipBackfillRun {
+            id: 0,
+            scope: "fiscal_periods".to_string(),
+            scanned_rows,
+            backfilled_rows,
+            unresolved_rows,
+            completed_at: ctx.timestamp,
+            completed_by: ctx.sender(),
+        });
+
+    log::info!(
+        "accounting fiscal ownership backfill: scanned={scanned_rows} backfilled={backfilled_rows} unresolved={unresolved_rows}"
+    );
+    Ok(())
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -903,10 +1102,6 @@ pub fn setup_fiscal_calendar(
             date_from: params.date_from,
             date_to: params.date_to,
             type_: "standard".to_string(),
-            state: FiscalYearState::Running,
-            carry_over_accounts: vec![],
-            closing_move_id: None,
-            opening_move_id: None,
             is_adjustment: false,
             notes: Some("Created by fiscal setup wizard".to_string()),
             metadata: None,
@@ -918,10 +1113,19 @@ pub fn setup_fiscal_calendar(
         .account_fiscal_year()
         .fiscal_year_by_company()
         .filter(&company_id)
-        .filter(|fy| fy.name == params.fiscal_year_name)
+        .filter(|fy| {
+            fy.organization_id == Some(organization_id) && fy.name == params.fiscal_year_name
+        })
         .map(|fy| fy.id)
         .last()
         .ok_or("Fiscal year not found after create")?;
+    let fiscal_year = load_fiscal_year_in_scope(ctx, organization_id, company_id, fiscal_year_id)?;
+    ctx.db.account_fiscal_year().id().update(AccountFiscalYear {
+        state: FiscalYearState::Running,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..fiscal_year
+    });
 
     let total_micros = params
         .date_to
@@ -965,20 +1169,28 @@ pub fn setup_fiscal_calendar(
             company_id,
             CreateAccountPeriodParams {
                 name,
-                code,
+                code: code.clone(),
                 date_from: period_from,
                 date_to: period_to,
                 fiscal_year_id,
-                state: if params.open_first_period && month == 0 {
-                    PeriodState::Open
-                } else {
-                    PeriodState::Draft
-                },
                 is_adjustment: false,
                 notes: None,
                 metadata: None,
             },
         )?;
+        if params.open_first_period && month == 0 {
+            let period_id = ctx
+                .db
+                .account_period()
+                .period_by_fiscal_year()
+                .filter(&fiscal_year_id)
+                .find(|period| {
+                    period.organization_id == Some(organization_id) && period.code == code
+                })
+                .map(|period| period.id)
+                .ok_or("First fiscal period not found after create")?;
+            open_account_period(ctx, organization_id, company_id, period_id)?;
+        }
     }
 
     write_audit_log_v2(

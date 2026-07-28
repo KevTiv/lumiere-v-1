@@ -1,3 +1,4 @@
+pub mod amortization;
 /// Accounting Module — Chart of Accounts, Journal Entries, Tax Management, Fiscal Periods, and Advanced Accounting
 ///
 /// # Module Structure
@@ -33,7 +34,6 @@
 /// └── financial_statements.rs← 8.6 Financial Statements
 /// ```
 pub mod analytic_accounting;
-pub mod amortization;
 pub mod bank_reconciliation;
 pub mod budgeting;
 pub mod chart_of_accounts;
@@ -43,11 +43,13 @@ pub mod financial_statements;
 pub mod fiscal_periods;
 pub mod fixed_assets;
 pub mod fx_revaluation;
+pub(crate) mod idempotency;
 pub mod intercompany;
 pub mod journal_entries;
 pub mod payment_management;
 pub mod payment_terms;
 pub mod payments;
+pub(crate) mod relations;
 pub mod tax_management;
 
 // Re-export Phase 7 types

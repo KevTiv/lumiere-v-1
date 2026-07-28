@@ -95,7 +95,11 @@ import AssignTeamMemberSkillReducer from "../assign_team_member_skill_reducer";
 import AssignTicketReducer from "../assign_ticket_reducer";
 import AssignUserToPickingReducer from "../assign_user_to_picking_reducer";
 import AwardPurchaseRfqBidReducer from "../award_purchase_rfq_bid_reducer";
+import BackfillConsolidationOrganizationOwnershipReducer from "../backfill_consolidation_organization_ownership_reducer";
 import BackfillExternalIdsReducer from "../backfill_external_ids_reducer";
+import BackfillFiscalPeriodOrganizationOwnershipReducer from "../backfill_fiscal_period_organization_ownership_reducer";
+import BackfillFixedAssetOrganizationOwnershipReducer from "../backfill_fixed_asset_organization_ownership_reducer";
+import BackfillIntercompanyOrganizationOwnershipReducer from "../backfill_intercompany_organization_ownership_reducer";
 import BillProjectMilestoneReducer from "../bill_project_milestone_reducer";
 import BillTimesheetsReducer from "../bill_timesheets_reducer";
 import BlockSerialReducer from "../block_serial_reducer";
@@ -787,6 +791,7 @@ import RevokeSubscriptionEntitlementReducer from "../revoke_subscription_entitle
 import RevokeWorkflowDelegationReducer from "../revoke_workflow_delegation_reducer";
 import RollbackAiSkillReleaseReducer from "../rollback_ai_skill_release_reducer";
 import RollbackImportJobReducer from "../rollback_import_job_reducer";
+import RunAccountingFixedAssetOwnershipTestReducer from "../run_accounting_fixed_asset_ownership_test_reducer";
 import RunAccountingFxRevaluationTestReducer from "../run_accounting_fx_revaluation_test_reducer";
 import RunAccountingIcConsolidationTestReducer from "../run_accounting_ic_consolidation_test_reducer";
 import RunAccountingPaymentCancelTestReducer from "../run_accounting_payment_cancel_test_reducer";
@@ -1289,7 +1294,11 @@ export type AssignTeamMemberSkillParams = __Infer<typeof AssignTeamMemberSkillRe
 export type AssignTicketParams = __Infer<typeof AssignTicketReducer>;
 export type AssignUserToPickingParams = __Infer<typeof AssignUserToPickingReducer>;
 export type AwardPurchaseRfqBidParams = __Infer<typeof AwardPurchaseRfqBidReducer>;
+export type BackfillConsolidationOrganizationOwnershipParams = __Infer<typeof BackfillConsolidationOrganizationOwnershipReducer>;
 export type BackfillExternalIdsParams = __Infer<typeof BackfillExternalIdsReducer>;
+export type BackfillFiscalPeriodOrganizationOwnershipParams = __Infer<typeof BackfillFiscalPeriodOrganizationOwnershipReducer>;
+export type BackfillFixedAssetOrganizationOwnershipParams = __Infer<typeof BackfillFixedAssetOrganizationOwnershipReducer>;
+export type BackfillIntercompanyOrganizationOwnershipParams = __Infer<typeof BackfillIntercompanyOrganizationOwnershipReducer>;
 export type BillProjectMilestoneParams = __Infer<typeof BillProjectMilestoneReducer>;
 export type BillTimesheetsParams = __Infer<typeof BillTimesheetsReducer>;
 export type BlockSerialParams = __Infer<typeof BlockSerialReducer>;
@@ -1981,6 +1990,7 @@ export type RevokeSubscriptionEntitlementParams = __Infer<typeof RevokeSubscript
 export type RevokeWorkflowDelegationParams = __Infer<typeof RevokeWorkflowDelegationReducer>;
 export type RollbackAiSkillReleaseParams = __Infer<typeof RollbackAiSkillReleaseReducer>;
 export type RollbackImportJobParams = __Infer<typeof RollbackImportJobReducer>;
+export type RunAccountingFixedAssetOwnershipTestParams = __Infer<typeof RunAccountingFixedAssetOwnershipTestReducer>;
 export type RunAccountingFxRevaluationTestParams = __Infer<typeof RunAccountingFxRevaluationTestReducer>;
 export type RunAccountingIcConsolidationTestParams = __Infer<typeof RunAccountingIcConsolidationTestReducer>;
 export type RunAccountingPaymentCancelTestParams = __Infer<typeof RunAccountingPaymentCancelTestReducer>;
@@ -2393,4 +2403,3 @@ export type VerifyContactIdentityParams = __Infer<typeof VerifyContactIdentityRe
 export type VoidPaymentTransactionParams = __Infer<typeof VoidPaymentTransactionReducer>;
 export type WaiveTaxDeadlineParams = __Infer<typeof WaiveTaxDeadlineReducer>;
 export type WorkerHeartbeatParams = __Infer<typeof WorkerHeartbeatReducer>;
-

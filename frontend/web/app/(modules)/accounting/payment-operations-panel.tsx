@@ -52,6 +52,14 @@ function numberValue(value: unknown): number {
   return Number.isFinite(number) ? number : 0
 }
 
+function idList(value: unknown): bigint[] {
+  return String(value ?? "")
+    .split(/[\s,]+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => BigInt(part))
+}
+
 function enumName(value: unknown): string {
   return value != null && typeof value === "object" && "tag" in value
     ? String((value as { tag: unknown }).tag)
@@ -152,6 +160,7 @@ export interface PaymentOperationsPanelProps {
   defaultCurrencyId: bigint
   currencyOptions: Array<{ value: string; label: string }>
   journalOptions: Array<{ value: string; label: string }>
+  glAccountOptions: Array<{ value: string; label: string }>
   partnerOptions: Array<{ value: string; label: string }>
   moveLines: Row[]
 }
@@ -162,6 +171,7 @@ export function PaymentOperationsPanel({
   defaultCurrencyId,
   currencyOptions,
   journalOptions,
+  glAccountOptions,
   partnerOptions,
   moveLines,
 }: PaymentOperationsPanelProps) {
@@ -209,11 +219,21 @@ export function PaymentOperationsPanel({
     [activeAccounts],
   )
   const moveLineOptions = useMemo(
-    () => moveLines.map((line) => ({
-      value: String(line.id ?? ""),
-      label: `${String(line.name ?? line.moveName ?? `Line ${line.id}`)} · ${numberValue(line.amountResidual ?? line.amountResidualCurrency ?? line.debit ?? line.credit)}`,
-    })),
-    [moveLines],
+    () => moveLines
+      .filter((line) => {
+        if (allocatingTransaction == null) return false
+        const accountType = enumName(line.accountInternalType).toLowerCase()
+        return asId(line.companyId) === companyId
+          && asId(line.partnerId) === asId(allocatingTransaction.partnerId)
+          && asId(line.currencyId) === asId(allocatingTransaction.currencyId)
+          && (accountType === "receivable" || accountType === "payable")
+          && numberValue(line.amountResidual ?? line.amountResidualCurrency) > 0
+      })
+      .map((line) => ({
+        value: String(line.id ?? ""),
+        label: `${String(line.name ?? line.moveName ?? `Line ${line.id}`)} · ${numberValue(line.amountResidual ?? line.amountResidualCurrency).toLocaleString()}`,
+      })),
+    [allocatingTransaction, companyId, moveLines],
   )
   const reconciliationsByTransaction = useMemo(() => {
     const map = new Map<string, Row[]>()
@@ -242,8 +262,10 @@ export function PaymentOperationsPanel({
     () => mergeFieldDefaultValues(mergeSelectOptionsForFields(newOperationalPaymentAccountForm(t), {
       currencyId: currencyOptions,
       accountJournalId: journalOptions,
+      feeAccountId: glAccountOptions,
+      clearingAccountId: glAccountOptions,
     }), { currencyId: String(defaultCurrencyId) }),
-    [currencyOptions, defaultCurrencyId, journalOptions, t],
+    [currencyOptions, defaultCurrencyId, glAccountOptions, journalOptions, t],
   )
   const paymentTransactionForm = useMemo(
     () => mergeFieldDefaultValues(mergeSelectOptionsForFields(newOperationalPaymentTransactionForm(t), {
@@ -256,8 +278,16 @@ export function PaymentOperationsPanel({
   const allocationForm = useMemo(
     () => mergeFieldDefaultValues(mergeSelectOptionsForFields(allocateOperationalPaymentForm(t), {
       allocatedMoveLineId: moveLineOptions,
+      writeOffAccountId: glAccountOptions,
     }), { writeOffAmount: 0 }),
-    [moveLineOptions, t],
+    [glAccountOptions, moveLineOptions, t],
+  )
+  const paymentFeeForm = useMemo(
+    () => mergeSelectOptionsForFields(newOperationalPaymentFeeForm(t), {
+      feeAccountId: glAccountOptions,
+      taxAccountId: glAccountOptions,
+    }),
+    [glAccountOptions, t],
   )
   const statementImportForm = useMemo(
     () => mergeFieldDefaultValues(mergeSelectOptionsForFields(stageBankStatementImportForm(t), {
@@ -272,17 +302,20 @@ export function PaymentOperationsPanel({
       setFormError(null)
       const currencyId = asId(data.currencyId)
       const accountJournalId = asId(data.accountJournalId)
+      const providerCode = stringValue(data.providerCode) || "Other"
+      const providerLabel = stringValue(data.providerLabel)
       if (companyId <= 0n || currencyId == null || accountJournalId == null) throw new Error("Choose a company currency and accounting journal")
+      if (providerCode === "Other" && !providerLabel) throw new Error("Enter the provider label")
       await createAccount.mutateAsync({
         companyId,
-        providerCode: enumValue<PaymentProviderCode>(stringValue(data.providerCode) || "Other"),
+        providerCode: enumValue<PaymentProviderCode>(providerCode),
         name: stringValue(data.name),
-        providerLabel: undefined,
+        providerLabel: providerLabel || undefined,
         referenceRaw: stringValue(data.referenceRaw) || undefined,
         currencyId,
         accountJournalId,
-        feeAccountId: undefined,
-        clearingAccountId: undefined,
+        feeAccountId: asId(data.feeAccountId) ?? undefined,
+        clearingAccountId: asId(data.clearingAccountId) ?? undefined,
         isPrimary: data.isPrimary === true,
         metadata: undefined,
       })
@@ -300,7 +333,14 @@ export function PaymentOperationsPanel({
       const paymentAccountId = asId(data.paymentAccountId)
       const partnerId = asId(data.partnerId)
       const currencyId = asId(data.currencyId)
+      const occurredAt = new Date(stringValue(data.occurredAt))
+      const sourceEntity = stringValue(data.sourceEntity)
+      const sourceEntityId = asId(data.sourceEntityId)
       if (companyId <= 0n || paymentAccountId == null || partnerId == null || currencyId == null) throw new Error("Choose a payment account, partner, and currency")
+      if (Number.isNaN(occurredAt.getTime())) throw new Error("Enter a valid provider event time")
+      if ((sourceEntity !== "") !== (sourceEntityId != null)) {
+        throw new Error("Source record type and ID must be supplied together")
+      }
       await createTransaction.mutateAsync({
         companyId,
         paymentAccountId,
@@ -312,10 +352,10 @@ export function PaymentOperationsPanel({
         settlementAmount: numberValue(data.settlementAmount),
         netAccountAmount: numberValue(data.netAccountAmount),
         currencyId,
-        occurredAt: undefined,
-        sourceEntity: undefined,
-        sourceEntityId: undefined,
-        evidenceDocumentIds: [],
+        occurredAt: stbTimestampFromDate(occurredAt),
+        sourceEntity: sourceEntity || undefined,
+        sourceEntityId: sourceEntityId ?? undefined,
+        evidenceDocumentIds: idList(data.evidenceDocumentIds),
         metadata: undefined,
       })
       setTransactionDialogOpen(false)
@@ -332,15 +372,18 @@ export function PaymentOperationsPanel({
     try {
       setFormError(null)
       const allocatedMoveLineId = asId(data.allocatedMoveLineId)
+      const writeOffAmount = numberValue(data.writeOffAmount)
+      const writeOffAccountId = asId(data.writeOffAccountId)
       if (transaction == null || transactionId == null || allocatedMoveLineId == null) throw new Error("Choose the invoice or bill line to allocate")
+      if (writeOffAmount > 0 && writeOffAccountId == null) throw new Error("Choose a write-off account")
       await allocateTransaction.mutateAsync({
         companyId,
         paymentTransactionId: transactionId,
         allocatedMoveLineId,
         allocatedAmount: numberValue(data.allocatedAmount),
         currencyId: asId(transaction.currencyId) ?? defaultCurrencyId,
-        writeOffAmount: numberValue(data.writeOffAmount),
-        writeOffAccountId: undefined,
+        writeOffAmount,
+        writeOffAccountId: writeOffAccountId ?? undefined,
         metadata: undefined,
       })
       setAllocatingTransaction(null)
@@ -374,15 +417,21 @@ export function PaymentOperationsPanel({
     try {
       setFormError(null)
       if (transaction == null || transactionId == null) throw new Error("The selected transaction has no ID")
+      const amount = numberValue(data.amount)
+      const taxAmount = numberValue(data.taxAmount)
+      const paymentAccount = accountById.get(String(transaction.paymentAccountId))
+      const feeAccountId = asId(data.feeAccountId) ?? asId(paymentAccount?.feeAccountId)
+      const taxAccountId = asId(data.taxAccountId)
+      if (amount > 0 && feeAccountId == null) throw new Error("Choose a fee expense account")
+      if (taxAmount > 0 && taxAccountId == null) throw new Error("Choose a fee tax account")
       await createFee.mutateAsync({
         companyId,
         paymentTransactionId: transactionId,
         bearer: enumValue<PaymentFeeBearer>(stringValue(data.bearer) || "Company"),
-        amount: numberValue(data.amount),
-        currencyId: asId(transaction.currencyId) ?? defaultCurrencyId,
-        feeAccountId: undefined,
-        taxAccountId: undefined,
-        taxAmount: numberValue(data.taxAmount),
+        amount,
+        feeAccountId: feeAccountId ?? undefined,
+        taxAccountId: taxAccountId ?? undefined,
+        taxAmount,
         providerReference: stringValue(data.providerReference) || undefined,
         metadata: undefined,
       })
@@ -540,7 +589,7 @@ export function PaymentOperationsPanel({
       <RuntimeFormModal open={statementImportDialogOpen} onOpenChange={(open) => !open && setStatementImportDialogOpen(false)} staticConfig={statementImportForm} moduleId="accounting" organizationId={organizationId} isPending={stageStatementImport.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveStatementImport} />
       <RuntimeFormModal key={allocatingTransaction ? `allocate-${String(allocatingTransaction.id)}` : "allocate-none"} open={allocatingTransaction != null} onOpenChange={(open) => !open && setAllocatingTransaction(null)} staticConfig={allocationForm} moduleId="accounting" organizationId={organizationId} isPending={allocateTransaction.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveAllocation} />
       <RuntimeFormModal key={reversingTransaction ? `reverse-${String(reversingTransaction.id)}` : "reverse-none"} open={reversingTransaction != null} onOpenChange={(open) => !open && setReversingTransaction(null)} staticConfig={reverseOperationalPaymentForm(t)} moduleId="accounting" organizationId={organizationId} isPending={reverseTransaction.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveReversal} />
-      <RuntimeFormModal key={feeTransaction ? `fee-${String(feeTransaction.id)}` : "fee-none"} open={feeTransaction != null} onOpenChange={(open) => !open && setFeeTransaction(null)} staticConfig={newOperationalPaymentFeeForm(t)} moduleId="accounting" organizationId={organizationId} isPending={createFee.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveFee} />
+      <RuntimeFormModal key={feeTransaction ? `fee-${String(feeTransaction.id)}` : "fee-none"} open={feeTransaction != null} onOpenChange={(open) => !open && setFeeTransaction(null)} staticConfig={paymentFeeForm} moduleId="accounting" organizationId={organizationId} isPending={createFee.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveFee} />
       <AlertDialog open={voidingTransaction != null} onOpenChange={(open) => !open && setVoidingTransaction(null)}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Void draft payment?</AlertDialogTitle><AlertDialogDescription>This removes the draft from the posting flow. Posted payments must be reversed instead.</AlertDialogDescription></AlertDialogHeader>

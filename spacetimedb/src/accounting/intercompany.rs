@@ -11,16 +11,21 @@
 /// - `IntercompanyRule` — Configuration rules for intercompany processing
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::fiscal_periods::{
+    accounting_ownership_backfill_issue, accounting_ownership_backfill_run, record_ownership_issue,
+    AccountingOwnershipBackfillRun,
+};
+use crate::core::organization::{company, require_company_in_organization};
+use crate::core::users::user_profile;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{IntercompanyState, RuleType};
-
-use crate::core::organization::require_company_in_organization;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(
     accessor = intercompany_transaction,
     public,
+    index(accessor = intercompany_by_organization, btree(columns = [organization_id])),
     index(accessor = intercompany_by_origin, btree(columns = [origin_company_id])),
     index(accessor = intercompany_by_destination, btree(columns = [destination_company_id])),
     index(accessor = intercompany_by_state, btree(columns = [state])),
@@ -31,6 +36,8 @@ pub struct IntercompanyTransaction {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Nullable only during the legacy ownership backfill.
+    pub organization_id: Option<u64>,
     pub name: String,
     pub origin_company_id: u64,
     pub destination_company_id: u64,
@@ -58,6 +65,7 @@ pub struct IntercompanyTransaction {
 #[spacetimedb::table(
     accessor = intercompany_rule,
     public,
+    index(accessor = intercompany_rule_by_organization, btree(columns = [organization_id])),
     index(accessor = intercompany_rule_by_source, btree(columns = [source_company_id])),
     index(accessor = intercompany_rule_by_destination, btree(columns = [destination_company_id])),
     index(accessor = intercompany_rule_by_type, btree(columns = [rule_type]))
@@ -67,6 +75,8 @@ pub struct IntercompanyRule {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Nullable only during the legacy ownership backfill.
+    pub organization_id: Option<u64>,
     pub name: String,
     pub rule_type: RuleType,
     pub source_company_id: u64,
@@ -150,6 +160,78 @@ pub struct CancelIntercompanyTransactionParams {
     pub reason: String,
 }
 
+fn validate_intercompany_companies(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    source_company_id: u64,
+    destination_company_id: u64,
+) -> Result<(), String> {
+    require_company_in_organization(ctx, organization_id, source_company_id)?;
+    require_company_in_organization(ctx, organization_id, destination_company_id)?;
+    if source_company_id == destination_company_id {
+        return Err("source and destination companies must be different".to_string());
+    }
+    Ok(())
+}
+
+fn load_intercompany_rule_in_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    rule_id: u64,
+) -> Result<IntercompanyRule, String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let rule = ctx
+        .db
+        .intercompany_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("intercompany rule not found")?;
+    if rule.organization_id != Some(organization_id) {
+        return Err("intercompany rule does not belong to this organization".to_string());
+    }
+    validate_intercompany_companies(
+        ctx,
+        organization_id,
+        rule.source_company_id,
+        rule.destination_company_id,
+    )?;
+    if rule.source_company_id != company_id && rule.destination_company_id != company_id {
+        return Err("intercompany rule does not involve this company".to_string());
+    }
+    Ok(rule)
+}
+
+fn load_intercompany_transaction_in_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    transaction_id: u64,
+) -> Result<IntercompanyTransaction, String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let transaction = ctx
+        .db
+        .intercompany_transaction()
+        .id()
+        .find(&transaction_id)
+        .ok_or("intercompany transaction not found")?;
+    if transaction.organization_id != Some(organization_id) {
+        return Err("intercompany transaction does not belong to this organization".to_string());
+    }
+    validate_intercompany_companies(
+        ctx,
+        organization_id,
+        transaction.origin_company_id,
+        transaction.destination_company_id,
+    )?;
+    if transaction.origin_company_id != company_id
+        && transaction.destination_company_id != company_id
+    {
+        return Err("intercompany transaction does not involve this company".to_string());
+    }
+    Ok(transaction)
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 #[spacetimedb::reducer]
@@ -162,19 +244,20 @@ pub fn create_intercompany_rule(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_rule", "create")?;
 
-    require_company_in_organization(ctx, organization_id, source_company_id)?;
-    require_company_in_organization(ctx, organization_id, destination_company_id)?;
+    validate_intercompany_companies(
+        ctx,
+        organization_id,
+        source_company_id,
+        destination_company_id,
+    )?;
 
     if params.name.is_empty() {
         return Err("Rule name is required".to_string());
     }
 
-    if source_company_id == destination_company_id {
-        return Err("Source and destination companies must be different".to_string());
-    }
-
     let rule = ctx.db.intercompany_rule().insert(IntercompanyRule {
         id: 0,
+        organization_id: Some(organization_id),
         name: params.name.clone(),
         rule_type: params.rule_type.clone(),
         source_company_id,
@@ -236,16 +319,7 @@ pub fn update_intercompany_rule(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_rule", "write")?;
 
-    let rule = ctx
-        .db
-        .intercompany_rule()
-        .id()
-        .find(&rule_id)
-        .ok_or("Intercompany rule not found")?;
-
-    if rule.source_company_id != company_id && rule.destination_company_id != company_id {
-        return Err("Rule does not belong to this company".to_string());
-    }
+    let rule = load_intercompany_rule_in_scope(ctx, organization_id, company_id, rule_id)?;
 
     let old_values = serde_json::json!({
         "name": rule.name,
@@ -290,18 +364,18 @@ pub fn update_intercompany_rule(
         changed_fields.push("auto_generate_bill".to_string());
     }
 
-    if params.journal_id.is_some() {
-        new_journal_id = params.journal_id.unwrap();
+    if let Some(journal_id) = params.journal_id {
+        new_journal_id = journal_id;
         changed_fields.push("journal_id".to_string());
     }
 
-    if params.account_id.is_some() {
-        new_account_id = params.account_id.unwrap();
+    if let Some(account_id) = params.account_id {
+        new_account_id = account_id;
         changed_fields.push("account_id".to_string());
     }
 
-    if params.pricelist_id.is_some() {
-        new_pricelist_id = params.pricelist_id.unwrap();
+    if let Some(pricelist_id) = params.pricelist_id {
+        new_pricelist_id = pricelist_id;
         changed_fields.push("pricelist_id".to_string());
     }
 
@@ -315,8 +389,8 @@ pub fn update_intercompany_rule(
         changed_fields.push("is_active".to_string());
     }
 
-    if params.notes.is_some() {
-        new_notes = params.notes.unwrap();
+    if let Some(notes) = params.notes {
+        new_notes = notes;
         changed_fields.push("notes".to_string());
     }
 
@@ -369,16 +443,7 @@ pub fn delete_intercompany_rule(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_rule", "delete")?;
 
-    let rule = ctx
-        .db
-        .intercompany_rule()
-        .id()
-        .find(&rule_id)
-        .ok_or("Intercompany rule not found")?;
-
-    if rule.source_company_id != company_id && rule.destination_company_id != company_id {
-        return Err("Rule does not belong to this company".to_string());
-    }
+    let rule = load_intercompany_rule_in_scope(ctx, organization_id, company_id, rule_id)?;
 
     ctx.db.intercompany_rule().id().delete(&rule_id);
 
@@ -409,12 +474,12 @@ pub fn create_intercompany_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "create")?;
 
-    require_company_in_organization(ctx, organization_id, origin_company_id)?;
-    require_company_in_organization(ctx, organization_id, params.destination_company_id)?;
-
-    if origin_company_id == params.destination_company_id {
-        return Err("Origin and destination companies must be different".to_string());
-    }
+    validate_intercompany_companies(
+        ctx,
+        organization_id,
+        origin_company_id,
+        params.destination_company_id,
+    )?;
 
     if params.origin_document_model.is_empty() {
         return Err("Document model is required".to_string());
@@ -426,7 +491,8 @@ pub fn create_intercompany_transaction(
         .intercompany_rule_by_source()
         .filter(&origin_company_id)
         .filter(|r| {
-            r.destination_company_id == params.destination_company_id
+            r.organization_id == Some(organization_id)
+                && r.destination_company_id == params.destination_company_id
                 && r.rule_type == params.transaction_type
                 && r.is_active
         })
@@ -455,6 +521,7 @@ pub fn create_intercompany_transaction(
         .intercompany_transaction()
         .insert(IntercompanyTransaction {
             id: 0,
+            organization_id: Some(organization_id),
             name: transaction_name,
             origin_company_id,
             destination_company_id: params.destination_company_id,
@@ -519,18 +586,8 @@ pub fn approve_intercompany_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let transaction = ctx
-        .db
-        .intercompany_transaction()
-        .id()
-        .find(&transaction_id)
-        .ok_or("Transaction not found")?;
-
-    if transaction.origin_company_id != company_id
-        && transaction.destination_company_id != company_id
-    {
-        return Err("Transaction does not involve this company".to_string());
-    }
+    let transaction =
+        load_intercompany_transaction_in_scope(ctx, organization_id, company_id, transaction_id)?;
 
     if transaction.state != IntercompanyState::Draft {
         return Err("Transaction must be in Draft state to approve".to_string());
@@ -579,12 +636,8 @@ pub fn process_intercompany_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let transaction = ctx
-        .db
-        .intercompany_transaction()
-        .id()
-        .find(&transaction_id)
-        .ok_or("Transaction not found")?;
+    let transaction =
+        load_intercompany_transaction_in_scope(ctx, organization_id, company_id, transaction_id)?;
 
     if transaction.destination_company_id != company_id {
         return Err("Transaction must be processed by destination company".to_string());
@@ -646,18 +699,8 @@ pub fn complete_intercompany_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let transaction = ctx
-        .db
-        .intercompany_transaction()
-        .id()
-        .find(&transaction_id)
-        .ok_or("Transaction not found")?;
-
-    if transaction.origin_company_id != company_id
-        && transaction.destination_company_id != company_id
-    {
-        return Err("Transaction does not involve this company".to_string());
-    }
+    let transaction =
+        load_intercompany_transaction_in_scope(ctx, organization_id, company_id, transaction_id)?;
 
     if transaction.state != IntercompanyState::Processing {
         return Err("Transaction must be in Processing state to complete".to_string());
@@ -704,18 +747,8 @@ pub fn error_intercompany_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let transaction = ctx
-        .db
-        .intercompany_transaction()
-        .id()
-        .find(&transaction_id)
-        .ok_or("Transaction not found")?;
-
-    if transaction.origin_company_id != company_id
-        && transaction.destination_company_id != company_id
-    {
-        return Err("Transaction does not involve this company".to_string());
-    }
+    let transaction =
+        load_intercompany_transaction_in_scope(ctx, organization_id, company_id, transaction_id)?;
 
     ctx.db
         .intercompany_transaction()
@@ -756,12 +789,8 @@ pub fn cancel_intercompany_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let transaction = ctx
-        .db
-        .intercompany_transaction()
-        .id()
-        .find(&transaction_id)
-        .ok_or("Transaction not found")?;
+    let transaction =
+        load_intercompany_transaction_in_scope(ctx, organization_id, company_id, transaction_id)?;
 
     if transaction.origin_company_id != company_id {
         return Err("Only origin company can cancel the transaction".to_string());
@@ -813,12 +842,8 @@ pub fn retry_intercompany_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_transaction", "write")?;
 
-    let transaction = ctx
-        .db
-        .intercompany_transaction()
-        .id()
-        .find(&transaction_id)
-        .ok_or("Transaction not found")?;
+    let transaction =
+        load_intercompany_transaction_in_scope(ctx, organization_id, company_id, transaction_id)?;
 
     if transaction.destination_company_id != company_id {
         return Err("Transaction must be retried by destination company".to_string());
@@ -866,16 +891,7 @@ pub fn set_intercompany_rule_active(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "intercompany_rule", "write")?;
 
-    let rule = ctx
-        .db
-        .intercompany_rule()
-        .id()
-        .find(&rule_id)
-        .ok_or("Intercompany rule not found")?;
-
-    if rule.source_company_id != company_id && rule.destination_company_id != company_id {
-        return Err("Rule does not belong to this company".to_string());
-    }
+    let rule = load_intercompany_rule_in_scope(ctx, organization_id, company_id, rule_id)?;
 
     ctx.db.intercompany_rule().id().update(IntercompanyRule {
         is_active,
@@ -899,5 +915,162 @@ pub fn set_intercompany_rule_active(
         },
     );
 
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn backfill_intercompany_organization_ownership(ctx: &ReducerContext) -> Result<(), String> {
+    let user = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(ctx.sender())
+        .ok_or("user not found")?;
+    if !user.is_superuser {
+        return Err("only superusers may backfill accounting ownership".to_string());
+    }
+
+    let stale_issue_ids: Vec<_> = ctx
+        .db
+        .accounting_ownership_backfill_issue()
+        .iter()
+        .filter(|issue| {
+            issue.table_name == "intercompany_rule"
+                || issue.table_name == "intercompany_transaction"
+        })
+        .map(|issue| issue.id)
+        .collect();
+    for issue_id in stale_issue_ids {
+        ctx.db
+            .accounting_ownership_backfill_issue()
+            .id()
+            .delete(&issue_id);
+    }
+
+    let mut scanned_rows = 0_u64;
+    let mut backfilled_rows = 0_u64;
+    let mut unresolved_rows = 0_u64;
+
+    let rules: Vec<_> = ctx.db.intercompany_rule().iter().collect();
+    for rule in rules {
+        scanned_rows += 1;
+        let source = ctx.db.company().id().find(&rule.source_company_id);
+        let destination = ctx.db.company().id().find(&rule.destination_company_id);
+        let derived = match (source, destination) {
+            (None, _) => Err("source company not found"),
+            (_, None) => Err("destination company not found"),
+            (Some(source), Some(destination))
+                if source.organization_id != destination.organization_id =>
+            {
+                Err("source and destination companies belong to different organizations")
+            }
+            (Some(source), Some(_)) => Ok(source.organization_id),
+        };
+
+        match derived {
+            Ok(organization_id) if rule.organization_id == Some(organization_id) => {}
+            Ok(organization_id) if rule.organization_id.is_none() => {
+                ctx.db.intercompany_rule().id().update(IntercompanyRule {
+                    organization_id: Some(organization_id),
+                    ..rule
+                });
+                backfilled_rows += 1;
+            }
+            Ok(_) | Err(_) => {
+                unresolved_rows += 1;
+                let issue = derived
+                    .err()
+                    .unwrap_or("stored organization conflicts with company organizations");
+                if rule.organization_id.is_some() {
+                    ctx.db.intercompany_rule().id().update(IntercompanyRule {
+                        organization_id: None,
+                        ..rule.clone()
+                    });
+                }
+                record_ownership_issue(
+                    ctx,
+                    "intercompany_rule",
+                    rule.id,
+                    Some(rule.source_company_id),
+                    Some(rule.destination_company_id),
+                    issue,
+                );
+            }
+        }
+    }
+
+    let transactions: Vec<_> = ctx.db.intercompany_transaction().iter().collect();
+    for transaction in transactions {
+        scanned_rows += 1;
+        let origin = ctx.db.company().id().find(&transaction.origin_company_id);
+        let destination = ctx
+            .db
+            .company()
+            .id()
+            .find(&transaction.destination_company_id);
+        let derived = match (origin, destination) {
+            (None, _) => Err("origin company not found"),
+            (_, None) => Err("destination company not found"),
+            (Some(origin), Some(destination))
+                if origin.organization_id != destination.organization_id =>
+            {
+                Err("origin and destination companies belong to different organizations")
+            }
+            (Some(origin), Some(_)) => Ok(origin.organization_id),
+        };
+
+        match derived {
+            Ok(organization_id) if transaction.organization_id == Some(organization_id) => {}
+            Ok(organization_id) if transaction.organization_id.is_none() => {
+                ctx.db
+                    .intercompany_transaction()
+                    .id()
+                    .update(IntercompanyTransaction {
+                        organization_id: Some(organization_id),
+                        ..transaction
+                    });
+                backfilled_rows += 1;
+            }
+            Ok(_) | Err(_) => {
+                unresolved_rows += 1;
+                let issue = derived
+                    .err()
+                    .unwrap_or("stored organization conflicts with company organizations");
+                if transaction.organization_id.is_some() {
+                    ctx.db
+                        .intercompany_transaction()
+                        .id()
+                        .update(IntercompanyTransaction {
+                            organization_id: None,
+                            ..transaction.clone()
+                        });
+                }
+                record_ownership_issue(
+                    ctx,
+                    "intercompany_transaction",
+                    transaction.id,
+                    Some(transaction.origin_company_id),
+                    Some(transaction.destination_company_id),
+                    issue,
+                );
+            }
+        }
+    }
+
+    ctx.db
+        .accounting_ownership_backfill_run()
+        .insert(AccountingOwnershipBackfillRun {
+            id: 0,
+            scope: "intercompany".to_string(),
+            scanned_rows,
+            backfilled_rows,
+            unresolved_rows,
+            completed_at: ctx.timestamp,
+            completed_by: ctx.sender(),
+        });
+
+    log::info!(
+        "accounting intercompany ownership backfill: scanned={scanned_rows} backfilled={backfilled_rows} unresolved={unresolved_rows}"
+    );
     Ok(())
 }

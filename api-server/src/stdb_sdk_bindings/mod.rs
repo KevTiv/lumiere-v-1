@@ -39,6 +39,9 @@ pub mod account_reconciliation_widget_type;
 pub mod account_tax_type;
 pub mod account_tax_group_type;
 pub mod account_type_internal_type;
+pub mod accounting_operation_receipt_type;
+pub mod accounting_ownership_backfill_issue_type;
+pub mod accounting_ownership_backfill_run_type;
 pub mod accrue_sale_commission_params_type;
 pub mod activity_type;
 pub mod activity_type_type;
@@ -1313,7 +1316,11 @@ pub mod assign_team_member_skill_reducer;
 pub mod assign_ticket_reducer;
 pub mod assign_user_to_picking_reducer;
 pub mod award_purchase_rfq_bid_reducer;
+pub mod backfill_consolidation_organization_ownership_reducer;
 pub mod backfill_external_ids_reducer;
+pub mod backfill_fiscal_period_organization_ownership_reducer;
+pub mod backfill_fixed_asset_organization_ownership_reducer;
+pub mod backfill_intercompany_organization_ownership_reducer;
 pub mod bill_project_milestone_reducer;
 pub mod bill_timesheets_reducer;
 pub mod block_serial_reducer;
@@ -2005,6 +2012,7 @@ pub mod revoke_subscription_entitlement_reducer;
 pub mod revoke_workflow_delegation_reducer;
 pub mod rollback_ai_skill_release_reducer;
 pub mod rollback_import_job_reducer;
+pub mod run_accounting_fixed_asset_ownership_test_reducer;
 pub mod run_accounting_fx_revaluation_test_reducer;
 pub mod run_accounting_ic_consolidation_test_reducer;
 pub mod run_accounting_payment_cancel_test_reducer;
@@ -2850,6 +2858,9 @@ pub use account_reconciliation_widget_type::AccountReconciliationWidget;
 pub use account_tax_type::AccountTax;
 pub use account_tax_group_type::AccountTaxGroup;
 pub use account_type_internal_type::AccountTypeInternal;
+pub use accounting_operation_receipt_type::AccountingOperationReceipt;
+pub use accounting_ownership_backfill_issue_type::AccountingOwnershipBackfillIssue;
+pub use accounting_ownership_backfill_run_type::AccountingOwnershipBackfillRun;
 pub use accrue_sale_commission_params_type::AccrueSaleCommissionParams;
 pub use activity_type::Activity;
 pub use activity_type_type::ActivityType;
@@ -4528,7 +4539,11 @@ pub use assign_team_member_skill_reducer::assign_team_member_skill;
 pub use assign_ticket_reducer::assign_ticket;
 pub use assign_user_to_picking_reducer::assign_user_to_picking;
 pub use award_purchase_rfq_bid_reducer::award_purchase_rfq_bid;
+pub use backfill_consolidation_organization_ownership_reducer::backfill_consolidation_organization_ownership;
 pub use backfill_external_ids_reducer::backfill_external_ids;
+pub use backfill_fiscal_period_organization_ownership_reducer::backfill_fiscal_period_organization_ownership;
+pub use backfill_fixed_asset_organization_ownership_reducer::backfill_fixed_asset_organization_ownership;
+pub use backfill_intercompany_organization_ownership_reducer::backfill_intercompany_organization_ownership;
 pub use bill_project_milestone_reducer::bill_project_milestone;
 pub use bill_timesheets_reducer::bill_timesheets;
 pub use block_serial_reducer::block_serial;
@@ -5220,6 +5235,7 @@ pub use revoke_subscription_entitlement_reducer::revoke_subscription_entitlement
 pub use revoke_workflow_delegation_reducer::revoke_workflow_delegation;
 pub use rollback_ai_skill_release_reducer::rollback_ai_skill_release;
 pub use rollback_import_job_reducer::rollback_import_job;
+pub use run_accounting_fixed_asset_ownership_test_reducer::run_accounting_fixed_asset_ownership_test;
 pub use run_accounting_fx_revaluation_test_reducer::run_accounting_fx_revaluation_test;
 pub use run_accounting_ic_consolidation_test_reducer::run_accounting_ic_consolidation_test;
 pub use run_accounting_payment_cancel_test_reducer::run_accounting_payment_cancel_test;
@@ -6095,7 +6111,11 @@ pub enum Reducer {
         rfq_id: u64,
         bid_id: u64,
 }    ,
+    BackfillConsolidationOrganizationOwnership ,
     BackfillExternalIds ,
+    BackfillFiscalPeriodOrganizationOwnership ,
+    BackfillFixedAssetOrganizationOwnership ,
+    BackfillIntercompanyOrganizationOwnership ,
     BillProjectMilestone {
         organization_id: u64,
         company_id: u64,
@@ -9340,6 +9360,7 @@ pub enum Reducer {
         organization_id: u64,
         job_id: u64,
 }    ,
+    RunAccountingFixedAssetOwnershipTest ,
     RunAccountingFxRevaluationTest ,
     RunAccountingIcConsolidationTest ,
     RunAccountingPaymentCancelTest ,
@@ -11000,7 +11021,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::AssignTicket { .. } => "assign_ticket",
             Reducer::AssignUserToPicking { .. } => "assign_user_to_picking",
             Reducer::AwardPurchaseRfqBid { .. } => "award_purchase_rfq_bid",
+            Reducer::BackfillConsolidationOrganizationOwnership => "backfill_consolidation_organization_ownership",
             Reducer::BackfillExternalIds => "backfill_external_ids",
+            Reducer::BackfillFiscalPeriodOrganizationOwnership => "backfill_fiscal_period_organization_ownership",
+            Reducer::BackfillFixedAssetOrganizationOwnership => "backfill_fixed_asset_organization_ownership",
+            Reducer::BackfillIntercompanyOrganizationOwnership => "backfill_intercompany_organization_ownership",
             Reducer::BillProjectMilestone { .. } => "bill_project_milestone",
             Reducer::BillTimesheets { .. } => "bill_timesheets",
             Reducer::BlockSerial { .. } => "block_serial",
@@ -11692,6 +11717,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RevokeWorkflowDelegation { .. } => "revoke_workflow_delegation",
             Reducer::RollbackAiSkillRelease { .. } => "rollback_ai_skill_release",
             Reducer::RollbackImportJob { .. } => "rollback_import_job",
+            Reducer::RunAccountingFixedAssetOwnershipTest => "run_accounting_fixed_asset_ownership_test",
             Reducer::RunAccountingFxRevaluationTest => "run_accounting_fx_revaluation_test",
             Reducer::RunAccountingIcConsolidationTest => "run_accounting_ic_consolidation_test",
             Reducer::RunAccountingPaymentCancelTest => "run_accounting_payment_cancel_test",
@@ -12930,7 +12956,15 @@ Reducer::ApplyHrIntegrationIntent{
                 rfq_id: rfq_id.clone(),
                 bid_id: bid_id.clone(),
 }),
-            Reducer::BackfillExternalIds => __sats::bsatn::to_vec(&backfill_external_ids_reducer::BackfillExternalIdsArgs {
+            Reducer::BackfillConsolidationOrganizationOwnership => __sats::bsatn::to_vec(&backfill_consolidation_organization_ownership_reducer::BackfillConsolidationOrganizationOwnershipArgs {
+                }),
+Reducer::BackfillExternalIds => __sats::bsatn::to_vec(&backfill_external_ids_reducer::BackfillExternalIdsArgs {
+                }),
+Reducer::BackfillFiscalPeriodOrganizationOwnership => __sats::bsatn::to_vec(&backfill_fiscal_period_organization_ownership_reducer::BackfillFiscalPeriodOrganizationOwnershipArgs {
+                }),
+Reducer::BackfillFixedAssetOrganizationOwnership => __sats::bsatn::to_vec(&backfill_fixed_asset_organization_ownership_reducer::BackfillFixedAssetOrganizationOwnershipArgs {
+                }),
+Reducer::BackfillIntercompanyOrganizationOwnership => __sats::bsatn::to_vec(&backfill_intercompany_organization_ownership_reducer::BackfillIntercompanyOrganizationOwnershipArgs {
                 }),
 Reducer::BillProjectMilestone{
                 organization_id,
@@ -18732,7 +18766,9 @@ Reducer::MigrateWorkflowInstance{
                 organization_id: organization_id.clone(),
                 job_id: job_id.clone(),
 }),
-            Reducer::RunAccountingFxRevaluationTest => __sats::bsatn::to_vec(&run_accounting_fx_revaluation_test_reducer::RunAccountingFxRevaluationTestArgs {
+            Reducer::RunAccountingFixedAssetOwnershipTest => __sats::bsatn::to_vec(&run_accounting_fixed_asset_ownership_test_reducer::RunAccountingFixedAssetOwnershipTestArgs {
+                }),
+Reducer::RunAccountingFxRevaluationTest => __sats::bsatn::to_vec(&run_accounting_fx_revaluation_test_reducer::RunAccountingFxRevaluationTestArgs {
                 }),
 Reducer::RunAccountingIcConsolidationTest => __sats::bsatn::to_vec(&run_accounting_ic_consolidation_test_reducer::RunAccountingIcConsolidationTestArgs {
                 }),

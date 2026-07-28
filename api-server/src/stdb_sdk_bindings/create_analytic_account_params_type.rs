@@ -21,14 +21,6 @@ pub struct CreateAnalyticAccountParams {
     pub is_required_in_move_lines: bool,
     pub is_required_in_distribution: bool,
     pub is_root_plan: bool,
-    pub line_ids: Vec<u64>,
-    pub child_ids: Vec<u64>,
-    pub message_follower_ids: Vec<u64>,
-    pub activity_ids: Vec<u64>,
-    pub message_ids: Vec<u64>,
-    pub balance: f64,
-    pub debit: f64,
-    pub credit: f64,
     pub metadata: Option<String>,
 }
 

@@ -9,8 +9,11 @@ use super::fx_revaluation_line_params_type::FxRevaluationLineParams;
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct RunFxRevaluationParams {
-    pub currency_code: String,
+    pub currency_id: u64,
     pub as_of_date: __sdk::Timestamp,
+    pub rate: f64,
+    pub rate_source: String,
+    pub rate_effective_date: __sdk::Timestamp,
     pub journal_id: u64,
     pub gain_account_id: u64,
     pub loss_account_id: u64,

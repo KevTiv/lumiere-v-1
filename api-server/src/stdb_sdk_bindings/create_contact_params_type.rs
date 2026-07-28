@@ -14,7 +14,7 @@ use spacetimedb_sdk::__codegen::{
 #[sats(crate = __lib)]
 pub struct CreateContactParams {
     pub name: String,
-    pub type: String,
+    pub r#type: String,
     pub email: Option::<String>,
     pub phone: Option::<String>,
     pub mobile: Option::<String>,

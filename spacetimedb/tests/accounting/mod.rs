@@ -1,6 +1,7 @@
 //! Accounting domain test suite — invoke via `run_all_accounting_tests` reducer.
-pub mod helpers;
+pub mod fixed_assets_test;
 pub mod fx_revaluation_test;
+pub mod helpers;
 pub mod ic_consolidation_test;
 pub mod journal_entries_test;
 pub mod payment_management_test;
@@ -21,6 +22,7 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_accounting_payment_multi_invoice_residual_test(ctx)?;
     run_accounting_payment_cancel_test(ctx)?;
     run_accounting_payment_term_update_test(ctx)?;
+    run_accounting_fixed_asset_ownership_test(ctx)?;
     run_accounting_period_lock_test(ctx)?;
     run_accounting_posted_immutability_test(ctx)?;
     run_accounting_trial_balance_test(ctx)?;
@@ -32,15 +34,25 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_accounting_fixed_asset_ownership_test(ctx: &ReducerContext) -> Result<(), String> {
+    fixed_assets_test::test_fixed_asset_ownership_is_derived_and_tenant_scoped(ctx)
+        .map_err(|e| format!("fixed asset ownership: {e}"))
+}
+
+#[spacetimedb::reducer]
 pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), String> {
     journal_entries_test::test_post_customer_invoice_creates_move_lines(ctx)
-        .map_err(|e| format!("post_customer_invoice: {e}"))
+        .map_err(|e| format!("post_customer_invoice: {e}"))?;
+    journal_entries_test::test_cross_tenant_move_mutations_fail_closed(ctx)
+        .map_err(|e| format!("cross_tenant_move_mutations: {e}"))
 }
 
 #[spacetimedb::reducer]
 pub fn run_accounting_payment_reconcile_test(ctx: &ReducerContext) -> Result<(), String> {
     payments_test::test_payment_reconciles_invoice(ctx)
-        .map_err(|e| format!("payment_reconciles_invoice: {e}"))
+        .map_err(|e| format!("payment_reconciles_invoice: {e}"))?;
+    payments_test::test_payment_create_rejects_invalid_relations(ctx)
+        .map_err(|e| format!("payment_create_relations: {e}"))
 }
 
 #[spacetimedb::reducer]
@@ -65,6 +77,8 @@ pub fn run_accounting_payment_term_update_test(ctx: &ReducerContext) -> Result<(
 
 #[spacetimedb::reducer]
 pub fn run_accounting_period_lock_test(ctx: &ReducerContext) -> Result<(), String> {
+    period_lock_test::test_fiscal_ownership_is_derived_and_tenant_scoped(ctx)
+        .map_err(|e| format!("fiscal ownership: {e}"))?;
     period_lock_test::test_post_blocked_in_closed_period(ctx)
         .map_err(|e| format!("period_lock invoice: {e}"))?;
     period_lock_test::test_post_payment_blocked_in_closed_period(ctx)
@@ -79,8 +93,12 @@ pub fn run_accounting_posted_immutability_test(ctx: &ReducerContext) -> Result<(
 
 #[spacetimedb::reducer]
 pub fn run_accounting_trial_balance_test(ctx: &ReducerContext) -> Result<(), String> {
+    trial_balance_test::test_analytic_account_patch_preserves_and_clears(ctx)
+        .map_err(|e| format!("analytic_account_patch: {e}"))?;
     trial_balance_test::test_trial_balance_summary_balances(ctx)
-        .map_err(|e| format!("trial_balance: {e}"))
+        .map_err(|e| format!("trial_balance: {e}"))?;
+    trial_balance_test::test_financial_report_rejects_cross_tenant_sources_and_filters(ctx)
+        .map_err(|e| format!("financial_report_tenant_isolation: {e}"))
 }
 
 #[spacetimedb::reducer]
@@ -93,6 +111,8 @@ pub fn run_accounting_payment_management_test(ctx: &ReducerContext) -> Result<()
         .map_err(|e| format!("payment_transaction_post_creates_ledger_payment: {e}"))?;
     payment_management_test::test_payment_transaction_fee_and_void(ctx)
         .map_err(|e| format!("payment_transaction_fee_and_void: {e}"))?;
+    payment_management_test::test_payment_allocation_updates_ledger_and_reverses(ctx)
+        .map_err(|e| format!("payment_allocation_ledger_mutation: {e}"))?;
     log::info!("✅ run_accounting_payment_management_test complete");
     Ok(())
 }

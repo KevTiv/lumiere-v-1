@@ -4,11 +4,16 @@
 ///
 /// Tables for managing taxes, tax groups, jurisdictions, tax schedules, and tax deadlines.
 /// Includes a scheduled reducer for automatic deadline status updates.
+use std::collections::HashSet;
+
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::account_account;
+use crate::accounting::relations::require_active_account;
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::{TaxAmountType, TaxDeadlineStatus, TaxDeadlineType, TaxTypeUse};
+use crate::types::{
+    AccountInternalGroup, TaxAmountType, TaxDeadlineStatus, TaxDeadlineType, TaxTypeUse,
+};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -360,6 +365,85 @@ pub struct UpdateTaxDeadlineParams {
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
+fn validate_tax_group_accounts(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    payable_id: Option<u64>,
+    receivable_id: Option<u64>,
+    advance_id: Option<u64>,
+) -> Result<(), String> {
+    for (id, role, group) in [
+        (payable_id, "tax payable", AccountInternalGroup::Liability),
+        (receivable_id, "tax receivable", AccountInternalGroup::Asset),
+        (
+            advance_id,
+            "advance tax payment",
+            AccountInternalGroup::Asset,
+        ),
+    ] {
+        if let Some(id) = id {
+            let account = require_active_account(ctx, organization_id, company_id, id, role)?;
+            if account.internal_group != Some(group) {
+                return Err(format!("{role} account has the wrong role"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_tax_ids(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    tax_ids: &[u64],
+) -> Result<(), String> {
+    let mut seen = HashSet::with_capacity(tax_ids.len());
+    for tax_id in tax_ids {
+        if !seen.insert(*tax_id) {
+            return Err(format!("Tax {tax_id} is duplicated"));
+        }
+        let tax = ctx
+            .db
+            .account_tax()
+            .id()
+            .find(tax_id)
+            .ok_or_else(|| format!("Tax {tax_id} not found"))?;
+        if tax.organization_id != organization_id || tax.company_id != company_id {
+            return Err(format!(
+                "Tax {tax_id} does not belong to this organization and company"
+            ));
+        }
+        if !tax.active {
+            return Err(format!("Tax {tax_id} is inactive"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_tax_jurisdiction(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    jurisdiction_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(jurisdiction_id) = jurisdiction_id else {
+        return Ok(());
+    };
+    let jurisdiction = ctx
+        .db
+        .tax_jurisdiction()
+        .id()
+        .find(&jurisdiction_id)
+        .ok_or("Jurisdiction not found")?;
+    if jurisdiction.organization_id != organization_id {
+        return Err("Jurisdiction does not belong to this organization".to_string());
+    }
+    if !jurisdiction.is_active {
+        return Err("Jurisdiction is inactive".to_string());
+    }
+    Ok(())
+}
+
 #[spacetimedb::reducer]
 pub fn create_account_tax_group(
     ctx: &ReducerContext,
@@ -368,21 +452,15 @@ pub fn create_account_tax_group(
     params: CreateAccountTaxGroupParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_tax_group", "create")?;
-
-    // Validate accounts if provided
-    for maybe_id in [
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    validate_tax_group_accounts(
+        ctx,
+        organization_id,
+        company_id,
         params.tax_payable_account_id,
         params.tax_receivable_account_id,
         params.advance_tax_payment_account_id,
-    ] {
-        if let Some(id) = maybe_id {
-            ctx.db
-                .account_account()
-                .id()
-                .find(&id)
-                .ok_or("Referenced account not found")?;
-        }
-    }
+    )?;
 
     let group = ctx.db.account_tax_group().insert(AccountTaxGroup {
         id: 0,
@@ -430,6 +508,7 @@ pub fn update_account_tax_group(
     params: UpdateAccountTaxGroupParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_tax_group", "write")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     let group = ctx
         .db
@@ -438,24 +517,18 @@ pub fn update_account_tax_group(
         .find(&group_id)
         .ok_or("Tax group not found")?;
 
-    if group.company_id != company_id {
-        return Err("Tax group does not belong to this company".to_string());
+    if group.organization_id != organization_id || group.company_id != company_id {
+        return Err("Tax group does not belong to this organization and company".to_string());
     }
 
-    // Validate accounts if provided
-    for maybe_id in [
+    validate_tax_group_accounts(
+        ctx,
+        organization_id,
+        company_id,
         params.tax_payable_account_id.flatten(),
         params.tax_receivable_account_id.flatten(),
         params.advance_tax_payment_account_id.flatten(),
-    ] {
-        if let Some(id) = maybe_id {
-            ctx.db
-                .account_account()
-                .id()
-                .find(&id)
-                .ok_or("Referenced account not found")?;
-        }
-    }
+    )?;
 
     let old_values =
         serde_json::json!({ "name": group.name, "sequence": group.sequence }).to_string();
@@ -527,6 +600,7 @@ pub fn create_account_tax(
     params: CreateAccountTaxParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_tax", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     // Validate tax group if provided
     if let Some(gid) = params.tax_group_id {
@@ -536,8 +610,8 @@ pub fn create_account_tax(
             .id()
             .find(&gid)
             .ok_or("Tax group not found")?;
-        if group.company_id != company_id {
-            return Err("Tax group does not belong to the specified company".to_string());
+        if group.organization_id != organization_id || group.company_id != company_id {
+            return Err("Tax group does not belong to this organization and company".to_string());
         }
     }
 
@@ -598,6 +672,7 @@ pub fn update_account_tax(
     params: UpdateAccountTaxParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_tax", "write")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     let tax = ctx
         .db
@@ -606,8 +681,8 @@ pub fn update_account_tax(
         .find(&tax_id)
         .ok_or("Tax not found")?;
 
-    if tax.company_id != company_id {
-        return Err("Tax does not belong to this company".to_string());
+    if tax.organization_id != organization_id || tax.company_id != company_id {
+        return Err("Tax does not belong to this organization and company".to_string());
     }
 
     // Validate tax group if provided
@@ -618,8 +693,8 @@ pub fn update_account_tax(
             .id()
             .find(&gid)
             .ok_or("Tax group not found")?;
-        if group.company_id != company_id {
-            return Err("Tax group does not belong to the same company".to_string());
+        if group.organization_id != organization_id || group.company_id != company_id {
+            return Err("Tax group does not belong to this organization and company".to_string());
         }
     }
 
@@ -833,31 +908,9 @@ pub fn create_tax_schedule(
     params: CreateTaxScheduleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "tax_schedule", "create")?;
-
-    // Validate jurisdiction if provided
-    if let Some(jid) = params.jurisdiction_id {
-        ctx.db
-            .tax_jurisdiction()
-            .id()
-            .find(&jid)
-            .ok_or("Jurisdiction not found")?;
-    }
-
-    // Validate all taxes exist and belong to company
-    for tax_id in &params.tax_ids {
-        let tax = ctx
-            .db
-            .account_tax()
-            .id()
-            .find(tax_id)
-            .ok_or(format!("Tax {} not found", tax_id))?;
-        if tax.company_id != company_id {
-            return Err(format!(
-                "Tax {} does not belong to the specified company",
-                tax_id
-            ));
-        }
-    }
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    validate_tax_jurisdiction(ctx, organization_id, params.jurisdiction_id)?;
+    validate_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
 
     let schedule = ctx.db.tax_schedule().insert(TaxSchedule {
         id: 0,
@@ -906,6 +959,7 @@ pub fn update_tax_schedule(
     params: UpdateTaxScheduleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "tax_schedule", "write")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     let schedule = ctx
         .db
@@ -914,35 +968,18 @@ pub fn update_tax_schedule(
         .find(&schedule_id)
         .ok_or("Tax schedule not found")?;
 
-    if schedule.company_id != company_id {
-        return Err("Tax schedule does not belong to this company".to_string());
+    if schedule.organization_id != organization_id || schedule.company_id != company_id {
+        return Err("Tax schedule does not belong to this organization and company".to_string());
     }
 
     // Validate jurisdiction if provided
     if let Some(Some(jid)) = params.jurisdiction_id {
-        ctx.db
-            .tax_jurisdiction()
-            .id()
-            .find(&jid)
-            .ok_or("Jurisdiction not found")?;
+        validate_tax_jurisdiction(ctx, organization_id, Some(jid))?;
     }
 
     // Validate all taxes if provided
     if let Some(ref new_tax_ids) = params.tax_ids {
-        for tax_id in new_tax_ids {
-            let tax = ctx
-                .db
-                .account_tax()
-                .id()
-                .find(tax_id)
-                .ok_or(format!("Tax {} not found", tax_id))?;
-            if tax.company_id != company_id {
-                return Err(format!(
-                    "Tax {} does not belong to the same company",
-                    tax_id
-                ));
-            }
-        }
+        validate_tax_ids(ctx, organization_id, company_id, new_tax_ids)?;
     }
 
     let old_values =

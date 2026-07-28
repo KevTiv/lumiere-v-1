@@ -56,17 +56,32 @@ function optionalTrimmedString(v: unknown): string | undefined {
   return s === '' ? undefined : s
 }
 
+function hasOwn(formData: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(formData, key)
+}
+
+function nullableTrimmedString(v: unknown): string | null {
+  if (v == null) return null
+  const value = String(v).trim()
+  return value === '' ? null : value
+}
+
+function nullableBigIntU64(v: unknown): bigint | null {
+  if (v == null || String(v).trim() === '') return null
+  return optionalBigIntU64(v) ?? null
+}
+
 function requiredBigIntU64(v: unknown): bigint | null {
   const b = optionalBigIntU64(v)
   return b === undefined ? null : b
 }
 
-function timestampFromFormDate(v: unknown, fallback = new Date()): Timestamp {
+function timestampFromFormDate(v: unknown): Timestamp {
   if (v != null && String(v).trim() !== '') {
     const d = new Date(String(v))
     if (!Number.isNaN(d.getTime())) return stbTimestampFromDate(d)
   }
-  return stbTimestampFromDate(fallback)
+  throw new Error('A valid business date is required')
 }
 
 function optionalTimestampFromFormDate(v: unknown): Timestamp | undefined {
@@ -122,7 +137,7 @@ function toInternalGroup(
 
 export function toCreateAccountAccountParams(
   formData: Record<string, unknown>,
-  opts?: { accountTypes?: ReadonlyArray<Record<string, unknown>> },
+  opts: { companyId: bigint; accountTypes?: ReadonlyArray<Record<string, unknown>> },
 ): CreateAccountAccountParams | null {
   const rawUt = formData.userTypeId
   let userTypeId: bigint | null =
@@ -140,7 +155,7 @@ export function toCreateAccountAccountParams(
   if (userTypeId == null) return null
 
   return {
-    companyId: undefined,
+    companyId: opts.companyId,
     code: String(formData.code ?? ''),
     name: String(formData.name ?? ''),
     userTypeId,
@@ -166,15 +181,16 @@ const MOVE_TYPE_IN_INVOICE: CreateAccountMoveParams['moveType'] = { tag: 'InInvo
 
 export function toCreateJournalEntryMoveParams(
   formData: Record<string, unknown>,
+  companyId: bigint,
 ): CreateAccountMoveParams | null {
   const journalId = requiredBigIntU64(formData.journalId)
   if (journalId == null) return null
 
   return {
-    companyId: undefined,
+    companyId,
     journalId,
     moveType: MOVE_TYPE_ENTRY,
-    date: timestampFromFormDate(formData.date ?? new Date().toISOString()),
+    date: timestampFromFormDate(formData.date),
     name: String(formData.name ?? formData.ref ?? 'Journal Entry'),
     ref: optionalTrimmedString(formData.ref),
     autoPost: false,
@@ -208,17 +224,16 @@ export function toCreateAccountMoveFromInvoiceModal(
   kind: 'OutInvoice' | 'InInvoice',
   journalId: bigint,
   defaultName: string,
+  companyId: bigint,
 ): CreateAccountMoveParams {
   const moveType =
     kind === 'OutInvoice' ? MOVE_TYPE_OUT_INVOICE : MOVE_TYPE_IN_INVOICE
 
   return {
-    companyId: undefined,
+    companyId,
     journalId,
     moveType,
-    date: timestampFromFormDate(
-      params.date ?? params.invoiceDate ?? new Date().toISOString(),
-    ),
+    date: timestampFromFormDate(params.date ?? params.invoiceDate),
     name: String(params.name ?? params.ref ?? defaultName),
     ref: optionalTrimmedString(params.ref),
     autoPost: false,
@@ -401,23 +416,16 @@ export function createAccountAccountParamsToStdbHttpJson(
   }
 }
 
-const BUDGET_STATE_DRAFT: CreateCrossoveredBudgetParams['state'] = { tag: 'Draft' }
-
 export function toCreateCrossoveredBudgetParams(
   formData: Record<string, unknown>,
+  companyId: bigint,
 ): CreateCrossoveredBudgetParams {
   return {
-    companyId: undefined,
+    companyId,
     name: String(formData.name ?? ''),
     description: optionalTrimmedString(formData.description),
-    dateFrom: timestampFromFormDate(formData.dateFrom ?? new Date().toISOString()),
-    dateTo: timestampFromFormDate(formData.dateTo ?? new Date().toISOString()),
-    state: BUDGET_STATE_DRAFT,
-    crossoveredBudgetLine: [],
-    totalPlanned: Number(formData.totalPlanned ?? 0),
-    totalPractical: 0,
-    totalTheoretical: 0,
-    variancePercentage: 0,
+    dateFrom: timestampFromFormDate(formData.dateFrom),
+    dateTo: timestampFromFormDate(formData.dateTo),
     metadata: undefined,
   }
 }
@@ -450,9 +458,12 @@ function updateAccountGroupParentId(
   return optionalBigIntU64(raw)
 }
 
-export function toCreateBudgetPostParams(formData: Record<string, unknown>): CreateBudgetPostParams {
+export function toCreateBudgetPostParams(
+  formData: Record<string, unknown>,
+  companyId: bigint,
+): CreateBudgetPostParams {
   return {
-    companyId: undefined,
+    companyId,
     name: String(formData.name ?? '').trim(),
     code: optionalTrimmedString(formData.code),
     description: optionalTrimmedString(formData.description),
@@ -462,52 +473,54 @@ export function toCreateBudgetPostParams(formData: Record<string, unknown>): Cre
   }
 }
 
-export function toUpdateBudgetPostParams(formData: Record<string, unknown>): UpdateBudgetPostParams {
-  return {
-    companyId: undefined,
-    name: String(formData.name ?? '').trim(),
-    code: optionalTrimmedString(formData.code),
-    description: optionalTrimmedString(formData.description),
-    accountIds: parseAccountIdList(formData.accountIds),
-    isActive: Boolean(formData.isActive),
-    metadata: optionalTrimmedString(formData.metadata),
+export function toUpdateBudgetPostParams(
+  formData: Record<string, unknown>,
+  companyId: bigint,
+): Record<string, unknown> {
+  const params: Record<string, unknown> = { companyId }
+  if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'code')) params.code = nullableTrimmedString(formData.code)
+  if (hasOwn(formData, 'description')) {
+    params.description = nullableTrimmedString(formData.description)
   }
+  if (hasOwn(formData, 'accountIds')) params.accountIds = parseAccountIdList(formData.accountIds)
+  if (hasOwn(formData, 'isActive')) params.isActive = Boolean(formData.isActive)
+  if (hasOwn(formData, 'metadata')) params.metadata = nullableTrimmedString(formData.metadata)
+  return params
 }
 
 export function toCreateAccountAccountTypeParams(
   formData: Record<string, unknown>,
+  companyId: bigint,
 ): CreateAccountAccountTypeParams {
   return {
     name: String(formData.name ?? '').trim(),
     type: String(formData.type ?? '').trim(),
     internalGroup: toInternalGroup(formData.internalGroup) ?? { tag: 'Asset' },
     includeInitialBalance: Boolean(formData.includeInitialBalance),
-    companyId: undefined,
+    companyId,
     metadata: optionalTrimmedString(formData.metadata),
   }
 }
 
 export function toUpdateAccountAccountTypeParams(
   formData: Record<string, unknown>,
-): UpdateAccountAccountTypeParams {
-  return {
-    companyId: undefined,
-    name: optionalTrimmedString(formData.name),
-    type: optionalTrimmedString(formData.type),
-    internalGroup:
-      formData.internalGroup === '' || formData.internalGroup == null
-        ? undefined
-        : toInternalGroup(formData.internalGroup),
-    includeInitialBalance:
-      formData.includeInitialBalance === '' || formData.includeInitialBalance === undefined
-        ? undefined
-        : Boolean(formData.includeInitialBalance),
-    isDeprecated:
-      formData.isDeprecated === '' || formData.isDeprecated === undefined
-        ? undefined
-        : Boolean(formData.isDeprecated),
-    metadata: optionalTrimmedString(formData.metadata),
+  companyId: bigint,
+): Record<string, unknown> {
+  const params: Record<string, unknown> = { companyId }
+  if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'type')) params.type = optionalTrimmedString(formData.type)
+  if (hasOwn(formData, 'internalGroup') && formData.internalGroup !== '') {
+    params.internalGroup = toInternalGroup(formData.internalGroup)
   }
+  if (hasOwn(formData, 'includeInitialBalance')) {
+    params.includeInitialBalance = Boolean(formData.includeInitialBalance)
+  }
+  if (hasOwn(formData, 'isDeprecated')) {
+    params.isDeprecated = Boolean(formData.isDeprecated)
+  }
+  if (hasOwn(formData, 'metadata')) params.metadata = nullableTrimmedString(formData.metadata)
+  return params
 }
 
 export function toCreateAccountGroupParams(
@@ -529,20 +542,22 @@ export function toCreateAccountGroupParams(
 /** `parentId` on the form updates hierarchy; empty string clears the parent (inner none). */
 export function toUpdateAccountGroupParams(
   formData: Record<string, unknown>,
-  companyId?: bigint,
-): UpdateAccountGroupParams {
-  return {
-    companyId,
-    name: optionalTrimmedString(formData.name),
-    codePrefixStart: optionalTrimmedString(formData.codePrefixStart),
-    codePrefixEnd: optionalTrimmedString(formData.codePrefixEnd),
-    level:
-      formData.level === '' || formData.level == null
-        ? undefined
-        : Math.max(0, Math.trunc(Number(formData.level))),
-    parentId: updateAccountGroupParentId(formData),
-    metadata: optionalTrimmedString(formData.metadata),
+  companyId: bigint,
+): Record<string, unknown> {
+  const params: Record<string, unknown> = { companyId }
+  if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'codePrefixStart')) {
+    params.codePrefixStart = nullableTrimmedString(formData.codePrefixStart)
   }
+  if (hasOwn(formData, 'codePrefixEnd')) {
+    params.codePrefixEnd = nullableTrimmedString(formData.codePrefixEnd)
+  }
+  if (hasOwn(formData, 'level') && formData.level !== '' && formData.level != null) {
+    params.level = Math.max(0, Math.trunc(Number(formData.level)))
+  }
+  params.parentId = updateAccountGroupParentId(formData)
+  if (hasOwn(formData, 'metadata')) params.metadata = nullableTrimmedString(formData.metadata)
+  return params
 }
 
 export function accountingParamsToJson(
@@ -582,14 +597,6 @@ export function toCreateAnalyticAccountParams(
     isRequiredInMoveLines: Boolean(formData.isRequiredInMoveLines),
     isRequiredInDistribution: Boolean(formData.isRequiredInDistribution),
     isRootPlan: Boolean(formData.isRootPlan),
-    lineIds: [],
-    childIds: [],
-    messageFollowerIds: [],
-    activityIds: [],
-    messageIds: [],
-    balance: Number(formData.balance ?? 0),
-    debit: Number(formData.debit ?? 0),
-    credit: Number(formData.credit ?? 0),
     metadata: optionalTrimmedString(formData.metadata),
   }
 }
@@ -608,7 +615,7 @@ export function toCreateAnalyticLineParams(
     amount: Number(formData.amount ?? 0),
     unitAmount: Number(formData.unitAmount ?? formData.amount ?? 0),
     currencyId: optionalBigIntU64(formData.currencyId) ?? defaultCurrencyId,
-    date: timestampFromFormDate(formData.date ?? new Date().toISOString()),
+    date: timestampFromFormDate(formData.date),
     partnerId: optionalBigIntU64(formData.partnerId),
     productId: optionalBigIntU64(formData.productId),
     productUomId: optionalBigIntU64(formData.productUomId),
@@ -658,52 +665,45 @@ export function toCreateAnalyticDistributionModelParams(
 
 export function toUpdateAnalyticAccountParams(
   formData: Record<string, unknown>,
-  companyId?: bigint,
-): UpdateAnalyticAccountParams {
-  return {
-    companyId,
-    name: optionalTrimmedString(formData.name),
-    code:
-      formData.code === '' || formData.code == null
-        ? undefined
-        : optionalTrimmedString(formData.code),
-    partnerId: optionalBigIntU64(formData.partnerId),
-    planId: optionalBigIntU64(formData.planId),
-    groupId: optionalBigIntU64(formData.groupId),
-    color:
-      formData.color != null && String(formData.color).trim() !== ''
-        ? Number(formData.color)
-        : undefined,
-    isRequiredInMoveLines:
-      formData.isRequiredInMoveLines === ''
-        ? undefined
-        : formData.isRequiredInMoveLines === undefined
-          ? undefined
-          : Boolean(formData.isRequiredInMoveLines),
-    metadata: optionalTrimmedString(formData.metadata),
+  companyId: bigint,
+): Record<string, unknown> {
+  const params: Record<string, unknown> = { companyId }
+  if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'code')) params.code = nullableTrimmedString(formData.code)
+  if (hasOwn(formData, 'partnerId')) params.partnerId = nullableBigIntU64(formData.partnerId)
+  if (hasOwn(formData, 'planId')) params.planId = nullableBigIntU64(formData.planId)
+  if (hasOwn(formData, 'groupId')) params.groupId = nullableBigIntU64(formData.groupId)
+  if (hasOwn(formData, 'color')) {
+    params.color =
+      formData.color == null || String(formData.color).trim() === ''
+        ? null
+        : Number(formData.color)
   }
+  if (hasOwn(formData, 'isRequiredInMoveLines')) {
+    params.isRequiredInMoveLines = Boolean(formData.isRequiredInMoveLines)
+  }
+  if (hasOwn(formData, 'metadata')) params.metadata = nullableTrimmedString(formData.metadata)
+  return params
 }
 
 export function toUpdateAnalyticLineParams(
   formData: Record<string, unknown>,
-): UpdateAnalyticLineParams {
-  return {
-    name: optionalTrimmedString(formData.name),
-    amount:
-      formData.amount === '' || formData.amount == null
-        ? undefined
-        : Number(formData.amount),
-    unitAmount:
-      formData.unitAmount === '' || formData.unitAmount == null
-        ? undefined
-        : Number(formData.unitAmount),
-    partnerId: optionalBigIntU64(formData.partnerId),
-    projectId: optionalBigIntU64(formData.projectId),
-    taskId: optionalBigIntU64(formData.taskId),
-    category: optionalTrimmedString(formData.category),
-    tagIds: optionalTagIdsForAnalyticLineUpdate(formData),
-    metadata: optionalTrimmedString(formData.metadata),
+): Record<string, unknown> {
+  const params: Record<string, unknown> = {}
+  if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'amount') && formData.amount !== '' && formData.amount != null) {
+    params.amount = Number(formData.amount)
   }
+  if (hasOwn(formData, 'unitAmount') && formData.unitAmount !== '' && formData.unitAmount != null) {
+    params.unitAmount = Number(formData.unitAmount)
+  }
+  if (hasOwn(formData, 'partnerId')) params.partnerId = nullableBigIntU64(formData.partnerId)
+  if (hasOwn(formData, 'projectId')) params.projectId = nullableBigIntU64(formData.projectId)
+  if (hasOwn(formData, 'taskId')) params.taskId = nullableBigIntU64(formData.taskId)
+  if (hasOwn(formData, 'category')) params.category = nullableTrimmedString(formData.category)
+  params.tagIds = optionalTagIdsForAnalyticLineUpdate(formData)
+  if (hasOwn(formData, 'metadata')) params.metadata = nullableTrimmedString(formData.metadata)
+  return params
 }
 
 export function toUpdateAnalyticDistributionModelParams(
@@ -756,7 +756,7 @@ export function toCreateAccountBankStatementLineParams(
   if (!Number.isFinite(amountCurrency)) return null
 
   return {
-    date: timestampFromFormDate(formData.date ?? new Date()),
+    date: timestampFromFormDate(formData.date),
     amount,
     amountCurrency,
     currencyId: optionalBigIntU64(formData.currencyId),
@@ -782,21 +782,25 @@ export function toCreateAccountBankStatementLineParams(
 export function toUpdateAccountBankStatementLineParams(
   formData: Record<string, unknown>,
 ): Record<string, unknown> {
-  const amount = Number(formData.amount ?? 0)
-  const ac = formData.amountCurrency
-  const amountCurrency =
-    ac === '' || ac == null || (typeof ac === 'string' && ac.trim() === '')
-      ? amount
-      : Number(ac)
-  const raw: Record<string, unknown> = {
-    date: timestampFromFormDate(formData.date ?? new Date()),
-    amount: Number.isFinite(amount) ? amount : 0,
-    amountCurrency: Number.isFinite(amountCurrency) ? amountCurrency : amount,
+  const raw: Record<string, unknown> = {}
+  if (hasOwn(formData, 'date')) raw.date = timestampFromFormDate(formData.date)
+  if (hasOwn(formData, 'amount') && formData.amount !== '' && formData.amount != null) {
+    raw.amount = Number(formData.amount)
   }
-  const acct = optionalTrimmedString(formData.accountNumber)
-  if (acct !== undefined) raw.accountNumber = acct
-  const tt = optionalTrimmedString(formData.transactionType)
-  if (tt !== undefined) raw.transactionType = tt
+  if (
+    hasOwn(formData, 'amountCurrency') &&
+    formData.amountCurrency !== '' &&
+    formData.amountCurrency != null
+  ) {
+    raw.amountCurrency = Number(formData.amountCurrency)
+  }
+  if (hasOwn(formData, 'accountNumber')) {
+    raw.accountNumber = nullableTrimmedString(formData.accountNumber)
+  }
+  if (hasOwn(formData, 'transactionType')) {
+    raw.transactionType = nullableTrimmedString(formData.transactionType)
+  }
+  if (hasOwn(formData, 'metadata')) raw.metadata = nullableTrimmedString(formData.metadata)
   return stdbParamsToJson(raw)
 }
 
@@ -1039,10 +1043,6 @@ export function toCreateFiscalYearParams(formData: Record<string, unknown>): Cre
     dateFrom,
     dateTo,
     type: fiscalYearTypeFromSelect(formData.fiscalYearType),
-    state: { tag: 'Draft' as const },
-    carryOverAccounts: [],
-    closingMoveId: undefined,
-    openingMoveId: undefined,
     isAdjustment: Boolean(formData.isAdjustment),
     notes: optionalTrimmedString(formData.notes),
     metadata: optionalTrimmedString(formData.metadata),
@@ -1050,14 +1050,18 @@ export function toCreateFiscalYearParams(formData: Record<string, unknown>): Cre
 }
 
 export function toUpdateFiscalYearParams(formData: Record<string, unknown>): Record<string, unknown> {
-  const payload = {
-    name: String(formData.name ?? '').trim(),
-    dateFrom: timestampFromFormDate(formData.dateFrom),
-    dateTo: timestampFromFormDate(formData.dateTo),
-    type: fiscalYearTypeFromSelect(formData.fiscalYearType),
-    isAdjustment: Boolean(formData.isAdjustment),
-    notes: optionalTrimmedString(formData.notes),
+  const payload: Record<string, unknown> = {}
+  if (hasOwn(formData, 'name')) payload.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'dateFrom')) payload.dateFrom = timestampFromFormDate(formData.dateFrom)
+  if (hasOwn(formData, 'dateTo')) payload.dateTo = timestampFromFormDate(formData.dateTo)
+  if (hasOwn(formData, 'fiscalYearType')) {
+    payload.type = fiscalYearTypeFromSelect(formData.fiscalYearType)
   }
+  if (hasOwn(formData, 'isAdjustment')) {
+    payload.isAdjustment = Boolean(formData.isAdjustment)
+  }
+  if (hasOwn(formData, 'notes')) payload.notes = nullableTrimmedString(formData.notes)
+  if (hasOwn(formData, 'metadata')) payload.metadata = nullableTrimmedString(formData.metadata)
   return stdbParamsToJson(payload)
 }
 
@@ -1097,7 +1101,6 @@ export function toCreateAccountPeriodParams(
     dateFrom,
     dateTo,
     fiscalYearId,
-    state: { tag: 'Draft' as const },
     isAdjustment: Boolean(formData.isAdjustment),
     notes: optionalTrimmedString(formData.notes),
     metadata: optionalTrimmedString(formData.metadata),
@@ -1105,14 +1108,16 @@ export function toCreateAccountPeriodParams(
 }
 
 export function toUpdateAccountPeriodParams(formData: Record<string, unknown>): Record<string, unknown> {
-  const payload = {
-    name: String(formData.name ?? '').trim(),
-    code: String(formData.code ?? '').trim(),
-    dateFrom: timestampFromFormDate(formData.dateFrom),
-    dateTo: timestampFromFormDate(formData.dateTo),
-    isAdjustment: Boolean(formData.isAdjustment),
-    notes: optionalTrimmedString(formData.notes),
+  const payload: Record<string, unknown> = {}
+  if (hasOwn(formData, 'name')) payload.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'code')) payload.code = optionalTrimmedString(formData.code)
+  if (hasOwn(formData, 'dateFrom')) payload.dateFrom = timestampFromFormDate(formData.dateFrom)
+  if (hasOwn(formData, 'dateTo')) payload.dateTo = timestampFromFormDate(formData.dateTo)
+  if (hasOwn(formData, 'isAdjustment')) {
+    payload.isAdjustment = Boolean(formData.isAdjustment)
   }
+  if (hasOwn(formData, 'notes')) payload.notes = nullableTrimmedString(formData.notes)
+  if (hasOwn(formData, 'metadata')) payload.metadata = nullableTrimmedString(formData.metadata)
   return stdbParamsToJson(payload)
 }
 
@@ -1129,9 +1134,10 @@ export function toCreateDepreciationLineParams(
   if (!Number.isFinite(amount) || amount <= 0) return null
 
   return {
+    idempotencyKey: `create-depreciation-line:${globalThis.crypto.randomUUID()}`,
     assetId,
     amount,
-    depreciationDate: timestampFromFormDate(formData.depreciationDate ?? new Date()),
+    depreciationDate: timestampFromFormDate(formData.depreciationDate),
     name: optionalTrimmedString(formData.name),
     moveId: optionalBigIntU64(formData.moveId),
     moveCheck: formData.moveCheck === true,
@@ -1323,23 +1329,28 @@ import type { UpdateAccountMoveLineParams } from '@lumiere/stdb/types'
 
 export function toUpdateAccountMoveLineParams(
   formData: Record<string, unknown>,
-): UpdateAccountMoveLineParams {
-  return {
+): Record<string, unknown> {
+  const params: Record<string, unknown> = {
     companyId: optionalBigIntU64(formData.companyId),
-    name: optionalTrimmedString(formData.name),
-    debit: formData.debit === '' || formData.debit == null ? undefined : Number(formData.debit),
-    credit: formData.credit === '' || formData.credit == null ? undefined : Number(formData.credit),
-    partnerId: formData.partnerId === '' || formData.partnerId == null
-      ? undefined
-      : optionalBigIntU64(formData.partnerId),
-    analyticAccountId: formData.analyticAccountId === '' || formData.analyticAccountId == null
-      ? undefined
-      : optionalBigIntU64(formData.analyticAccountId),
-    metadata: optionalTrimmedString(formData.metadata),
   }
+  if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'debit') && formData.debit !== '' && formData.debit != null) {
+    params.debit = Number(formData.debit)
+  }
+  if (hasOwn(formData, 'credit') && formData.credit !== '' && formData.credit != null) {
+    params.credit = Number(formData.credit)
+  }
+  if (hasOwn(formData, 'partnerId')) params.partnerId = nullableBigIntU64(formData.partnerId)
+  if (hasOwn(formData, 'analyticAccountId')) {
+    params.analyticAccountId = nullableBigIntU64(formData.analyticAccountId)
+  }
+  if (hasOwn(formData, 'metadata')) {
+    params.metadata = nullableTrimmedString(formData.metadata) ?? undefined
+  }
+  return params
 }
 
-export function updateAccountMoveLineParamsToJson(params: UpdateAccountMoveLineParams): Record<string, unknown> {
+export function updateAccountMoveLineParamsToJson(params: Record<string, unknown>): Record<string, unknown> {
   return stdbParamsToJson(params)
 }
 
@@ -1648,15 +1659,9 @@ export function toCreateAccountJournalParams(
 /** Form → journal entry move; alias for coverage and explicit call sites. */
 export function toCreateAccountMoveParams(
   formData: Record<string, unknown>,
+  companyId: bigint,
 ): CreateAccountMoveParams | null {
-  return toCreateJournalEntryMoveParams(formData)
-}
-
-function bankStatementStateFromForm(raw: unknown): CreateAccountBankStatementParams['state'] {
-  const s = String(raw ?? 'Open').trim()
-  if (s === 'Open' || s === 'Posted' || s === 'Cancelled' || s === 'Processing') return { tag: s }
-  if (s === 'Confirm') return { tag: 'Processing' }
-  return { tag: 'Open' }
+  return toCreateJournalEntryMoveParams(formData, companyId)
 }
 
 export function toCreateAccountBankStatementParams(
@@ -1671,15 +1676,6 @@ export function toCreateAccountBankStatementParams(
     date: optionalTimestampFromFormDate(formData.date),
     balanceStart: Number.isFinite(balanceStart) ? balanceStart : 0,
     currencyId,
-    state: bankStatementStateFromForm(formData.state),
-    lineIds: u64IdArrayFromForm(field(formData, "lineIds", "line_ids")),
-    moveLineIds: u64IdArrayFromForm(field(formData, "moveLineIds", "move_line_ids")),
-    totalEntryEncoding: Number(field(formData, "totalEntryEncoding", "total_entry_encoding") ?? 0),
-    totalAmount: Number(field(formData, "totalAmount", "total_amount") ?? 0),
-    totalAmountCurrency: Number(field(formData, "totalAmountCurrency", "total_amount_currency") ?? 0),
-    dateDone: optionalTimestampFromFormDate(field(formData, "dateDone", "date_done")),
-    isValidBalanceStart: formData.isValidBalanceStart !== false && formData.is_valid_balance_start !== false,
-    isValidBalanceEnd: formData.isValidBalanceEnd !== false && formData.is_valid_balance_end !== false,
     metadata: optionalTrimmedString(formData.metadata),
   }
 }
@@ -1691,8 +1687,8 @@ export function toCreateCrossoveredBudgetLineParams(
   return {
     analyticAccountId: optionalBigIntU64(field(formData, "analyticAccountId", "analytic_account_id")),
     projectId: optionalBigIntU64(field(formData, "projectId", "project_id")),
-    dateFrom: timestampFromFormDate(field(formData, "dateFrom", "date_from") ?? new Date()),
-    dateTo: timestampFromFormDate(field(formData, "dateTo", "date_to") ?? new Date()),
+    dateFrom: timestampFromFormDate(field(formData, "dateFrom", "date_from")),
+    dateTo: timestampFromFormDate(field(formData, "dateTo", "date_to")),
     paidDate: optionalTimestampFromFormDate(field(formData, "paidDate", "paid_date")),
     plannedAmount: Number.isFinite(plannedAmount) ? plannedAmount : 0,
     practicalAmount: Number(field(formData, "practicalAmount", "practical_amount") ?? 0),
@@ -1772,6 +1768,7 @@ export function toCreateAccountAssetParams(
   if (!code || !name) return null
 
   return {
+    idempotencyKey: `create-account-asset:${globalThis.crypto.randomUUID()}`,
     code,
     name,
     active: field(formData, 'active', 'active') !== false,
@@ -1797,7 +1794,6 @@ export function toCreateAccountAssetParams(
     journalId: optionalBigIntU64(field(formData, 'journalId', 'journal_id')) ?? context.journalId,
     acquisitionDate: timestampFromFormDate(
       field(formData, 'acquisitionDate', 'acquisition_date'),
-      new Date(),
     ),
     accountAnalyticId: optionalBigIntU64(field(formData, 'accountAnalyticId', 'account_analytic_id')),
     parentId: optionalBigIntU64(field(formData, 'parentId', 'parent_id')),
@@ -1814,36 +1810,15 @@ export function toCreateAccountAssetParams(
       field(formData, 'alreadyDepreciatedAmountImport', 'already_depreciated_amount_import'),
       0,
     ),
-    originalMoveLineIds: u64IdArrayFromForm(
-      field(formData, 'originalMoveLineIds', 'original_move_line_ids'),
-    ),
     isImported: field(formData, 'isImported', 'is_imported') === true,
     accountAnalyticTagIds: u64IdArrayFromForm(
       field(formData, 'accountAnalyticTagIds', 'account_analytic_tag_ids'),
     ),
-    childrenIds: u64IdArrayFromForm(field(formData, 'childrenIds', 'children_ids')),
-    analyticLineIds: u64IdArrayFromForm(field(formData, 'analyticLineIds', 'analytic_line_ids')),
-    depreciationMoveIds: u64IdArrayFromForm(
-      field(formData, 'depreciationMoveIds', 'depreciation_move_ids'),
-    ),
     assetLifetimeDays: Math.trunc(num(field(formData, 'assetLifetimeDays', 'asset_lifetime_days'), 0)),
     assetPausedDays: Math.trunc(num(field(formData, 'assetPausedDays', 'asset_paused_days'), 0)),
-    depreciationSequence: Math.trunc(
-      num(field(formData, 'depreciationSequence', 'depreciation_sequence'), 0),
-    ),
-    salvageMoveId: optionalBigIntU64(field(formData, 'salvageMoveId', 'salvage_move_id')),
     depreciationSchedule: optionalTrimmedString(
       field(formData, 'depreciationSchedule', 'depreciation_schedule'),
     ),
-    depreciationBoardIds: u64IdArrayFromForm(
-      field(formData, 'depreciationBoardIds', 'depreciation_board_ids'),
-    ),
-    modificationIds: u64IdArrayFromForm(field(formData, 'modificationIds', 'modification_ids')),
-    activityIds: u64IdArrayFromForm(field(formData, 'activityIds', 'activity_ids')),
-    messageFollowerIds: u64IdArrayFromForm(
-      field(formData, 'messageFollowerIds', 'message_follower_ids'),
-    ),
-    messageIds: u64IdArrayFromForm(field(formData, 'messageIds', 'message_ids')),
     metadata: optionalTrimmedString(field(formData, 'metadata', 'metadata')),
   }
 }
@@ -1915,8 +1890,8 @@ export function toCreateConsolidationJournalParams(
     name,
     periodId,
     periodName,
-    dateFrom: timestampFromFormDate(field(formData, 'dateFrom', 'date_from'), new Date()),
-    dateTo: timestampFromFormDate(field(formData, 'dateTo', 'date_to'), new Date()),
+    dateFrom: timestampFromFormDate(field(formData, 'dateFrom', 'date_from')),
+    dateTo: timestampFromFormDate(field(formData, 'dateTo', 'date_to')),
     companyIds,
     currencyId,
     exchangeRate: num(field(formData, 'exchangeRate', 'exchange_rate'), 1),
@@ -1985,26 +1960,34 @@ export function toCreateEliminationEntryParams(
 export function toRunFxRevaluationParamsFromForm(
   formData: Record<string, unknown>,
 ): Record<string, unknown> | null {
-  const currencyCode = optionalTrimmedString(formData.currencyCode)?.toUpperCase()
+  const currencyId = requiredBigIntU64(formData.currencyId)
   const journalId = requiredBigIntU64(formData.journalId)
   const accountId = requiredBigIntU64(formData.accountId)
   const gainAccountId = requiredBigIntU64(formData.gainAccountId)
   const lossAccountId = requiredBigIntU64(formData.lossAccountId)
   const adjustment = Number(formData.adjustment)
+  const rate = Number(formData.rate)
+  const rateSource = optionalTrimmedString(formData.rateSource)
   if (
-    !currencyCode ||
+    currencyId == null ||
     journalId == null ||
     accountId == null ||
     gainAccountId == null ||
     lossAccountId == null ||
     !Number.isFinite(adjustment) ||
-    adjustment === 0
+    adjustment === 0 ||
+    !Number.isFinite(rate) ||
+    rate <= 0 ||
+    !rateSource
   ) {
     return null
   }
   return {
-    currencyCode,
+    currencyId,
     asOfDate: timestampFromFormDate(formData.asOfDate),
+    rate,
+    rateSource,
+    rateEffectiveDate: timestampFromFormDate(formData.rateEffectiveDate),
     journalId,
     gainAccountId,
     lossAccountId,
@@ -2021,28 +2004,32 @@ export function runFxRevaluationParamsToJson(params: Record<string, unknown>): R
 export function toRunFxRevaluationBatchParamsFromForm(
   formData: Record<string, unknown>,
 ): Record<string, unknown> | null {
-  const currencyCode = optionalTrimmedString(formData.currencyCode)?.toUpperCase()
+  const currencyId = requiredBigIntU64(formData.currencyId)
   const journalId = requiredBigIntU64(formData.journalId)
   const gainAccountId = requiredBigIntU64(formData.gainAccountId)
   const lossAccountId = requiredBigIntU64(formData.lossAccountId)
   const rate = Number(formData.rate)
+  const rateSource = optionalTrimmedString(formData.rateSource)
   if (
-    !currencyCode ||
+    currencyId == null ||
     journalId == null ||
     gainAccountId == null ||
     lossAccountId == null ||
     !Number.isFinite(rate) ||
-    rate <= 0
+    rate <= 0 ||
+    !rateSource
   ) {
     return null
   }
   return {
-    currencyCode,
+    currencyId,
     asOfDate: timestampFromFormDate(formData.asOfDate),
     journalId,
     gainAccountId,
     lossAccountId,
     rate,
+    rateSource,
+    rateEffectiveDate: timestampFromFormDate(formData.rateEffectiveDate),
     reference: optionalTrimmedString(formData.reference),
     metadata: undefined,
   }

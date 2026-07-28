@@ -9,11 +9,11 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct UpdateAccountGroupParams {
     pub company_id: Option<u64>,
     pub name: Option<String>,
-    pub code_prefix_start: Option<String>,
-    pub code_prefix_end: Option<String>,
+    pub code_prefix_start: Option<Option<String>>,
+    pub code_prefix_end: Option<Option<String>>,
     pub level: Option<u32>,
     pub parent_id: Option<Option<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateAccountGroupParams {

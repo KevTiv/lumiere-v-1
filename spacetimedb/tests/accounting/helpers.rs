@@ -362,10 +362,7 @@ pub fn patch_receivable_line_type(
 }
 
 /// Seed a bank journal + liquidity account for payment tests.
-pub fn seed_bank_journal(
-    ctx: &ReducerContext,
-    fixture: &OrgFixture,
-) -> Result<(u64, u64), String> {
+pub fn seed_bank_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(u64, u64), String> {
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
     let suffix = fixture.company_id;

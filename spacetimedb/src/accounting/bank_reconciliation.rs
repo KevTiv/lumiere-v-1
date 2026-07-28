@@ -203,15 +203,6 @@ pub struct CreateAccountBankStatementParams {
     pub date: Option<Timestamp>,
     pub balance_start: f64,
     pub currency_id: u64,
-    pub state: BankStatementState,
-    pub line_ids: Vec<u64>,
-    pub move_line_ids: Vec<u64>,
-    pub total_entry_encoding: f64,
-    pub total_amount: f64,
-    pub total_amount_currency: f64,
-    pub date_done: Option<Timestamp>,
-    pub is_valid_balance_start: bool,
-    pub is_valid_balance_end: bool,
     pub metadata: Option<String>,
 }
 
@@ -488,15 +479,6 @@ pub fn approve_bank_statement_import(
             date: None,
             balance_start: import.opening_balance,
             currency_id: import.currency_id,
-            state: BankStatementState::Open,
-            line_ids: Vec::new(),
-            move_line_ids: Vec::new(),
-            total_entry_encoding: total_amount,
-            total_amount,
-            total_amount_currency: total_amount,
-            date_done: None,
-            is_valid_balance_start: true,
-            is_valid_balance_end: true,
             metadata: Some(metadata.clone()),
         },
     )?;
@@ -562,6 +544,25 @@ pub fn approve_bank_statement_import(
                 ..line
             });
     }
+    let statement = ctx
+        .db
+        .account_bank_statement()
+        .id()
+        .find(&statement_id)
+        .ok_or("Statement import approval lost the created bank statement")?;
+    ctx.db
+        .account_bank_statement()
+        .id()
+        .update(AccountBankStatement {
+            balance_end_real: statement.balance_start + total_amount,
+            balance_end: statement.balance_start + total_amount,
+            total_entry_encoding: total_amount,
+            total_amount,
+            total_amount_currency: total_amount,
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            ..statement
+        });
     ctx.db
         .bank_statement_import()
         .id()
@@ -620,20 +621,20 @@ pub fn create_account_bank_statement(
             reference: params.reference,
             date: params.date,
             balance_start: params.balance_start,
-            balance_end_real: params.balance_start + params.total_entry_encoding,
-            balance_end: params.balance_start + params.total_amount,
+            balance_end_real: params.balance_start,
+            balance_end: params.balance_start,
             company_id,
             journal_id,
             currency_id: params.currency_id,
-            state: params.state,
-            line_ids: params.line_ids,
-            move_line_ids: params.move_line_ids,
-            total_entry_encoding: params.total_entry_encoding,
-            total_amount: params.total_amount,
-            total_amount_currency: params.total_amount_currency,
-            date_done: params.date_done,
-            is_valid_balance_start: params.is_valid_balance_start,
-            is_valid_balance_end: params.is_valid_balance_end,
+            state: BankStatementState::Open,
+            line_ids: vec![],
+            move_line_ids: vec![],
+            total_entry_encoding: 0.0,
+            total_amount: 0.0,
+            total_amount_currency: 0.0,
+            date_done: None,
+            is_valid_balance_start: true,
+            is_valid_balance_end: true,
             create_uid: Some(ctx.sender()),
             create_date: Some(ctx.timestamp),
             write_uid: Some(ctx.sender()),

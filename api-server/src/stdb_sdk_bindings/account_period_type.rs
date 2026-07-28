@@ -14,6 +14,7 @@ pub struct AccountPeriod {
     pub code: String,
     pub date_from: __sdk::Timestamp,
     pub date_to: __sdk::Timestamp,
+    pub organization_id: Option<u64>,
     pub company_id: u64,
     pub fiscal_year_id: u64,
     pub state: PeriodState,
@@ -39,6 +40,7 @@ pub struct AccountPeriodCols {
     pub code: __sdk::__query_builder::Col<AccountPeriod, String>,
     pub date_from: __sdk::__query_builder::Col<AccountPeriod, __sdk::Timestamp>,
     pub date_to: __sdk::__query_builder::Col<AccountPeriod, __sdk::Timestamp>,
+    pub organization_id: __sdk::__query_builder::Col<AccountPeriod, Option<u64>>,
     pub company_id: __sdk::__query_builder::Col<AccountPeriod, u64>,
     pub fiscal_year_id: __sdk::__query_builder::Col<AccountPeriod, u64>,
     pub state: __sdk::__query_builder::Col<AccountPeriod, PeriodState>,
@@ -60,6 +62,7 @@ impl __sdk::__query_builder::HasCols for AccountPeriod {
             code: __sdk::__query_builder::Col::new(table_name, "code"),
             date_from: __sdk::__query_builder::Col::new(table_name, "date_from"),
             date_to: __sdk::__query_builder::Col::new(table_name, "date_to"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             fiscal_year_id: __sdk::__query_builder::Col::new(table_name, "fiscal_year_id"),
             state: __sdk::__query_builder::Col::new(table_name, "state"),
@@ -81,6 +84,7 @@ pub struct AccountPeriodIxCols {
     pub company_id: __sdk::__query_builder::IxCol<AccountPeriod, u64>,
     pub fiscal_year_id: __sdk::__query_builder::IxCol<AccountPeriod, u64>,
     pub id: __sdk::__query_builder::IxCol<AccountPeriod, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<AccountPeriod, Option<u64>>,
     pub state: __sdk::__query_builder::IxCol<AccountPeriod, PeriodState>,
 }
 
@@ -91,6 +95,7 @@ impl __sdk::__query_builder::HasIxCols for AccountPeriod {
             company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             fiscal_year_id: __sdk::__query_builder::IxCol::new(table_name, "fiscal_year_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             state: __sdk::__query_builder::IxCol::new(table_name, "state"),
         }
     }

@@ -9,7 +9,7 @@ use crate::accounting::payments::{
 };
 use crate::core::audit::audit_log;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
-use crate::types::{PaymentState, PaymentType};
+use crate::types::{PartnerType, PaymentState, PaymentType};
 
 use super::helpers::{
     create_balanced_customer_invoice, create_balanced_customer_invoice_on_account,
@@ -37,7 +37,7 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
             partner_id: fixture.partner_id,
             amount,
             currency_id: 1,
-            date: None,
+            date: Some(ctx.timestamp),
             journal_id: bank_journal_id,
             ref_: Some("Harness payment".to_string()),
             memo: Some("Invoice settlement".to_string()),
@@ -48,9 +48,7 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
         .db
         .account_payment()
         .iter()
-        .find(|p| {
-            p.organization_id == org_id && p.ref_ == Some("Harness payment".to_string())
-        })
+        .find(|p| p.organization_id == org_id && p.ref_ == Some("Harness payment".to_string()))
         .map(|p| p.id)
         .ok_or("Payment record not found after create")?;
 
@@ -111,7 +109,9 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
         .ok_or("Payment not found after register")?;
 
     if !payment.reconciled_invoice_ids.contains(&invoice_move_id) {
-        return Err("Invoice id not linked on payment after register_payment_on_invoice".to_string());
+        return Err(
+            "Invoice id not linked on payment after register_payment_on_invoice".to_string(),
+        );
     }
 
     let invoice = ctx
@@ -128,6 +128,100 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
         ));
     }
 
+    Ok(())
+}
+
+pub fn test_payment_create_rejects_invalid_relations(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+    let (bank_journal_id, _) = seed_bank_journal(ctx, &fixture)?;
+    let (foreign_journal_id, _) = seed_bank_journal(ctx, &foreign)?;
+    let before = ctx
+        .db
+        .account_payment()
+        .payment_by_org()
+        .filter(&fixture.organization_id)
+        .count();
+
+    let invalid_attempts = [
+        CreatePaymentParams {
+            company_id: fixture.company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount: 731.29,
+            currency_id: 1,
+            date: Some(ctx.timestamp),
+            journal_id: foreign_journal_id,
+            ref_: Some("ACC-RI-006-foreign-journal".to_string()),
+            memo: None,
+        },
+        CreatePaymentParams {
+            company_id: fixture.company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: foreign.partner_id,
+            amount: 731.29,
+            currency_id: 1,
+            date: Some(ctx.timestamp),
+            journal_id: bank_journal_id,
+            ref_: Some("ACC-RI-006-foreign-partner".to_string()),
+            memo: None,
+        },
+        CreatePaymentParams {
+            company_id: fixture.company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount: 731.29,
+            currency_id: 999,
+            date: Some(ctx.timestamp),
+            journal_id: bank_journal_id,
+            ref_: Some("ACC-RI-006-missing-currency".to_string()),
+            memo: None,
+        },
+        CreatePaymentParams {
+            company_id: fixture.company_id,
+            payment_type: PaymentType::OutBound,
+            partner_type: PartnerType::Supplier,
+            partner_id: fixture.partner_id,
+            amount: 731.29,
+            currency_id: 1,
+            date: Some(ctx.timestamp),
+            journal_id: bank_journal_id,
+            ref_: Some("ACC-RI-006-wrong-partner-role".to_string()),
+            memo: None,
+        },
+        CreatePaymentParams {
+            company_id: fixture.company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount: 731.29,
+            currency_id: 1,
+            date: None,
+            journal_id: bank_journal_id,
+            ref_: Some("ACC-RI-008-missing-date".to_string()),
+            memo: None,
+        },
+    ];
+
+    for params in invalid_attempts {
+        if create_payment(ctx, fixture.organization_id, params).is_ok() {
+            return Err("create_payment accepted an invalid relation".to_string());
+        }
+    }
+
+    let after = ctx
+        .db
+        .account_payment()
+        .payment_by_org()
+        .filter(&fixture.organization_id)
+        .count();
+    if after != before {
+        return Err("Rejected payment relation persisted a payment".to_string());
+    }
     Ok(())
 }
 
@@ -150,7 +244,7 @@ pub fn test_cancel_payment_audited(ctx: &ReducerContext) -> Result<(), String> {
             partner_id: fixture.partner_id,
             amount,
             currency_id: 1,
-            date: None,
+            date: Some(ctx.timestamp),
             journal_id: bank_journal_id,
             ref_: Some("Harness cancel payment".to_string()),
             memo: Some("To be cancelled".to_string()),
@@ -274,7 +368,7 @@ pub fn test_payment_multi_invoice_residual_and_clearing_account(
             partner_id: fixture.partner_id,
             amount: 100.0,
             currency_id: 1,
-            date: None,
+            date: Some(ctx.timestamp),
             journal_id: bank_journal_id,
             ref_: Some("A3 multi-invoice payment".to_string()),
             memo: Some("100 vs 60+60".to_string()),
@@ -286,8 +380,7 @@ pub fn test_payment_multi_invoice_residual_and_clearing_account(
         .account_payment()
         .iter()
         .find(|p| {
-            p.organization_id == org_id
-                && p.ref_ == Some("A3 multi-invoice payment".to_string())
+            p.organization_id == org_id && p.ref_ == Some("A3 multi-invoice payment".to_string())
         })
         .map(|p| p.id)
         .ok_or("Payment not found after create")?;

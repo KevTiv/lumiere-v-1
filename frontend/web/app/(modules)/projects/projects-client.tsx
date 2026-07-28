@@ -233,7 +233,7 @@ function buildBillTimesheetsForm(
           { id: "journal", type: "select", name: "journalId", label: "Journal", required: true, width: "1/3", options: journalOptions },
           { id: "income-account", type: "select", name: "incomeAccountId", label: "Income account", required: true, width: "1/3", options: accountOptions },
           { id: "partner", type: "select", name: "partnerId", label: "Partner", required: true, width: "1/3", options: partnerOptions },
-          { id: "invoice-date", type: "date", name: "invoiceDate", label: "Invoice date", width: "1/2" },
+          { id: "invoice-date", type: "date", name: "invoiceDate", label: "Invoice date", required: true, width: "1/2" },
         ],
       },
     ],
@@ -1270,16 +1270,17 @@ function ProjectsClientLoaded({
                 )
               } else if (lifecycleModal.type === "billTimesheets") {
                 if (ids.length === 0) throw new Error("Select at least one timesheet")
+                if (operatingCompanyId == null) throw new Error("Select an active company")
+                if (formData.invoiceDate == null || String(formData.invoiceDate).trim() === "") {
+                  throw new Error("Invoice date is required")
+                }
                 await billTimesheets.mutateAsync({
                   companyId: operatingCompanyId,
                   timesheetIds: ids,
                   journalId: formData.journalId as string | number,
                   incomeAccountId: formData.incomeAccountId as string | number,
                   partnerId: formData.partnerId as string | number,
-                  invoiceDate:
-                    formData.invoiceDate != null && String(formData.invoiceDate).trim() !== ""
-                      ? (formData.invoiceDate as string | number | Date)
-                      : null,
+                  invoiceDate: formData.invoiceDate as string | number | Date,
                 })
               } else if (lifecycleModal.type === "expenseRebill") {
                 // Surface expenses reducer create_expense_project_rebill (do not reimplement).

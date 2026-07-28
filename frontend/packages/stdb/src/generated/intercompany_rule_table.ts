@@ -16,6 +16,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.option(__t.u64()).name("organization_id"),
   name: __t.string(),
   get ruleType() {
     return RuleType.name("rule_type");

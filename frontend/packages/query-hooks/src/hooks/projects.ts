@@ -616,13 +616,12 @@ export function useReopenTimesheets(organizationId: bigint) {
 }
 
 export type BillTimesheetsInput = {
-  companyId: bigint | number | string | null
+  companyId: bigint | number | string
   timesheetIds: (string | number | bigint)[]
   journalId: bigint | number | string
   incomeAccountId: bigint | number | string
   partnerId: bigint | number | string
-  /** Pass `null` to let the server default the invoice date. */
-  invoiceDate: Date | string | number | null
+  invoiceDate: Date | string | number
   /** Optional sale tax IDs; empty lets the server pick company Sale tax (pack GST/VAT). */
   taxIds?: (string | number | bigint)[]
   fiscalPositionId?: bigint | number | string | null
@@ -644,17 +643,14 @@ export function useBillTimesheets(organizationId: bigint) {
       const { urlPath, init } = projectsBffPost("bill_timesheets", [
           organizationId,
           stdbParamsToJson({
-            companyId: companyId != null ? toScalarU64(companyId) : null,
+            companyId: toScalarU64(companyId),
             timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
             journalId: toScalarU64(journalId),
             incomeAccountId: toScalarU64(incomeAccountId),
             partnerId: toScalarU64(partnerId),
-            invoiceDate:
-              invoiceDate != null
-                ? stbTimestampFromDate(
-                    invoiceDate instanceof Date ? invoiceDate : new Date(invoiceDate),
-                  )
-                : null,
+            invoiceDate: stbTimestampFromDate(
+              invoiceDate instanceof Date ? invoiceDate : new Date(invoiceDate),
+            ),
             taxIds: (taxIds ?? []).map((id) => toScalarU64(id)),
             fiscalPositionId:
               fiscalPositionId != null && String(fiscalPositionId).trim() !== ""

@@ -4,8 +4,6 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::bank_statement_state_type::BankStatementState;
-
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateAccountBankStatementParams {
@@ -14,15 +12,6 @@ pub struct CreateAccountBankStatementParams {
     pub date: Option<__sdk::Timestamp>,
     pub balance_start: f64,
     pub currency_id: u64,
-    pub state: BankStatementState,
-    pub line_ids: Vec<u64>,
-    pub move_line_ids: Vec<u64>,
-    pub total_entry_encoding: f64,
-    pub total_amount: f64,
-    pub total_amount_currency: f64,
-    pub date_done: Option<__sdk::Timestamp>,
-    pub is_valid_balance_start: bool,
-    pub is_valid_balance_end: bool,
     pub metadata: Option<String>,
 }
 

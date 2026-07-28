@@ -567,9 +567,11 @@ fn seed_active_release_for_skill(
     output_type: &str,
     source_hash_char: char,
 ) {
-    let existing_release = ctx.db.ai_skill_release().iter().any(|row| {
-        row.organization_id == org_id && row.skill_id == skill.id && row.is_active
-    });
+    let existing_release = ctx
+        .db
+        .ai_skill_release()
+        .iter()
+        .any(|row| row.organization_id == org_id && row.skill_id == skill.id && row.is_active);
     if existing_release {
         return;
     }
@@ -4444,6 +4446,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             residual_after: 8_750.0,
             write_off_amount: 0.0,
             write_off_account_id: None,
+            write_off_move_id: None,
             is_reversal: false,
             reversed_reconciliation_id: None,
             created_at: ctx.timestamp,
@@ -4992,6 +4995,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         code: "LAPTOP-001".to_string(),
         name: "Developer Laptop Fleet".to_string(),
         active: true,
+        organization_id: Some(org_id),
         company_id: company_id,
         state: AssetState::Running,
         asset_type: AssetType::Purchase,
@@ -5051,6 +5055,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         .account_asset_depreciation_line()
         .insert(AccountAssetDepreciationLine {
             id: 0,
+            organization_id: Some(org_id),
+            company_id: Some(company_id),
             asset_id: asset_laptop_fleet.id,
             name: Some("Month 1 Depreciation".to_string()),
             sequence: 1,
@@ -5085,6 +5091,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         name: "Fiscal Year 2026".to_string(),
         date_from: fy_from,
         date_to: fy_to,
+        organization_id: Some(org_id),
         company_id: company_id,
         state: FiscalYearState::Running,
         type_: "standard".to_string(),
@@ -5106,6 +5113,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         code: "JAN-2026".to_string(),
         date_from: closed_a_from,
         date_to: closed_a_to,
+        organization_id: Some(org_id),
         company_id: company_id,
         fiscal_year_id: fiscal_year_2026.id,
         state: PeriodState::Closed,
@@ -5124,6 +5132,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         code: "FEB-2026".to_string(),
         date_from: closed_b_from,
         date_to: closed_b_to,
+        organization_id: Some(org_id),
         company_id: company_id,
         fiscal_year_id: fiscal_year_2026.id,
         state: PeriodState::Closed,
@@ -5142,6 +5151,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         code: "MAR-2026".to_string(),
         date_from: open_from,
         date_to: open_to,
+        organization_id: Some(org_id),
         company_id: company_id,
         fiscal_year_id: fiscal_year_2026.id,
         state: PeriodState::Open,
@@ -5272,6 +5282,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let _ = ctx.db.intercompany_rule().insert(IntercompanyRule {
         id: 0,
+        organization_id: Some(org_id),
         name: "HQ → EU — mirrored invoices".to_string(),
         rule_type: RuleType::Invoice,
         source_company_id: company_id,
@@ -5297,6 +5308,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         .intercompany_transaction()
         .insert(IntercompanyTransaction {
             id: 0,
+            organization_id: Some(org_id),
             name: "IC-INV-SEED-001".to_string(),
             origin_company_id: company_id,
             destination_company_id: company_sub.id,
@@ -5323,6 +5335,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let cons_acct = ctx.db.consolidation_account().insert(ConsolidationAccount {
         id: 0,
+        organization_id: Some(org_id),
         name: "Elimination — Intercompany AR".to_string(),
         code: "ELIM-AR-IC".to_string(),
         account_type: "asset".to_string(),
@@ -5343,6 +5356,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let cons_journal = ctx.db.consolidation_journal().insert(ConsolidationJournal {
         id: 0,
+        organization_id: Some(org_id),
         name: "FY2026 Q1 elimination (seed)".to_string(),
         period_id: fiscal_year_2026.id,
         period_name: fiscal_year_2026.name.clone(),
@@ -5374,6 +5388,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             .consolidation_elimination_entry()
             .insert(ConsolidationEliminationEntry {
                 id: 0,
+                organization_id: Some(org_id),
                 journal_id: cons_journal.id,
                 sequence: 1,
                 name: "IC receivable elimination".to_string(),

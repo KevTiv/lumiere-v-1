@@ -2,10 +2,17 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
-use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, AccountMove, AccountMoveLine,
+};
+use crate::accounting::relations::{
+    require_active_account, require_active_journal, require_contact_in_scope,
+};
 use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
-use crate::types::{AccountMoveState, PaymentState};
+use crate::types::{
+    AccountInternalGroup, AccountMoveState, AccountTypeInternal, JournalType, PaymentState,
+};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -127,6 +134,16 @@ pub fn upsert_partner_credit_control(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "partner_credit_control", "write")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
+    let partner = require_contact_in_scope(
+        ctx,
+        organization_id,
+        company_id,
+        params.partner_id,
+        "credit-control partner",
+    )?;
+    if !partner.is_customer {
+        return Err("credit-control partner is not a customer".to_string());
+    }
 
     if params.credit_limit < 0.0 {
         return Err("credit_limit cannot be negative".to_string());
@@ -141,15 +158,18 @@ pub fn upsert_partner_credit_control(
 
     let record_id = if let Some(row) = existing {
         let id = row.id;
-        ctx.db.partner_credit_control().id().update(PartnerCreditControl {
-            credit_limit: params.credit_limit,
-            payment_hold: params.payment_hold,
-            notes: params.notes.clone(),
-            write_uid: Some(ctx.sender()),
-            write_date: Some(ctx.timestamp),
-            metadata: params.metadata.clone(),
-            ..row
-        });
+        ctx.db
+            .partner_credit_control()
+            .id()
+            .update(PartnerCreditControl {
+                credit_limit: params.credit_limit,
+                payment_hold: params.payment_hold,
+                notes: params.notes.clone(),
+                write_uid: Some(ctx.sender()),
+                write_date: Some(ctx.timestamp),
+                metadata: params.metadata.clone(),
+                ..row
+            });
         id
     } else {
         ctx.db
@@ -188,10 +208,7 @@ pub fn upsert_partner_credit_control(
                 })
                 .to_string(),
             ),
-            changed_fields: vec![
-                "credit_limit".to_string(),
-                "payment_hold".to_string(),
-            ],
+            changed_fields: vec!["credit_limit".to_string(), "payment_hold".to_string()],
             metadata: params.metadata.clone(),
         },
     );
@@ -229,6 +246,46 @@ pub fn create_bad_debt_write_off(
     if params.amount > source.amount_residual + 0.01 {
         return Err("Write-off amount exceeds residual".to_string());
     }
+    if source.partner_id != Some(params.partner_id) {
+        return Err("Write-off partner does not match the source move".to_string());
+    }
+    require_contact_in_scope(
+        ctx,
+        organization_id,
+        company_id,
+        params.partner_id,
+        "write-off partner",
+    )?;
+    let journal = require_active_journal(
+        ctx,
+        organization_id,
+        company_id,
+        params.journal_id,
+        "write-off",
+    )?;
+    if journal.type_ != JournalType::General {
+        return Err("bad-debt write-off requires a general journal".to_string());
+    }
+    let receivable = require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        params.receivable_account_id,
+        "write-off receivable",
+    )?;
+    if receivable.internal_type != Some(AccountTypeInternal::Receivable) {
+        return Err("write-off receivable account has the wrong role".to_string());
+    }
+    let write_off = require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        params.write_off_account_id,
+        "bad-debt write-off",
+    )?;
+    if write_off.internal_group != Some(AccountInternalGroup::Expense) {
+        return Err("bad-debt write-off account must be an expense account".to_string());
+    }
 
     let name = next_doc_number(ctx, "BDEBT");
     let currency_id = source.currency_id;
@@ -265,7 +322,7 @@ pub fn create_bad_debt_write_off(
         company_id,
         journal_id: params.journal_id,
         currency_id,
-        company_currency_id: currency_id,
+        company_currency_id: source.company_currency_id,
         amount_untaxed: amount,
         amount_tax: 0.0,
         amount_total: amount,
@@ -301,7 +358,7 @@ pub fn create_bad_debt_write_off(
             parent_state: AccountMoveState::Posted,
             journal_id: params.journal_id,
             company_id,
-            company_currency_id: currency_id,
+            company_currency_id: source.company_currency_id,
             sequence,
             name: line_name.to_string(),
             quantity: 0.0,
@@ -368,13 +425,7 @@ pub fn create_bad_debt_write_off(
         0.0,
         1,
     );
-    insert_line(
-        params.receivable_account_id,
-        "AR write-off",
-        0.0,
-        amount,
-        2,
-    );
+    insert_line(params.receivable_account_id, "AR write-off", 0.0, amount, 2);
 
     ctx.db.account_move().id().update(AccountMove {
         amount_residual: (source.amount_residual - amount).max(0.0),

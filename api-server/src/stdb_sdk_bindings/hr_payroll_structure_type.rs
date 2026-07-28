@@ -16,7 +16,7 @@ pub struct HrPayrollStructure {
     pub id: u64,
     pub organization_id: u64,
     pub name: String,
-    pub type: String,
+    pub r#type: String,
     pub is_active: bool,
     pub created_at: __sdk::Timestamp,
 }
@@ -34,7 +34,7 @@ pub struct HrPayrollStructureCols {
     pub id: __sdk::__query_builder::Col<HrPayrollStructure, u64>,
     pub organization_id: __sdk::__query_builder::Col<HrPayrollStructure, u64>,
     pub name: __sdk::__query_builder::Col<HrPayrollStructure, String>,
-    pub type: __sdk::__query_builder::Col<HrPayrollStructure, String>,
+    pub r#type: __sdk::__query_builder::Col<HrPayrollStructure, String>,
     pub is_active: __sdk::__query_builder::Col<HrPayrollStructure, bool>,
     pub created_at: __sdk::__query_builder::Col<HrPayrollStructure, __sdk::Timestamp>,
 }
@@ -46,7 +46,7 @@ impl __sdk::__query_builder::HasCols for HrPayrollStructure {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
-            type: __sdk::__query_builder::Col::new(table_name, "type"),
+            r#type: __sdk::__query_builder::Col::new(table_name, "type"),
             is_active: __sdk::__query_builder::Col::new(table_name, "is_active"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
 

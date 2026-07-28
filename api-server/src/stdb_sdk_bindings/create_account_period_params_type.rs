@@ -4,8 +4,6 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::period_state_type::PeriodState;
-
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateAccountPeriodParams {
@@ -14,7 +12,6 @@ pub struct CreateAccountPeriodParams {
     pub date_from: __sdk::Timestamp,
     pub date_to: __sdk::Timestamp,
     pub fiscal_year_id: u64,
-    pub state: PeriodState,
     pub is_adjustment: bool,
     pub notes: Option<String>,
     pub metadata: Option<String>,

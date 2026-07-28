@@ -11,14 +11,27 @@
 /// - `AccountAssetDepreciationLine` — Individual depreciation entries
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::analytic_accounting::account_analytic_account;
+use crate::accounting::fiscal_periods::{
+    accounting_ownership_backfill_issue, accounting_ownership_backfill_run, record_ownership_issue,
+    AccountingOwnershipBackfillRun,
+};
+use crate::accounting::idempotency::{record_result, replayed_result};
+use crate::accounting::journal_entries::account_move;
+use crate::accounting::relations::{
+    require_active_account, require_active_currency_id, require_active_journal,
+};
+use crate::core::organization::{company, require_company_in_organization};
+use crate::core::users::user_profile;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::{AssetState, AssetType, DepreciationMethod};
+use crate::types::{AccountInternalGroup, AssetState, AssetType, DepreciationMethod, JournalType};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(
     accessor = account_asset,
     public,
+    index(accessor = asset_by_organization, btree(columns = [organization_id])),
     index(accessor = asset_by_code, btree(columns = [company_id, code])),
     index(accessor = asset_by_company, btree(columns = [company_id])),
     index(accessor = asset_by_state, btree(columns = [state])),
@@ -33,6 +46,8 @@ pub struct AccountAsset {
     pub code: String,
     pub name: String,
     pub active: bool,
+    /// Nullable only during the legacy ownership backfill.
+    pub organization_id: Option<u64>,
     pub company_id: u64,
     pub state: AssetState,
     pub asset_type: AssetType,
@@ -90,6 +105,7 @@ pub struct AccountAsset {
 #[spacetimedb::table(
     accessor = account_asset_depreciation_line,
     public,
+    index(accessor = depreciation_line_by_organization, btree(columns = [organization_id])),
     index(accessor = depreciation_line_by_asset, btree(columns = [asset_id])),
     index(accessor = depreciation_line_by_move, btree(columns = [move_id])),
     index(accessor = depreciation_line_by_date, btree(columns = [depreciation_date]))
@@ -99,6 +115,10 @@ pub struct AccountAssetDepreciationLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Nullable only during the legacy ownership backfill.
+    pub organization_id: Option<u64>,
+    /// Derived from the parent asset; nullable only during the legacy ownership backfill.
+    pub company_id: Option<u64>,
     pub asset_id: u64,
     pub name: Option<String>,
     pub sequence: u32,
@@ -120,6 +140,7 @@ pub struct AccountAssetDepreciationLine {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAccountAssetParams {
+    pub idempotency_key: String,
     pub code: String,
     pub name: String,
     pub active: bool,
@@ -146,22 +167,11 @@ pub struct CreateAccountAssetParams {
     pub first_depreciation_date: Option<Timestamp>,
     pub first_depreciation_date_manual: Option<Timestamp>,
     pub already_depreciated_amount_import: f64,
-    pub original_move_line_ids: Vec<u64>,
     pub is_imported: bool,
     pub account_analytic_tag_ids: Vec<u64>,
-    pub children_ids: Vec<u64>,
-    pub analytic_line_ids: Vec<u64>,
-    pub depreciation_move_ids: Vec<u64>,
     pub asset_lifetime_days: u32,
     pub asset_paused_days: u32,
-    pub depreciation_sequence: u32,
-    pub salvage_move_id: Option<u64>,
     pub depreciation_schedule: Option<String>,
-    pub depreciation_board_ids: Vec<u64>,
-    pub modification_ids: Vec<u64>,
-    pub activity_ids: Vec<u64>,
-    pub message_follower_ids: Vec<u64>,
-    pub message_ids: Vec<u64>,
     pub metadata: Option<String>,
 }
 
@@ -192,6 +202,7 @@ pub struct UpdateAccountAssetParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateDepreciationLineParams {
+    pub idempotency_key: String,
     pub asset_id: u64,
     pub amount: f64,
     pub depreciation_date: Timestamp,
@@ -209,6 +220,75 @@ pub struct DisposeAccountAssetParams {
     pub loss_account_id: Option<u64>,
 }
 
+fn validate_asset_parent(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    parent_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(parent_id) = parent_id else {
+        return Ok(());
+    };
+
+    let parent = ctx
+        .db
+        .account_asset()
+        .id()
+        .find(&parent_id)
+        .ok_or("parent asset not found")?;
+    if parent.organization_id != Some(organization_id) {
+        return Err("parent asset does not belong to this organization".to_string());
+    }
+    if parent.company_id != company_id {
+        return Err("parent asset does not belong to this company".to_string());
+    }
+    Ok(())
+}
+
+fn load_asset_in_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    asset_id: u64,
+) -> Result<AccountAsset, String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+
+    let asset = ctx
+        .db
+        .account_asset()
+        .id()
+        .find(&asset_id)
+        .ok_or("asset not found")?;
+    if asset.organization_id != Some(organization_id) {
+        return Err("asset does not belong to this organization".to_string());
+    }
+    if asset.company_id != company_id {
+        return Err("asset does not belong to this company".to_string());
+    }
+    validate_asset_parent(ctx, organization_id, company_id, asset.parent_id)?;
+    Ok(asset)
+}
+
+fn load_depreciation_lines_in_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    asset_id: u64,
+) -> Result<Vec<AccountAssetDepreciationLine>, String> {
+    let lines: Vec<_> = ctx
+        .db
+        .account_asset_depreciation_line()
+        .depreciation_line_by_asset()
+        .filter(&asset_id)
+        .collect();
+    if lines.iter().any(|line| {
+        line.organization_id != Some(organization_id) || line.company_id != Some(company_id)
+    }) {
+        return Err("asset depreciation line scope conflicts with parent".to_string());
+    }
+    Ok(lines)
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 #[spacetimedb::reducer]
@@ -219,6 +299,91 @@ pub fn create_account_asset(
     params: CreateAccountAssetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_asset", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let payload_fingerprint = format!("{params:?}");
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "create_account_asset",
+        &params.idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
+    validate_asset_parent(ctx, organization_id, company_id, params.parent_id)?;
+    require_active_currency_id(ctx, params.currency_id, "asset")?;
+    let journal =
+        require_active_journal(ctx, organization_id, company_id, params.journal_id, "asset")?;
+    if journal.type_ != JournalType::General {
+        return Err("asset depreciation requires a general journal".to_string());
+    }
+    for (account_id, role, expected_group) in [
+        (
+            params.account_asset_id,
+            "asset",
+            AccountInternalGroup::Asset,
+        ),
+        (
+            params.account_depreciation_id,
+            "asset depreciation",
+            AccountInternalGroup::Asset,
+        ),
+        (
+            params.account_depreciation_expense_id,
+            "asset depreciation expense",
+            AccountInternalGroup::Expense,
+        ),
+    ] {
+        let account = require_active_account(ctx, organization_id, company_id, account_id, role)?;
+        if account.internal_group != Some(expected_group) {
+            return Err(format!("{role} account has the wrong role"));
+        }
+    }
+    for (account_id, role, expected_group) in [
+        (
+            params.gain_account_id,
+            "asset disposal gain",
+            AccountInternalGroup::Income,
+        ),
+        (
+            params.loss_account_id,
+            "asset disposal loss",
+            AccountInternalGroup::Expense,
+        ),
+        (
+            params.account_disposal_id,
+            "asset disposal",
+            AccountInternalGroup::Asset,
+        ),
+    ] {
+        if let Some(account_id) = account_id {
+            let account =
+                require_active_account(ctx, organization_id, company_id, account_id, role)?;
+            if account.internal_group != Some(expected_group) {
+                return Err(format!("{role} account has the wrong role"));
+            }
+        }
+    }
+    if let Some(analytic_id) = params.account_analytic_id {
+        let analytic = ctx
+            .db
+            .account_analytic_account()
+            .id()
+            .find(&analytic_id)
+            .ok_or("asset analytic account not found")?;
+        if analytic.organization_id != organization_id || analytic.company_id != company_id {
+            return Err(
+                "asset analytic account does not belong to this organization and company"
+                    .to_string(),
+            );
+        }
+        if !analytic.active {
+            return Err("asset analytic account is inactive".to_string());
+        }
+    }
 
     if params.code.is_empty() {
         return Err("Asset code is required".to_string());
@@ -249,12 +414,13 @@ pub fn create_account_asset(
         code: params.code.clone(),
         name: params.name.clone(),
         active: params.active,
+        organization_id: Some(organization_id),
         company_id,
         state: AssetState::Draft,
         asset_type: params.asset_type,
         currency_id: params.currency_id,
         parent_id: params.parent_id,
-        children_ids: params.children_ids,
+        children_ids: vec![],
         original_value: params.original_value,
         book_value: params.original_value,
         value_residual: params.original_value - params.salvage_value,
@@ -262,8 +428,8 @@ pub fn create_account_asset(
         salvage_value_percentage,
         account_analytic_id: params.account_analytic_id,
         account_analytic_tag_ids: params.account_analytic_tag_ids,
-        analytic_line_ids: params.analytic_line_ids,
-        depreciation_move_ids: params.depreciation_move_ids,
+        analytic_line_ids: vec![],
+        depreciation_move_ids: vec![],
         method: params.method,
         method_number: params.method_number,
         method_period: params.method_period,
@@ -282,20 +448,20 @@ pub fn create_account_asset(
         first_depreciation_date: params.first_depreciation_date,
         first_depreciation_date_manual: params.first_depreciation_date_manual,
         already_depreciated_amount_import: params.already_depreciated_amount_import,
-        original_move_line_ids: params.original_move_line_ids,
+        original_move_line_ids: vec![],
         total_depreciable_amount,
         is_imported: params.is_imported,
         asset_lifetime_days: params.asset_lifetime_days,
         asset_paused_days: params.asset_paused_days,
         close_date: None,
-        depreciation_sequence: params.depreciation_sequence,
-        salvage_move_id: params.salvage_move_id,
+        depreciation_sequence: 0,
+        salvage_move_id: None,
         depreciation_schedule: params.depreciation_schedule,
-        depreciation_board_ids: params.depreciation_board_ids,
-        modification_ids: params.modification_ids,
-        activity_ids: params.activity_ids,
-        message_follower_ids: params.message_follower_ids,
-        message_ids: params.message_ids,
+        depreciation_board_ids: vec![],
+        modification_ids: vec![],
+        activity_ids: vec![],
+        message_follower_ids: vec![],
+        message_ids: vec![],
         create_uid: Some(ctx.sender()),
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
@@ -304,12 +470,11 @@ pub fn create_account_asset(
     });
 
     if let Some(pid) = params.parent_id {
-        if let Some(mut parent) = ctx.db.account_asset().id().find(&pid) {
-            parent.children_ids.push(asset.id);
-            parent.write_uid = Some(ctx.sender());
-            parent.write_date = Some(ctx.timestamp);
-            ctx.db.account_asset().id().update(parent);
-        }
+        let mut parent = load_asset_in_scope(ctx, organization_id, company_id, pid)?;
+        parent.children_ids.push(asset.id);
+        parent.write_uid = Some(ctx.sender());
+        parent.write_date = Some(ctx.timestamp);
+        ctx.db.account_asset().id().update(parent);
     }
 
     write_audit_log_v2(
@@ -338,6 +503,17 @@ pub fn create_account_asset(
         },
     );
 
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "create_account_asset",
+        params.idempotency_key,
+        payload_fingerprint,
+        "account_asset",
+        asset.id,
+    );
+
     Ok(())
 }
 
@@ -351,16 +527,7 @@ pub fn update_account_asset(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_asset", "write")?;
 
-    let asset = ctx
-        .db
-        .account_asset()
-        .id()
-        .find(&asset_id)
-        .ok_or("Asset not found")?;
-
-    if asset.company_id != company_id {
-        return Err("Asset does not belong to this company".to_string());
-    }
+    let asset = load_asset_in_scope(ctx, organization_id, company_id, asset_id)?;
 
     if asset.state != AssetState::Draft {
         return Err("Can only modify assets in Draft state".to_string());
@@ -513,6 +680,72 @@ pub fn update_account_asset(
         changed_fields.push("metadata".to_string());
     }
 
+    let journal =
+        require_active_journal(ctx, organization_id, company_id, new_journal_id, "asset")?;
+    if journal.type_ != JournalType::General {
+        return Err("asset depreciation requires a general journal".to_string());
+    }
+    for (account_id, role, expected_group) in [
+        (new_account_asset_id, "asset", AccountInternalGroup::Asset),
+        (
+            new_account_depreciation_id,
+            "asset depreciation",
+            AccountInternalGroup::Asset,
+        ),
+        (
+            new_account_depreciation_expense_id,
+            "asset depreciation expense",
+            AccountInternalGroup::Expense,
+        ),
+    ] {
+        let account = require_active_account(ctx, organization_id, company_id, account_id, role)?;
+        if account.internal_group != Some(expected_group) {
+            return Err(format!("{role} account has the wrong role"));
+        }
+    }
+    for (account_id, role, expected_group) in [
+        (
+            new_gain_account_id,
+            "asset disposal gain",
+            AccountInternalGroup::Income,
+        ),
+        (
+            new_loss_account_id,
+            "asset disposal loss",
+            AccountInternalGroup::Expense,
+        ),
+        (
+            new_account_disposal_id,
+            "asset disposal",
+            AccountInternalGroup::Asset,
+        ),
+    ] {
+        if let Some(account_id) = account_id {
+            let account =
+                require_active_account(ctx, organization_id, company_id, account_id, role)?;
+            if account.internal_group != Some(expected_group) {
+                return Err(format!("{role} account has the wrong role"));
+            }
+        }
+    }
+    if let Some(analytic_id) = new_account_analytic_id {
+        let analytic = ctx
+            .db
+            .account_analytic_account()
+            .id()
+            .find(&analytic_id)
+            .ok_or("asset analytic account not found")?;
+        if analytic.organization_id != organization_id || analytic.company_id != company_id {
+            return Err(
+                "asset analytic account does not belong to this organization and company"
+                    .to_string(),
+            );
+        }
+        if !analytic.active {
+            return Err("asset analytic account is inactive".to_string());
+        }
+    }
+
     let total_depreciable_amount = new_original_value - new_salvage_value;
     let salvage_value_percentage = if new_original_value > 0.0 {
         (new_salvage_value / new_original_value) * 100.0
@@ -578,39 +811,25 @@ pub fn delete_account_asset(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_asset", "delete")?;
 
-    let asset = ctx
-        .db
-        .account_asset()
-        .id()
-        .find(&asset_id)
-        .ok_or("Asset not found")?;
-
-    if asset.company_id != company_id {
-        return Err("Asset does not belong to this company".to_string());
-    }
+    let asset = load_asset_in_scope(ctx, organization_id, company_id, asset_id)?;
 
     if asset.state != AssetState::Draft {
         return Err("Can only delete assets in Draft state".to_string());
     }
 
-    let depreciation_lines: Vec<_> = ctx
-        .db
-        .account_asset_depreciation_line()
-        .depreciation_line_by_asset()
-        .filter(&asset_id)
-        .collect();
+    let depreciation_lines =
+        load_depreciation_lines_in_scope(ctx, organization_id, company_id, asset_id)?;
 
     if !depreciation_lines.is_empty() {
         return Err("Cannot delete asset with associated depreciation lines".to_string());
     }
 
     if let Some(pid) = asset.parent_id {
-        if let Some(mut parent) = ctx.db.account_asset().id().find(&pid) {
-            parent.children_ids.retain(|&id| id != asset_id);
-            parent.write_uid = Some(ctx.sender());
-            parent.write_date = Some(ctx.timestamp);
-            ctx.db.account_asset().id().update(parent);
-        }
+        let mut parent = load_asset_in_scope(ctx, organization_id, company_id, pid)?;
+        parent.children_ids.retain(|&id| id != asset_id);
+        parent.write_uid = Some(ctx.sender());
+        parent.write_date = Some(ctx.timestamp);
+        ctx.db.account_asset().id().update(parent);
     }
 
     ctx.db.account_asset().id().delete(&asset_id);
@@ -644,16 +863,7 @@ pub fn confirm_account_asset(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_asset", "write")?;
 
-    let asset = ctx
-        .db
-        .account_asset()
-        .id()
-        .find(&asset_id)
-        .ok_or("Asset not found")?;
-
-    if asset.company_id != company_id {
-        return Err("Asset does not belong to this company".to_string());
-    }
+    let asset = load_asset_in_scope(ctx, organization_id, company_id, asset_id)?;
 
     if asset.state != AssetState::Draft {
         return Err("Asset must be in Draft state to confirm".to_string());
@@ -698,16 +908,7 @@ pub fn close_account_asset(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_asset", "write")?;
 
-    let asset = ctx
-        .db
-        .account_asset()
-        .id()
-        .find(&asset_id)
-        .ok_or("Asset not found")?;
-
-    if asset.company_id != company_id {
-        return Err("Asset does not belong to this company".to_string());
-    }
+    let asset = load_asset_in_scope(ctx, organization_id, company_id, asset_id)?;
 
     if asset.state != AssetState::Running {
         return Err("Asset must be in Running state to close".to_string());
@@ -753,28 +954,46 @@ pub fn create_depreciation_line(
         "create",
     )?;
 
-    let asset = ctx
-        .db
-        .account_asset()
-        .id()
-        .find(&params.asset_id)
-        .ok_or("Asset not found")?;
-
-    if asset.company_id != company_id {
-        return Err("Asset does not belong to this company".to_string());
+    let asset = load_asset_in_scope(ctx, organization_id, company_id, params.asset_id)?;
+    let payload_fingerprint = format!("{params:?}");
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "create_depreciation_line",
+        &params.idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
     }
 
     if params.amount <= 0.0 {
         return Err("Depreciation amount must be positive".to_string());
     }
 
-    let sequence = ctx
-        .db
-        .account_asset_depreciation_line()
-        .iter()
-        .filter(|l| l.asset_id == params.asset_id)
-        .count() as u32
-        + 1;
+    if let Some(move_id) = params.move_id {
+        let move_record = ctx
+            .db
+            .account_move()
+            .id()
+            .find(&move_id)
+            .ok_or("depreciation move not found")?;
+        if move_record.organization_id != organization_id || move_record.company_id != company_id {
+            return Err(
+                "depreciation move does not belong to this organization and company".to_string(),
+            );
+        }
+        if params.move_posted_check && move_record.state != crate::types::AccountMoveState::Posted {
+            return Err("depreciation move is not posted".to_string());
+        }
+    }
+
+    let sequence =
+        load_depreciation_lines_in_scope(ctx, organization_id, company_id, params.asset_id)?.len()
+            as u32
+            + 1;
 
     let depreciated_value = asset.book_value - asset.value_residual + params.amount;
     let remaining_value = asset.value_residual - params.amount;
@@ -789,6 +1008,8 @@ pub fn create_depreciation_line(
         .account_asset_depreciation_line()
         .insert(AccountAssetDepreciationLine {
             id: 0,
+            organization_id: Some(organization_id),
+            company_id: Some(company_id),
             asset_id: params.asset_id,
             name: Some(line_name),
             sequence,
@@ -841,6 +1062,17 @@ pub fn create_depreciation_line(
         },
     );
 
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "create_depreciation_line",
+        params.idempotency_key,
+        payload_fingerprint,
+        "account_asset_depreciation_line",
+        line.id,
+    );
+
     Ok(())
 }
 
@@ -853,23 +1085,13 @@ pub fn compute_depreciation_board(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_asset", "write")?;
 
-    let asset = ctx
-        .db
-        .account_asset()
-        .id()
-        .find(&asset_id)
-        .ok_or("Asset not found")?;
+    let asset = load_asset_in_scope(ctx, organization_id, company_id, asset_id)?;
 
-    if asset.company_id != company_id {
-        return Err("Asset does not belong to this company".to_string());
-    }
-
-    let existing_lines: Vec<_> = ctx
-        .db
-        .account_asset_depreciation_line()
-        .iter()
-        .filter(|l| l.asset_id == asset_id && !l.move_posted_check)
-        .collect();
+    let existing_lines: Vec<_> =
+        load_depreciation_lines_in_scope(ctx, organization_id, company_id, asset_id)?
+            .into_iter()
+            .filter(|line| !line.move_posted_check)
+            .collect();
 
     for line in existing_lines {
         ctx.db
@@ -931,6 +1153,8 @@ pub fn compute_depreciation_board(
             .account_asset_depreciation_line()
             .insert(AccountAssetDepreciationLine {
                 id: 0,
+                organization_id: Some(organization_id),
+                company_id: Some(company_id),
                 asset_id,
                 name: Some(format!("Depreciation {}/{}", asset.code, sequence)),
                 sequence,
@@ -979,16 +1203,7 @@ pub fn dispose_account_asset(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_asset", "write")?;
 
-    let asset = ctx
-        .db
-        .account_asset()
-        .id()
-        .find(&asset_id)
-        .ok_or("Asset not found")?;
-
-    if asset.company_id != company_id {
-        return Err("Asset does not belong to this company".to_string());
-    }
+    let asset = load_asset_in_scope(ctx, organization_id, company_id, asset_id)?;
 
     if asset.state == AssetState::Removed {
         return Err("Asset already disposed".to_string());
@@ -1036,16 +1251,7 @@ pub fn set_asset_active(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_asset", "write")?;
 
-    let asset = ctx
-        .db
-        .account_asset()
-        .id()
-        .find(&asset_id)
-        .ok_or("Asset not found")?;
-
-    if asset.company_id != company_id {
-        return Err("Asset does not belong to this company".to_string());
-    }
+    let asset = load_asset_in_scope(ctx, organization_id, company_id, asset_id)?;
 
     ctx.db.account_asset().id().update(AccountAsset {
         active,
@@ -1069,5 +1275,169 @@ pub fn set_asset_active(
         },
     );
 
+    Ok(())
+}
+
+/// Backfill fixed-asset ownership from company and parent relations.
+///
+/// Rows with missing or conflicting provenance remain at `organization_id = None`.
+/// Every mutation loader rejects those quarantined rows.
+#[spacetimedb::reducer]
+pub fn backfill_fixed_asset_organization_ownership(ctx: &ReducerContext) -> Result<(), String> {
+    let user = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(ctx.sender())
+        .ok_or("user not found")?;
+    if !user.is_superuser {
+        return Err("only superusers may backfill accounting ownership".to_string());
+    }
+
+    let stale_issue_ids: Vec<_> = ctx
+        .db
+        .accounting_ownership_backfill_issue()
+        .iter()
+        .filter(|issue| {
+            issue.table_name == "account_asset"
+                || issue.table_name == "account_asset_depreciation_line"
+        })
+        .map(|issue| issue.id)
+        .collect();
+    for issue_id in stale_issue_ids {
+        ctx.db
+            .accounting_ownership_backfill_issue()
+            .id()
+            .delete(&issue_id);
+    }
+
+    let mut scanned_rows = 0_u64;
+    let mut backfilled_rows = 0_u64;
+    let mut unresolved_rows = 0_u64;
+
+    let mut assets: Vec<_> = ctx.db.account_asset().iter().collect();
+    assets.sort_by_key(|asset| asset.id);
+    for asset in assets {
+        scanned_rows += 1;
+        let company = ctx.db.company().id().find(&asset.company_id);
+        let parent = asset
+            .parent_id
+            .and_then(|parent_id| ctx.db.account_asset().id().find(&parent_id));
+
+        let derived_organization_id = match (company, asset.parent_id, parent) {
+            (None, _, _) => Err("company not found"),
+            (Some(_), Some(_), None) => Err("parent asset not found"),
+            (Some(_), Some(_), Some(parent)) if parent.company_id != asset.company_id => {
+                Err("asset company conflicts with parent asset company")
+            }
+            (Some(company), Some(_), Some(parent))
+                if parent.organization_id != Some(company.organization_id) =>
+            {
+                Err("parent asset ownership is unresolved or conflicts with company organization")
+            }
+            (Some(company), _, _) => Ok(company.organization_id),
+        };
+
+        match derived_organization_id {
+            Ok(organization_id) if asset.organization_id == Some(organization_id) => {}
+            Ok(organization_id) if asset.organization_id.is_none() => {
+                ctx.db.account_asset().id().update(AccountAsset {
+                    organization_id: Some(organization_id),
+                    ..asset
+                });
+                backfilled_rows += 1;
+            }
+            Ok(_) | Err(_) => {
+                unresolved_rows += 1;
+                let issue = derived_organization_id
+                    .err()
+                    .unwrap_or("stored organization conflicts with derived organization");
+                if asset.organization_id.is_some() {
+                    ctx.db.account_asset().id().update(AccountAsset {
+                        organization_id: None,
+                        ..asset.clone()
+                    });
+                }
+                record_ownership_issue(
+                    ctx,
+                    "account_asset",
+                    asset.id,
+                    Some(asset.company_id),
+                    asset.parent_id,
+                    issue,
+                );
+            }
+        }
+    }
+
+    let depreciation_lines: Vec<_> = ctx.db.account_asset_depreciation_line().iter().collect();
+    for line in depreciation_lines {
+        scanned_rows += 1;
+        let asset = ctx.db.account_asset().id().find(&line.asset_id);
+        let derived_scope = match asset {
+            None => Err("parent asset not found"),
+            Some(asset) => asset
+                .organization_id
+                .map(|organization_id| (organization_id, asset.company_id))
+                .ok_or("parent asset ownership is unresolved"),
+        };
+
+        match derived_scope {
+            Ok((organization_id, company_id))
+                if line.organization_id == Some(organization_id)
+                    && line.company_id == Some(company_id) => {}
+            Ok((organization_id, company_id))
+                if line.organization_id.is_none() || line.company_id.is_none() =>
+            {
+                ctx.db.account_asset_depreciation_line().id().update(
+                    AccountAssetDepreciationLine {
+                        organization_id: Some(organization_id),
+                        company_id: Some(company_id),
+                        ..line
+                    },
+                );
+                backfilled_rows += 1;
+            }
+            Ok(_) | Err(_) => {
+                unresolved_rows += 1;
+                let issue = derived_scope
+                    .err()
+                    .unwrap_or("stored scope conflicts with parent asset scope");
+                if line.organization_id.is_some() || line.company_id.is_some() {
+                    ctx.db.account_asset_depreciation_line().id().update(
+                        AccountAssetDepreciationLine {
+                            organization_id: None,
+                            company_id: None,
+                            ..line.clone()
+                        },
+                    );
+                }
+                record_ownership_issue(
+                    ctx,
+                    "account_asset_depreciation_line",
+                    line.id,
+                    line.company_id,
+                    Some(line.asset_id),
+                    issue,
+                );
+            }
+        }
+    }
+
+    ctx.db
+        .accounting_ownership_backfill_run()
+        .insert(AccountingOwnershipBackfillRun {
+            id: 0,
+            scope: "fixed_assets".to_string(),
+            scanned_rows,
+            backfilled_rows,
+            unresolved_rows,
+            completed_at: ctx.timestamp,
+            completed_by: ctx.sender(),
+        });
+
+    log::info!(
+        "accounting fixed asset ownership backfill: scanned={scanned_rows} backfilled={backfilled_rows} unresolved={unresolved_rows}"
+    );
     Ok(())
 }

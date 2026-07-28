@@ -8,6 +8,8 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct AccountAssetDepreciationLine {
     pub id: u64,
+    pub organization_id: Option<u64>,
+    pub company_id: Option<u64>,
     pub asset_id: u64,
     pub name: Option<String>,
     pub sequence: u32,
@@ -34,6 +36,8 @@ impl __sdk::InModule for AccountAssetDepreciationLine {
 /// Provides typed access to columns for query building.
 pub struct AccountAssetDepreciationLineCols {
     pub id: __sdk::__query_builder::Col<AccountAssetDepreciationLine, u64>,
+    pub organization_id: __sdk::__query_builder::Col<AccountAssetDepreciationLine, Option<u64>>,
+    pub company_id: __sdk::__query_builder::Col<AccountAssetDepreciationLine, Option<u64>>,
     pub asset_id: __sdk::__query_builder::Col<AccountAssetDepreciationLine, u64>,
     pub name: __sdk::__query_builder::Col<AccountAssetDepreciationLine, Option<String>>,
     pub sequence: __sdk::__query_builder::Col<AccountAssetDepreciationLine, u32>,
@@ -61,6 +65,8 @@ impl __sdk::__query_builder::HasCols for AccountAssetDepreciationLine {
     fn cols(table_name: &'static str) -> Self::Cols {
         AccountAssetDepreciationLineCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             asset_id: __sdk::__query_builder::Col::new(table_name, "asset_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             sequence: __sdk::__query_builder::Col::new(table_name, "sequence"),
@@ -89,6 +95,7 @@ pub struct AccountAssetDepreciationLineIxCols {
         __sdk::__query_builder::IxCol<AccountAssetDepreciationLine, __sdk::Timestamp>,
     pub id: __sdk::__query_builder::IxCol<AccountAssetDepreciationLine, u64>,
     pub move_id: __sdk::__query_builder::IxCol<AccountAssetDepreciationLine, Option<u64>>,
+    pub organization_id: __sdk::__query_builder::IxCol<AccountAssetDepreciationLine, Option<u64>>,
 }
 
 impl __sdk::__query_builder::HasIxCols for AccountAssetDepreciationLine {
@@ -99,6 +106,7 @@ impl __sdk::__query_builder::HasIxCols for AccountAssetDepreciationLine {
             depreciation_date: __sdk::__query_builder::IxCol::new(table_name, "depreciation_date"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             move_id: __sdk::__query_builder::IxCol::new(table_name, "move_id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
         }
     }
 }

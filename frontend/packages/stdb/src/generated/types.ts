@@ -168,6 +168,7 @@ export const AccountAsset = __t.object("AccountAsset", {
   code: __t.string(),
   name: __t.string(),
   active: __t.bool(),
+  organizationId: __t.option(__t.u64()),
   companyId: __t.u64(),
   get state() {
     return AssetState;
@@ -231,6 +232,8 @@ export type AccountAsset = __Infer<typeof AccountAsset>;
 
 export const AccountAssetDepreciationLine = __t.object("AccountAssetDepreciationLine", {
   id: __t.u64(),
+  organizationId: __t.option(__t.u64()),
+  companyId: __t.option(__t.u64()),
   assetId: __t.u64(),
   name: __t.option(__t.string()),
   sequence: __t.u32(),
@@ -339,6 +342,7 @@ export const AccountFiscalYear = __t.object("AccountFiscalYear", {
   name: __t.string(),
   dateFrom: __t.timestamp(),
   dateTo: __t.timestamp(),
+  organizationId: __t.option(__t.u64()),
   companyId: __t.u64(),
   get state() {
     return FiscalYearState;
@@ -644,6 +648,7 @@ export const AccountPeriod = __t.object("AccountPeriod", {
   code: __t.string(),
   dateFrom: __t.timestamp(),
   dateTo: __t.timestamp(),
+  organizationId: __t.option(__t.u64()),
   companyId: __t.u64(),
   fiscalYearId: __t.u64(),
   get state() {
@@ -740,6 +745,42 @@ export const AccountTypeInternal = __t.enum("AccountTypeInternal", {
   Other: __t.unit(),
 });
 export type AccountTypeInternal = __Infer<typeof AccountTypeInternal>;
+
+export const AccountingOperationReceipt = __t.object("AccountingOperationReceipt", {
+  id: __t.string(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  actionKind: __t.string(),
+  idempotencyKey: __t.string(),
+  payloadFingerprint: __t.string(),
+  resultTable: __t.string(),
+  resultId: __t.u64(),
+  createdAt: __t.timestamp(),
+  createdBy: __t.identity(),
+});
+export type AccountingOperationReceipt = __Infer<typeof AccountingOperationReceipt>;
+
+export const AccountingOwnershipBackfillIssue = __t.object("AccountingOwnershipBackfillIssue", {
+  id: __t.u64(),
+  tableName: __t.string(),
+  recordId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  parentId: __t.option(__t.u64()),
+  issue: __t.string(),
+  detectedAt: __t.timestamp(),
+});
+export type AccountingOwnershipBackfillIssue = __Infer<typeof AccountingOwnershipBackfillIssue>;
+
+export const AccountingOwnershipBackfillRun = __t.object("AccountingOwnershipBackfillRun", {
+  id: __t.u64(),
+  scope: __t.string(),
+  scannedRows: __t.u64(),
+  backfilledRows: __t.u64(),
+  unresolvedRows: __t.u64(),
+  completedAt: __t.timestamp(),
+  completedBy: __t.identity(),
+});
+export type AccountingOwnershipBackfillRun = __Infer<typeof AccountingOwnershipBackfillRun>;
 
 export const AccrueSaleCommissionParams = __t.object("AccrueSaleCommissionParams", {
   ratePercent: __t.f64(),
@@ -2549,6 +2590,7 @@ export type ConsignmentAgreement = __Infer<typeof ConsignmentAgreement>;
 
 export const ConsolidationAccount = __t.object("ConsolidationAccount", {
   id: __t.u64(),
+  organizationId: __t.option(__t.u64()),
   name: __t.string(),
   code: __t.string(),
   accountType: __t.string(),
@@ -2570,6 +2612,7 @@ export type ConsolidationAccount = __Infer<typeof ConsolidationAccount>;
 
 export const ConsolidationCompanyRate = __t.object("ConsolidationCompanyRate", {
   id: __t.u64(),
+  organizationId: __t.option(__t.u64()),
   companyId: __t.u64(),
   periodId: __t.u64(),
   currencyId: __t.u64(),
@@ -2584,6 +2627,7 @@ export type ConsolidationCompanyRate = __Infer<typeof ConsolidationCompanyRate>;
 
 export const ConsolidationEliminationEntry = __t.object("ConsolidationEliminationEntry", {
   id: __t.u64(),
+  organizationId: __t.option(__t.u64()),
   journalId: __t.u64(),
   sequence: __t.u32(),
   name: __t.string(),
@@ -2609,6 +2653,7 @@ export type ConsolidationEliminationEntry = __Infer<typeof ConsolidationEliminat
 
 export const ConsolidationJournal = __t.object("ConsolidationJournal", {
   id: __t.u64(),
+  organizationId: __t.option(__t.u64()),
   name: __t.string(),
   periodId: __t.u64(),
   periodName: __t.string(),
@@ -3010,6 +3055,7 @@ export const CreateAccountAccountTypeParams = __t.object("CreateAccountAccountTy
 export type CreateAccountAccountTypeParams = __Infer<typeof CreateAccountAccountTypeParams>;
 
 export const CreateAccountAssetParams = __t.object("CreateAccountAssetParams", {
+  idempotencyKey: __t.string(),
   code: __t.string(),
   name: __t.string(),
   active: __t.bool(),
@@ -3040,22 +3086,11 @@ export const CreateAccountAssetParams = __t.object("CreateAccountAssetParams", {
   firstDepreciationDate: __t.option(__t.timestamp()),
   firstDepreciationDateManual: __t.option(__t.timestamp()),
   alreadyDepreciatedAmountImport: __t.f64(),
-  originalMoveLineIds: __t.array(__t.u64()),
   isImported: __t.bool(),
   accountAnalyticTagIds: __t.array(__t.u64()),
-  childrenIds: __t.array(__t.u64()),
-  analyticLineIds: __t.array(__t.u64()),
-  depreciationMoveIds: __t.array(__t.u64()),
   assetLifetimeDays: __t.u32(),
   assetPausedDays: __t.u32(),
-  depreciationSequence: __t.u32(),
-  salvageMoveId: __t.option(__t.u64()),
   depreciationSchedule: __t.option(__t.string()),
-  depreciationBoardIds: __t.array(__t.u64()),
-  modificationIds: __t.array(__t.u64()),
-  activityIds: __t.array(__t.u64()),
-  messageFollowerIds: __t.array(__t.u64()),
-  messageIds: __t.array(__t.u64()),
   metadata: __t.option(__t.string()),
 });
 export type CreateAccountAssetParams = __Infer<typeof CreateAccountAssetParams>;
@@ -3086,17 +3121,6 @@ export const CreateAccountBankStatementParams = __t.object("CreateAccountBankSta
   date: __t.option(__t.timestamp()),
   balanceStart: __t.f64(),
   currencyId: __t.u64(),
-  get state() {
-    return BankStatementState;
-  },
-  lineIds: __t.array(__t.u64()),
-  moveLineIds: __t.array(__t.u64()),
-  totalEntryEncoding: __t.f64(),
-  totalAmount: __t.f64(),
-  totalAmountCurrency: __t.f64(),
-  dateDone: __t.option(__t.timestamp()),
-  isValidBalanceStart: __t.bool(),
-  isValidBalanceEnd: __t.bool(),
   metadata: __t.option(__t.string()),
 });
 export type CreateAccountBankStatementParams = __Infer<typeof CreateAccountBankStatementParams>;
@@ -3189,9 +3213,6 @@ export const CreateAccountPeriodParams = __t.object("CreateAccountPeriodParams",
   dateFrom: __t.timestamp(),
   dateTo: __t.timestamp(),
   fiscalYearId: __t.u64(),
-  get state() {
-    return PeriodState;
-  },
   isAdjustment: __t.bool(),
   notes: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
@@ -3464,14 +3485,6 @@ export const CreateAnalyticAccountParams = __t.object("CreateAnalyticAccountPara
   isRequiredInMoveLines: __t.bool(),
   isRequiredInDistribution: __t.bool(),
   isRootPlan: __t.bool(),
-  lineIds: __t.array(__t.u64()),
-  childIds: __t.array(__t.u64()),
-  messageFollowerIds: __t.array(__t.u64()),
-  activityIds: __t.array(__t.u64()),
-  messageIds: __t.array(__t.u64()),
-  balance: __t.f64(),
-  debit: __t.f64(),
-  credit: __t.f64(),
   metadata: __t.option(__t.string()),
 });
 export type CreateAnalyticAccountParams = __Infer<typeof CreateAnalyticAccountParams>;
@@ -3915,14 +3928,6 @@ export const CreateCrossoveredBudgetParams = __t.object("CreateCrossoveredBudget
   description: __t.option(__t.string()),
   dateFrom: __t.timestamp(),
   dateTo: __t.timestamp(),
-  get state() {
-    return BudgetState;
-  },
-  crossoveredBudgetLine: __t.array(__t.u64()),
-  totalPlanned: __t.f64(),
-  totalPractical: __t.f64(),
-  totalTheoretical: __t.f64(),
-  variancePercentage: __t.f64(),
   metadata: __t.option(__t.string()),
 });
 export type CreateCrossoveredBudgetParams = __Infer<typeof CreateCrossoveredBudgetParams>;
@@ -4090,6 +4095,7 @@ export const CreateDepartmentParams = __t.object("CreateDepartmentParams", {
 export type CreateDepartmentParams = __Infer<typeof CreateDepartmentParams>;
 
 export const CreateDepreciationLineParams = __t.object("CreateDepreciationLineParams", {
+  idempotencyKey: __t.string(),
   assetId: __t.u64(),
   amount: __t.f64(),
   depreciationDate: __t.timestamp(),
@@ -4382,12 +4388,6 @@ export const CreateFiscalYearParams = __t.object("CreateFiscalYearParams", {
   dateFrom: __t.timestamp(),
   dateTo: __t.timestamp(),
   type: __t.string(),
-  get state() {
-    return FiscalYearState;
-  },
-  carryOverAccounts: __t.array(__t.u64()),
-  closingMoveId: __t.option(__t.u64()),
-  openingMoveId: __t.option(__t.u64()),
   isAdjustment: __t.bool(),
   notes: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
@@ -5057,7 +5057,6 @@ export const CreatePaymentFeeParams = __t.object("CreatePaymentFeeParams", {
     return PaymentFeeBearer;
   },
   amount: __t.f64(),
-  currencyId: __t.u64(),
   feeAccountId: __t.option(__t.u64()),
   taxAccountId: __t.option(__t.u64()),
   taxAmount: __t.f64(),
@@ -8191,7 +8190,12 @@ export const FxRevaluationRun = __t.object("FxRevaluationRun", {
   id: __t.u64(),
   organizationId: __t.u64(),
   companyId: __t.u64(),
+  currencyId: __t.u64(),
   currencyCode: __t.string(),
+  companyCurrencyId: __t.u64(),
+  rate: __t.f64(),
+  rateSource: __t.string(),
+  rateEffectiveDate: __t.timestamp(),
   asOfDate: __t.timestamp(),
   moveId: __t.u64(),
   journalId: __t.u64(),
@@ -9366,6 +9370,7 @@ export type IntegrationType = __Infer<typeof IntegrationType>;
 
 export const IntercompanyRule = __t.object("IntercompanyRule", {
   id: __t.u64(),
+  organizationId: __t.option(__t.u64()),
   name: __t.string(),
   get ruleType() {
     return RuleType;
@@ -9403,6 +9408,7 @@ export type IntercompanyState = __Infer<typeof IntercompanyState>;
 
 export const IntercompanyTransaction = __t.object("IntercompanyTransaction", {
   id: __t.u64(),
+  organizationId: __t.option(__t.u64()),
   name: __t.string(),
   originCompanyId: __t.u64(),
   destinationCompanyId: __t.u64(),
@@ -10839,6 +10845,7 @@ export const PaymentReconciliation = __t.object("PaymentReconciliation", {
   residualAfter: __t.f64(),
   writeOffAmount: __t.f64(),
   writeOffAccountId: __t.option(__t.u64()),
+  writeOffMoveId: __t.option(__t.u64()),
   isReversal: __t.bool(),
   reversedReconciliationId: __t.option(__t.u64()),
   createdAt: __t.timestamp(),
@@ -13694,20 +13701,25 @@ export const RunCartonizationParams = __t.object("RunCartonizationParams", {
 export type RunCartonizationParams = __Infer<typeof RunCartonizationParams>;
 
 export const RunFxRevaluationBatchParams = __t.object("RunFxRevaluationBatchParams", {
-  currencyCode: __t.string(),
+  currencyId: __t.u64(),
   asOfDate: __t.timestamp(),
   journalId: __t.u64(),
   gainAccountId: __t.u64(),
   lossAccountId: __t.u64(),
   rate: __t.f64(),
+  rateSource: __t.string(),
+  rateEffectiveDate: __t.timestamp(),
   reference: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
 });
 export type RunFxRevaluationBatchParams = __Infer<typeof RunFxRevaluationBatchParams>;
 
 export const RunFxRevaluationParams = __t.object("RunFxRevaluationParams", {
-  currencyCode: __t.string(),
+  currencyId: __t.u64(),
   asOfDate: __t.timestamp(),
+  rate: __t.f64(),
+  rateSource: __t.string(),
+  rateEffectiveDate: __t.timestamp(),
   journalId: __t.u64(),
   gainAccountId: __t.u64(),
   lossAccountId: __t.u64(),
@@ -15922,7 +15934,7 @@ export const UpdateAccountAccountParams = __t.object("UpdateAccountAccountParams
   name: __t.option(__t.string()),
   code: __t.option(__t.string()),
   deprecated: __t.option(__t.bool()),
-  currencyId: __t.option(__t.u64()),
+  currencyId: __t.option(__t.option(__t.u64())),
   get internalType() {
     return __t.option(AccountTypeInternal);
   },
@@ -15935,7 +15947,7 @@ export const UpdateAccountAccountParams = __t.object("UpdateAccountAccountParams
   note: __t.option(__t.option(__t.string())),
   allowedJournalIds: __t.option(__t.array(__t.u64())),
   nonTrade: __t.option(__t.bool()),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAccountAccountParams = __Infer<typeof UpdateAccountAccountParams>;
 
@@ -15948,7 +15960,7 @@ export const UpdateAccountAccountTypeParams = __t.object("UpdateAccountAccountTy
   },
   includeInitialBalance: __t.option(__t.bool()),
   isDeprecated: __t.option(__t.bool()),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAccountAccountTypeParams = __Infer<typeof UpdateAccountAccountTypeParams>;
 
@@ -16025,11 +16037,11 @@ export type UpdateAccountBankStatementParams = __Infer<typeof UpdateAccountBankS
 export const UpdateAccountGroupParams = __t.object("UpdateAccountGroupParams", {
   companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
-  codePrefixStart: __t.option(__t.string()),
-  codePrefixEnd: __t.option(__t.string()),
+  codePrefixStart: __t.option(__t.option(__t.string())),
+  codePrefixEnd: __t.option(__t.option(__t.string())),
   level: __t.option(__t.u32()),
   parentId: __t.option(__t.option(__t.u64())),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAccountGroupParams = __Infer<typeof UpdateAccountGroupParams>;
 
@@ -16038,7 +16050,7 @@ export const UpdateAccountJournalParams = __t.object("UpdateAccountJournalParams
   name: __t.option(__t.string()),
   code: __t.option(__t.string()),
   active: __t.option(__t.bool()),
-  currencyId: __t.option(__t.u64()),
+  currencyId: __t.option(__t.option(__t.u64())),
   defaultAccountId: __t.option(__t.option(__t.u64())),
   suspenseAccountId: __t.option(__t.option(__t.u64())),
   lossAccountId: __t.option(__t.option(__t.u64())),
@@ -16049,7 +16061,7 @@ export const UpdateAccountJournalParams = __t.object("UpdateAccountJournalParams
   aliasName: __t.option(__t.option(__t.string())),
   aliasDomain: __t.option(__t.option(__t.string())),
   restrictModeHashTable: __t.option(__t.bool()),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAccountJournalParams = __Infer<typeof UpdateAccountJournalParams>;
 
@@ -16071,7 +16083,7 @@ export const UpdateAccountPeriodParams = __t.object("UpdateAccountPeriodParams",
   dateTo: __t.option(__t.timestamp()),
   isAdjustment: __t.option(__t.bool()),
   notes: __t.option(__t.option(__t.string())),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAccountPeriodParams = __Infer<typeof UpdateAccountPeriodParams>;
 
@@ -16151,13 +16163,13 @@ export type UpdateAiReducerAllowlistParams = __Infer<typeof UpdateAiReducerAllow
 export const UpdateAnalyticAccountParams = __t.object("UpdateAnalyticAccountParams", {
   companyId: __t.option(__t.u64()),
   name: __t.option(__t.string()),
-  code: __t.option(__t.string()),
-  partnerId: __t.option(__t.u64()),
-  planId: __t.option(__t.u64()),
-  groupId: __t.option(__t.u64()),
-  color: __t.option(__t.u8()),
+  code: __t.option(__t.option(__t.string())),
+  partnerId: __t.option(__t.option(__t.u64())),
+  planId: __t.option(__t.option(__t.u64())),
+  groupId: __t.option(__t.option(__t.u64())),
+  color: __t.option(__t.option(__t.u8())),
   isRequiredInMoveLines: __t.option(__t.bool()),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAnalyticAccountParams = __Infer<typeof UpdateAnalyticAccountParams>;
 
@@ -16178,12 +16190,12 @@ export const UpdateAnalyticLineParams = __t.object("UpdateAnalyticLineParams", {
   name: __t.option(__t.string()),
   amount: __t.option(__t.f64()),
   unitAmount: __t.option(__t.f64()),
-  partnerId: __t.option(__t.u64()),
-  projectId: __t.option(__t.u64()),
-  taskId: __t.option(__t.u64()),
-  category: __t.option(__t.string()),
+  partnerId: __t.option(__t.option(__t.u64())),
+  projectId: __t.option(__t.option(__t.u64())),
+  taskId: __t.option(__t.option(__t.u64())),
+  category: __t.option(__t.option(__t.string())),
   tagIds: __t.option(__t.array(__t.u64())),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAnalyticLineParams = __Infer<typeof UpdateAnalyticLineParams>;
 
@@ -16562,7 +16574,7 @@ export const UpdateFiscalYearParams = __t.object("UpdateFiscalYearParams", {
   openingMoveId: __t.option(__t.option(__t.u64())),
   isAdjustment: __t.option(__t.bool()),
   notes: __t.option(__t.option(__t.string())),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateFiscalYearParams = __Infer<typeof UpdateFiscalYearParams>;
 

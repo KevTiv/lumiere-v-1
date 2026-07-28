@@ -4,14 +4,19 @@
 /// A payment is a cash/bank movement that settles one or more invoices or bills.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::chart_of_accounts::account_account;
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line,
     is_receivable_or_payable_line_type, reconcile_payment_with_invoice, AccountMove,
     AccountMoveLine, AddAccountMoveLineParams,
 };
+use crate::accounting::relations::{
+    require_active_account, require_active_currency_id, require_active_journal,
+    require_contact_in_scope,
+};
 use crate::accounting::tax_management::account_tax;
+use crate::core::organization::{company, require_company_in_organization};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::types::{
     AccountMoveState, AccountTypeInternal, MoveType, PartnerType, PaymentState, PaymentType,
@@ -126,24 +131,35 @@ pub(crate) fn payment_line_params(
 
 pub(crate) fn resolve_payment_liquidity_account(
     ctx: &ReducerContext,
-    journal_id: u64,
+    payment: &AccountPayment,
 ) -> Result<u64, String> {
-    let journal = ctx
-        .db
-        .account_journal()
-        .id()
-        .find(&journal_id)
-        .ok_or("Payment journal not found")?;
-    journal
+    let journal = require_active_journal(
+        ctx,
+        payment.organization_id,
+        payment.company_id,
+        payment.journal_id,
+        "payment",
+    )?;
+    let account_id = journal
         .default_account_id
         .or(journal.bank_account_id)
-        .ok_or_else(|| {
-            "Payment journal missing default/bank liquidity account".to_string()
-        })
+        .ok_or_else(|| "Payment journal missing default/bank liquidity account".to_string())?;
+    let account = require_active_account(
+        ctx,
+        payment.organization_id,
+        payment.company_id,
+        account_id,
+        "payment liquidity",
+    )?;
+    if account.internal_type != Some(AccountTypeInternal::Liquidity) && !account.is_bank_account {
+        return Err("payment liquidity account has the wrong role".to_string());
+    }
+    Ok(account.id)
 }
 
 pub(crate) fn resolve_payment_clearing_account(
     ctx: &ReducerContext,
+    organization_id: u64,
     company_id: u64,
     payment_type: PaymentType,
     preferred_account_id: Option<u64>,
@@ -161,7 +177,8 @@ pub(crate) fn resolve_payment_clearing_account(
     // A4: prefer the invoice's AR/AP account when provided and valid for company+type.
     if let Some(pref) = preferred_account_id {
         if let Some(acct) = ctx.db.account_account().id().find(&pref) {
-            if acct.company_id == company_id
+            if acct.organization_id == organization_id
+                && acct.company_id == company_id
                 && !acct.deprecated
                 && acct.internal_type.as_ref() == Some(&want)
             {
@@ -175,11 +192,13 @@ pub(crate) fn resolve_payment_clearing_account(
         .account_account()
         .account_by_company()
         .filter(&company_id)
-        .find(|a| !a.deprecated && a.internal_type.as_ref() == Some(&want))
+        .find(|a| {
+            a.organization_id == organization_id
+                && !a.deprecated
+                && a.internal_type.as_ref() == Some(&want)
+        })
         .map(|a| a.id)
-        .ok_or_else(|| {
-            format!("No active {label} account found for company {company_id}")
-        })?;
+        .ok_or_else(|| format!("No active {label} account found for company {company_id}"))?;
     Ok((account_id, label))
 }
 
@@ -237,7 +256,7 @@ pub(crate) fn insert_balanced_payment_lines_and_post(
     let payment_type = payment.payment_type.clone();
     let partner_id = payment.partner_id;
     let payment_id = payment.id;
-    let liquidity_account_id = resolve_payment_liquidity_account(ctx, payment.journal_id)?;
+    let liquidity_account_id = resolve_payment_liquidity_account(ctx, payment)?;
     let preferred_clearing = preferred_clearing_account_for_partner(
         ctx,
         payment.organization_id,
@@ -247,6 +266,7 @@ pub(crate) fn insert_balanced_payment_lines_and_post(
     );
     let (clearing_account_id, clearing_label) = resolve_payment_clearing_account(
         ctx,
+        payment.organization_id,
         payment.company_id,
         payment_type.clone(),
         preferred_clearing,
@@ -423,8 +443,50 @@ pub fn create_payment(
     params: CreatePaymentParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment", "create")?;
+    require_company_in_organization(ctx, organization_id, params.company_id)?;
     if params.amount <= 0.0 {
         return Err("Payment amount must be positive".to_string());
+    }
+    let date = params
+        .date
+        .ok_or_else(|| "payment date is required".to_string())?;
+    let journal = require_active_journal(
+        ctx,
+        organization_id,
+        params.company_id,
+        params.journal_id,
+        "payment",
+    )?;
+    if !matches!(
+        journal.type_,
+        crate::types::JournalType::Bank
+            | crate::types::JournalType::Cash
+            | crate::types::JournalType::Check
+    ) {
+        return Err("payment journal must be bank, cash, or check".to_string());
+    }
+    require_active_currency_id(ctx, params.currency_id, "payment")?;
+    if journal
+        .currency_id
+        .is_some_and(|currency_id| currency_id != params.currency_id)
+    {
+        return Err("payment currency is incompatible with the journal".to_string());
+    }
+    let partner = require_contact_in_scope(
+        ctx,
+        organization_id,
+        params.company_id,
+        params.partner_id,
+        "payment partner",
+    )?;
+    match &params.partner_type {
+        PartnerType::Customer if !partner.is_customer => {
+            return Err("payment partner is not a customer".to_string());
+        }
+        PartnerType::Supplier if !partner.is_vendor => {
+            return Err("payment partner is not a supplier".to_string());
+        }
+        _ => {}
     }
     let payment = ctx.db.account_payment().insert(AccountPayment {
         id: 0,
@@ -437,7 +499,7 @@ pub fn create_payment(
         partner_id: params.partner_id,
         amount: params.amount,
         currency_id: params.currency_id,
-        date: params.date.unwrap_or(ctx.timestamp),
+        date,
         journal_id: params.journal_id,
         ref_: params.ref_,
         memo: params.memo,
@@ -494,6 +556,22 @@ pub fn post_payment_impl(
     if payment.state != PaymentState::NotPaid {
         return Err("Payment is not in draft state".to_string());
     }
+    require_company_in_organization(ctx, organization_id, payment.company_id)?;
+    require_active_journal(
+        ctx,
+        organization_id,
+        payment.company_id,
+        payment.journal_id,
+        "payment",
+    )?;
+    require_active_currency_id(ctx, payment.currency_id, "payment")?;
+    require_contact_in_scope(
+        ctx,
+        organization_id,
+        payment.company_id,
+        payment.partner_id,
+        "payment partner",
+    )?;
 
     if !skip_approval_check {
         if matches!(
@@ -562,6 +640,14 @@ pub fn post_payment_impl(
     let amount = payment.amount;
     let partner_id = payment.partner_id;
     let company_id = payment.company_id;
+    let company_currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Payment company not found")?
+        .currency_id;
+    require_active_currency_id(ctx, company_currency_id, "company")?;
     let wht_metadata = wht_metadata_for_vendor_payment(ctx, organization_id, &payment);
 
     // Draft move first so line inserts stay consistent; mark Posted after balanced lines.
@@ -596,7 +682,7 @@ pub fn post_payment_impl(
         company_id,
         journal_id: payment.journal_id,
         currency_id: payment.currency_id,
-        company_currency_id: payment.currency_id,
+        company_currency_id,
         amount_untaxed: amount,
         amount_tax: 0.0,
         amount_total: amount,

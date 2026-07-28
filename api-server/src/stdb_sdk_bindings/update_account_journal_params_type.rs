@@ -11,7 +11,7 @@ pub struct UpdateAccountJournalParams {
     pub name: Option<String>,
     pub code: Option<String>,
     pub active: Option<bool>,
-    pub currency_id: Option<u64>,
+    pub currency_id: Option<Option<u64>>,
     pub default_account_id: Option<Option<u64>>,
     pub suspense_account_id: Option<Option<u64>>,
     pub loss_account_id: Option<Option<u64>>,
@@ -22,7 +22,7 @@ pub struct UpdateAccountJournalParams {
     pub alias_name: Option<Option<String>>,
     pub alias_domain: Option<Option<String>>,
     pub restrict_mode_hash_table: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateAccountJournalParams {

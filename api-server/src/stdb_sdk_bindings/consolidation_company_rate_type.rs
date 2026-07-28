@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct ConsolidationCompanyRate {
     pub id: u64,
+    pub organization_id: Option<u64>,
     pub company_id: u64,
     pub period_id: u64,
     pub currency_id: u64,
@@ -28,6 +29,7 @@ impl __sdk::InModule for ConsolidationCompanyRate {
 /// Provides typed access to columns for query building.
 pub struct ConsolidationCompanyRateCols {
     pub id: __sdk::__query_builder::Col<ConsolidationCompanyRate, u64>,
+    pub organization_id: __sdk::__query_builder::Col<ConsolidationCompanyRate, Option<u64>>,
     pub company_id: __sdk::__query_builder::Col<ConsolidationCompanyRate, u64>,
     pub period_id: __sdk::__query_builder::Col<ConsolidationCompanyRate, u64>,
     pub currency_id: __sdk::__query_builder::Col<ConsolidationCompanyRate, u64>,
@@ -44,6 +46,7 @@ impl __sdk::__query_builder::HasCols for ConsolidationCompanyRate {
     fn cols(table_name: &'static str) -> Self::Cols {
         ConsolidationCompanyRateCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             period_id: __sdk::__query_builder::Col::new(table_name, "period_id"),
             currency_id: __sdk::__query_builder::Col::new(table_name, "currency_id"),
@@ -63,6 +66,7 @@ impl __sdk::__query_builder::HasCols for ConsolidationCompanyRate {
 pub struct ConsolidationCompanyRateIxCols {
     pub company_id: __sdk::__query_builder::IxCol<ConsolidationCompanyRate, u64>,
     pub id: __sdk::__query_builder::IxCol<ConsolidationCompanyRate, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<ConsolidationCompanyRate, Option<u64>>,
     pub period_id: __sdk::__query_builder::IxCol<ConsolidationCompanyRate, u64>,
 }
 
@@ -72,6 +76,7 @@ impl __sdk::__query_builder::HasIxCols for ConsolidationCompanyRate {
         ConsolidationCompanyRateIxCols {
             company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             period_id: __sdk::__query_builder::IxCol::new(table_name, "period_id"),
         }
     }

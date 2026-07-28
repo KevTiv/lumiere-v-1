@@ -23,6 +23,7 @@ export default __t.row({
   residualAfter: __t.f64().name("residual_after"),
   writeOffAmount: __t.f64().name("write_off_amount"),
   writeOffAccountId: __t.option(__t.u64()).name("write_off_account_id"),
+  writeOffMoveId: __t.option(__t.u64()).name("write_off_move_id"),
   isReversal: __t.bool().name("is_reversal"),
   reversedReconciliationId: __t.option(__t.u64()).name("reversed_reconciliation_id"),
   createdAt: __t.timestamp().name("created_at"),

@@ -410,9 +410,9 @@ export const paymentTermLinesTableConfig = (t: TFunction): EntityViewConfig => (
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("accounting.entities.paymentTerms.searchPlaceholder"),
-    searchKeys: ["paymentTermId"],
+    searchKeys: ["paymentTermLabel"],
     columns: [
-      { key: "paymentTermId", label: "Term ID", width: "min-w-24" },
+      { key: "paymentTermLabel", label: "Payment term", width: "min-w-40" },
       { key: "value", label: "Type", type: "badge", ...paymentTermLineValueBadges(t) },
       { key: "valueAmount", label: "Amount / %", type: "number", align: "right" },
       { key: "days", label: "Days", type: "number", align: "right" },
