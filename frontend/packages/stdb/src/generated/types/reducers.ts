@@ -791,6 +791,7 @@ import RevokeSubscriptionEntitlementReducer from "../revoke_subscription_entitle
 import RevokeWorkflowDelegationReducer from "../revoke_workflow_delegation_reducer";
 import RollbackAiSkillReleaseReducer from "../rollback_ai_skill_release_reducer";
 import RollbackImportJobReducer from "../rollback_import_job_reducer";
+import RunAccountingBudgetingTestReducer from "../run_accounting_budgeting_test_reducer";
 import RunAccountingFixedAssetOwnershipTestReducer from "../run_accounting_fixed_asset_ownership_test_reducer";
 import RunAccountingFxRevaluationTestReducer from "../run_accounting_fx_revaluation_test_reducer";
 import RunAccountingIcConsolidationTestReducer from "../run_accounting_ic_consolidation_test_reducer";
@@ -1994,6 +1995,7 @@ export type RevokeSubscriptionEntitlementParams = __Infer<typeof RevokeSubscript
 export type RevokeWorkflowDelegationParams = __Infer<typeof RevokeWorkflowDelegationReducer>;
 export type RollbackAiSkillReleaseParams = __Infer<typeof RollbackAiSkillReleaseReducer>;
 export type RollbackImportJobParams = __Infer<typeof RollbackImportJobReducer>;
+export type RunAccountingBudgetingTestParams = __Infer<typeof RunAccountingBudgetingTestReducer>;
 export type RunAccountingFixedAssetOwnershipTestParams = __Infer<typeof RunAccountingFixedAssetOwnershipTestReducer>;
 export type RunAccountingFxRevaluationTestParams = __Infer<typeof RunAccountingFxRevaluationTestReducer>;
 export type RunAccountingIcConsolidationTestParams = __Infer<typeof RunAccountingIcConsolidationTestReducer>;

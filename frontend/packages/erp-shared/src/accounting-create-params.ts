@@ -1748,15 +1748,6 @@ export function toCreateCrossoveredBudgetLineParams(
     dateTo: timestampFromFormDate(field(formData, "dateTo", "date_to")),
     paidDate: optionalTimestampFromFormDate(field(formData, "paidDate", "paid_date")),
     plannedAmount: Number.isFinite(plannedAmount) ? plannedAmount : 0,
-    practicalAmount: Number(field(formData, "practicalAmount", "practical_amount") ?? 0),
-    theoreticalAmount: Number(field(formData, "theoreticalAmount", "theoretical_amount") ?? 0),
-    achievePercentage: Number(field(formData, "achievePercentage", "achieve_percentage") ?? 0),
-    isAboveBudget: formData.isAboveBudget === true || formData.is_above_budget === true,
-    variance: Number(formData.variance ?? -plannedAmount),
-    variancePercentage: Number(
-      field(formData, "variancePercentage", "variance_percentage") ??
-        (plannedAmount > 0 ? -100 : 0),
-    ),
     metadata: optionalTrimmedString(formData.metadata),
   }
 }

@@ -1200,8 +1200,8 @@ Remaining for this item:
 **Fix criteria**
 
 - [x] Manual move lines submit only user intent.
-- [ ] Budget create excludes totals, children, and lifecycle. — **regressed by
-      audit finding below for budget lines specifically**
+- [x] Budget create excludes totals, children, and lifecycle, including the
+      budget-line actuals closed by the remediation below.
 - [x] Analytic-account create excludes balances and reverse IDs.
 - [x] Bank-statement create excludes computed totals and child projections.
 - [x] Asset create excludes reverse/chatter/system arrays.
@@ -1240,24 +1240,36 @@ are not caller-owned", §2).
 
 **Revised fix criteria for budget lines**
 
-- [ ] Remove `practical_amount`, `theoretical_amount`, `achieve_percentage`,
+- [x] Remove `practical_amount`, `theoretical_amount`, `achieve_percentage`,
       `is_above_budget`, `variance`, `variance_percentage` from
       `CreateCrossoveredBudgetLineParams`; derive them server-side from posted
       moves the same way the budget header's totals are derived.
-- [ ] Remove the corresponding manufactured defaults from
+- [x] Remove the corresponding manufactured defaults from
       `toCreateCrossoveredBudgetLineParams`.
 
 **Required tests**
 
-- Persisted test: creating a budget line without actuals/variance fields
-  persists server-derived (not client-supplied-default) values, and a
-  subsequent posted-move recompute changes them.
-- Regression test: the create DTO type has no actuals/variance fields (typecheck
-  or generated-schema assertion).
+- [x] Persisted test:
+  `test_budget_line_actuals_are_server_derived_and_recomputed_on_confirm`
+  creates a budget line without actuals/variance fields, proves persisted zeros,
+  and proves a subsequent confirmed-budget recompute changes them.
+- [x] Regression test:
+  `test_budget_line_actuals_are_server_derived_and_recomputed_on_confirm`
+  constructs `CreateCrossoveredBudgetLineParams` from only the surviving fields,
+  so generated/source DTO drift fails compilation.
+
+**Implementation progress (2026-07-30)**
+
+- Removed all six computed actual/variance fields from the budget-line create
+  DTO and regenerated the Rust/TypeScript binding shape.
+- `create_budget_line` now persists zero actuals and variance directly; the
+  existing `update_budget_line_actuals` confirmed-budget path remains the sole
+  recompute owner and updates the parent budget totals.
+- Removed frontend-manufactured defaults and added persisted reducer coverage
+  for both initial server-owned values and recomputation.
 
 Remaining for this item:
 - Run published persisted-data and UI reload coverage before marking verified.
-- Close the budget-line gap above before marking verified.
 
 ### ACC-RI-010 — Convert accounting updates to explicit patches
 
@@ -1977,7 +1989,7 @@ required-relation fallback issue remains `Unsafe for real ERP data`.
 | 6e | ACC-RI-024 | P0 | Open — provisional findings pending verification | ACC-RI-002/006/015 |
 | 7 | ACC-RI-007 | P0 | In progress (local done; published pending) | None |
 | 8 | ACC-RI-008 | P0 | In progress | DTO changes |
-| 9 | ACC-RI-009 | P1 | In progress — budget-line actuals gap found | P0 contracts stabilized |
+| 9 | ACC-RI-009 | P1 | Implemented locally — budget-line actuals gap closed; published pending | P0 contracts stabilized |
 | 10 | ACC-RI-010 | P1 | In progress (local done; published pending) | P0 contracts stabilized |
 | 11 | ACC-RI-011 | P1 | In progress | ACC-RI-004/006 |
 | 12 | ACC-RI-012 | P1 | In progress — payment-term subscription not wired | ACC-RI-001 |

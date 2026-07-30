@@ -819,6 +819,7 @@ import RevokeSubscriptionEntitlementReducer from "./revoke_subscription_entitlem
 import RevokeWorkflowDelegationReducer from "./revoke_workflow_delegation_reducer";
 import RollbackAiSkillReleaseReducer from "./rollback_ai_skill_release_reducer";
 import RollbackImportJobReducer from "./rollback_import_job_reducer";
+import RunAccountingBudgetingTestReducer from "./run_accounting_budgeting_test_reducer";
 import RunAccountingFixedAssetOwnershipTestReducer from "./run_accounting_fixed_asset_ownership_test_reducer";
 import RunAccountingFxRevaluationTestReducer from "./run_accounting_fx_revaluation_test_reducer";
 import RunAccountingIcConsolidationTestReducer from "./run_accounting_ic_consolidation_test_reducer";
@@ -9813,6 +9814,7 @@ const reducersSchema = __reducers(
   __reducerSchema("revoke_workflow_delegation", RevokeWorkflowDelegationReducer),
   __reducerSchema("rollback_ai_skill_release", RollbackAiSkillReleaseReducer),
   __reducerSchema("rollback_import_job", RollbackImportJobReducer),
+  __reducerSchema("run_accounting_budgeting_test", RunAccountingBudgetingTestReducer),
   __reducerSchema("run_accounting_fixed_asset_ownership_test", RunAccountingFixedAssetOwnershipTestReducer),
   __reducerSchema("run_accounting_fx_revaluation_test", RunAccountingFxRevaluationTestReducer),
   __reducerSchema("run_accounting_ic_consolidation_test", RunAccountingIcConsolidationTestReducer),

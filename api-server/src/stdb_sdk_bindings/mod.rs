@@ -2014,6 +2014,7 @@ pub mod revoke_subscription_entitlement_reducer;
 pub mod revoke_workflow_delegation_reducer;
 pub mod rollback_ai_skill_release_reducer;
 pub mod rollback_import_job_reducer;
+pub mod run_accounting_budgeting_test_reducer;
 pub mod run_accounting_fixed_asset_ownership_test_reducer;
 pub mod run_accounting_fx_revaluation_test_reducer;
 pub mod run_accounting_ic_consolidation_test_reducer;
@@ -5243,6 +5244,7 @@ pub use revoke_subscription_entitlement_reducer::revoke_subscription_entitlement
 pub use revoke_workflow_delegation_reducer::revoke_workflow_delegation;
 pub use rollback_ai_skill_release_reducer::rollback_ai_skill_release;
 pub use rollback_import_job_reducer::rollback_import_job;
+pub use run_accounting_budgeting_test_reducer::run_accounting_budgeting_test;
 pub use run_accounting_fixed_asset_ownership_test_reducer::run_accounting_fixed_asset_ownership_test;
 pub use run_accounting_fx_revaluation_test_reducer::run_accounting_fx_revaluation_test;
 pub use run_accounting_ic_consolidation_test_reducer::run_accounting_ic_consolidation_test;
@@ -9372,6 +9374,7 @@ pub enum Reducer {
         organization_id: u64,
         job_id: u64,
 }    ,
+    RunAccountingBudgetingTest ,
     RunAccountingFixedAssetOwnershipTest ,
     RunAccountingFxRevaluationTest ,
     RunAccountingIcConsolidationTest ,
@@ -11733,6 +11736,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RevokeWorkflowDelegation { .. } => "revoke_workflow_delegation",
             Reducer::RollbackAiSkillRelease { .. } => "rollback_ai_skill_release",
             Reducer::RollbackImportJob { .. } => "rollback_import_job",
+            Reducer::RunAccountingBudgetingTest => "run_accounting_budgeting_test",
             Reducer::RunAccountingFixedAssetOwnershipTest => "run_accounting_fixed_asset_ownership_test",
             Reducer::RunAccountingFxRevaluationTest => "run_accounting_fx_revaluation_test",
             Reducer::RunAccountingIcConsolidationTest => "run_accounting_ic_consolidation_test",
@@ -18786,7 +18790,9 @@ Reducer::MigrateWorkflowInstance{
                 organization_id: organization_id.clone(),
                 job_id: job_id.clone(),
 }),
-            Reducer::RunAccountingFixedAssetOwnershipTest => __sats::bsatn::to_vec(&run_accounting_fixed_asset_ownership_test_reducer::RunAccountingFixedAssetOwnershipTestArgs {
+            Reducer::RunAccountingBudgetingTest => __sats::bsatn::to_vec(&run_accounting_budgeting_test_reducer::RunAccountingBudgetingTestArgs {
+                }),
+Reducer::RunAccountingFixedAssetOwnershipTest => __sats::bsatn::to_vec(&run_accounting_fixed_asset_ownership_test_reducer::RunAccountingFixedAssetOwnershipTestArgs {
                 }),
 Reducer::RunAccountingFxRevaluationTest => __sats::bsatn::to_vec(&run_accounting_fx_revaluation_test_reducer::RunAccountingFxRevaluationTestArgs {
                 }),

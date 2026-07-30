@@ -1,6 +1,7 @@
 //! Accounting domain test suite — invoke via `run_all_accounting_tests` reducer.
 pub mod active_company_matrix_test;
 pub mod adversarial_p0_fixes_test;
+pub mod budgeting_test;
 pub mod fixed_assets_test;
 pub mod fx_revaluation_test;
 pub mod helpers;
@@ -27,6 +28,7 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_accounting_payment_cancel_test(ctx)?;
     run_accounting_payment_term_update_test(ctx)?;
     run_accounting_fixed_asset_ownership_test(ctx)?;
+    run_accounting_budgeting_test(ctx)?;
     run_accounting_period_lock_test(ctx)?;
     run_accounting_posted_immutability_test(ctx)?;
     run_accounting_trial_balance_test(ctx)?;
@@ -51,6 +53,12 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|error| format!("ACC-RI-022 bank statement: {error}"))?;
     log::info!("✅ run_all_accounting_tests complete");
     Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_accounting_budgeting_test(ctx: &ReducerContext) -> Result<(), String> {
+    budgeting_test::test_budget_line_actuals_are_server_derived_and_recomputed_on_confirm(ctx)
+        .map_err(|e| format!("budget line server-derived actuals: {e}"))
 }
 
 #[spacetimedb::reducer]
