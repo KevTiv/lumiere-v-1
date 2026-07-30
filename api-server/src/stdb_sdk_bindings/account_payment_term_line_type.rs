@@ -11,6 +11,7 @@ use super::payment_term_value_type::PaymentTermValue;
 pub struct AccountPaymentTermLine {
     pub id: u64,
     pub payment_term_id: u64,
+    pub organization_id: u64,
     pub value: PaymentTermValue,
     pub value_amount: f64,
     pub days: u32,
@@ -29,6 +30,7 @@ impl __sdk::InModule for AccountPaymentTermLine {
 pub struct AccountPaymentTermLineCols {
     pub id: __sdk::__query_builder::Col<AccountPaymentTermLine, u64>,
     pub payment_term_id: __sdk::__query_builder::Col<AccountPaymentTermLine, u64>,
+    pub organization_id: __sdk::__query_builder::Col<AccountPaymentTermLine, u64>,
     pub value: __sdk::__query_builder::Col<AccountPaymentTermLine, PaymentTermValue>,
     pub value_amount: __sdk::__query_builder::Col<AccountPaymentTermLine, f64>,
     pub days: __sdk::__query_builder::Col<AccountPaymentTermLine, u32>,
@@ -43,6 +45,7 @@ impl __sdk::__query_builder::HasCols for AccountPaymentTermLine {
         AccountPaymentTermLineCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             payment_term_id: __sdk::__query_builder::Col::new(table_name, "payment_term_id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             value: __sdk::__query_builder::Col::new(table_name, "value"),
             value_amount: __sdk::__query_builder::Col::new(table_name, "value_amount"),
             days: __sdk::__query_builder::Col::new(table_name, "days"),

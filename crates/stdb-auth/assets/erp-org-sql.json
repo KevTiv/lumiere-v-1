@@ -148,6 +148,13 @@
   },
   {
     "extra_where": "",
+    "mapKey": "account-payment-term-lines",
+    "order_by": "",
+    "resource_key": "account-payment-term-lines",
+    "table": "account_payment_term_line"
+  },
+  {
+    "extra_where": "",
     "mapKey": "payment-accounts",
     "order_by": "",
     "resource_key": "payment-accounts",

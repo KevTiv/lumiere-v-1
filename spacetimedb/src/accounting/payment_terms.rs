@@ -30,13 +30,18 @@ pub struct AccountPaymentTerm {
 #[spacetimedb::table(
     accessor = account_payment_term_line,
     public,
-    index(accessor = payment_term_line_by_term, btree(columns = [payment_term_id]))
+    index(accessor = payment_term_line_by_term, btree(columns = [payment_term_id])),
+    index(accessor = payment_term_line_by_org, btree(columns = [organization_id]))
 )]
 pub struct AccountPaymentTermLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
     pub payment_term_id: u64,          // FK → AccountPaymentTerm
+    /// Denormalized from the parent term at write time — lets subscriptions
+    /// scope this table directly (SpacetimeDB subscription SQL has no
+    /// subquery/join support to derive it from payment_term_id at read time).
+    pub organization_id: u64,
     pub value: PaymentTermValue,       // Balance | Percent | Fixed
     pub value_amount: f64, // 0.0 for Balance, percentage for Percent, fixed amount for Fixed
     pub days: u32,         // Days from invoice date
@@ -256,6 +261,7 @@ pub fn create_payment_term_line(
         .insert(AccountPaymentTermLine {
             id: 0,
             payment_term_id: params.payment_term_id,
+            organization_id: term.organization_id,
             value: params.value,
             value_amount: params.value_amount,
             days: params.days,

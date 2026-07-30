@@ -4819,6 +4819,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         .insert(AccountPaymentTermLine {
             id: 0,
             payment_term_id: payment_term_30.id,
+            organization_id: org_id,
             value: PaymentTermValue::Balance,
             value_amount: 0.0,
             days: 30,
@@ -4842,6 +4843,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         .insert(AccountPaymentTermLine {
             id: 0,
             payment_term_id: payment_term_50_50.id,
+            organization_id: org_id,
             value: PaymentTermValue::Percent,
             value_amount: 50.0,
             days: 0,
@@ -4856,6 +4858,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         .insert(AccountPaymentTermLine {
             id: 0,
             payment_term_id: payment_term_50_50.id,
+            organization_id: org_id,
             value: PaymentTermValue::Balance,
             value_amount: 0.0,
             days: 30,

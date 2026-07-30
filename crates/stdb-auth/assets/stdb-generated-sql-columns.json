@@ -529,6 +529,7 @@
   "AccountPaymentTermLine": [
     "id",
     "payment_term_id",
+    "organization_id",
     "value",
     "value_amount",
     "days",

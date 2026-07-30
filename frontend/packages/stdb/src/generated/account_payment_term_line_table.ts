@@ -17,6 +17,7 @@ import {
 export default __t.row({
   id: __t.u64().primaryKey(),
   paymentTermId: __t.u64().name("payment_term_id"),
+  organizationId: __t.u64().name("organization_id"),
   get value() {
     return PaymentTermValue;
   },

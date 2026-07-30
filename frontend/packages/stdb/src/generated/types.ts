@@ -631,6 +631,7 @@ export type AccountPaymentTerm = __Infer<typeof AccountPaymentTerm>;
 export const AccountPaymentTermLine = __t.object("AccountPaymentTermLine", {
   id: __t.u64(),
   paymentTermId: __t.u64(),
+  organizationId: __t.u64(),
   get value() {
     return PaymentTermValue;
   },

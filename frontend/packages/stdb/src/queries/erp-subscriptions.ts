@@ -398,6 +398,14 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("account-payments", "account_payment", id, fa, "", " ORDER BY id DESC"),
   "account-payment-terms": (id, fa) =>
     selectOrgScopedSql("account-payment-terms", "account_payment_term", id, fa, ""),
+  "account-payment-term-lines": (id, fa) =>
+    selectOrgScopedSql(
+      "account-payment-term-lines",
+      "account_payment_term_line",
+      id,
+      fa,
+      "",
+    ),
   "payment-accounts": (id, fa) =>
     selectOrgScopedSql("payment-accounts", "payment_account", id, fa, ""),
   "payment-transactions": (id, fa) =>

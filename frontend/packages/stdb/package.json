@@ -26,7 +26,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/stdb-params-json.test.ts src/live/projection.test.ts"
+    "test": "node --import tsx --test src/stdb-params-json.test.ts src/live/projection.test.ts src/queries/erp-subscriptions.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
