@@ -102,7 +102,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	init-stack docker-dev docker-dev-iot \
 	codegen check-codegen api-server-run \
-	lint-no-magic-fk-zero \
+	lint-no-magic-fk-zero lint-accounting-as-unknown-as \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
 	module-check module-build module-generate-ts module-generate-rust \
 	local-start local-stop local-publish local-reset local-test local-logs \
@@ -856,6 +856,10 @@ check-codegen: codegen
 # Fail if coverage/create-params mappers use magic FK sentinels (`?? 0n` / `|| 0n`).
 lint-no-magic-fk-zero:
 	bash scripts/lint-no-magic-fk-zero.sh
+
+# ACC-RI-018: retained accounting double assertions require an adjacent rationale.
+lint-accounting-as-unknown-as:
+	bash scripts/lint-accounting-as-unknown-as.sh
 
 # Starts only the Rust API with its service-local environment file.
 api-server-run:
