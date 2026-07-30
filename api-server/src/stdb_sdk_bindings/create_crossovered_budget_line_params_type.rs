@@ -13,12 +13,6 @@ pub struct CreateCrossoveredBudgetLineParams {
     pub date_to: __sdk::Timestamp,
     pub paid_date: Option<__sdk::Timestamp>,
     pub planned_amount: f64,
-    pub practical_amount: f64,
-    pub theoretical_amount: f64,
-    pub achieve_percentage: f64,
-    pub is_above_budget: bool,
-    pub variance: f64,
-    pub variance_percentage: f64,
     pub metadata: Option<String>,
 }
 

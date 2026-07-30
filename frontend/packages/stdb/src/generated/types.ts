@@ -3921,12 +3921,6 @@ export const CreateCrossoveredBudgetLineParams = __t.object("CreateCrossoveredBu
   dateTo: __t.timestamp(),
   paidDate: __t.option(__t.timestamp()),
   plannedAmount: __t.f64(),
-  practicalAmount: __t.f64(),
-  theoreticalAmount: __t.f64(),
-  achievePercentage: __t.f64(),
-  isAboveBudget: __t.bool(),
-  variance: __t.f64(),
-  variancePercentage: __t.f64(),
   metadata: __t.option(__t.string()),
 });
 export type CreateCrossoveredBudgetLineParams = __Infer<typeof CreateCrossoveredBudgetLineParams>;

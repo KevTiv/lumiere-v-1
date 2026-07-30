@@ -3086,12 +3086,6 @@
     "date_to",
     "paid_date",
     "planned_amount",
-    "practical_amount",
-    "theoretical_amount",
-    "achieve_percentage",
-    "is_above_budget",
-    "variance",
-    "variance_percentage",
     "metadata"
   ],
   "CreateCrossoveredBudgetParams": [
