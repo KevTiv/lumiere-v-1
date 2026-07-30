@@ -646,6 +646,35 @@ pub fn update_payment_account(
         return Err("Cannot update archived payment account".to_string());
     }
 
+    if let Some(Some(account_id)) = params.fee_account_id {
+        let fee_account = require_active_account(
+            ctx,
+            organization_id,
+            account.company_id,
+            account_id,
+            "payment fee",
+        )?;
+        if fee_account.internal_group != Some(AccountInternalGroup::Expense) {
+            return Err("payment fee account must be an expense account".to_string());
+        }
+    }
+    if let Some(Some(account_id)) = params.clearing_account_id {
+        let clearing_account = require_active_account(
+            ctx,
+            organization_id,
+            account.company_id,
+            account_id,
+            "payment clearing",
+        )?;
+        if clearing_account.internal_group != Some(AccountInternalGroup::Asset)
+            && clearing_account.internal_group != Some(AccountInternalGroup::Liability)
+        {
+            return Err(
+                "payment clearing account must be an asset or liability account".to_string(),
+            );
+        }
+    }
+
     let (reference_normalized, reference_masked) = if let Some(ref reference_raw) = params.reference_raw {
         normalize_reference(reference_raw)
     } else {

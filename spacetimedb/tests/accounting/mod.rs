@@ -139,6 +139,8 @@ pub fn run_accounting_payment_management_test(ctx: &ReducerContext) -> Result<()
         .map_err(|e| format!("payment_account_lifecycle: {e}"))?;
     payment_management_test::test_payment_account_patch_preserves_and_clears(ctx)
         .map_err(|e| format!("payment_account_patch: {e}"))?;
+    payment_management_test::test_update_payment_account_rejects_cross_tenant_accounts(ctx)
+        .map_err(|e| format!("ACC-RI-023 payment_account_cross_tenant: {e}"))?;
     payment_management_test::test_payment_transaction_duplicate_reference(ctx)
         .map_err(|e| format!("payment_transaction_duplicate_reference: {e}"))?;
     payment_management_test::test_payment_transaction_post_creates_ledger_payment(ctx)

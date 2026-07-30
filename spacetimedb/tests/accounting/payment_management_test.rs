@@ -862,3 +862,127 @@ pub fn test_payment_account_patch_preserves_and_clears(
     }
     Ok(())
 }
+
+/// ACC-RI-023: `update_payment_account` must validate `fee_account_id` and
+/// `clearing_account_id` under the caller's organization/company the same way
+/// `create_payment_account` already does — rejecting a cross-tenant account ID
+/// instead of persisting it unchecked.
+pub fn test_update_payment_account_rejects_cross_tenant_accounts(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture_a = OrgFixture::seed_minimal(ctx)?;
+    let fixture_b = OrgFixture::seed_minimal(ctx)?;
+
+    let (journal_a, _) = seed_bank_journal(ctx, &fixture_a)?;
+    let fee_account_a = seed_payment_fee_account(ctx, &fixture_a)?;
+    let fee_account_b = seed_payment_fee_account(ctx, &fixture_b)?;
+
+    create_payment_account(
+        ctx,
+        fixture_a.organization_id,
+        CreatePaymentAccountParams {
+            company_id: fixture_a.company_id,
+            provider_code: PaymentProviderCode::Other,
+            name: "ACC-RI-023 Wallet".to_string(),
+            provider_label: Some("ACC-RI-023 label".to_string()),
+            reference_raw: Some("P-ACC-RI-023".to_string()),
+            currency_id: 1,
+            account_journal_id: journal_a,
+            fee_account_id: Some(fee_account_a),
+            clearing_account_id: None,
+            is_primary: false,
+            metadata: None,
+        },
+    )?;
+    let account_id = ctx
+        .db
+        .payment_account()
+        .iter()
+        .find(|a| a.organization_id == fixture_a.organization_id && a.name == "ACC-RI-023 Wallet")
+        .map(|a| a.id)
+        .ok_or("ACC-RI-023 payment account missing")?;
+
+    let cross_tenant_result = update_payment_account(
+        ctx,
+        fixture_a.organization_id,
+        account_id,
+        UpdatePaymentAccountParams {
+            name: None,
+            provider_label: None,
+            reference_raw: None,
+            fee_account_id: Some(Some(fee_account_b)),
+            clearing_account_id: None,
+            active: None,
+            is_primary: None,
+            metadata: None,
+        },
+    );
+    if cross_tenant_result.is_ok() {
+        return Err(
+            "update_payment_account accepted a cross-organization fee_account_id".to_string(),
+        );
+    }
+    let unchanged = ctx
+        .db
+        .payment_account()
+        .id()
+        .find(&account_id)
+        .ok_or("payment account disappeared after rejected cross-tenant update")?;
+    if unchanged.fee_account_id != Some(fee_account_a) {
+        return Err(
+            "rejected cross-tenant fee_account_id update still mutated the stored account"
+                .to_string(),
+        );
+    }
+
+    let cross_tenant_clearing = update_payment_account(
+        ctx,
+        fixture_a.organization_id,
+        account_id,
+        UpdatePaymentAccountParams {
+            name: None,
+            provider_label: None,
+            reference_raw: None,
+            fee_account_id: None,
+            clearing_account_id: Some(Some(fee_account_b)),
+            active: None,
+            is_primary: None,
+            metadata: None,
+        },
+    );
+    if cross_tenant_clearing.is_ok() {
+        return Err(
+            "update_payment_account accepted a cross-organization clearing_account_id"
+                .to_string(),
+        );
+    }
+
+    // Positive: a same-tenant fee account still validates and persists.
+    update_payment_account(
+        ctx,
+        fixture_a.organization_id,
+        account_id,
+        UpdatePaymentAccountParams {
+            name: None,
+            provider_label: None,
+            reference_raw: None,
+            fee_account_id: Some(Some(fee_account_a)),
+            clearing_account_id: None,
+            active: None,
+            is_primary: None,
+            metadata: None,
+        },
+    )?;
+    let updated = ctx
+        .db
+        .payment_account()
+        .id()
+        .find(&account_id)
+        .ok_or("payment account disappeared after same-tenant update")?;
+    if updated.fee_account_id != Some(fee_account_a) {
+        return Err("same-tenant fee_account_id update did not persist".to_string());
+    }
+
+    Ok(())
+}
