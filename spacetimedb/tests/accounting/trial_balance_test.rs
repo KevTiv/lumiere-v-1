@@ -7,12 +7,13 @@ use crate::accounting::analytic_accounting::{
     CreateAnalyticAccountParams, UpdateAnalyticAccountParams,
 };
 use crate::accounting::financial_statements::{
-    create_financial_report, financial_report, generate_financial_report, trial_balance,
-    CreateFinancialReportParams,
+    create_financial_report, export_financial_report, financial_report, generate_financial_report,
+    trial_balance, CreateFinancialReportParams, ExportFinancialReportParams,
 };
 use crate::accounting::journal_entries::{account_move_line, AccountMoveLine};
+use crate::core::audit::audit_log;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
-use crate::types::{AccountMoveState, ReportType};
+use crate::types::{AccountMoveState, ReportState, ReportType};
 
 use super::helpers::create_balanced_customer_invoice;
 
@@ -167,6 +168,44 @@ pub fn test_trial_balance_summary_balances(ctx: &ReducerContext) -> Result<(), S
         .ok_or("Financial report not found after create")?;
 
     generate_financial_report(ctx, fixture.organization_id, fixture.company_id, report_id)?;
+    let generated_line_count = ctx
+        .db
+        .trial_balance()
+        .trial_balance_by_report()
+        .filter(&report_id)
+        .count();
+    generate_financial_report(ctx, fixture.organization_id, fixture.company_id, report_id)?;
+    if ctx
+        .db
+        .trial_balance()
+        .trial_balance_by_report()
+        .filter(&report_id)
+        .count()
+        != generated_line_count
+    {
+        return Err("financial report retry changed its generated child set".to_string());
+    }
+    let generation_audits = ctx
+        .db
+        .audit_log()
+        .iter()
+        .filter(|audit| {
+            audit.organization_id == fixture.organization_id
+                && audit.company_id == Some(fixture.company_id)
+                && audit.table_name == "financial_report"
+                && audit.record_id == report_id
+                && audit.action == "UPDATE"
+                && audit
+                    .new_values
+                    .as_deref()
+                    .is_some_and(|values| values.contains("\"Generated\""))
+        })
+        .count();
+    if generation_audits != 1 {
+        return Err(format!(
+            "financial report retry persisted {generation_audits} generation audits"
+        ));
+    }
 
     let report = ctx
         .db
@@ -195,6 +234,67 @@ pub fn test_trial_balance_summary_balances(ctx: &ReducerContext) -> Result<(), S
     if (period_debit - period_credit).abs() > 0.01 {
         return Err(format!(
             "Trial balance not balanced: debit={period_debit} credit={period_credit}"
+        ));
+    }
+
+    let export_params = ExportFinancialReportParams {
+        export_format: "pdf".to_string(),
+    };
+    export_financial_report(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        report_id,
+        export_params.clone(),
+    )?;
+    export_financial_report(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        report_id,
+        export_params,
+    )?;
+    let exported = ctx
+        .db
+        .financial_report()
+        .id()
+        .find(&report_id)
+        .ok_or("exported report not found")?;
+    if exported.state != ReportState::Exported || exported.export_format.as_deref() != Some("pdf") {
+        return Err("financial report export retry did not retain its result".to_string());
+    }
+    if export_financial_report(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        report_id,
+        ExportFinancialReportParams {
+            export_format: "csv".to_string(),
+        },
+    )
+    .is_ok()
+    {
+        return Err("changed report export reused an idempotency key".to_string());
+    }
+    let export_audits = ctx
+        .db
+        .audit_log()
+        .iter()
+        .filter(|audit| {
+            audit.organization_id == fixture.organization_id
+                && audit.company_id == Some(fixture.company_id)
+                && audit.table_name == "financial_report"
+                && audit.record_id == report_id
+                && audit.action == "UPDATE"
+                && audit
+                    .new_values
+                    .as_deref()
+                    .is_some_and(|values| values.contains("\"format\":\"pdf\""))
+        })
+        .count();
+    if export_audits != 1 {
+        return Err(format!(
+            "financial report retry persisted {export_audits} export audits"
         ));
     }
 

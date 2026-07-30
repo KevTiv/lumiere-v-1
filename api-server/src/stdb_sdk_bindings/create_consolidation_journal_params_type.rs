@@ -9,7 +9,6 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct CreateConsolidationJournalParams {
     pub name: String,
     pub period_id: u64,
-    pub period_name: String,
     pub date_from: __sdk::Timestamp,
     pub date_to: __sdk::Timestamp,
     pub company_ids: Vec<u64>,

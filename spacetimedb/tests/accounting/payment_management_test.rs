@@ -5,16 +5,18 @@ use crate::accounting::chart_of_accounts::{
     account_account, account_account_type, create_account_account, create_account_account_type,
     CreateAccountAccountParams, CreateAccountAccountTypeParams,
 };
+use crate::accounting::idempotency::accounting_operation_receipt;
 use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::accounting::payment_management::{
     allocate_payment_transaction, archive_payment_account, create_payment_account,
     create_payment_fee, create_payment_transaction, payment_account, payment_fee,
     payment_reconciliation, payment_transaction, post_payment_transaction,
-    reverse_payment_transaction_impl, void_payment_transaction, AllocatePaymentParams,
-    CreatePaymentAccountParams, CreatePaymentFeeParams, CreatePaymentTransactionParams,
-    ReversePaymentTransactionParams,
+    reverse_payment_transaction_impl, update_payment_account, void_payment_transaction,
+    AllocatePaymentParams, CreatePaymentAccountParams, CreatePaymentFeeParams,
+    CreatePaymentTransactionParams, ReversePaymentTransactionParams, UpdatePaymentAccountParams,
 };
 use crate::accounting::payments::account_payment;
+use crate::core::audit::audit_log;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{
     AccountInternalGroup, PartnerType, PaymentDirection, PaymentFeeBearer, PaymentProviderCode,
@@ -314,6 +316,11 @@ pub fn test_payment_transaction_post_creates_ledger_payment(
     let account_payment_id = posted
         .account_payment_id
         .ok_or("Posted transaction missing ledger payment link")?;
+    match post_payment_transaction(ctx, org_id, transaction.id) {
+        Err(error) if error.contains("Only draft transactions") => {}
+        Err(error) => return Err(format!("unexpected payment post retry conflict: {error}")),
+        Ok(()) => return Err("posted payment transaction was applied twice".to_string()),
+    }
 
     let ledger_payment = ctx
         .db
@@ -359,6 +366,34 @@ pub fn test_payment_transaction_post_creates_ledger_payment(
     if (debit - credit).abs() > 0.01 {
         return Err(format!(
             "Ledger payment move unbalanced: debit={debit} credit={credit}"
+        ));
+    }
+    let linked_payment_count = ctx
+        .db
+        .account_payment()
+        .iter()
+        .filter(|payment| {
+            payment.organization_id == org_id
+                && payment.company_id == company_id
+                && payment.ref_.as_deref() == Some("TXN-POST-001")
+        })
+        .count();
+    let transaction_post_audits = ctx
+        .db
+        .audit_log()
+        .iter()
+        .filter(|audit| {
+            audit.organization_id == org_id
+                && audit.company_id == Some(company_id)
+                && audit.table_name == "payment_transaction"
+                && audit.record_id == transaction.id
+                && audit.action == "POST"
+        })
+        .count();
+    if linked_payment_count != 1 || transaction_post_audits != 1 {
+        return Err(format!(
+            "payment post retry persisted {linked_payment_count} ledger payments and \
+             {transaction_post_audits} transaction audits"
         ));
     }
 
@@ -563,6 +598,7 @@ pub fn test_payment_allocation_updates_ledger_and_reverses(
         .account_payment_id
         .ok_or("posted transaction missing ledger payment")?;
     let params = AllocatePaymentParams {
+        idempotency_key: format!("payment-allocation:{}:{}", posted.id, invoice_line.id),
         company_id,
         payment_transaction_id: posted.id,
         allocated_move_line_id: invoice_line.id,
@@ -633,7 +669,7 @@ pub fn test_payment_allocation_updates_ledger_and_reverses(
         .iter()
         .filter(|row| row.payment_transaction_id == posted.id)
         .count();
-    allocate_payment_transaction(ctx, org_id, params)?;
+    allocate_payment_transaction(ctx, org_id, params.clone())?;
     if ctx
         .db
         .payment_reconciliation()
@@ -645,6 +681,46 @@ pub fn test_payment_allocation_updates_ledger_and_reverses(
         return Err("allocation retry inserted a duplicate reconciliation".to_string());
     }
     assert_invoice_residual(389.54)?;
+    let allocation_receipts = ctx
+        .db
+        .accounting_operation_receipt()
+        .iter()
+        .filter(|receipt| {
+            receipt.organization_id == org_id
+                && receipt.company_id == company_id
+                && receipt.action_kind == "allocate_payment_transaction"
+                && receipt.result_id == reconciliation.id
+        })
+        .count();
+    if allocation_receipts != 1 {
+        return Err(format!(
+            "allocation retry persisted {allocation_receipts} operation receipts"
+        ));
+    }
+    let allocation_audits = ctx
+        .db
+        .audit_log()
+        .iter()
+        .filter(|audit| {
+            audit.organization_id == org_id
+                && audit.company_id == Some(company_id)
+                && audit.table_name == "payment_reconciliation"
+                && audit.record_id == reconciliation.id
+                && audit.action == "CREATE"
+        })
+        .count();
+    if allocation_audits != 1 {
+        return Err(format!(
+            "allocation retry persisted {allocation_audits} reconciliation audits"
+        ));
+    }
+    let mut changed_retry = params.clone();
+    changed_retry.allocated_amount = 200.0;
+    match allocate_payment_transaction(ctx, org_id, changed_retry) {
+        Err(error) if error.contains("idempotency key") => {}
+        Err(error) => return Err(format!("unexpected allocation retry conflict: {error}")),
+        Ok(()) => return Err("changed allocation retry reused its idempotency key".to_string()),
+    }
 
     reverse_payment_transaction_impl(
         ctx,
@@ -691,5 +767,98 @@ pub fn test_payment_allocation_updates_ledger_and_reverses(
         return Err("reversal did not restore payment clearing residual".to_string());
     }
 
+    Ok(())
+}
+
+pub fn test_payment_account_patch_preserves_and_clears(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let (journal_id, _) = seed_bank_journal(ctx, &fixture)?;
+    let fee_account_id = seed_payment_fee_account(ctx, &fixture)?;
+    create_payment_account(
+        ctx,
+        fixture.organization_id,
+        CreatePaymentAccountParams {
+            company_id: fixture.company_id,
+            provider_code: PaymentProviderCode::Other,
+            name: "Patch Wallet".to_string(),
+            provider_label: Some("ACC-RI-010 label".to_string()),
+            reference_raw: Some("P-A1-73129".to_string()),
+            currency_id: 1,
+            account_journal_id: journal_id,
+            fee_account_id: Some(fee_account_id),
+            clearing_account_id: Some(fee_account_id),
+            is_primary: false,
+            metadata: Some(r#"{"proof":"preserved"}"#.to_string()),
+        },
+    )?;
+    let account_id = ctx
+        .db
+        .payment_account()
+        .iter()
+        .find(|a| a.organization_id == fixture.organization_id && a.name == "Patch Wallet")
+        .map(|a| a.id)
+        .ok_or("patch payment account missing")?;
+
+    update_payment_account(
+        ctx,
+        fixture.organization_id,
+        account_id,
+        UpdatePaymentAccountParams {
+            name: Some("Only name changed".to_string()),
+            provider_label: None,
+            reference_raw: None,
+            fee_account_id: None,
+            clearing_account_id: None,
+            active: None,
+            is_primary: None,
+            metadata: None,
+        },
+    )?;
+    let preserved = ctx
+        .db
+        .payment_account()
+        .id()
+        .find(&account_id)
+        .ok_or("payment account missing after name-only update")?;
+    if preserved.name != "Only name changed" {
+        return Err("name-only update did not change name".to_string());
+    }
+    if preserved.provider_label.as_deref() != Some("ACC-RI-010 label")
+        || preserved.fee_account_id != Some(fee_account_id)
+        || preserved.metadata.as_deref() != Some(r#"{"proof":"preserved"}"#)
+    {
+        return Err("name-only update cleared unrelated payment-account fields".to_string());
+    }
+
+    update_payment_account(
+        ctx,
+        fixture.organization_id,
+        account_id,
+        UpdatePaymentAccountParams {
+            name: None,
+            provider_label: Some(None),
+            reference_raw: None,
+            fee_account_id: Some(None),
+            clearing_account_id: None,
+            active: None,
+            is_primary: None,
+            metadata: Some(None),
+        },
+    )?;
+    let cleared = ctx
+        .db
+        .payment_account()
+        .id()
+        .find(&account_id)
+        .ok_or("payment account missing after clear")?;
+    if cleared.provider_label.is_some()
+        || cleared.fee_account_id.is_some()
+        || cleared.metadata.is_some()
+    {
+        return Err("explicit clear did not null nullable payment-account fields".to_string());
+    }
     Ok(())
 }

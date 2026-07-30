@@ -1,5 +1,50 @@
 import type { TFunction } from "i18next"
-import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
+import { createElement } from "react"
+import { resolveAccountingRelationLabel } from "@lumiere/stdb/read-models"
+import type { EntityColumn, EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
+
+/** Prebuilt ID→label maps from already-subscribed tables (build once — avoid N+1). */
+export type AccountingRelationLabelMaps = {
+  partnerLabelMap?: ReadonlyMap<string, string>
+  journalLabelMap?: ReadonlyMap<string, string>
+  accountLabelMap?: ReadonlyMap<string, string>
+  currencyLabelMap?: ReadonlyMap<string, string>
+  companyLabelMap?: ReadonlyMap<string, string>
+  parentLabelMap?: ReadonlyMap<string, string>
+  sourceDocumentLabelMap?: ReadonlyMap<string, string>
+}
+
+function relationFkColumn(
+  key: string,
+  label: string,
+  labelMap: ReadonlyMap<string, string> | undefined,
+  width?: string,
+): EntityColumn {
+  return {
+    key,
+    label,
+    width,
+    render: (value) => {
+      const shown = resolveAccountingRelationLabel(value, labelMap)
+      if (shown === "—") {
+        return createElement("span", { className: "text-muted-foreground" }, "—")
+      }
+      return shown
+    },
+  }
+}
+
+function relationFkDetailField(
+  key: string,
+  label: string,
+  labelMap: ReadonlyMap<string, string> | undefined,
+) {
+  return {
+    key,
+    label,
+    render: (value: unknown) => resolveAccountingRelationLabel(value, labelMap),
+  }
+}
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const assetStateBadges = (t: TFunction) => ({
@@ -256,11 +301,14 @@ export const paymentStateBadges = (t: TFunction) => ({
   },
 }) as const
 
-export type AccountPaymentsTableConfigOptions = {
+export type AccountPaymentsTableConfigOptions = AccountingRelationLabelMaps & {
   onEmptyAction?: () => void
 }
 
-export const accountPaymentDetailConfig = (t: TFunction): EntityDetailConfig => ({
+export const accountPaymentDetailConfig = (
+  t: TFunction,
+  options?: AccountingRelationLabelMaps,
+): EntityDetailConfig => ({
   mode: "detail",
   sections: [
     {
@@ -284,9 +332,21 @@ export const accountPaymentDetailConfig = (t: TFunction): EntityDetailConfig => 
     {
       id: "party",
       fields: [
-        { key: "partnerId", label: t("accounting.entities.payments.columns.partnerId") },
-        { key: "journalId", label: t("accounting.entities.payments.columns.journalId") },
-        { key: "currencyId", label: t("accounting.entities.payments.columns.currencyId") },
+        relationFkDetailField(
+          "partnerId",
+          t("accounting.entities.payments.columns.partnerId"),
+          options?.partnerLabelMap,
+        ),
+        relationFkDetailField(
+          "journalId",
+          t("accounting.entities.payments.columns.journalId"),
+          options?.journalLabelMap,
+        ),
+        relationFkDetailField(
+          "currencyId",
+          t("accounting.entities.payments.columns.currencyId"),
+          options?.currencyLabelMap,
+        ),
       ],
     },
     {
@@ -355,9 +415,24 @@ export const accountPaymentsTableConfig = (
         type: "relative-date",
         sortable: true,
       },
-      { key: "partnerId", label: t("accounting.entities.payments.columns.partnerId"), width: "min-w-24" },
-      { key: "journalId", label: t("accounting.entities.payments.columns.journalId"), width: "min-w-24" },
-      { key: "currencyId", label: t("accounting.entities.payments.columns.currencyId"), width: "min-w-20" },
+      relationFkColumn(
+        "partnerId",
+        t("accounting.entities.payments.columns.partnerId"),
+        options?.partnerLabelMap,
+        "min-w-24",
+      ),
+      relationFkColumn(
+        "journalId",
+        t("accounting.entities.payments.columns.journalId"),
+        options?.journalLabelMap,
+        "min-w-24",
+      ),
+      relationFkColumn(
+        "currencyId",
+        t("accounting.entities.payments.columns.currencyId"),
+        options?.currencyLabelMap,
+        "min-w-20",
+      ),
     ],
     emptyMessage: t("accounting.entities.payments.emptyMessage"),
     emptyState: {
@@ -549,7 +624,12 @@ export const accountPeriodsTableConfig = (t: TFunction): EntityViewConfig => ({
 })
 
 // ── Analytic lines ───────────────────────────────────────────────────────────
-export const analyticLinesTableConfig = (t: TFunction): EntityViewConfig => ({
+export type AnalyticLinesTableConfigOptions = Pick<AccountingRelationLabelMaps, "accountLabelMap">
+
+export const analyticLinesTableConfig = (
+  t: TFunction,
+  options?: AnalyticLinesTableConfigOptions,
+): EntityViewConfig => ({
   id: "analytic-lines-table",
   title: t("accounting.entities.analyticLines.title"),
   description: t("accounting.entities.analyticLines.description"),
@@ -561,7 +641,12 @@ export const analyticLinesTableConfig = (t: TFunction): EntityViewConfig => ({
     searchKeys: ["name", "description"],
     columns: [
       { key: "name", label: t("accounting.entities.analyticLines.columns.name"), width: "min-w-40" },
-      { key: "accountId", label: t("accounting.entities.analyticLines.columns.accountId"), width: "min-w-28" },
+      relationFkColumn(
+        "accountId",
+        t("accounting.entities.analyticLines.columns.accountId"),
+        options?.accountLabelMap,
+        "min-w-28",
+      ),
       { key: "amount", label: t("accounting.entities.analyticLines.columns.amount"), type: "currency", align: "right" },
       { key: "date", label: t("accounting.entities.analyticLines.columns.date"), type: "date" },
     ],
@@ -667,7 +752,15 @@ export const accountJournalsTableConfig = (t: TFunction): EntityViewConfig => ({
 })
 
 // ── Account move lines ────────────────────────────────────────────────────────
-export const accountMoveLinesTableConfig = (t: TFunction): EntityViewConfig => ({
+export type AccountMoveLinesTableConfigOptions = Pick<
+  AccountingRelationLabelMaps,
+  "accountLabelMap" | "sourceDocumentLabelMap"
+>
+
+export const accountMoveLinesTableConfig = (
+  t: TFunction,
+  options?: AccountMoveLinesTableConfigOptions,
+): EntityViewConfig => ({
   id: "account-move-lines-table",
   title: t("accounting.entities.moveLines.title"),
   description: t("accounting.entities.moveLines.description"),
@@ -678,8 +771,18 @@ export const accountMoveLinesTableConfig = (t: TFunction): EntityViewConfig => (
     searchPlaceholder: t("accounting.entities.moveLines.searchPlaceholder"),
     searchKeys: ["name", "moveId", "accountId"],
     columns: [
-      { key: "moveId", label: t("accounting.entities.moveLines.columns.moveId"), width: "min-w-20" },
-      { key: "accountId", label: t("accounting.entities.moveLines.columns.accountId"), width: "min-w-20" },
+      relationFkColumn(
+        "moveId",
+        t("accounting.entities.moveLines.columns.moveId"),
+        options?.sourceDocumentLabelMap,
+        "min-w-20",
+      ),
+      relationFkColumn(
+        "accountId",
+        t("accounting.entities.moveLines.columns.accountId"),
+        options?.accountLabelMap,
+        "min-w-20",
+      ),
       { key: "name", label: t("accounting.entities.moveLines.columns.name"), width: "min-w-40" },
       { key: "debit", label: t("accounting.entities.moveLines.columns.debit"), type: "currency", align: "right" },
       { key: "credit", label: t("accounting.entities.moveLines.columns.credit"), type: "currency", align: "right" },
@@ -1112,7 +1215,15 @@ const intercompanyTransactionTypeBadges = (t: TFunction) => ({
   },
 }) as const
 
-export const intercompanyTransactionsTableConfig = (t: TFunction): EntityViewConfig => ({
+export type IntercompanyTransactionsTableConfigOptions = Pick<
+  AccountingRelationLabelMaps,
+  "sourceDocumentLabelMap" | "companyLabelMap" | "currencyLabelMap"
+>
+
+export const intercompanyTransactionsTableConfig = (
+  t: TFunction,
+  options?: IntercompanyTransactionsTableConfigOptions,
+): EntityViewConfig => ({
   id: "intercompany-transactions-table",
   title: t("accounting.entities.intercompanyTransactions.title"),
   description: t("accounting.entities.intercompanyTransactions.description"),
@@ -1150,11 +1261,26 @@ export const intercompanyTransactionsTableConfig = (t: TFunction): EntityViewCon
       },
     ],
     columns: [
-      { key: "originDocumentId", label: t("accounting.entities.intercompanyTransactions.columns.originDocumentId"), width: "min-w-28" },
+      relationFkColumn(
+        "originDocumentId",
+        t("accounting.entities.intercompanyTransactions.columns.originDocumentId"),
+        options?.sourceDocumentLabelMap,
+        "min-w-28",
+      ),
       { key: "originDocumentModel", label: t("accounting.entities.intercompanyTransactions.columns.originDocumentModel"), width: "min-w-32" },
-      { key: "destinationCompanyId", label: t("accounting.entities.intercompanyTransactions.columns.destinationCompanyId"), width: "min-w-32" },
+      relationFkColumn(
+        "destinationCompanyId",
+        t("accounting.entities.intercompanyTransactions.columns.destinationCompanyId"),
+        options?.companyLabelMap,
+        "min-w-32",
+      ),
       { key: "amount", label: t("accounting.entities.intercompanyTransactions.columns.amount"), type: "currency", align: "right" },
-      { key: "currencyId", label: t("accounting.entities.intercompanyTransactions.columns.currencyId"), width: "min-w-24" },
+      relationFkColumn(
+        "currencyId",
+        t("accounting.entities.intercompanyTransactions.columns.currencyId"),
+        options?.currencyLabelMap,
+        "min-w-24",
+      ),
       { key: "transactionType", label: t("accounting.entities.intercompanyTransactions.columns.transactionType"), type: "badge", ...intercompanyTransactionTypeBadges(t) },
       { key: "state", label: t("accounting.entities.intercompanyTransactions.columns.state"), type: "badge", ...intercompanyTransactionStateBadges(t) },
       { key: "autoProcess", label: t("accounting.entities.intercompanyTransactions.columns.autoProcess"), type: "boolean", align: "center" },

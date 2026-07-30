@@ -191,40 +191,59 @@ pub fn create_balanced_customer_invoice_on_account(
     };
 
     let ref_owned = ref_label.to_string();
-    create_account_move(
-        ctx,
-        org_id,
-        CreateAccountMoveParams {
-            company_id: Some(company_id),
-            journal_id,
-            move_type: MoveType::OutInvoice,
-            date: ctx.timestamp,
-            name: String::new(),
-            ref_: Some(ref_owned.clone()),
-            auto_post: false,
-            to_check: false,
-            is_storno: false,
-            partner_id: Some(fixture.partner_id),
-            partner_bank_id: None,
-            fiscal_position_id: None,
-            invoice_date: Some(ctx.timestamp),
-            invoice_date_due: None,
-            invoice_payment_term_id: None,
-            payment_reference: None,
-            invoice_origin: None,
-            invoice_partner_display_name: None,
-            invoice_cash_rounding_id: None,
-            partner_shipping_id: None,
-            sale_order_id: None,
-            invoice_incoterm_id: None,
-            incoterm_location: None,
-            campaign_id: None,
-            source_id: None,
-            medium_id: None,
-            secure_sequence_number: None,
-            metadata: Some(r#"{"test":"balanced_customer_invoice"}"#.to_string()),
-        },
-    )?;
+    let create_params = CreateAccountMoveParams {
+        idempotency_key: format!("test-customer-invoice:{ref_owned}"),
+        company_id: Some(company_id),
+        journal_id,
+        move_type: MoveType::OutInvoice,
+        date: ctx.timestamp,
+        name: String::new(),
+        ref_: Some(ref_owned.clone()),
+        auto_post: false,
+        to_check: false,
+        is_storno: false,
+        partner_id: Some(fixture.partner_id),
+        partner_bank_id: None,
+        fiscal_position_id: None,
+        invoice_date: Some(ctx.timestamp),
+        invoice_date_due: None,
+        invoice_payment_term_id: None,
+        payment_reference: None,
+        invoice_origin: None,
+        invoice_partner_display_name: None,
+        invoice_cash_rounding_id: None,
+        partner_shipping_id: None,
+        sale_order_id: None,
+        invoice_incoterm_id: None,
+        incoterm_location: None,
+        campaign_id: None,
+        source_id: None,
+        medium_id: None,
+        secure_sequence_number: None,
+        metadata: Some(r#"{"test":"balanced_customer_invoice"}"#.to_string()),
+    };
+    create_account_move(ctx, org_id, create_params.clone())?;
+    create_account_move(ctx, org_id, create_params.clone())?;
+    if ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|move_record| {
+            move_record.organization_id == org_id
+                && move_record.ref_.as_deref() == Some(ref_owned.as_str())
+        })
+        .count()
+        != 1
+    {
+        return Err("move creation retry duplicated the move".to_string());
+    }
+    let mut conflicting_params = create_params;
+    conflicting_params.name = "changed retry input".to_string();
+    match create_account_move(ctx, org_id, conflicting_params) {
+        Err(error) if error.contains("idempotency key") => {}
+        Err(error) => return Err(format!("unexpected move retry conflict: {error}")),
+        Ok(()) => return Err("changed move retry reused its idempotency key".to_string()),
+    }
 
     let move_id = ctx
         .db
@@ -493,4 +512,39 @@ pub fn seed_bank_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(
     };
 
     Ok((journal_id, bank_account_id))
+}
+
+/// Create a second company in the same organization as `fixture` (company A2).
+pub fn seed_sibling_company(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
+    use crate::core::organization::{company, create_company, CreateCompanyParams};
+
+    let code = format!("A2-{}", fixture.company_id);
+    create_company(
+        ctx,
+        fixture.organization_id,
+        CreateCompanyParams {
+            name: format!("Active Company A2 {}", fixture.company_id),
+            code: code.clone(),
+            currency_id: 1,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: Some(fixture.company_id),
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: Some(r#"{"test":"acc_ri_007"}"#.to_string()),
+        },
+    )?;
+    ctx.db
+        .company()
+        .company_by_org()
+        .filter(&fixture.organization_id)
+        .map(|c| c.id)
+        .filter(|id| *id != fixture.company_id)
+        .max()
+        .ok_or_else(|| "sibling company A2 missing after create".to_string())
 }

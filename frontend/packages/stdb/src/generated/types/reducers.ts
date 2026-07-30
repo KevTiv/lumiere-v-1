@@ -796,6 +796,7 @@ import RunAccountingFxRevaluationTestReducer from "../run_accounting_fx_revaluat
 import RunAccountingIcConsolidationTestReducer from "../run_accounting_ic_consolidation_test_reducer";
 import RunAccountingPaymentCancelTestReducer from "../run_accounting_payment_cancel_test_reducer";
 import RunAccountingPaymentManagementTestReducer from "../run_accounting_payment_management_test_reducer";
+import RunAccountingPaymentMultiInvoiceResidualTestReducer from "../run_accounting_payment_multi_invoice_residual_test_reducer";
 import RunAccountingPaymentReconcileTestReducer from "../run_accounting_payment_reconcile_test_reducer";
 import RunAccountingPaymentTermUpdateTestReducer from "../run_accounting_payment_term_update_test_reducer";
 import RunAccountingPeriodLockTestReducer from "../run_accounting_period_lock_test_reducer";
@@ -1995,6 +1996,7 @@ export type RunAccountingFxRevaluationTestParams = __Infer<typeof RunAccountingF
 export type RunAccountingIcConsolidationTestParams = __Infer<typeof RunAccountingIcConsolidationTestReducer>;
 export type RunAccountingPaymentCancelTestParams = __Infer<typeof RunAccountingPaymentCancelTestReducer>;
 export type RunAccountingPaymentManagementTestParams = __Infer<typeof RunAccountingPaymentManagementTestReducer>;
+export type RunAccountingPaymentMultiInvoiceResidualTestParams = __Infer<typeof RunAccountingPaymentMultiInvoiceResidualTestReducer>;
 export type RunAccountingPaymentReconcileTestParams = __Infer<typeof RunAccountingPaymentReconcileTestReducer>;
 export type RunAccountingPaymentTermUpdateTestParams = __Infer<typeof RunAccountingPaymentTermUpdateTestReducer>;
 export type RunAccountingPeriodLockTestParams = __Infer<typeof RunAccountingPeriodLockTestReducer>;
@@ -2403,3 +2405,4 @@ export type VerifyContactIdentityParams = __Infer<typeof VerifyContactIdentityRe
 export type VoidPaymentTransactionParams = __Infer<typeof VoidPaymentTransactionReducer>;
 export type WaiveTaxDeadlineParams = __Infer<typeof WaiveTaxDeadlineReducer>;
 export type WorkerHeartbeatParams = __Infer<typeof WorkerHeartbeatReducer>;
+

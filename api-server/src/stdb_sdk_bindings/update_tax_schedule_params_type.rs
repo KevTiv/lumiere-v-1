@@ -14,7 +14,7 @@ pub struct UpdateTaxScheduleParams {
     pub is_active: Option<bool>,
     pub effective_from: Option<Option<__sdk::Timestamp>>,
     pub effective_to: Option<Option<__sdk::Timestamp>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateTaxScheduleParams {

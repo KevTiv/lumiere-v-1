@@ -1258,6 +1258,7 @@
     "write_date"
   ],
   "AllocatePaymentParams": [
+    "idempotency_key",
     "company_id",
     "payment_transaction_id",
     "allocated_move_line_id",
@@ -1315,6 +1316,10 @@
     "create_uid",
     "create_date",
     "metadata"
+  ],
+  "AnalyticDistributionLineParams": [
+    "account_id",
+    "percentage"
   ],
   "AnalyticsMetric": [
     "id",
@@ -2467,6 +2472,7 @@
     "metadata"
   ],
   "CreateAccountMoveParams": [
+    "idempotency_key",
     "company_id",
     "journal_id",
     "move_type",
@@ -2951,7 +2957,6 @@
   "CreateConsolidationJournalParams": [
     "name",
     "period_id",
-    "period_name",
     "date_from",
     "date_to",
     "company_ids",
@@ -3311,8 +3316,6 @@
     "journal_id",
     "name",
     "account_id",
-    "account_code",
-    "account_name",
     "company_id",
     "counterparty_company_id",
     "debit",
@@ -4042,6 +4045,7 @@
     "sequence"
   ],
   "CreatePaymentParams": [
+    "idempotency_key",
     "company_id",
     "payment_type",
     "partner_type",

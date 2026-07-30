@@ -17,7 +17,7 @@ pub struct UpdateIntercompanyRuleParams {
     pub sequence: Option<u32>,
     pub is_active: Option<bool>,
     pub notes: Option<Option<String>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateIntercompanyRuleParams {

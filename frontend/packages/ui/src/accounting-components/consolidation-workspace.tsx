@@ -69,7 +69,10 @@ export interface ConsolidationWorkspaceProps {
   cancelConsolidationPending?: boolean
   /** Companies included in new consolidation accounts/journals when the form omits companyIds. */
   consolidationCompanyIds?: bigint[]
-  /** Resolve fiscal period id from period name on the journal form. */
+  /**
+   * Optional name→id fallback when the journal form has no `periodId`.
+   * Prefer selecting a period via the `periodId` relation field.
+   */
   resolveConsolidationPeriodId?: (periodName: string) => bigint | undefined
   /** Select options merged into consolidation create/edit forms. */
   companySelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
@@ -524,11 +527,13 @@ export function ConsolidationWorkspace({
         }}
         config={newConsolidationJournalFormConfig}
         onSubmit={async (fd) => {
-          const periodName = String(fd.periodName ?? "").trim()
-          const periodId =
-            (fd.periodId != null && String(fd.periodId).trim() !== ""
+          const periodIdFromForm =
+            fd.periodId != null && String(fd.periodId).trim() !== ""
               ? BigInt(String(fd.periodId))
-              : undefined) ?? resolveConsolidationPeriodId?.(periodName)
+              : undefined
+          const periodId =
+            periodIdFromForm ??
+            resolveConsolidationPeriodId?.(String(fd.periodName ?? "").trim())
           if (periodId === undefined) {
             throw new Error(t("common.paramsMapper.periodNotFound"))
           }

@@ -398,6 +398,7 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
       await callReducerBff(page, "allocate_payment_transaction", [
         organizationId,
         {
+          idempotency_key: `e2e-payment-allocation:${reference}:${index + 1}`,
           company_id: wallet.companyId,
           payment_transaction_id: transactionId,
           allocated_move_line_id: lineId,

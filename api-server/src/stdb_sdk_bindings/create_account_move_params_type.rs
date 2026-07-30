@@ -14,6 +14,7 @@ use super::move_type_type::MoveType;
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateAccountMoveParams {
+    pub idempotency_key: String,
     pub company_id: Option::<u64>,
     pub journal_id: u64,
     pub move_type: MoveType,

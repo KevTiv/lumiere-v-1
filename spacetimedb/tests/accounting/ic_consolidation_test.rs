@@ -7,22 +7,24 @@ use crate::accounting::consolidation::{
     backfill_consolidation_organization_ownership, consolidation_account,
     consolidation_company_rate, consolidation_elimination_entry, consolidation_journal,
     create_consolidation_account, create_consolidation_journal, create_elimination_entry,
-    set_consolidation_company_rate, update_consolidation_account, ConsolidationAccount,
-    ConsolidationCompanyRate, ConsolidationEliminationEntry, ConsolidationJournal,
-    CreateConsolidationAccountParams, CreateConsolidationJournalParams,
+    process_consolidation, set_consolidation_company_rate, update_consolidation_account,
+    ConsolidationAccount, ConsolidationCompanyRate, ConsolidationEliminationEntry,
+    ConsolidationJournal, CreateConsolidationAccountParams, CreateConsolidationJournalParams,
     CreateEliminationEntryParams, SetConsolidationCompanyRateParams,
     UpdateConsolidationAccountParams,
 };
 use crate::accounting::fiscal_periods::accounting_ownership_backfill_issue;
+use crate::accounting::idempotency::accounting_operation_receipt;
 use crate::accounting::intercompany::{
     backfill_intercompany_organization_ownership, create_intercompany_rule,
     create_intercompany_transaction, intercompany_rule, intercompany_transaction,
     set_intercompany_rule_active, CreateIntercompanyRuleParams,
     CreateIntercompanyTransactionParams, IntercompanyRule, IntercompanyTransaction,
 };
+use crate::core::audit::audit_log;
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
-use crate::types::{ConsolidationState, RuleType};
+use crate::types::{ConsolidationState, IntercompanyDocumentModel, RuleType};
 
 pub fn test_intercompany_rule_requires_same_org(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -126,8 +128,115 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
         fixture.organization_id,
         fixture.company_id,
         CreateIntercompanyTransactionParams {
-            origin_document_id: fixture.fiscal_year_id,
-            origin_document_model: "account.fiscal.year".to_string(),
+            origin_document_id: {
+                // Use a real account.move created under A1 for typed provenance.
+                use crate::accounting::journal_entries::{
+                    account_move, create_account_move, CreateAccountMoveParams,
+                };
+                use crate::accounting::chart_of_accounts::{
+                    account_journal, create_account_journal, CreateAccountJournalParams,
+                };
+                use crate::types::{JournalType, MoveType};
+                let journal_code = format!("ICJ{}", fixture.company_id);
+                if ctx
+                    .db
+                    .account_journal()
+                    .iter()
+                    .find(|j| j.organization_id == fixture.organization_id && j.code == journal_code)
+                    .is_none()
+                {
+                    create_account_journal(
+                        ctx,
+                        fixture.organization_id,
+                        CreateAccountJournalParams {
+                            company_id: Some(fixture.company_id),
+                            name: "IC origin journal".to_string(),
+                            code: journal_code.clone(),
+                            type_: JournalType::General,
+                            currency_id: Some(1),
+                            default_account_id: None,
+                            suspense_account_id: None,
+                            loss_account_id: None,
+                            profit_account_id: None,
+                            bank_account_id: None,
+                            payment_credit_account_id: None,
+                            payment_debit_account_id: None,
+                            invoice_reference_type: None,
+                            invoice_reference_model: None,
+                            sequence_id: None,
+                            refund_sequence_id: None,
+                            sequence_override_regex: None,
+                            secure_sequence_id: None,
+                            alias_name: None,
+                            alias_domain: None,
+                            sale_activity_type_id: None,
+                            sale_activity_user_id: None,
+                            sale_activity_note: None,
+                            sale_activity_date_deadline: None,
+                            restrict_mode_hash_table: false,
+                            active: true,
+                            at_least_one_inbound: false,
+                            at_least_one_outbound: false,
+                            dedicated_payment_method_ids: vec![],
+                            sale_activity_done: false,
+                            metadata: None,
+                        },
+                    )?;
+                }
+                let journal_id = ctx
+                    .db
+                    .account_journal()
+                    .iter()
+                    .find(|j| j.organization_id == fixture.organization_id && j.code == journal_code)
+                    .map(|j| j.id)
+                    .ok_or("IC journal missing")?;
+                let move_ref = format!("IC-ORIG-{}", fixture.company_id);
+                create_account_move(
+                    ctx,
+                    fixture.organization_id,
+                    CreateAccountMoveParams {
+                        idempotency_key: format!("ic-origin-{}", fixture.company_id),
+                        company_id: Some(fixture.company_id),
+                        journal_id,
+                        move_type: MoveType::Entry,
+                        date: ctx.timestamp,
+                        name: move_ref.clone(),
+                        ref_: Some(move_ref.clone()),
+                        auto_post: false,
+                        to_check: false,
+                        is_storno: false,
+                        partner_id: None,
+                        partner_bank_id: None,
+                        fiscal_position_id: None,
+                        invoice_date: None,
+                        invoice_date_due: None,
+                        invoice_payment_term_id: None,
+                        payment_reference: None,
+                        invoice_origin: None,
+                        invoice_partner_display_name: None,
+                        invoice_cash_rounding_id: None,
+                        partner_shipping_id: None,
+                        sale_order_id: None,
+                        invoice_incoterm_id: None,
+                        incoterm_location: None,
+                        campaign_id: None,
+                        source_id: None,
+                        medium_id: None,
+                        secure_sequence_number: None,
+                        metadata: None,
+                    },
+                )?;
+                ctx.db
+                    .account_move()
+                    .iter()
+                    .find(|m| {
+                        m.organization_id == fixture.organization_id
+                            && m.ref_.as_deref() == Some(move_ref.as_str())
+                    })
+                    .map(|m| m.id)
+                    .ok_or("IC origin move missing")?
+            },
+            origin_document_model: IntercompanyDocumentModel::AccountMove,
             destination_company_id: sub_company_id,
             amount: 250.0,
             currency_id: 1,
@@ -203,8 +312,16 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
         fixture.organization_id,
         CreateConsolidationJournalParams {
             name: journal_name.clone(),
-            period_id: fixture.fiscal_year_id,
-            period_name: "FY smoke".to_string(),
+            period_id: {
+                use crate::accounting::fiscal_periods::account_period;
+                ctx.db
+                    .account_period()
+                    .period_by_fiscal_year()
+                    .filter(&fixture.fiscal_year_id)
+                    .map(|p| p.id)
+                    .max()
+                    .ok_or("open account period missing")?
+            },
             date_from: ctx.timestamp,
             date_to: ctx.timestamp + Duration::from_secs(86_400),
             company_ids: vec![fixture.company_id, sub_company_id],
@@ -224,15 +341,21 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
         .ok_or("Consolidation journal not found")?;
 
     let amount = 1_000.0;
+    let ar_id = *fixture
+        .chart_account_ids
+        .get(crate::test_harness::chart_keys::AR)
+        .ok_or("harness missing AR")?;
+    let ap_id = *fixture
+        .chart_account_ids
+        .get(crate::test_harness::chart_keys::AP)
+        .ok_or("harness missing AP")?;
     create_elimination_entry(
         ctx,
         fixture.organization_id,
         CreateEliminationEntryParams {
             journal_id: journal.id,
             name: "IC AR elimination".to_string(),
-            account_id: 1,
-            account_code: "1200".to_string(),
-            account_name: "Intercompany AR".to_string(),
+            account_id: ar_id,
             company_id: fixture.company_id,
             counterparty_company_id: Some(sub_company_id),
             debit: amount,
@@ -252,10 +375,8 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
         CreateEliminationEntryParams {
             journal_id: journal.id,
             name: "IC AP elimination".to_string(),
-            account_id: 2,
-            account_code: "2100".to_string(),
-            account_name: "Intercompany AP".to_string(),
-            company_id: sub_company_id,
+            account_id: ap_id,
+            company_id: fixture.company_id,
             counterparty_company_id: Some(fixture.company_id),
             debit: 0.0,
             credit: amount,
@@ -317,7 +438,75 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
         return Err("new accounting ownership was not persisted".to_string());
     }
 
+    process_consolidation(ctx, fixture.organization_id, updated.id)?;
+    let processed_once = ctx
+        .db
+        .consolidation_journal()
+        .id()
+        .find(&updated.id)
+        .ok_or("processed consolidation journal not found")?;
+    process_consolidation(ctx, fixture.organization_id, updated.id)?;
+    let processed_twice = ctx
+        .db
+        .consolidation_journal()
+        .id()
+        .find(&updated.id)
+        .ok_or("retried consolidation journal not found")?;
+    if processed_twice.state != ConsolidationState::InProgress
+        || processed_twice.processed_at != processed_once.processed_at
+        || processed_twice.processed_by != processed_once.processed_by
+        || processed_twice.elimination_entries != processed_once.elimination_entries
+    {
+        return Err("consolidation processing retry changed persisted effects".to_string());
+    }
+    let process_audits = ctx
+        .db
+        .audit_log()
+        .iter()
+        .filter(|audit| {
+            audit.organization_id == fixture.organization_id
+                && audit.table_name == "consolidation_journal"
+                && audit.record_id == updated.id
+                && audit.action == "UPDATE"
+                && audit
+                    .new_values
+                    .as_deref()
+                    .is_some_and(|values| values.contains("\"InProgress\""))
+        })
+        .count();
+    if process_audits != 1 {
+        return Err(format!(
+            "consolidation retry persisted {process_audits} processing audits"
+        ));
+    }
+    let process_receipts: Vec<_> = ctx
+        .db
+        .accounting_operation_receipt()
+        .iter()
+        .filter(|receipt| {
+            receipt.organization_id == fixture.organization_id
+                && receipt.company_id == fixture.company_id
+                && receipt.action_kind == "process_consolidation"
+                && receipt.result_id == updated.id
+        })
+        .collect();
+    if process_receipts.len() != 1 {
+        return Err(format!(
+            "consolidation retry persisted {} operation receipts",
+            process_receipts.len()
+        ));
+    }
+
     let foreign_fixture = OrgFixture::seed_minimal(ctx)?;
+    match process_consolidation(ctx, foreign_fixture.organization_id, updated.id) {
+        Err(error) if error.contains("organization") => {}
+        Err(error) => {
+            return Err(format!(
+                "unexpected cross-tenant consolidation processing error: {error}"
+            ))
+        }
+        Ok(()) => return Err("cross-tenant consolidation processing succeeded".to_string()),
+    }
     let cross_tenant_update = set_intercompany_rule_active(
         ctx,
         foreign_fixture.organization_id,
@@ -360,7 +549,7 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
         .id()
         .update(ConsolidationJournal {
             organization_id: None,
-            ..updated
+            ..processed_twice
         });
     ctx.db
         .consolidation_elimination_entry()

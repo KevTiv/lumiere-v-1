@@ -40,7 +40,7 @@ import type {
 } from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
-import { userTypeIdFromAccountTypes, userTypeIdFromInternalGroup } from "./accounting-defaults"
+import { userTypeIdFromAccountTypes } from "./accounting-defaults"
 import {
   formValue as field,
   optionalBigIntU64,
@@ -69,6 +69,15 @@ function nullableTrimmedString(v: unknown): string | null {
 function nullableBigIntU64(v: unknown): bigint | null {
   if (v == null || String(v).trim() === '') return null
   return optionalBigIntU64(v) ?? null
+}
+
+/**
+ * Generated `Infer` collapses `Option<Option<T>>` to `T | undefined`, so clear
+ * (`null`) is not representable on the official type. Patch builders keep
+ * runtime `null` for clear and omit keys for preserve.
+ */
+type ClearablePatch<T> = {
+  [K in keyof T]?: T[K] | null
 }
 
 function requiredBigIntU64(v: unknown): bigint | null {
@@ -148,10 +157,7 @@ export function toCreateAccountAccountParams(
       userTypeIdFromAccountTypes(opts.accountTypes, String(formData.internalGroup ?? "")) ?? null
   }
 
-  if (userTypeId == null) {
-    userTypeId = userTypeIdFromInternalGroup(String(formData.internalGroup ?? "")) ?? null
-  }
-
+  // Fail closed: never invent fixed account-type IDs 1..6.
   if (userTypeId == null) return null
 
   return {
@@ -171,7 +177,7 @@ export function toCreateAccountAccountParams(
     allowedJournalIds: [],
     nonTrade: false,
     isOffBalance: false,
-    metadata: undefined,
+    metadata: optionalTrimmedString(formData.metadata),
   }
 }
 
@@ -187,6 +193,7 @@ export function toCreateJournalEntryMoveParams(
   if (journalId == null) return null
 
   return {
+    idempotencyKey: `create-account-move:${globalThis.crypto.randomUUID()}`,
     companyId,
     journalId,
     moveType: MOVE_TYPE_ENTRY,
@@ -230,6 +237,7 @@ export function toCreateAccountMoveFromInvoiceModal(
     kind === 'OutInvoice' ? MOVE_TYPE_OUT_INVOICE : MOVE_TYPE_IN_INVOICE
 
   return {
+    idempotencyKey: `create-account-move:${globalThis.crypto.randomUUID()}`,
     companyId,
     journalId,
     moveType,
@@ -301,7 +309,7 @@ export function toCreateAccountTaxParams(
     hasNegativeFactor: false,
     invoiceRepartitionLineIds: [],
     refundRepartitionLineIds: [],
-    metadata: undefined,
+    metadata: optionalTrimmedString(formData.metadata),
   }
 }
 
@@ -426,7 +434,7 @@ export function toCreateCrossoveredBudgetParams(
     description: optionalTrimmedString(formData.description),
     dateFrom: timestampFromFormDate(formData.dateFrom),
     dateTo: timestampFromFormDate(formData.dateTo),
-    metadata: undefined,
+    metadata: optionalTrimmedString(formData.metadata),
   }
 }
 
@@ -449,13 +457,13 @@ function analyticLineTagIdsForCreate(formData: Record<string, unknown>): bigint[
 
 function updateAccountGroupParentId(
   formData: Record<string, unknown>,
-): UpdateAccountGroupParams['parentId'] {
+): bigint | null | undefined {
   if (!('parentId' in formData)) return undefined
   const raw = formData.parentId
   if (raw === '' || raw == null) {
-    return null as unknown as UpdateAccountGroupParams['parentId']
+    return null
   }
-  return optionalBigIntU64(raw)
+  return optionalBigIntU64(raw) ?? null
 }
 
 export function toCreateBudgetPostParams(
@@ -644,9 +652,6 @@ export function toCreateAnalyticDistributionModelParams(
 ): CreateAnalyticDistributionModelParams | null {
   const accountId = optionalBigIntU64(formData.analyticAccountId)
   if (accountId === undefined) return null
-  const distribution = JSON.stringify([
-    { account_id: Number(accountId), percentage: 100 },
-  ])
   const precRaw = Number(formData.analyticPrecision ?? 2)
   const analyticPrecision = Number.isFinite(precRaw)
     ? Math.min(255, Math.max(0, Math.trunc(precRaw)))
@@ -657,7 +662,7 @@ export function toCreateAnalyticDistributionModelParams(
     partnerCategoryId: optionalBigIntU64(formData.partnerCategoryId),
     productId: optionalBigIntU64(formData.productId),
     productCategId: optionalBigIntU64(formData.productCategId),
-    analyticDistribution: distribution,
+    analyticDistribution: [{ accountId, percentage: 100 }],
     analyticPrecision,
     metadata: optionalTrimmedString(formData.metadata),
   }
@@ -709,25 +714,39 @@ export function toUpdateAnalyticLineParams(
 export function toUpdateAnalyticDistributionModelParams(
   formData: Record<string, unknown>,
   companyId?: bigint,
-): UpdateAnalyticDistributionModelParams {
-  const dist = optionalTrimmedString(formData.analyticDistribution)
-  return {
-    companyId,
-    name: optionalTrimmedString(formData.name),
-    partnerCategoryId: optionalBigIntU64(formData.partnerCategoryId),
-    productId: optionalBigIntU64(formData.productId),
-    productCategId: optionalBigIntU64(formData.productCategId),
-    analyticDistribution: dist,
-    analyticPrecision:
-      formData.analyticPrecision === '' || formData.analyticPrecision == null
-        ? undefined
-        : Number(formData.analyticPrecision),
-    isActive:
-      formData.isActive === '' ? undefined : formData.isActive === undefined
-        ? undefined
-        : Boolean(formData.isActive),
-    metadata: optionalTrimmedString(formData.metadata),
+): ClearablePatch<UpdateAnalyticDistributionModelParams> {
+  const params: ClearablePatch<UpdateAnalyticDistributionModelParams> = { companyId }
+  if (hasOwn(formData, 'name')) params.name = nullableTrimmedString(formData.name)
+  if (hasOwn(formData, 'partnerCategoryId')) {
+    params.partnerCategoryId = nullableBigIntU64(formData.partnerCategoryId)
   }
+  if (hasOwn(formData, 'productId')) params.productId = nullableBigIntU64(formData.productId)
+  if (hasOwn(formData, 'productCategId')) {
+    params.productCategId = nullableBigIntU64(formData.productCategId)
+  }
+  if (hasOwn(formData, 'analyticAccountId')) {
+    const accountId = optionalBigIntU64(formData.analyticAccountId)
+    if (accountId !== undefined) {
+      params.analyticDistribution = [{ accountId, percentage: 100 }]
+    }
+  } else if (hasOwn(formData, 'analyticDistribution') && Array.isArray(formData.analyticDistribution)) {
+    params.analyticDistribution = (formData.analyticDistribution as unknown[]).flatMap((row) => {
+      if (row == null || typeof row !== 'object') return []
+      const record = row as Record<string, unknown>
+      const accountId = optionalBigIntU64(record.accountId ?? record.account_id)
+      const percentage = Number(record.percentage ?? 0)
+      if (accountId === undefined || !Number.isFinite(percentage)) return []
+      return [{ accountId, percentage }]
+    })
+  }
+  if (hasOwn(formData, 'analyticPrecision') && formData.analyticPrecision !== '' && formData.analyticPrecision != null) {
+    params.analyticPrecision = Number(formData.analyticPrecision)
+  }
+  if (hasOwn(formData, 'isActive') && formData.isActive !== '') {
+    params.isActive = Boolean(formData.isActive)
+  }
+  if (hasOwn(formData, 'metadata')) params.metadata = nullableTrimmedString(formData.metadata)
+  return params
 }
 
 /** Convert SpacetimeDB timestamp JSON (or number) to `YYYY-MM-DD` for date inputs. */
@@ -740,7 +759,7 @@ export function bankStatementTimestampToDateInput(v: unknown): string {
   if (typeof v === 'number' && Number.isFinite(v)) {
     return new Date(v / 1000).toISOString().slice(0, 10)
   }
-  return new Date().toISOString().slice(0, 10)
+  return ''
 }
 
 export function toCreateAccountBankStatementLineParams(
@@ -837,17 +856,22 @@ export function toCreateAccountReconciliationWidgetParams(
 export function toUpdateAccountReconciliationWidgetParams(
   formData: Record<string, unknown>,
 ): Record<string, unknown> | null {
-  const accountId = requiredBigIntU64(formData.accountId)
-  if (accountId === null) return null
-  const moveLineIds = parseBigIntU64Csv(formData.moveLineIds)
-  const raw: Record<string, unknown> = {
-    accountId,
-    moveLineIds,
-    toCheck: formData.toCheck === true,
-    mode: String(formData.mode ?? 'bank').trim() || 'bank',
+  const raw: Record<string, unknown> = {}
+  if (hasOwn(formData, 'accountId')) {
+    const accountId = requiredBigIntU64(formData.accountId)
+    if (accountId === null) return null
+    raw.accountId = accountId
   }
-  const pid = optionalBigIntU64(formData.partnerId)
-  if (pid !== undefined) raw.partnerId = pid
+  if (hasOwn(formData, 'moveLineIds')) {
+    raw.moveLineIds = parseBigIntU64Csv(formData.moveLineIds)
+  }
+  if (hasOwn(formData, 'toCheck')) raw.toCheck = formData.toCheck === true
+  if (hasOwn(formData, 'mode')) {
+    const mode = String(formData.mode ?? '').trim()
+    if (mode) raw.mode = mode
+  }
+  if (hasOwn(formData, 'partnerId')) raw.partnerId = nullableBigIntU64(formData.partnerId)
+  if (Object.keys(raw).length === 0) return null
   return stdbParamsToJson(raw)
 }
 
@@ -898,6 +922,7 @@ export function toCreatePaymentParamsFromInvoice(
   if (!isCustomerInvoice && !isVendorBill) return null
 
   return {
+    idempotencyKey: `create-payment:${globalThis.crypto.randomUUID()}`,
     companyId: cid,
     paymentType: isCustomerInvoice ? { tag: 'InBound' as const } : { tag: 'OutBound' as const },
     partnerType: isCustomerInvoice ? { tag: 'Customer' as const } : { tag: 'Supplier' as const },
@@ -928,6 +953,7 @@ export function toCreatePaymentParamsFromManualForm(
   const pt = String(formData.paymentType ?? 'InBound').trim()
   const pty = String(formData.partnerType ?? 'Customer').trim()
   return {
+    idempotencyKey: `create-payment:${globalThis.crypto.randomUUID()}`,
     companyId,
     paymentType: pt === 'OutBound' ? { tag: 'OutBound' as const } : { tag: 'InBound' as const },
     partnerType: pty === 'Supplier' ? { tag: 'Supplier' as const } : { tag: 'Customer' as const },
@@ -1216,55 +1242,51 @@ export function intercompanyRuleParamsToJson(params: CreateIntercompanyRuleParam
 
 import type { UpdateIntercompanyRuleParams } from '@lumiere/stdb/types'
 
-/** `Option<Option<T>>` update field: omit → no change; empty select → no change; value → set. */
+/** `Option<Option<T>>` update field: omit → no change; empty → clear; value → set. */
 function optionalNestedU64FromForm(
   formData: Record<string, unknown>,
   key: string,
-): bigint | undefined {
-  if (!(key in formData)) return undefined
-  const raw = formData[key]
-  if (raw === '' || raw == null) return undefined
-  return optionalBigIntU64(raw)
+): bigint | null | undefined {
+  if (!hasOwn(formData, key)) return undefined
+  return nullableBigIntU64(formData[key])
 }
 
 function optionalNestedStringFromForm(
   formData: Record<string, unknown>,
   key: string,
-): string | undefined {
-  if (!(key in formData)) return undefined
-  const raw = formData[key]
-  if (raw === '' || raw == null) return undefined
-  return optionalTrimmedString(raw)
+): string | null | undefined {
+  if (!hasOwn(formData, key)) return undefined
+  return nullableTrimmedString(formData[key])
 }
 
 export function toUpdateIntercompanyRuleParams(
   formData: Record<string, unknown>,
-): UpdateIntercompanyRuleParams {
-  return {
-    name: optionalTrimmedString(formData.name),
-    autoValidation:
-      formData.autoValidation === undefined ? undefined : formData.autoValidation === true,
-    autoGenerateInvoice:
-      formData.autoGenerateInvoice === undefined
-        ? undefined
-        : formData.autoGenerateInvoice === true,
-    autoGenerateBill:
-      formData.autoGenerateBill === undefined ? undefined : formData.autoGenerateBill === true,
-    journalId: optionalNestedU64FromForm(formData, 'journalId'),
-    accountId: optionalNestedU64FromForm(formData, 'accountId'),
-    pricelistId: optionalNestedU64FromForm(formData, 'pricelistId'),
-    sequence:
-      formData.sequence === '' || formData.sequence == null
-        ? undefined
-        : Number(formData.sequence),
-    isActive: formData.isActive === undefined ? undefined : formData.isActive === true,
-    notes: optionalNestedStringFromForm(formData, 'notes'),
-    metadata: optionalTrimmedString(formData.metadata),
+): ClearablePatch<UpdateIntercompanyRuleParams> {
+  const params: ClearablePatch<UpdateIntercompanyRuleParams> = {}
+  if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'autoValidation')) params.autoValidation = formData.autoValidation === true
+  if (hasOwn(formData, 'autoGenerateInvoice')) {
+    params.autoGenerateInvoice = formData.autoGenerateInvoice === true
   }
+  if (hasOwn(formData, 'autoGenerateBill')) {
+    params.autoGenerateBill = formData.autoGenerateBill === true
+  }
+  if (hasOwn(formData, 'journalId')) params.journalId = optionalNestedU64FromForm(formData, 'journalId')
+  if (hasOwn(formData, 'accountId')) params.accountId = optionalNestedU64FromForm(formData, 'accountId')
+  if (hasOwn(formData, 'pricelistId')) {
+    params.pricelistId = optionalNestedU64FromForm(formData, 'pricelistId')
+  }
+  if (hasOwn(formData, 'sequence') && formData.sequence !== '' && formData.sequence != null) {
+    params.sequence = Number(formData.sequence)
+  }
+  if (hasOwn(formData, 'isActive')) params.isActive = formData.isActive === true
+  if (hasOwn(formData, 'notes')) params.notes = optionalNestedStringFromForm(formData, 'notes')
+  if (hasOwn(formData, 'metadata')) params.metadata = nullableTrimmedString(formData.metadata)
+  return params
 }
 
 export function intercompanyRuleUpdateParamsToJson(
-  params: UpdateIntercompanyRuleParams,
+  params: ClearablePatch<UpdateIntercompanyRuleParams>,
 ): Record<string, unknown> {
   return stdbParamsToJson(params)
 }
@@ -1287,9 +1309,18 @@ export function toCreateIntercompanyTransactionParams(
   const transactionType = toIntercompanyRuleType(formData.transactionType)
   if (!transactionType) return null
 
+  const originDocumentModelRaw = String(formData.originDocumentModel ?? '').trim()
+  const originDocumentModel =
+    originDocumentModelRaw === 'account.move' || originDocumentModelRaw === 'AccountMove'
+      ? ({ tag: 'AccountMove' } as const)
+      : originDocumentModelRaw === 'sale.order' || originDocumentModelRaw === 'SaleOrder'
+        ? ({ tag: 'SaleOrder' } as const)
+        : null
+  if (!originDocumentModel) return null
+
   return {
     originDocumentId,
-    originDocumentModel: String(formData.originDocumentModel ?? 'sale.order').trim(),
+    originDocumentModel,
     destinationCompanyId,
     amount,
     currencyId,
@@ -1311,9 +1342,18 @@ export function toProcessIntercompanyTransactionParams(
   const destinationDocumentId = requiredBigIntU64(formData.destinationDocumentId)
   if (destinationDocumentId === null) return null
 
+  const destinationDocumentModelRaw = String(formData.destinationDocumentModel ?? '').trim()
+  const destinationDocumentModel =
+    destinationDocumentModelRaw === 'account.move' || destinationDocumentModelRaw === 'AccountMove'
+      ? ({ tag: 'AccountMove' } as const)
+      : destinationDocumentModelRaw === 'sale.order' || destinationDocumentModelRaw === 'SaleOrder'
+        ? ({ tag: 'SaleOrder' } as const)
+        : null
+  if (!destinationDocumentModel) return null
+
   return {
     destinationDocumentId,
-    destinationDocumentModel: String(formData.destinationDocumentModel ?? 'sale.order').trim(),
+    destinationDocumentModel,
   }
 }
 
@@ -1391,27 +1431,31 @@ export function createAccountTaxGroupParamsToJson(params: CreateAccountTaxGroupP
 
 export function toUpdateAccountTaxGroupParams(
   formData: Record<string, unknown>,
-): UpdateAccountTaxGroupParams {
-  return {
-    name: optionalTrimmedString(formData.name),
-    sequence: formData.sequence === '' || formData.sequence == null ? undefined : Number(formData.sequence),
-    precedingSubtotal: formData.precedingSubtotal === '' || formData.precedingSubtotal == null
-      ? undefined
-      : optionalTrimmedString(formData.precedingSubtotal),
-    taxPayableAccountId: formData.taxPayableAccountId === '' || formData.taxPayableAccountId == null
-      ? undefined
-      : optionalBigIntU64(formData.taxPayableAccountId),
-    taxReceivableAccountId: formData.taxReceivableAccountId === '' || formData.taxReceivableAccountId == null
-      ? undefined
-      : optionalBigIntU64(formData.taxReceivableAccountId),
-    advanceTaxPaymentAccountId: formData.advanceTaxPaymentAccountId === '' || formData.advanceTaxPaymentAccountId == null
-      ? undefined
-      : optionalBigIntU64(formData.advanceTaxPaymentAccountId),
-    metadata: optionalTrimmedString(formData.metadata),
+): ClearablePatch<UpdateAccountTaxGroupParams> {
+  const params: ClearablePatch<UpdateAccountTaxGroupParams> = {}
+  if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'sequence') && formData.sequence !== '' && formData.sequence != null) {
+    params.sequence = Number(formData.sequence)
   }
+  if (hasOwn(formData, 'precedingSubtotal')) {
+    params.precedingSubtotal = nullableTrimmedString(formData.precedingSubtotal)
+  }
+  if (hasOwn(formData, 'taxPayableAccountId')) {
+    params.taxPayableAccountId = nullableBigIntU64(formData.taxPayableAccountId)
+  }
+  if (hasOwn(formData, 'taxReceivableAccountId')) {
+    params.taxReceivableAccountId = nullableBigIntU64(formData.taxReceivableAccountId)
+  }
+  if (hasOwn(formData, 'advanceTaxPaymentAccountId')) {
+    params.advanceTaxPaymentAccountId = nullableBigIntU64(formData.advanceTaxPaymentAccountId)
+  }
+  if (hasOwn(formData, 'metadata')) params.metadata = nullableTrimmedString(formData.metadata)
+  return params
 }
 
-export function updateAccountTaxGroupParamsToJson(params: UpdateAccountTaxGroupParams): Record<string, unknown> {
+export function updateAccountTaxGroupParamsToJson(
+  params: ClearablePatch<UpdateAccountTaxGroupParams>,
+): Record<string, unknown> {
   return stdbParamsToJson(params)
 }
 
@@ -1444,31 +1488,25 @@ export function createTaxJurisdictionParamsToJson(params: CreateTaxJurisdictionP
 
 export function toUpdateTaxJurisdictionParams(
   formData: Record<string, unknown>,
-): UpdateTaxJurisdictionParams {
-  return {
-    name: optionalTrimmedString(formData.name),
-    code: optionalTrimmedString(formData.code),
-    stateCode: formData.stateCode === '' || formData.stateCode == null
-      ? undefined
-      : optionalTrimmedString(formData.stateCode),
-    countyCode: formData.countyCode === '' || formData.countyCode == null
-      ? undefined
-      : optionalTrimmedString(formData.countyCode),
-    city: formData.city === '' || formData.city == null
-      ? undefined
-      : optionalTrimmedString(formData.city),
-    zipFrom: formData.zipFrom === '' || formData.zipFrom == null
-      ? undefined
-      : optionalTrimmedString(formData.zipFrom),
-    zipTo: formData.zipTo === '' || formData.zipTo == null
-      ? undefined
-      : optionalTrimmedString(formData.zipTo),
-    isActive: formData.isActive === '' || formData.isActive == null ? undefined : Boolean(formData.isActive),
-    metadata: optionalTrimmedString(formData.metadata),
+): ClearablePatch<UpdateTaxJurisdictionParams> {
+  const params: ClearablePatch<UpdateTaxJurisdictionParams> = {}
+  if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'code')) params.code = optionalTrimmedString(formData.code)
+  if (hasOwn(formData, 'stateCode')) params.stateCode = nullableTrimmedString(formData.stateCode)
+  if (hasOwn(formData, 'countyCode')) params.countyCode = nullableTrimmedString(formData.countyCode)
+  if (hasOwn(formData, 'city')) params.city = nullableTrimmedString(formData.city)
+  if (hasOwn(formData, 'zipFrom')) params.zipFrom = nullableTrimmedString(formData.zipFrom)
+  if (hasOwn(formData, 'zipTo')) params.zipTo = nullableTrimmedString(formData.zipTo)
+  if (hasOwn(formData, 'isActive') && formData.isActive !== '') {
+    params.isActive = Boolean(formData.isActive)
   }
+  if (hasOwn(formData, 'metadata')) params.metadata = nullableTrimmedString(formData.metadata)
+  return params
 }
 
-export function updateTaxJurisdictionParamsToJson(params: UpdateTaxJurisdictionParams): Record<string, unknown> {
+export function updateTaxJurisdictionParamsToJson(
+  params: ClearablePatch<UpdateTaxJurisdictionParams>,
+): Record<string, unknown> {
   return stdbParamsToJson(params)
 }
 
@@ -1499,32 +1537,42 @@ export function createTaxScheduleParamsToJson(params: CreateTaxScheduleParams): 
 
 export function toUpdateTaxScheduleParams(
   formData: Record<string, unknown>,
-): UpdateTaxScheduleParams {
-  return {
-    name: optionalTrimmedString(formData.name),
-    description: formData.description === '' || formData.description == null
-      ? undefined
-      : optionalTrimmedString(formData.description),
-    jurisdictionId: formData.jurisdictionId === '' || formData.jurisdictionId == null
-      ? undefined
-      : optionalBigIntU64(formData.jurisdictionId),
-    taxIds: formData.taxIds === undefined
-      ? undefined
-      : Array.isArray(formData.taxIds)
-        ? formData.taxIds.map((id) => BigInt(String(id)))
-        : [],
-    isActive: formData.isActive === '' || formData.isActive == null ? undefined : Boolean(formData.isActive),
-    effectiveFrom: formData.effectiveFrom === undefined
-      ? undefined
-      : optionalTimestampFromFormDate(formData.effectiveFrom),
-    effectiveTo: formData.effectiveTo === undefined
-      ? undefined
-      : optionalTimestampFromFormDate(formData.effectiveTo),
-    metadata: optionalTrimmedString(formData.metadata),
+): ClearablePatch<UpdateTaxScheduleParams> {
+  const params: ClearablePatch<UpdateTaxScheduleParams> = {}
+  if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
+  if (hasOwn(formData, 'description')) {
+    params.description = nullableTrimmedString(formData.description)
   }
+  if (hasOwn(formData, 'jurisdictionId')) {
+    params.jurisdictionId = nullableBigIntU64(formData.jurisdictionId)
+  }
+  if (hasOwn(formData, 'taxIds')) {
+    params.taxIds = Array.isArray(formData.taxIds)
+      ? formData.taxIds.map((id) => BigInt(String(id)))
+      : []
+  }
+  if (hasOwn(formData, 'isActive') && formData.isActive !== '') {
+    params.isActive = Boolean(formData.isActive)
+  }
+  if (hasOwn(formData, 'effectiveFrom')) {
+    params.effectiveFrom =
+      formData.effectiveFrom == null || String(formData.effectiveFrom).trim() === ''
+        ? null
+        : optionalTimestampFromFormDate(formData.effectiveFrom) ?? null
+  }
+  if (hasOwn(formData, 'effectiveTo')) {
+    params.effectiveTo =
+      formData.effectiveTo == null || String(formData.effectiveTo).trim() === ''
+        ? null
+        : optionalTimestampFromFormDate(formData.effectiveTo) ?? null
+  }
+  if (hasOwn(formData, 'metadata')) params.metadata = nullableTrimmedString(formData.metadata)
+  return params
 }
 
-export function updateTaxScheduleParamsToJson(params: UpdateTaxScheduleParams): Record<string, unknown> {
+export function updateTaxScheduleParamsToJson(
+  params: ClearablePatch<UpdateTaxScheduleParams>,
+): Record<string, unknown> {
   return stdbParamsToJson(params)
 }
 
@@ -1550,11 +1598,10 @@ export function toCreateTaxDeadlineParams(
   if (!title) return null
 
   const deadlineType = toTaxDeadlineType(formData.deadlineType)
-  if (!deadlineType) return undefined as unknown as null
+  if (!deadlineType) return null
 
-  const dueDate = formData.dueDate != null && String(formData.dueDate).trim() !== ''
-    ? timestampFromFormDate(formData.dueDate)
-    : undefined as unknown as null
+  if (formData.dueDate == null || String(formData.dueDate).trim() === '') return null
+  const dueDate = timestampFromFormDate(formData.dueDate)
   if (!dueDate) return null
 
   return {
@@ -1579,28 +1626,38 @@ export function createTaxDeadlineParamsToJson(params: CreateTaxDeadlineParams): 
 
 export function toUpdateTaxDeadlineParams(
   formData: Record<string, unknown>,
-): UpdateTaxDeadlineParams {
-  return {
-    title: optionalTrimmedString(formData.title),
-    description: optionalTrimmedString(formData.description),
-    dueDate: formData.dueDate === undefined
-      ? undefined
-      : optionalTimestampFromFormDate(formData.dueDate),
-    fiscalPeriodStart: formData.fiscalPeriodStart === undefined
-      ? undefined
-      : optionalTimestampFromFormDate(formData.fiscalPeriodStart),
-    fiscalPeriodEnd: formData.fiscalPeriodEnd === undefined
-      ? undefined
-      : optionalTimestampFromFormDate(formData.fiscalPeriodEnd),
-    reminderDaysBefore: formData.reminderDaysBefore === undefined
-      ? undefined
-      : Array.isArray(formData.reminderDaysBefore)
-        ? formData.reminderDaysBefore.map((d) => Number(d))
-        : [],
+): ClearablePatch<UpdateTaxDeadlineParams> {
+  const params: ClearablePatch<UpdateTaxDeadlineParams> = {}
+  if (hasOwn(formData, 'title')) params.title = optionalTrimmedString(formData.title)
+  if (hasOwn(formData, 'description')) {
+    params.description = nullableTrimmedString(formData.description)
   }
+  if (hasOwn(formData, 'dueDate') && formData.dueDate != null && String(formData.dueDate).trim() !== '') {
+    params.dueDate = optionalTimestampFromFormDate(formData.dueDate)
+  }
+  if (hasOwn(formData, 'fiscalPeriodStart')) {
+    params.fiscalPeriodStart =
+      formData.fiscalPeriodStart == null || String(formData.fiscalPeriodStart).trim() === ''
+        ? null
+        : optionalTimestampFromFormDate(formData.fiscalPeriodStart) ?? null
+  }
+  if (hasOwn(formData, 'fiscalPeriodEnd')) {
+    params.fiscalPeriodEnd =
+      formData.fiscalPeriodEnd == null || String(formData.fiscalPeriodEnd).trim() === ''
+        ? null
+        : optionalTimestampFromFormDate(formData.fiscalPeriodEnd) ?? null
+  }
+  if (hasOwn(formData, 'reminderDaysBefore')) {
+    params.reminderDaysBefore = Array.isArray(formData.reminderDaysBefore)
+      ? formData.reminderDaysBefore.map((d) => Number(d))
+      : []
+  }
+  return params
 }
 
-export function updateTaxDeadlineParamsToJson(params: UpdateTaxDeadlineParams): Record<string, unknown> {
+export function updateTaxDeadlineParamsToJson(
+  params: ClearablePatch<UpdateTaxDeadlineParams>,
+): Record<string, unknown> {
   return stdbParamsToJson(params)
 }
 
@@ -1875,11 +1932,10 @@ export function toCreateConsolidationJournalParams(
   context?: ConsolidationJournalMapperContext,
 ): CreateConsolidationJournalParams | null {
   const name = requiredTrimmedString(field(formData, 'name', 'name'))
-  const periodName = requiredTrimmedString(field(formData, 'periodName', 'period_name'))
   const currencyId = requiredBigIntU64(field(formData, 'currencyId', 'currency_id'))
   const periodId =
     optionalBigIntU64(field(formData, 'periodId', 'period_id')) ?? context?.periodId
-  if (!name || !periodName || currencyId === null || periodId === undefined) return null
+  if (!name || currencyId === null || periodId === undefined) return null
 
   const companyIds =
     u64IdArrayFromForm(field(formData, 'companyIds', 'company_ids')).length > 0
@@ -1889,7 +1945,6 @@ export function toCreateConsolidationJournalParams(
   return {
     name,
     periodId,
-    periodName,
     dateFrom: timestampFromFormDate(field(formData, 'dateFrom', 'date_from')),
     dateTo: timestampFromFormDate(field(formData, 'dateTo', 'date_to')),
     companyIds,
@@ -1909,8 +1964,6 @@ export function toCreateEliminationEntryParams(
   const journalId = requiredBigIntU64(field(formData, 'journalId', 'journal_id'))
   const name = requiredTrimmedString(field(formData, 'name', 'name'))
   const accountId = requiredBigIntU64(field(formData, 'accountId', 'account_id'))
-  const accountCode = requiredTrimmedString(field(formData, 'accountCode', 'account_code'))
-  const accountName = requiredTrimmedString(field(formData, 'accountName', 'account_name'))
   const companyId = requiredBigIntU64(field(formData, 'companyId', 'company_id'))
   const currencyId = requiredBigIntU64(field(formData, 'currencyId', 'currency_id'))
   const eliminationType = requiredTrimmedString(
@@ -1920,8 +1973,6 @@ export function toCreateEliminationEntryParams(
     journalId === null ||
     !name ||
     accountId === null ||
-    !accountCode ||
-    !accountName ||
     companyId === null ||
     currencyId === null ||
     !eliminationType
@@ -1940,8 +1991,6 @@ export function toCreateEliminationEntryParams(
     journalId,
     name,
     accountId,
-    accountCode,
-    accountName,
     companyId,
     counterpartyCompanyId: optionalBigIntU64(
       field(formData, 'counterpartyCompanyId', 'counterparty_company_id'),
@@ -1993,7 +2042,6 @@ export function toRunFxRevaluationParamsFromForm(
     lossAccountId,
     lines: [{ accountId, adjustment }],
     reference: optionalTrimmedString(formData.reference),
-    metadata: undefined,
   }
 }
 
@@ -2031,7 +2079,6 @@ export function toRunFxRevaluationBatchParamsFromForm(
     rateSource,
     rateEffectiveDate: timestampFromFormDate(formData.rateEffectiveDate),
     reference: optionalTrimmedString(formData.reference),
-    metadata: undefined,
   }
 }
 
@@ -2069,7 +2116,6 @@ export function toPostRealizedFxParamsFromForm(
     clearingAccountId,
     date: timestampFromFormDate(formData.date),
     reference: optionalTrimmedString(formData.reference),
-    metadata: undefined,
   }
 }
 
@@ -2086,7 +2132,6 @@ export function toUpsertPartnerCreditControlParamsFromForm(
     creditLimit,
     paymentHold: Boolean(formData.paymentHold),
     notes: optionalTrimmedString(formData.notes),
-    metadata: undefined,
   }
 }
 
@@ -2119,7 +2164,6 @@ export function toCreateBadDebtWriteOffParamsFromForm(
     writeOffAccountId,
     date: timestampFromFormDate(formData.date),
     reference: optionalTrimmedString(formData.reference),
-    metadata: undefined,
   }
 }
 
@@ -2158,6 +2202,5 @@ export function toCreateAmortizationScheduleParamsFromForm(
     startDate: timestampFromFormDate(formData.startDate),
     endDate: timestampFromFormDate(formData.endDate),
     recognitionPeriod,
-    metadata: undefined,
   }
 }

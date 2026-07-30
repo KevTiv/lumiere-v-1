@@ -8,13 +8,13 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct UpdatePaymentAccountParams {
     pub name: Option<String>,
-    pub provider_label: Option<String>,
-    pub reference_raw: Option<String>,
-    pub fee_account_id: Option<u64>,
-    pub clearing_account_id: Option<u64>,
+    pub provider_label: Option<Option<String>>,
+    pub reference_raw: Option<Option<String>>,
+    pub fee_account_id: Option<Option<u64>>,
+    pub clearing_account_id: Option<Option<u64>>,
     pub active: Option<bool>,
     pub is_primary: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdatePaymentAccountParams {

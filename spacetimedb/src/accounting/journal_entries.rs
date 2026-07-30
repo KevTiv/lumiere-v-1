@@ -11,6 +11,7 @@ use crate::accounting::budgeting::{
 };
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::relations::require_explicit_company_id;
 use crate::accounting::tax_management::account_tax;
 use crate::core::organization::{company, require_company_in_organization};
@@ -204,6 +205,7 @@ pub struct AccountMoveLine {
 /// (state, payment_state, amounts, posted_before) are initialized by the reducer.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAccountMoveParams {
+    pub idempotency_key: String,
     /// Legal entity; default company for the org when omitted.
     pub company_id: Option<u64>,
     pub journal_id: u64,
@@ -322,7 +324,7 @@ pub struct UpdateAccountMoveLineParams {
     pub credit: Option<f64>,
     pub partner_id: Option<Option<u64>>,
     pub analytic_account_id: Option<Option<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 /// Parameters for the `bill_timesheets` workflow action.
@@ -1093,6 +1095,19 @@ pub fn create_account_move(
 
     let company_id =
         require_explicit_company_id(ctx, organization_id, params.company_id, "move creation")?;
+    let payload_fingerprint = format!("{params:?}");
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "create_account_move",
+        &params.idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
 
     let journal =
         load_active_journal_in_scope(ctx, organization_id, company_id, params.journal_id)?;
@@ -1188,6 +1203,17 @@ pub fn create_account_move(
             changed_fields: vec!["move_type".to_string(), "date".to_string()],
             metadata: None,
         },
+    );
+
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "create_account_move",
+        params.idempotency_key,
+        payload_fingerprint,
+        "account_move",
+        move_record.id,
     );
 
     Ok(())
@@ -1666,7 +1692,7 @@ pub fn update_account_move_line(
             .unwrap_or(line.analytic_account_id),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.map(Some).unwrap_or(line.metadata),
+        metadata: params.metadata.unwrap_or(line.metadata),
         ..line
     });
 
@@ -1925,6 +1951,8 @@ pub fn create_invoice_from_sale_order(
         line_params.price_unit = line.price_unit;
         line_params.discount = line_discount;
         line_params.tax_ids = tax_ids;
+        // Always take tags from the sale line — do not treat template `[]` as preserve.
+        line_params.analytic_tag_ids = analytic_tag_ids;
         if line_params.partner_id.is_none() {
             line_params.partner_id = Some(order.partner_invoice_id);
         }
@@ -1933,9 +1961,6 @@ pub fn create_invoice_from_sale_order(
         line_params.is_downpayment = is_downpayment;
         if line_params.analytic_account_id.is_none() {
             line_params.analytic_account_id = order.analytic_account_id;
-        }
-        if line_params.analytic_tag_ids.is_empty() {
-            line_params.analytic_tag_ids = analytic_tag_ids;
         }
 
         insert_draft_account_move_line(ctx, &move_record, line_params)?;
@@ -2202,9 +2227,8 @@ pub fn create_bill_from_purchase_order(
         if line_params.analytic_account_id.is_none() {
             line_params.analytic_account_id = account_analytic_id;
         }
-        if line_params.analytic_tag_ids.is_empty() {
-            line_params.analytic_tag_ids = analytic_tag_ids;
-        }
+        // Always take tags from the PO line — do not treat template `[]` as preserve.
+        line_params.analytic_tag_ids = analytic_tag_ids;
 
         insert_draft_account_move_line(ctx, &move_record, line_params)?;
 

@@ -25,6 +25,7 @@ import {
   newReconciliationWidgetForm,
   editReconciliationWidgetForm,
   reconciliationWidgetsTableConfig,
+  analyticLinesTableConfig,
   editAnalyticAccountForm,
   editAnalyticLineForm,
   editAnalyticDistributionModelForm,
@@ -145,6 +146,15 @@ import {
 } from "@/lib/accounting-create-params"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
+import {
+  buildAccountLabelMap,
+  buildAnalyticAccountLabelMap,
+  buildCompanyLabelMap,
+  buildCurrencyLabelMap,
+  buildJournalLabelMap,
+  buildPartnerLabelMap,
+  buildSourceDocumentLabelMap,
+} from "@lumiere/stdb/read-models"
 import type {
   AddAccountMoveLineParams,
   UpdateAccountJournalParams,
@@ -412,7 +422,6 @@ function toAddAccountMoveLineParamsFromForm(
       expectedPayDateCurrencyId: undefined,
       expectedPayDateAmount: 0,
       expectedPayDateResidual: 0,
-      metadata: undefined,
     },
   }
 }
@@ -474,7 +483,6 @@ function toUpdateBudgetParams(formData: Record<string, unknown>): Record<string,
     description: formData.description == null ? undefined : optionalText(formData.description) ?? null,
     dateFrom: formData.dateFrom ? dateInputToStdbTimestamp(formData.dateFrom) : undefined,
     dateTo: formData.dateTo ? dateInputToStdbTimestamp(formData.dateTo) : undefined,
-    metadata: undefined,
   }
 }
 
@@ -999,14 +1007,43 @@ function AccountingClientReady({
     return mergeFieldDefaultValues(merged, { currencyId: String(defaultCurrencyId) })
   }, [t, partnerSelectOptions, currencySelectOptions, journalFieldOptionsForModularForm, defaultCurrencyId])
 
-  const partnerLabelById = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const contact of contacts) {
-      const row = contact as Record<string, unknown>
-      map.set(String(row.id), String(row.name ?? row.displayName ?? row.id))
-    }
-    return map
-  }, [contacts])
+  // Relation-aware labels: build Maps once from subscribed rows (ACC-RI-016).
+  // Invoice partner display keeps `invoicePartnerDisplayName` snapshots on moves;
+  // picker FKs (partner/journal/account/currency/company/origin) use these live maps.
+  const partnerLabelMap = useMemo(
+    () => buildPartnerLabelMap(contacts as Record<string, unknown>[]),
+    [contacts],
+  )
+  const journalLabelMap = useMemo(
+    () => buildJournalLabelMap(journals as Record<string, unknown>[]),
+    [journals],
+  )
+  const accountLabelMap = useMemo(
+    () => buildAccountLabelMap(accounts as Record<string, unknown>[]),
+    [accounts],
+  )
+  const analyticAccountLabelMap = useMemo(
+    () => buildAnalyticAccountLabelMap(analytic as Record<string, unknown>[]),
+    [analytic],
+  )
+  const companyLabelMap = useMemo(
+    () => buildCompanyLabelMap(companies as Record<string, unknown>[]),
+    [companies],
+  )
+  const currencyLabelMap = useMemo(() => {
+    const rows = currencySelectOptions
+      .filter((o) => o.value)
+      .map((o) => ({ id: o.value, name: o.label }))
+    return buildCurrencyLabelMap(rows)
+  }, [currencySelectOptions])
+  const sourceDocumentLabelMap = useMemo(
+    () =>
+      buildSourceDocumentLabelMap([
+        ...(allMoves as Record<string, unknown>[]),
+        ...(saleOrders as Record<string, unknown>[]),
+      ]),
+    [allMoves, saleOrders],
+  )
 
   const openCreateAccountPayment = useCallback(
     () =>
@@ -1019,40 +1056,19 @@ function AccountingClientReady({
 
   const paymentRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = paymentStateBadges(t)
-    const baseDetail = accountPaymentDetailConfig(t)
-    const detailConfig = {
-      ...baseDetail,
-      sections: baseDetail.sections.map((section) =>
-        section.id === "party"
-          ? {
-              ...section,
-              fields: section.fields.map((field) =>
-                field.key === "partnerId"
-                  ? {
-                      ...field,
-                      render: (_value: unknown, record: Record<string, unknown>) => {
-                        const partnerId = record.partnerId ?? record.partner_id
-                        if (partnerId == null) return "—"
-                        return (
-                          partnerLabelById.get(String(partnerId)) ?? `Partner ${String(partnerId)}`
-                        )
-                      },
-                    }
-                  : field,
-              ),
-            }
-          : section,
-      ),
-    }
     return {
       titleKey: "name",
       statusKey: "state",
       statusBadgeVariants: status.badgeVariants,
       statusBadgeLabels: status.badgeLabels,
-      detailConfig,
+      detailConfig: accountPaymentDetailConfig(t, {
+        partnerLabelMap,
+        journalLabelMap,
+        currencyLabelMap,
+      }),
       auditTableName: "account_payment",
     }
-  }, [t, partnerLabelById])
+  }, [t, partnerLabelMap, journalLabelMap, currencyLabelMap])
 
   const bankStatementRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = bankStatementStateBadges(t)
@@ -1138,7 +1154,10 @@ function AccountingClientReady({
         Cancelled: "Cancelled",
       },
     }
-    const linesConfig = accountMoveLinesTableConfig(t)
+    const linesConfig = accountMoveLinesTableConfig(t, {
+      accountLabelMap,
+      sourceDocumentLabelMap,
+    })
     return {
       titleKey: "name",
       statusKey: "state",
@@ -1170,7 +1189,7 @@ function AccountingClientReady({
         },
       ],
     }
-  }, [t, accountMoveLines])
+  }, [t, accountMoveLines, accountLabelMap, sourceDocumentLabelMap])
 
   /**
    * Record sheet for invoices and bills: move overview + lines + audit trail,
@@ -2183,7 +2202,12 @@ function AccountingClientReady({
   ])
 
   const accountPaymentsEntityConfig = useMemo((): EntityViewConfig => {
-    const base = accountPaymentsTableConfig(t, { onEmptyAction: openCreateAccountPayment })
+    const base = accountPaymentsTableConfig(t, {
+      onEmptyAction: openCreateAccountPayment,
+      partnerLabelMap,
+      journalLabelMap,
+      currencyLabelMap,
+    })
     const view = base.view as EntityTableConfig
     return {
       ...base,
@@ -2240,7 +2264,15 @@ function AccountingClientReady({
         ],
       },
     }
-  }, [t, postAccountPayment, cancelAccountPayment, openCreateAccountPayment])
+  }, [
+    t,
+    postAccountPayment,
+    cancelAccountPayment,
+    openCreateAccountPayment,
+    partnerLabelMap,
+    journalLabelMap,
+    currencyLabelMap,
+  ])
 
   const paymentTermsEntityConfig = useMemo((): EntityViewConfig => {
     const base = paymentTermsTableConfig(t)
@@ -2356,7 +2388,10 @@ function AccountingClientReady({
   }, [t])
 
   const accountMoveLinesEntityConfig = useMemo((): EntityViewConfig => {
-    const base = accountMoveLinesTableConfig(t)
+    const base = accountMoveLinesTableConfig(t, {
+      accountLabelMap,
+      sourceDocumentLabelMap,
+    })
     const view = base.view as EntityTableConfig
     return {
       ...base,
@@ -2381,7 +2416,7 @@ function AccountingClientReady({
         ],
       },
     }
-  }, [t, deleteAccountMoveLine, organizationId, operatingCompanyId])
+  }, [t, deleteAccountMoveLine, organizationId, operatingCompanyId, accountLabelMap, sourceDocumentLabelMap])
 
   // Helper to get intercompany rule active state
   const intercompanyRuleIsActive = useCallback((row: Record<string, unknown>): boolean => {
@@ -2450,7 +2485,11 @@ function AccountingClientReady({
   }
 
   const intercompanyTransactionsEntityConfig = useMemo((): EntityViewConfig => {
-    const base = intercompanyTransactionsTableConfig(t)
+    const base = intercompanyTransactionsTableConfig(t, {
+      sourceDocumentLabelMap,
+      companyLabelMap,
+      currencyLabelMap,
+    })
     const view = base.view as EntityTableConfig
     return {
       ...base,
@@ -2542,7 +2581,17 @@ function AccountingClientReady({
         ],
       },
     }
-  }, [t, approveIntercompanyTransaction, processIntercompanyTransaction, completeIntercompanyTransaction, retryIntercompanyTransaction, cancelIntercompanyTransaction])
+  }, [
+    t,
+    approveIntercompanyTransaction,
+    processIntercompanyTransaction,
+    completeIntercompanyTransaction,
+    retryIntercompanyTransaction,
+    cancelIntercompanyTransaction,
+    sourceDocumentLabelMap,
+    companyLabelMap,
+    currencyLabelMap,
+  ])
 
   const postDraft = useCallback(
     (move: unknown) => {
@@ -2551,11 +2600,10 @@ function AccountingClientReady({
       const id = row.id as string | number | bigint
       const mt = moveTypeTag(row)
       if (isInvoiceLikeMoveType(mt)) {
-        const isCustomerInvoice = mt === "OutInvoice" || mt === "OutRefund"
         const resolved = resolveDefaultCogsInventoryAccountIds(
           accounts as readonly Record<string, unknown>[],
         )
-        if (isCustomerInvoice && resolved == null) {
+        if (resolved == null) {
           toast({
             variant: "destructive",
             title: t("accounting.invoices.invoiceActions.postDraft"),
@@ -2563,9 +2611,12 @@ function AccountingClientReady({
           })
           return
         }
-        const cogsId = resolved?.cogsAccountId ?? 0
-        const invId = resolved?.inventoryAccountId ?? 0
-        postInvoice.mutate([organizationId, id, cogsId, invId])
+        postInvoice.mutate([
+          organizationId,
+          id,
+          resolved.cogsAccountId,
+          resolved.inventoryAccountId,
+        ])
       } else {
         postMove.mutate([organizationId, id])
       }
@@ -3056,7 +3107,11 @@ function AccountingClientReady({
         tabs: (() => {
           const mapped = withDashboardSections(moduleConfigBase, liveSections).tabs.map((tab) => {
             if (tab.id === "analytic-lines") {
-              return { ...tab, createForm: analyticLineFormConfig }
+              return {
+                ...tab,
+                createForm: analyticLineFormConfig,
+                entityConfig: analyticLinesTableConfig(t, { accountLabelMap: analyticAccountLabelMap }),
+              }
             }
             if (tab.id === "analytic") {
               return { ...tab, createForm: newAnalyticAccountFormConfig }
@@ -3667,6 +3722,7 @@ function AccountingClientReady({
       analyticLineFormConfig,
       newAnalyticAccountFormConfig,
       analyticDistFormConfig,
+      analyticAccountLabelMap,
       reconciliationWidgetCreateFormConfig,
       consolidationAccounts,
       consolidationJournals,

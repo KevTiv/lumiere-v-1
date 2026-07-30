@@ -12,12 +12,12 @@ pub struct UpdateConsolidationAccountParams {
     pub account_type: Option<String>,
     pub company_ids: Option<Vec<u64>>,
     pub consolidation_rate: Option<f64>,
-    pub elimination_account_id: Option<u64>,
+    pub elimination_account_id: Option<Option<u64>>,
     pub is_intercompany: Option<bool>,
-    pub elimination_method: Option<String>,
+    pub elimination_method: Option<Option<String>>,
     pub is_active: Option<bool>,
-    pub notes: Option<String>,
-    pub metadata: Option<String>,
+    pub notes: Option<Option<String>>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateConsolidationAccountParams {

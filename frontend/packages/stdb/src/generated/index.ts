@@ -824,6 +824,7 @@ import RunAccountingFxRevaluationTestReducer from "./run_accounting_fx_revaluati
 import RunAccountingIcConsolidationTestReducer from "./run_accounting_ic_consolidation_test_reducer";
 import RunAccountingPaymentCancelTestReducer from "./run_accounting_payment_cancel_test_reducer";
 import RunAccountingPaymentManagementTestReducer from "./run_accounting_payment_management_test_reducer";
+import RunAccountingPaymentMultiInvoiceResidualTestReducer from "./run_accounting_payment_multi_invoice_residual_test_reducer";
 import RunAccountingPaymentReconcileTestReducer from "./run_accounting_payment_reconcile_test_reducer";
 import RunAccountingPaymentTermUpdateTestReducer from "./run_accounting_payment_term_update_test_reducer";
 import RunAccountingPeriodLockTestReducer from "./run_accounting_period_lock_test_reducer";
@@ -9814,6 +9815,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_accounting_ic_consolidation_test", RunAccountingIcConsolidationTestReducer),
   __reducerSchema("run_accounting_payment_cancel_test", RunAccountingPaymentCancelTestReducer),
   __reducerSchema("run_accounting_payment_management_test", RunAccountingPaymentManagementTestReducer),
+  __reducerSchema("run_accounting_payment_multi_invoice_residual_test", RunAccountingPaymentMultiInvoiceResidualTestReducer),
   __reducerSchema("run_accounting_payment_reconcile_test", RunAccountingPaymentReconcileTestReducer),
   __reducerSchema("run_accounting_payment_term_update_test", RunAccountingPaymentTermUpdateTestReducer),
   __reducerSchema("run_accounting_period_lock_test", RunAccountingPeriodLockTestReducer),
@@ -10277,3 +10279,4 @@ export class DbConnection extends __DbConnectionImpl<typeof REMOTE_MODULE> {
     return new SubscriptionBuilder(this);
   };
 }
+

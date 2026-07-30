@@ -13,6 +13,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::analytic_accounting::account_analytic_account;
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::core::organization::require_company_in_organization;
 use crate::core::reference::{legacy_currency_code_for_id, require_currency_row};
@@ -256,7 +257,7 @@ pub struct UpdateFinancialReportParams {
     pub show_hierarchy: Option<bool>,
     pub show_percentage: Option<bool>,
     pub show_debit_credit: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -689,7 +690,7 @@ pub fn update_financial_report(
     }
 
     if let Some(m) = params.metadata {
-        report.metadata = Some(m);
+        report.metadata = m;
         changed_fields.push("metadata".to_string());
     }
 
@@ -739,6 +740,21 @@ pub fn generate_financial_report(
 
     if report.company_id != company_id {
         return Err("Report does not belong to this company".to_string());
+    }
+
+    let idempotency_key = format!("financial-report:{report_id}:generate");
+    let payload_fingerprint = report_id.to_string();
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "generate_financial_report",
+        &idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
     }
 
     if report.state != ReportState::Draft {
@@ -1004,6 +1020,17 @@ pub fn generate_financial_report(
             changed_fields: vec!["state".to_string()],
             metadata: report.metadata.clone(),
         },
+    );
+
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "generate_financial_report",
+        idempotency_key,
+        payload_fingerprint,
+        "financial_report",
+        report_id,
     );
 
     Ok(())
@@ -1366,6 +1393,21 @@ pub fn export_financial_report(
         return Err("Report does not belong to this company".to_string());
     }
 
+    let idempotency_key = format!("financial-report:{report_id}:export");
+    let payload_fingerprint = params.export_format.clone();
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "export_financial_report",
+        &idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
+
     if report.state != ReportState::Generated {
         return Err("Report must be generated before exporting".to_string());
     }
@@ -1395,6 +1437,17 @@ pub fn export_financial_report(
             changed_fields: vec!["export_format".to_string()],
             metadata: None,
         },
+    );
+
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "export_financial_report",
+        idempotency_key,
+        payload_fingerprint,
+        "financial_report",
+        report_id,
     );
 
     Ok(())

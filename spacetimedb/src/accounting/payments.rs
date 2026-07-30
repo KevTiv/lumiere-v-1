@@ -6,6 +6,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::accounting::chart_of_accounts::account_account;
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line,
     is_receivable_or_payable_line_type, reconcile_payment_with_invoice, AccountMove,
@@ -66,8 +67,9 @@ pub struct AccountPayment {
 
 // ── Params ────────────────────────────────────────────────────────────────────
 
-#[derive(SpacetimeType)]
+#[derive(SpacetimeType, Clone, Debug)]
 pub struct CreatePaymentParams {
+    pub idempotency_key: String,
     pub company_id: u64,
     pub payment_type: PaymentType,
     pub partner_type: PartnerType,
@@ -444,6 +446,19 @@ pub fn create_payment(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment", "create")?;
     require_company_in_organization(ctx, organization_id, params.company_id)?;
+    let payload_fingerprint = format!("{params:?}");
+    if replayed_result(
+        ctx,
+        organization_id,
+        params.company_id,
+        "create_payment",
+        &params.idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
     if params.amount <= 0.0 {
         return Err("Payment amount must be positive".to_string());
     }
@@ -522,6 +537,16 @@ pub fn create_payment(
             changed_fields: vec![],
             metadata: None,
         },
+    );
+    record_result(
+        ctx,
+        organization_id,
+        params.company_id,
+        "create_payment",
+        params.idempotency_key,
+        payload_fingerprint,
+        "account_payment",
+        payment.id,
     );
     Ok(())
 }

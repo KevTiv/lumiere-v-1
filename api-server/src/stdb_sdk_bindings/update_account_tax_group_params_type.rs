@@ -13,7 +13,7 @@ pub struct UpdateAccountTaxGroupParams {
     pub tax_payable_account_id: Option<Option<u64>>,
     pub tax_receivable_account_id: Option<Option<u64>>,
     pub advance_tax_payment_account_id: Option<Option<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateAccountTaxGroupParams {

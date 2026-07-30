@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::account_account;
+use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line,
     is_receivable_or_payable_line_type, AccountMove, AccountMoveLine,
@@ -222,16 +223,17 @@ pub struct CreatePaymentAccountParams {
     pub metadata: Option<String>,
 }
 
+/// `None` outer = no change; `Some(None)` clears a nullable field.
 #[derive(SpacetimeType)]
 pub struct UpdatePaymentAccountParams {
     pub name: Option<String>,
-    pub provider_label: Option<String>,
-    pub reference_raw: Option<String>,
-    pub fee_account_id: Option<u64>,
-    pub clearing_account_id: Option<u64>,
+    pub provider_label: Option<Option<String>>,
+    pub reference_raw: Option<Option<String>>,
+    pub fee_account_id: Option<Option<u64>>,
+    pub clearing_account_id: Option<Option<u64>>,
     pub active: Option<bool>,
     pub is_primary: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone)]
@@ -253,15 +255,16 @@ pub struct CreatePaymentTransactionParams {
     pub metadata: Option<String>,
 }
 
+/// `None` outer = no change; `Some(None)` clears nullable fields.
 #[derive(SpacetimeType)]
 pub struct UpdatePaymentTransactionParams {
-    pub external_reference: Option<String>,
+    pub external_reference: Option<Option<String>>,
     pub gross_external_amount: Option<f64>,
     pub settlement_amount: Option<f64>,
     pub net_account_amount: Option<f64>,
     pub occurred_at: Option<Timestamp>,
     pub evidence_document_ids: Option<Vec<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType)]
@@ -277,8 +280,9 @@ pub struct CreatePaymentFeeParams {
     pub metadata: Option<String>,
 }
 
-#[derive(SpacetimeType, Clone)]
+#[derive(SpacetimeType, Clone, Debug)]
 pub struct AllocatePaymentParams {
+    pub idempotency_key: String,
     pub company_id: u64,
     pub payment_transaction_id: u64,
     pub allocated_move_line_id: u64,
@@ -642,8 +646,8 @@ pub fn update_payment_account(
         return Err("Cannot update archived payment account".to_string());
     }
 
-    let (reference_normalized, reference_masked) = if params.reference_raw.is_some() {
-        normalize_reference(&params.reference_raw)
+    let (reference_normalized, reference_masked) = if let Some(ref reference_raw) = params.reference_raw {
+        normalize_reference(reference_raw)
     } else {
         (
             account.reference_normalized.clone(),
@@ -653,16 +657,16 @@ pub fn update_payment_account(
 
     ctx.db.payment_account().id().update(PaymentAccount {
         name: params.name.unwrap_or(account.name),
-        provider_label: params.provider_label.or(account.provider_label),
+        provider_label: params.provider_label.unwrap_or(account.provider_label),
         reference_normalized,
         reference_masked,
-        fee_account_id: params.fee_account_id.or(account.fee_account_id),
-        clearing_account_id: params.clearing_account_id.or(account.clearing_account_id),
+        fee_account_id: params.fee_account_id.unwrap_or(account.fee_account_id),
+        clearing_account_id: params.clearing_account_id.unwrap_or(account.clearing_account_id),
         active: params.active.unwrap_or(account.active),
         is_primary: params.is_primary.unwrap_or(account.is_primary),
         updated_at: ctx.timestamp,
         updated_by: ctx.sender(),
-        metadata: params.metadata.or(account.metadata),
+        metadata: params.metadata.unwrap_or(account.metadata),
         ..account
     });
 
@@ -897,7 +901,7 @@ pub fn update_payment_transaction(
 
     let external_reference = params
         .external_reference
-        .or(transaction.external_reference.clone());
+        .unwrap_or_else(|| transaction.external_reference.clone());
     let reference_fingerprint = fingerprint_reference(&external_reference);
 
     // Re-check duplicate guard if reference changed.
@@ -952,7 +956,7 @@ pub fn update_payment_transaction(
                 .unwrap_or(transaction.evidence_document_ids),
             updated_at: ctx.timestamp,
             updated_by: ctx.sender(),
-            metadata: params.metadata.or(transaction.metadata),
+            metadata: params.metadata.unwrap_or(transaction.metadata),
             ..transaction
         });
 
@@ -1682,6 +1686,19 @@ pub fn allocate_payment_transaction(
     {
         return Err("payment transaction does not match organization and company".to_string());
     }
+    let payload_fingerprint = format!("{params:?}");
+    if replayed_result(
+        ctx,
+        organization_id,
+        params.company_id,
+        "allocate_payment_transaction",
+        &params.idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
     if transaction.status != PaymentTransactionStatus::Posted {
         return Err("only posted transactions can be allocated".to_string());
     }
@@ -1876,6 +1893,16 @@ pub fn allocate_payment_transaction(
             && previous.currency_id == params.currency_id
             && previous.write_off_account_id == params.write_off_account_id
         {
+            record_result(
+                ctx,
+                organization_id,
+                params.company_id,
+                "allocate_payment_transaction",
+                params.idempotency_key,
+                payload_fingerprint,
+                "payment_reconciliation",
+                previous.id,
+            );
             return Ok(());
         }
         return Err(
@@ -1994,6 +2021,17 @@ pub fn allocate_payment_transaction(
             changed_fields: vec!["amount_residual".to_string(), "payment_state".to_string()],
             metadata: None,
         },
+    );
+
+    record_result(
+        ctx,
+        organization_id,
+        params.company_id,
+        "allocate_payment_transaction",
+        params.idempotency_key,
+        payload_fingerprint,
+        "payment_reconciliation",
+        reconciliation.id,
     );
     Ok(())
 }

@@ -1,14 +1,17 @@
 //! Accounting domain test suite — invoke via `run_all_accounting_tests` reducer.
+pub mod active_company_matrix_test;
 pub mod fixed_assets_test;
 pub mod fx_revaluation_test;
 pub mod helpers;
 pub mod ic_consolidation_test;
 pub mod journal_entries_test;
+pub mod option_vec_semantics_test;
 pub mod payment_management_test;
 pub mod payment_terms_test;
 pub mod payments_test;
 pub mod period_lock_test;
 pub mod posted_immutability_test;
+pub mod relational_integrity_test;
 pub mod trial_balance_test;
 
 use spacetimedb::ReducerContext;
@@ -29,6 +32,16 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_accounting_payment_management_test(ctx)?;
     run_accounting_ic_consolidation_test(ctx)?;
     run_accounting_fx_revaluation_test(ctx)?;
+    relational_integrity_test::test_core_relation_negative_matrix(ctx)
+        .map_err(|error| format!("core relation negative matrix: {error}"))?;
+    relational_integrity_test::test_credit_control_relation_negative_matrix(ctx)
+        .map_err(|error| format!("credit-control relation negative matrix: {error}"))?;
+    active_company_matrix_test::test_active_company_a2_create_persist_matrix(ctx)
+        .map_err(|error| format!("active company A2 matrix: {error}"))?;
+    option_vec_semantics_test::test_account_tax_ids_option_vec_semantics(ctx)
+        .map_err(|error| format!("account tax_ids Option<Vec>: {error}"))?;
+    option_vec_semantics_test::test_budget_post_account_ids_option_vec_semantics(ctx)
+        .map_err(|error| format!("budget_post account_ids Option<Vec>: {error}"))?;
     log::info!("✅ run_all_accounting_tests complete");
     Ok(())
 }
@@ -36,7 +49,11 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
 #[spacetimedb::reducer]
 pub fn run_accounting_fixed_asset_ownership_test(ctx: &ReducerContext) -> Result<(), String> {
     fixed_assets_test::test_fixed_asset_ownership_is_derived_and_tenant_scoped(ctx)
-        .map_err(|e| format!("fixed asset ownership: {e}"))
+        .map_err(|e| format!("fixed asset ownership: {e}"))?;
+    fixed_assets_test::test_amortization_recognition_is_idempotent_and_tenant_scoped(ctx)
+        .map_err(|e| format!("amortization recognition: {e}"))?;
+    fixed_assets_test::test_asset_and_amortization_relation_negative_matrix(ctx)
+        .map_err(|e| format!("asset/amortization relation matrix: {e}"))
 }
 
 #[spacetimedb::reducer]
@@ -105,6 +122,8 @@ pub fn run_accounting_trial_balance_test(ctx: &ReducerContext) -> Result<(), Str
 pub fn run_accounting_payment_management_test(ctx: &ReducerContext) -> Result<(), String> {
     payment_management_test::test_payment_account_lifecycle(ctx)
         .map_err(|e| format!("payment_account_lifecycle: {e}"))?;
+    payment_management_test::test_payment_account_patch_preserves_and_clears(ctx)
+        .map_err(|e| format!("payment_account_patch: {e}"))?;
     payment_management_test::test_payment_transaction_duplicate_reference(ctx)
         .map_err(|e| format!("payment_transaction_duplicate_reference: {e}"))?;
     payment_management_test::test_payment_transaction_post_creates_ledger_payment(ctx)

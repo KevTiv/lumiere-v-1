@@ -676,7 +676,56 @@ Completion evidence:
 
 ### ACC-RI-005 — Remove hard-coded FX currency
 
-**Status:** In progress — implemented locally; published verification pending
+**Status:** Reopened — adversarial audit found the fix does not hold (2026-07-30)
+
+**Adversarial audit finding (2026-07-30):** The prior "implemented locally" evidence
+below is **false**, not just unverified. `currency_id: u64` was never made a real
+foreign key. `spacetimedb/src/core/reference.rs:533-546`
+(`legacy_currency_code_for_id`) is a hardcoded `match` (`1 => "USD"`, `2 => "EUR"`,
+`3 => "GBP"`, ... `_ => "USD"`). `Currency`'s primary key is the ISO **code**
+(`core/reference.rs:118-120`), not a numeric ID — there is no per-tenant currency
+row a `currency_id` could validate against. Both
+`spacetimedb/src/accounting/relations.rs:87-102`
+(`require_active_currency_id`) and `spacetimedb/src/accounting/fx_revaluation.rs:157-174`
+(`load_fx_scope`) gate on `(1..=9).contains(&currency_id)` and then translate
+through the hardcoded table. The same hardcoded lookup is reused for payment
+allocation currency checks at `spacetimedb/src/accounting/payment_management.rs:1821-1824`.
+The plan's own "positive proof" test (`currency_id 2 = EUR`) only passes because
+of this hardcoding — it is evidence the assumption survived, not evidence it was
+removed. Every tenant is permanently locked to the same fixed 9-currency table
+regardless of which currencies actually exist in their environment.
+
+**Revised fix criteria**
+
+- [ ] Give `Currency` (or a new tenant-scoped currency reference table) a real
+      numeric primary key, or change `currency_id` fields to reference the
+      existing `code: String` primary key directly instead of translating
+      through a hardcoded ID table.
+- [ ] Delete `legacy_currency_code_for_id` and every call site
+      (`relations.rs::require_active_currency_id`, `fx_revaluation.rs::load_fx_scope`,
+      `payment_management.rs` allocation currency check) that depends on it.
+- [ ] `require_active_currency_id` (or its replacement) must load an actual
+      `Currency` row and fail for any ID/code with no matching row, not just IDs
+      outside `1..=9`.
+- [ ] Re-run the FX revaluation and payment-allocation currency tests against a
+      database seeded with a currency table that does **not** match the
+      hardcoded 1-9 ordering (e.g. seed EUR as row/code inserted third, USD
+      inserted last) to prove the fix no longer depends on insertion order or a
+      compiled-in table.
+
+**Required tests**
+
+- Persisted test: seed two organizations with different currency catalogs (or a
+  currency added/reordered after the hardcoded table would have assumed a
+  different code) and prove FX revaluation and payment allocation resolve the
+  correct currency for each, not the hardcoded one.
+- Negative test: an ID/code with no matching `Currency` row is rejected, for
+  both `run_fx_revaluation` and `allocate_payment_transaction`.
+- Regression test asserting `legacy_currency_code_for_id` (or equivalent) no
+  longer exists in `spacetimedb/src/accounting/` (grep-based, wired into CI
+  alongside the ACC-RI-018 grep gate).
+
+**Original implementation progress (2026-07-27) — status below is superseded by the audit finding above; retained for history.**
 
 **Current evidence**
 
@@ -731,7 +780,7 @@ Completion evidence:
 
 ### ACC-RI-006 — Validate core accounting foreign keys
 
-**Status:** In progress
+**Status:** Implemented, unverified
 
 **Affected domains**
 
@@ -753,12 +802,12 @@ Completion evidence:
 
 **Fix criteria**
 
-- [ ] Introduce relation-specific scoped loaders.
-- [ ] Validate existence, organization, company, lifecycle, type, and operation
+- [x] Introduce relation-specific scoped loaders.
+- [x] Validate existence, organization, company, lifecycle, type, and operation
       role.
-- [ ] Validate optional relations when present.
-- [ ] Reject invalid IDs; do not silently omit them.
-- [ ] Validate every ID in arrays.
+- [x] Validate optional relations when present.
+- [x] Reject invalid IDs; do not silently omit them.
+- [x] Validate every ID in arrays.
 
 **Done check**
 
@@ -794,15 +843,238 @@ Completion evidence:
   validates the source move/partner, general journal, receivable account, and
   expense write-off account, and derives company currency from the source move.
 
-Remaining for this item:
-- Complete the same negative matrix for account/journal, tax, amortization,
-  asset, and credit-control reducers.
-- Review the remaining optional and array relations in those domains before
-  marking the five broad criteria complete.
+**Implementation completion (2026-07-28)**
+
+- Account-group parents now require the same organization and company and
+  cannot self-reference.
+- Journal activity types are loaded and checked for tenant ownership and
+  lifecycle. Numeric sequence IDs, numeric user IDs, and dedicated payment
+  method arrays now fail closed because no compatible typed accounting
+  relation exists.
+- Tax country IDs/codes resolve active global country rows. Tax tags,
+  repartition-line arrays, and obligation IDs fail closed until their typed
+  target tables exist. Tax deadline companies are organization-validated.
+- Asset parents must remain active and undisposed. Analytic-tag arrays fail
+  closed until a typed analytic-tag relation exists. Disposal gain/loss
+  accounts are reloaded and role-validated before mutation.
+- Added table-driven negative matrices for account types, account/journal
+  arrays, account-group parents, journal auxiliary IDs, tax groups/countries,
+  tax schedule arrays, amortization, assets, disposal, credit-control partners,
+  and bad-debt write-offs.
+- Negative cases cover missing, cross-organization/company,
+  inactive/deprecated, duplicate-array, unsupported-target, and wrong-role
+  relations, with persisted row counts proving rejected batches write nothing.
+
+Completion evidence:
+- Implementation:
+  `spacetimedb/src/accounting/chart_of_accounts.rs`,
+  `spacetimedb/src/accounting/tax_management.rs`, and
+  `spacetimedb/src/accounting/fixed_assets.rs`.
+- Negative matrices:
+  `test_core_relation_negative_matrix` and
+  `test_credit_control_relation_negative_matrix` in
+  `spacetimedb/tests/accounting/relational_integrity_test.rs`, plus
+  `test_asset_and_amortization_relation_negative_matrix` in
+  `spacetimedb/tests/accounting/fixed_assets_test.rs`.
+- Suite wiring: the matrices run through `run_all_accounting_tests`.
+- Local verification: focused rustfmt, `git diff --check`, `cargo check`,
+  `cargo test --no-run`, and `cargo clippy --lib` pass. Clippy reports the
+  repository's existing warning backlog.
+- Published-module execution and persisted query capture: pending.
+- Reviewer: pending.
+- Completed on: pending.
+
+**Adversarial audit finding (2026-07-30):** the negative matrices above cover the
+sampled reducers but do not cover every reducer that loads a row by raw ID. A
+full adversarial pass (Claude + Codex, cross-checked by direct code read) found
+four additional reducers with no organization/company scope check at all,
+despite ACC-RI-006 claiming "each corrected reducer has a table-driven negative
+test." These are tracked as ACC-RI-020 through ACC-RI-023 below and must close
+before ACC-RI-006 can be marked verified. A further batch of findings
+(ACC-RI-024) was reported by the adversarial pass but not yet independently
+confirmed by direct code read — treat as provisional until verified.
+
+### ACC-RI-020 — Fix cross-tenant tax-jurisdiction mutation
+
+**Status:** Open — found 2026-07-30
+
+**Current evidence**
+
+- `spacetimedb/src/accounting/tax_management.rs:900` (`update_tax_jurisdiction`)
+
+**Finding**
+
+`TaxJurisdiction` has an `organization_id` field
+(`spacetimedb/src/accounting/tax_management.rs:97-102`), but
+`update_tax_jurisdiction` loads the row by ID and never compares it against the
+caller's `organization_id`. Organization A can rename, recode, deactivate, or
+otherwise mutate organization B's jurisdiction by ID alone. Verified by direct
+read: the reducer body (lines 900-924+) has a `check_permission` call scoped to
+the caller's own `organization_id`, but no `if jurisdiction.organization_id !=
+organization_id` guard on the loaded row.
+
+**Fix criteria**
+
+- [ ] `update_tax_jurisdiction` (and any other jurisdiction mutation reducer)
+      loads the jurisdiction and rejects when `jurisdiction.organization_id !=
+      organization_id`.
+- [ ] Audit sibling reducers in `tax_management.rs` (create/delete/activate) for
+      the same omission.
+
+**Required tests**
+
+- Persisted test: organization B jurisdiction is targeted through organization
+  A; call rejects and the jurisdiction row is unchanged (byte-for-byte, not
+  just an `Err`).
+- Positive test: organization A can still update its own jurisdiction.
+
+### ACC-RI-021 — Fix cross-tenant analytic-account parent mutation
+
+**Status:** Open — found 2026-07-30
+
+**Current evidence**
+
+- `spacetimedb/src/accounting/analytic_accounting.rs:357-365`
+  (`create_analytic_account`)
+
+**Finding**
+
+`create_analytic_account` accepts any `parent_id`, loads that row with no
+organization/company validation, and unconditionally pushes the new child's ID
+into the parent's `child_ids` array plus updates `write_uid`/`write_date` on
+the parent. Organization A can create a child account referencing organization
+B's analytic account by ID and thereby mutate B's row as a side effect of A's
+own create call.
+
+**Fix criteria**
+
+- [ ] `parent_id` must be loaded and validated under the caller's
+      `organization_id`/`company_id` (matching the pattern used elsewhere, e.g.
+      `validate_account_group_parent` in `chart_of_accounts.rs:592-614`) before
+      the child is inserted or the parent's `child_ids` is mutated.
+- [ ] Reject rather than silently skip when the parent is missing or
+      cross-tenant — do not create an orphaned child with a dangling
+      `parent_id`.
+
+**Required tests**
+
+- Persisted test: organization A submits `parent_id` belonging to organization
+  B; call rejects, no child row is created, and B's parent row (including
+  `child_ids`) is unchanged.
+- Positive test: a same-tenant parent/child link still succeeds and
+  `child_ids` is updated correctly.
+
+### ACC-RI-022 — Fix bank statement update/delete missing organization check
+
+**Status:** Open — found 2026-07-30
+
+**Current evidence**
+
+- `spacetimedb/src/accounting/bank_reconciliation.rs:672-820`
+  (`update_account_bank_statement`, `delete_account_bank_statement`)
+
+**Finding**
+
+`AccountBankStatement` has an `organization_id` field
+(`bank_reconciliation.rs:23-28`), but `update_account_bank_statement` and
+`delete_account_bank_statement` only compare the loaded row's `company_id`
+against a caller-supplied `company_id` parameter — they never validate that
+company belongs to the caller's organization, and never check
+`statement.organization_id` directly. Organization A can update or delete
+organization B's bank statement by supplying B's `company_id` alongside B's
+`statement_id`.
+
+**Fix criteria**
+
+- [ ] Both reducers load the statement and reject when
+      `statement.organization_id != organization_id`, in addition to (not
+      instead of) the existing company check.
+- [ ] Audit `bank_reconciliation.rs` for the same pattern on bank-statement-line
+      and matching-candidate reducers (the adversarial pass separately flagged
+      `bank_reconciliation.rs:1146` and `:1677` as likely affected — verify
+      before closing this item).
+
+**Required tests**
+
+- Persisted test: organization B's statement is targeted through organization
+  A using B's real `company_id`; call rejects, statement state unchanged.
+- Positive test: organization A can still update/delete its own statement.
+
+### ACC-RI-023 — Fix payment-account update skipping FK validation present on create
+
+**Status:** Open — found 2026-07-30
+
+**Current evidence**
+
+- `spacetimedb/src/accounting/payment_management.rs:629-671`
+  (`update_payment_account`) vs. `:525-565` (`create_payment_account`)
+
+**Finding**
+
+`create_payment_account` validates `fee_account_id`/`clearing_account_id` via
+`require_active_account` (organization + company + expense/role scoped).
+`update_payment_account` checks the payment account row's own
+`organization_id` (line 642-644) but applies
+`params.fee_account_id.unwrap_or(...)` /
+`params.clearing_account_id.unwrap_or(...)` directly with no equivalent
+validation. Organization A can retarget its own payment account's fee or
+clearing account to point at an account ID belonging to organization B,
+poisoning later fee/posting flows that trust those fields as scoped.
+
+**Fix criteria**
+
+- [ ] `update_payment_account` re-validates `fee_account_id` and
+      `clearing_account_id` through the same `require_active_account` +
+      role-check path used on create whenever the field is present
+      (`Some(Some(id))`).
+- [ ] Confirm the `Option<Option<T>>` clear/unchanged semantics from
+      ACC-RI-010 are preserved — validation only runs when a new ID is
+      actually supplied.
+
+**Required tests**
+
+- Persisted test: an update supplying a cross-tenant `fee_account_id` (or
+  `clearing_account_id`) is rejected; the payment account's stored account IDs
+  are unchanged.
+- Positive test: updating to a valid same-tenant account still succeeds and
+  persists.
+
+### ACC-RI-024 — Verify and close remaining adversarial findings (provisional)
+
+**Status:** Open — reported 2026-07-30, not yet independently confirmed
+
+**Reported findings (require direct code verification before a fix is scoped)**
+
+- `spacetimedb/src/accounting/journal_entries.rs:2882` — explicit billing tax
+  IDs reportedly returned unchanged from caller input and loaded globally by
+  the shared tax calculator, allowing organization A to apply organization B's
+  tax rates/IDs to its own invoice lines.
+- `spacetimedb/src/accounting/intercompany.rs:239` and `:660` — intercompany
+  rule journal/account/pricelist IDs and transaction destination-document
+  references reportedly stored without loading/validating the referenced row
+  (see also ACC-RI-015's confirmed destination-document gap, which overlaps
+  with the `:660` report).
+- `spacetimedb/src/accounting/journal_entries.rs:2393` — credit-note source
+  invoice reportedly raw-loaded and checked only against a caller-supplied
+  `company_id`, bypassing the scoped move loader used elsewhere in the same
+  file (ACC-RI-002).
+
+**Fix criteria**
+
+- [ ] Each reported line is read against current source and reclassified as
+      CONFIRMED, OVERSTATED, or not-reproducible before any fix is written.
+- [ ] Confirmed items get their own tracker entry (or are folded into
+      ACC-RI-002/006/015 as applicable) with fix criteria and required tests
+      matching the pattern used in ACC-RI-020 through ACC-RI-023.
+
+**Required tests**
+
+- To be defined per confirmed finding, following the persisted
+  cross-tenant-rejection pattern used throughout this document.
 
 ### ACC-RI-007 — Wire active company without sentinels
 
-**Status:** In progress
+**Status:** In progress — implemented locally; published verification pending
 
 **Current evidence**
 
@@ -826,6 +1098,22 @@ Remaining for this item:
 - With company A2 active, account, move, budget, tax, journal, payment, report,
   asset, and analytic creates persist A2—not the organization’s first company.
 
+```md
+Completion evidence:
+- Implementation: `spacetimedb/tests/accounting/helpers.rs` (`seed_sibling_company`),
+  `spacetimedb/tests/accounting/active_company_matrix_test.rs`, suite wiring in
+  `spacetimedb/tests/accounting/mod.rs`.
+- Persisted-data test: `test_active_company_a2_create_persist_matrix` asserts
+  `company_id == A2` for account, move, budget, tax, journal, payment, report,
+  asset, and analytic creates.
+- Isolation test: covered by sibling-company fixture within one org.
+- UI/reload test: pending published-module / e2e company-switch pass.
+- Retry test: not applicable to create-persist matrix.
+- Generated artifacts: no new public DTO; `cargo test --no-run` green locally.
+- Reviewer: pending
+- Completed on: 2026-07-29 (local; published proof deferred)
+```
+
 **Implementation progress (2026-07-27)**
 
 - Removed the accounting workspace’s `?? 0n` company sentinel.
@@ -842,8 +1130,9 @@ Remaining for this item:
   fails server-side even when a caller bypasses the accounting UI.
 
 Remaining for this item:
-- Add the A1/A2 persisted test matrix across the listed create reducers.
-- Complete the persisted A1/A2 matrix after publishing the updated module.
+- Complete the persisted A1/A2 matrix after publishing the updated module
+  (local matrix already in `active_company_matrix_test.rs`).
+- Published-module / e2e company-switch verification.
 
 ### ACC-RI-008 — Require real business dates
 
@@ -911,7 +1200,8 @@ Remaining for this item:
 **Fix criteria**
 
 - [x] Manual move lines submit only user intent.
-- [x] Budget create excludes totals, children, and lifecycle.
+- [ ] Budget create excludes totals, children, and lifecycle. — **regressed by
+      audit finding below for budget lines specifically**
 - [x] Analytic-account create excludes balances and reverse IDs.
 - [x] Bank-statement create excludes computed totals and child projections.
 - [x] Asset create excludes reverse/chatter/system arrays.
@@ -934,12 +1224,44 @@ Remaining for this item:
 - TypeScript and Rust bindings regenerated; Rust test compilation and focused
   `@lumiere/stdb` and `@lumiere/erp-shared` typechecks pass.
 
+**Adversarial audit finding (2026-07-30):** the "Budget create excludes
+totals... and lifecycle" claim is true for `CreateCrossoveredBudgetParams`
+(the budget header) but **false for budget lines**.
+`CreateCrossoveredBudgetLineParams`
+(`spacetimedb/src/accounting/budgeting.rs:139-153`) still accepts caller-supplied
+`practical_amount`, `theoretical_amount`, `achieve_percentage`, `is_above_budget`,
+and `variance`/`variance_percentage` — all system-computed actuals. The frontend
+mapper `toCreateCrossoveredBudgetLineParams`
+(`frontend/packages/erp-shared/src/accounting-create-params.ts:1739-1760`)
+manufactures defaults for these when absent (e.g. `variance =
+-plannedAmount`), which directly violates the global definition-of-done
+("no required relation falls back to 0... system-managed and derived fields
+are not caller-owned", §2).
+
+**Revised fix criteria for budget lines**
+
+- [ ] Remove `practical_amount`, `theoretical_amount`, `achieve_percentage`,
+      `is_above_budget`, `variance`, `variance_percentage` from
+      `CreateCrossoveredBudgetLineParams`; derive them server-side from posted
+      moves the same way the budget header's totals are derived.
+- [ ] Remove the corresponding manufactured defaults from
+      `toCreateCrossoveredBudgetLineParams`.
+
+**Required tests**
+
+- Persisted test: creating a budget line without actuals/variance fields
+  persists server-derived (not client-supplied-default) values, and a
+  subsequent posted-move recompute changes them.
+- Regression test: the create DTO type has no actuals/variance fields (typecheck
+  or generated-schema assertion).
+
 Remaining for this item:
 - Run published persisted-data and UI reload coverage before marking verified.
+- Close the budget-line gap above before marking verified.
 
 ### ACC-RI-010 — Convert accounting updates to explicit patches
 
-**Status:** In progress — core patch semantics implemented locally
+**Status:** In progress — implemented locally; published verification pending
 
 **Current evidence**
 
@@ -950,7 +1272,7 @@ Remaining for this item:
 
 **Fix criteria**
 
-- [ ] Document unchanged/clear semantics for every update field.
+- [x] Document unchanged/clear semantics for every update field.
 - [x] Use `Option<Option<T>>` where clear is valid.
 - [x] Do not reconstruct absent values with empty/false/current-date defaults.
 - [x] Test one-field updates preserve every unrelated stored value.
@@ -960,6 +1282,23 @@ Remaining for this item:
 
 - Updating only a name cannot change dates, active state, metadata, accounts,
   relations, or arrays.
+
+```md
+Completion evidence:
+- Implementation: nested clearable fields in `payment_management.rs`,
+  `tax_management.rs`, `fixed_assets.rs`, `consolidation.rs`,
+  `financial_statements.rs`, `analytic_accounting.rs`, `intercompany.rs`,
+  `journal_entries.rs`; presence-based frontend update mappers in
+  `accounting-create-params.ts`.
+- Persisted-data test: `test_payment_account_patch_preserves_and_clears`,
+  `test_analytic_account_patch_preserves_and_clears`.
+- Isolation test: existing tenant guards unchanged.
+- UI/reload test: pending published-module pass.
+- Retry test: not applicable to patch-semantics slice.
+- Generated artifacts: TS/Rust SDKs regenerated 2026-07-29.
+- Reviewer: pending
+- Completed on: 2026-07-29 (local; published proof deferred)
+```
 
 **Implementation progress (2026-07-28)**
 
@@ -1035,7 +1374,8 @@ Remaining for this item:
 
 - [x] Depreciation lines load through their scoped asset parents.
 - [x] Consolidation accounts and journals have scoped reads.
-- [x] Payment-term lines have a real query/subscription path.
+- [ ] Payment-term lines have a real query/subscription path. — **HTTP query
+      path only; live subscription is not wired (see audit finding below)**
 - [x] Child mutations invalidate or refresh parent detail and totals.
 - [x] Archived/missing related records have an explicit display state.
 
@@ -1066,7 +1406,39 @@ Implementation progress (2026-07-28):
   `@lumiere/erp-shared`, `@lumiere/query-hooks`, and `@lumiere/ui` typechecks
   pass.
 
+**Adversarial audit finding (2026-07-30):** `account-payment-term-lines` has a
+working HTTP query path (`query-registry.ts:380-385`,
+`useAccountPaymentTermLines` in `query-hooks/src/hooks/accounting.ts:217-221`)
+and mutation-triggered cache invalidation, but it is **absent from the
+WebSocket subscription registry** — it is listed in
+`ACCOUNTING_WORKSPACE_RESOURCE_KEYS`
+(`frontend/packages/stdb/src/subscriptions/accounting-workspace.ts:14`) but not
+in `SUBSCRIPTION_RESOURCE_KEYS` or `ERP_ORG_SQL` in
+`frontend/packages/stdb/src/queries/erp-subscriptions.ts`, so
+`subscriptionQueriesForResource` returns `null` for it. Once global
+subscriptions are ready, `useStdbQuery`'s `staleTime` becomes `Infinity` for
+subscribed resources — this one silently stops auto-refreshing and only
+updates via explicit mutation-triggered invalidation, unlike every sibling
+resource that has a live subscription. A payment-term line changed by another
+session/tab will not appear until an explicit mutation happens to invalidate
+it.
+
+**Revised fix criteria**
+
+- [ ] Add `account-payment-term-lines` to `SUBSCRIPTION_RESOURCE_KEYS` and
+      `ERP_ORG_SQL` in `erp-subscriptions.ts`, scoped by organization (and
+      company where applicable), matching the pattern used by sibling
+      accounting resources.
+
+**Required tests**
+
+- UI/reload test: a payment-term line created in one session becomes visible
+  in a second session's live view without a manual mutation/invalidation in
+  that second session.
+
 ### ACC-RI-013 — Add operation-level idempotency
+
+**Status:** Implemented, unverified
 
 **Affected actions**
 
@@ -1079,10 +1451,12 @@ Implementation progress (2026-07-28):
 
 **Fix criteria**
 
-- [ ] Each command accepts or derives a stable idempotency key.
-- [ ] The key scope includes organization, company, and action kind.
-- [ ] Duplicate calls return the existing result or a clear conflict.
-- [ ] Idempotency covers all child and audit effects.
+- [ ] Each command accepts or derives a stable idempotency key. — **false for
+      FX revaluation reducers; see audit finding below**
+- [x] The key scope includes organization, company, and action kind.
+- [x] Duplicate calls return the existing result or a clear conflict.
+- [ ] Idempotency covers all child and audit effects. — **FX gain/loss journal
+      entries are not covered**
 
 **Done check**
 
@@ -1091,20 +1465,59 @@ Implementation progress (2026-07-28):
 Implementation progress (2026-07-28):
 
 - Added an accounting operation-receipt contract scoped by organization,
-  company, action kind, and caller-supplied idempotency key. Receipts bind the
-  key to a payload fingerprint and persisted result ID; changed reuse returns a
-  conflict.
-- Asset and manual depreciation creation record receipts only after their row,
-  parent child/value projections, and audit entry succeed atomically. Exact
-  retries return before any of those effects are repeated.
-- The asset and depreciation form mappers create one command key per submitted
-  intent. The fixed-asset persisted-data test repeats both commands, asserts
-  one persisted effect, and proves changed input under a reused key conflicts.
-- Remaining affected create commands must adopt the receipt helper before this
-  item can close. Record lifecycle commands already derive a stable action key
-  from their scoped record ID and reject reapplying a completed transition.
+  company, action kind, and a caller-supplied or server-derived idempotency key.
+  Receipts bind the key to a payload fingerprint and persisted result ID;
+  changed reuse returns a conflict.
+- Account-move headers (journal entries, invoices, and bills), assets, manual
+  depreciation, accounting payments, and financial-report generation/export
+  plus consolidation processing and amortization recognition record receipts
+  only after their row, child projections where applicable, and audit entry
+  succeed atomically. Exact retries return before any effect is repeated.
+- Operational payment allocation now uses an explicit key per allocation intent,
+  allowing a reversed allocation to be intentionally re-applied with a new key
+  while exact retries return the original reconciliation.
+- The corresponding form mappers create one command key per submitted intent.
+  Persisted-data tests repeat the commands, assert one persisted effect, and
+  prove changed input under a reused key conflicts.
+- Every affected ACC-RI-013 command boundary now accepts or derives a stable
+  key. Record lifecycle commands derive their action key from the scoped record
+  ID and return the existing result or a clear completed-transition conflict.
+- Local implementation is complete; published-module retry execution and
+  reviewer sign-off remain before this item can be marked verified.
 - The updated Rust module compiles and the SDK/query artifacts are regenerated;
   focused shared-package typechecks pass.
+
+**Adversarial audit finding (2026-07-30):** the "every affected command
+boundary" claim is **false** for FX revaluation. `run_fx_revaluation`,
+`run_fx_revaluation_batch`, and `post_realized_fx_gain_loss`
+(`spacetimedb/src/accounting/fx_revaluation.rs`) accept no idempotency key and
+have zero calls to `replayed_result`/`record_result` — confirmed by direct
+grep of the file (zero hits) and contrasted against `payment_management.rs`,
+`fixed_assets.rs`, and `consolidation.rs`, which all use the receipt
+mechanism correctly. A network retry, double-click, or at-least-once dispatch
+of any of these three reducers posts a second, fully independent journal
+entry recognizing the same gain/loss twice — this is a real money-movement
+duplication bug, not a cosmetic gap.
+
+**Revised fix criteria**
+
+- [ ] `run_fx_revaluation`, `run_fx_revaluation_batch`, and
+      `post_realized_fx_gain_loss` accept/derive an idempotency key and use
+      the same `idempotency.rs` receipt contract as every other ACC-RI-013
+      command, scoped by organization + company + action kind.
+- [ ] The receipt is recorded only after the FX journal entry is posted
+      (matching the insert-then-receipt ordering already used correctly in
+      `payment_management.rs` and `fixed_assets.rs`).
+
+**Required tests**
+
+- Persisted test: repeating an identical `run_fx_revaluation` /
+  `post_realized_fx_gain_loss` call with the same key returns the existing
+  result and posts exactly one journal entry (assert entry count, not just
+  return value).
+- Negative test: a repeated call with the same key but a changed payload
+  (different rate/amount) returns a conflict rather than posting a second
+  entry.
 
 ---
 
@@ -1112,70 +1525,152 @@ Implementation progress (2026-07-28):
 
 ### ACC-RI-014 — Replace analytic-distribution JSON IDs
 
+**Status:** In progress — implemented locally; published verification pending
+
 **Current evidence**
 
-- `frontend/packages/erp-shared/src/accounting-create-params.ts:640`
-- `spacetimedb/src/accounting/analytic_accounting.rs:730`
+- `frontend/packages/erp-shared/src/accounting-create-params.ts`
+- `spacetimedb/src/accounting/analytic_accounting.rs`
+- `AnalyticDistributionLineParams` in generated TS/Rust SDKs
 
 **Fix criteria**
 
-- [ ] Add typed distribution rows or a typed ID/percentage command.
-- [ ] Preserve `u64` precision end-to-end.
-- [ ] Validate accounts under the model company.
-- [ ] Prevent duplicate account links.
-- [ ] Require total percentage to equal 100.
-- [ ] Support explicit replace/add/remove semantics.
+- [x] Add typed distribution rows or a typed ID/percentage command.
+- [x] Preserve `u64` precision end-to-end.
+- [x] Validate accounts under the model company.
+- [x] Prevent duplicate account links.
+- [x] Require total percentage to equal 100.
+- [x] Support explicit replace/add/remove semantics (`Option<Vec>` on update).
 
 **Done check**
 
 - Large IDs beyond JavaScript’s safe integer range round-trip exactly.
 
+```md
+Completion evidence:
+- Implementation: `AnalyticDistributionLineParams` + validated serialize in
+  `analytic_accounting.rs`; mapper/UI use typed lines (no `Number(id)` / freeform
+  JSON).
+- Persisted-data test: covered by active-company analytic create matrix; dedicated
+  distribution %/dup tests may expand later.
+- Isolation test: scoped analytic-account load rejects cross-company IDs.
+- UI/reload test: form uses `analyticAccountId` relation field.
+- Retry test: N/A for DTO reshape.
+- Generated artifacts: `make generate-stdb-ts-sdk`, `make generate-stdb-rust-sdk`,
+  `make codegen` (2026-07-29).
+- Reviewer: pending
+- Completed on: 2026-07-29 (local; published proof deferred)
+```
+
 ### ACC-RI-015 — Type intercompany and consolidation sources
+
+**Status:** In progress — implemented locally; published verification pending
 
 **Current evidence**
 
-- `frontend/packages/erp-shared/src/accounting-create-params.ts:1284`
-- `spacetimedb/src/accounting/intercompany.rs:403`
-- `spacetimedb/src/accounting/consolidation.rs:498`
+- `spacetimedb/src/types.rs` (`IntercompanyDocumentModel`)
+- `spacetimedb/src/accounting/intercompany.rs`
+- `spacetimedb/src/accounting/consolidation.rs`
+- `frontend/packages/erp-shared/src/accounting-create-params.ts`
+- `frontend/packages/ui/src/lib/accounting-form-configs.ts`
+- `frontend/packages/ui/src/accounting-components/consolidation-workspace.tsx`
 
 **Fix criteria**
 
-- [ ] Replace arbitrary document-model strings with typed variants.
-- [ ] Load and validate origin/destination documents.
-- [ ] Validate consolidation period, companies, accounts, currency, and
+- [x] Replace arbitrary document-model strings with typed variants.
+- [ ] Load and validate origin/destination documents. — **origin only; see
+      audit finding below**
+- [x] Validate consolidation period, companies, accounts, currency, and
       counterparties.
-- [ ] Derive account code/name snapshots from the account relation.
-- [ ] Preserve historical snapshots alongside the real account ID.
+- [x] Derive account code/name snapshots from the account relation.
+- [x] Preserve historical snapshots alongside the real account ID.
 
 **Done check**
 
 - An ID cannot be interpreted against a default `"sale.order"` model, and a
   mismatched account snapshot cannot be submitted.
 
+```md
+Completion evidence:
+- Implementation: `IntercompanyDocumentModel::{AccountMove,SaleOrder}`;
+  consolidation journal derives `period_name` from period; elimination derives
+  account code/name from `account_account`; forms drop client snapshot fields.
+- Persisted-data test: `ic_consolidation_test.rs` uses typed document model and
+  fixture AR/AP accounts.
+- Isolation test: existing IC cross-org rule test remains in suite.
+- UI/reload test: consolidation workspace posts `periodId` / `accountId` only.
+- Retry test: N/A.
+- Generated artifacts: TS/Rust SDKs + codegen regenerated 2026-07-29.
+- Reviewer: pending
+- Completed on: 2026-07-29 (local; published proof deferred)
+```
+
+**Adversarial audit finding (2026-07-30):** `create_intercompany_transaction`
+(`intercompany.rs:470-513`) correctly loads and validates the **origin**
+document (`AccountMove`/`SaleOrder`) against organization+company.
+`process_intercompany_transaction` (`intercompany.rs:658-692`), however, sets
+`destination_document_id`/`destination_document_model` directly from
+caller-supplied params with no lookup or validation of the destination
+document at all — it is accepted as an opaque, unverified reference. This
+overlaps with the provisional ACC-RI-024 finding at `intercompany.rs:660`;
+resolve them together.
+
+**Revised fix criteria**
+
+- [ ] `process_intercompany_transaction` loads the destination document via
+      the same typed `IntercompanyDocumentModel` match used for the origin
+      document and validates it under organization+company before persisting
+      the reference.
+
+**Required tests**
+
+- Persisted test: a destination document ID belonging to a different
+  organization/company is rejected before the transaction is processed.
+- Positive test: a valid same-tenant destination document is accepted and its
+  ID/model persist correctly.
+
 ### ACC-RI-016 — Add relation-aware accounting read models
+
+**Status:** In progress — implemented locally; published verification pending
 
 **Current evidence**
 
-- `frontend/packages/stdb/src/read-models/accounting.ts:1`
-- `frontend/packages/ui/src/lib/accounting-entity-configs.ts:287`
-- `frontend/packages/ui/src/lib/accounting-entity-configs.ts:564`
-- `frontend/packages/ui/src/lib/accounting-entity-configs.ts:1153`
+- `frontend/packages/stdb/src/read-models/accounting.ts`
+- `frontend/packages/ui/src/lib/accounting-entity-configs.ts`
+- `frontend/web/app/(modules)/accounting/accounting-client.tsx`
 
 **Fix criteria**
 
-- [ ] Add typed IDs and labels for partner, company, journal, account, currency,
+- [x] Add typed IDs and labels for partner, company, journal, account, currency,
       parent, and source document.
-- [ ] Use relation labels in lists/details instead of raw IDs.
-- [ ] Add filters and navigation based on stable IDs.
-- [ ] Define snapshot-versus-live-label behavior.
-- [ ] Avoid N+1 lookups through bounded queries or client-side indexed maps.
+- [x] Use relation labels in lists/details instead of raw IDs.
+- [x] Add filters and navigation based on stable IDs.
+- [x] Define snapshot-versus-live-label behavior.
+- [x] Avoid N+1 lookups through bounded queries or client-side indexed maps.
 
 **Done check**
 
 - Every important persisted foreign key is visible as a useful label after
   reload and can be used for filtering or navigation.
 
+```md
+Completion evidence:
+- Implementation: `build*LabelMap` / `resolveAccountingRelationLabel`; entity
+  configs use maps for payments, move lines, analytic lines, IC; accounting
+  client builds maps once from subscribed rows. Invoice partner snapshots remain
+  snapshot fields.
+- Persisted-data test: N/A (read-path).
+- Isolation test: N/A (client maps from scoped subscriptions).
+- UI/reload test: pending visual e2e; maps rebuild from live table arrays.
+- Retry test: N/A.
+- Generated artifacts: no DTO change for this item.
+- Reviewer: pending
+- Completed on: 2026-07-29 (local; published proof deferred)
+```
+
 ### ACC-RI-017 — Make many-to-many semantics explicit
+
+**Status:** In progress — MVP implemented locally; published verification pending
 
 **Affected fields**
 
@@ -1189,16 +1684,32 @@ Implementation progress (2026-07-28):
 
 **Fix criteria**
 
-- [ ] Define replace/add/remove/clear commands.
-- [ ] Validate and deduplicate every ID.
-- [ ] Prevent duplicate links.
-- [ ] Test `undefined`, `[]`, add, remove, and replace separately.
+- [x] Define replace/add/remove/clear commands (`None` / `Some([])` / `Some(ids)`).
+- [x] Validate and deduplicate every ID (tax_ids, budget-post account_ids,
+      consolidation company_ids).
+- [x] Prevent duplicate links.
+- [x] Test `undefined`, `[]`, add, remove, and replace separately.
 - [ ] Prefer association tables when relation metadata or reverse queries are
-      useful.
+      useful (deferred; Vec storage retained for MVP).
 
 **Done check**
 
 - An omitted collection never clears stored links, while an explicit clear does.
+
+```md
+Completion evidence:
+- Implementation: docs in `relations.rs`; `validate_budget_post_account_ids`;
+  consolidation company_ids dedup; SO/PO invoice paths always copy source
+  `analytic_tag_ids` (no empty-as-preserve).
+- Persisted-data test: `option_vec_semantics_test.rs` (tax_ids + budget_post
+  account_ids) wired into `run_all_accounting_tests`.
+- Isolation test: scoped account validation rejects foreign IDs.
+- UI/reload test: pending.
+- Retry test: N/A.
+- Generated artifacts: no new public enum; suite compiles via `cargo test --no-run`.
+- Reviewer: pending
+- Completed on: 2026-07-29 (local; published proof deferred)
+```
 
 ---
 
@@ -1206,19 +1717,21 @@ Implementation progress (2026-07-28):
 
 ### ACC-RI-018 — Remove hard-coded and compiler-only mapping behavior
 
+**Status:** In progress — implemented locally; published verification pending
+
 **Current evidence**
 
-- `frontend/packages/erp-shared/src/accounting-defaults.ts:8`
-- `frontend/packages/erp-shared/src/accounting-create-params.ts:1542`
-- `frontend/web/app/(modules)/accounting/accounting-client.tsx:2527`
+- `frontend/packages/erp-shared/src/accounting-defaults.ts`
+- `frontend/packages/erp-shared/src/accounting-create-params.ts`
+- `frontend/web/app/(modules)/accounting/accounting-client.tsx`
 
 **Fix criteria**
 
-- [ ] Remove fixed account-type IDs `1..6`.
-- [ ] Remove `undefined as unknown as null`.
-- [ ] Remove zero COGS/inventory arguments.
-- [ ] Remove explicit `metadata: undefined` filler where the contract can omit it.
-- [ ] Reject unknown enums rather than choosing arbitrary domain values.
+- [x] Remove fixed account-type IDs `1..6`.
+- [x] Remove `undefined as unknown as null`.
+- [x] Remove zero COGS/inventory arguments.
+- [x] Remove explicit `metadata: undefined` filler where the contract can omit it.
+- [x] Reject unknown enums rather than choosing arbitrary domain values.
 
 **Done check**
 
@@ -1235,26 +1748,85 @@ inventoryAccountId ?? 0
 
 Any remaining match must have a written, reviewed rationale.
 
+```md
+Completion evidence:
+- Implementation: removed `userTypeIdFromInternalGroup`; fail-closed type resolve;
+  tax deadline / account-group parent clear without casts; invoice post refuses
+  missing COGS/inventory; dropped `metadata: undefined` fillers.
+- Persisted-data test: covered indirectly by create-path fail-closed behavior.
+- Isolation test: N/A.
+- UI/reload test: pending.
+- Retry test: N/A.
+- Generated artifacts: N/A for this cleanup.
+- Reviewer: pending
+- Completed on: 2026-07-29 (local; published proof deferred)
+```
+
+**Adversarial audit finding (2026-07-30):** running the plan's own done-check
+greps found `?? 0n`, `|| 0n`, `undefined as unknown`,
+`cogsAccountId ?? 0`, and `inventoryAccountId ?? 0` all clean (zero matches)
+in the scoped files. `as unknown as`, however, returns **zero matches** in
+`accounting-create-params.ts` but **41 matches** in
+`frontend/web/app/(modules)/accounting/accounting-client.tsx`, none carrying
+the "written, reviewed rationale" the done-check requires for a surviving
+match. These are type-erasure casts on display/table props and mutation
+payloads (e.g. `params as unknown as Record<string, unknown>` around lines
+2934, 2949, 2955, 3498) rather than value-fallback casts — they do not corrupt
+persisted data — but they are a literal, unremediated violation of this
+item's own done-check as written.
+
+**Revised fix criteria**
+
+- [ ] Either replace each `as unknown as` cast in `accounting-client.tsx` with
+      a properly typed conversion, or add an inline rationale comment per
+      the done-check's own escape hatch, for all 41 occurrences.
+
+**Required tests**
+
+- Regression grep wired into CI: `as unknown as` matches in
+  `accounting-client.tsx` must each have an adjacent rationale comment, or the
+  count must be zero.
+
 ### ACC-RI-019 — Make accounting tests prove behavior
+
+**Status:** In progress — suite + Playwright FK assert local; published proof deferred
 
 **Current evidence**
 
-- `spacetimedb/tests/domain_test_reducers.rs:44`
-- `frontend/web/tests/e2e/accounting-mutations.spec.ts:21`
+- `spacetimedb/tests/accounting/mod.rs`
+- `spacetimedb/tests/accounting/active_company_matrix_test.rs`
+- `spacetimedb/tests/accounting/option_vec_semantics_test.rs`
+- `frontend/web/tests/e2e/accounting-mutations.spec.ts`
 
 **Fix criteria**
 
-- [ ] Native compile guards are not counted as behavioral coverage.
-- [ ] `run_all_accounting_tests` covers every corrected reducer.
-- [ ] Tenant-isolation tests cover every globally addressed accounting table.
-- [ ] Playwright tests query persisted rows and relations.
-- [ ] Tests use distinctive non-default dates, amounts, references, and IDs.
-- [ ] Tests verify retry/idempotency and UI reload.
+- [x] Native compile guards are not counted as behavioral coverage.
+- [x] `run_all_accounting_tests` covers every corrected reducer (new matrices wired).
+- [ ] Tenant-isolation tests cover every globally addressed accounting table
+      (existing matrices; full table inventory still continuous).
+- [x] Playwright tests query persisted rows and relations.
+- [x] Tests use distinctive non-default dates, amounts, references, and IDs.
+- [ ] Tests verify retry/idempotency and UI reload (existing payment/FX coverage;
+      continuous).
 
 **Done check**
 
 - Removing any scoped validation or persisted relation makes at least one test
   fail for the intended reason.
+
+```md
+Completion evidence:
+- Implementation: suite wires A2 matrix + Option<Vec> semantics; Playwright
+  `creates a tax and persists company_id FK with distinctive amount` polls
+  `/api/query/account-taxes` for `companyId` + amount `12.5`.
+- Persisted-data test: see above.
+- Isolation test: relational_integrity + IC cross-org remain in suite.
+- UI/reload test: Playwright assert is query-backed (not toast-only).
+- Retry test: existing payment allocation / amortization coverage unchanged.
+- Generated artifacts: `cargo test --no-run` green; SDKs regenerated 2026-07-29.
+- Reviewer: pending
+- Completed on: 2026-07-29 (local; published proof deferred)
+```
 
 ---
 
@@ -1396,21 +1968,37 @@ required-relation fallback issue remains `Unsafe for real ERP data`.
 | 2 | ACC-RI-002 | P0 | In progress | ACC-RI-001/scoped loaders |
 | 3 | ACC-RI-003 | P0 | Verified | Scoped loaders |
 | 4 | ACC-RI-004 | P0 | In progress | ACC-RI-002, ACC-RI-006 |
-| 5 | ACC-RI-005 | P0 | In progress | ACC-RI-006 |
-| 6 | ACC-RI-006 | P0 | In progress | None; implement alongside 001 |
-| 7 | ACC-RI-007 | P0 | In progress | None |
+| 5 | ACC-RI-005 | P0 | Reopened — hardcoded currency table found | ACC-RI-006 |
+| 6 | ACC-RI-006 | P0 | Implemented, unverified | None; implement alongside 001 |
+| 6a | ACC-RI-020 | P0 | Open — cross-tenant tax-jurisdiction mutation | ACC-RI-006 |
+| 6b | ACC-RI-021 | P0 | Open — cross-tenant analytic-parent mutation | ACC-RI-006 |
+| 6c | ACC-RI-022 | P0 | Open — bank statement update/delete missing org check | ACC-RI-006 |
+| 6d | ACC-RI-023 | P0 | Open — payment-account update skips FK validation | ACC-RI-006 |
+| 6e | ACC-RI-024 | P0 | Open — provisional findings pending verification | ACC-RI-002/006/015 |
+| 7 | ACC-RI-007 | P0 | In progress (local done; published pending) | None |
 | 8 | ACC-RI-008 | P0 | In progress | DTO changes |
-| 9 | ACC-RI-009 | P1 | In progress | P0 contracts stabilized |
-| 10 | ACC-RI-010 | P1 | In progress | P0 contracts stabilized |
+| 9 | ACC-RI-009 | P1 | In progress — budget-line actuals gap found | P0 contracts stabilized |
+| 10 | ACC-RI-010 | P1 | In progress (local done; published pending) | P0 contracts stabilized |
 | 11 | ACC-RI-011 | P1 | In progress | ACC-RI-004/006 |
-| 12 | ACC-RI-012 | P1 | In progress | ACC-RI-001 |
-| 13 | ACC-RI-013 | P1 | In progress | Final command boundaries |
-| 14 | ACC-RI-014 | P2 | Not started | ACC-RI-006/009 |
-| 15 | ACC-RI-015 | P2 | Not started | ACC-RI-001/006 |
-| 16 | ACC-RI-016 | P2 | Not started | Subscription fixes |
-| 17 | ACC-RI-017 | P2 | Not started | Final association design |
-| 18 | ACC-RI-018 | P3 | Not started | DTO cleanup |
-| 19 | ACC-RI-019 | P3 | Not started | Continuous; closes last |
+| 12 | ACC-RI-012 | P1 | In progress — payment-term subscription not wired | ACC-RI-001 |
+| 13 | ACC-RI-013 | P1 | Implemented, unverified — FX revaluation has no idempotency | Final command boundaries |
+| 14 | ACC-RI-014 | P2 | In progress (local done; published pending) | ACC-RI-006/009 |
+| 15 | ACC-RI-015 | P2 | In progress — destination document not validated | ACC-RI-001/006 |
+| 16 | ACC-RI-016 | P2 | In progress (local done; published pending) | Subscription fixes |
+| 17 | ACC-RI-017 | P2 | In progress (MVP local; published pending) | Final association design |
+| 18 | ACC-RI-018 | P3 | In progress — 41 unrationalized `as unknown as` casts remain | DTO cleanup |
+| 19 | ACC-RI-019 | P3 | In progress (suite+e2e local; published pending) | Continuous; closes last |
+
+Rows 6a-6e (ACC-RI-020 through ACC-RI-024) were added by the adversarial audit
+of 2026-07-30 (parallel Claude review agents per work item, cross-checked by an
+independent Codex pass, with the four highest-severity Codex findings
+independently confirmed by direct source read). They are P0 because each is an
+unauthenticated-boundary cross-tenant write, matching the severity class of
+ACC-RI-001/002. Until ACC-RI-020 through ACC-RI-023 close, the release-gate
+statement "no unresolved ownership remains" and "every global-ID reducer
+checks row organization before mutation" (Gate A) are not true, and the final
+release decision must remain **Unsafe for real ERP data** regardless of the
+status of any other item in this document.
 
 The tracker status changes only when its completion evidence block is present
 and all applicable definition-of-done checks pass.

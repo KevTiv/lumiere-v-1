@@ -10,8 +10,6 @@ pub struct CreateEliminationEntryParams {
     pub journal_id: u64,
     pub name: String,
     pub account_id: u64,
-    pub account_code: String,
-    pub account_name: String,
     pub company_id: u64,
     pub counterparty_company_id: Option<u64>,
     pub debit: f64,

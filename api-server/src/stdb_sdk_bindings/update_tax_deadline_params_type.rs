@@ -8,10 +8,10 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct UpdateTaxDeadlineParams {
     pub title: Option<String>,
-    pub description: Option<String>,
+    pub description: Option<Option<String>>,
     pub due_date: Option<__sdk::Timestamp>,
-    pub fiscal_period_start: Option<__sdk::Timestamp>,
-    pub fiscal_period_end: Option<__sdk::Timestamp>,
+    pub fiscal_period_start: Option<Option<__sdk::Timestamp>>,
+    pub fiscal_period_end: Option<Option<__sdk::Timestamp>>,
     pub reminder_days_before: Option<Vec<u32>>,
 }
 

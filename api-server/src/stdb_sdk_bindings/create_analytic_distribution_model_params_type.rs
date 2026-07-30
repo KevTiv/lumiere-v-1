@@ -4,6 +4,8 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::analytic_distribution_line_params_type::AnalyticDistributionLineParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateAnalyticDistributionModelParams {
@@ -12,7 +14,7 @@ pub struct CreateAnalyticDistributionModelParams {
     pub partner_category_id: Option<u64>,
     pub product_id: Option<u64>,
     pub product_categ_id: Option<u64>,
-    pub analytic_distribution: String,
+    pub analytic_distribution: Vec<AnalyticDistributionLineParams>,
     pub analytic_precision: u8,
     pub metadata: Option<String>,
 }

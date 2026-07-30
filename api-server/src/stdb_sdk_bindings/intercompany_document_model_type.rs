@@ -4,15 +4,15 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::intercompany_document_model_type::IntercompanyDocumentModel;
-
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub struct ProcessIntercompanyTransactionParams {
-    pub destination_document_id: u64,
-    pub destination_document_model: IntercompanyDocumentModel,
+#[derive(Copy, Eq, Hash)]
+pub enum IntercompanyDocumentModel {
+    AccountMove,
+
+    SaleOrder,
 }
 
-impl __sdk::InModule for ProcessIntercompanyTransactionParams {
+impl __sdk::InModule for IntercompanyDocumentModel {
     type Module = super::RemoteModule;
 }

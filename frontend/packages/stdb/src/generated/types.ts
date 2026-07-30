@@ -1525,6 +1525,7 @@ export const AiTeamMemberSkill = __t.object("AiTeamMemberSkill", {
 export type AiTeamMemberSkill = __Infer<typeof AiTeamMemberSkill>;
 
 export const AllocatePaymentParams = __t.object("AllocatePaymentParams", {
+  idempotencyKey: __t.string(),
   companyId: __t.u64(),
   paymentTransactionId: __t.u64(),
   allocatedMoveLineId: __t.u64(),
@@ -1590,6 +1591,12 @@ export const AmortizationSchedule = __t.object("AmortizationSchedule", {
   metadata: __t.option(__t.string()),
 });
 export type AmortizationSchedule = __Infer<typeof AmortizationSchedule>;
+
+export const AnalyticDistributionLineParams = __t.object("AnalyticDistributionLineParams", {
+  accountId: __t.u64(),
+  percentage: __t.f64(),
+});
+export type AnalyticDistributionLineParams = __Infer<typeof AnalyticDistributionLineParams>;
 
 export const AnalyticsMetric = __t.object("AnalyticsMetric", {
   id: __t.u64(),
@@ -3174,6 +3181,7 @@ export const CreateAccountJournalParams = __t.object("CreateAccountJournalParams
 export type CreateAccountJournalParams = __Infer<typeof CreateAccountJournalParams>;
 
 export const CreateAccountMoveParams = __t.object("CreateAccountMoveParams", {
+  idempotencyKey: __t.string(),
   companyId: __t.option(__t.u64()),
   journalId: __t.u64(),
   get moveType() {
@@ -3495,7 +3503,9 @@ export const CreateAnalyticDistributionModelParams = __t.object("CreateAnalyticD
   partnerCategoryId: __t.option(__t.u64()),
   productId: __t.option(__t.u64()),
   productCategId: __t.option(__t.u64()),
-  analyticDistribution: __t.string(),
+  get analyticDistribution() {
+    return __t.array(AnalyticDistributionLineParams);
+  },
   analyticPrecision: __t.u8(),
   metadata: __t.option(__t.string()),
 });
@@ -3752,7 +3762,6 @@ export type CreateConsolidationAccountParams = __Infer<typeof CreateConsolidatio
 export const CreateConsolidationJournalParams = __t.object("CreateConsolidationJournalParams", {
   name: __t.string(),
   periodId: __t.u64(),
-  periodName: __t.string(),
   dateFrom: __t.timestamp(),
   dateTo: __t.timestamp(),
   companyIds: __t.array(__t.u64()),
@@ -4182,8 +4191,6 @@ export const CreateEliminationEntryParams = __t.object("CreateEliminationEntryPa
   journalId: __t.u64(),
   name: __t.string(),
   accountId: __t.u64(),
-  accountCode: __t.string(),
-  accountName: __t.string(),
   companyId: __t.u64(),
   counterpartyCompanyId: __t.option(__t.u64()),
   debit: __t.f64(),
@@ -4581,7 +4588,9 @@ export type CreateIntercompanyRuleParams = __Infer<typeof CreateIntercompanyRule
 
 export const CreateIntercompanyTransactionParams = __t.object("CreateIntercompanyTransactionParams", {
   originDocumentId: __t.u64(),
-  originDocumentModel: __t.string(),
+  get originDocumentModel() {
+    return IntercompanyDocumentModel;
+  },
   destinationCompanyId: __t.u64(),
   amount: __t.f64(),
   currencyId: __t.u64(),
@@ -5085,6 +5094,7 @@ export const CreatePaymentMethodParams = __t.object("CreatePaymentMethodParams",
 export type CreatePaymentMethodParams = __Infer<typeof CreatePaymentMethodParams>;
 
 export const CreatePaymentParams = __t.object("CreatePaymentParams", {
+  idempotencyKey: __t.string(),
   companyId: __t.u64(),
   get paymentType() {
     return PaymentType;
@@ -9368,6 +9378,13 @@ export const IntegrationType = __t.enum("IntegrationType", {
 });
 export type IntegrationType = __Infer<typeof IntegrationType>;
 
+// The tagged union or sum type for the algebraic type `IntercompanyDocumentModel`.
+export const IntercompanyDocumentModel = __t.enum("IntercompanyDocumentModel", {
+  AccountMove: __t.unit(),
+  SaleOrder: __t.unit(),
+});
+export type IntercompanyDocumentModel = __Infer<typeof IntercompanyDocumentModel>;
+
 export const IntercompanyRule = __t.object("IntercompanyRule", {
   id: __t.u64(),
   organizationId: __t.option(__t.u64()),
@@ -11484,7 +11501,9 @@ export type PrivacyConsent = __Infer<typeof PrivacyConsent>;
 
 export const ProcessIntercompanyTransactionParams = __t.object("ProcessIntercompanyTransactionParams", {
   destinationDocumentId: __t.u64(),
-  destinationDocumentModel: __t.string(),
+  get destinationDocumentModel() {
+    return IntercompanyDocumentModel;
+  },
 });
 export type ProcessIntercompanyTransactionParams = __Infer<typeof ProcessIntercompanyTransactionParams>;
 
@@ -15976,7 +15995,7 @@ export const UpdateAccountAssetParams = __t.object("UpdateAccountAssetParams", {
   methodProgressFactor: __t.option(__t.f64()),
   prorata: __t.option(__t.bool()),
   prorataDate: __t.option(__t.option(__t.timestamp())),
-  accountAnalyticId: __t.option(__t.u64()),
+  accountAnalyticId: __t.option(__t.option(__t.u64())),
   accountAssetId: __t.option(__t.u64()),
   accountDepreciationId: __t.option(__t.u64()),
   accountDepreciationExpenseId: __t.option(__t.u64()),
@@ -15987,7 +16006,7 @@ export const UpdateAccountAssetParams = __t.object("UpdateAccountAssetParams", {
   firstDepreciationDate: __t.option(__t.option(__t.timestamp())),
   firstDepreciationDateManual: __t.option(__t.option(__t.timestamp())),
   accountAnalyticTagIds: __t.option(__t.array(__t.u64())),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAccountAssetParams = __Infer<typeof UpdateAccountAssetParams>;
 
@@ -16072,7 +16091,7 @@ export const UpdateAccountMoveLineParams = __t.object("UpdateAccountMoveLinePara
   credit: __t.option(__t.f64()),
   partnerId: __t.option(__t.option(__t.u64())),
   analyticAccountId: __t.option(__t.option(__t.u64())),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAccountMoveLineParams = __Infer<typeof UpdateAccountMoveLineParams>;
 
@@ -16104,7 +16123,7 @@ export const UpdateAccountTaxGroupParams = __t.object("UpdateAccountTaxGroupPara
   taxPayableAccountId: __t.option(__t.option(__t.u64())),
   taxReceivableAccountId: __t.option(__t.option(__t.u64())),
   advanceTaxPaymentAccountId: __t.option(__t.option(__t.u64())),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAccountTaxGroupParams = __Infer<typeof UpdateAccountTaxGroupParams>;
 
@@ -16122,7 +16141,7 @@ export const UpdateAccountTaxParams = __t.object("UpdateAccountTaxParams", {
   sequence: __t.option(__t.u32()),
   taxGroupId: __t.option(__t.option(__t.u64())),
   tags: __t.option(__t.array(__t.u64())),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAccountTaxParams = __Infer<typeof UpdateAccountTaxParams>;
 
@@ -16175,14 +16194,14 @@ export type UpdateAnalyticAccountParams = __Infer<typeof UpdateAnalyticAccountPa
 
 export const UpdateAnalyticDistributionModelParams = __t.object("UpdateAnalyticDistributionModelParams", {
   companyId: __t.option(__t.u64()),
-  name: __t.option(__t.string()),
-  partnerCategoryId: __t.option(__t.u64()),
-  productId: __t.option(__t.u64()),
-  productCategId: __t.option(__t.u64()),
-  analyticDistribution: __t.option(__t.string()),
+  name: __t.option(__t.option(__t.string())),
+  partnerCategoryId: __t.option(__t.option(__t.u64())),
+  productId: __t.option(__t.option(__t.u64())),
+  productCategId: __t.option(__t.option(__t.u64())),
+  analyticDistribution: __t.option(__t.array(AnalyticDistributionLineParams)),
   analyticPrecision: __t.option(__t.u8()),
   isActive: __t.option(__t.bool()),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateAnalyticDistributionModelParams = __Infer<typeof UpdateAnalyticDistributionModelParams>;
 
@@ -16344,12 +16363,12 @@ export const UpdateConsolidationAccountParams = __t.object("UpdateConsolidationA
   accountType: __t.option(__t.string()),
   companyIds: __t.option(__t.array(__t.u64())),
   consolidationRate: __t.option(__t.f64()),
-  eliminationAccountId: __t.option(__t.u64()),
+  eliminationAccountId: __t.option(__t.option(__t.u64())),
   isIntercompany: __t.option(__t.bool()),
-  eliminationMethod: __t.option(__t.string()),
+  eliminationMethod: __t.option(__t.option(__t.string())),
   isActive: __t.option(__t.bool()),
-  notes: __t.option(__t.string()),
-  metadata: __t.option(__t.string()),
+  notes: __t.option(__t.option(__t.string())),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateConsolidationAccountParams = __Infer<typeof UpdateConsolidationAccountParams>;
 
@@ -16560,7 +16579,7 @@ export const UpdateFinancialReportParams = __t.object("UpdateFinancialReportPara
   showHierarchy: __t.option(__t.bool()),
   showPercentage: __t.option(__t.bool()),
   showDebitCredit: __t.option(__t.bool()),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateFinancialReportParams = __Infer<typeof UpdateFinancialReportParams>;
 
@@ -16645,7 +16664,7 @@ export const UpdateIntercompanyRuleParams = __t.object("UpdateIntercompanyRulePa
   sequence: __t.option(__t.u32()),
   isActive: __t.option(__t.bool()),
   notes: __t.option(__t.option(__t.string())),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateIntercompanyRuleParams = __Infer<typeof UpdateIntercompanyRuleParams>;
 
@@ -16849,24 +16868,24 @@ export type UpdatePartnerBankParams = __Infer<typeof UpdatePartnerBankParams>;
 
 export const UpdatePaymentAccountParams = __t.object("UpdatePaymentAccountParams", {
   name: __t.option(__t.string()),
-  providerLabel: __t.option(__t.string()),
-  referenceRaw: __t.option(__t.string()),
-  feeAccountId: __t.option(__t.u64()),
-  clearingAccountId: __t.option(__t.u64()),
+  providerLabel: __t.option(__t.option(__t.string())),
+  referenceRaw: __t.option(__t.option(__t.string())),
+  feeAccountId: __t.option(__t.option(__t.u64())),
+  clearingAccountId: __t.option(__t.option(__t.u64())),
   active: __t.option(__t.bool()),
   isPrimary: __t.option(__t.bool()),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdatePaymentAccountParams = __Infer<typeof UpdatePaymentAccountParams>;
 
 export const UpdatePaymentTransactionParams = __t.object("UpdatePaymentTransactionParams", {
-  externalReference: __t.option(__t.string()),
+  externalReference: __t.option(__t.option(__t.string())),
   grossExternalAmount: __t.option(__t.f64()),
   settlementAmount: __t.option(__t.f64()),
   netAccountAmount: __t.option(__t.f64()),
   occurredAt: __t.option(__t.timestamp()),
   evidenceDocumentIds: __t.option(__t.array(__t.u64())),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdatePaymentTransactionParams = __Infer<typeof UpdatePaymentTransactionParams>;
 
@@ -17434,10 +17453,10 @@ export type UpdateTaskParams = __Infer<typeof UpdateTaskParams>;
 
 export const UpdateTaxDeadlineParams = __t.object("UpdateTaxDeadlineParams", {
   title: __t.option(__t.string()),
-  description: __t.option(__t.string()),
+  description: __t.option(__t.option(__t.string())),
   dueDate: __t.option(__t.timestamp()),
-  fiscalPeriodStart: __t.option(__t.timestamp()),
-  fiscalPeriodEnd: __t.option(__t.timestamp()),
+  fiscalPeriodStart: __t.option(__t.option(__t.timestamp())),
+  fiscalPeriodEnd: __t.option(__t.option(__t.timestamp())),
   reminderDaysBefore: __t.option(__t.array(__t.u32())),
 });
 export type UpdateTaxDeadlineParams = __Infer<typeof UpdateTaxDeadlineParams>;
@@ -17451,7 +17470,7 @@ export const UpdateTaxJurisdictionParams = __t.object("UpdateTaxJurisdictionPara
   zipFrom: __t.option(__t.option(__t.string())),
   zipTo: __t.option(__t.option(__t.string())),
   isActive: __t.option(__t.bool()),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateTaxJurisdictionParams = __Infer<typeof UpdateTaxJurisdictionParams>;
 
@@ -17463,7 +17482,7 @@ export const UpdateTaxScheduleParams = __t.object("UpdateTaxScheduleParams", {
   isActive: __t.option(__t.bool()),
   effectiveFrom: __t.option(__t.option(__t.timestamp())),
   effectiveTo: __t.option(__t.option(__t.timestamp())),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateTaxScheduleParams = __Infer<typeof UpdateTaxScheduleParams>;
 

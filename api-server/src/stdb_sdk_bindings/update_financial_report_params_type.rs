@@ -21,7 +21,7 @@ pub struct UpdateFinancialReportParams {
     pub show_hierarchy: Option<bool>,
     pub show_percentage: Option<bool>,
     pub show_debit_credit: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateFinancialReportParams {

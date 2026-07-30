@@ -195,6 +195,7 @@ pub fn test_post_payment_blocked_in_closed_period(ctx: &ReducerContext) -> Resul
         ctx,
         fixture.organization_id,
         CreatePaymentParams {
+            idempotency_key: "period-lock-payment-test".to_string(),
             company_id: fixture.company_id,
             payment_type: PaymentType::InBound,
             partner_type: PartnerType::Customer,

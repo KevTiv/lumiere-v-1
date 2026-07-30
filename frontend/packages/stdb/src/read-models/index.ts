@@ -12,7 +12,26 @@ export {
 } from "./crm";
 export {
   chartAccountPrimaryLabel,
+  accountJournalPrimaryLabel,
+  accountingPartnerPrimaryLabel,
+  accountingCurrencyPrimaryLabel,
+  accountingCompanyPrimaryLabel,
+  accountParentPrimaryLabel,
+  accountingSourceDocumentPrimaryLabel,
+  analyticAccountPrimaryLabel,
+  accountingRelationIdKey,
+  resolveAccountingRelationLabel,
+  buildAccountingLabelMap,
+  buildPartnerLabelMap,
+  buildJournalLabelMap,
+  buildAccountLabelMap,
+  buildCurrencyLabelMap,
+  buildCompanyLabelMap,
+  buildParentAccountLabelMap,
+  buildSourceDocumentLabelMap,
+  buildAnalyticAccountLabelMap,
   type AccountingAccountQueryRow,
+  type AccountingQueryRow,
 } from "./accounting";
 export {
   saleOrderPrimaryLabel,

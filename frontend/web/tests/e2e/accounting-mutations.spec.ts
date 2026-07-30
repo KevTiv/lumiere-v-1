@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test"
 
 import {
+  chooseFirstOption,
   expectNoAppError,
+  fetchDefaultCompanyId,
   fillField,
   openEntityCreate,
   selectEntityRowByText,
@@ -10,7 +12,69 @@ import {
   waitForEntityActionEnabled,
 } from "./helpers"
 
+function unwrapQueryValue(value: unknown): unknown {
+  if (value != null && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>
+    if ("some" in record) return unwrapQueryValue(record.some)
+    if ("none" in record) return null
+  }
+  return value
+}
+
+function idOf(value: unknown): number | null {
+  const raw = unwrapQueryValue(value)
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : null
+  if (typeof raw === "bigint") return Number(raw)
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
 test.describe("Accounting update mutations", { tag: ["@p0", "@phase-3"] }, () => {
+  test("creates a tax and persists company_id FK with distinctive amount", async ({ page }) => {
+    test.setTimeout(120_000)
+
+    const taxName = smokeName("ri-tax")
+    const companyId = await fetchDefaultCompanyId(page)
+
+    await openEntityCreate(page, "/accounting", "accounting", "taxes", "new-tax")
+    await fillField(page, "name", taxName)
+    await fillField(page, "amount", "12.5")
+    await chooseFirstOption(page, "typeTaxUse")
+
+    const [createTaxRes] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/call/create_account_tax") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      submitForm(page, "new-tax"),
+    ])
+    expect(createTaxRes.ok()).toBe(true)
+
+    await expect
+      .poll(
+        async () => {
+          const res = await page.request.get("/api/query/account-taxes")
+          if (!res.ok()) return null
+          const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
+          const row = (json.data ?? []).find(
+            (tax) => String(unwrapQueryValue(tax.name) ?? "") === taxName,
+          )
+          if (!row) return null
+          const persistedCompanyId = idOf(row.companyId ?? row.company_id)
+          const amount = Number(unwrapQueryValue(row.amount))
+          if (persistedCompanyId !== companyId || amount !== 12.5) return null
+          return { companyId: persistedCompanyId, amount }
+        },
+        { timeout: 30_000 },
+      )
+      .toEqual({ companyId, amount: 12.5 })
+
+    await expectNoAppError(page)
+  })
+
   test("deactivates a payment term via pt-deactivate and update_payment_term reducer", async ({
     page,
   }) => {

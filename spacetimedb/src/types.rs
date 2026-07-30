@@ -737,6 +737,22 @@ pub enum RuleType {
     Transfer,
 }
 
+/// Typed origin/destination document model for intercompany transactions.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum IntercompanyDocumentModel {
+    AccountMove,
+    SaleOrder,
+}
+
+impl IntercompanyDocumentModel {
+    pub fn as_storage_str(&self) -> &'static str {
+        match self {
+            Self::AccountMove => "account.move",
+            Self::SaleOrder => "sale.order",
+        }
+    }
+}
+
 // Consolidation
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum ConsolidationState {

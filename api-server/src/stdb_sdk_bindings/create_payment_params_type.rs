@@ -15,6 +15,7 @@ use super::partner_type_type::PartnerType;
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreatePaymentParams {
+    pub idempotency_key: String,
     pub company_id: u64,
     pub payment_type: PaymentType,
     pub partner_type: PartnerType,

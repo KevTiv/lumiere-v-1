@@ -12,6 +12,7 @@ use crate::accounting::relations::{
     require_explicit_company_id,
 };
 use crate::accounting::tax_management::account_tax;
+use crate::crm::activities::activity_type;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{AccountInternalGroup, AccountTypeInternal, JournalType};
 
@@ -445,13 +446,7 @@ pub fn create_account_group(
         "account-group creation",
     )?;
 
-    if let Some(pid) = params.parent_id {
-        ctx.db
-            .account_group()
-            .id()
-            .find(&pid)
-            .ok_or("Parent group not found")?;
-    }
+    validate_account_group_parent(ctx, organization_id, company_id, None, params.parent_id)?;
 
     let group = ctx.db.account_group().insert(AccountGroup {
         id: 0,
@@ -512,16 +507,12 @@ pub fn update_account_group(
         .find(&group_id)
         .ok_or("Account group not found")?;
 
-    if group.company_id != company_id {
-        return Err("Account group does not belong to this company".to_string());
+    if group.organization_id != organization_id || group.company_id != company_id {
+        return Err("account group does not belong to this organization and company".to_string());
     }
 
-    if let Some(pid) = params.parent_id.flatten() {
-        ctx.db
-            .account_group()
-            .id()
-            .find(&pid)
-            .ok_or("Parent group not found")?;
+    if let Some(parent_id) = params.parent_id {
+        validate_account_group_parent(ctx, organization_id, company_id, Some(group_id), parent_id)?;
     }
 
     ctx.db.account_group().id().update(AccountGroup {
@@ -598,6 +589,31 @@ fn validate_account_group_relation(
     Ok(())
 }
 
+fn validate_account_group_parent(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    group_id: Option<u64>,
+    parent_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(parent_id) = parent_id else {
+        return Ok(());
+    };
+    if group_id == Some(parent_id) {
+        return Err("account group cannot be its own parent".to_string());
+    }
+    let parent = ctx
+        .db
+        .account_group()
+        .id()
+        .find(&parent_id)
+        .ok_or("parent group not found")?;
+    if parent.organization_id != organization_id || parent.company_id != company_id {
+        return Err("parent group does not belong to this organization and company".to_string());
+    }
+    Ok(())
+}
+
 fn validate_account_journal_ids(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -614,6 +630,8 @@ fn validate_account_journal_ids(
     Ok(())
 }
 
+/// Validate account `tax_ids` (duplicates fail). Update semantics: `None` preserve,
+/// `Some([])` clear, `Some(ids)` replace — see `relations` module docs (ACC-RI-017).
 fn validate_account_tax_ids(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -638,6 +656,53 @@ fn validate_account_tax_ids(
         }
         if !tax.active {
             return Err(format!("Tax {tax_id} is inactive"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_journal_auxiliary_relations(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    sequence_id: Option<u64>,
+    refund_sequence_id: Option<u64>,
+    secure_sequence_id: Option<u64>,
+    dedicated_payment_method_ids: &[u64],
+    sale_activity_type_id: Option<u64>,
+    sale_activity_user_id: Option<u64>,
+) -> Result<(), String> {
+    if sequence_id.is_some() || refund_sequence_id.is_some() || secure_sequence_id.is_some() {
+        return Err(
+            "journal numeric sequence IDs are unsupported until a typed sequence relation exists"
+                .to_string(),
+        );
+    }
+    if !dedicated_payment_method_ids.is_empty() {
+        return Err(
+            "journal dedicated payment method IDs are unsupported until an accounting payment-method relation exists"
+                .to_string(),
+        );
+    }
+    if sale_activity_user_id.is_some() {
+        return Err(
+            "journal sale activity user IDs are unsupported; users are identified by Identity"
+                .to_string(),
+        );
+    }
+    if let Some(activity_type_id) = sale_activity_type_id {
+        let activity_type = ctx
+            .db
+            .activity_type()
+            .id()
+            .find(&activity_type_id)
+            .ok_or("journal sale activity type not found")?;
+        if activity_type.organization_id != organization_id {
+            return Err(
+                "journal sale activity type does not belong to this organization".to_string(),
+            );
+        }
+        if !activity_type.is_active {
+            return Err("journal sale activity type is inactive".to_string());
         }
     }
     Ok(())
@@ -818,6 +883,16 @@ pub fn create_account_journal(
     if let Some(currency_id) = params.currency_id {
         require_active_currency_id(ctx, currency_id, "journal")?;
     }
+    validate_journal_auxiliary_relations(
+        ctx,
+        organization_id,
+        params.sequence_id,
+        params.refund_sequence_id,
+        params.secure_sequence_id,
+        &params.dedicated_payment_method_ids,
+        params.sale_activity_type_id,
+        params.sale_activity_user_id,
+    )?;
     for (maybe_id, role) in [
         (params.default_account_id, "journal default"),
         (params.suspense_account_id, "journal suspense"),

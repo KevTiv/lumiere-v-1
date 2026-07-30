@@ -9,12 +9,16 @@
 /// ## Tables
 /// - `ConsolidationAccount` — Account mappings for consolidation
 /// - `ConsolidationJournal` — Consolidation journals with elimination entries
+use std::collections::HashSet;
+
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::chart_of_accounts::account_account;
 use crate::accounting::fiscal_periods::{
-    accounting_ownership_backfill_issue, accounting_ownership_backfill_run, record_ownership_issue,
-    AccountingOwnershipBackfillRun,
+    account_period, accounting_ownership_backfill_issue, accounting_ownership_backfill_run,
+    record_ownership_issue, AccountingOwnershipBackfillRun,
 };
+use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::users::user_profile;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -183,19 +187,18 @@ pub struct UpdateConsolidationAccountParams {
     pub account_type: Option<String>,
     pub company_ids: Option<Vec<u64>>,
     pub consolidation_rate: Option<f64>,
-    pub elimination_account_id: Option<u64>,
+    pub elimination_account_id: Option<Option<u64>>,
     pub is_intercompany: Option<bool>,
-    pub elimination_method: Option<String>,
+    pub elimination_method: Option<Option<String>>,
     pub is_active: Option<bool>,
-    pub notes: Option<String>,
-    pub metadata: Option<String>,
+    pub notes: Option<Option<String>>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateConsolidationJournalParams {
     pub name: String,
     pub period_id: u64,
-    pub period_name: String,
     pub date_from: Timestamp,
     pub date_to: Timestamp,
     pub company_ids: Vec<u64>,
@@ -211,8 +214,6 @@ pub struct CreateEliminationEntryParams {
     pub journal_id: u64,
     pub name: String,
     pub account_id: u64,
-    pub account_code: String,
-    pub account_name: String,
     pub company_id: u64,
     pub counterparty_company_id: Option<u64>,
     pub debit: f64,
@@ -244,7 +245,11 @@ fn validate_consolidation_companies(
     if company_ids.is_empty() {
         return Err("at least one company is required".to_string());
     }
+    let mut seen = HashSet::with_capacity(company_ids.len());
     for company_id in company_ids {
+        if !seen.insert(*company_id) {
+            return Err(format!("Consolidation company {company_id} is duplicated"));
+        }
         require_company_in_organization(ctx, organization_id, *company_id)?;
     }
     Ok(())
@@ -480,8 +485,8 @@ pub fn update_consolidation_account(
         changed_fields.push("consolidation_rate".to_string());
     }
 
-    if params.elimination_account_id.is_some() {
-        account.elimination_account_id = params.elimination_account_id;
+    if let Some(elimination_account_id) = params.elimination_account_id {
+        account.elimination_account_id = elimination_account_id;
         changed_fields.push("elimination_account_id".to_string());
     }
 
@@ -490,8 +495,8 @@ pub fn update_consolidation_account(
         changed_fields.push("is_intercompany".to_string());
     }
 
-    if params.elimination_method.is_some() {
-        account.elimination_method = params.elimination_method;
+    if let Some(elimination_method) = params.elimination_method {
+        account.elimination_method = elimination_method;
         changed_fields.push("elimination_method".to_string());
     }
 
@@ -500,13 +505,13 @@ pub fn update_consolidation_account(
         changed_fields.push("is_active".to_string());
     }
 
-    if params.notes.is_some() {
-        account.notes = params.notes;
+    if let Some(notes) = params.notes {
+        account.notes = notes;
         changed_fields.push("notes".to_string());
     }
 
     if let Some(m) = params.metadata {
-        account.metadata = Some(m);
+        account.metadata = m;
         changed_fields.push("metadata".to_string());
     }
 
@@ -561,12 +566,23 @@ pub fn create_consolidation_journal(
 
     validate_consolidation_companies(ctx, organization_id, &params.company_ids)?;
 
+    let period = ctx
+        .db
+        .account_period()
+        .id()
+        .find(&params.period_id)
+        .ok_or("consolidation period not found")?;
+    if period.organization_id != Some(organization_id) {
+        return Err("consolidation period does not belong to this organization".to_string());
+    }
+    let period_name = period.name.clone();
+
     let journal = ctx.db.consolidation_journal().insert(ConsolidationJournal {
         id: 0,
         organization_id: Some(organization_id),
         name: params.name.clone(),
         period_id: params.period_id,
-        period_name: params.period_name,
+        period_name,
         date_from: params.date_from,
         date_to: params.date_to,
         company_ids: params.company_ids.clone(),
@@ -663,6 +679,21 @@ pub fn create_elimination_entry(
         return Err("Entry must have either debit or credit, but not both".to_string());
     }
 
+    let account = ctx
+        .db
+        .account_account()
+        .id()
+        .find(&params.account_id)
+        .ok_or("elimination account not found")?;
+    if account.organization_id != organization_id {
+        return Err("elimination account does not belong to this organization".to_string());
+    }
+    if account.company_id != params.company_id {
+        return Err("elimination account does not belong to the entry company".to_string());
+    }
+    let account_code = account.code.clone();
+    let account_name = account.name.clone();
+
     let sequence = ctx
         .db
         .consolidation_elimination_entry()
@@ -682,8 +713,8 @@ pub fn create_elimination_entry(
             sequence,
             name: params.name.clone(),
             account_id: params.account_id,
-            account_code: params.account_code.clone(),
-            account_name: params.account_name,
+            account_code: account_code.clone(),
+            account_name,
             company_id: params.company_id,
             counterparty_company_id: params.counterparty_company_id,
             debit: params.debit,
@@ -719,7 +750,7 @@ pub fn create_elimination_entry(
             new_values: Some(
                 serde_json::json!({
                     "name": params.name,
-                    "account_code": params.account_code,
+                    "account_code": account_code,
                     "debit": params.debit,
                     "credit": params.credit
                 })
@@ -743,6 +774,24 @@ pub fn process_consolidation(
     check_permission(ctx, organization_id, "consolidation_journal", "write")?;
 
     let mut journal = load_consolidation_journal_in_scope(ctx, organization_id, journal_id)?;
+    let company_id = *journal
+        .company_ids
+        .first()
+        .ok_or("consolidation journal company set is empty")?;
+    let idempotency_key = format!("consolidation-journal:{journal_id}:process");
+    let payload_fingerprint = journal_id.to_string();
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "process_consolidation",
+        &idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
 
     if journal.state != ConsolidationState::Draft {
         return Err("Journal must be in Draft state to process".to_string());
@@ -767,6 +816,17 @@ pub fn process_consolidation(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
+    );
+
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "process_consolidation",
+        idempotency_key,
+        payload_fingerprint,
+        "consolidation_journal",
+        journal_id,
     );
 
     Ok(())

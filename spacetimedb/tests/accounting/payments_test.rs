@@ -27,22 +27,40 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
     let invoice_move_id = create_balanced_customer_invoice(ctx, &fixture, amount, true)?;
     let (bank_journal_id, _) = seed_bank_journal(ctx, &fixture)?;
 
-    create_payment(
-        ctx,
-        org_id,
-        CreatePaymentParams {
-            company_id,
-            payment_type: PaymentType::InBound,
-            partner_type: crate::types::PartnerType::Customer,
-            partner_id: fixture.partner_id,
-            amount,
-            currency_id: 1,
-            date: Some(ctx.timestamp),
-            journal_id: bank_journal_id,
-            ref_: Some("Harness payment".to_string()),
-            memo: Some("Invoice settlement".to_string()),
-        },
-    )?;
+    let create_params = CreatePaymentParams {
+        idempotency_key: "payment-reconciles-invoice".to_string(),
+        company_id,
+        payment_type: PaymentType::InBound,
+        partner_type: crate::types::PartnerType::Customer,
+        partner_id: fixture.partner_id,
+        amount,
+        currency_id: 1,
+        date: Some(ctx.timestamp),
+        journal_id: bank_journal_id,
+        ref_: Some("Harness payment".to_string()),
+        memo: Some("Invoice settlement".to_string()),
+    };
+    create_payment(ctx, org_id, create_params.clone())?;
+    create_payment(ctx, org_id, create_params.clone())?;
+    if ctx
+        .db
+        .account_payment()
+        .iter()
+        .filter(|payment| {
+            payment.organization_id == org_id && payment.ref_.as_deref() == Some("Harness payment")
+        })
+        .count()
+        != 1
+    {
+        return Err("payment creation retry duplicated the payment".to_string());
+    }
+    let mut conflicting_params = create_params;
+    conflicting_params.amount = 101.0;
+    match create_payment(ctx, org_id, conflicting_params) {
+        Err(error) if error.contains("idempotency key") => {}
+        Err(error) => return Err(format!("unexpected payment retry conflict: {error}")),
+        Ok(()) => return Err("changed payment retry reused its idempotency key".to_string()),
+    }
 
     let payment_id = ctx
         .db
@@ -146,6 +164,7 @@ pub fn test_payment_create_rejects_invalid_relations(ctx: &ReducerContext) -> Re
 
     let invalid_attempts = [
         CreatePaymentParams {
+            idempotency_key: "invalid-payment-foreign-journal".to_string(),
             company_id: fixture.company_id,
             payment_type: PaymentType::InBound,
             partner_type: PartnerType::Customer,
@@ -158,6 +177,7 @@ pub fn test_payment_create_rejects_invalid_relations(ctx: &ReducerContext) -> Re
             memo: None,
         },
         CreatePaymentParams {
+            idempotency_key: "invalid-payment-foreign-partner".to_string(),
             company_id: fixture.company_id,
             payment_type: PaymentType::InBound,
             partner_type: PartnerType::Customer,
@@ -170,6 +190,7 @@ pub fn test_payment_create_rejects_invalid_relations(ctx: &ReducerContext) -> Re
             memo: None,
         },
         CreatePaymentParams {
+            idempotency_key: "invalid-payment-missing-currency".to_string(),
             company_id: fixture.company_id,
             payment_type: PaymentType::InBound,
             partner_type: PartnerType::Customer,
@@ -182,6 +203,7 @@ pub fn test_payment_create_rejects_invalid_relations(ctx: &ReducerContext) -> Re
             memo: None,
         },
         CreatePaymentParams {
+            idempotency_key: "invalid-payment-wrong-partner-role".to_string(),
             company_id: fixture.company_id,
             payment_type: PaymentType::OutBound,
             partner_type: PartnerType::Supplier,
@@ -194,6 +216,7 @@ pub fn test_payment_create_rejects_invalid_relations(ctx: &ReducerContext) -> Re
             memo: None,
         },
         CreatePaymentParams {
+            idempotency_key: "invalid-payment-missing-date".to_string(),
             company_id: fixture.company_id,
             payment_type: PaymentType::InBound,
             partner_type: PartnerType::Customer,
@@ -238,6 +261,7 @@ pub fn test_cancel_payment_audited(ctx: &ReducerContext) -> Result<(), String> {
         ctx,
         org_id,
         CreatePaymentParams {
+            idempotency_key: "cancel-payment-audit".to_string(),
             company_id,
             payment_type: PaymentType::InBound,
             partner_type: crate::types::PartnerType::Customer,
@@ -362,6 +386,7 @@ pub fn test_payment_multi_invoice_residual_and_clearing_account(
         ctx,
         org_id,
         CreatePaymentParams {
+            idempotency_key: "multi-invoice-residual-payment".to_string(),
             company_id,
             payment_type: PaymentType::InBound,
             partner_type: crate::types::PartnerType::Customer,

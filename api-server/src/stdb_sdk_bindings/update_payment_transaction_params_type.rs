@@ -7,13 +7,13 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct UpdatePaymentTransactionParams {
-    pub external_reference: Option<String>,
+    pub external_reference: Option<Option<String>>,
     pub gross_external_amount: Option<f64>,
     pub settlement_amount: Option<f64>,
     pub net_account_amount: Option<f64>,
     pub occurred_at: Option<__sdk::Timestamp>,
     pub evidence_document_ids: Option<Vec<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdatePaymentTransactionParams {

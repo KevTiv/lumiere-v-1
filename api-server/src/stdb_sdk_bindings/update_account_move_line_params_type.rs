@@ -13,7 +13,7 @@ pub struct UpdateAccountMoveLineParams {
     pub credit: Option<f64>,
     pub partner_id: Option<Option<u64>>,
     pub analytic_account_id: Option<Option<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateAccountMoveLineParams {

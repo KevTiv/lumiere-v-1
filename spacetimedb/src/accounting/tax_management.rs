@@ -10,6 +10,7 @@ use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Ti
 
 use crate::accounting::relations::require_active_account;
 use crate::core::organization::require_company_in_organization;
+use crate::core::reference::country;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{
     AccountInternalGroup, TaxAmountType, TaxDeadlineStatus, TaxDeadlineType, TaxTypeUse,
@@ -241,7 +242,7 @@ pub struct UpdateAccountTaxGroupParams {
     pub tax_payable_account_id: Option<Option<u64>>,
     pub tax_receivable_account_id: Option<Option<u64>>,
     pub advance_tax_payment_account_id: Option<Option<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -280,7 +281,7 @@ pub struct UpdateAccountTaxParams {
     pub sequence: Option<u32>,
     pub tax_group_id: Option<Option<u64>>,
     pub tags: Option<Vec<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -298,6 +299,7 @@ pub struct CreateTaxJurisdictionParams {
 }
 
 /// `None` outer = no change; `Some(None)` = clear nullable field.
+/// `None` outer = no change; `Some(None)` clears nullable fields.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateTaxJurisdictionParams {
     pub name: Option<String>,
@@ -308,7 +310,7 @@ pub struct UpdateTaxJurisdictionParams {
     pub zip_from: Option<Option<String>>,
     pub zip_to: Option<Option<String>>,
     pub is_active: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -333,7 +335,7 @@ pub struct UpdateTaxScheduleParams {
     pub is_active: Option<bool>,
     pub effective_from: Option<Option<Timestamp>>,
     pub effective_to: Option<Option<Timestamp>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 /// `company_id` is `Option<u64>` in params because not all tax deadlines are
@@ -353,13 +355,14 @@ pub struct CreateTaxDeadlineParams {
     pub auto_generated: bool,
 }
 
+/// `None` outer = no change; `Some(None)` clears nullable fields.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateTaxDeadlineParams {
     pub title: Option<String>,
-    pub description: Option<String>,
+    pub description: Option<Option<String>>,
     pub due_date: Option<Timestamp>,
-    pub fiscal_period_start: Option<Timestamp>,
-    pub fiscal_period_end: Option<Timestamp>,
+    pub fiscal_period_start: Option<Option<Timestamp>>,
+    pub fiscal_period_end: Option<Option<Timestamp>>,
     pub reminder_days_before: Option<Vec<u32>>,
 }
 
@@ -440,6 +443,65 @@ fn validate_tax_jurisdiction(
     }
     if !jurisdiction.is_active {
         return Err("Jurisdiction is inactive".to_string());
+    }
+    Ok(())
+}
+
+fn validate_country_code(ctx: &ReducerContext, country_code: &str) -> Result<(), String> {
+    let country = ctx
+        .db
+        .country()
+        .iter()
+        .find(|country| country.code == country_code)
+        .ok_or("country not found")?;
+    if !country.is_active {
+        return Err("country is inactive".to_string());
+    }
+    Ok(())
+}
+
+fn validate_tax_country(
+    ctx: &ReducerContext,
+    country_id: Option<u64>,
+    country_code: Option<&str>,
+) -> Result<(), String> {
+    if let Some(code) = country_code {
+        validate_country_code(ctx, code)?;
+    }
+    if let Some(country_id) = country_id {
+        let numeric_code =
+            u16::try_from(country_id).map_err(|_| "country ID is outside ISO numeric range")?;
+        let country = ctx
+            .db
+            .country()
+            .iter()
+            .find(|country| country.numcode == numeric_code)
+            .ok_or("country ID not found")?;
+        if !country.is_active {
+            return Err("country is inactive".to_string());
+        }
+        if country_code.is_some_and(|code| code != country.code) {
+            return Err("country ID and country code do not identify the same country".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn reject_unmodeled_tax_relations(
+    tags: &[u64],
+    invoice_repartition_line_ids: &[u64],
+    refund_repartition_line_ids: &[u64],
+) -> Result<(), String> {
+    if !tags.is_empty() {
+        return Err(
+            "tax tag IDs are unsupported until a typed tax-tag relation exists".to_string(),
+        );
+    }
+    if !invoice_repartition_line_ids.is_empty() || !refund_repartition_line_ids.is_empty() {
+        return Err(
+            "tax repartition line IDs are unsupported until a typed repartition relation exists"
+                .to_string(),
+        );
     }
     Ok(())
 }
@@ -570,7 +632,7 @@ pub fn update_account_tax_group(
             .unwrap_or(group.advance_tax_payment_account_id),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.map(Some).unwrap_or(group.metadata),
+        metadata: params.metadata.unwrap_or(group.metadata),
         ..group
     });
 
@@ -601,6 +663,12 @@ pub fn create_account_tax(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_tax", "create")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
+    validate_tax_country(ctx, params.country_id, params.country_code.as_deref())?;
+    reject_unmodeled_tax_relations(
+        &params.tags,
+        &params.invoice_repartition_line_ids,
+        &params.refund_repartition_line_ids,
+    )?;
 
     // Validate tax group if provided
     if let Some(gid) = params.tax_group_id {
@@ -684,6 +752,11 @@ pub fn update_account_tax(
     if tax.organization_id != organization_id || tax.company_id != company_id {
         return Err("Tax does not belong to this organization and company".to_string());
     }
+    if params.tags.as_ref().is_some_and(|tags| !tags.is_empty()) {
+        return Err(
+            "tax tag IDs are unsupported until a typed tax-tag relation exists".to_string(),
+        );
+    }
 
     // Validate tax group if provided
     if let Some(Some(gid)) = params.tax_group_id {
@@ -753,7 +826,7 @@ pub fn update_account_tax(
         tags: params.tags.unwrap_or(tax.tags),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.map(Some).unwrap_or(tax.metadata),
+        metadata: params.metadata.unwrap_or(tax.metadata),
         ..tax
     });
 
@@ -782,6 +855,7 @@ pub fn create_tax_jurisdiction(
     params: CreateTaxJurisdictionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "tax_jurisdiction", "create")?;
+    validate_country_code(ctx, &params.country_code)?;
 
     let jurisdiction = ctx.db.tax_jurisdiction().insert(TaxJurisdiction {
         id: 0,
@@ -878,7 +952,7 @@ pub fn update_tax_jurisdiction(
         is_active: params.is_active.unwrap_or(jurisdiction.is_active),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.map(Some).unwrap_or(jurisdiction.metadata),
+        metadata: params.metadata.unwrap_or(jurisdiction.metadata),
         ..jurisdiction
     });
 
@@ -1018,7 +1092,7 @@ pub fn update_tax_schedule(
         effective_to: params.effective_to.unwrap_or(schedule.effective_to),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.map(Some).unwrap_or(schedule.metadata),
+        metadata: params.metadata.unwrap_or(schedule.metadata),
         ..schedule
     });
 
@@ -1269,6 +1343,15 @@ pub fn create_tax_deadline(
     params: CreateTaxDeadlineParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "tax_deadline", "create")?;
+    if let Some(company_id) = params.company_id {
+        require_company_in_organization(ctx, organization_id, company_id)?;
+    }
+    if params.tax_obligation_id.is_some() {
+        return Err(
+            "tax obligation IDs are unsupported until a typed obligation relation exists"
+                .to_string(),
+        );
+    }
 
     if params.title.trim().is_empty() {
         return Err("Title cannot be empty".to_string());
@@ -1394,10 +1477,14 @@ pub fn update_tax_deadline(
 
     ctx.db.tax_deadline().id().update(TaxDeadline {
         title: new_title,
-        description: params.description.or(deadline.description),
+        description: params.description.unwrap_or(deadline.description),
         due_date: new_due_date,
-        fiscal_period_start: params.fiscal_period_start.or(deadline.fiscal_period_start),
-        fiscal_period_end: params.fiscal_period_end.or(deadline.fiscal_period_end),
+        fiscal_period_start: params
+            .fiscal_period_start
+            .unwrap_or(deadline.fiscal_period_start),
+        fiscal_period_end: params
+            .fiscal_period_end
+            .unwrap_or(deadline.fiscal_period_end),
         reminder_days_before: params
             .reminder_days_before
             .unwrap_or(deadline.reminder_days_before),

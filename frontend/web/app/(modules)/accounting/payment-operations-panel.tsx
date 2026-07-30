@@ -317,7 +317,6 @@ export function PaymentOperationsPanel({
         feeAccountId: asId(data.feeAccountId) ?? undefined,
         clearingAccountId: asId(data.clearingAccountId) ?? undefined,
         isPrimary: data.isPrimary === true,
-        metadata: undefined,
       })
       setAccountDialogOpen(false)
     } catch (cause) {
@@ -356,7 +355,6 @@ export function PaymentOperationsPanel({
         sourceEntity: sourceEntity || undefined,
         sourceEntityId: sourceEntityId ?? undefined,
         evidenceDocumentIds: idList(data.evidenceDocumentIds),
-        metadata: undefined,
       })
       setTransactionDialogOpen(false)
     } catch (cause) {
@@ -377,6 +375,7 @@ export function PaymentOperationsPanel({
       if (transaction == null || transactionId == null || allocatedMoveLineId == null) throw new Error("Choose the invoice or bill line to allocate")
       if (writeOffAmount > 0 && writeOffAccountId == null) throw new Error("Choose a write-off account")
       await allocateTransaction.mutateAsync({
+        idempotencyKey: `allocate-payment:${globalThis.crypto.randomUUID()}`,
         companyId,
         paymentTransactionId: transactionId,
         allocatedMoveLineId,
@@ -384,7 +383,6 @@ export function PaymentOperationsPanel({
         currencyId: asId(transaction.currencyId) ?? defaultCurrencyId,
         writeOffAmount,
         writeOffAccountId: writeOffAccountId ?? undefined,
-        metadata: undefined,
       })
       setAllocatingTransaction(null)
     } catch (cause) {
@@ -401,7 +399,7 @@ export function PaymentOperationsPanel({
       if (transactionId == null) throw new Error("The selected transaction has no ID")
       await reverseTransaction.mutateAsync({
         transactionId,
-        params: { companyId, reason: stringValue(data.reason) || undefined, metadata: undefined },
+        params: { companyId, reason: stringValue(data.reason) || undefined },
       })
       setReversingTransaction(null)
     } catch (cause) {
@@ -433,7 +431,6 @@ export function PaymentOperationsPanel({
         taxAccountId: taxAccountId ?? undefined,
         taxAmount,
         providerReference: stringValue(data.providerReference) || undefined,
-        metadata: undefined,
       })
       setFeeTransaction(null)
     } catch (cause) {

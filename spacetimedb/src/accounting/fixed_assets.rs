@@ -186,7 +186,7 @@ pub struct UpdateAccountAssetParams {
     pub method_progress_factor: Option<f64>,
     pub prorata: Option<bool>,
     pub prorata_date: Option<Option<Timestamp>>,
-    pub account_analytic_id: Option<u64>,
+    pub account_analytic_id: Option<Option<u64>>,
     pub account_asset_id: Option<u64>,
     pub account_depreciation_id: Option<u64>,
     pub account_depreciation_expense_id: Option<u64>,
@@ -197,7 +197,7 @@ pub struct UpdateAccountAssetParams {
     pub first_depreciation_date: Option<Option<Timestamp>>,
     pub first_depreciation_date_manual: Option<Option<Timestamp>>,
     pub account_analytic_tag_ids: Option<Vec<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -242,7 +242,21 @@ fn validate_asset_parent(
     if parent.company_id != company_id {
         return Err("parent asset does not belong to this company".to_string());
     }
+    if !parent.active || parent.state == AssetState::Removed {
+        return Err("parent asset is inactive or disposed".to_string());
+    }
     Ok(())
+}
+
+fn reject_unmodeled_asset_tag_ids(tag_ids: &[u64]) -> Result<(), String> {
+    if tag_ids.is_empty() {
+        Ok(())
+    } else {
+        Err(
+            "asset analytic tag IDs are unsupported until a typed analytic-tag relation exists"
+                .to_string(),
+        )
+    }
 }
 
 fn load_asset_in_scope(
@@ -314,6 +328,7 @@ pub fn create_account_asset(
         return Ok(());
     }
     validate_asset_parent(ctx, organization_id, company_id, params.parent_id)?;
+    reject_unmodeled_asset_tag_ids(&params.account_analytic_tag_ids)?;
     require_active_currency_id(ctx, params.currency_id, "asset")?;
     let journal =
         require_active_journal(ctx, organization_id, company_id, params.journal_id, "asset")?;
@@ -620,8 +635,8 @@ pub fn update_account_asset(
         changed_fields.push("prorata_date".to_string());
     }
 
-    if params.account_analytic_id.is_some() {
-        new_account_analytic_id = params.account_analytic_id;
+    if let Some(analytic_id) = params.account_analytic_id {
+        new_account_analytic_id = analytic_id;
         changed_fields.push("account_analytic_id".to_string());
     }
 
@@ -671,12 +686,13 @@ pub fn update_account_asset(
     }
 
     if let Some(tags) = params.account_analytic_tag_ids {
+        reject_unmodeled_asset_tag_ids(&tags)?;
         new_account_analytic_tag_ids = tags;
         changed_fields.push("account_analytic_tag_ids".to_string());
     }
 
     if let Some(m) = params.metadata {
-        new_metadata = Some(m);
+        new_metadata = m;
         changed_fields.push("metadata".to_string());
     }
 
@@ -1211,6 +1227,26 @@ pub fn dispose_account_asset(
 
     if asset.state == AssetState::Draft {
         return Err("Cannot dispose asset in Draft state - confirm it first".to_string());
+    }
+    for (account_id, role, expected_group) in [
+        (
+            params.gain_account_id,
+            "asset disposal gain",
+            AccountInternalGroup::Income,
+        ),
+        (
+            params.loss_account_id,
+            "asset disposal loss",
+            AccountInternalGroup::Expense,
+        ),
+    ] {
+        if let Some(account_id) = account_id {
+            let account =
+                require_active_account(ctx, organization_id, company_id, account_id, role)?;
+            if account.internal_group != Some(expected_group) {
+                return Err(format!("{role} account has the wrong role"));
+            }
+        }
     }
 
     ctx.db.account_asset().id().update(AccountAsset {

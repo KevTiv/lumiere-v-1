@@ -2,6 +2,7 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, AccountMove, AccountMoveLine,
 };
@@ -269,9 +270,6 @@ pub fn recognize_amortization_line(
     if line.organization_id != organization_id || line.company_id != company_id {
         return Err("Amortization line does not belong to this company".to_string());
     }
-    if line.recognized {
-        return Err("Amortization line already recognized".to_string());
-    }
 
     let schedule = ctx
         .db
@@ -279,6 +277,81 @@ pub fn recognize_amortization_line(
         .id()
         .find(&line.schedule_id)
         .ok_or("Amortization schedule not found")?;
+    if schedule.organization_id != organization_id || schedule.company_id != company_id {
+        return Err("Amortization schedule does not belong to this company".to_string());
+    }
+
+    let idempotency_key = format!("amortization-line:{line_id}:recognize");
+    let payload_fingerprint = format!("{params:?}");
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "recognize_amortization_line",
+        &idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
+
+    if line.recognized {
+        return Err("Amortization line already recognized".to_string());
+    }
+    if schedule.state != "running" {
+        return Err("Amortization schedule is not running".to_string());
+    }
+
+    let journal = require_active_journal(
+        ctx,
+        organization_id,
+        company_id,
+        schedule.journal_id,
+        "amortization recognition",
+    )?;
+    if journal.type_ != JournalType::General {
+        return Err("amortization recognition requires a general journal".to_string());
+    }
+    require_active_currency_id(ctx, schedule.currency_id, "amortization recognition")?;
+    if journal
+        .currency_id
+        .is_some_and(|currency_id| currency_id != schedule.currency_id)
+    {
+        return Err(
+            "amortization recognition currency is incompatible with the journal".to_string(),
+        );
+    }
+    let balance_account = require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        schedule.balance_sheet_account_id,
+        "amortization recognition balance sheet",
+    )?;
+    let expected_balance_group = if schedule.schedule_kind == "prepaid" {
+        AccountInternalGroup::Asset
+    } else {
+        AccountInternalGroup::Liability
+    };
+    if balance_account.internal_group != Some(expected_balance_group) {
+        return Err(
+            "amortization recognition balance sheet account has the wrong role".to_string(),
+        );
+    }
+    let pl_account = require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        schedule.pl_account_id,
+        "amortization recognition P&L",
+    )?;
+    if !matches!(
+        pl_account.internal_group,
+        Some(AccountInternalGroup::Income | AccountInternalGroup::Expense)
+    ) {
+        return Err("amortization recognition P&L account has the wrong role".to_string());
+    }
 
     ensure_accounting_period_open_for_date(ctx, company_id, line.recognition_date)?;
 
@@ -465,6 +538,17 @@ pub fn recognize_amortization_line(
             changed_fields: vec!["recognized".to_string(), "move_id".to_string()],
             metadata: params.metadata.clone(),
         },
+    );
+
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "recognize_amortization_line",
+        idempotency_key,
+        payload_fingerprint,
+        "account_move",
+        move_record.id,
     );
 
     Ok(())

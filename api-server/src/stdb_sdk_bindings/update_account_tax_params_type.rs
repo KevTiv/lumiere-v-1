@@ -20,7 +20,7 @@ pub struct UpdateAccountTaxParams {
     pub sequence: Option<u32>,
     pub tax_group_id: Option<Option<u64>>,
     pub tags: Option<Vec<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateAccountTaxParams {

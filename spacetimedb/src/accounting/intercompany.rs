@@ -15,10 +15,12 @@ use crate::accounting::fiscal_periods::{
     accounting_ownership_backfill_issue, accounting_ownership_backfill_run, record_ownership_issue,
     AccountingOwnershipBackfillRun,
 };
+use crate::accounting::journal_entries::account_move;
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::users::user_profile;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::{IntercompanyState, RuleType};
+use crate::sales::sales_core::sale_order;
+use crate::types::{IntercompanyDocumentModel, IntercompanyState, RuleType};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -127,13 +129,13 @@ pub struct UpdateIntercompanyRuleParams {
     pub sequence: Option<u32>,
     pub is_active: Option<bool>,
     pub notes: Option<Option<String>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateIntercompanyTransactionParams {
     pub origin_document_id: u64,
-    pub origin_document_model: String,
+    pub origin_document_model: IntercompanyDocumentModel,
     pub destination_company_id: u64,
     pub amount: f64,
     pub currency_id: u64,
@@ -147,7 +149,7 @@ pub struct CreateIntercompanyTransactionParams {
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct ProcessIntercompanyTransactionParams {
     pub destination_document_id: u64,
-    pub destination_document_model: String,
+    pub destination_document_model: IntercompanyDocumentModel,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -395,7 +397,7 @@ pub fn update_intercompany_rule(
     }
 
     if let Some(m) = params.metadata {
-        new_metadata = Some(m);
+        new_metadata = m;
         changed_fields.push("metadata".to_string());
     }
 
@@ -481,8 +483,36 @@ pub fn create_intercompany_transaction(
         params.destination_company_id,
     )?;
 
-    if params.origin_document_model.is_empty() {
-        return Err("Document model is required".to_string());
+    let origin_document_model = params.origin_document_model.as_storage_str().to_string();
+    match &params.origin_document_model {
+        IntercompanyDocumentModel::AccountMove => {
+            let move_row = ctx
+                .db
+                .account_move()
+                .id()
+                .find(&params.origin_document_id)
+                .ok_or("origin account move not found")?;
+            if move_row.organization_id != organization_id {
+                return Err("origin account move does not belong to this organization".to_string());
+            }
+            if move_row.company_id != origin_company_id {
+                return Err("origin account move does not belong to the origin company".to_string());
+            }
+        }
+        IntercompanyDocumentModel::SaleOrder => {
+            let order = ctx
+                .db
+                .sale_order()
+                .id()
+                .find(&params.origin_document_id)
+                .ok_or("origin sale order not found")?;
+            if order.organization_id != organization_id {
+                return Err("origin sale order does not belong to this organization".to_string());
+            }
+            if order.company_id != origin_company_id {
+                return Err("origin sale order does not belong to the origin company".to_string());
+            }
+        }
     }
 
     let rule = ctx
@@ -513,7 +543,7 @@ pub fn create_intercompany_transaction(
 
     let transaction_name = format!(
         "{}-{}-{}",
-        params.origin_document_model, params.origin_document_id, ctx.timestamp
+        origin_document_model, params.origin_document_id, ctx.timestamp
     );
 
     let transaction = ctx
@@ -526,7 +556,7 @@ pub fn create_intercompany_transaction(
             origin_company_id,
             destination_company_id: params.destination_company_id,
             origin_document_id: params.origin_document_id,
-            origin_document_model: params.origin_document_model,
+            origin_document_model,
             destination_document_id: None,
             destination_document_model: None,
             amount: params.amount,
@@ -658,7 +688,9 @@ pub fn process_intercompany_transaction(
         .update(IntercompanyTransaction {
             state: IntercompanyState::Processing,
             destination_document_id: Some(params.destination_document_id),
-            destination_document_model: Some(params.destination_document_model.clone()),
+            destination_document_model: Some(
+                params.destination_document_model.as_storage_str().to_string(),
+            ),
             processed_by: Some(ctx.sender()),
             ..transaction
         });
@@ -675,7 +707,7 @@ pub fn process_intercompany_transaction(
             new_values: Some(
                 serde_json::json!({
                     "destination_document_id": params.destination_document_id,
-                    "destination_document_model": params.destination_document_model
+                    "destination_document_model": params.destination_document_model.as_storage_str()
                 })
                 .to_string(),
             ),

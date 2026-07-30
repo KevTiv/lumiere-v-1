@@ -89,6 +89,7 @@ pub mod allocate_payment_params_type;
 pub mod amend_subscription_params_type;
 pub mod amortization_line_type;
 pub mod amortization_schedule_type;
+pub mod analytic_distribution_line_params_type;
 pub mod analytics_metric_type;
 pub mod answer_proposal_clarification_params_type;
 pub mod append_ai_agent_run_step_params_type;
@@ -612,6 +613,7 @@ pub mod insight_severity_type;
 pub mod intake_state_type;
 pub mod integration_status_type;
 pub mod integration_type_type;
+pub mod intercompany_document_model_type;
 pub mod intercompany_rule_type;
 pub mod intercompany_state_type;
 pub mod intercompany_transaction_type;
@@ -2017,6 +2019,7 @@ pub mod run_accounting_fx_revaluation_test_reducer;
 pub mod run_accounting_ic_consolidation_test_reducer;
 pub mod run_accounting_payment_cancel_test_reducer;
 pub mod run_accounting_payment_management_test_reducer;
+pub mod run_accounting_payment_multi_invoice_residual_test_reducer;
 pub mod run_accounting_payment_reconcile_test_reducer;
 pub mod run_accounting_payment_term_update_test_reducer;
 pub mod run_accounting_period_lock_test_reducer;
@@ -2908,6 +2911,7 @@ pub use allocate_payment_params_type::AllocatePaymentParams;
 pub use amend_subscription_params_type::AmendSubscriptionParams;
 pub use amortization_line_type::AmortizationLine;
 pub use amortization_schedule_type::AmortizationSchedule;
+pub use analytic_distribution_line_params_type::AnalyticDistributionLineParams;
 pub use analytics_metric_type::AnalyticsMetric;
 pub use answer_proposal_clarification_params_type::AnswerProposalClarificationParams;
 pub use append_ai_agent_run_step_params_type::AppendAiAgentRunStepParams;
@@ -3431,6 +3435,7 @@ pub use insight_severity_type::InsightSeverity;
 pub use intake_state_type::IntakeState;
 pub use integration_status_type::IntegrationStatus;
 pub use integration_type_type::IntegrationType;
+pub use intercompany_document_model_type::IntercompanyDocumentModel;
 pub use intercompany_rule_type::IntercompanyRule;
 pub use intercompany_state_type::IntercompanyState;
 pub use intercompany_transaction_type::IntercompanyTransaction;
@@ -5240,6 +5245,7 @@ pub use run_accounting_fx_revaluation_test_reducer::run_accounting_fx_revaluatio
 pub use run_accounting_ic_consolidation_test_reducer::run_accounting_ic_consolidation_test;
 pub use run_accounting_payment_cancel_test_reducer::run_accounting_payment_cancel_test;
 pub use run_accounting_payment_management_test_reducer::run_accounting_payment_management_test;
+pub use run_accounting_payment_multi_invoice_residual_test_reducer::run_accounting_payment_multi_invoice_residual_test;
 pub use run_accounting_payment_reconcile_test_reducer::run_accounting_payment_reconcile_test;
 pub use run_accounting_payment_term_update_test_reducer::run_accounting_payment_term_update_test;
 pub use run_accounting_period_lock_test_reducer::run_accounting_period_lock_test;
@@ -9365,6 +9371,7 @@ pub enum Reducer {
     RunAccountingIcConsolidationTest ,
     RunAccountingPaymentCancelTest ,
     RunAccountingPaymentManagementTest ,
+    RunAccountingPaymentMultiInvoiceResidualTest ,
     RunAccountingPaymentReconcileTest ,
     RunAccountingPaymentTermUpdateTest ,
     RunAccountingPeriodLockTest ,
@@ -11722,6 +11729,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAccountingIcConsolidationTest => "run_accounting_ic_consolidation_test",
             Reducer::RunAccountingPaymentCancelTest => "run_accounting_payment_cancel_test",
             Reducer::RunAccountingPaymentManagementTest => "run_accounting_payment_management_test",
+            Reducer::RunAccountingPaymentMultiInvoiceResidualTest => "run_accounting_payment_multi_invoice_residual_test",
             Reducer::RunAccountingPaymentReconcileTest => "run_accounting_payment_reconcile_test",
             Reducer::RunAccountingPaymentTermUpdateTest => "run_accounting_payment_term_update_test",
             Reducer::RunAccountingPeriodLockTest => "run_accounting_period_lock_test",
@@ -18775,6 +18783,8 @@ Reducer::RunAccountingIcConsolidationTest => __sats::bsatn::to_vec(&run_accounti
 Reducer::RunAccountingPaymentCancelTest => __sats::bsatn::to_vec(&run_accounting_payment_cancel_test_reducer::RunAccountingPaymentCancelTestArgs {
                 }),
 Reducer::RunAccountingPaymentManagementTest => __sats::bsatn::to_vec(&run_accounting_payment_management_test_reducer::RunAccountingPaymentManagementTestArgs {
+                }),
+Reducer::RunAccountingPaymentMultiInvoiceResidualTest => __sats::bsatn::to_vec(&run_accounting_payment_multi_invoice_residual_test_reducer::RunAccountingPaymentMultiInvoiceResidualTestArgs {
                 }),
 Reducer::RunAccountingPaymentReconcileTest => __sats::bsatn::to_vec(&run_accounting_payment_reconcile_test_reducer::RunAccountingPaymentReconcileTestArgs {
                 }),

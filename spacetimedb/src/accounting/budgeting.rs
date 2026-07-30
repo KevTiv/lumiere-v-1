@@ -9,9 +9,11 @@
 /// - `CrossoveredBudget` — Budget header with date range and state
 /// - `CrossoveredBudgetLines` — Budget line items with planned vs actual amounts
 /// - `BudgetPost` — Budget positions for categorization
+use std::collections::HashSet;
+
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::relations::require_explicit_company_id;
+use crate::accounting::relations::{require_active_account, require_explicit_company_id};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::projects::projects::project_project;
 use crate::types::BudgetState;
@@ -187,6 +189,25 @@ pub struct UpdateBudgetPostParams {
     pub account_ids: Option<Vec<u64>>,
     pub is_active: Option<bool>,
     pub metadata: Option<Option<String>>,
+}
+
+// ── Validation ───────────────────────────────────────────────────────────────
+
+/// Validate budget-post `account_ids`: each must be active in-scope; duplicates fail.
+fn validate_budget_post_account_ids(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    account_ids: &[u64],
+) -> Result<(), String> {
+    let mut seen = HashSet::with_capacity(account_ids.len());
+    for account_id in account_ids {
+        if !seen.insert(*account_id) {
+            return Err(format!("Budget-post account {account_id} is duplicated"));
+        }
+        require_active_account(ctx, organization_id, company_id, *account_id, "budget-post")?;
+    }
+    Ok(())
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -887,6 +908,8 @@ pub fn create_budget_post(
         return Err("Budget post name is required".to_string());
     }
 
+    validate_budget_post_account_ids(ctx, organization_id, company_id, &params.account_ids)?;
+
     let post = ctx.db.budget_post().insert(BudgetPost {
         id: 0,
         organization_id,
@@ -973,6 +996,8 @@ pub fn update_budget_post(
     }
 
     if let Some(accs) = params.account_ids {
+        // None = preserve; Some([]) = clear; Some(ids) = replace (ACC-RI-017).
+        validate_budget_post_account_ids(ctx, organization_id, company_id, &accs)?;
         post.account_ids = accs;
         changed_fields.push("account_ids".to_string());
     }

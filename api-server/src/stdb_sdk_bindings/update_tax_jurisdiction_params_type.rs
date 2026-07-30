@@ -15,7 +15,7 @@ pub struct UpdateTaxJurisdictionParams {
     pub zip_from: Option<Option<String>>,
     pub zip_to: Option<Option<String>>,
     pub is_active: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateTaxJurisdictionParams {

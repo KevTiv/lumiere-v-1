@@ -18,7 +18,7 @@ pub struct UpdateAccountAssetParams {
     pub method_progress_factor: Option<f64>,
     pub prorata: Option<bool>,
     pub prorata_date: Option<Option<__sdk::Timestamp>>,
-    pub account_analytic_id: Option<u64>,
+    pub account_analytic_id: Option<Option<u64>>,
     pub account_asset_id: Option<u64>,
     pub account_depreciation_id: Option<u64>,
     pub account_depreciation_expense_id: Option<u64>,
@@ -29,7 +29,7 @@ pub struct UpdateAccountAssetParams {
     pub first_depreciation_date: Option<Option<__sdk::Timestamp>>,
     pub first_depreciation_date_manual: Option<Option<__sdk::Timestamp>>,
     pub account_analytic_tag_ids: Option<Vec<u64>>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateAccountAssetParams {

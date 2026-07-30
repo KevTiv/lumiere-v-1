@@ -11,6 +11,7 @@
 /// - `AccountAnalyticLine` — Analytic entries (timesheets, costs, revenues)
 /// - `AccountAnalyticDistributionModel` — Auto-distribution rules for analytic accounts
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+use std::collections::HashSet;
 
 use crate::accounting::relations::require_explicit_company_id;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -217,13 +218,19 @@ pub struct UpdateAnalyticLineParams {
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
+pub struct AnalyticDistributionLineParams {
+    pub account_id: u64,
+    pub percentage: f64,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateAnalyticDistributionModelParams {
     pub company_id: Option<u64>,
     pub name: Option<String>,
     pub partner_category_id: Option<u64>,
     pub product_id: Option<u64>,
     pub product_categ_id: Option<u64>,
-    pub analytic_distribution: String,
+    pub analytic_distribution: Vec<AnalyticDistributionLineParams>,
     pub analytic_precision: u8,
     pub metadata: Option<String>,
 }
@@ -231,17 +238,64 @@ pub struct CreateAnalyticDistributionModelParams {
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateAnalyticDistributionModelParams {
     pub company_id: Option<u64>,
-    pub name: Option<String>,
-    pub partner_category_id: Option<u64>,
-    pub product_id: Option<u64>,
-    pub product_categ_id: Option<u64>,
-    pub analytic_distribution: Option<String>,
+    pub name: Option<Option<String>>,
+    pub partner_category_id: Option<Option<u64>>,
+    pub product_id: Option<Option<u64>>,
+    pub product_categ_id: Option<Option<u64>>,
+    pub analytic_distribution: Option<Vec<AnalyticDistributionLineParams>>,
     pub analytic_precision: Option<u8>,
     pub is_active: Option<bool>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
+
+fn serialize_validated_distribution(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    lines: &[AnalyticDistributionLineParams],
+) -> Result<String, String> {
+    if lines.is_empty() {
+        return Err("analytic distribution must include at least one line".to_string());
+    }
+    let mut seen = HashSet::new();
+    let mut total_percentage = 0.0f64;
+    let mut json_lines = Vec::with_capacity(lines.len());
+    for line in lines {
+        if !seen.insert(line.account_id) {
+            return Err("analytic distribution contains duplicate account links".to_string());
+        }
+        if line.percentage < 0.0 || line.percentage > 100.0 {
+            return Err("percentage must be between 0 and 100".to_string());
+        }
+        let account = ctx
+            .db
+            .account_analytic_account()
+            .id()
+            .find(&line.account_id)
+            .ok_or("analytic account not found")?;
+        if account.organization_id != organization_id || account.company_id != company_id {
+            return Err(
+                "analytic account does not belong to this organization and company".to_string(),
+            );
+        }
+        if !account.active {
+            return Err("analytic account is inactive".to_string());
+        }
+        total_percentage += line.percentage;
+        json_lines.push(serde_json::json!({
+            "account_id": line.account_id,
+            "percentage": line.percentage,
+        }));
+    }
+    if (total_percentage - 100.0).abs() > 0.01 {
+        return Err(format!(
+            "total percentage must equal 100, got {total_percentage}"
+        ));
+    }
+    serde_json::to_string(&json_lines).map_err(|e| format!("failed to serialize distribution: {e}"))
+}
 
 /// Create a new analytic account
 #[spacetimedb::reducer]
@@ -749,29 +803,12 @@ pub fn create_analytic_distribution_model(
         "analytic-distribution creation",
     )?;
 
-    // Validate distribution JSON
-    let parsed: Vec<serde_json::Value> = serde_json::from_str(&params.analytic_distribution)
-        .map_err(|e| format!("Invalid analytic distribution JSON: {}", e))?;
-
-    let mut total_percentage = 0.0f64;
-    for item in &parsed {
-        let percentage = item
-            .get("percentage")
-            .and_then(|p| p.as_f64())
-            .ok_or("Each distribution item must have a percentage")?;
-        if percentage < 0.0 || percentage > 100.0 {
-            return Err("Percentage must be between 0 and 100".to_string());
-        }
-        total_percentage += percentage;
-    }
-
-    // Allow some floating point tolerance
-    if (total_percentage - 100.0).abs() > 0.01 {
-        return Err(format!(
-            "Total percentage must equal 100%, got {}",
-            total_percentage
-        ));
-    }
+    let analytic_distribution = serialize_validated_distribution(
+        ctx,
+        organization_id,
+        company_id,
+        &params.analytic_distribution,
+    )?;
 
     let model =
         ctx.db
@@ -784,7 +821,7 @@ pub fn create_analytic_distribution_model(
                 product_id: params.product_id,
                 product_categ_id: params.product_categ_id,
                 company_id,
-                analytic_distribution: params.analytic_distribution,
+                analytic_distribution,
                 analytic_precision: params.analytic_precision,
                 is_active: true,
                 create_uid: Some(ctx.sender()),
@@ -856,51 +893,33 @@ pub fn update_analytic_distribution_model(
 
     let mut changed_fields = Vec::new();
 
-    if params.name.is_some() {
-        model.name = params.name;
+    if let Some(name) = params.name {
+        model.name = name;
         changed_fields.push("name".to_string());
     }
 
-    if params.partner_category_id.is_some() {
-        model.partner_category_id = params.partner_category_id;
+    if let Some(partner_category_id) = params.partner_category_id {
+        model.partner_category_id = partner_category_id;
         changed_fields.push("partner_category_id".to_string());
     }
 
-    if params.product_id.is_some() {
-        model.product_id = params.product_id;
+    if let Some(product_id) = params.product_id {
+        model.product_id = product_id;
         changed_fields.push("product_id".to_string());
     }
 
-    if params.product_categ_id.is_some() {
-        model.product_categ_id = params.product_categ_id;
+    if let Some(product_categ_id) = params.product_categ_id {
+        model.product_categ_id = product_categ_id;
         changed_fields.push("product_categ_id".to_string());
     }
 
     if let Some(dist) = params.analytic_distribution {
-        // Validate distribution JSON
-        let parsed: Vec<serde_json::Value> = serde_json::from_str(&dist)
-            .map_err(|e| format!("Invalid analytic distribution JSON: {}", e))?;
-
-        let mut total_percentage = 0.0f64;
-        for item in &parsed {
-            let percentage = item
-                .get("percentage")
-                .and_then(|p| p.as_f64())
-                .ok_or("Each distribution item must have a percentage")?;
-            if percentage < 0.0 || percentage > 100.0 {
-                return Err("Percentage must be between 0 and 100".to_string());
-            }
-            total_percentage += percentage;
-        }
-
-        if (total_percentage - 100.0).abs() > 0.01 {
-            return Err(format!(
-                "Total percentage must equal 100%, got {}",
-                total_percentage
-            ));
-        }
-
-        model.analytic_distribution = dist;
+        model.analytic_distribution = serialize_validated_distribution(
+            ctx,
+            organization_id,
+            company_id,
+            &dist,
+        )?;
         changed_fields.push("analytic_distribution".to_string());
     }
 
@@ -915,7 +934,7 @@ pub fn update_analytic_distribution_model(
     }
 
     if let Some(m) = params.metadata {
-        model.metadata = Some(m);
+        model.metadata = m;
         changed_fields.push("metadata".to_string());
     }
 

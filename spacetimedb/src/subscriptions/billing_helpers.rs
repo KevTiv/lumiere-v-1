@@ -935,6 +935,7 @@ pub fn apply_subscription_invoice_payment(
         ctx,
         organization_id,
         CreateAccountMoveParams {
+            idempotency_key: format!("subscription-payment-move:{payment_ref}"),
             company_id: Some(company_id),
             journal_id: payment_journal_id,
             move_type: MoveType::Entry,
@@ -1046,6 +1047,7 @@ pub fn apply_subscription_invoice_payment(
         ctx,
         organization_id,
         CreatePaymentParams {
+            idempotency_key: format!("subscription-payment:{payment_ref}"),
             company_id,
             payment_type: PaymentType::InBound,
             partner_type: PartnerType::Customer,

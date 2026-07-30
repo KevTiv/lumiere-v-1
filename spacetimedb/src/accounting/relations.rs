@@ -1,4 +1,19 @@
 //! Scoped relational loaders shared by accounting mutation reducers.
+//!
+//! # `Option<Vec<…>>` many-to-many update semantics (ACC-RI-017)
+//!
+//! Accounting update params use `Option<Vec<T>>` for association fields
+//! (`tax_ids`, `account_ids`, `company_ids`, `evidence_document_ids`,
+//! `allowed_journal_ids`, filter ID lists, etc.):
+//!
+//! | Wire value | Meaning |
+//! |---|---|
+//! | `None` (field omitted) | Preserve the stored collection unchanged |
+//! | `Some([])` | Clear — replace with an empty collection |
+//! | `Some(ids)` | Replace with exactly `ids` (validated + deduped; duplicates fail) |
+//!
+//! Do not treat an empty `Vec` on a non-optional create/template field as
+//! “preserve from another source”; that collides with explicit clear.
 
 use spacetimedb::ReducerContext;
 
