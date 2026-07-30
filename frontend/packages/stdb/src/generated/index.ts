@@ -916,11 +916,13 @@ import RunProjectsWaveATestReducer from "./run_projects_wave_a_test_reducer";
 import RunProjectsWaveCTestReducer from "./run_projects_wave_c_test_reducer";
 import RunProjectsWaveDTestReducer from "./run_projects_wave_d_test_reducer";
 import RunProjectsWaveETestReducer from "./run_projects_wave_e_test_reducer";
+import RunProposalsConvertIntegrityTestReducer from "./run_proposals_convert_integrity_test_reducer";
 import RunProposalsWaveATestReducer from "./run_proposals_wave_a_test_reducer";
 import RunProposalsWaveDTestReducer from "./run_proposals_wave_d_test_reducer";
 import RunPurchasingBillBalancedTestReducer from "./run_purchasing_bill_balanced_test_reducer";
 import RunPurchasingCompanyIsolationTestReducer from "./run_purchasing_company_isolation_test_reducer";
 import RunPurchasingIncomingPickingTestReducer from "./run_purchasing_incoming_picking_test_reducer";
+import RunPurchasingLotReceiveTestReducer from "./run_purchasing_lot_receive_test_reducer";
 import RunPurchasingWaveCSmokeTestReducer from "./run_purchasing_wave_c_smoke_test_reducer";
 import RunPurchasingWaveETestReducer from "./run_purchasing_wave_e_test_reducer";
 import RunQueueFoundationTestsReducer from "./run_queue_foundation_tests_reducer";
@@ -935,6 +937,7 @@ import RunSalesDropshipConfirmTestReducer from "./run_sales_dropship_confirm_tes
 import RunSalesExchangeFromReturnTestReducer from "./run_sales_exchange_from_return_test_reducer";
 import RunSalesFiscalRemapTestReducer from "./run_sales_fiscal_remap_test_reducer";
 import RunSalesFxFailClosedTestReducer from "./run_sales_fx_fail_closed_test_reducer";
+import RunSalesGhostProductFailClosedTestReducer from "./run_sales_ghost_product_fail_closed_test_reducer";
 import RunSalesLineUpdateDeleteTestReducer from "./run_sales_line_update_delete_test_reducer";
 import RunSalesLockBlocksUpdateTestReducer from "./run_sales_lock_blocks_update_test_reducer";
 import RunSalesOmsExtensionsTestReducer from "./run_sales_oms_extensions_test_reducer";
@@ -9907,11 +9910,13 @@ const reducersSchema = __reducers(
   __reducerSchema("run_projects_wave_c_test", RunProjectsWaveCTestReducer),
   __reducerSchema("run_projects_wave_d_test", RunProjectsWaveDTestReducer),
   __reducerSchema("run_projects_wave_e_test", RunProjectsWaveETestReducer),
+  __reducerSchema("run_proposals_convert_integrity_test", RunProposalsConvertIntegrityTestReducer),
   __reducerSchema("run_proposals_wave_a_test", RunProposalsWaveATestReducer),
   __reducerSchema("run_proposals_wave_d_test", RunProposalsWaveDTestReducer),
   __reducerSchema("run_purchasing_bill_balanced_test", RunPurchasingBillBalancedTestReducer),
   __reducerSchema("run_purchasing_company_isolation_test", RunPurchasingCompanyIsolationTestReducer),
   __reducerSchema("run_purchasing_incoming_picking_test", RunPurchasingIncomingPickingTestReducer),
+  __reducerSchema("run_purchasing_lot_receive_test", RunPurchasingLotReceiveTestReducer),
   __reducerSchema("run_purchasing_wave_c_smoke_test", RunPurchasingWaveCSmokeTestReducer),
   __reducerSchema("run_purchasing_wave_e_test", RunPurchasingWaveETestReducer),
   __reducerSchema("run_queue_foundation_tests", RunQueueFoundationTestsReducer),
@@ -9926,6 +9931,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_sales_exchange_from_return_test", RunSalesExchangeFromReturnTestReducer),
   __reducerSchema("run_sales_fiscal_remap_test", RunSalesFiscalRemapTestReducer),
   __reducerSchema("run_sales_fx_fail_closed_test", RunSalesFxFailClosedTestReducer),
+  __reducerSchema("run_sales_ghost_product_fail_closed_test", RunSalesGhostProductFailClosedTestReducer),
   __reducerSchema("run_sales_line_update_delete_test", RunSalesLineUpdateDeleteTestReducer),
   __reducerSchema("run_sales_lock_blocks_update_test", RunSalesLockBlocksUpdateTestReducer),
   __reducerSchema("run_sales_oms_extensions_test", RunSalesOmsExtensionsTestReducer),

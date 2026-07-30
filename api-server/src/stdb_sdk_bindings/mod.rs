@@ -2111,11 +2111,13 @@ pub mod run_projects_wave_a_test_reducer;
 pub mod run_projects_wave_c_test_reducer;
 pub mod run_projects_wave_d_test_reducer;
 pub mod run_projects_wave_e_test_reducer;
+pub mod run_proposals_convert_integrity_test_reducer;
 pub mod run_proposals_wave_a_test_reducer;
 pub mod run_proposals_wave_d_test_reducer;
 pub mod run_purchasing_bill_balanced_test_reducer;
 pub mod run_purchasing_company_isolation_test_reducer;
 pub mod run_purchasing_incoming_picking_test_reducer;
+pub mod run_purchasing_lot_receive_test_reducer;
 pub mod run_purchasing_wave_c_smoke_test_reducer;
 pub mod run_purchasing_wave_e_test_reducer;
 pub mod run_queue_foundation_tests_reducer;
@@ -2130,6 +2132,7 @@ pub mod run_sales_dropship_confirm_test_reducer;
 pub mod run_sales_exchange_from_return_test_reducer;
 pub mod run_sales_fiscal_remap_test_reducer;
 pub mod run_sales_fx_fail_closed_test_reducer;
+pub mod run_sales_ghost_product_fail_closed_test_reducer;
 pub mod run_sales_line_update_delete_test_reducer;
 pub mod run_sales_lock_blocks_update_test_reducer;
 pub mod run_sales_oms_extensions_test_reducer;
@@ -5337,11 +5340,13 @@ pub use run_projects_wave_a_test_reducer::run_projects_wave_a_test;
 pub use run_projects_wave_c_test_reducer::run_projects_wave_c_test;
 pub use run_projects_wave_d_test_reducer::run_projects_wave_d_test;
 pub use run_projects_wave_e_test_reducer::run_projects_wave_e_test;
+pub use run_proposals_convert_integrity_test_reducer::run_proposals_convert_integrity_test;
 pub use run_proposals_wave_a_test_reducer::run_proposals_wave_a_test;
 pub use run_proposals_wave_d_test_reducer::run_proposals_wave_d_test;
 pub use run_purchasing_bill_balanced_test_reducer::run_purchasing_bill_balanced_test;
 pub use run_purchasing_company_isolation_test_reducer::run_purchasing_company_isolation_test;
 pub use run_purchasing_incoming_picking_test_reducer::run_purchasing_incoming_picking_test;
+pub use run_purchasing_lot_receive_test_reducer::run_purchasing_lot_receive_test;
 pub use run_purchasing_wave_c_smoke_test_reducer::run_purchasing_wave_c_smoke_test;
 pub use run_purchasing_wave_e_test_reducer::run_purchasing_wave_e_test;
 pub use run_queue_foundation_tests_reducer::run_queue_foundation_tests;
@@ -5356,6 +5361,7 @@ pub use run_sales_dropship_confirm_test_reducer::run_sales_dropship_confirm_test
 pub use run_sales_exchange_from_return_test_reducer::run_sales_exchange_from_return_test;
 pub use run_sales_fiscal_remap_test_reducer::run_sales_fiscal_remap_test;
 pub use run_sales_fx_fail_closed_test_reducer::run_sales_fx_fail_closed_test;
+pub use run_sales_ghost_product_fail_closed_test_reducer::run_sales_ghost_product_fail_closed_test;
 pub use run_sales_line_update_delete_test_reducer::run_sales_line_update_delete_test;
 pub use run_sales_lock_blocks_update_test_reducer::run_sales_lock_blocks_update_test;
 pub use run_sales_oms_extensions_test_reducer::run_sales_oms_extensions_test;
@@ -9483,11 +9489,13 @@ pub enum Reducer {
     RunProjectsWaveCTest ,
     RunProjectsWaveDTest ,
     RunProjectsWaveETest ,
+    RunProposalsConvertIntegrityTest ,
     RunProposalsWaveATest ,
     RunProposalsWaveDTest ,
     RunPurchasingBillBalancedTest ,
     RunPurchasingCompanyIsolationTest ,
     RunPurchasingIncomingPickingTest ,
+    RunPurchasingLotReceiveTest ,
     RunPurchasingWaveCSmokeTest ,
     RunPurchasingWaveETest ,
     RunQueueFoundationTests ,
@@ -9502,6 +9510,7 @@ pub enum Reducer {
     RunSalesExchangeFromReturnTest ,
     RunSalesFiscalRemapTest ,
     RunSalesFxFailClosedTest ,
+    RunSalesGhostProductFailClosedTest ,
     RunSalesLineUpdateDeleteTest ,
     RunSalesLockBlocksUpdateTest ,
     RunSalesOmsExtensionsTest ,
@@ -11821,11 +11830,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunProjectsWaveCTest => "run_projects_wave_c_test",
             Reducer::RunProjectsWaveDTest => "run_projects_wave_d_test",
             Reducer::RunProjectsWaveETest => "run_projects_wave_e_test",
+            Reducer::RunProposalsConvertIntegrityTest => "run_proposals_convert_integrity_test",
             Reducer::RunProposalsWaveATest => "run_proposals_wave_a_test",
             Reducer::RunProposalsWaveDTest => "run_proposals_wave_d_test",
             Reducer::RunPurchasingBillBalancedTest => "run_purchasing_bill_balanced_test",
             Reducer::RunPurchasingCompanyIsolationTest => "run_purchasing_company_isolation_test",
             Reducer::RunPurchasingIncomingPickingTest => "run_purchasing_incoming_picking_test",
+            Reducer::RunPurchasingLotReceiveTest => "run_purchasing_lot_receive_test",
             Reducer::RunPurchasingWaveCSmokeTest => "run_purchasing_wave_c_smoke_test",
             Reducer::RunPurchasingWaveETest => "run_purchasing_wave_e_test",
             Reducer::RunQueueFoundationTests => "run_queue_foundation_tests",
@@ -11840,6 +11851,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunSalesExchangeFromReturnTest => "run_sales_exchange_from_return_test",
             Reducer::RunSalesFiscalRemapTest => "run_sales_fiscal_remap_test",
             Reducer::RunSalesFxFailClosedTest => "run_sales_fx_fail_closed_test",
+            Reducer::RunSalesGhostProductFailClosedTest => "run_sales_ghost_product_fail_closed_test",
             Reducer::RunSalesLineUpdateDeleteTest => "run_sales_line_update_delete_test",
             Reducer::RunSalesLockBlocksUpdateTest => "run_sales_lock_blocks_update_test",
             Reducer::RunSalesOmsExtensionsTest => "run_sales_oms_extensions_test",
@@ -19003,6 +19015,8 @@ Reducer::RunProjectsWaveDTest => __sats::bsatn::to_vec(&run_projects_wave_d_test
                 }),
 Reducer::RunProjectsWaveETest => __sats::bsatn::to_vec(&run_projects_wave_e_test_reducer::RunProjectsWaveETestArgs {
                 }),
+Reducer::RunProposalsConvertIntegrityTest => __sats::bsatn::to_vec(&run_proposals_convert_integrity_test_reducer::RunProposalsConvertIntegrityTestArgs {
+                }),
 Reducer::RunProposalsWaveATest => __sats::bsatn::to_vec(&run_proposals_wave_a_test_reducer::RunProposalsWaveATestArgs {
                 }),
 Reducer::RunProposalsWaveDTest => __sats::bsatn::to_vec(&run_proposals_wave_d_test_reducer::RunProposalsWaveDTestArgs {
@@ -19012,6 +19026,8 @@ Reducer::RunPurchasingBillBalancedTest => __sats::bsatn::to_vec(&run_purchasing_
 Reducer::RunPurchasingCompanyIsolationTest => __sats::bsatn::to_vec(&run_purchasing_company_isolation_test_reducer::RunPurchasingCompanyIsolationTestArgs {
                 }),
 Reducer::RunPurchasingIncomingPickingTest => __sats::bsatn::to_vec(&run_purchasing_incoming_picking_test_reducer::RunPurchasingIncomingPickingTestArgs {
+                }),
+Reducer::RunPurchasingLotReceiveTest => __sats::bsatn::to_vec(&run_purchasing_lot_receive_test_reducer::RunPurchasingLotReceiveTestArgs {
                 }),
 Reducer::RunPurchasingWaveCSmokeTest => __sats::bsatn::to_vec(&run_purchasing_wave_c_smoke_test_reducer::RunPurchasingWaveCSmokeTestArgs {
                 }),
@@ -19040,6 +19056,8 @@ Reducer::RunSalesExchangeFromReturnTest => __sats::bsatn::to_vec(&run_sales_exch
 Reducer::RunSalesFiscalRemapTest => __sats::bsatn::to_vec(&run_sales_fiscal_remap_test_reducer::RunSalesFiscalRemapTestArgs {
                 }),
 Reducer::RunSalesFxFailClosedTest => __sats::bsatn::to_vec(&run_sales_fx_fail_closed_test_reducer::RunSalesFxFailClosedTestArgs {
+                }),
+Reducer::RunSalesGhostProductFailClosedTest => __sats::bsatn::to_vec(&run_sales_ghost_product_fail_closed_test_reducer::RunSalesGhostProductFailClosedTestArgs {
                 }),
 Reducer::RunSalesLineUpdateDeleteTest => __sats::bsatn::to_vec(&run_sales_line_update_delete_test_reducer::RunSalesLineUpdateDeleteTestArgs {
                 }),
