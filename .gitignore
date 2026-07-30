@@ -22,3 +22,6 @@ frontend/web/reports/
 */**/.pnpm-store
 */**/**/.turbo
 */**/.turbo
+/.tmp/
+/.vscode/
+/3. Fix AI certification integrity
