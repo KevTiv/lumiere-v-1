@@ -317,6 +317,21 @@ pub fn create_analytic_account(
         return Err("Analytic account name is required".to_string());
     }
 
+    if let Some(pid) = params.parent_id {
+        let parent = ctx
+            .db
+            .account_analytic_account()
+            .id()
+            .find(&pid)
+            .ok_or("parent analytic account not found")?;
+        if parent.organization_id != organization_id || parent.company_id != company_id {
+            return Err(
+                "parent analytic account does not belong to this organization and company"
+                    .to_string(),
+            );
+        }
+    }
+
     let account = ctx
         .db
         .account_analytic_account()

@@ -25,3 +25,5 @@ frontend/web/reports/
 /.tmp/
 /.vscode/
 /3. Fix AI certification integrity
+/.claude/worktrees/
+/.claude/settings.local.json

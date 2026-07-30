@@ -911,6 +911,9 @@ pub fn update_tax_jurisdiction(
         .id()
         .find(&jurisdiction_id)
         .ok_or("Jurisdiction not found")?;
+    if jurisdiction.organization_id != organization_id {
+        return Err("Jurisdiction does not belong to this organization".to_string());
+    }
 
     let old_values =
         serde_json::json!({ "name": jurisdiction.name, "code": jurisdiction.code }).to_string();

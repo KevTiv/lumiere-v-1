@@ -685,6 +685,9 @@ pub fn update_account_bank_statement(
         .find(&statement_id)
         .ok_or("Statement not found")?;
 
+    if statement.organization_id != organization_id {
+        return Err("Statement does not belong to this organization".to_string());
+    }
     if statement.company_id != company_id {
         return Err("Record does not belong to this company".to_string());
     }
@@ -818,6 +821,9 @@ pub fn delete_account_bank_statement(
         .find(&statement_id)
         .ok_or("Statement not found")?;
 
+    if statement.organization_id != organization_id {
+        return Err("Statement does not belong to this organization".to_string());
+    }
     if statement.company_id != company_id {
         return Err("Record does not belong to this company".to_string());
     }
@@ -875,6 +881,9 @@ pub fn create_account_bank_statement_line(
         .find(&statement_id)
         .ok_or("Statement not found")?;
 
+    if statement.organization_id != organization_id {
+        return Err("Statement does not belong to this organization".to_string());
+    }
     if statement.state == BankStatementState::Posted {
         return Err("Cannot add lines to a posted statement".to_string());
     }
@@ -970,6 +979,9 @@ pub fn update_account_bank_statement_line(
         .find(&line.statement_id)
         .ok_or("Parent statement not found")?;
 
+    if statement.organization_id != organization_id {
+        return Err("Statement does not belong to this organization".to_string());
+    }
     if statement.company_id != company_id {
         return Err("Record does not belong to this company".to_string());
     }
@@ -1107,6 +1119,9 @@ pub fn delete_account_bank_statement_line(
         .find(&line.statement_id)
         .ok_or("Parent statement not found")?;
 
+    if statement.organization_id != organization_id {
+        return Err("Statement does not belong to this organization".to_string());
+    }
     if statement.company_id != company_id {
         return Err("Record does not belong to this company".to_string());
     }
@@ -1158,6 +1173,9 @@ pub fn post_account_bank_statement(
         .find(&statement_id)
         .ok_or("Statement not found")?;
 
+    if statement.organization_id != organization_id {
+        return Err("Statement does not belong to this organization".to_string());
+    }
     if statement.company_id != company_id {
         return Err("Record does not belong to this company".to_string());
     }
@@ -1697,6 +1715,10 @@ pub fn match_bank_line(
         .find(&line.statement_id)
         .ok_or("Parent statement not found")?;
 
+    if statement.organization_id != organization_id {
+        return Err("Statement does not belong to this organization".to_string());
+    }
+
     if line.is_reconciled {
         return Err("Line is already reconciled".to_string());
     }
@@ -1714,7 +1736,7 @@ pub fn match_bank_line(
     let is_payment = line.amount < 0.0;
 
     for move_line in ctx.db.account_move_line().iter() {
-        if move_line.company_id != statement.company_id {
+        if move_line.organization_id != organization_id || move_line.company_id != statement.company_id {
             continue;
         }
 

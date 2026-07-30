@@ -1,5 +1,6 @@
 //! Accounting domain test suite — invoke via `run_all_accounting_tests` reducer.
 pub mod active_company_matrix_test;
+pub mod adversarial_p0_fixes_test;
 pub mod fixed_assets_test;
 pub mod fx_revaluation_test;
 pub mod helpers;
@@ -42,6 +43,12 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|error| format!("account tax_ids Option<Vec>: {error}"))?;
     option_vec_semantics_test::test_budget_post_account_ids_option_vec_semantics(ctx)
         .map_err(|error| format!("budget_post account_ids Option<Vec>: {error}"))?;
+    adversarial_p0_fixes_test::test_update_tax_jurisdiction_rejects_cross_tenant(ctx)
+        .map_err(|error| format!("ACC-RI-020 tax jurisdiction: {error}"))?;
+    adversarial_p0_fixes_test::test_create_analytic_account_rejects_cross_tenant_parent(ctx)
+        .map_err(|error| format!("ACC-RI-021 analytic account parent: {error}"))?;
+    adversarial_p0_fixes_test::test_bank_statement_reducers_reject_cross_tenant(ctx)
+        .map_err(|error| format!("ACC-RI-022 bank statement: {error}"))?;
     log::info!("✅ run_all_accounting_tests complete");
     Ok(())
 }
