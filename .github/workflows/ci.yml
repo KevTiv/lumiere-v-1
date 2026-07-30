@@ -66,6 +66,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check accounting double-cast rationales
+        run: bash ../scripts/lint-accounting-as-unknown-as.sh
+
       - name: Typecheck
         run: pnpm typecheck
 

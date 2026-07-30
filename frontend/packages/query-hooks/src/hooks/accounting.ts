@@ -2,16 +2,24 @@
 
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { paymentParamsToJson } from "@lumiere/erp-shared/accounting-create-params"
+import {
+  paymentParamsToJson,
+  type ClearablePatch,
+} from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson, encodeOptionalU64, encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   AllocatePaymentParams,
+  CreateAccountAccountTypeParams,
+  CreateAccountGroupParams,
+  CreateCurrencyRateParams,
   CreatePaymentAccountParams,
   CreatePaymentFeeParams,
   CreatePaymentParams,
   CreatePaymentTransactionParams,
   ReversePaymentTransactionParams,
   StageBankStatementImportParams,
+  UpdateAccountAccountTypeParams,
+  UpdateAccountGroupParams,
 } from "@lumiere/stdb/types"
 import { accountingBffPost, type AccountingBffReducerKey } from "@lumiere/stdb/commands"
 import { invalidateStdbQueryResources, useStdbQuery } from "./stdb"
@@ -593,7 +601,7 @@ export function useCreateCrossoveredBudget(organizationId: number) {
 export function useCreateAccountAccountType(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
+    mutationFn: async (params: CreateAccountAccountTypeParams) => {
       const { urlPath, init } = accountingBffPost("create_account_account_type", [
         organizationId,
         stdbParamsToJson(params as object, "CreateAccountAccountTypeParams"),
@@ -608,7 +616,10 @@ export function useCreateAccountAccountType(organizationId: number) {
 export function useUpdateAccountAccountType(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { typeId: bigint; params: Record<string, unknown> }) => {
+    mutationFn: async (args: {
+      typeId: bigint
+      params: ClearablePatch<UpdateAccountAccountTypeParams>
+    }) => {
       const { urlPath, init } = accountingBffPost("update_account_account_type", [
         organizationId,
         args.typeId,
@@ -624,7 +635,7 @@ export function useUpdateAccountAccountType(organizationId: number) {
 export function useCreateAccountGroup(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
+    mutationFn: async (params: CreateAccountGroupParams) => {
       const { urlPath, init } = accountingBffPost("create_account_group", [
         organizationId,
         stdbParamsToJson(params as object, "CreateAccountGroupParams"),
@@ -639,7 +650,10 @@ export function useCreateAccountGroup(organizationId: number) {
 export function useUpdateAccountGroup(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { groupId: bigint; params: Record<string, unknown> }) => {
+    mutationFn: async (args: {
+      groupId: bigint
+      params: ClearablePatch<UpdateAccountGroupParams>
+    }) => {
       const { urlPath, init } = accountingBffPost("update_account_group", [
         organizationId,
         args.groupId,
@@ -2058,7 +2072,7 @@ export function useCreateCurrencyRate(organizationId: number, companyId: bigint 
   const qc = useQueryClient()
   const k = String(organizationId)
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
+    mutationFn: async (params: CreateCurrencyRateParams) => {
       const { urlPath, init } = accountingBffPost("create_currency_rate", [
         organizationId,
         encodeOptionalU64(companyId),

@@ -76,8 +76,8 @@ function nullableBigIntU64(v: unknown): bigint | null {
  * (`null`) is not representable on the official type. Patch builders keep
  * runtime `null` for clear and omit keys for preserve.
  */
-type ClearablePatch<T> = {
-  [K in keyof T]?: T[K] | null
+export type ClearablePatch<T> = {
+  -readonly [K in keyof T]?: T[K] | null
 }
 
 function requiredBigIntU64(v: unknown): bigint | null {
@@ -514,8 +514,8 @@ export function toCreateAccountAccountTypeParams(
 export function toUpdateAccountAccountTypeParams(
   formData: Record<string, unknown>,
   companyId: bigint,
-): Record<string, unknown> {
-  const params: Record<string, unknown> = { companyId }
+): ClearablePatch<UpdateAccountAccountTypeParams> {
+  const params: ClearablePatch<UpdateAccountAccountTypeParams> = { companyId }
   if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
   if (hasOwn(formData, 'type')) params.type = optionalTrimmedString(formData.type)
   if (hasOwn(formData, 'internalGroup') && formData.internalGroup !== '') {
@@ -551,8 +551,8 @@ export function toCreateAccountGroupParams(
 export function toUpdateAccountGroupParams(
   formData: Record<string, unknown>,
   companyId: bigint,
-): Record<string, unknown> {
-  const params: Record<string, unknown> = { companyId }
+): ClearablePatch<UpdateAccountGroupParams> {
+  const params: ClearablePatch<UpdateAccountGroupParams> = { companyId }
   if (hasOwn(formData, 'name')) params.name = optionalTrimmedString(formData.name)
   if (hasOwn(formData, 'codePrefixStart')) {
     params.codePrefixStart = nullableTrimmedString(formData.codePrefixStart)

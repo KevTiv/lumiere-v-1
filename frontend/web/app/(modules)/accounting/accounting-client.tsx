@@ -1210,6 +1210,7 @@ function AccountingClientReady({
               variant="outline"
               onClick={() => {
                 setInvoiceSheetRecord(null)
+                // ACC-RI-018 rationale: safe because this generic sheet is installed only on AccountMove tabs.
                 setSelectedInvoice(record as unknown as AccountMove)
               }}
             >
@@ -2926,12 +2927,12 @@ function AccountingClientReady({
   const chartStructurePanel = useMemo(
     () => (
       <ChartStructureWorkspace
-        accountTypes={accountTypes as unknown as Record<string, unknown>[]}
-        accountGroups={accountGroups as unknown as Record<string, unknown>[]}
+        accountTypes={accountTypes}
+        accountGroups={accountGroups}
         onCreateAccountType={async (fd) => {
           const p = toCreateAccountAccountTypeParams(fd, operatingCompanyId)
           if (p.name.trim() && p.type.trim()) {
-            await createAccountType.mutateAsync(p as unknown as Record<string, unknown>)
+            await createAccountType.mutateAsync(p)
           }
         }}
         onUpdateAccountType={async (typeId, fd) => {
@@ -2940,19 +2941,19 @@ function AccountingClientReady({
             params: toUpdateAccountAccountTypeParams(
               fd,
               operatingCompanyId,
-            ) as unknown as Record<string, unknown>,
+            ),
           })
         }}
         onCreateAccountGroup={async (fd) => {
           const p = toCreateAccountGroupParams(fd, operatingCompanyId)
           if (p.name.trim()) {
-            await createAccountGroup.mutateAsync(p as unknown as Record<string, unknown>)
+            await createAccountGroup.mutateAsync(p)
           }
         }}
         onUpdateAccountGroup={async (groupId, fd) => {
           await updateAccountGroup.mutateAsync({
             groupId,
-            params: toUpdateAccountGroupParams(fd, operatingCompanyId) as unknown as Record<string, unknown>,
+            params: toUpdateAccountGroupParams(fd, operatingCompanyId),
           })
         }}
       />
@@ -3126,8 +3127,12 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <InvoiceListView
-                    invoices={invoices as unknown as AccountMove[]}
+                    invoices={
+                      // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
+                      invoices as unknown as AccountMove[]
+                    }
                     onSelectInvoice={(invoice) =>
+                      // ACC-RI-018 rationale: safe because this sheet receives only InvoiceListView AccountMove rows.
                       setInvoiceSheetRecord(invoice as unknown as Record<string, unknown>)
                     }
                     onCreateInvoice={() => setShowCreateInvoice(true)}
@@ -3145,9 +3150,13 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <BillsListView
-                    bills={bills as unknown as AccountMove[]}
+                    bills={
+                      // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
+                      bills as unknown as AccountMove[]
+                    }
                     onCreateBill={() => setShowCreateBill(true)}
                     onSelectBill={(bill) =>
+                      // ACC-RI-018 rationale: safe because this sheet receives only BillsListView AccountMove rows.
                       setInvoiceSheetRecord(bill as unknown as Record<string, unknown>)
                     }
                     onRecalculateTotals={(bill) =>
@@ -3164,7 +3173,10 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <ChartOfAccountsView
-                    accounts={accounts as unknown as Parameters<typeof ChartOfAccountsView>[0]["accounts"]}
+                    accounts={
+                      // ACC-RI-018 rationale: safe because this resource selects every AccountAccount view field.
+                      accounts as unknown as Parameters<typeof ChartOfAccountsView>[0]["accounts"]
+                    }
                     chartStructureContent={chartStructurePanel}
                     onImportAccountsCsv={() => setCsvKind("account")}
                     onAccountClick={(account) => setGlDrilldownAccount(account)}
@@ -3187,7 +3199,10 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <GeneralLedgerView
-                    moves={allMoves as unknown as AccountMove[]}
+                    moves={
+                      // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
+                      allMoves as unknown as AccountMove[]
+                    }
                     onImportMovesCsv={() => setCsvKind("accountMove")}
                     onImportMoveLinesCsv={() => setCsvKind("accountMoveLine")}
                     onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
@@ -3220,9 +3235,9 @@ function AccountingClientReady({
                       </Button>
                     </div>
                     <BudgetsWorkspace
-                      budgets={budgets as unknown as Record<string, unknown>[]}
-                      budgetLines={budgetLines as unknown as Record<string, unknown>[]}
-                      budgetPosts={budgetPosts as unknown as Record<string, unknown>[]}
+                      budgets={budgets}
+                      budgetLines={budgetLines}
+                      budgetPosts={budgetPosts}
                       onCreateBudget={(params) =>
                         createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(params, operatingCompanyId), "CreateCrossoveredBudgetParams"))
                       }
@@ -3340,7 +3355,7 @@ function AccountingClientReady({
                   <div className="space-y-4">
                     <EntityView
                       config={fixedAssetsEntityConfig}
-                      data={fixedAssets as unknown as Record<string, unknown>[]}
+                      data={fixedAssets}
                       onRowClick={(row) => setSelectedFixedAsset(row)}
                     />
                     {selectedFixedAsset ? (
@@ -3440,7 +3455,7 @@ function AccountingClientReady({
                     </div>
                     <EntityView
                       config={intercompanyTransactionsEntityConfig}
-                      data={intercompanyTransactions as unknown as Record<string, unknown>[]}
+                      data={intercompanyTransactions}
                     />
                   </div>
                 ),
@@ -3465,7 +3480,7 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <FxRevaluationPanel
-                    runs={fxRevaluationRuns as unknown as Record<string, unknown>[]}
+                    runs={fxRevaluationRuns}
                     currencySelectOptions={currencySelectOptions}
                     journalSelectOptions={journalFieldOptionsForModularForm}
                     accountSelectOptions={glAccountFieldOptions}
@@ -3495,7 +3510,7 @@ function AccountingClientReady({
                     onCreateCurrencyRate={async (formData) => {
                       const params = toCreateCurrencyRateParamsFromForm(formData)
                       if (!params) throw new Error(t("accounting.fxRevaluation.invalidForm"))
-                      await createCurrencyRate.mutateAsync(params as unknown as Record<string, unknown>)
+                      await createCurrencyRate.mutateAsync(params)
                       toast({ title: t("accounting.fxRevaluation.rateSuccess") })
                     }}
                   />
@@ -3508,7 +3523,7 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <PartnerCreditControlPanel
-                    controls={partnerCreditControls as unknown as Record<string, unknown>[]}
+                    controls={partnerCreditControls}
                     partnerSelectOptions={partnerSelectOptions}
                     journalSelectOptions={journalFieldOptionsForModularForm}
                     accountSelectOptions={glAccountFieldOptions}
@@ -3537,8 +3552,8 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <AmortizationPanel
-                    schedules={amortizationSchedules as unknown as Record<string, unknown>[]}
-                    lines={amortizationLines as unknown as Record<string, unknown>[]}
+                    schedules={amortizationSchedules}
+                    lines={amortizationLines}
                     journalSelectOptions={journalFieldOptionsForModularForm}
                     accountSelectOptions={glAccountFieldOptions}
                     currencySelectOptions={currencySelectOptions}
@@ -3564,9 +3579,9 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <ConsolidationWorkspace
-                    consolidationAccounts={consolidationAccounts as unknown as Record<string, unknown>[]}
-                    consolidationJournals={consolidationJournals as unknown as Record<string, unknown>[]}
-                    eliminationEntries={eliminationEntries as unknown as Record<string, unknown>[]}
+                    consolidationAccounts={consolidationAccounts}
+                    consolidationJournals={consolidationJournals}
+                    eliminationEntries={eliminationEntries}
                     consolidationCompanyIds={
                       operatingCompanyId > 0n ? [operatingCompanyId] : []
                     }
@@ -3779,23 +3794,23 @@ function AccountingClientReady({
   // Entity tab data (taxes, budgets, analytic, etc. — non-rich tabs)
   const data = useMemo(
     () => ({
-      taxes: taxes as unknown as Record<string, unknown>[],
-      budgets: budgets as unknown as Record<string, unknown>[],
-      analytic: analytic as unknown as Record<string, unknown>[],
-      "analytic-lines": analyticLines as unknown as Record<string, unknown>[],
-      "analytic-distribution": analyticDistribution as unknown as Record<string, unknown>[],
-      "reconciliation-widgets": reconciliationWidgets as unknown as Record<string, unknown>[],
-      "fixed-assets": fixedAssets as unknown as Record<string, unknown>[],
-      "fiscal-years": fiscalYearsDisplay as unknown as Record<string, unknown>[],
-      "account-periods": accountPeriodsDisplay as unknown as Record<string, unknown>[],
-      "intercompany-rules": intercompanyRules as unknown as Record<string, unknown>[],
-      "intercompany-transactions": intercompanyTransactions as unknown as Record<string, unknown>[],
-      payments: accountPayments as unknown as Record<string, unknown>[],
-      "bank-statements": bankStatements as unknown as Record<string, unknown>[],
-      "payment-terms": paymentTerms as unknown as Record<string, unknown>[],
+      taxes,
+      budgets,
+      analytic,
+      "analytic-lines": analyticLines,
+      "analytic-distribution": analyticDistribution,
+      "reconciliation-widgets": reconciliationWidgets,
+      "fixed-assets": fixedAssets,
+      "fiscal-years": fiscalYearsDisplay,
+      "account-periods": accountPeriodsDisplay,
+      "intercompany-rules": intercompanyRules,
+      "intercompany-transactions": intercompanyTransactions,
+      payments: accountPayments,
+      "bank-statements": bankStatements,
+      "payment-terms": paymentTerms,
       "payment-term-lines": paymentTermLinesDisplay,
-      "account-journals": journals as unknown as Record<string, unknown>[],
-      "move-lines": accountMoveLines as unknown as Record<string, unknown>[],
+      "account-journals": journals,
+      "move-lines": accountMoveLines,
     }),
     [
       taxes,
@@ -3885,7 +3900,10 @@ function AccountingClientReady({
       <AccountGlDrilldownPanel
         account={glDrilldownAccount}
         moveLines={accountMoveLines as Record<string, unknown>[]}
-        moves={allMoves as unknown as AccountMove[]}
+        moves={
+          // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
+          allMoves as unknown as AccountMove[]
+        }
         open={glDrilldownAccount != null}
         onOpenChange={(open) => {
           if (!open) setGlDrilldownAccount(null)
