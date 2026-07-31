@@ -13,8 +13,8 @@ import {
 export default __t.row({
   id: __t.u64().primaryKey(),
   organizationId: __t.u64().name("organization_id"),
-  fromCurrency: __t.string().name("from_currency"),
-  toCurrency: __t.string().name("to_currency"),
+  fromCurrencyId: __t.u64().name("from_currency_id"),
+  toCurrencyId: __t.u64().name("to_currency_id"),
   rate: __t.f64(),
   inverseRate: __t.f64().name("inverse_rate"),
   date: __t.timestamp(),

@@ -17,7 +17,7 @@ use crate::accounting::payment_management::{
 use crate::accounting::payments::{account_payment, post_payment_impl};
 use crate::ai::action_drafts::{ai_action_draft, approve_ai_action_draft_core};
 use crate::core::organization::require_company_in_organization;
-use crate::core::reference::legacy_currency_code_for_id;
+use crate::core::reference::require_currency_by_id;
 use crate::expenses::expenses::{approve_expense_sheet_impl, expense_sheet, hr_expense};
 use crate::hr::leaves::{approve_leave_impl, hr_leave};
 use crate::purchasing::purchase_orders::{
@@ -512,7 +512,7 @@ fn purchase_order_snapshot(
         tax_ids.sort_unstable();
         fields.push(field("line.analytic_tag_ids", joined_ids(&tax_ids)));
     }
-    let amount = money_value(order.amount_total, order.currency_id)?;
+    let amount = money_value(ctx, order.amount_total, order.currency_id)?;
     Ok(material(
         GuardedActionSubjectKind::PurchaseOrder,
         order.id,
@@ -601,7 +601,7 @@ fn sales_order_snapshot(
         ]);
     }
     let max_discount = lines_max_discount(ctx, order_id)?;
-    let amount = money_value(order.amount_total, order.currency_id)?;
+    let amount = money_value(ctx, order.amount_total, order.currency_id)?;
     let percentage = fixed_decimal(max_discount, 4)?;
     Ok(material(
         GuardedActionSubjectKind::SalesOrder,
@@ -690,7 +690,7 @@ fn account_move_snapshot(
             ),
         ]);
     }
-    let amount = money_value(move_record.amount_total, move_record.currency_id)?;
+    let amount = money_value(ctx, move_record.amount_total, move_record.currency_id)?;
     Ok(material(
         GuardedActionSubjectKind::AccountMove,
         move_record.id,
@@ -749,7 +749,7 @@ fn payment_snapshot(
         field("reconciled_invoice_ids", joined_ids(&invoice_ids)),
         field("reconciled_bill_ids", joined_ids(&bill_ids)),
     ];
-    let amount = money_value(payment.amount, payment.currency_id)?;
+    let amount = money_value(ctx, payment.amount, payment.currency_id)?;
     Ok(material(
         GuardedActionSubjectKind::AccountPayment,
         payment.id,
@@ -837,7 +837,7 @@ fn expense_sheet_snapshot(
             field("line.policy_hold", line.policy_hold),
         ]);
     }
-    let amount = money_value(sheet.total_amount, sheet.currency_id)?;
+    let amount = money_value(ctx, sheet.total_amount, sheet.currency_id)?;
     Ok(material(
         GuardedActionSubjectKind::ExpenseSheet,
         sheet.id,
@@ -983,7 +983,7 @@ fn payment_transaction_snapshot(
             option_u64(transaction.account_payment_id),
         ),
     ];
-    let amount = money_value(transaction.net_account_amount, transaction.currency_id)?;
+    let amount = money_value(ctx, transaction.net_account_amount, transaction.currency_id)?;
     Ok(material(
         GuardedActionSubjectKind::PaymentTransaction,
         transaction.id,
@@ -1142,9 +1142,10 @@ fn subject_for_input(input: &GuardedActionInput) -> (GuardedActionSubjectKind, u
             (GuardedActionSubjectKind::HrLeave, *leave_id)
         }
         GuardedActionInput::PostPaymentTransaction { transaction_id }
-        | GuardedActionInput::ReversePaymentTransaction { transaction_id } => {
-            (GuardedActionSubjectKind::PaymentTransaction, *transaction_id)
-        }
+        | GuardedActionInput::ReversePaymentTransaction { transaction_id } => (
+            GuardedActionSubjectKind::PaymentTransaction,
+            *transaction_id,
+        ),
     }
 }
 
@@ -1341,13 +1342,20 @@ fn option_canonical_json(value: Option<&str>) -> String {
     value.map_or_else(|| "null".to_string(), canonical_json_or_raw)
 }
 
-fn money_value(value: f64, currency_id: u64) -> Result<MoneyValue, String> {
-    let currency = legacy_currency_code_for_id(currency_id);
-    let scale = if currency == "JPY" { 0 } else { 2 };
-    let minor_units = exact_scaled_integer(value, scale, "guarded action amount")?;
+fn money_value(ctx: &ReducerContext, value: f64, currency_id: u64) -> Result<MoneyValue, String> {
+    let currency = require_currency_by_id(ctx, currency_id)?;
+    money_value_with_scale(value, currency.decimal_places, &currency.code)
+}
+
+fn money_value_with_scale(
+    value: f64,
+    scale: u8,
+    currency_code: &str,
+) -> Result<MoneyValue, String> {
+    let minor_units = exact_scaled_integer(value, u32::from(scale), "guarded action amount")?;
     Ok(MoneyValue {
         minor_units,
-        currency: currency.to_string(),
+        currency: currency_code.to_string(),
     })
 }
 
@@ -1421,11 +1429,17 @@ mod tests {
 
     #[test]
     fn fixed_point_boundaries_reject_lossy_values() {
-        assert_eq!(money_value(12.34, 1).unwrap().minor_units, 1_234);
-        assert_eq!(money_value(12.0, 6).unwrap().minor_units, 12);
-        assert!(money_value(12.345, 1).is_err());
-        assert!(money_value(12.5, 6).is_err());
-        assert!(money_value(f64::NAN, 1).is_err());
+        assert_eq!(
+            money_value_with_scale(12.34, 2, "USD").unwrap().minor_units,
+            1_234
+        );
+        assert_eq!(
+            money_value_with_scale(12.0, 0, "JPY").unwrap().minor_units,
+            12
+        );
+        assert!(money_value_with_scale(12.345, 2, "USD").is_err());
+        assert!(money_value_with_scale(12.5, 0, "JPY").is_err());
+        assert!(money_value_with_scale(f64::NAN, 2, "USD").is_err());
         assert!(fixed_decimal(2.12345, 4).is_err());
     }
 }

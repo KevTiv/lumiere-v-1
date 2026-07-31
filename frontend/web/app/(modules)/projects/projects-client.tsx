@@ -93,6 +93,7 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useContacts, useUsers } from "@lumiere/query-hooks/hooks/crm"
 import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import {
   pricelistRowsToSelectOptions,
   contactRowsToPartnerSelectOptions,
@@ -326,6 +327,7 @@ function ProjectsClientLoaded({
   const { data: users = [] } = useUsers(orgId)
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
+  const { data: currencies = [] } = useCurrencies()
 
   const createProject = useCreateProject(orgId, operatingCompanyId)
   const createTask = useCreateTask(orgId, operatingCompanyId)
@@ -390,11 +392,8 @@ function ProjectsClientLoaded({
   }, [employees, t])
 
   const currencyFieldOptions = useMemo(
-    () =>
-      currencyOptionsFromRows(
-        [projects as Record<string, unknown>[], pricelists as Record<string, unknown>[]],
-      ),
-    [projects, pricelists],
+    () => currencyOptionsFromRows(currencies),
+    [currencies],
   )
 
   const uomFieldOptions = useMemo(() => {
@@ -1426,7 +1425,7 @@ function ProjectsClientLoaded({
                   vendorBillLineId: null,
                   partnerId: null,
                   amount: Number(formData.amount ?? 0),
-                  currencyId: BigInt(String(formData.currencyId ?? 1)),
+                  currencyId: BigInt(String(formData.currencyId)),
                   name:
                     formData.name != null && String(formData.name).trim() !== ""
                       ? String(formData.name)

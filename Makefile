@@ -102,7 +102,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	init-stack docker-dev docker-dev-iot \
 	codegen check-codegen api-server-run \
-	lint-no-magic-fk-zero lint-accounting-as-unknown-as \
+	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
 	module-check module-build module-generate-ts module-generate-rust \
 	local-start local-stop local-publish local-reset local-test local-logs \
@@ -860,6 +860,10 @@ lint-no-magic-fk-zero:
 # ACC-RI-018: retained accounting double assertions require an adjacent rationale.
 lint-accounting-as-unknown-as:
 	bash scripts/lint-accounting-as-unknown-as.sh
+
+# Canonical currencies must use persisted IDs, never bridge tables or magic ID 1.
+lint-accounting-currency-refs:
+	bash scripts/lint-canonical-currency.sh
 
 # Starts only the Rust API with its service-local environment file.
 api-server-run:

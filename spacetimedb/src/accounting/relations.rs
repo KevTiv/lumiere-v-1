@@ -21,7 +21,7 @@ use crate::accounting::chart_of_accounts::{
     account_account, account_journal, AccountAccount, AccountJournal,
 };
 use crate::core::organization::require_company_in_organization;
-use crate::core::reference::{legacy_currency_code_for_id, require_currency_row, Currency};
+use crate::core::reference::{require_currency_by_id, Currency};
 use crate::crm::contacts::{contact, Contact};
 
 pub(crate) fn require_explicit_company_id(
@@ -89,12 +89,8 @@ pub(crate) fn require_active_currency_id(
     currency_id: u64,
     role: &str,
 ) -> Result<Currency, String> {
-    if !(1..=9).contains(&currency_id) {
-        return Err(format!(
-            "{role} currency_id does not map to a supported currency"
-        ));
-    }
-    let currency = require_currency_row(ctx, legacy_currency_code_for_id(currency_id))?;
+    let currency =
+        require_currency_by_id(ctx, currency_id).map_err(|error| format!("{role} {error}"))?;
     if !currency.active {
         return Err(format!("{role} currency is inactive"));
     }

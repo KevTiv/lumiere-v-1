@@ -88,6 +88,7 @@ import {
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting"
 import { useStoredDashboardDataSources } from "@/hooks/use-stored-dashboard-data-sources"
 import {
@@ -194,6 +195,7 @@ function ReportsClientLoaded({
   const { data: dashboardWidgets = [] } = useDashboardWidgets(orgId, initialDashboardWidgets)
   const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
+  const { data: currencies = [] } = useCurrencies()
 
   const reports = useMemo(
     () =>
@@ -302,13 +304,8 @@ function ReportsClientLoaded({
   )
 
   const currencySelectOptions = useMemo(
-    () =>
-      currencyOptionsFromRows([
-        reports as Record<string, unknown>[],
-        trialBalances as Record<string, unknown>[],
-        accountAccounts as Record<string, unknown>[],
-      ]),
-    [reports, trialBalances, accountAccounts],
+    () => currencyOptionsFromRows(currencies),
+    [currencies],
   )
 
   const financialReportSelectOptions = useMemo(

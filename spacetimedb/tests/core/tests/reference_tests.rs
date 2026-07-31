@@ -11,9 +11,47 @@ use crate::core::reference::{
     CreateUomCategoryParams, CreateUomConversionParams, CreateUomParams,
 };
 
+fn ensure_currency(
+    ctx: &ReducerContext,
+    code: &str,
+    name: &str,
+    symbol: &str,
+    decimal_places: u8,
+    rounding_factor: f64,
+    position: &str,
+) -> Result<u64, String> {
+    if let Some(currency) = ctx.db.currency().code().find(&code.to_string()) {
+        return Ok(currency.id);
+    }
+    create_currency(
+        ctx,
+        code.to_string(),
+        CreateCurrencyParams {
+            name: name.to_string(),
+            symbol: symbol.to_string(),
+            decimal_places,
+            rounding_factor,
+            position: position.to_string(),
+            active: true,
+            metadata: None,
+        },
+    )?;
+    ctx.db
+        .currency()
+        .code()
+        .find(&code.to_string())
+        .map(|currency| currency.id)
+        .ok_or_else(|| format!("{code} currency not created"))
+}
+
 /// Test reference data lifecycle
 #[spacetimedb::reducer]
 pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
+    let usd_id = ensure_currency(ctx, "USD", "US Dollar", "$", 2, 0.01, "before")?;
+    let eur_id = ensure_currency(ctx, "EUR", "Euro", "€", 2, 0.01, "after")?;
+    let gbp_id = ensure_currency(ctx, "GBP", "British Pound", "£", 2, 0.01, "before")?;
+    let cad_id = ensure_currency(ctx, "CAD", "Canadian Dollar", "$", 2, 0.01, "before")?;
+
     // Test 1: Create countries (requires superuser)
     log::info!("TEST: Creating countries...");
     create_country(
@@ -25,7 +63,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
             numcode: 840,
             phone_code: "+1".to_string(),
             official_name: Some("United States of America".to_string()),
-            currency_code: Some("USD".to_string()),
+            currency_id: Some(usd_id),
             language_codes: vec!["en".to_string(), "es".to_string()],
             is_active: true,
             metadata: None,
@@ -41,7 +79,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
             numcode: 124,
             phone_code: "+1".to_string(),
             official_name: None,
-            currency_code: Some("CAD".to_string()),
+            currency_id: Some(cad_id),
             language_codes: vec!["en".to_string(), "fr".to_string()],
             is_active: true,
             metadata: None,
@@ -57,7 +95,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
             numcode: 826,
             phone_code: "+44".to_string(),
             official_name: None,
-            currency_code: Some("GBP".to_string()),
+            currency_id: Some(gbp_id),
             language_codes: vec!["en".to_string()],
             is_active: true,
             metadata: None,
@@ -75,56 +113,14 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         return Err("Country name mismatch".to_string());
     }
 
-    if us.currency_code != Some("USD".to_string()) {
-        return Err("Currency code not stored".to_string());
+    if us.currency_id != Some(usd_id) {
+        return Err("Currency ID not stored".to_string());
     }
 
     log::info!("✓ Countries created successfully");
 
     // Test 2: Create currencies (requires superuser)
     log::info!("TEST: Creating currencies...");
-    create_currency(
-        ctx,
-        "USD".to_string(),
-        CreateCurrencyParams {
-            name: "US Dollar".to_string(),
-            symbol: "$".to_string(),
-            decimal_places: 2,
-            rounding_factor: 0.01,
-            position: "before".to_string(),
-            active: true,
-            metadata: None,
-        },
-    )?;
-
-    create_currency(
-        ctx,
-        "EUR".to_string(),
-        CreateCurrencyParams {
-            name: "Euro".to_string(),
-            symbol: "€".to_string(),
-            decimal_places: 2,
-            rounding_factor: 0.01,
-            position: "after".to_string(),
-            active: true,
-            metadata: None,
-        },
-    )?;
-
-    create_currency(
-        ctx,
-        "GBP".to_string(),
-        CreateCurrencyParams {
-            name: "British Pound".to_string(),
-            symbol: "£".to_string(),
-            decimal_places: 2,
-            rounding_factor: 0.01,
-            position: "before".to_string(),
-            active: true,
-            metadata: None,
-        },
-    )?;
-
     let usd = ctx
         .db
         .currency()
@@ -153,7 +149,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
             numcode: 999,
             phone_code: "+999".to_string(),
             official_name: None,
-            currency_code: None,
+            currency_id: None,
             language_codes: vec![],
             is_active: true,
             metadata: None,
@@ -242,10 +238,10 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     create_currency_rate(
         ctx,
         org_id,
-        Some(1),
+        None,
         CreateCurrencyRateParams {
-            from_currency: "USD".to_string(),
-            to_currency: "EUR".to_string(),
+            from_currency_id: usd_id,
+            to_currency_id: eur_id,
             rate: 0.85,
             metadata: None,
         },
@@ -256,8 +252,8 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         org_id,
         None,
         CreateCurrencyRateParams {
-            from_currency: "USD".to_string(),
-            to_currency: "GBP".to_string(),
+            from_currency_id: usd_id,
+            to_currency_id: gbp_id,
             rate: 0.73,
             metadata: None,
         },
@@ -276,7 +272,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let eur_rate = rates
         .iter()
-        .find(|r| r.to_currency == "EUR")
+        .find(|r| r.to_currency_id == eur_id)
         .ok_or("EUR rate not found")?;
 
     if eur_rate.rate != 0.85 {
@@ -296,8 +292,8 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         org_id,
         None,
         CreateCurrencyRateParams {
-            from_currency: "USD".to_string(),
-            to_currency: "JPY".to_string(),
+            from_currency_id: usd_id,
+            to_currency_id: eur_id,
             rate: -1.0,
             metadata: None,
         },
@@ -312,8 +308,8 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         org_id,
         None,
         CreateCurrencyRateParams {
-            from_currency: "USD".to_string(),
-            to_currency: "JPY".to_string(),
+            from_currency_id: usd_id,
+            to_currency_id: eur_id,
             rate: 0.0,
             metadata: None,
         },
@@ -583,6 +579,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
 /// Test country data integrity
 #[spacetimedb::reducer]
 pub fn test_country_data_integrity(ctx: &ReducerContext) -> Result<(), String> {
+    let eur_id = ensure_currency(ctx, "EUR", "Euro", "€", 2, 0.01, "after")?;
     // Create countries
     create_country(
         ctx,
@@ -593,7 +590,7 @@ pub fn test_country_data_integrity(ctx: &ReducerContext) -> Result<(), String> {
             numcode: 250,
             phone_code: "+33".to_string(),
             official_name: None,
-            currency_code: Some("EUR".to_string()),
+            currency_id: Some(eur_id),
             language_codes: vec!["fr".to_string()],
             is_active: true,
             metadata: None,
@@ -638,19 +635,7 @@ pub fn test_country_data_integrity(ctx: &ReducerContext) -> Result<(), String> {
 /// Test currency data integrity
 #[spacetimedb::reducer]
 pub fn test_currency_data_integrity(ctx: &ReducerContext) -> Result<(), String> {
-    create_currency(
-        ctx,
-        "JPY".to_string(),
-        CreateCurrencyParams {
-            name: "Japanese Yen".to_string(),
-            symbol: "¥".to_string(),
-            decimal_places: 0,
-            rounding_factor: 1.0,
-            position: "before".to_string(),
-            active: true,
-            metadata: None,
-        },
-    )?;
+    let yen_id = ensure_currency(ctx, "JPY", "Japanese Yen", "¥", 0, 1.0, "before")?;
 
     let yen = ctx
         .db
@@ -662,6 +647,10 @@ pub fn test_currency_data_integrity(ctx: &ReducerContext) -> Result<(), String> 
     // Verify zero decimal places allowed
     if yen.decimal_places != 0 {
         return Err("JPY should have 0 decimal places".to_string());
+    }
+
+    if yen.id != yen_id || yen.id == 0 {
+        return Err("Currency should have a generated nonzero ID".to_string());
     }
 
     // Verify active by default
@@ -885,33 +874,8 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         .ok_or("Test org not found")?;
 
     // Create currencies first
-    create_currency(
-        ctx,
-        "CHF".to_string(),
-        CreateCurrencyParams {
-            name: "Swiss Franc".to_string(),
-            symbol: "Fr".to_string(),
-            decimal_places: 2,
-            rounding_factor: 0.05,
-            position: "before".to_string(),
-            active: true,
-            metadata: None,
-        },
-    )?;
-
-    create_currency(
-        ctx,
-        "SEK".to_string(),
-        CreateCurrencyParams {
-            name: "Swedish Krona".to_string(),
-            symbol: "kr".to_string(),
-            decimal_places: 2,
-            rounding_factor: 0.01,
-            position: "after".to_string(),
-            active: true,
-            metadata: None,
-        },
-    )?;
+    let chf_id = ensure_currency(ctx, "CHF", "Swiss Franc", "Fr", 2, 0.05, "before")?;
+    let sek_id = ensure_currency(ctx, "SEK", "Swedish Krona", "kr", 2, 0.01, "after")?;
 
     // Test: Very small exchange rate
     log::info!("TEST: Very small exchange rate...");
@@ -920,8 +884,8 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         org.id,
         None,
         CreateCurrencyRateParams {
-            from_currency: "CHF".to_string(),
-            to_currency: "SEK".to_string(),
+            from_currency_id: chf_id,
+            to_currency_id: sek_id,
             rate: 0.0001,
             metadata: None,
         },
@@ -931,7 +895,7 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         .db
         .currency_rate()
         .iter()
-        .find(|r| r.from_currency == "CHF" && r.to_currency == "SEK")
+        .find(|r| r.from_currency_id == chf_id && r.to_currency_id == sek_id)
         .ok_or("Small rate not found")?;
 
     if small_rate.rate != 0.0001 {
@@ -951,8 +915,8 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         org.id,
         None,
         CreateCurrencyRateParams {
-            from_currency: "SEK".to_string(),
-            to_currency: "CHF".to_string(),
+            from_currency_id: sek_id,
+            to_currency_id: chf_id,
             rate: 10000.0,
             metadata: None,
         },
@@ -962,7 +926,7 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         .db
         .currency_rate()
         .iter()
-        .find(|r| r.from_currency == "SEK" && r.to_currency == "CHF")
+        .find(|r| r.from_currency_id == sek_id && r.to_currency_id == chf_id)
         .ok_or("Large rate not found")?;
 
     if large_rate.rate != 10000.0 {
@@ -973,30 +937,23 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
 
     // Test: Rate with company_id
     log::info!("TEST: Rate with company_id...");
-    create_currency_rate(
+    let invalid_company_rate = create_currency_rate(
         ctx,
         org.id,
         Some(999), // Non-existent company ID
         CreateCurrencyRateParams {
-            from_currency: "CHF".to_string(),
-            to_currency: "SEK".to_string(),
+            from_currency_id: chf_id,
+            to_currency_id: sek_id,
             rate: 11.5,
             metadata: None,
         },
-    )?;
+    );
 
-    let rate_with_company = ctx
-        .db
-        .currency_rate()
-        .iter()
-        .find(|r| r.from_currency == "CHF" && r.rate == 11.5)
-        .ok_or("Rate with company not found")?;
-
-    if rate_with_company.company_id != Some(999) {
-        return Err("Company ID not stored".to_string());
+    if invalid_company_rate.is_ok() {
+        return Err("Non-existent company scope should be rejected".to_string());
     }
 
-    log::info!("✓ Rate with company_id stored");
+    log::info!("✓ Invalid company_id rejected");
 
     // Test: Multiple rates for same pair (different times)
     log::info!("TEST: Multiple rates over time...");

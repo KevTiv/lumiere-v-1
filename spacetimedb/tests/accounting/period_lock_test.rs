@@ -1,11 +1,9 @@
-use std::time::Duration;
-
 use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::fiscal_periods::{
     account_fiscal_year, account_period, accounting_ownership_backfill_issue,
-    backfill_fiscal_period_organization_ownership, close_account_period, create_account_period,
-    update_fiscal_year, AccountFiscalYear, CreateAccountPeriodParams, UpdateFiscalYearParams,
+    backfill_fiscal_period_organization_ownership, close_account_period, update_fiscal_year,
+    AccountFiscalYear, UpdateFiscalYearParams,
 };
 use crate::accounting::journal_entries::post_invoice;
 use crate::accounting::payments::{
@@ -127,29 +125,14 @@ pub fn test_fiscal_ownership_is_derived_and_tenant_scoped(
 }
 
 fn seed_closed_period(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(), String> {
-    create_account_period(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        CreateAccountPeriodParams {
-            name: "Closed test period".to_string(),
-            code: "CL01".to_string(),
-            date_from: ctx.timestamp,
-            date_to: ctx.timestamp + Duration::from_secs(86_400),
-            fiscal_year_id: fixture.fiscal_year_id,
-            is_adjustment: false,
-            notes: None,
-            metadata: None,
-        },
-    )?;
-
     let period_id = ctx
         .db
         .account_period()
-        .iter()
-        .find(|p| p.company_id == fixture.company_id && p.code == "CL01")
+        .period_by_fiscal_year()
+        .filter(&fixture.fiscal_year_id)
+        .find(|period| period.organization_id == Some(fixture.organization_id))
         .map(|p| p.id)
-        .ok_or("Period not found after create")?;
+        .ok_or("Fixture period not found")?;
 
     close_account_period(ctx, fixture.organization_id, fixture.company_id, period_id)?;
 

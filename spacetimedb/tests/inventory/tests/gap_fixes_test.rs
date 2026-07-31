@@ -2830,6 +2830,13 @@ pub fn test_inventory_close_posts_valuation_journal(ctx: &ReducerContext) -> Res
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("company")?
+        .currency_id;
 
     let asset_type_name = format!("Inv Asset Type {company_id}");
     create_account_account_type(
@@ -2925,7 +2932,7 @@ pub fn test_inventory_close_posts_valuation_journal(ctx: &ReducerContext) -> Res
             name: "Stock Valuation".into(),
             code: journal_code.clone(),
             type_: JournalType::Inventory,
-            currency_id: Some(1),
+            currency_id: Some(currency_id),
             default_account_id: Some(inv_acct),
             suspense_account_id: None,
             loss_account_id: None,
@@ -3016,6 +3023,9 @@ pub fn test_inventory_close_posts_valuation_journal(ctx: &ReducerContext) -> Res
     if mv.company_id != company_id {
         return Err("move company mismatch".into());
     }
+    if mv.currency_id != currency_id || mv.company_currency_id != currency_id {
+        return Err("valuation move did not use the company currency".into());
+    }
 
     let lines: Vec<_> = ctx
         .db
@@ -3025,6 +3035,12 @@ pub fn test_inventory_close_posts_valuation_journal(ctx: &ReducerContext) -> Res
         .collect();
     if lines.len() != 2 {
         return Err(format!("expected 2 valuation lines, got {}", lines.len()));
+    }
+    if lines
+        .iter()
+        .any(|line| line.currency_id != currency_id || line.company_currency_id != currency_id)
+    {
+        return Err("valuation lines did not use the company currency".into());
     }
     let debit: f64 = lines.iter().map(|l| l.debit).sum();
     let credit: f64 = lines.iter().map(|l| l.credit).sum();

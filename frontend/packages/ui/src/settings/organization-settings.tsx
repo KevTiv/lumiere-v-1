@@ -554,7 +554,10 @@ export function OrganizationSettings() {
                         const cid = companyIdFromForm(data)
                         if (!cid) return
                         const row = companies.find((c) => String(c.id) === cid)
-                        const cur = row?.currencyId != null ? BigInt(String(row.currencyId)) : 1n
+                        if (row?.currencyId == null) {
+                          throw new Error("The parent company does not have a currency")
+                        }
+                        const cur = BigInt(String(row.currencyId))
                         const params = toCreateCompanyParams(
                           {
                             ...data,
@@ -1381,7 +1384,7 @@ export function OrganizationSettings() {
                     numcode: Number(data.numcode ?? 0),
                     phoneCode: String(data.phoneCode ?? ""),
                     officialName: null,
-                    currencyCode: null,
+                    currencyId: null,
                     languageCodes: [],
                     isActive: Boolean(data.isActive),
                     metadata: null,

@@ -4,8 +4,8 @@ use spacetimedb::{ReducerContext, Table};
 use crate::core::organization::{company, new_external_id, Company};
 use crate::core::permissions::{role, Role};
 use crate::core::reference::{
-    country, currency, currency_rate, uom, uom_cat, Country, Currency, CurrencyRate, UOMCategory,
-    UOM,
+    country, currency, currency_rate, require_active_currency_by_id, require_currency_row, uom,
+    uom_cat, Country, Currency, CurrencyRate, UOMCategory, UOM,
 };
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
@@ -54,6 +54,28 @@ pub fn import_country_csv(
             continue;
         }
 
+        let currency_code = opt_str(col(&headers, row, "currency_code"));
+        let currency_id = match currency_code.as_deref() {
+            Some(code) => match require_currency_row(ctx, code)
+                .and_then(|currency| require_active_currency_by_id(ctx, currency.id))
+            {
+                Ok(currency) => Some(currency.id),
+                Err(error) => {
+                    record_import_error(
+                        ctx,
+                        job.id,
+                        row_num,
+                        Some("currency_code"),
+                        Some(code),
+                        &error,
+                    );
+                    errors += 1;
+                    continue;
+                }
+            },
+            None => None,
+        };
+
         ctx.db.country().insert(Country {
             code,
             name,
@@ -61,7 +83,7 @@ pub fn import_country_csv(
             iso3: col(&headers, row, "iso3").to_string(),
             numcode: col(&headers, row, "numcode").parse().unwrap_or(0),
             phone_code: col(&headers, row, "phone_code").to_string(),
-            currency_code: opt_str(col(&headers, row, "currency_code")),
+            currency_id,
             language_codes: vec_str(col(&headers, row, "language_codes")),
             is_active: true,
             metadata: opt_str(col(&headers, row, "metadata")),
@@ -122,7 +144,8 @@ pub fn import_currency_csv(
         };
 
         ctx.db.currency().insert(Currency {
-            code,
+            id: 0,
+            code: code.clone(),
             name,
             symbol: if symbol.is_empty() {
                 "?".to_string()
@@ -170,7 +193,7 @@ pub fn import_currency_rate_csv(
         let to_currency = col(&headers, row, "to_currency").to_uppercase();
         let rate = parse_f64(col(&headers, row, "rate"));
 
-        if rate <= 0.0 {
+        if !rate.is_finite() || rate <= 0.0 {
             record_import_error(
                 ctx,
                 job.id,
@@ -183,15 +206,83 @@ pub fn import_currency_rate_csv(
             continue;
         }
 
+        let from_currency_id = match require_currency_row(ctx, &from_currency)
+            .and_then(|currency| require_active_currency_by_id(ctx, currency.id))
+        {
+            Ok(currency) => currency.id,
+            Err(error) => {
+                record_import_error(
+                    ctx,
+                    job.id,
+                    row_num,
+                    Some("from_currency"),
+                    Some(&from_currency),
+                    &error,
+                );
+                errors += 1;
+                continue;
+            }
+        };
+        let to_currency_id = match require_currency_row(ctx, &to_currency)
+            .and_then(|currency| require_active_currency_by_id(ctx, currency.id))
+        {
+            Ok(currency) => currency.id,
+            Err(error) => {
+                record_import_error(
+                    ctx,
+                    job.id,
+                    row_num,
+                    Some("to_currency"),
+                    Some(&to_currency),
+                    &error,
+                );
+                errors += 1;
+                continue;
+            }
+        };
+        if from_currency_id == to_currency_id {
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                Some("to_currency"),
+                Some(&to_currency),
+                "rate currencies must be different",
+            );
+            errors += 1;
+            continue;
+        }
+        let company_id = opt_u64(col(&headers, row, "company_id"));
+        if let Some(company_id) = company_id {
+            let valid_scope = ctx
+                .db
+                .company()
+                .id()
+                .find(&company_id)
+                .is_some_and(|company| company.organization_id == organization_id);
+            if !valid_scope {
+                record_import_error(
+                    ctx,
+                    job.id,
+                    row_num,
+                    Some("company_id"),
+                    Some(&company_id.to_string()),
+                    "company does not belong to this organization",
+                );
+                errors += 1;
+                continue;
+            }
+        }
+
         ctx.db.currency_rate().insert(CurrencyRate {
             id: 0,
             organization_id,
-            from_currency,
-            to_currency,
+            from_currency_id,
+            to_currency_id,
             rate,
             inverse_rate: 1.0 / rate,
             date: opt_timestamp(col(&headers, row, "date")).unwrap_or(ctx.timestamp),
-            company_id: opt_u64(col(&headers, row, "company_id")),
+            company_id,
             created_at: ctx.timestamp,
             metadata: opt_str(col(&headers, row, "metadata")),
         });

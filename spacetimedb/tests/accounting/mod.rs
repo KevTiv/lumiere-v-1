@@ -163,8 +163,10 @@ pub fn run_accounting_ic_consolidation_test(ctx: &ReducerContext) -> Result<(), 
         .map_err(|e| format!("ic_elimination: {e}"))?;
     ic_consolidation_test::test_intercompany_rule_rejects_cross_tenant_account(ctx)
         .map_err(|e| format!("ACC-RI-024 ic_rule_cross_tenant_account: {e}"))?;
-    ic_consolidation_test::test_process_intercompany_transaction_rejects_cross_tenant_destination(ctx)
-        .map_err(|e| format!("ACC-RI-015 ic_destination_document_cross_tenant: {e}"))
+    ic_consolidation_test::test_process_intercompany_transaction_rejects_cross_tenant_destination(
+        ctx,
+    )
+    .map_err(|e| format!("ACC-RI-015 ic_destination_document_cross_tenant: {e}"))
 }
 
 #[spacetimedb::reducer]

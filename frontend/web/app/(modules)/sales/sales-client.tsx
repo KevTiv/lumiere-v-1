@@ -189,6 +189,7 @@ import {
   persistCustomFieldsToEav,
 } from '@/lib/persist-record-custom-fields';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
+import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 import { useModuleTab } from '@/hooks/use-module-tab';
 import { useModuleFilters } from '@/hooks/use-module-filters';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
@@ -435,6 +436,7 @@ function SalesClientLoaded({
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
   const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId);
   const { data: partnerCreditHolds = [] } = usePartnerCreditHolds(orgId);
+  const { data: currencies = [] } = useCurrencies();
   const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
   const { data: stockMoves = [] } = useStockMoves(orgId);
   const { data: returnOrders = [] } = useReturnOrders(orgId, initialReturnOrders);
@@ -827,14 +829,10 @@ function SalesClientLoaded({
   }, [uoms, t]);
 
   const currencyFieldOptions = useMemo(() => {
-    const fromApi = currencyOptionsFromRows([
-      pricelists as Record<string, unknown>[],
-      accountJournals as Record<string, unknown>[],
-      accountAccounts as Record<string, unknown>[],
-    ]);
+    const fromApi = currencyOptionsFromRows(currencies);
     if (fromApi.length > 0) return fromApi;
-    return [{ value: '1', label: 'Currency 1' }];
-  }, [pricelists, accountJournals, accountAccounts]);
+    return [{ value: '', label: 'No currencies available', disabled: true }];
+  }, [currencies, t]);
 
   const productCategoryFieldOptions = useMemo(() => {
     const fromApi = productCategoryRowsToSelectOptions(productCategories as Record<string, unknown>[]);
@@ -860,7 +858,7 @@ function SalesClientLoaded({
         mergeSelectOptionsForFields(newPricelistForm(t), {
           currencyId: currencyFieldOptions,
         }),
-        { currencyId: currencyFieldOptions[0]?.value ?? '1' },
+        { currencyId: currencyFieldOptions[0]?.value ?? '' },
       ),
     [t, currencyFieldOptions],
   );

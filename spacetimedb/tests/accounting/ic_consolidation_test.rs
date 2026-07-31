@@ -130,11 +130,11 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
         CreateIntercompanyTransactionParams {
             origin_document_id: {
                 // Use a real account.move created under A1 for typed provenance.
-                use crate::accounting::journal_entries::{
-                    account_move, create_account_move, CreateAccountMoveParams,
-                };
                 use crate::accounting::chart_of_accounts::{
                     account_journal, create_account_journal, CreateAccountJournalParams,
+                };
+                use crate::accounting::journal_entries::{
+                    account_move, create_account_move, CreateAccountMoveParams,
                 };
                 use crate::types::{JournalType, MoveType};
                 let journal_code = format!("ICJ{}", fixture.company_id);
@@ -142,7 +142,9 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
                     .db
                     .account_journal()
                     .iter()
-                    .find(|j| j.organization_id == fixture.organization_id && j.code == journal_code)
+                    .find(|j| {
+                        j.organization_id == fixture.organization_id && j.code == journal_code
+                    })
                     .is_none()
                 {
                     create_account_journal(
@@ -187,7 +189,9 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
                     .db
                     .account_journal()
                     .iter()
-                    .find(|j| j.organization_id == fixture.organization_id && j.code == journal_code)
+                    .find(|j| {
+                        j.organization_id == fixture.organization_id && j.code == journal_code
+                    })
                     .map(|j| j.id)
                     .ok_or("IC journal missing")?;
                 let move_ref = format!("IC-ORIG-{}", fixture.company_id);
@@ -711,7 +715,9 @@ pub fn test_intercompany_rule_rejects_cross_tenant_account(
         },
     );
     if cross_tenant_result.is_ok() {
-        return Err("create_intercompany_rule accepted a cross-organization account_id".to_string());
+        return Err(
+            "create_intercompany_rule accepted a cross-organization account_id".to_string(),
+        );
     }
 
     let rule_exists = ctx
@@ -725,11 +731,12 @@ pub fn test_intercompany_rule_rejects_cross_tenant_account(
         );
     }
 
-    // Positive: a same-tenant account (destination company's own AR account) is accepted.
-    let own_account_id = *fixture_a
-        .chart_account_ids
-        .get(crate::test_harness::chart_keys::AR)
-        .ok_or("harness A missing AR account")?;
+    // Positive: an account owned by the destination company is accepted.
+    let destination_fixture = OrgFixture {
+        company_id: sibling_a2,
+        ..fixture_a.clone()
+    };
+    let (_, own_account_id) = super::helpers::seed_bank_journal(ctx, &destination_fixture)?;
     create_intercompany_rule(
         ctx,
         fixture_a.organization_id,
@@ -769,7 +776,8 @@ pub fn test_process_intercompany_transaction_rejects_cross_tenant_destination(
     let fixture_b = OrgFixture::seed_minimal(ctx)?;
     let sibling_a2 = super::helpers::seed_sibling_company(ctx, &fixture_a)?;
 
-    let origin_move = super::helpers::create_balanced_customer_invoice(ctx, &fixture_a, 731.29, true)?;
+    let origin_move =
+        super::helpers::create_balanced_customer_invoice(ctx, &fixture_a, 731.29, true)?;
 
     create_intercompany_transaction(
         ctx,
@@ -799,7 +807,8 @@ pub fn test_process_intercompany_transaction_rejects_cross_tenant_destination(
         .ok_or("intercompany transaction not found after create")?;
 
     // A foreign org's posted invoice used as the destination document.
-    let foreign_move = super::helpers::create_balanced_customer_invoice(ctx, &fixture_b, 40.0, true)?;
+    let foreign_move =
+        super::helpers::create_balanced_customer_invoice(ctx, &fixture_b, 40.0, true)?;
 
     let cross_tenant_result = process_intercompany_transaction(
         ctx,
@@ -825,9 +834,7 @@ pub fn test_process_intercompany_transaction_rejects_cross_tenant_destination(
         .find(&transaction.id)
         .ok_or("intercompany transaction disappeared after rejected process")?;
     if unchanged.destination_document_id.is_some() {
-        return Err(
-            "rejected cross-tenant destination document was still persisted".to_string(),
-        );
+        return Err("rejected cross-tenant destination document was still persisted".to_string());
     }
 
     Ok(())

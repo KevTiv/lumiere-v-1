@@ -15,7 +15,7 @@ export default __t.row({
   organizationId: __t.u64().name("organization_id"),
   companyId: __t.u64().name("company_id"),
   currencyId: __t.u64().name("currency_id"),
-  currencyCode: __t.string().name("currency_code"),
+  currencyCodeSnapshot: __t.string().name("currency_code_snapshot"),
   companyCurrencyId: __t.u64().name("company_currency_id"),
   rate: __t.f64(),
   rateSource: __t.string().name("rate_source"),

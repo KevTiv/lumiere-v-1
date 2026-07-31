@@ -1,12 +1,13 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   useArchiveFinancialReport,
   useExportFinancialReport,
   useGenerateEuVatReport,
 } from "@lumiere/query-hooks/hooks/reports"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import {
   EntityTable,
   vatReportsTableConfig,
@@ -18,6 +19,7 @@ import type { EntityTableConfig } from "@lumiere/ui"
 import { Archive, FileDown, FileSpreadsheet, PlayCircle } from "lucide-react"
 import { reportStateTag } from "@/lib/reports-create-params"
 import { useToast } from "@/hooks/use-toast"
+import { currencyOptionsFromRows } from "@/lib/form-lookup"
 
 type VatReportPanelProps = {
   organizationId: bigint
@@ -62,11 +64,18 @@ export function VatReportPanel({ organizationId, financialReports }: VatReportPa
   const generateEuVatReport = useGenerateEuVatReport(organizationId)
   const exportFinancialReport = useExportFinancialReport(organizationId)
   const archiveFinancialReport = useArchiveFinancialReport(organizationId)
+  const { data: currencies = [] } = useCurrencies()
 
   const [name, setName] = useState("EU VAT Return")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [locale, setLocale] = useState("EU")
+  const [currencyId, setCurrencyId] = useState("")
+  const currencyOptions = useMemo(() => currencyOptionsFromRows(currencies), [currencies])
+
+  useEffect(() => {
+    if (!currencyId && currencyOptions[0]) setCurrencyId(currencyOptions[0].value)
+  }, [currencyId, currencyOptions])
 
   const vatReports = useMemo(
     () =>
@@ -221,10 +230,23 @@ export function VatReportPanel({ organizationId, financialReports }: VatReportPa
           <Label>{t("reports.vat.locale")}</Label>
           <Input value={locale} onChange={(e) => setLocale(e.target.value)} />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="vat-report-currency">Currency</Label>
+          <select
+            id="vat-report-currency"
+            value={currencyId}
+            onChange={(event) => setCurrencyId(event.target.value)}
+            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm"
+          >
+            {currencyOptions.map((currency) => (
+              <option key={currency.value} value={currency.value}>{currency.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <Button
-        disabled={!name.trim() || !dateFrom || !dateTo || generateEuVatReport.isPending}
+        disabled={!name.trim() || !dateFrom || !dateTo || !currencyId || generateEuVatReport.isPending}
         data-testid="vat-report-generate"
         onClick={() =>
           void generateEuVatReport
@@ -232,7 +254,7 @@ export function VatReportPanel({ organizationId, financialReports }: VatReportPa
               name,
               dateFrom: `${dateFrom}T00:00:00.000Z`,
               dateTo: `${dateTo}T23:59:59.999Z`,
-              currencyId: 1,
+              currencyId: Number(currencyId),
               locale,
             })
             .catch((e) => {

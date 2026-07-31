@@ -199,6 +199,14 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<Tenant>
       throw new Error(`tenant signup failed (${signup.status()}): ${await signup.text()}`)
     }
 
+    const currencyResponse = await api.get("/api/bootstrap/currencies")
+    if (!currencyResponse.ok()) {
+      throw new Error(`currency catalog failed (${currencyResponse.status()}): ${await currencyResponse.text()}`)
+    }
+    const currencyPayload = (await currencyResponse.json()) as { data?: QueryRow[] }
+    const usdCurrency = currencyPayload.data?.find((row) => row.code === "USD")
+    if (usdCurrency?.id == null) throw new Error("USD is missing from the bootstrap currency catalog")
+
     const bootstrap = await api.post("/api/bootstrap/tenant", {
       data: {
         organization: {
@@ -218,7 +226,7 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<Tenant>
         },
         defaultCompanyName: `${suffix} main`,
         defaultCompanyCode: `${code}M`,
-        defaultCompanyCurrencyCode: "USD",
+        defaultCompanyCurrencyId: Number(usdCurrency.id),
         fiscalYearEndMonth: 12,
         fiscalYearEndDay: 31,
         seedFormConfigs: true,

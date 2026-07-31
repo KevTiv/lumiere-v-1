@@ -53,6 +53,15 @@ export const newProposalForm = (t: TFunction): FormConfig => ({
           width: "1/2",
         },
         {
+          id: "currencyId",
+          name: "currencyId",
+          type: "select",
+          label: "Currency",
+          required: true,
+          width: "1/2",
+          options: [],
+        },
+        {
           id: "deadline",
           name: "deadline",
           type: "date",

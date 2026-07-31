@@ -85,7 +85,8 @@ export function toCreateFinancialReportParams(
     ? comparisonRaw
     : 'none'
 
-  const currencyId = parseU64(formData.currencyId, 1n)
+  const currencyId = parseU64(formData.currencyId, 0n)
+  if (currencyId === 0n) return null
   const resultCurrencyId = parseU64(formData.resultCurrencyId, currencyId)
   const hierarchyLevel = parseHierarchyLevel(formData.hierarchyLevel, 2)
 

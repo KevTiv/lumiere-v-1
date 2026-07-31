@@ -14,7 +14,9 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::company;
 use crate::core::organization::company_id_from_scope;
-use crate::core::reference::{currency_rate, legacy_currency_code_for_id};
+use crate::core::reference::{
+    require_active_currency_by_id, require_currency_by_id, resolve_currency_rate_as_of,
+};
 use crate::crm::contacts::contact;
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
@@ -388,46 +390,19 @@ fn confirm_exchange_rate_snapshot(
         .id()
         .find(&order.company_id)
         .ok_or("Company not found for sale order")?;
-    let from = legacy_currency_code_for_id(order.currency_id).to_string();
-    let to = legacy_currency_code_for_id(company_row.currency_id).to_string();
-    if from.eq_ignore_ascii_case(&to) {
+    let from = require_currency_by_id(ctx, order.currency_id)?.code;
+    let to = require_currency_by_id(ctx, company_row.currency_id)?.code;
+    if order.currency_id == company_row.currency_id {
         return Ok((1.0, from, to));
     }
-
-    let mut best_rate: Option<(Timestamp, f64)> = None;
-    for rate in ctx
-        .db
-        .currency_rate()
-        .rate_by_org()
-        .filter(&organization_id)
-    {
-        if !rate.from_currency.eq_ignore_ascii_case(&from)
-            || !rate.to_currency.eq_ignore_ascii_case(&to)
-        {
-            continue;
-        }
-        if let Some(cid) = rate.company_id {
-            if cid != order.company_id {
-                continue;
-            }
-        }
-        match best_rate {
-            Some((prev_date, _)) if rate.date <= prev_date => {}
-            _ => best_rate = Some((rate.date, rate.rate)),
-        }
-    }
-
-    let rate = best_rate
-        .map(|(_, r)| r)
-        .ok_or_else(|| {
-            format!(
-                "No exchange rate for {} → {} (company {}); seed currency_rate before confirming multi-currency orders",
-                from, to, order.company_id
-            )
-        })?;
-    if rate <= 0.0 {
-        return Err("Exchange rate must be positive".to_string());
-    }
+    let rate = resolve_currency_rate_as_of(
+        ctx,
+        organization_id,
+        order.company_id,
+        order.currency_id,
+        company_row.currency_id,
+        ctx.timestamp,
+    )?;
     Ok((rate, from, to))
 }
 
@@ -641,7 +616,9 @@ pub fn create_sale_order(
             .find(&extra_partner_id)
             .ok_or("Invoice/shipping partner not found")?;
         if extra.organization_id != organization_id {
-            return Err("Invoice/shipping partner does not belong to this organization".to_string());
+            return Err(
+                "Invoice/shipping partner does not belong to this organization".to_string(),
+            );
         }
     }
 
@@ -668,6 +645,7 @@ pub fn create_sale_order(
     if params.currency_id == 0 {
         return Err("Currency is required".to_string());
     }
+    require_active_currency_by_id(ctx, params.currency_id)?;
     // Pricelist currency is authoritative when set; reject mismatched create payloads.
     if pl.currency_id != 0 && pl.currency_id != params.currency_id {
         return Err("Currency does not match pricelist currency".to_string());
@@ -1697,6 +1675,7 @@ pub fn update_sale_order(
         }
         pricelist_id = pid;
         currency_id = pl.currency_id;
+        require_active_currency_by_id(ctx, currency_id)?;
     }
     if let Some(wid) = params.warehouse_id {
         let wh = ctx

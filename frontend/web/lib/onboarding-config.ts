@@ -16,9 +16,6 @@ export const ONBOARDING_TIMEZONES = [
   'Australia/Sydney',
 ] as const
 
-/** ISO 4217 codes; each must exist as a row in the global SpacetimeDB `currency` table before bootstrap. */
-export const ONBOARDING_CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY'] as const
-
 export const DEFAULT_FISCAL_YEAR_END_MONTH = 12
 export const DEFAULT_FISCAL_YEAR_END_DAY = 31
 

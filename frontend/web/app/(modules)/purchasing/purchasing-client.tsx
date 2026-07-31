@@ -146,6 +146,7 @@ import {
 } from "@/lib/persist-record-custom-fields"
 import { fetchQueryList } from "@lumiere/query-hooks/http"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import {
   contactRowsToVendorSelectOptions,
   pricelistRowsToSelectOptions,
@@ -486,6 +487,7 @@ function PurchasingClientLoaded({
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId)
+  const { data: currencies = [] } = useCurrencies()
 
   const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId: operatingCompanyId ?? undefined })
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId: operatingCompanyId ?? undefined })
@@ -590,6 +592,7 @@ function PurchasingClientLoaded({
   )
 
   const promptCreateRfqFromRequisition = async (requisitionId?: string) => {
+    if (!defaultCurrencyId) throw new Error("No active currency is available")
     const reqId =
       requisitionId ??
       window
@@ -630,7 +633,7 @@ function PurchasingClientLoaded({
     }
     await createPurchaseRfq.mutateAsync({
       requisitionId: reqId ? BigInt(reqId) : null,
-      currencyId: 1n,
+      currencyId: BigInt(defaultCurrencyId),
       notes: "RFQ from Purchasing Ops",
       lines: [
         {
@@ -646,6 +649,7 @@ function PurchasingClientLoaded({
   }
 
   const promptAddRfqBid = async () => {
+    if (!defaultCurrencyId) throw new Error("No active currency is available")
     const rfqId = window
       .prompt(
         t("purchasing.ops.prompt.rfqId", { defaultValue: "RFQ id" }),
@@ -674,7 +678,7 @@ function PurchasingClientLoaded({
     await addPurchaseRfqBid.mutateAsync({
       rfqId: BigInt(rfqId),
       partnerId: BigInt(partnerId),
-      currencyId: 1n,
+      currencyId: BigInt(defaultCurrencyId),
       priceUnit,
       notes: null,
     })
@@ -1398,15 +1402,11 @@ function PurchasingClientLoaded({
     [t, editLineOptions, productFieldOptions, uomFieldOptions],
   )
 
-  const defaultCurrencyId = useMemo(() => {
-    const pl = pricelists.find((p) => p.currencyId != null)
-    return pl?.currencyId != null ? Number(pl.currencyId) : 1
-  }, [pricelists])
-
   const currencyFieldOptions = useMemo(
-    () => currencyOptionsFromRows([pricelists as Record<string, unknown>[]]),
-    [pricelists],
+    () => currencyOptionsFromRows(currencies),
+    [currencies],
   )
+  const defaultCurrencyId = currencyFieldOptions[0]?.value ?? ""
 
   const partnerBankFormConfig = useMemo(
     () =>
@@ -1415,7 +1415,7 @@ function PurchasingClientLoaded({
           partnerId: vendorFieldOptions,
           currencyId: currencyFieldOptions,
         }),
-        { currencyId: String(defaultCurrencyId) },
+        { currencyId: defaultCurrencyId },
       ),
     [t, vendorFieldOptions, currencyFieldOptions, defaultCurrencyId],
   )

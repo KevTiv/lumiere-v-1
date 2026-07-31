@@ -7,6 +7,7 @@ import {
   fetchFirstPricelistId,
   fetchFirstWarehouseId,
   fetchFirstUomId,
+  fetchCurrencyIdByCode,
   fetchFulfillmentPickingIdBySaleOrderId,
   fetchOrgPermissionId,
   fetchProductIdByName,
@@ -316,6 +317,7 @@ async function fetchDefaultCompanyId(page: Page): Promise<number> {
 
 async function adminCreateDraftPayment(page: Page): Promise<number> {
   const companyId = await fetchDefaultCompanyId(page)
+  const currencyId = await fetchCurrencyIdByCode(page, "USD")
   const partnerId = await fetchVendorPartnerIdByName(page, "Globex Corp")
   const amount = 42.5
   await callReducerBff(page, "create_payment", [
@@ -326,7 +328,7 @@ async function adminCreateDraftPayment(page: Page): Promise<number> {
       partnerType: { tag: "Supplier" },
       partnerId,
       amount,
-      currencyId: 1,
+      currencyId,
       journalId: 1,
       ref: smokeName("perm-pay"),
     },
@@ -336,6 +338,7 @@ async function adminCreateDraftPayment(page: Page): Promise<number> {
 
 async function adminPrepareAssignedPicking(page: Page): Promise<number> {
   const companyId = await fetchDefaultCompanyId(page)
+  const currencyId = await fetchCurrencyIdByCode(page, "USD")
   const partnerRes = await page.request.get("/api/query/contacts")
   if (!partnerRes.ok()) throw new Error(`contacts query failed: ${partnerRes.status()}`)
   const contactsJson = (await partnerRes.json()) as {
@@ -363,7 +366,7 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
         partner_invoice_id: partnerId,
         partner_shipping_id: partnerId,
         pricelist_id: pricelistId,
-        currency_id: 1,
+        currency_id: currencyId,
         warehouse_id: warehouseId,
         order_lines: [],
         origin: smokeName("perm-so"),

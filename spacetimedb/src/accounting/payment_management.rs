@@ -21,7 +21,7 @@ use crate::accounting::relations::{
     require_active_account, require_active_currency_id, require_active_journal,
 };
 use crate::core::organization::require_company_in_organization;
-use crate::core::reference::{legacy_currency_code_for_id, require_currency_row};
+use crate::core::reference::require_currency_by_id;
 use crate::crm::contacts::contact;
 use crate::documents::documents::document;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
@@ -675,14 +675,15 @@ pub fn update_payment_account(
         }
     }
 
-    let (reference_normalized, reference_masked) = if let Some(ref reference_raw) = params.reference_raw {
-        normalize_reference(reference_raw)
-    } else {
-        (
-            account.reference_normalized.clone(),
-            account.reference_masked.clone(),
-        )
-    };
+    let (reference_normalized, reference_masked) =
+        if let Some(ref reference_raw) = params.reference_raw {
+            normalize_reference(reference_raw)
+        } else {
+            (
+                account.reference_normalized.clone(),
+                account.reference_masked.clone(),
+            )
+        };
 
     ctx.db.payment_account().id().update(PaymentAccount {
         name: params.name.unwrap_or(account.name),
@@ -690,7 +691,9 @@ pub fn update_payment_account(
         reference_normalized,
         reference_masked,
         fee_account_id: params.fee_account_id.unwrap_or(account.fee_account_id),
-        clearing_account_id: params.clearing_account_id.unwrap_or(account.clearing_account_id),
+        clearing_account_id: params
+            .clearing_account_id
+            .unwrap_or(account.clearing_account_id),
         active: params.active.unwrap_or(account.active),
         is_primary: params.is_primary.unwrap_or(account.is_primary),
         updated_at: ctx.timestamp,
@@ -1847,10 +1850,7 @@ pub fn allocate_payment_transaction(
         return Err("target line is not on the required receivable/payable account".to_string());
     }
 
-    if !(1..=9).contains(&transaction.currency_id) {
-        return Err("payment currency is not supported".to_string());
-    }
-    let currency = require_currency_row(ctx, legacy_currency_code_for_id(transaction.currency_id))?;
+    let currency = require_currency_by_id(ctx, transaction.currency_id)?;
     if !currency.active
         || params.currency_id != transaction.currency_id
         || ledger_payment.currency_id != transaction.currency_id

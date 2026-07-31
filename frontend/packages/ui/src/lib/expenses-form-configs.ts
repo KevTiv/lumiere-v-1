@@ -657,10 +657,10 @@ export const upsertExpenseMileageRateForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "text",
+          type: "select",
           label: t("expenses.forms.upsertMileageRate.fields.currencyId"),
           required: true,
-          defaultValue: "1",
+          options: [],
           width: "1/2",
         },
         {
@@ -746,10 +746,10 @@ export const upsertExpensePerDiemRateForm = (t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "text",
+          type: "select",
           label: t("expenses.forms.upsertPerDiemRate.fields.currencyId"),
           required: true,
-          defaultValue: "1",
+          options: [],
           width: "1/2",
         },
         {

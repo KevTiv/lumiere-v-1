@@ -13,7 +13,7 @@ pub struct BootstrapNewTenantParams {
     pub organization: CreateOrganizationParams,
     pub default_company_name: String,
     pub default_company_code: String,
-    pub default_company_currency_code: String,
+    pub default_company_currency_id: u64,
     pub fiscal_year_end_month: u8,
     pub fiscal_year_end_day: u8,
     pub seed_form_configs: bool,

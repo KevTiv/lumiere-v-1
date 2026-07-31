@@ -5,12 +5,13 @@ use crate::accounting::chart_of_accounts::{
     account_account, account_journal, AccountAccount, AccountJournal,
 };
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, AccountMove, AccountMoveLine,
 };
 use crate::accounting::payments::account_payment;
 use crate::core::organization::{company, require_company_in_organization};
-use crate::core::reference::{legacy_currency_code_for_id, require_currency_row};
+use crate::core::reference::require_currency_by_id;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::types::{AccountInternalGroup, AccountMoveState, JournalType, PaymentState};
 
@@ -29,7 +30,8 @@ pub struct FxRevaluationRun {
     pub organization_id: u64,
     pub company_id: u64,
     pub currency_id: u64,
-    pub currency_code: String,
+    /// Immutable ISO-code snapshot captured when the run is posted.
+    pub currency_code_snapshot: String,
     pub company_currency_id: u64,
     pub rate: f64,
     pub rate_source: String,
@@ -57,6 +59,7 @@ pub struct FxRevaluationLineParams {
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct RunFxRevaluationParams {
+    pub idempotency_key: String,
     pub currency_id: u64,
     pub as_of_date: Timestamp,
     /// Functional currency units per 1.0 foreign currency unit.
@@ -74,6 +77,7 @@ pub struct RunFxRevaluationParams {
 /// Auto-scan open AR/AP foreign-currency residuals and revalue at `rate`.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct RunFxRevaluationBatchParams {
+    pub idempotency_key: String,
     pub currency_id: u64,
     pub as_of_date: Timestamp,
     pub journal_id: u64,
@@ -90,6 +94,7 @@ pub struct RunFxRevaluationBatchParams {
 /// Post realized FX gain/loss on settlement (payment vs invoice functional residual).
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct PostRealizedFxParams {
+    pub idempotency_key: String,
     pub payment_id: u64,
     pub invoice_move_id: u64,
     pub payment_amount_functional: f64,
@@ -106,7 +111,7 @@ pub struct PostRealizedFxParams {
 
 struct FxScope {
     currency_id: u64,
-    currency_code: String,
+    currency_code_snapshot: String,
     company_currency_id: u64,
     journal: AccountJournal,
     gain_account: AccountAccount,
@@ -154,21 +159,14 @@ fn load_fx_scope(
         .find(&company_id)
         .ok_or("company not found")?;
 
-    if !(1..=9).contains(&currency_id) {
-        return Err("currency_id does not map to a supported currency".to_string());
-    }
-    if !(1..=9).contains(&company.currency_id) {
-        return Err("company currency_id does not map to a supported currency".to_string());
-    }
     if currency_id == company.currency_id {
         return Err("revaluation currency must differ from company currency".to_string());
     }
-    let currency = require_currency_row(ctx, legacy_currency_code_for_id(currency_id))?;
+    let currency = require_currency_by_id(ctx, currency_id)?;
     if !currency.active {
         return Err("revaluation currency is inactive".to_string());
     }
-    let company_currency =
-        require_currency_row(ctx, legacy_currency_code_for_id(company.currency_id))?;
+    let company_currency = require_currency_by_id(ctx, company.currency_id)?;
     if !company_currency.active {
         return Err("company currency is inactive".to_string());
     }
@@ -206,7 +204,7 @@ fn load_fx_scope(
 
     Ok(FxScope {
         currency_id,
-        currency_code: currency.code,
+        currency_code_snapshot: currency.code,
         company_currency_id: company.currency_id,
         journal,
         gain_account,
@@ -311,14 +309,12 @@ fn insert_move_line(
     });
 }
 
-#[spacetimedb::reducer]
-pub fn run_fx_revaluation(
+fn run_fx_revaluation_impl(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
     params: RunFxRevaluationParams,
-) -> Result<(), String> {
-    check_permission(ctx, organization_id, "account_move", "create")?;
+) -> Result<u64, String> {
     let scope = load_fx_scope(
         ctx,
         organization_id,
@@ -539,7 +535,7 @@ pub fn run_fx_revaluation(
         organization_id,
         company_id,
         currency_id: scope.currency_id,
-        currency_code: scope.currency_code.clone(),
+        currency_code_snapshot: scope.currency_code_snapshot.clone(),
         company_currency_id: scope.company_currency_id,
         rate: params.rate,
         rate_source: rate_source.clone(),
@@ -568,7 +564,7 @@ pub fn run_fx_revaluation(
             new_values: Some(
                 serde_json::json!({
                     "currency_id": scope.currency_id,
-                    "currency_code": scope.currency_code,
+                    "currency_code_snapshot": scope.currency_code_snapshot,
                     "company_currency_id": scope.company_currency_id,
                     "rate": params.rate,
                     "rate_source": rate_source,
@@ -582,7 +578,7 @@ pub fn run_fx_revaluation(
             ),
             changed_fields: vec![
                 "currency_id".to_string(),
-                "currency_code".to_string(),
+                "currency_code_snapshot".to_string(),
                 "company_currency_id".to_string(),
                 "rate".to_string(),
                 "rate_source".to_string(),
@@ -594,6 +590,42 @@ pub fn run_fx_revaluation(
         },
     );
 
+    Ok(run.id)
+}
+
+#[spacetimedb::reducer]
+pub fn run_fx_revaluation(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: RunFxRevaluationParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "create")?;
+    let payload_fingerprint = format!("{params:?}");
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "run_fx_revaluation",
+        &params.idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
+    let idempotency_key = params.idempotency_key.clone();
+    let run_id = run_fx_revaluation_impl(ctx, organization_id, company_id, params)?;
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "run_fx_revaluation",
+        idempotency_key,
+        payload_fingerprint,
+        "fx_revaluation_run",
+        run_id,
+    );
     Ok(())
 }
 
@@ -606,6 +638,20 @@ pub fn run_fx_revaluation_batch(
     params: RunFxRevaluationBatchParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "create")?;
+    let payload_fingerprint = format!("{params:?}");
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "run_fx_revaluation_batch",
+        &params.idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
+    let idempotency_key = params.idempotency_key.clone();
     let scope = load_fx_scope(
         ctx,
         organization_id,
@@ -676,15 +722,16 @@ pub fn run_fx_revaluation_batch(
     if lines.is_empty() {
         return Err(format!(
             "No open AR/AP residuals found for currency {}",
-            scope.currency_code
+            scope.currency_code_snapshot
         ));
     }
 
-    run_fx_revaluation(
+    let run_id = run_fx_revaluation_impl(
         ctx,
         organization_id,
         company_id,
         RunFxRevaluationParams {
+            idempotency_key: params.idempotency_key,
             currency_id: scope.currency_id,
             as_of_date: params.as_of_date,
             rate: params.rate,
@@ -697,7 +744,18 @@ pub fn run_fx_revaluation_batch(
             reference: params.reference,
             metadata: params.metadata,
         },
-    )
+    )?;
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "run_fx_revaluation_batch",
+        idempotency_key,
+        payload_fingerprint,
+        "fx_revaluation_run",
+        run_id,
+    );
+    Ok(())
 }
 
 /// Post realized FX gain/loss when settling a foreign invoice at a different rate.
@@ -709,6 +767,20 @@ pub fn post_realized_fx_gain_loss(
     params: PostRealizedFxParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "create")?;
+    let payload_fingerprint = format!("{params:?}");
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "post_realized_fx_gain_loss",
+        &params.idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
+    let idempotency_key = params.idempotency_key.clone();
     require_company_in_organization(ctx, organization_id, company_id)?;
     ensure_accounting_period_open_for_date(ctx, company_id, params.date)?;
 
@@ -923,5 +995,15 @@ pub fn post_realized_fx_gain_loss(
         },
     );
 
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "post_realized_fx_gain_loss",
+        idempotency_key,
+        payload_fingerprint,
+        "account_move",
+        move_record.id,
+    );
     Ok(())
 }

@@ -2,7 +2,12 @@
 
 use std::sync::Arc;
 
-use axum::{extract::State, http::HeaderMap, routing::post, Json, Router};
+use axum::{
+    extract::State,
+    http::HeaderMap,
+    routing::{get, post},
+    Json, Router,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
@@ -45,7 +50,7 @@ struct BootstrapTenantBody {
     pub organization: OrganizationInput,
     pub default_company_name: String,
     pub default_company_code: String,
-    pub default_company_currency_code: String,
+    pub default_company_currency_id: u64,
     pub fiscal_year_end_month: u32,
     pub fiscal_year_end_day: u32,
     pub seed_form_configs: bool,
@@ -58,7 +63,7 @@ struct BootstrapReducerArg {
     organization: OrganizationInput,
     default_company_name: String,
     default_company_code: String,
-    default_company_currency_code: String,
+    default_company_currency_id: u64,
     fiscal_year_end_month: u32,
     fiscal_year_end_day: u32,
     seed_form_configs: bool,
@@ -101,10 +106,9 @@ fn validate_bootstrap(b: &BootstrapTenantBody) -> Result<(), ApiError> {
             "Default company code is required".into(),
         ));
     }
-    let cur = b.default_company_currency_code.trim();
-    if cur.len() < 3 || cur.len() > 3 {
+    if b.default_company_currency_id == 0 {
         return Err(ApiError::BadRequest(
-            "defaultCompanyCurrencyCode must be exactly 3 characters".into(),
+            "defaultCompanyCurrencyId must be a positive integer".into(),
         ));
     }
     if !(1..=12).contains(&b.fiscal_year_end_month) {
@@ -151,7 +155,7 @@ async fn bootstrap_tenant_post(
         organization: body.organization.clone(),
         default_company_name: body.default_company_name.clone(),
         default_company_code: body.default_company_code.clone(),
-        default_company_currency_code: body.default_company_currency_code.to_uppercase(),
+        default_company_currency_id: body.default_company_currency_id,
         fiscal_year_end_month: body.fiscal_year_end_month,
         fiscal_year_end_day: body.fiscal_year_end_day,
         seed_form_configs: body.seed_form_configs,
@@ -174,6 +178,47 @@ async fn bootstrap_tenant_post(
     }
 }
 
+async fn bootstrap_currencies_get(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+) -> Result<Json<Value>, ApiError> {
+    let auth = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok());
+    let id_hint = stdb_identity_hex_hint(&headers, &cookies);
+    let cookie_token = cookies
+        .get("stdb_token")
+        .map(|cookie| cookie.value().to_string());
+    let session = resolve_api_session(&state, auth, cookie_token.as_deref(), id_hint.as_deref())
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    if session.identity_hex == "unknown" {
+        return Err(ApiError::Unauthorized);
+    }
+
+    let mut currencies = state
+        .client_with_token(&session.stdb_token)
+        .query_sql("SELECT id, code, name FROM currency WHERE active = true")
+        .await
+        .map_err(|error| ApiError::Internal(error.to_string()))?;
+    currencies.sort_by(|left, right| {
+        left.get("code")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .cmp(
+                right
+                    .get("code")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+            )
+    });
+
+    Ok(Json(json!({ "data": currencies })))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new().route("/bootstrap/tenant", post(bootstrap_tenant_post))
+    Router::new()
+        .route("/bootstrap/currencies", get(bootstrap_currencies_get))
+        .route("/bootstrap/tenant", post(bootstrap_tenant_post))
 }

@@ -7,8 +7,8 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateCurrencyRateParams {
-    pub from_currency: String,
-    pub to_currency: String,
+    pub from_currency_id: u64,
+    pub to_currency_id: u64,
     pub rate: f64,
     pub metadata: Option<String>,
 }

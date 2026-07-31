@@ -95,6 +95,36 @@ impl<'ctx> __sdk::TableWithPrimaryKey for CurrencyTableHandle<'ctx> {
     }
 }
 
+/// Access to the `id` unique index on the table `currency`,
+/// which allows point queries on the field of the same name
+/// via the [`CurrencyIdUnique::find`] method.
+///
+/// Users are encouraged not to explicitly reference this type,
+/// but to directly chain method calls,
+/// like `ctx.db.currency().id().find(...)`.
+pub struct CurrencyIdUnique<'ctx> {
+    imp: __sdk::UniqueConstraintHandle<Currency, u64>,
+    phantom: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+impl<'ctx> CurrencyTableHandle<'ctx> {
+    /// Get a handle on the `id` unique index on the table `currency`.
+    pub fn id(&self) -> CurrencyIdUnique<'ctx> {
+        CurrencyIdUnique {
+            imp: self.imp.get_unique_constraint::<u64>("id"),
+            phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'ctx> CurrencyIdUnique<'ctx> {
+    /// Find the subscribed row whose `id` column value is equal to `col_val`,
+    /// if such a row is present in the client cache.
+    pub fn find(&self, col_val: &u64) -> Option<Currency> {
+        self.imp.find(col_val)
+    }
+}
+
 /// Access to the `code` unique index on the table `currency`,
 /// which allows point queries on the field of the same name
 /// via the [`CurrencyCodeUnique::find`] method.
@@ -128,6 +158,7 @@ impl<'ctx> CurrencyCodeUnique<'ctx> {
 #[doc(hidden)]
 pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
     let _table = client_cache.get_or_make_table::<Currency>("currency");
+    _table.add_unique_constraint::<u64>("id", |row| &row.id);
     _table.add_unique_constraint::<String>("code", |row| &row.code);
 }
 

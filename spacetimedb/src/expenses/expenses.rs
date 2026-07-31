@@ -14,7 +14,9 @@ use crate::accounting::journal_entries::{
 use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::country_pack::pack_expense_evidence_rules;
 use crate::core::organization::{company, company_id_from_scope};
-use crate::core::reference::{currency_rate, legacy_currency_code_for_id};
+use crate::core::reference::{
+    require_active_currency_by_id, require_currency_by_id, resolve_currency_rate_as_of,
+};
 use crate::expenses::expense_depth::{
     allocations_for_expense, hr_expense_mileage_rate, hr_expense_per_diem_rate,
 };
@@ -533,44 +535,19 @@ fn expense_exchange_rate_snapshot(
         .find(&company_id)
         .ok_or("Company not found for expense sheet")?;
     let company_currency_id = company_row.currency_id;
-    let from = legacy_currency_code_for_id(currency_id).to_string();
-    let to = legacy_currency_code_for_id(company_currency_id).to_string();
-    if from.eq_ignore_ascii_case(&to) {
+    let from = require_currency_by_id(ctx, currency_id)?.code;
+    let to = require_currency_by_id(ctx, company_currency_id)?.code;
+    if currency_id == company_currency_id {
         return Ok((1.0, company_currency_id, from, to));
     }
-
-    let mut best_rate: Option<(Timestamp, f64)> = None;
-    for rate in ctx
-        .db
-        .currency_rate()
-        .rate_by_org()
-        .filter(&organization_id)
-    {
-        if !rate.from_currency.eq_ignore_ascii_case(&from)
-            || !rate.to_currency.eq_ignore_ascii_case(&to)
-        {
-            continue;
-        }
-        if let Some(cid) = rate.company_id {
-            if cid != company_id {
-                continue;
-            }
-        }
-        match best_rate {
-            Some((prev_date, _)) if rate.date <= prev_date => {}
-            _ => best_rate = Some((rate.date, rate.rate)),
-        }
-    }
-
-    let rate = best_rate.map(|(_, r)| r).ok_or_else(|| {
-        format!(
-            "No exchange rate for {} → {} (company {}); seed currency_rate before submitting multi-currency expenses",
-            from, to, company_id
-        )
-    })?;
-    if rate <= 0.0 {
-        return Err("Exchange rate must be positive".to_string());
-    }
+    let rate = resolve_currency_rate_as_of(
+        ctx,
+        organization_id,
+        company_id,
+        currency_id,
+        company_currency_id,
+        ctx.timestamp,
+    )?;
     Ok((rate, company_currency_id, from, to))
 }
 
@@ -793,6 +770,7 @@ pub fn create_expense(
     check_permission(ctx, organization_id, "hr_expense", "create")?;
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    require_active_currency_by_id(ctx, params.currency_id)?;
 
     if let Some(ref req) = params.client_request_id {
         if !req.is_empty()
@@ -1460,6 +1438,7 @@ pub fn create_expense_sheet(
     check_permission(ctx, organization_id, "hr_expense_sheet", "create")?;
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    require_active_currency_by_id(ctx, params.currency_id)?;
 
     if params.name.is_empty() {
         return Err("Expense sheet name cannot be empty".to_string());

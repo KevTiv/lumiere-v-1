@@ -7,7 +7,7 @@ use spacetimedb::rand::Rng;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
-use crate::core::reference::{legacy_currency_id_for_code, require_currency_row};
+use crate::core::reference::require_active_currency_by_id;
 use crate::core::users::user_profile;
 use crate::core::users::{user_organization, UserOrganization};
 use crate::forms::migrations::run_seed_organization_form_configs;
@@ -144,7 +144,7 @@ pub struct BootstrapNewTenantParams {
     pub organization: CreateOrganizationParams,
     pub default_company_name: String,
     pub default_company_code: String,
-    pub default_company_currency_code: String,
+    pub default_company_currency_id: u64,
     pub fiscal_year_end_month: u8,
     pub fiscal_year_end_day: u8,
     pub seed_form_configs: bool,
@@ -266,6 +266,9 @@ pub(crate) fn insert_organization_with_owner(
     if params.code.is_empty() {
         return Err("Organization code cannot be empty".to_string());
     }
+    if let Some(currency_id) = params.currency_id {
+        require_active_currency_by_id(ctx, currency_id)?;
+    }
 
     let code = params.code.clone();
 
@@ -372,15 +375,11 @@ pub fn bootstrap_new_tenant(
 
     let (org, owner_role) = insert_organization_with_owner(ctx, params.organization)?;
 
-    let currency_code = params.default_company_currency_code.trim().to_uppercase();
-    if currency_code.is_empty() {
-        return Err("Default company currency code cannot be empty".to_string());
-    }
-    let currency_row = require_currency_row(ctx, &currency_code)?;
-    let legacy_company_currency_id = legacy_currency_id_for_code(&currency_row.code);
+    let company_currency_id = params.default_company_currency_id;
+    require_active_currency_by_id(ctx, company_currency_id)?;
 
     ctx.db.organization().id().update(Organization {
-        currency_id: Some(legacy_company_currency_id),
+        currency_id: Some(company_currency_id),
         updated_at: ctx.timestamp,
         ..org
     });
@@ -402,7 +401,7 @@ pub fn bootstrap_new_tenant(
         code: default_code.to_string(),
         is_parent: true,
         parent_id: None,
-        currency_id: legacy_company_currency_id,
+        currency_id: company_currency_id,
         fiscal_year_end_month: params.fiscal_year_end_month,
         fiscal_year_end_day: params.fiscal_year_end_day,
         tax_id: None,
@@ -480,6 +479,9 @@ pub fn update_organization(
         .id()
         .find(&organization_id)
         .ok_or("Organization not found")?;
+    if let Some(currency_id) = params.currency_id {
+        require_active_currency_by_id(ctx, currency_id)?;
+    }
 
     ctx.db.organization().id().update(Organization {
         name: params.name.unwrap_or(org.name),
@@ -552,6 +554,7 @@ pub fn create_company(
     if params.name.is_empty() {
         return Err("Company name cannot be empty".to_string());
     }
+    require_active_currency_by_id(ctx, params.currency_id)?;
 
     if let Some(parent_id) = params.parent_id {
         require_company_in_organization(ctx, organization_id, parent_id)?;

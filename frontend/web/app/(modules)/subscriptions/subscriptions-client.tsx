@@ -120,6 +120,7 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useSaleOrders, usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useAccountJournals, useAccountAccounts, useAccountMoves, useAccountMoveLines } from "@lumiere/query-hooks/hooks/accounting"
 import {
   saleOrderRowsToSelectOptions,
@@ -130,6 +131,7 @@ import {
   accountAccountRowsToSelectOptions,
   accountMoveRowsToSelectOptions,
   accountMoveLineRowsToSelectOptions,
+  currencyOptionsFromRows,
 } from "@/lib/form-lookup"
 
 function isSubscriptionActiveForMetrics(row: Record<string, unknown>): boolean {
@@ -221,6 +223,7 @@ function SubscriptionsClientLoaded({
   const { data: accounts = [] } = useAccountAccounts(orgId, { initialData: initialAccounts })
   const { data: accountMoves = [] } = useAccountMoves(orgId)
   const { data: accountMoveLines = [] } = useAccountMoveLines(orgId)
+  const { data: currencies = [] } = useCurrencies()
 
   const createSubscription = useCreateSubscription(orgId, operatingCompanyId)
   const createPlan = useCreateSubscriptionPlan(orgId, operatingCompanyId)
@@ -312,12 +315,11 @@ function SubscriptionsClientLoaded({
   }, [accounts, t])
 
   const currencyFieldOptions = useMemo(() => {
-    const ids = new Set<string>(["1"])
-    for (const j of journals as Record<string, unknown>[]) {
-      if (j.currencyId != null) ids.add(String(j.currencyId))
-    }
-    return [...ids].map((id) => ({ value: id, label: `Currency ${id}` }))
-  }, [journals])
+    const fromApi = currencyOptionsFromRows(currencies)
+    return fromApi.length > 0
+      ? fromApi
+      : [{ value: "", label: "No currencies available", disabled: true }]
+  }, [currencies])
 
   const recognizeMoveSelectOptions = useMemo(() => {
     const posted = (accountMoves as Record<string, unknown>[]).filter((m) => {

@@ -2,6 +2,8 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
+use crate::core::organization::company;
+use crate::core::reference::require_active_currency_by_id;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::inventory::stock::stock_quant;
 use crate::types::{AccountMoveState, PaymentState};
@@ -223,7 +225,17 @@ fn post_close_valuation_move(
 
     let amount = total_value.abs();
     let name = next_doc_number(ctx, "INVCLS");
-    let currency_id = 1_u64;
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Company not found")?;
+    if company.organization_id != organization_id {
+        return Err("Company does not belong to this organization".to_string());
+    }
+    let currency_id = company.currency_id;
+    require_active_currency_by_id(ctx, currency_id)?;
     let debit_inv = total_value >= 0.0;
 
     let move_record = ctx.db.account_move().insert(AccountMove {

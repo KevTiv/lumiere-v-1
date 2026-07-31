@@ -14,7 +14,7 @@ use crate::accounting::payments::{
 };
 use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::organization::company;
-use crate::core::reference::{currency_rate, legacy_currency_code_for_id};
+use crate::core::reference::resolve_currency_rate_as_of;
 use crate::crm::contacts::contact;
 use crate::helpers::calculate_tax;
 use crate::inventory::product::product;
@@ -164,48 +164,14 @@ pub fn resolve_subscription_fx_rate(
     if currency_id == company_currency_id {
         return Ok(1.0);
     }
-    let from = legacy_currency_code_for_id(currency_id).to_string();
-    let to = legacy_currency_code_for_id(company_currency_id).to_string();
-    if from.eq_ignore_ascii_case(&to) {
-        return Ok(1.0);
-    }
-
-    let mut best_rate: Option<(Timestamp, f64)> = None;
-    for rate in ctx
-        .db
-        .currency_rate()
-        .rate_by_org()
-        .filter(&organization_id)
-    {
-        if !rate.from_currency.eq_ignore_ascii_case(&from)
-            || !rate.to_currency.eq_ignore_ascii_case(&to)
-        {
-            continue;
-        }
-        if let Some(cid) = rate.company_id {
-            if cid != company_id {
-                continue;
-            }
-        }
-        if rate.date > as_of {
-            continue;
-        }
-        match best_rate {
-            Some((prev_date, _)) if rate.date <= prev_date => {}
-            _ => best_rate = Some((rate.date, rate.rate)),
-        }
-    }
-
-    let rate = best_rate.map(|(_, r)| r).ok_or_else(|| {
-        format!(
-            "No exchange rate for {} → {} (company {}); seed currency_rate before multi-currency billing",
-            from, to, company_id
-        )
-    })?;
-    if rate <= 0.0 {
-        return Err("Exchange rate must be positive".to_string());
-    }
-    Ok(rate)
+    resolve_currency_rate_as_of(
+        ctx,
+        organization_id,
+        company_id,
+        currency_id,
+        company_currency_id,
+        as_of,
+    )
 }
 
 fn resolve_tax_payable_account(

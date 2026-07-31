@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   useApplyPendingExpenseIntegrationIntents,
@@ -12,14 +12,18 @@ import {
   useUpsertExpensePerDiemRate,
 } from "@lumiere/query-hooks/hooks/expenses"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import {
   Button,
   FormModal,
+  mergeFieldDefaultValues,
+  mergeSelectOptionsForFields,
   upsertExpenseMileageRateForm,
   upsertExpensePerDiemRateForm,
 } from "@lumiere/ui"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
+import { currencyOptionsFromRows } from "@/lib/form-lookup"
 
 /**
  * Wave E ops: card statement match + OCR/email inbox intent flush.
@@ -36,6 +40,7 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
   const upsertMileage = useUpsertExpenseMileageRate(orgId, companyId)
   const upsertPerDiem = useUpsertExpensePerDiemRate(orgId, companyId)
   const seedStatutoryMileage = useSeedStatutoryExpenseMileageRates(orgId, companyId)
+  const { data: currencies = [] } = useCurrencies()
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [rateForm, setRateForm] = useState<"mileage" | "perDiem" | null>(null)
@@ -44,12 +49,37 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
   const [merchantKey, setMerchantKey] = useState("")
   const [amount, setAmount] = useState("")
   const [fxFee, setFxFee] = useState("0")
-  const [currencyId, setCurrencyId] = useState("1")
+  const [currencyId, setCurrencyId] = useState("")
   const [statementLineId, setStatementLineId] = useState("")
   const [expenseId, setExpenseId] = useState("")
 
-  const mileageForm = useMemo(() => upsertExpenseMileageRateForm(t), [t])
-  const perDiemForm = useMemo(() => upsertExpensePerDiemRateForm(t), [t])
+  const currencyOptions = useMemo(() => currencyOptionsFromRows(currencies), [currencies])
+  const mileageForm = useMemo(
+    () =>
+      mergeFieldDefaultValues(
+        mergeSelectOptionsForFields(upsertExpenseMileageRateForm(t), { currencyId: currencyOptions }),
+        { currencyId },
+      ),
+    [t, currencyOptions, currencyId],
+  )
+  const perDiemForm = useMemo(
+    () =>
+      mergeFieldDefaultValues(
+        mergeSelectOptionsForFields(upsertExpensePerDiemRateForm(t), { currencyId: currencyOptions }),
+        { currencyId },
+      ),
+    [t, currencyOptions, currencyId],
+  )
+
+  useEffect(() => {
+    if (!currencyId && currencyOptions[0]) setCurrencyId(currencyOptions[0].value)
+  }, [currencyId, currencyOptions])
+
+  const requireCurrencyId = (value: unknown): bigint => {
+    const parsed = optionalBigIntU64(value)
+    if (parsed === undefined || parsed === 0n) throw new Error("Choose an active currency")
+    return parsed
+  }
 
   const run = async (fn: () => Promise<void>, okMsg: string) => {
     setBusy(true)
@@ -113,16 +143,20 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
           value={fxFee}
           onChange={(e) => setFxFee(e.target.value)}
         />
-        <input
+        <select
           className="rounded-md border bg-background px-2 py-1.5 text-sm"
-          placeholder={t("expenses.ops.currencyId")}
           value={currencyId}
           onChange={(e) => setCurrencyId(e.target.value)}
-        />
+          aria-label={t("expenses.ops.currencyId")}
+        >
+          {currencyOptions.map((currency) => (
+            <option key={currency.value} value={currency.value}>{currency.label}</option>
+          ))}
+        </select>
         <Button
           type="button"
           size="sm"
-          disabled={busy || !externalRef.trim() || !amount}
+          disabled={busy || !externalRef.trim() || !amount || !currencyId}
           data-testid="expenses-ops-create-statement"
           onClick={() =>
             void run(async () => {
@@ -130,7 +164,7 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
                 externalRef: externalRef.trim(),
                 merchantKey: merchantKey.trim() || undefined,
                 amount: Number(amount),
-                currencyId: BigInt(currencyId || "1"),
+                currencyId: requireCurrencyId(currencyId),
                 transactionDate: stbTimestampFromDate(new Date()),
                 fxFeeAmount: Number(fxFee || 0),
               })
@@ -220,7 +254,7 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
             data-testid="expenses-ops-seed-statutory-mileage"
             onClick={() =>
               void run(async () => {
-                const seedCurrencyId = optionalBigIntU64(currencyId) ?? 1n
+                const seedCurrencyId = requireCurrencyId(currencyId)
                 await seedStatutoryMileage.mutateAsync({ currencyId: seedCurrencyId })
               }, t("expenses.ops.statutoryMileageSeeded"))
             }
@@ -259,7 +293,7 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
               rateId: rateId ?? null,
               params: {
                 name: String(formData.name ?? ""),
-                currencyId: optionalBigIntU64(formData.currencyId) ?? 1n,
+                currencyId: requireCurrencyId(formData.currencyId),
                 ratePerUnit: Number(formData.ratePerUnit ?? 0),
                 unit: String(formData.unit ?? "km"),
                 effectiveFrom: optionalDate(formData.effectiveFrom),
@@ -273,7 +307,7 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
               rateId: rateId ?? null,
               params: {
                 name: String(formData.name ?? ""),
-                currencyId: optionalBigIntU64(formData.currencyId) ?? 1n,
+                currencyId: requireCurrencyId(formData.currencyId),
                 locationCode: String(formData.locationCode ?? ""),
                 amountPerDay: Number(formData.amountPerDay ?? 0),
                 effectiveFrom: optionalDate(formData.effectiveFrom),

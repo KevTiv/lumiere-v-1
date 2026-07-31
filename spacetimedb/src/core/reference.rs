@@ -5,6 +5,7 @@
 ///          is scoped to an organization. Only superusers may manage global tables.
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::company;
 use crate::core::users::user_profile;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -22,7 +23,7 @@ pub struct CreateCountryParams {
     pub numcode: u16,
     pub phone_code: String,
     pub official_name: Option<String>,
-    pub currency_code: Option<String>,
+    pub currency_id: Option<u64>,
     pub language_codes: Vec<String>,
     pub is_active: bool,
     pub metadata: Option<String>,
@@ -49,8 +50,8 @@ pub struct CreateCurrencyParams {
 /// `inverse_rate`, `date`, `created_at` are system-derived.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateCurrencyRateParams {
-    pub from_currency: String,
-    pub to_currency: String,
+    pub from_currency_id: u64,
+    pub to_currency_id: u64,
     pub rate: f64,
     pub metadata: Option<String>,
 }
@@ -108,7 +109,7 @@ pub struct Country {
     pub iso3: String,
     pub numcode: u16,
     pub phone_code: String,
-    pub currency_code: Option<String>,
+    pub currency_id: Option<u64>,
     pub language_codes: Vec<String>,
     pub is_active: bool,
     pub metadata: Option<String>,
@@ -117,6 +118,9 @@ pub struct Country {
 #[spacetimedb::table(accessor = currency, public)]
 pub struct Currency {
     #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    #[unique]
     pub code: String, // ISO 4217
     pub name: String,
     pub symbol: String,
@@ -139,8 +143,8 @@ pub struct CurrencyRate {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
-    pub from_currency: String,
-    pub to_currency: String,
+    pub from_currency_id: u64,
+    pub to_currency_id: u64,
     pub rate: f64,
     pub inverse_rate: f64,
     pub date: Timestamp,
@@ -251,6 +255,9 @@ pub fn create_country(
     if ctx.db.country().code().find(&code).is_some() {
         return Err(format!("Country '{}' already exists", code));
     }
+    if let Some(currency_id) = params.currency_id {
+        require_active_currency_by_id(ctx, currency_id)?;
+    }
 
     ctx.db.country().insert(Country {
         code: code.clone(),
@@ -259,22 +266,26 @@ pub fn create_country(
         iso3: params.iso3,
         numcode: params.numcode,
         phone_code: params.phone_code,
-        currency_code: params.currency_code,
+        currency_id: params.currency_id,
         language_codes: params.language_codes,
         is_active: params.is_active,
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(ctx, 0, AuditLogParams {
-        company_id: None,
-        table_name: "country",
-        record_id: 0,
-        action: "CREATE",
-        old_values: None,
-        new_values: Some(serde_json::json!({ "code": code, "name": params.name }).to_string()),
-        changed_fields: vec!["code".to_string(), "name".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        0,
+        AuditLogParams {
+            company_id: None,
+            table_name: "country",
+            record_id: 0,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "code": code, "name": params.name }).to_string()),
+            changed_fields: vec!["code".to_string(), "name".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -287,16 +298,20 @@ pub fn create_currency(
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
-    if ctx.db.currency().code().find(&code).is_some() {
-        return Err(format!("Currency '{}' already exists", code));
+    let normalized_code = code.trim().to_uppercase();
+    if normalized_code.is_empty() {
+        return Err("Currency code cannot be empty".to_string());
     }
-
+    if ctx.db.currency().code().find(&normalized_code).is_some() {
+        return Err(format!("Currency '{}' already exists", normalized_code));
+    }
     if params.position != "before" && params.position != "after" {
         return Err("Position must be 'before' or 'after'".to_string());
     }
 
     ctx.db.currency().insert(Currency {
-        code,
+        id: 0,
+        code: normalized_code.clone(),
         name: params.name,
         symbol: params.symbol,
         decimal_places: params.decimal_places,
@@ -307,7 +322,6 @@ pub fn create_currency(
         created_at: ctx.timestamp,
         metadata: params.metadata,
     });
-
     Ok(())
 }
 
@@ -320,15 +334,31 @@ pub fn create_currency_rate(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "currency_rate", "create")?;
 
-    if params.rate <= 0.0 {
+    if !params.rate.is_finite() || params.rate <= 0.0 {
         return Err("Rate must be positive".to_string());
+    }
+    if params.from_currency_id == params.to_currency_id {
+        return Err("Rate currencies must be different".to_string());
+    }
+    require_active_currency_by_id(ctx, params.from_currency_id)?;
+    require_active_currency_by_id(ctx, params.to_currency_id)?;
+    if let Some(company_id) = company_id {
+        let company = ctx
+            .db
+            .company()
+            .id()
+            .find(&company_id)
+            .ok_or("Company not found for currency rate")?;
+        if company.organization_id != organization_id {
+            return Err("Company does not belong to this organization".to_string());
+        }
     }
 
     ctx.db.currency_rate().insert(CurrencyRate {
         id: 0,
         organization_id,
-        from_currency: params.from_currency,
-        to_currency: params.to_currency,
+        from_currency_id: params.from_currency_id,
+        to_currency_id: params.to_currency_id,
         rate: params.rate,
         // System-derived: inverse is always 1/rate
         inverse_rate: 1.0 / params.rate,
@@ -511,38 +541,29 @@ fn apply_uom_rounding(qty: f64, rounding: f64) -> f64 {
     }
 }
 
-// ── Currency helpers (legacy `u64` id vs string PK on `currency`) ───────────────
+// ── Currency relation helpers ────────────────────────────────────────────────
 
-/// Maps ISO 4217 codes to the legacy numeric `currency_id` used on `Company` and related tables.
-pub(crate) fn legacy_currency_id_for_code(code: &str) -> u64 {
-    match code.trim().to_uppercase().as_str() {
-        "USD" => 1,
-        "EUR" => 2,
-        "GBP" => 3,
-        "CAD" => 4,
-        "AUD" => 5,
-        "JPY" => 6,
-        "CHF" => 7,
-        "CNY" => 8,
-        "INR" => 9,
-        _ => 1,
-    }
+pub(crate) fn require_currency_by_id(
+    ctx: &ReducerContext,
+    currency_id: u64,
+) -> Result<Currency, String> {
+    ctx.db
+        .currency()
+        .id()
+        .find(&currency_id)
+        .ok_or_else(|| format!("Currency ID '{}' was not found", currency_id))
 }
 
-/// Maps legacy numeric `currency_id` back to ISO 4217 (inverse of [`legacy_currency_id_for_code`]).
-pub(crate) fn legacy_currency_code_for_id(id: u64) -> &'static str {
-    match id {
-        1 => "USD",
-        2 => "EUR",
-        3 => "GBP",
-        4 => "CAD",
-        5 => "AUD",
-        6 => "JPY",
-        7 => "CHF",
-        8 => "CNY",
-        9 => "INR",
-        _ => "USD",
+/// Resolves a currency for a new write and rejects inactive catalog rows.
+pub(crate) fn require_active_currency_by_id(
+    ctx: &ReducerContext,
+    currency_id: u64,
+) -> Result<Currency, String> {
+    let currency = require_currency_by_id(ctx, currency_id)?;
+    if !currency.active {
+        return Err(format!("Currency '{}' is inactive", currency.code));
     }
+    Ok(currency)
 }
 
 /// Resolves a global `Currency` row by ISO 4217 code (case-insensitive).
@@ -557,4 +578,63 @@ pub(crate) fn require_currency_row(ctx: &ReducerContext, code: &str) -> Result<C
             normalized
         )
     })
+}
+
+/// Resolves the applicable FX rate at a business timestamp.
+///
+/// Company-specific rates take precedence over organization-wide rates. Within
+/// each scope, the newest rate whose date is not after `as_of` wins.
+pub(crate) fn resolve_currency_rate_as_of(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    from_currency_id: u64,
+    to_currency_id: u64,
+    as_of: Timestamp,
+) -> Result<f64, String> {
+    if from_currency_id == to_currency_id {
+        return Ok(1.0);
+    }
+
+    let from = require_currency_by_id(ctx, from_currency_id)?;
+    let to = require_currency_by_id(ctx, to_currency_id)?;
+    let mut company_rate: Option<(Timestamp, f64)> = None;
+    let mut global_rate: Option<(Timestamp, f64)> = None;
+
+    for rate in ctx
+        .db
+        .currency_rate()
+        .rate_by_org()
+        .filter(&organization_id)
+    {
+        if rate.from_currency_id != from_currency_id
+            || rate.to_currency_id != to_currency_id
+            || rate.date > as_of
+        {
+            continue;
+        }
+
+        let candidate = match rate.company_id {
+            Some(id) if id == company_id => &mut company_rate,
+            None => &mut global_rate,
+            Some(_) => continue,
+        };
+        if candidate.as_ref().is_none_or(|(date, _)| rate.date > *date) {
+            *candidate = Some((rate.date, rate.rate));
+        }
+    }
+
+    let rate = company_rate
+        .or(global_rate)
+        .map(|(_, rate)| rate)
+        .ok_or_else(|| {
+            format!(
+                "No exchange rate for {} → {} (company {}) at the requested time",
+                from.code, to.code, company_id
+            )
+        })?;
+    if !rate.is_finite() || rate <= 0.0 {
+        return Err("Exchange rate must be positive".to_string());
+    }
+    Ok(rate)
 }

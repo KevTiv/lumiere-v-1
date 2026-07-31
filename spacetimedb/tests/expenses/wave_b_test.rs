@@ -11,11 +11,12 @@ use crate::accounting::tax_management::{
     account_tax, account_tax_group, create_account_tax, create_account_tax_group,
     CreateAccountTaxGroupParams, CreateAccountTaxParams,
 };
-use crate::core::reference::{create_currency_rate, CreateCurrencyRateParams};
+use crate::core::reference::{create_currency_rate, currency, CreateCurrencyRateParams};
 use crate::expenses::expenses::{
     approve_expense_sheet_impl, create_expense, create_expense_sheet, expense_sheet, hr_expense,
     post_expense_sheet, submit_expense, submit_expense_sheet, upsert_expense_policy,
-    CreateExpenseParams, CreateExpenseSheetParams, PostExpenseSheetParams, UpsertExpensePolicyParams,
+    CreateExpenseParams, CreateExpenseSheetParams, PostExpenseSheetParams,
+    UpsertExpensePolicyParams,
 };
 use crate::hr::employees::{
     create_employee, hr_employee, update_employee, CreateEmployeeParams, UpdateEmployeeParams,
@@ -23,8 +24,8 @@ use crate::hr::employees::{
 use crate::inventory::product::{create_product, product, CreateProductParams};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{
-    AccountInternalGroup, AccountMoveState, EmploymentType, ExpenseLineKind, ExpensePaymentMode, ExpenseSheetState, JournalType,
-    TaxAmountType, TaxTypeUse,
+    AccountInternalGroup, AccountMoveState, EmploymentType, ExpenseLineKind, ExpensePaymentMode,
+    ExpenseSheetState, JournalType, TaxAmountType, TaxTypeUse,
 };
 
 struct ExpenseAccounts {
@@ -317,9 +318,8 @@ fn create_expensed_product(
             property_account_expense_id: None,
             variant_attribute_ids: None,
             attribute_line_ids: None,
-            metadata: max_amount.map(|m| {
-                serde_json::json!({ "expense_max_amount": m }).to_string()
-            }),
+            metadata: max_amount
+                .map(|m| serde_json::json!({ "expense_max_amount": m }).to_string()),
         },
     )?;
     ctx.db
@@ -359,7 +359,12 @@ pub fn test_product_policy_and_line_cap(ctx: &ReducerContext) -> Result<(), Stri
             mileage_rate_id: None,
             per_diem_days: None,
             per_diem_rate_id: None,
-            attachment_ids: vec![super::test_receipt_id(ctx, fixture.organization_id, fixture.company_id, employee_id)?],
+            attachment_ids: vec![super::test_receipt_id(
+                ctx,
+                fixture.organization_id,
+                fixture.company_id,
+                employee_id,
+            )?],
             client_request_id: None,
             payment_mode: ExpensePaymentMode::OutOfPocket,
             merchant_key: None,
@@ -392,7 +397,12 @@ pub fn test_product_policy_and_line_cap(ctx: &ReducerContext) -> Result<(), Stri
             mileage_rate_id: None,
             per_diem_days: None,
             per_diem_rate_id: None,
-            attachment_ids: vec![super::test_receipt_id(ctx, fixture.organization_id, fixture.company_id, employee_id)?],
+            attachment_ids: vec![super::test_receipt_id(
+                ctx,
+                fixture.organization_id,
+                fixture.company_id,
+                employee_id,
+            )?],
             client_request_id: None,
             payment_mode: ExpensePaymentMode::OutOfPocket,
             merchant_key: None,
@@ -436,7 +446,12 @@ pub fn test_product_policy_and_line_cap(ctx: &ReducerContext) -> Result<(), Stri
             mileage_rate_id: None,
             per_diem_days: None,
             per_diem_rate_id: None,
-            attachment_ids: vec![super::test_receipt_id(ctx, fixture.organization_id, fixture.company_id, employee_id)?],
+            attachment_ids: vec![super::test_receipt_id(
+                ctx,
+                fixture.organization_id,
+                fixture.company_id,
+                employee_id,
+            )?],
             client_request_id: None,
             payment_mode: ExpensePaymentMode::OutOfPocket,
             merchant_key: None,
@@ -627,12 +642,7 @@ pub fn test_tax_recovery_and_partner_on_post(ctx: &ReducerContext) -> Result<(),
         .find(&sheet_id)
         .ok_or("posted sheet")?;
     let move_id = sheet.account_move_id.ok_or("move id")?;
-    let mv = ctx
-        .db
-        .account_move()
-        .id()
-        .find(&move_id)
-        .ok_or("move")?;
+    let mv = ctx.db.account_move().id().find(&move_id).ok_or("move")?;
     if mv.state != AccountMoveState::Posted {
         return Err("move not posted".into());
     }
@@ -663,13 +673,27 @@ pub fn test_tax_recovery_and_partner_on_post(ctx: &ReducerContext) -> Result<(),
 pub fn test_fx_snapshot_on_submit(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    let eur_currency_id = ctx
+        .db
+        .currency()
+        .code()
+        .find(&"EUR".to_string())
+        .ok_or("EUR currency is not seeded")?
+        .id;
+    let usd_currency_id = ctx
+        .db
+        .currency()
+        .code()
+        .find(&"USD".to_string())
+        .ok_or("USD currency is not seeded")?
+        .id;
     let _ = create_currency_rate(
         ctx,
         fixture.organization_id,
         Some(fixture.company_id),
         CreateCurrencyRateParams {
-            from_currency: "EUR".into(),
-            to_currency: "USD".into(),
+            from_currency_id: eur_currency_id,
+            to_currency_id: usd_currency_id,
             rate: 1.25,
             metadata: None,
         },
@@ -683,7 +707,7 @@ pub fn test_fx_snapshot_on_submit(ctx: &ReducerContext) -> Result<(), String> {
             company_id: Some(fixture.company_id),
             employee_id,
             name: "FX Sheet".into(),
-            currency_id: 2, // EUR
+            currency_id: eur_currency_id,
             notes: None,
             accounting_date: None,
         },
@@ -706,7 +730,7 @@ pub fn test_fx_snapshot_on_submit(ctx: &ReducerContext) -> Result<(), String> {
             date: ctx.timestamp,
             unit_amount: 80.0,
             quantity: 1.0,
-            currency_id: 2,
+            currency_id: eur_currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![],

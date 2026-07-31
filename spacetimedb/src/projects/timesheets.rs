@@ -8,7 +8,9 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company, company_id_from_scope};
-use crate::core::reference::{currency_rate, legacy_currency_code_for_id};
+use crate::core::reference::{
+    require_active_currency_by_id, require_currency_by_id, resolve_currency_rate_as_of,
+};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::projects::project_accounting::{
@@ -206,44 +208,19 @@ pub fn timesheet_exchange_rate_snapshot(
         .find(&company_id)
         .ok_or("Company not found for timesheet FX")?;
     let company_currency_id = company_row.currency_id;
-    let from = legacy_currency_code_for_id(currency_id).to_string();
-    let to = legacy_currency_code_for_id(company_currency_id).to_string();
-    if from.eq_ignore_ascii_case(&to) {
+    if currency_id == company_currency_id {
         return Ok((1.0, company_currency_id));
     }
-
-    let mut best_rate: Option<(Timestamp, f64)> = None;
-    for rate in ctx
-        .db
-        .currency_rate()
-        .rate_by_org()
-        .filter(&organization_id)
-    {
-        if !rate.from_currency.eq_ignore_ascii_case(&from)
-            || !rate.to_currency.eq_ignore_ascii_case(&to)
-        {
-            continue;
-        }
-        if let Some(cid) = rate.company_id {
-            if cid != company_id {
-                continue;
-            }
-        }
-        match best_rate {
-            Some((prev_date, _)) if rate.date <= prev_date => {}
-            _ => best_rate = Some((rate.date, rate.rate)),
-        }
-    }
-
-    let rate = best_rate.map(|(_, r)| r).ok_or_else(|| {
-        format!(
-            "No exchange rate for {} → {} (company {}); seed currency_rate before multi-currency timesheets",
-            from, to, company_id
-        )
-    })?;
-    if rate <= 0.0 {
-        return Err("Exchange rate must be positive".to_string());
-    }
+    require_currency_by_id(ctx, currency_id)?;
+    require_currency_by_id(ctx, company_currency_id)?;
+    let rate = resolve_currency_rate_as_of(
+        ctx,
+        organization_id,
+        company_id,
+        currency_id,
+        company_currency_id,
+        ctx.timestamp,
+    )?;
     Ok((rate, company_currency_id))
 }
 
@@ -327,20 +304,22 @@ fn insert_approval_snapshot(
     decision: &str,
     reason: Option<String>,
 ) {
-    ctx.db.project_timesheet_approval().insert(ProjectTimesheetApproval {
-        id: 0,
-        organization_id,
-        company_id,
-        timesheet_id: entry.id,
-        actor: ctx.sender(),
-        decision: decision.to_string(),
-        reason,
-        hours: entry.unit_amount,
-        sell_rate: entry.sell_rate,
-        cost_rate: entry.employee_cost,
-        currency_id: entry.currency_id,
-        decided_at: ctx.timestamp,
-    });
+    ctx.db
+        .project_timesheet_approval()
+        .insert(ProjectTimesheetApproval {
+            id: 0,
+            organization_id,
+            company_id,
+            timesheet_id: entry.id,
+            actor: ctx.sender(),
+            decision: decision.to_string(),
+            reason,
+            hours: entry.unit_amount,
+            sell_rate: entry.sell_rate,
+            cost_rate: entry.employee_cost,
+            currency_id: entry.currency_id,
+            decided_at: ctx.timestamp,
+        });
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -353,6 +332,7 @@ pub fn log_timesheet(
     params: LogTimesheetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_timesheet", "create")?;
+    require_active_currency_by_id(ctx, params.currency_id)?;
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
@@ -425,12 +405,8 @@ pub fn log_timesheet(
     let amount = params.unit_amount * employee_cost;
     let revenue = params.unit_amount * sell_rate;
 
-    let (currency_rate, company_currency_id) = timesheet_exchange_rate_snapshot(
-        ctx,
-        organization_id,
-        company_id,
-        params.currency_id,
-    )?;
+    let (currency_rate, company_currency_id) =
+        timesheet_exchange_rate_snapshot(ctx, organization_id, company_id, params.currency_id)?;
     if company_currency_id == 0 {
         return Err("Company currency is required for timesheet FX snapshot".to_string());
     }
@@ -541,6 +517,7 @@ pub fn start_timesheet_timer(
     params: StartTimesheetTimerParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_timesheet", "create")?;
+    require_active_currency_by_id(ctx, params.currency_id)?;
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
@@ -612,12 +589,8 @@ pub fn start_timesheet_timer(
         params.sell_rate,
     )?;
 
-    let (currency_rate, company_currency_id) = timesheet_exchange_rate_snapshot(
-        ctx,
-        organization_id,
-        company_id,
-        params.currency_id,
-    )?;
+    let (currency_rate, company_currency_id) =
+        timesheet_exchange_rate_snapshot(ctx, organization_id, company_id, params.currency_id)?;
     if company_currency_id == 0 {
         return Err("Company currency is required for timesheet FX snapshot".to_string());
     }
@@ -884,9 +857,7 @@ pub fn validate_timesheets(
                 table_name: "project_timesheet",
                 record_id: *tid,
                 action: "UPDATE",
-                old_values: Some(
-                    serde_json::json!({ "validation_status": "draft" }).to_string(),
-                ),
+                old_values: Some(serde_json::json!({ "validation_status": "draft" }).to_string()),
                 new_values: Some(
                     serde_json::json!({ "validation_status": "validated" }).to_string(),
                 ),
@@ -976,7 +947,10 @@ pub fn reject_timesheets(
             return Err("Timesheet does not belong to this company".to_string());
         }
         if entry.timesheet_invoice_id.is_some() {
-            return Err(format!("Timesheet {} is billed and cannot be rejected", tid));
+            return Err(format!(
+                "Timesheet {} is billed and cannot be rejected",
+                tid
+            ));
         }
         if entry.validation_status != "draft" && entry.validation_status != "submitted" {
             return Err(format!(
@@ -1110,9 +1084,7 @@ pub fn reopen_timesheets(
                 old_values: Some(
                     serde_json::json!({ "validation_status": old_status }).to_string(),
                 ),
-                new_values: Some(
-                    serde_json::json!({ "validation_status": "draft" }).to_string(),
-                ),
+                new_values: Some(serde_json::json!({ "validation_status": "draft" }).to_string()),
                 changed_fields: vec!["reopened".to_string()],
                 metadata: None,
             },

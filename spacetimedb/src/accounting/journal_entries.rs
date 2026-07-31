@@ -3014,7 +3014,8 @@ pub fn bill_timesheets(
         );
     }
 
-    let tax_ids = resolve_timesheet_bill_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
+    let tax_ids =
+        resolve_timesheet_bill_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
 
     let company = ctx
         .db
@@ -3304,7 +3305,8 @@ pub fn bill_project_milestone(
         .ok_or_else(|| "invoice_date is required for milestone billing".to_string())?;
     ensure_accounting_period_open_for_date(ctx, company_id, inv_date)?;
 
-    let tax_ids = resolve_timesheet_bill_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
+    let tax_ids =
+        resolve_timesheet_bill_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
     let amount_tax = calculate_tax(ctx, &tax_ids, amount_untaxed);
     let amount_total = amount_untaxed + amount_tax;
 

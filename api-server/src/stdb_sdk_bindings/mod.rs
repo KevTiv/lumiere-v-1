@@ -22597,7 +22597,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.crm_forecast_snapshot = cache.apply_diff_to_table::<CrmForecastSnapshot>("crm_forecast_snapshot", &self.crm_forecast_snapshot).with_updates_by_pk(|row| &row.id);
         diff.crossovered_budget = cache.apply_diff_to_table::<CrossoveredBudget>("crossovered_budget", &self.crossovered_budget).with_updates_by_pk(|row| &row.id);
         diff.crossovered_budget_lines = cache.apply_diff_to_table::<CrossoveredBudgetLines>("crossovered_budget_lines", &self.crossovered_budget_lines).with_updates_by_pk(|row| &row.id);
-        diff.currency = cache.apply_diff_to_table::<Currency>("currency", &self.currency).with_updates_by_pk(|row| &row.code);
+        diff.currency = cache.apply_diff_to_table::<Currency>("currency", &self.currency).with_updates_by_pk(|row| &row.id);
         diff.currency_rate = cache.apply_diff_to_table::<CurrencyRate>("currency_rate", &self.currency_rate).with_updates_by_pk(|row| &row.id);
         diff.dashboard = cache.apply_diff_to_table::<Dashboard>("dashboard", &self.dashboard).with_updates_by_pk(|row| &row.id);
         diff.dashboard_widget = cache.apply_diff_to_table::<DashboardWidget>("dashboard_widget", &self.dashboard_widget).with_updates_by_pk(|row| &row.id);

@@ -21,8 +21,37 @@ use crate::accounting::tax_management::{
     create_tax_jurisdiction, tax_jurisdiction, update_tax_jurisdiction,
     CreateTaxJurisdictionParams, UpdateTaxJurisdictionParams,
 };
+use crate::core::reference::{country, create_country, currency, CreateCountryParams};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::JournalType;
+
+fn ensure_us_country(ctx: &ReducerContext) -> Result<(), String> {
+    if ctx.db.country().code().find(&"US".to_string()).is_some() {
+        return Ok(());
+    }
+    let usd_currency_id = ctx
+        .db
+        .currency()
+        .code()
+        .find(&"USD".to_string())
+        .ok_or("USD currency is not seeded")?
+        .id;
+    create_country(
+        ctx,
+        "US".to_string(),
+        CreateCountryParams {
+            name: "United States".to_string(),
+            official_name: Some("United States of America".to_string()),
+            iso3: "USA".to_string(),
+            numcode: 840,
+            phone_code: "+1".to_string(),
+            currency_id: Some(usd_currency_id),
+            language_codes: vec!["en".to_string()],
+            is_active: true,
+            metadata: Some(r#"{"test":"acc_ri_020"}"#.to_string()),
+        },
+    )
+}
 
 fn journal_params(company_id: u64, code: &str) -> CreateAccountJournalParams {
     CreateAccountJournalParams {
@@ -61,7 +90,11 @@ fn journal_params(company_id: u64, code: &str) -> CreateAccountJournalParams {
 }
 
 fn seed_journal(ctx: &ReducerContext, fixture: &OrgFixture, code: &str) -> Result<u64, String> {
-    create_account_journal(ctx, fixture.organization_id, journal_params(fixture.company_id, code))?;
+    create_account_journal(
+        ctx,
+        fixture.organization_id,
+        journal_params(fixture.company_id, code),
+    )?;
     ctx.db
         .account_journal()
         .iter()
@@ -76,8 +109,11 @@ fn seed_journal(ctx: &ReducerContext, fixture: &OrgFixture, code: &str) -> Resul
 
 /// ACC-RI-020: `update_tax_jurisdiction` must reject a caller from a different
 /// organization than the jurisdiction it targets, and leave the row unchanged.
-pub fn test_update_tax_jurisdiction_rejects_cross_tenant(ctx: &ReducerContext) -> Result<(), String> {
+pub fn test_update_tax_jurisdiction_rejects_cross_tenant(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
+    ensure_us_country(ctx)?;
     let fixture_a = OrgFixture::seed_minimal(ctx)?;
     let fixture_b = OrgFixture::seed_minimal(ctx)?;
 
@@ -226,11 +262,10 @@ pub fn test_create_analytic_account_rejects_cross_tenant_parent(
         return Err("create_analytic_account accepted a cross-organization parent_id".to_string());
     }
 
-    let child_exists = ctx
-        .db
-        .account_analytic_account()
-        .iter()
-        .any(|a| a.organization_id == fixture_a.organization_id && a.name == "ACC-RI-021 child A");
+    let child_exists =
+        ctx.db.account_analytic_account().iter().any(|a| {
+            a.organization_id == fixture_a.organization_id && a.name == "ACC-RI-021 child A"
+        });
     if child_exists {
         return Err("rejected cross-tenant create still persisted an orphaned child".to_string());
     }
@@ -242,7 +277,9 @@ pub fn test_create_analytic_account_rejects_cross_tenant_parent(
         .find(&parent_b.id)
         .ok_or("parent B disappeared")?;
     if !parent_b_reloaded.child_ids.is_empty() {
-        return Err("rejected cross-tenant create still mutated the foreign parent's child_ids".to_string());
+        return Err(
+            "rejected cross-tenant create still mutated the foreign parent's child_ids".to_string(),
+        );
     }
 
     // Positive: same-tenant parent linkage still succeeds and updates child_ids.
@@ -282,7 +319,9 @@ pub fn test_create_analytic_account_rejects_cross_tenant_parent(
 /// ACC-RI-022: bank-statement mutation/read reducers must reject a caller
 /// from a different organization than the statement, even when the caller
 /// supplies the statement's real `company_id`.
-pub fn test_bank_statement_reducers_reject_cross_tenant(ctx: &ReducerContext) -> Result<(), String> {
+pub fn test_bank_statement_reducers_reject_cross_tenant(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture_a = OrgFixture::seed_minimal(ctx)?;
     let fixture_b = OrgFixture::seed_minimal(ctx)?;
@@ -340,7 +379,9 @@ pub fn test_bank_statement_reducers_reject_cross_tenant(ctx: &ReducerContext) ->
         },
     );
     if cross_update.is_ok() {
-        return Err("update_account_bank_statement accepted a cross-organization caller".to_string());
+        return Err(
+            "update_account_bank_statement accepted a cross-organization caller".to_string(),
+        );
     }
 
     // Cross-tenant line create against A's statement.
@@ -375,17 +416,27 @@ pub fn test_bank_statement_reducers_reject_cross_tenant(ctx: &ReducerContext) ->
     }
 
     // Cross-tenant post.
-    let cross_post =
-        post_account_bank_statement(ctx, fixture_b.organization_id, fixture_a.company_id, statement_a.id);
+    let cross_post = post_account_bank_statement(
+        ctx,
+        fixture_b.organization_id,
+        fixture_a.company_id,
+        statement_a.id,
+    );
     if cross_post.is_ok() {
         return Err("post_account_bank_statement accepted a cross-organization caller".to_string());
     }
 
     // Cross-tenant delete.
-    let cross_delete =
-        delete_account_bank_statement(ctx, fixture_b.organization_id, fixture_a.company_id, statement_a.id);
+    let cross_delete = delete_account_bank_statement(
+        ctx,
+        fixture_b.organization_id,
+        fixture_a.company_id,
+        statement_a.id,
+    );
     if cross_delete.is_ok() {
-        return Err("delete_account_bank_statement accepted a cross-organization caller".to_string());
+        return Err(
+            "delete_account_bank_statement accepted a cross-organization caller".to_string(),
+        );
     }
 
     let reloaded = ctx
@@ -446,7 +497,12 @@ pub fn test_bank_statement_reducers_reject_cross_tenant(ctx: &ReducerContext) ->
     }
 
     // Positive: same-tenant post still succeeds.
-    post_account_bank_statement(ctx, fixture_a.organization_id, fixture_a.company_id, statement_a.id)?;
+    post_account_bank_statement(
+        ctx,
+        fixture_a.organization_id,
+        fixture_a.company_id,
+        statement_a.id,
+    )?;
     let reloaded = ctx
         .db
         .account_bank_statement()

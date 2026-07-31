@@ -3,21 +3,46 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::chart_of_accounts::{
     account_account, account_account_type, account_journal, create_account_account,
-    create_account_account_type, create_account_journal, CreateAccountAccountParams,
-    CreateAccountAccountTypeParams, CreateAccountJournalParams,
+    create_account_account_type, create_account_journal, AccountJournal,
+    CreateAccountAccountParams, CreateAccountAccountTypeParams, CreateAccountJournalParams,
 };
 use crate::accounting::fx_revaluation::{
-    fx_revaluation_run, run_fx_revaluation, FxRevaluationLineParams, RunFxRevaluationParams,
+    fx_revaluation_run, post_realized_fx_gain_loss, run_fx_revaluation, run_fx_revaluation_batch,
+    FxRevaluationLineParams, PostRealizedFxParams, RunFxRevaluationBatchParams,
+    RunFxRevaluationParams,
 };
-use crate::accounting::journal_entries::{account_move, account_move_line};
+use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove};
+use crate::accounting::payments::{
+    account_payment, create_payment, post_payment, CreatePaymentParams,
+};
+use crate::core::reference::{currency, Currency};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
-use crate::types::{AccountInternalGroup, JournalType};
+use crate::types::{AccountInternalGroup, JournalType, PartnerType, PaymentType};
+
+use super::helpers::{create_balanced_customer_invoice, seed_bank_journal};
 
 pub fn test_fx_revaluation_posts_balanced_move(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let sek = if let Some(currency) = ctx.db.currency().code().find(&"SEK".to_string()) {
+        currency
+    } else {
+        ctx.db.currency().insert(Currency {
+            id: 0,
+            code: "SEK".to_string(),
+            name: "Swedish Krona".to_string(),
+            symbol: "kr".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            active: true,
+            position: "after".to_string(),
+            created_at: ctx.timestamp,
+            metadata: Some("{\"fixture\":\"ACC-RI-005\"}".to_string()),
+        })
+    };
+    let sek_currency_id = sek.id;
 
     let ar_id = *fixture
         .chart_account_ids
@@ -136,7 +161,8 @@ pub fn test_fx_revaluation_posts_balanced_move(ctx: &ReducerContext) -> Result<(
     };
 
     let params = RunFxRevaluationParams {
-        currency_id: 2,
+        idempotency_key: format!("fx-revaluation-{company_id}"),
+        currency_id: sek_currency_id,
         as_of_date: ctx.timestamp,
         rate: 1.087_321,
         rate_source: "ECB-test-fixture".to_string(),
@@ -166,8 +192,13 @@ pub fn test_fx_revaluation_posts_balanced_move(ctx: &ReducerContext) -> Result<(
     {
         return Err("Rejected FX revaluation persisted a run".to_string());
     }
+    let mut missing_currency_params = params.clone();
+    missing_currency_params.currency_id = 999_999;
+    if run_fx_revaluation(ctx, org_id, company_id, missing_currency_params).is_ok() {
+        return Err("FX revaluation accepted a missing persisted currency reference".to_string());
+    }
 
-    run_fx_revaluation(ctx, org_id, company_id, params)?;
+    run_fx_revaluation(ctx, org_id, company_id, params.clone())?;
 
     let run = ctx
         .db
@@ -176,6 +207,47 @@ pub fn test_fx_revaluation_posts_balanced_move(ctx: &ReducerContext) -> Result<(
         .filter(&company_id)
         .find(|r| r.reference.as_deref() == Some("A10-smoke"))
         .ok_or("FX revaluation run not recorded")?;
+    let run_count = ctx
+        .db
+        .fx_revaluation_run()
+        .fx_reval_by_company()
+        .filter(&company_id)
+        .filter(|row| row.reference.as_deref() == Some("A10-smoke"))
+        .count();
+    let move_count = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|row| row.organization_id == org_id && row.ref_.as_deref() == Some("A10-smoke"))
+        .count();
+
+    run_fx_revaluation(ctx, org_id, company_id, params.clone())?;
+    let replayed_run_count = ctx
+        .db
+        .fx_revaluation_run()
+        .fx_reval_by_company()
+        .filter(&company_id)
+        .filter(|row| row.reference.as_deref() == Some("A10-smoke"))
+        .count();
+    let replayed_move_count = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|row| row.organization_id == org_id && row.ref_.as_deref() == Some("A10-smoke"))
+        .count();
+    if run_count != 1
+        || move_count != 1
+        || replayed_run_count != run_count
+        || replayed_move_count != move_count
+    {
+        return Err("FX revaluation retry duplicated a run or journal entry".to_string());
+    }
+
+    let mut changed_payload = params;
+    changed_payload.rate = 1.099_999;
+    if run_fx_revaluation(ctx, org_id, company_id, changed_payload).is_ok() {
+        return Err("FX revaluation accepted a changed payload under a reused key".to_string());
+    }
 
     if (run.net_adjustment - 125.0).abs() > 0.001 {
         return Err(format!(
@@ -183,8 +255,8 @@ pub fn test_fx_revaluation_posts_balanced_move(ctx: &ReducerContext) -> Result<(
             run.net_adjustment
         ));
     }
-    if run.currency_id != 2
-        || run.currency_code != "EUR"
+    if run.currency_id != sek_currency_id
+        || run.currency_code_snapshot != "SEK"
         || run.company_currency_id == run.currency_id
         || (run.rate - 1.087_321).abs() > 0.000_001
         || run.rate_source != "ECB-test-fixture"
@@ -225,6 +297,123 @@ pub fn test_fx_revaluation_posts_balanced_move(ctx: &ReducerContext) -> Result<(
         return Err(format!(
             "FX move not balanced: debit={total_debit} credit={total_credit}"
         ));
+    }
+
+    let foreign_invoice_id = create_balanced_customer_invoice(ctx, &fixture, 200.0, true)?;
+    let foreign_invoice = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&foreign_invoice_id)
+        .ok_or("foreign invoice fixture missing")?;
+    ctx.db.account_move().id().update(AccountMove {
+        currency_id: sek_currency_id,
+        company_currency_id: 1,
+        ..foreign_invoice
+    });
+
+    let batch_params = RunFxRevaluationBatchParams {
+        idempotency_key: format!("fx-revaluation-batch-{company_id}"),
+        currency_id: sek_currency_id,
+        as_of_date: ctx.timestamp,
+        journal_id,
+        gain_account_id: gain_id,
+        loss_account_id: loss_id,
+        rate: 1.25,
+        rate_source: "ECB-batch-test".to_string(),
+        rate_effective_date: ctx.timestamp,
+        reference: Some("A10-batch".to_string()),
+        metadata: None,
+    };
+    run_fx_revaluation_batch(ctx, org_id, company_id, batch_params.clone())?;
+    run_fx_revaluation_batch(ctx, org_id, company_id, batch_params.clone())?;
+    if ctx
+        .db
+        .fx_revaluation_run()
+        .fx_reval_by_company()
+        .filter(&company_id)
+        .filter(|row| row.reference.as_deref() == Some("A10-batch"))
+        .count()
+        != 1
+    {
+        return Err("FX batch retry duplicated its revaluation run".to_string());
+    }
+    let mut changed_batch = batch_params;
+    changed_batch.rate = 1.3;
+    if run_fx_revaluation_batch(ctx, org_id, company_id, changed_batch).is_ok() {
+        return Err("FX batch accepted a changed payload under a reused key".to_string());
+    }
+
+    let (bank_journal_id, _) = seed_bank_journal(ctx, &fixture)?;
+    let bank_journal = ctx
+        .db
+        .account_journal()
+        .id()
+        .find(&bank_journal_id)
+        .ok_or("FX payment bank journal missing")?;
+    ctx.db.account_journal().id().update(AccountJournal {
+        currency_id: Some(sek_currency_id),
+        ..bank_journal
+    });
+    create_payment(
+        ctx,
+        org_id,
+        CreatePaymentParams {
+            idempotency_key: format!("fx-realized-payment-{company_id}"),
+            company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount: 205.0,
+            currency_id: sek_currency_id,
+            date: Some(ctx.timestamp),
+            journal_id: bank_journal_id,
+            ref_: Some("A10-realized-payment".to_string()),
+            memo: None,
+        },
+    )?;
+    let payment_id = ctx
+        .db
+        .account_payment()
+        .iter()
+        .find(|payment| {
+            payment.organization_id == org_id
+                && payment.ref_.as_deref() == Some("A10-realized-payment")
+        })
+        .map(|payment| payment.id)
+        .ok_or("realized FX payment fixture missing")?;
+    post_payment(ctx, org_id, payment_id)?;
+
+    let realized_params = PostRealizedFxParams {
+        idempotency_key: format!("fx-realized-{company_id}"),
+        payment_id,
+        invoice_move_id: foreign_invoice_id,
+        payment_amount_functional: 205.0,
+        invoice_residual_functional: 200.0,
+        journal_id,
+        gain_account_id: gain_id,
+        loss_account_id: loss_id,
+        clearing_account_id: ar_id,
+        date: ctx.timestamp,
+        reference: Some("A10-realized".to_string()),
+        metadata: None,
+    };
+    post_realized_fx_gain_loss(ctx, org_id, company_id, realized_params.clone())?;
+    post_realized_fx_gain_loss(ctx, org_id, company_id, realized_params.clone())?;
+    if ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|row| row.organization_id == org_id && row.ref_.as_deref() == Some("A10-realized"))
+        .count()
+        != 1
+    {
+        return Err("realized FX retry duplicated its journal entry".to_string());
+    }
+    let mut changed_realized = realized_params;
+    changed_realized.payment_amount_functional = 206.0;
+    if post_realized_fx_gain_loss(ctx, org_id, company_id, changed_realized).is_ok() {
+        return Err("realized FX accepted a changed payload under a reused key".to_string());
     }
 
     Ok(())

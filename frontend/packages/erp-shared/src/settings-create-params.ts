@@ -113,7 +113,7 @@ export function toCreateCountryParams(formData: Record<string, unknown>): Create
     numcode: Math.max(0, Math.trunc(Number(formData.numcode ?? formData.numCode ?? 0))),
     phoneCode: String(field(formData, "phoneCode", "phone_code") ?? ""),
     officialName: optionalTrimmedString(field(formData, "officialName", "official_name")),
-    currencyCode: optionalTrimmedString(field(formData, "currencyCode", "currency_code")),
+    currencyId: optionalBigIntU64(field(formData, "currencyId", "currency_id")),
     languageCodes,
     isActive: formData.isActive !== false,
     metadata: optionalTrimmedString(formData.metadata),

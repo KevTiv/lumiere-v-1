@@ -269,10 +269,10 @@ export function useGenerateEuVatReport(organizationId: bigint) {
       const name = String(formData.name ?? "").trim()
       const dateFromRaw = formData.dateFrom ?? formData.date_from
       const dateToRaw = formData.dateTo ?? formData.date_to
-      const currencyId = Number(formData.currencyId ?? formData.currency_id ?? 1)
+      const currencyId = Number(formData.currencyId ?? formData.currency_id)
       const locale = String(formData.locale ?? "EU").trim() || "EU"
-      if (!name || dateFromRaw == null || dateToRaw == null) {
-        throw new Error("Name and date range are required")
+      if (!name || dateFromRaw == null || dateToRaw == null || !Number.isSafeInteger(currencyId) || currencyId <= 0) {
+        throw new Error("Name, date range, and currency are required")
       }
       const dateFrom = stbTimestampFromDate(new Date(String(dateFromRaw)))
       const dateTo = stbTimestampFromDate(new Date(String(dateToRaw)))

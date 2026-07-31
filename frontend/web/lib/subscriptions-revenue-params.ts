@@ -44,7 +44,7 @@ export function buildCreateDeferredRevenueScheduleParams(
     journalId: BigInt(String(formData.journalId ?? 0)),
     accountId: BigInt(String(formData.accountId ?? 0)),
     deferredAccountId: BigInt(String(formData.deferredAccountId ?? 0)),
-    currencyId: BigInt(String(formData.currencyId ?? 1)),
+    currencyId: BigInt(String(formData.currencyId)),
     totalAmount: total,
     recognizedAmount: recognized,
     deferredAmount: deferred,

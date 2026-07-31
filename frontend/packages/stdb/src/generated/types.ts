@@ -2091,7 +2091,7 @@ export const BootstrapNewTenantParams = __t.object("BootstrapNewTenantParams", {
   },
   defaultCompanyName: __t.string(),
   defaultCompanyCode: __t.string(),
-  defaultCompanyCurrencyCode: __t.string(),
+  defaultCompanyCurrencyId: __t.u64(),
   fiscalYearEndMonth: __t.u8(),
   fiscalYearEndDay: __t.u8(),
   seedFormConfigs: __t.bool(),
@@ -2995,7 +2995,7 @@ export const Country = __t.object("Country", {
   iso3: __t.string(),
   numcode: __t.u16(),
   phoneCode: __t.string(),
-  currencyCode: __t.option(__t.string()),
+  currencyId: __t.option(__t.u64()),
   languageCodes: __t.array(__t.string()),
   isActive: __t.bool(),
   metadata: __t.option(__t.string()),
@@ -3881,7 +3881,7 @@ export const CreateCountryParams = __t.object("CreateCountryParams", {
   numcode: __t.u16(),
   phoneCode: __t.string(),
   officialName: __t.option(__t.string()),
-  currencyCode: __t.option(__t.string()),
+  currencyId: __t.option(__t.u64()),
   languageCodes: __t.array(__t.string()),
   isActive: __t.bool(),
   metadata: __t.option(__t.string()),
@@ -3948,8 +3948,8 @@ export const CreateCurrencyParams = __t.object("CreateCurrencyParams", {
 export type CreateCurrencyParams = __Infer<typeof CreateCurrencyParams>;
 
 export const CreateCurrencyRateParams = __t.object("CreateCurrencyRateParams", {
-  fromCurrency: __t.string(),
-  toCurrency: __t.string(),
+  fromCurrencyId: __t.u64(),
+  toCurrencyId: __t.u64(),
   rate: __t.f64(),
   metadata: __t.option(__t.string()),
 });
@@ -4531,7 +4531,7 @@ export const CreateHrLaborCostSnapshotParams = __t.object("CreateHrLaborCostSnap
   periodStart: __t.timestamp(),
   periodEnd: __t.timestamp(),
   totalLaborCost: __t.f64(),
-  currencyCode: __t.string(),
+  currencyId: __t.u64(),
   status: __t.string(),
   metadata: __t.option(__t.string()),
 });
@@ -7227,6 +7227,7 @@ export const CrossoveredBudgetLines = __t.object("CrossoveredBudgetLines", {
 export type CrossoveredBudgetLines = __Infer<typeof CrossoveredBudgetLines>;
 
 export const Currency = __t.object("Currency", {
+  id: __t.u64(),
   code: __t.string(),
   name: __t.string(),
   symbol: __t.string(),
@@ -7242,8 +7243,8 @@ export type Currency = __Infer<typeof Currency>;
 export const CurrencyRate = __t.object("CurrencyRate", {
   id: __t.u64(),
   organizationId: __t.u64(),
-  fromCurrency: __t.string(),
-  toCurrency: __t.string(),
+  fromCurrencyId: __t.u64(),
+  toCurrencyId: __t.u64(),
   rate: __t.f64(),
   inverseRate: __t.f64(),
   date: __t.timestamp(),
@@ -8196,7 +8197,7 @@ export const FxRevaluationRun = __t.object("FxRevaluationRun", {
   organizationId: __t.u64(),
   companyId: __t.u64(),
   currencyId: __t.u64(),
-  currencyCode: __t.string(),
+  currencyCodeSnapshot: __t.string(),
   companyCurrencyId: __t.u64(),
   rate: __t.f64(),
   rateSource: __t.string(),
@@ -8919,7 +8920,8 @@ export const HrLaborCostSnapshot = __t.object("HrLaborCostSnapshot", {
   periodStart: __t.timestamp(),
   periodEnd: __t.timestamp(),
   totalLaborCost: __t.f64(),
-  currencyCode: __t.string(),
+  currencyId: __t.u64(),
+  currencyCodeSnapshot: __t.string(),
   status: __t.string(),
   metadata: __t.option(__t.string()),
   createdAt: __t.timestamp(),
@@ -11451,6 +11453,7 @@ export const PostPayslipParams = __t.object("PostPayslipParams", {
 export type PostPayslipParams = __Infer<typeof PostPayslipParams>;
 
 export const PostRealizedFxParams = __t.object("PostRealizedFxParams", {
+  idempotencyKey: __t.string(),
   paymentId: __t.u64(),
   invoiceMoveId: __t.u64(),
   paymentAmountFunctional: __t.f64(),
@@ -13715,6 +13718,7 @@ export const RunCartonizationParams = __t.object("RunCartonizationParams", {
 export type RunCartonizationParams = __Infer<typeof RunCartonizationParams>;
 
 export const RunFxRevaluationBatchParams = __t.object("RunFxRevaluationBatchParams", {
+  idempotencyKey: __t.string(),
   currencyId: __t.u64(),
   asOfDate: __t.timestamp(),
   journalId: __t.u64(),
@@ -13729,6 +13733,7 @@ export const RunFxRevaluationBatchParams = __t.object("RunFxRevaluationBatchPara
 export type RunFxRevaluationBatchParams = __Infer<typeof RunFxRevaluationBatchParams>;
 
 export const RunFxRevaluationParams = __t.object("RunFxRevaluationParams", {
+  idempotencyKey: __t.string(),
   currencyId: __t.u64(),
   asOfDate: __t.timestamp(),
   rate: __t.f64(),

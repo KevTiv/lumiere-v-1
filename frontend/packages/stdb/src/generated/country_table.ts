@@ -17,7 +17,7 @@ export default __t.row({
   iso3: __t.string().name("iso_3"),
   numcode: __t.u16(),
   phoneCode: __t.string().name("phone_code"),
-  currencyCode: __t.option(__t.string()).name("currency_code"),
+  currencyId: __t.option(__t.u64()).name("currency_id"),
   languageCodes: __t.array(__t.string()).name("language_codes"),
   isActive: __t.bool().name("is_active"),
   metadata: __t.option(__t.string()),

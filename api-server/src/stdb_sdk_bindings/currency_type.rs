@@ -7,6 +7,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct Currency {
+    pub id: u64,
     pub code: String,
     pub name: String,
     pub symbol: String,
@@ -26,6 +27,7 @@ impl __sdk::InModule for Currency {
 ///
 /// Provides typed access to columns for query building.
 pub struct CurrencyCols {
+    pub id: __sdk::__query_builder::Col<Currency, u64>,
     pub code: __sdk::__query_builder::Col<Currency, String>,
     pub name: __sdk::__query_builder::Col<Currency, String>,
     pub symbol: __sdk::__query_builder::Col<Currency, String>,
@@ -41,6 +43,7 @@ impl __sdk::__query_builder::HasCols for Currency {
     type Cols = CurrencyCols;
     fn cols(table_name: &'static str) -> Self::Cols {
         CurrencyCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
             code: __sdk::__query_builder::Col::new(table_name, "code"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             symbol: __sdk::__query_builder::Col::new(table_name, "symbol"),
@@ -59,6 +62,7 @@ impl __sdk::__query_builder::HasCols for Currency {
 /// Provides typed access to indexed columns for query building.
 pub struct CurrencyIxCols {
     pub code: __sdk::__query_builder::IxCol<Currency, String>,
+    pub id: __sdk::__query_builder::IxCol<Currency, u64>,
 }
 
 impl __sdk::__query_builder::HasIxCols for Currency {
@@ -66,6 +70,7 @@ impl __sdk::__query_builder::HasIxCols for Currency {
     fn ix_cols(table_name: &'static str) -> Self::IxCols {
         CurrencyIxCols {
             code: __sdk::__query_builder::IxCol::new(table_name, "code"),
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
         }
     }
 }

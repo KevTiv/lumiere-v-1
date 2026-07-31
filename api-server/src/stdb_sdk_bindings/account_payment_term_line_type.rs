@@ -64,6 +64,7 @@ impl __sdk::__query_builder::HasCols for AccountPaymentTermLine {
 /// Provides typed access to indexed columns for query building.
 pub struct AccountPaymentTermLineIxCols {
     pub id: __sdk::__query_builder::IxCol<AccountPaymentTermLine, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<AccountPaymentTermLine, u64>,
     pub payment_term_id: __sdk::__query_builder::IxCol<AccountPaymentTermLine, u64>,
 }
 
@@ -72,6 +73,7 @@ impl __sdk::__query_builder::HasIxCols for AccountPaymentTermLine {
     fn ix_cols(table_name: &'static str) -> Self::IxCols {
         AccountPaymentTermLineIxCols {
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             payment_term_id: __sdk::__query_builder::IxCol::new(table_name, "payment_term_id"),
         }
     }

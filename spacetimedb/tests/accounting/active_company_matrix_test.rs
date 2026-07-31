@@ -17,8 +17,12 @@ use crate::accounting::chart_of_accounts::{
 use crate::accounting::financial_statements::{
     create_financial_report, financial_report, CreateFinancialReportParams,
 };
-use crate::accounting::fixed_assets::{account_asset, create_account_asset, CreateAccountAssetParams};
-use crate::accounting::journal_entries::{account_move, create_account_move, CreateAccountMoveParams};
+use crate::accounting::fixed_assets::{
+    account_asset, create_account_asset, CreateAccountAssetParams,
+};
+use crate::accounting::journal_entries::{
+    account_move, create_account_move, CreateAccountMoveParams,
+};
 use crate::accounting::payments::{account_payment, create_payment, CreatePaymentParams};
 use crate::accounting::tax_management::{
     account_tax, account_tax_group, create_account_tax, create_account_tax_group,
@@ -27,8 +31,8 @@ use crate::accounting::tax_management::{
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{
-    AccountInternalGroup, AccountTypeInternal, AssetType, DepreciationMethod, JournalType, MoveType,
-    PartnerType, PaymentType, ReportType, TaxAmountType, TaxTypeUse,
+    AccountInternalGroup, AccountTypeInternal, AssetType, DepreciationMethod, JournalType,
+    MoveType, PartnerType, PaymentType, ReportType, TaxAmountType, TaxTypeUse,
 };
 
 use super::helpers::seed_sibling_company;
@@ -429,7 +433,7 @@ pub fn test_active_company_a2_create_persist_matrix(ctx: &ReducerContext) -> Res
             name: tax_group_name.clone(),
             sequence: 10,
             preceding_subtotal: None,
-            tax_payable_account_id: Some(ar_id),
+            tax_payable_account_id: None,
             tax_receivable_account_id: Some(ar_id),
             advance_tax_payment_account_id: Some(ar_id),
             metadata: Some(r#"{"test":"acc_ri_007"}"#.to_string()),
@@ -505,7 +509,8 @@ pub fn test_active_company_a2_create_persist_matrix(ctx: &ReducerContext) -> Res
             .account_payment()
             .iter()
             .find(|p| {
-                p.organization_id == org_id && p.ref_.as_deref() == Some(&format!("A2-PAY-{suffix}"))
+                p.organization_id == org_id
+                    && p.ref_.as_deref() == Some(&format!("A2-PAY-{suffix}"))
             })
             .map(|p| p.company_id)
             .ok_or("A2 payment missing")?,

@@ -770,12 +770,10 @@ pub fn test_payment_allocation_updates_ledger_and_reverses(
     Ok(())
 }
 
-pub fn test_payment_account_patch_preserves_and_clears(
-    ctx: &ReducerContext,
-) -> Result<(), String> {
+pub fn test_payment_account_patch_preserves_and_clears(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
-    let (journal_id, _) = seed_bank_journal(ctx, &fixture)?;
+    let (journal_id, clearing_account_id) = seed_bank_journal(ctx, &fixture)?;
     let fee_account_id = seed_payment_fee_account(ctx, &fixture)?;
     create_payment_account(
         ctx,
@@ -789,7 +787,7 @@ pub fn test_payment_account_patch_preserves_and_clears(
             currency_id: 1,
             account_journal_id: journal_id,
             fee_account_id: Some(fee_account_id),
-            clearing_account_id: Some(fee_account_id),
+            clearing_account_id: Some(clearing_account_id),
             is_primary: false,
             metadata: Some(r#"{"proof":"preserved"}"#.to_string()),
         },
@@ -953,8 +951,7 @@ pub fn test_update_payment_account_rejects_cross_tenant_accounts(
     );
     if cross_tenant_clearing.is_ok() {
         return Err(
-            "update_payment_account accepted a cross-organization clearing_account_id"
-                .to_string(),
+            "update_payment_account accepted a cross-organization clearing_account_id".to_string(),
         );
     }
 

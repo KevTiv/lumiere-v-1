@@ -9,8 +9,8 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct CurrencyRate {
     pub id: u64,
     pub organization_id: u64,
-    pub from_currency: String,
-    pub to_currency: String,
+    pub from_currency_id: u64,
+    pub to_currency_id: u64,
     pub rate: f64,
     pub inverse_rate: f64,
     pub date: __sdk::Timestamp,
@@ -29,8 +29,8 @@ impl __sdk::InModule for CurrencyRate {
 pub struct CurrencyRateCols {
     pub id: __sdk::__query_builder::Col<CurrencyRate, u64>,
     pub organization_id: __sdk::__query_builder::Col<CurrencyRate, u64>,
-    pub from_currency: __sdk::__query_builder::Col<CurrencyRate, String>,
-    pub to_currency: __sdk::__query_builder::Col<CurrencyRate, String>,
+    pub from_currency_id: __sdk::__query_builder::Col<CurrencyRate, u64>,
+    pub to_currency_id: __sdk::__query_builder::Col<CurrencyRate, u64>,
     pub rate: __sdk::__query_builder::Col<CurrencyRate, f64>,
     pub inverse_rate: __sdk::__query_builder::Col<CurrencyRate, f64>,
     pub date: __sdk::__query_builder::Col<CurrencyRate, __sdk::Timestamp>,
@@ -45,8 +45,8 @@ impl __sdk::__query_builder::HasCols for CurrencyRate {
         CurrencyRateCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
-            from_currency: __sdk::__query_builder::Col::new(table_name, "from_currency"),
-            to_currency: __sdk::__query_builder::Col::new(table_name, "to_currency"),
+            from_currency_id: __sdk::__query_builder::Col::new(table_name, "from_currency_id"),
+            to_currency_id: __sdk::__query_builder::Col::new(table_name, "to_currency_id"),
             rate: __sdk::__query_builder::Col::new(table_name, "rate"),
             inverse_rate: __sdk::__query_builder::Col::new(table_name, "inverse_rate"),
             date: __sdk::__query_builder::Col::new(table_name, "date"),

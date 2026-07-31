@@ -9,7 +9,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
-use crate::core::reference::uom;
+use crate::core::reference::{require_active_currency_by_id, uom};
 use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
@@ -493,7 +493,7 @@ fn confirm_po_exchange_rate_snapshot(
     order: &PurchaseOrder,
 ) -> Result<(f64, String, String), String> {
     use crate::core::organization::company;
-    use crate::core::reference::{currency_rate, legacy_currency_code_for_id};
+    use crate::core::reference::{require_currency_by_id, resolve_currency_rate_as_of};
 
     let company_row = ctx
         .db
@@ -501,44 +501,19 @@ fn confirm_po_exchange_rate_snapshot(
         .id()
         .find(&order.company_id)
         .ok_or("Company not found for purchase order")?;
-    let from = legacy_currency_code_for_id(order.currency_id).to_string();
-    let to = legacy_currency_code_for_id(company_row.currency_id).to_string();
-    if from.eq_ignore_ascii_case(&to) {
+    let from = require_currency_by_id(ctx, order.currency_id)?.code;
+    let to = require_currency_by_id(ctx, company_row.currency_id)?.code;
+    if order.currency_id == company_row.currency_id {
         return Ok((1.0, from, to));
     }
-
-    let mut best_rate: Option<(Timestamp, f64)> = None;
-    for rate in ctx
-        .db
-        .currency_rate()
-        .rate_by_org()
-        .filter(&organization_id)
-    {
-        if !rate.from_currency.eq_ignore_ascii_case(&from)
-            || !rate.to_currency.eq_ignore_ascii_case(&to)
-        {
-            continue;
-        }
-        if let Some(cid) = rate.company_id {
-            if cid != order.company_id {
-                continue;
-            }
-        }
-        match best_rate {
-            Some((prev_date, _)) if rate.date <= prev_date => {}
-            _ => best_rate = Some((rate.date, rate.rate)),
-        }
-    }
-
-    let rate = best_rate.map(|(_, r)| r).ok_or_else(|| {
-        format!(
-            "No exchange rate for {} → {} (company {}); seed currency_rate before confirming multi-currency POs",
-            from, to, order.company_id
-        )
-    })?;
-    if rate <= 0.0 {
-        return Err("Exchange rate must be positive".to_string());
-    }
+    let rate = resolve_currency_rate_as_of(
+        ctx,
+        organization_id,
+        order.company_id,
+        order.currency_id,
+        company_row.currency_id,
+        ctx.timestamp,
+    )?;
     Ok((rate, from, to))
 }
 
@@ -609,6 +584,7 @@ pub fn create_purchase_order(
     }
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    require_active_currency_by_id(ctx, params.currency_id)?;
 
     require_vendor_in_organization(ctx, organization_id, params.partner_id)?;
 
@@ -1217,6 +1193,7 @@ pub fn update_purchase_order(
         updated.partner_id = pid;
     }
     if let Some(cid) = params.currency_id {
+        require_active_currency_by_id(ctx, cid)?;
         updated.currency_id = cid;
     }
     if let Some(tol) = params.match_qty_tolerance {

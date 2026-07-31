@@ -316,7 +316,9 @@ import {
   companyRowsToSelectOptions,
   consolidationJournalRowsToSelectOptions,
   consolidationAccountRowsToSelectOptions,
+  currencyOptionsFromRows,
 } from "@/lib/form-lookup"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useToast } from "@/hooks/use-toast"
 import type { AccountMove } from "@lumiere/query-hooks/hooks/accounting"
 import {
@@ -751,6 +753,7 @@ function AccountingClientReady({
   const { data: paymentTermLines = [] } = useAccountPaymentTermLines(orgId, { enabled: organizationId > 0 })
   const { data: depreciationLines = [] } = useDepreciationLines(orgId, { enabled: organizationId > 0 })
   const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
+  const { data: currencies = [] } = useCurrencies()
   const { data: intercompanyRules = [] } = useIntercompanyRules(orgId, { enabled: organizationId > 0 })
   const { data: intercompanyTransactions = [] } = useIntercompanyTransactions(orgId, {
     enabled: organizationId > 0,
@@ -932,14 +935,6 @@ function AccountingClientReady({
 
   const creditNoteFormConfig = useMemo(() => createCreditNoteForm(t), [t])
 
-  const defaultCurrencyId = useMemo(() => {
-    for (const a of accounts) {
-      const id = optionalBigIntU64((a as { currencyId?: unknown }).currencyId)
-      if (id !== undefined) return id
-    }
-    return 1n
-  }, [accounts])
-
   const paymentTermSelectOptions = useMemo(() => {
     const rows = paymentTerms as Record<string, unknown>[]
     if (rows.length === 0) {
@@ -951,19 +946,18 @@ function AccountingClientReady({
     }))
   }, [paymentTerms, t])
 
-  const currencySelectOptions = useMemo(() => {
-    const ids = new Set<string>()
-    ids.add(String(defaultCurrencyId))
-    for (const j of journals as Record<string, unknown>[]) {
-      const cid = j.currencyId
-      if (cid != null) ids.add(String(cid))
-    }
-    for (const account of accounts as Record<string, unknown>[]) {
-      const cid = account.currencyId
-      if (cid != null) ids.add(String(cid))
-    }
-    return [...ids].map((id) => ({ value: id, label: `Currency ${id}` }))
-  }, [accounts, journals, defaultCurrencyId])
+  const currencySelectOptions = useMemo(() => currencyOptionsFromRows(currencies), [currencies])
+
+  const defaultCurrencyId = useMemo(() => {
+    const company = (companies as Record<string, unknown>[]).find(
+      (row) => String(row.id ?? "") === String(operatingCompanyId),
+    )
+    return (
+      optionalBigIntU64(company?.currencyId ?? company?.currency_id) ??
+      optionalBigIntU64(currencySelectOptions[0]?.value) ??
+      0n
+    )
+  }, [companies, currencySelectOptions, operatingCompanyId])
 
   const companySelectOptions = useMemo(
     () => companyRowsToSelectOptions(companies as Record<string, unknown>[]),
@@ -1506,7 +1500,14 @@ function AccountingClientReady({
     })
   }, [paymentTermLineEdit, t])
 
-  const currencyRateFormConfig = useMemo(() => newCurrencyRateForm(t), [t])
+  const currencyRateFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newCurrencyRateForm(t), {
+        fromCurrencyId: currencySelectOptions,
+        toCurrencyId: currencySelectOptions,
+      }),
+    [t, currencySelectOptions],
+  )
 
   const analyticAccountSelectOptions = useMemo(
     () =>
@@ -1719,7 +1720,7 @@ function AccountingClientReady({
 
   const newBankStatementLineFormConfig = useMemo(() => {
     const base = !bankStatementDetail?.id
-      ? newBankStatementLineForm(t, { statementId: "", defaultCurrencyId: "1" })
+      ? newBankStatementLineForm(t, { statementId: "", defaultCurrencyId: defaultCurrencyId.toString() })
       : newBankStatementLineForm(t, {
           statementId: String(bankStatementDetail.id),
           defaultCurrencyId:

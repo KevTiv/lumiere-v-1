@@ -15,6 +15,7 @@ import {
   expectNoAppError,
   fetchAccountIdByCode,
   fetchAccountSelectLabelByInternalType,
+  fetchCurrencyIdByCode,
   fetchSessionOrganizationId,
   fillField,
   gotoModule,
@@ -89,6 +90,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
 
     // Allocations: create a Draft expense via BFF (seed rows are often Approved), then open form.
     const organizationId = await fetchSessionOrganizationId(page)
+    const currencyId = await fetchCurrencyIdByCode(page, "USD")
     const employees = await page.request.get("/api/query/employees")
     const employeeId = Number(((await employees.json()) as { data?: Array<{ id?: number }> }).data?.[0]?.id)
     expect(employeeId).toBeGreaterThan(0)
@@ -121,7 +123,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
         date: { __timestamp_micros_since_unix_epoch__: Date.now() * 1000 },
         unit_amount: 22,
         quantity: 1,
-        currency_id: 1,
+        currency_id: currencyId,
         product_id: none,
         description: none,
         tax_ids: [],
@@ -158,8 +160,9 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await gotoModule(page, "/expenses", "expenses")
     // Seed a conflict item via localStorage to assert retry/discard UI without flaky network.
     const organizationId = await fetchSessionOrganizationId(page)
+    const currencyId = await fetchCurrencyIdByCode(page, "USD")
     await page.evaluate(
-      ({ orgId }) => {
+      ({ orgId, currencyId }) => {
         const deviceKey = "lumiere.expense-capture-device-id"
         let deviceId = window.localStorage.getItem(deviceKey)
         if (!deviceId) {
@@ -176,7 +179,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
             date: new Date().toISOString().slice(0, 10),
             unitAmount: 9,
             quantity: 1,
-            currencyId: "1",
+            currencyId: String(currencyId),
             hasReceipt: true,
             lineKind: "Standard",
           },
@@ -186,7 +189,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
         }
         window.localStorage.setItem(key, JSON.stringify([item]))
       },
-      { orgId: organizationId },
+      { orgId: organizationId, currencyId },
     )
     await page.reload()
     await gotoModule(page, "/expenses", "expenses")
@@ -214,6 +217,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     test.setTimeout(180_000)
     await gotoModule(page, "/expenses", "expenses")
     const organizationId = await fetchSessionOrganizationId(page)
+    const currencyId = await fetchCurrencyIdByCode(page, "USD")
 
     const employees = await page.request.get("/api/query/employees")
     const employeeId = Number(((await employees.json()) as { data?: Array<{ id?: number }> }).data?.[0]?.id)
@@ -248,7 +252,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
         company_id: none,
         employee_id: employeeId,
         name: sheetName,
-        currency_id: 1,
+        currency_id: currencyId,
         notes: none,
         accounting_date: none,
       },
@@ -271,7 +275,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
         // Unique amount avoids seed/demo duplicate fraud holds (same employee+day+amount).
         unit_amount: 48.17 + (Date.now() % 1000) / 1000,
         quantity: 1,
-        currency_id: 1,
+        currency_id: currencyId,
         product_id: none,
         description: none,
         tax_ids: [],

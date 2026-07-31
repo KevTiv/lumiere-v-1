@@ -369,6 +369,19 @@ export async function fetchAccountIdByCode(page: Page, code: string): Promise<nu
   return id
 }
 
+/** Active currency id from the canonical bootstrap catalog. */
+export async function fetchCurrencyIdByCode(page: Page, code: string): Promise<number> {
+  const res = await page.request.get("/api/bootstrap/currencies")
+  if (!res.ok()) throw new Error(`currency catalog query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<{ id?: unknown; code?: string }> }
+  const row = (json.data ?? []).find(
+    (currency) => String(currency.code ?? "").toUpperCase() === code.toUpperCase(),
+  )
+  const id = scalarQueryId(row?.id)
+  if (id == null) throw new Error(`active currency not found: ${code}`)
+  return id
+}
+
 /** Sales invoice journal from seed (INV — Customer Invoices). */
 export async function fetchSalesInvoiceJournalLabel(page: Page): Promise<string> {
   const res = await page.request.get("/api/query/account-journals")
@@ -2728,4 +2741,3 @@ export async function openWorkflowVersionRow(page: Page, versionId: number) {
   await row.click()
   await expect(page.getByTestId("workflow-row-dialog-versions")).toBeVisible({ timeout: 15_000 })
 }
-

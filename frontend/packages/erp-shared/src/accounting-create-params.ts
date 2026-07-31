@@ -1002,13 +1002,19 @@ export function toCreatePaymentTermLineParamsFromForm(
 }
 
 export function toCreateCurrencyRateParamsFromForm(formData: Record<string, unknown>): CreateCurrencyRateParams | null {
-  const fromCurrency = optionalTrimmedString(formData.fromCurrency)?.toUpperCase()
-  const toCurrency = optionalTrimmedString(formData.toCurrency)?.toUpperCase()
+  const fromCurrencyId = requiredBigIntU64(field(formData, 'fromCurrencyId', 'from_currency_id'))
+  const toCurrencyId = requiredBigIntU64(field(formData, 'toCurrencyId', 'to_currency_id'))
   const rate = Number(formData.rate)
-  if (!fromCurrency || !toCurrency || !Number.isFinite(rate) || rate <= 0) return null
+  if (
+    fromCurrencyId === null ||
+    toCurrencyId === null ||
+    fromCurrencyId === toCurrencyId ||
+    !Number.isFinite(rate) ||
+    rate <= 0
+  ) return null
   return {
-    fromCurrency,
-    toCurrency,
+    fromCurrencyId,
+    toCurrencyId,
     rate,
     metadata: optionalTrimmedString(formData.metadata),
   }
@@ -2023,6 +2029,7 @@ export function toRunFxRevaluationParamsFromForm(
     return null
   }
   return {
+    idempotencyKey: `run-fx-revaluation:${globalThis.crypto.randomUUID()}`,
     currencyId,
     asOfDate: timestampFromFormDate(formData.asOfDate),
     rate,
@@ -2061,6 +2068,7 @@ export function toRunFxRevaluationBatchParamsFromForm(
     return null
   }
   return {
+    idempotencyKey: `run-fx-revaluation-batch:${globalThis.crypto.randomUUID()}`,
     currencyId,
     asOfDate: timestampFromFormDate(formData.asOfDate),
     journalId,
@@ -2097,6 +2105,7 @@ export function toPostRealizedFxParamsFromForm(
     return null
   }
   return {
+    idempotencyKey: `post-realized-fx:${globalThis.crypto.randomUUID()}`,
     paymentId,
     invoiceMoveId,
     paymentAmountFunctional,

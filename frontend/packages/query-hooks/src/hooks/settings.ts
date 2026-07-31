@@ -11,7 +11,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 // ── Organization Mutations ─────────────────────────────────────────────────
 
@@ -67,6 +67,20 @@ export function useCreateOrganization() {
 }
 
 // ── Reference data (superuser) ───────────────────────────────────────────────
+
+/** Active global currencies, also available before a user creates their tenant. */
+export function useCurrencies() {
+  return useQuery<Record<string, unknown>[]>({
+    queryKey: ['currencies'],
+    queryFn: async () => {
+      const response = await apiFetch('/api/bootstrap/currencies')
+      if (!response.ok) throw new Error('Failed to load currencies')
+      const payload = (await response.json()) as { data?: Record<string, unknown>[] }
+      return payload.data ?? []
+    },
+    staleTime: 5 * 60_000,
+  })
+}
 
 export function useCreateCountry() {
   const qc = useQueryClient()

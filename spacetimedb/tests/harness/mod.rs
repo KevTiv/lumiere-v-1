@@ -35,8 +35,8 @@ use crate::accounting::chart_of_accounts::{
     CreateAccountAccountParams, CreateAccountAccountTypeParams,
 };
 use crate::accounting::fiscal_periods::{
-    account_fiscal_year, create_account_period, create_fiscal_year, CreateAccountPeriodParams,
-    CreateFiscalYearParams,
+    account_fiscal_year, account_period, create_account_period, create_fiscal_year,
+    open_account_period, open_fiscal_year, CreateAccountPeriodParams, CreateFiscalYearParams,
 };
 use crate::core::organization::{
     company, create_company, insert_organization_with_owner, organization, CreateCompanyParams,
@@ -180,6 +180,16 @@ impl OrgFixture {
                 metadata: None,
             },
         )?;
+        let period_id = ctx
+            .db
+            .account_period()
+            .period_by_fiscal_year()
+            .filter(&fiscal_year_id)
+            .find(|period| period.code == format!("OP{suffix}"))
+            .map(|period| period.id)
+            .ok_or("Harness: accounting period not found after create")?;
+        open_fiscal_year(ctx, organization_id, company_id, fiscal_year_id)?;
+        open_account_period(ctx, organization_id, company_id, period_id)?;
 
         let at_receivable = seed_account_type(
             ctx,

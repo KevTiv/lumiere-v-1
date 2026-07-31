@@ -62,7 +62,9 @@ fn validate_intercompany_rule_relations(
             .find(&pricelist_id)
             .ok_or("intercompany rule pricelist not found")?;
         if pricelist.organization_id != organization_id {
-            return Err("intercompany rule pricelist does not belong to this organization".to_string());
+            return Err(
+                "intercompany rule pricelist does not belong to this organization".to_string(),
+            );
         }
         if !pricelist.is_active {
             return Err("intercompany rule pricelist is inactive".to_string());
@@ -462,8 +464,7 @@ pub fn update_intercompany_rule(
                 .ok_or("intercompany rule pricelist not found")?;
             if pricelist.organization_id != organization_id {
                 return Err(
-                    "intercompany rule pricelist does not belong to this organization"
-                        .to_string(),
+                    "intercompany rule pricelist does not belong to this organization".to_string(),
                 );
             }
             if !pricelist.is_active {
@@ -809,8 +810,7 @@ pub fn process_intercompany_transaction(
             }
             if order.company_id != company_id {
                 return Err(
-                    "destination sale order does not belong to the destination company"
-                        .to_string(),
+                    "destination sale order does not belong to the destination company".to_string(),
                 );
             }
         }
@@ -823,7 +823,10 @@ pub fn process_intercompany_transaction(
             state: IntercompanyState::Processing,
             destination_document_id: Some(params.destination_document_id),
             destination_document_model: Some(
-                params.destination_document_model.as_storage_str().to_string(),
+                params
+                    .destination_document_model
+                    .as_storage_str()
+                    .to_string(),
             ),
             processed_by: Some(ctx.sender()),
             ..transaction

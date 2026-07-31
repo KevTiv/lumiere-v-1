@@ -1597,22 +1597,22 @@ export const newCurrencyRateForm = (t: TFunction): FormConfig => ({
       title: t("accounting.forms.newCurrencyRate.sections.main"),
       fields: [
         {
-          id: "fromCurrency",
-          name: "fromCurrency",
-          type: "text",
+          id: "fromCurrencyId",
+          name: "fromCurrencyId",
+          type: "select",
           label: t("accounting.forms.newCurrencyRate.fields.fromCurrency"),
           required: true,
           width: "1/2",
-          placeholder: "USD",
+          options: [],
         },
         {
-          id: "toCurrency",
-          name: "toCurrency",
-          type: "text",
+          id: "toCurrencyId",
+          name: "toCurrencyId",
+          type: "select",
           label: t("accounting.forms.newCurrencyRate.fields.toCurrency"),
           required: true,
           width: "1/2",
-          placeholder: "EUR",
+          options: [],
         },
         {
           id: "rate",
@@ -2476,7 +2476,7 @@ export const accountingFormConfigs = (t: TFunction): Record<string, FormConfig> 
   "edit-analytic-distribution-model": editAnalyticDistributionModelForm(t),
   "new-bank-statement-line": newBankStatementLineForm(t, {
     statementId: "",
-    defaultCurrencyId: "1",
+    defaultCurrencyId: "",
   }),
   "edit-bank-statement-line": editBankStatementLineForm(t, {
     lineId: "",

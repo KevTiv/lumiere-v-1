@@ -11,6 +11,7 @@ import {
   callReducerBff,
   callReducerBffResult,
   expectNoAppError,
+  fetchCurrencyIdByCode,
   fetchSessionOrganizationId,
   gotoModule,
   smokeName,
@@ -91,6 +92,7 @@ test.describe("Projects wave A lifecycle e2e @projects", () => {
     const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchFirstCompanyId(page)
     const employeeId = await fetchFirstEmployeeId(page)
+    const currencyId = await fetchCurrencyIdByCode(page, "USD")
 
     const projectName = smokeName("psa-proj")
     const taskName = smokeName("psa-task")
@@ -104,7 +106,7 @@ test.describe("Projects wave A lifecycle e2e @projects", () => {
         description: none,
         active: true,
         sequence: 1,
-        currency_id: 1,
+        currency_id: currencyId,
         partner_id: none,
         partner_email: none,
         partner_phone: none,
@@ -222,7 +224,7 @@ test.describe("Projects wave A lifecycle e2e @projects", () => {
         name: tsName,
         date: { __timestamp_micros_since_unix_epoch__: Date.now() * 1000 },
         unit_amount: 2,
-        currency_id: 1,
+        currency_id: currencyId,
         employee_cost: 50,
         sell_rate: some(150),
         timesheet_invoice_type: some("billable"),

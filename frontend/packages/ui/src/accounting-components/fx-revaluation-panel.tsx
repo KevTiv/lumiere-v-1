@@ -207,20 +207,22 @@ export function FxRevaluationPanel({
                 title: t("accounting.forms.newCurrencyRate.sections.main"),
                 fields: [
                   {
-                    id: "fromCurrency",
-                    name: "fromCurrency",
-                    type: "text",
+                    id: "fromCurrencyId",
+                    name: "fromCurrencyId",
+                    type: "select",
                     label: t("accounting.forms.newCurrencyRate.fields.fromCurrency"),
                     required: true,
                     width: "1/2",
+                    options: currencySelectOptions,
                   },
                   {
-                    id: "toCurrency",
-                    name: "toCurrency",
-                    type: "text",
+                    id: "toCurrencyId",
+                    name: "toCurrencyId",
+                    type: "select",
                     label: t("accounting.forms.newCurrencyRate.fields.toCurrency"),
                     required: true,
                     width: "1/2",
+                    options: currencySelectOptions,
                   },
                   {
                     id: "rate",

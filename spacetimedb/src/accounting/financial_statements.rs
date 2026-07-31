@@ -16,7 +16,7 @@ use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::core::organization::require_company_in_organization;
-use crate::core::reference::{legacy_currency_code_for_id, require_currency_row};
+use crate::core::reference::require_currency_by_id;
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{AccountInternalGroup, AccountMoveState, MoveType, ReportState, ReportType};
@@ -282,10 +282,7 @@ pub struct ExportFinancialReportParams {
 }
 
 fn validate_report_currency_id(ctx: &ReducerContext, currency_id: u64) -> Result<(), String> {
-    if !(1..=9).contains(&currency_id) {
-        return Err("currency is not supported".to_string());
-    }
-    let currency = require_currency_row(ctx, legacy_currency_code_for_id(currency_id))?;
+    let currency = require_currency_by_id(ctx, currency_id)?;
     if !currency.active {
         return Err("currency is inactive".to_string());
     }

@@ -9,6 +9,7 @@ use super::fx_revaluation_line_params_type::FxRevaluationLineParams;
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct RunFxRevaluationParams {
+    pub idempotency_key: String,
     pub currency_id: u64,
     pub as_of_date: __sdk::Timestamp,
     pub rate: f64,

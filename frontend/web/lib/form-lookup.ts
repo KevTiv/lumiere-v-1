@@ -649,23 +649,21 @@ export function expenseSheetRowsToDraftSelectOptions(
   }))
 }
 
-/** Distinct currency IDs from row sets (pricelists, journals, accounts, etc.). */
+/** Active canonical currencies from the global currency catalog. */
 export function currencyOptionsFromRows(
-  rowSets: Record<string, unknown>[][],
-  opts?: { fallbackId?: string; field?: string },
+  rows: Record<string, unknown>[],
 ): Array<{ value: string; label: string }> {
-  const field = opts?.field ?? 'currencyId'
-  const fallbackId = opts?.fallbackId ?? '1'
-  const ids = new Set<string>([fallbackId])
-  for (const rows of rowSets) {
-    for (const row of rows) {
-      const v = row[field] ?? (row as { currency_id?: unknown }).currency_id
-      if (v != null && String(v) !== '') ids.add(String(v))
-    }
-  }
-  return [...ids]
-    .sort((a, b) => Number(a) - Number(b))
-    .map((id) => ({ value: id, label: `Currency ${id}` }))
+  return rows
+    .flatMap((row) => {
+      const id = row.id
+      const code = String(row.code ?? '').trim().toUpperCase()
+      const name = String(row.name ?? '').trim()
+      const active = row.active ?? row.isActive ?? (row as { is_active?: unknown }).is_active
+      if (id == null || String(id) === '' || !code || !name || active === false) return []
+      return [{ value: String(id), label: `${code} — ${name}`, code }]
+    })
+    .sort((left, right) => left.code.localeCompare(right.code))
+    .map(({ value, label }) => ({ value, label }))
 }
 
 export function documentFolderRowsToSelectOptions(

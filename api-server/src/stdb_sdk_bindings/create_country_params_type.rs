@@ -12,7 +12,7 @@ pub struct CreateCountryParams {
     pub numcode: u16,
     pub phone_code: String,
     pub official_name: Option<String>,
-    pub currency_code: Option<String>,
+    pub currency_id: Option<u64>,
     pub language_codes: Vec<String>,
     pub is_active: bool,
     pub metadata: Option<String>,

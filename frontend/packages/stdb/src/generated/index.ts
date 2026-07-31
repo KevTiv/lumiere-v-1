@@ -2077,6 +2077,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'payment_term_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'payment_term_line_by_term', algorithm: 'btree', columns: [
         'paymentTermId',
       ] },
@@ -3526,9 +3529,13 @@ const tablesSchema = __schema({
       { name: 'code', algorithm: 'btree', columns: [
         'code',
       ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
     ],
     constraints: [
       { name: 'currency_code_key', constraint: 'unique', columns: ['code'] },
+      { name: 'currency_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CurrencyRow),
   currency_rate: __table({

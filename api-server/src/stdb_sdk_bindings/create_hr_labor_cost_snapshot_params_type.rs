@@ -11,7 +11,7 @@ pub struct CreateHrLaborCostSnapshotParams {
     pub period_start: __sdk::Timestamp,
     pub period_end: __sdk::Timestamp,
     pub total_labor_cost: f64,
-    pub currency_code: String,
+    pub currency_id: u64,
     pub status: String,
     pub metadata: Option<String>,
 }

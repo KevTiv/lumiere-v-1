@@ -1690,7 +1690,7 @@
     "organization",
     "default_company_name",
     "default_company_code",
-    "default_company_currency_code",
+    "default_company_currency_id",
     "fiscal_year_end_month",
     "fiscal_year_end_day",
     "seed_form_configs",
@@ -2318,7 +2318,7 @@
     "iso_3",
     "numcode",
     "phone_code",
-    "currency_code",
+    "currency_id",
     "language_codes",
     "is_active",
     "metadata"
@@ -3058,7 +3058,7 @@
     "numcode",
     "phone_code",
     "official_name",
-    "currency_code",
+    "currency_id",
     "language_codes",
     "is_active",
     "metadata"
@@ -3107,8 +3107,8 @@
     "metadata"
   ],
   "CreateCurrencyRateParams": [
-    "from_currency",
-    "to_currency",
+    "from_currency_id",
+    "to_currency_id",
     "rate",
     "metadata"
   ],
@@ -3588,7 +3588,7 @@
     "period_start",
     "period_end",
     "total_labor_cost",
-    "currency_code",
+    "currency_id",
     "status",
     "metadata"
   ],
@@ -5860,6 +5860,7 @@
     "metadata"
   ],
   "Currency": [
+    "id",
     "code",
     "name",
     "symbol",
@@ -5873,8 +5874,8 @@
   "CurrencyRate": [
     "id",
     "organization_id",
-    "from_currency",
-    "to_currency",
+    "from_currency_id",
+    "to_currency_id",
     "rate",
     "inverse_rate",
     "date",
@@ -6604,7 +6605,7 @@
     "organization_id",
     "company_id",
     "currency_id",
-    "currency_code",
+    "currency_code_snapshot",
     "company_currency_id",
     "rate",
     "rate_source",
@@ -7167,7 +7168,8 @@
     "period_start",
     "period_end",
     "total_labor_cost",
-    "currency_code",
+    "currency_id",
+    "currency_code_snapshot",
     "status",
     "metadata",
     "created_at"
@@ -9175,6 +9177,7 @@
     "accounting_date"
   ],
   "PostRealizedFxParams": [
+    "idempotency_key",
     "payment_id",
     "invoice_move_id",
     "payment_amount_functional",
@@ -11056,6 +11059,7 @@
     "metadata"
   ],
   "RunFxRevaluationBatchParams": [
+    "idempotency_key",
     "currency_id",
     "as_of_date",
     "journal_id",
@@ -11068,6 +11072,7 @@
     "metadata"
   ],
   "RunFxRevaluationParams": [
+    "idempotency_key",
     "currency_id",
     "as_of_date",
     "rate",

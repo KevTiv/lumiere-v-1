@@ -3,6 +3,7 @@
 /// Metadata-only hooks for partner optimizers and PSA adjacency; not a full WFM product.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::reference::require_active_currency_by_id;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::attendance::{hr_attendance, hr_work_schedule};
 use crate::hr::employees::hr_employee;
@@ -30,7 +31,9 @@ pub struct HrLaborCostSnapshot {
     pub period_start: Timestamp,
     pub period_end: Timestamp,
     pub total_labor_cost: f64,
-    pub currency_code: String,
+    pub currency_id: u64,
+    /// Immutable display snapshot captured from the canonical currency row.
+    pub currency_code_snapshot: String,
     /// draft | computed | stale
     pub status: String,
     pub metadata: Option<String>,
@@ -95,7 +98,7 @@ pub struct CreateHrLaborCostSnapshotParams {
     pub period_start: Timestamp,
     pub period_end: Timestamp,
     pub total_labor_cost: f64,
-    pub currency_code: String,
+    pub currency_id: u64,
     pub status: String,
     pub metadata: Option<String>,
 }
@@ -169,7 +172,12 @@ fn period_secs(start: Timestamp, end: Timestamp) -> f64 {
     ((end_us - start_us) / 1_000_000.0).max(0.0)
 }
 
-fn timestamps_overlap(a_start: Timestamp, a_end: Timestamp, b_start: Timestamp, b_end: Timestamp) -> bool {
+fn timestamps_overlap(
+    a_start: Timestamp,
+    a_end: Timestamp,
+    b_start: Timestamp,
+    b_end: Timestamp,
+) -> bool {
     a_start <= b_end && b_start <= a_end
 }
 
@@ -244,9 +252,9 @@ pub fn refresh_hr_capacity_forecast_for_employee(
     let period_days = period_secs(period_start, period_end) / 86_400.0;
     let scheduled_hours = hours_per_week * (period_days / 7.0).max(0.0);
     let hours_per_day = (hours_per_week / 5.0).max(0.0);
-    let leave_hours = leave_hours_in_period(ctx, employee_id, period_start, period_end, hours_per_day);
-    let attendance_hours =
-        attendance_hours_in_period(ctx, employee_id, period_start, period_end);
+    let leave_hours =
+        leave_hours_in_period(ctx, employee_id, period_start, period_end, hours_per_day);
+    let attendance_hours = attendance_hours_in_period(ctx, employee_id, period_start, period_end);
     let available_hours = (scheduled_hours - leave_hours).max(0.0);
 
     let metadata = serde_json::json!({
@@ -307,9 +315,7 @@ pub fn create_hr_labor_cost_snapshot(
         assert_employee_in_company(ctx, company_id, employee_id)?;
     }
 
-    if params.currency_code.trim().is_empty() {
-        return Err("currency_code cannot be empty".to_string());
-    }
+    let currency = require_active_currency_by_id(ctx, params.currency_id)?;
 
     let status = normalize_labor_cost_status(&params.status)?;
 
@@ -321,7 +327,8 @@ pub fn create_hr_labor_cost_snapshot(
         period_start: params.period_start,
         period_end: params.period_end,
         total_labor_cost: params.total_labor_cost,
-        currency_code: params.currency_code,
+        currency_id: currency.id,
+        currency_code_snapshot: currency.code,
         status,
         metadata: params.metadata,
         created_at: ctx.timestamp,

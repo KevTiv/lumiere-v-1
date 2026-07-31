@@ -13,6 +13,7 @@ import {
   proposalsTableConfig,
   MissingOrganization,
   mergeFieldDefaultValues,
+  mergeSelectOptionsForFields,
 } from "@lumiere/ui"
 import type { EntityAction, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { proposalsModuleConfig } from "@/lib/module-dashboard-configs"
@@ -26,8 +27,10 @@ import {
   useApproveProposal,
 } from "@lumiere/query-hooks/hooks/proposals"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { fetchQueryList, rqBigIntKey } from "@lumiere/query-hooks/http"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { currencyOptionsFromRows } from "@/lib/form-lookup"
 import {
   Archive,
   Award,
@@ -126,6 +129,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
   const [activeTab, setActiveTab] = useState<string>("dashboard")
 
   const { data: proposals = [] } = useProposals(orgId, initialProposals)
+  const { data: currencies = [] } = useCurrencies()
   const createProposal = useCreateProposal(orgId, operatingCompanyId)
   const updateProposal = useUpdateProposal(orgId, operatingCompanyId)
   const updateProposalStatus = useUpdateProposalStatus(orgId, operatingCompanyId)
@@ -136,6 +140,12 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
     updateProposal.isPending ||
     updateProposalStatus.isPending ||
     approveProposal.isPending
+
+  const currencyOptions = useMemo(() => currencyOptionsFromRows(currencies), [currencies])
+  const proposalCreateForm = useMemo(
+    () => mergeSelectOptionsForFields(newProposalForm(t), { currencyId: currencyOptions }),
+    [t, currencyOptions],
+  )
 
   const activeCount = proposals.filter((p) => {
     const s = normalizeProposalStatus(p.status)
@@ -275,10 +285,10 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            new_proposal: () => setQuickActionForm({ form: newProposalForm(t), action: "createProposal" }),
+            new_proposal: () => setQuickActionForm({ form: proposalCreateForm, action: "createProposal" }),
             use_template: () => setActiveTab("templates"),
             // Label is "Import RFP (coming soon)" — still opens create form as a create-only shortcut
-            import_rfp: () => setQuickActionForm({ form: newProposalForm(t), action: "createProposal" }),
+            import_rfp: () => setQuickActionForm({ form: proposalCreateForm, action: "createProposal" }),
             review_pending: () => {
               const pending = proposals.find((p) => normalizeProposalStatus(p.status) === "Review")
               if (pending) router.push(`/proposals/${pending.id}`)
@@ -294,7 +304,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         }
         return w
           })
-  }, [activeCount, submittedCount, awardedCount, pipelineValueLabel, proposals, router, moduleConfig, t])
+  }, [activeCount, submittedCount, awardedCount, pipelineValueLabel, proposals, router, moduleConfig, proposalCreateForm])
 
   const config = useMemo(
     (): ModuleConfig => ({
@@ -325,10 +335,12 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
       const descriptionRaw = formData.description != null ? String(formData.description).trim() : ""
       const typeRaw = formData.type != null ? String(formData.type).trim() : ""
       const partnerRaw = formData.partnerId ?? formData.partner_id
+      const currencyId = Number(formData.currencyId)
+      if (!Number.isSafeInteger(currencyId) || currencyId <= 0) return
       await createProposal.mutateAsync({
         title,
         clientName: String(formData.clientName ?? "").trim(),
-        currencyId: 1,
+        currencyId,
         value: Number(formData.value ?? 0),
         deadline: formData.deadline ? new Date(String(formData.deadline)) : undefined,
         description: descriptionRaw || undefined,
@@ -393,7 +405,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? newProposalForm(t)}
+        config={quickActionForm?.form ?? proposalCreateForm}
         isPending={isPending}
         onSubmit={async (formData) => {
           if (quickActionForm) await handleFormSubmit("dashboard", quickActionForm.action, formData)
