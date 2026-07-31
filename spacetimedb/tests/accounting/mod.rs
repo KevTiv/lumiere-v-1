@@ -76,7 +76,9 @@ pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), Stri
     journal_entries_test::test_post_customer_invoice_creates_move_lines(ctx)
         .map_err(|e| format!("post_customer_invoice: {e}"))?;
     journal_entries_test::test_cross_tenant_move_mutations_fail_closed(ctx)
-        .map_err(|e| format!("cross_tenant_move_mutations: {e}"))
+        .map_err(|e| format!("cross_tenant_move_mutations: {e}"))?;
+    journal_entries_test::test_create_credit_note_rejects_cross_tenant_invoice(ctx)
+        .map_err(|e| format!("ACC-RI-024 credit_note_cross_tenant: {e}"))
 }
 
 #[spacetimedb::reducer]
@@ -158,7 +160,11 @@ pub fn run_accounting_ic_consolidation_test(ctx: &ReducerContext) -> Result<(), 
     ic_consolidation_test::test_intercompany_rule_requires_same_org(ctx)
         .map_err(|e| format!("ic_cross_org: {e}"))?;
     ic_consolidation_test::test_intercompany_elimination_nets_to_zero(ctx)
-        .map_err(|e| format!("ic_elimination: {e}"))
+        .map_err(|e| format!("ic_elimination: {e}"))?;
+    ic_consolidation_test::test_intercompany_rule_rejects_cross_tenant_account(ctx)
+        .map_err(|e| format!("ACC-RI-024 ic_rule_cross_tenant_account: {e}"))?;
+    ic_consolidation_test::test_process_intercompany_transaction_rejects_cross_tenant_destination(ctx)
+        .map_err(|e| format!("ACC-RI-015 ic_destination_document_cross_tenant: {e}"))
 }
 
 #[spacetimedb::reducer]

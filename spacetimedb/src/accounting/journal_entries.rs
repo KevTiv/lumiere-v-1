@@ -2406,6 +2406,9 @@ pub fn create_credit_note_from_invoice(
         .find(&invoice_id)
         .ok_or("Invoice not found")?;
 
+    if source.organization_id != organization_id {
+        return Err("Invoice does not belong to this organization".to_string());
+    }
     if source.company_id != company_id {
         return Err("Record does not belong to this company".to_string());
     }
@@ -2877,16 +2880,34 @@ pub fn reconcile_payment_with_invoice(
 }
 
 /// Resolve sale tax IDs for T&M timesheet billing.
-/// Explicit `tax_ids` win; otherwise the lowest-sequence active Sale tax for the company
-/// (typically country-pack GST/VAT) is used so a non-zero tax path is available when configured.
+/// Explicit `tax_ids` win, but each must be an active tax owned by this
+/// organization/company; otherwise the lowest-sequence active Sale tax for
+/// the company (typically country-pack GST/VAT) is used so a non-zero tax
+/// path is available when configured.
 fn resolve_timesheet_bill_tax_ids(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
     explicit: &[u64],
-) -> Vec<u64> {
+) -> Result<Vec<u64>, String> {
     if !explicit.is_empty() {
-        return explicit.to_vec();
+        for tax_id in explicit {
+            let tax = ctx
+                .db
+                .account_tax()
+                .id()
+                .find(tax_id)
+                .ok_or_else(|| format!("Tax {tax_id} not found"))?;
+            if tax.organization_id != organization_id || tax.company_id != company_id {
+                return Err(format!(
+                    "Tax {tax_id} does not belong to this organization and company"
+                ));
+            }
+            if !tax.active {
+                return Err(format!("Tax {tax_id} is inactive"));
+            }
+        }
+        return Ok(explicit.to_vec());
     }
     let mut sale_taxes: Vec<_> = ctx
         .db
@@ -2898,11 +2919,11 @@ fn resolve_timesheet_bill_tax_ids(
         })
         .collect();
     sale_taxes.sort_by_key(|t| t.sequence);
-    sale_taxes
+    Ok(sale_taxes
         .into_iter()
         .next()
         .map(|t| vec![t.id])
-        .unwrap_or_default()
+        .unwrap_or_default())
 }
 
 /// Create a customer invoice from validated billable timesheets.
@@ -2993,7 +3014,7 @@ pub fn bill_timesheets(
         );
     }
 
-    let tax_ids = resolve_timesheet_bill_tax_ids(ctx, organization_id, company_id, &params.tax_ids);
+    let tax_ids = resolve_timesheet_bill_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
 
     let company = ctx
         .db
@@ -3283,7 +3304,7 @@ pub fn bill_project_milestone(
         .ok_or_else(|| "invoice_date is required for milestone billing".to_string())?;
     ensure_accounting_period_open_for_date(ctx, company_id, inv_date)?;
 
-    let tax_ids = resolve_timesheet_bill_tax_ids(ctx, organization_id, company_id, &params.tax_ids);
+    let tax_ids = resolve_timesheet_bill_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
     let amount_tax = calculate_tax(ctx, &tax_ids, amount_untaxed);
     let amount_total = amount_untaxed + amount_tax;
 

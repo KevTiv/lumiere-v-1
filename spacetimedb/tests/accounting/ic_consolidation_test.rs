@@ -671,3 +671,164 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
 
     Ok(())
 }
+
+/// ACC-RI-024: `create_intercompany_rule` and `update_intercompany_rule` must
+/// validate `journal_id`/`account_id`/`pricelist_id` under the destination
+/// company's organization instead of storing them unchecked (representative
+/// coverage via `account_id`; `journal_id` and `pricelist_id` are validated
+/// by the identical pattern in the same function).
+pub fn test_intercompany_rule_rejects_cross_tenant_account(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture_a = OrgFixture::seed_minimal(ctx)?;
+    let fixture_b = OrgFixture::seed_minimal(ctx)?;
+    let sibling_a2 = super::helpers::seed_sibling_company(ctx, &fixture_a)?;
+
+    let foreign_account_id = *fixture_b
+        .chart_account_ids
+        .get(crate::test_harness::chart_keys::AR)
+        .ok_or("harness B missing AR account")?;
+
+    let cross_tenant_result = create_intercompany_rule(
+        ctx,
+        fixture_a.organization_id,
+        fixture_a.company_id,
+        sibling_a2,
+        CreateIntercompanyRuleParams {
+            name: "ACC-RI-024 cross-tenant account".to_string(),
+            rule_type: RuleType::Invoice,
+            auto_validation: false,
+            auto_generate_invoice: false,
+            auto_generate_bill: false,
+            is_active: true,
+            journal_id: None,
+            account_id: Some(foreign_account_id),
+            pricelist_id: None,
+            sequence: 1,
+            notes: None,
+            metadata: None,
+        },
+    );
+    if cross_tenant_result.is_ok() {
+        return Err("create_intercompany_rule accepted a cross-organization account_id".to_string());
+    }
+
+    let rule_exists = ctx
+        .db
+        .intercompany_rule()
+        .iter()
+        .any(|r| r.name == "ACC-RI-024 cross-tenant account");
+    if rule_exists {
+        return Err(
+            "rejected cross-tenant intercompany rule create still persisted a row".to_string(),
+        );
+    }
+
+    // Positive: a same-tenant account (destination company's own AR account) is accepted.
+    let own_account_id = *fixture_a
+        .chart_account_ids
+        .get(crate::test_harness::chart_keys::AR)
+        .ok_or("harness A missing AR account")?;
+    create_intercompany_rule(
+        ctx,
+        fixture_a.organization_id,
+        fixture_a.company_id,
+        sibling_a2,
+        CreateIntercompanyRuleParams {
+            name: "ACC-RI-024 same-tenant account".to_string(),
+            rule_type: RuleType::Invoice,
+            auto_validation: false,
+            auto_generate_invoice: false,
+            auto_generate_bill: false,
+            is_active: true,
+            journal_id: None,
+            account_id: Some(own_account_id),
+            pricelist_id: None,
+            sequence: 1,
+            notes: None,
+            metadata: None,
+        },
+    )?;
+
+    Ok(())
+}
+
+/// ACC-RI-015: `process_intercompany_transaction` must reject a destination
+/// document belonging to a different organization/company than the
+/// transaction's destination company, instead of storing it unchecked.
+pub fn test_process_intercompany_transaction_rejects_cross_tenant_destination(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    use crate::accounting::intercompany::{
+        process_intercompany_transaction, ProcessIntercompanyTransactionParams,
+    };
+
+    ensure_test_superuser(ctx)?;
+    let fixture_a = OrgFixture::seed_minimal(ctx)?;
+    let fixture_b = OrgFixture::seed_minimal(ctx)?;
+    let sibling_a2 = super::helpers::seed_sibling_company(ctx, &fixture_a)?;
+
+    let origin_move = super::helpers::create_balanced_customer_invoice(ctx, &fixture_a, 731.29, true)?;
+
+    create_intercompany_transaction(
+        ctx,
+        fixture_a.organization_id,
+        fixture_a.company_id,
+        CreateIntercompanyTransactionParams {
+            origin_document_id: origin_move,
+            origin_document_model: IntercompanyDocumentModel::AccountMove,
+            destination_company_id: sibling_a2,
+            amount: 731.29,
+            currency_id: 1,
+            transaction_type: RuleType::Invoice,
+            notes: None,
+            auto_process: false,
+            requires_approval: false,
+            metadata: None,
+        },
+    )?;
+    let transaction = ctx
+        .db
+        .intercompany_transaction()
+        .iter()
+        .find(|t| {
+            t.organization_id == Some(fixture_a.organization_id)
+                && t.origin_document_id == origin_move
+        })
+        .ok_or("intercompany transaction not found after create")?;
+
+    // A foreign org's posted invoice used as the destination document.
+    let foreign_move = super::helpers::create_balanced_customer_invoice(ctx, &fixture_b, 40.0, true)?;
+
+    let cross_tenant_result = process_intercompany_transaction(
+        ctx,
+        fixture_a.organization_id,
+        sibling_a2,
+        transaction.id,
+        ProcessIntercompanyTransactionParams {
+            destination_document_id: foreign_move,
+            destination_document_model: IntercompanyDocumentModel::AccountMove,
+        },
+    );
+    if cross_tenant_result.is_ok() {
+        return Err(
+            "process_intercompany_transaction accepted a cross-organization destination document"
+                .to_string(),
+        );
+    }
+
+    let unchanged = ctx
+        .db
+        .intercompany_transaction()
+        .id()
+        .find(&transaction.id)
+        .ok_or("intercompany transaction disappeared after rejected process")?;
+    if unchanged.destination_document_id.is_some() {
+        return Err(
+            "rejected cross-tenant destination document was still persisted".to_string(),
+        );
+    }
+
+    Ok(())
+}

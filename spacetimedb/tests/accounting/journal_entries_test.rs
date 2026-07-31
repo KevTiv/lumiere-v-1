@@ -1,9 +1,10 @@
 /// Journal entry / customer invoice domain tests.
-use spacetimedb::ReducerContext;
+use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, cancel_account_move,
-    compute_invoice_totals, post_invoice, AddAccountMoveLineParams,
+    compute_invoice_totals, create_credit_note_from_invoice, post_invoice,
+    AddAccountMoveLineParams, CreateCreditNoteParams,
 };
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::AccountMoveState;
@@ -165,6 +166,63 @@ pub fn test_cross_tenant_move_mutations_fail_closed(ctx: &ReducerContext) -> Res
         || after_line_count != line_count
     {
         return Err("rejected cross-tenant move mutation changed persisted data".to_string());
+    }
+
+    Ok(())
+}
+
+/// ACC-RI-024: `create_credit_note_from_invoice` must reject a source invoice
+/// belonging to a different organization than the caller, even when the
+/// caller supplies the invoice's real `company_id`, and must not create a
+/// credit note as a side effect of the rejected call.
+pub fn test_create_credit_note_rejects_cross_tenant_invoice(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture_a = OrgFixture::seed_minimal(ctx)?;
+    let fixture_b = OrgFixture::seed_minimal(ctx)?;
+
+    let invoice_a = create_balanced_customer_invoice(ctx, &fixture_a, 250.0, true)?;
+
+    let before_count = ctx.db.account_move().iter().count();
+
+    let cross_tenant_result = create_credit_note_from_invoice(
+        ctx,
+        fixture_b.organization_id,
+        fixture_a.company_id,
+        invoice_a,
+        CreateCreditNoteParams {
+            line_ids: vec![],
+            reason: Some("cross-tenant probe".to_string()),
+        },
+    );
+    if cross_tenant_result.is_ok() {
+        return Err(
+            "create_credit_note_from_invoice accepted a cross-organization invoice".to_string(),
+        );
+    }
+
+    let after_count = ctx.db.account_move().iter().count();
+    if after_count != before_count {
+        return Err(
+            "rejected cross-tenant credit-note create still persisted a new move".to_string(),
+        );
+    }
+
+    // Positive: same-tenant credit note creation still succeeds.
+    create_credit_note_from_invoice(
+        ctx,
+        fixture_a.organization_id,
+        fixture_a.company_id,
+        invoice_a,
+        CreateCreditNoteParams {
+            line_ids: vec![],
+            reason: Some("same-tenant correction".to_string()),
+        },
+    )?;
+    let after_positive_count = ctx.db.account_move().iter().count();
+    if after_positive_count != before_count + 1 {
+        return Err("same-tenant credit-note create did not persist a new move".to_string());
     }
 
     Ok(())

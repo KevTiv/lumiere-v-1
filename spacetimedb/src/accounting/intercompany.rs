@@ -16,11 +16,60 @@ use crate::accounting::fiscal_periods::{
     AccountingOwnershipBackfillRun,
 };
 use crate::accounting::journal_entries::account_move;
+use crate::accounting::relations::{require_active_account, require_active_journal};
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::users::user_profile;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::sales::pricelists::product_pricelist;
 use crate::sales::sales_core::sale_order;
 use crate::types::{IntercompanyDocumentModel, IntercompanyState, RuleType};
+
+/// A rule's journal/account back auto-generated invoices/bills, which post in
+/// the destination company; its pricelist prices the source company's side of
+/// the intercompany sale. Rejects any ID that does not resolve to an
+/// active, correctly scoped row instead of storing it unchecked.
+fn validate_intercompany_rule_relations(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    destination_company_id: u64,
+    journal_id: Option<u64>,
+    account_id: Option<u64>,
+    pricelist_id: Option<u64>,
+) -> Result<(), String> {
+    if let Some(journal_id) = journal_id {
+        require_active_journal(
+            ctx,
+            organization_id,
+            destination_company_id,
+            journal_id,
+            "intercompany rule",
+        )?;
+    }
+    if let Some(account_id) = account_id {
+        require_active_account(
+            ctx,
+            organization_id,
+            destination_company_id,
+            account_id,
+            "intercompany rule",
+        )?;
+    }
+    if let Some(pricelist_id) = pricelist_id {
+        let pricelist = ctx
+            .db
+            .product_pricelist()
+            .id()
+            .find(&pricelist_id)
+            .ok_or("intercompany rule pricelist not found")?;
+        if pricelist.organization_id != organization_id {
+            return Err("intercompany rule pricelist does not belong to this organization".to_string());
+        }
+        if !pricelist.is_active {
+            return Err("intercompany rule pricelist is inactive".to_string());
+        }
+    }
+    Ok(())
+}
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -257,6 +306,15 @@ pub fn create_intercompany_rule(
         return Err("Rule name is required".to_string());
     }
 
+    validate_intercompany_rule_relations(
+        ctx,
+        organization_id,
+        destination_company_id,
+        params.journal_id,
+        params.account_id,
+        params.pricelist_id,
+    )?;
+
     let rule = ctx.db.intercompany_rule().insert(IntercompanyRule {
         id: 0,
         organization_id: Some(organization_id),
@@ -367,16 +425,51 @@ pub fn update_intercompany_rule(
     }
 
     if let Some(journal_id) = params.journal_id {
+        if let Some(id) = journal_id {
+            require_active_journal(
+                ctx,
+                organization_id,
+                rule.destination_company_id,
+                id,
+                "intercompany rule",
+            )?;
+        }
         new_journal_id = journal_id;
         changed_fields.push("journal_id".to_string());
     }
 
     if let Some(account_id) = params.account_id {
+        if let Some(id) = account_id {
+            require_active_account(
+                ctx,
+                organization_id,
+                rule.destination_company_id,
+                id,
+                "intercompany rule",
+            )?;
+        }
         new_account_id = account_id;
         changed_fields.push("account_id".to_string());
     }
 
     if let Some(pricelist_id) = params.pricelist_id {
+        if let Some(id) = pricelist_id {
+            let pricelist = ctx
+                .db
+                .product_pricelist()
+                .id()
+                .find(&id)
+                .ok_or("intercompany rule pricelist not found")?;
+            if pricelist.organization_id != organization_id {
+                return Err(
+                    "intercompany rule pricelist does not belong to this organization"
+                        .to_string(),
+                );
+            }
+            if !pricelist.is_active {
+                return Err("intercompany rule pricelist is inactive".to_string());
+            }
+        }
         new_pricelist_id = pricelist_id;
         changed_fields.push("pricelist_id".to_string());
     }
@@ -680,6 +773,47 @@ pub fn process_intercompany_transaction(
         return Err(
             "Transaction must be in Draft, Approved, or Pending state to process".to_string(),
         );
+    }
+
+    match &params.destination_document_model {
+        IntercompanyDocumentModel::AccountMove => {
+            let move_row = ctx
+                .db
+                .account_move()
+                .id()
+                .find(&params.destination_document_id)
+                .ok_or("destination account move not found")?;
+            if move_row.organization_id != organization_id {
+                return Err(
+                    "destination account move does not belong to this organization".to_string(),
+                );
+            }
+            if move_row.company_id != company_id {
+                return Err(
+                    "destination account move does not belong to the destination company"
+                        .to_string(),
+                );
+            }
+        }
+        IntercompanyDocumentModel::SaleOrder => {
+            let order = ctx
+                .db
+                .sale_order()
+                .id()
+                .find(&params.destination_document_id)
+                .ok_or("destination sale order not found")?;
+            if order.organization_id != organization_id {
+                return Err(
+                    "destination sale order does not belong to this organization".to_string(),
+                );
+            }
+            if order.company_id != company_id {
+                return Err(
+                    "destination sale order does not belong to the destination company"
+                        .to_string(),
+                );
+            }
+        }
     }
 
     ctx.db
