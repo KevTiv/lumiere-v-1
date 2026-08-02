@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react"
 import {
   ArchiveIcon,
-  BadgeCheckIcon,
   PencilIcon,
   PhoneIcon,
   PlusIcon,
@@ -27,13 +26,9 @@ import {
   useCreateContactIdentity,
   useEndContactRole,
   useUpdateContactIdentity,
-  useVerifyContactIdentity,
 } from "@lumiere/query-hooks/hooks/crm"
 import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/erp-shared/form-coercion"
-import type {
-  ContactIdentityKind,
-  ContactVerificationState,
-} from "@lumiere/stdb/types"
+import type { ContactIdentityKind } from "@lumiere/stdb/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -143,7 +138,6 @@ export function ContactIdentitiesPanel({
   const { data: roleRows = [], isLoading: rolesLoading } = useContactRoleAssignments(organization)
   const createIdentity = useCreateContactIdentity(organization)
   const updateIdentity = useUpdateContactIdentity(organization)
-  const verifyIdentity = useVerifyContactIdentity(organization)
   const archiveIdentity = useArchiveContactIdentity(organization)
   const assignRole = useAssignContactRole(organization)
   const endRole = useEndContactRole(organization)
@@ -177,7 +171,6 @@ export function ContactIdentitiesPanel({
       contactIdentityForm(t, {
         mode: editingIdentity ? "edit" : "create",
         kind: editingIdentity ? identityKind(editingIdentity) : "Primary",
-        verificationState: editingIdentity ? verificationState(editingIdentity) : "Unverified",
         isPreferred: editingIdentity
           ? Boolean(editingIdentity.isPreferred ?? editingIdentity.is_preferred)
           : true,
@@ -187,7 +180,6 @@ export function ContactIdentitiesPanel({
 
   const saveIdentity = async (formData: Record<string, unknown>) => {
     const rawValue = stringValue(formData.rawValue)
-    const state = stringValue(formData.verificationState) || "Unverified"
     try {
       setIdentityFormError(null)
       if (identityDialog === "create") {
@@ -197,7 +189,7 @@ export function ContactIdentitiesPanel({
           kind: enumValue<ContactIdentityKind>(stringValue(formData.kind) || "Primary"),
           rawValue,
           isPreferred: booleanValue(formData.isPreferred),
-          verificationState: enumValue<ContactVerificationState>(state),
+          verificationState: undefined,
           metadata: undefined,
         })
       } else if (editingIdentity) {
@@ -209,7 +201,7 @@ export function ContactIdentitiesPanel({
             companyId: companyId && companyId > 0n ? companyId : undefined,
             rawValue: rawValue || undefined,
             isPreferred: booleanValue(formData.isPreferred),
-            verificationState: enumValue<ContactVerificationState>(state),
+            verificationState: undefined,
             metadata: undefined,
           },
         })
@@ -252,20 +244,6 @@ export function ContactIdentitiesPanel({
     }
   }
 
-  const verify = async (row: Row) => {
-    const id = rowId(row)
-    if (id == null) return
-    try {
-      setActionError(null)
-      await verifyIdentity.mutateAsync({
-        identityId: id,
-        state: enumValue<ContactVerificationState>("Verified"),
-      })
-    } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "Unable to verify the phone identity")
-    }
-  }
-
   const finishRole = async (formData: Record<string, unknown>) => {
     const assignmentId = endingRole ? rowId(endingRole) : null
     if (assignmentId == null) return
@@ -286,7 +264,6 @@ export function ContactIdentitiesPanel({
   const mutationBusy =
     createIdentity.isPending ||
     updateIdentity.isPending ||
-    verifyIdentity.isPending ||
     archiveIdentity.isPending ||
     assignRole.isPending ||
     endRole.isPending
@@ -320,14 +297,11 @@ export function ContactIdentitiesPanel({
                     {Boolean(identity.isPreferred ?? identity.is_preferred) ? <Badge variant="secondary">Preferred</Badge> : null}
                   </div>
                   <span className="text-xs text-muted-foreground">The full number is never displayed in this workspace.</span>
+                  {state !== "Verified" ? (
+                    <span className="text-xs text-muted-foreground">Verification completes only after trusted OTP/provider proof.</span>
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-1">
-                  {state !== "Verified" ? (
-                    <Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => void verify(identity)}>
-                      <BadgeCheckIcon data-icon="inline-start" />
-                      Verify
-                    </Button>
-                  ) : null}
                   <Button size="icon-sm" variant="ghost" aria-label="Edit phone identity" onClick={() => { setActionError(null); setIdentityFormError(null); setIdentityDialog(identity) }}>
                     <PencilIcon />
                   </Button>

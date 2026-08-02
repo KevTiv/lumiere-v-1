@@ -645,7 +645,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "contact_communication_preference",
     aliases: ["contact-communication-preferences", "contact_communication_preference"],
     defaultRestricted: ["company_id", "quiet_hours_start", "quiet_hours_end", "updated_by", "metadata"],
-    mandatory: ["id", "organization_id", "contact_id"],
+    mandatory: ["id", "organization_id", "company_id", "contact_id"],
   },
   "contact-duplicate-candidates": {
     table: "contact_duplicate_candidate",
@@ -657,25 +657,25 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "contact_phone_identity",
     aliases: ["contact-phone-identities", "contact_phone_identity"],
     defaultRestricted: ["contact_id", "company_id", "normalized_e164", "created_by", "verified_at", "archived_at", "metadata"],
-    mandatory: ["id", "organization_id", "archived_at"],
+    mandatory: ["id", "organization_id", "company_id", "archived_at"],
   },
   "contact-relationship-insights": {
     table: "contact_relationship_insight",
     aliases: ["contact-relationship-insights", "contact_relationship_insight"],
     defaultRestricted: ["contact_id", "strength_score", "active_relationship_count", "hierarchy_depth", "related_contact_ids", "summary", "metadata"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "contact-relationships": {
     table: "contact_relationship",
     aliases: ["contact-relationships", "contact_relationship"],
     defaultRestricted: ["left_contact_id", "right_contact_id", "relationship_type", "notes", "metadata"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "contact-role-assignments": {
     table: "contact_role_assignment",
     aliases: ["contact-role-assignments", "contact_role_assignment"],
     defaultRestricted: ["contact_id", "company_id", "assigned_by", "ended_by", "metadata"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "contact-segment-rules": {
     table: "contact_segment_rule",
@@ -693,7 +693,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "contact_tag_assignment",
     aliases: ["contact-tag-assignments", "contact_tag_assignment"],
     defaultRestricted: ["contact_id", "tag_id", "metadata"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "contact-tags": {
     table: "contact_tag",
@@ -705,7 +705,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "contact",
     aliases: ["contacts", "contact"],
     defaultRestricted: ["name", "email", "phone", "parent_id", "company_id"],
-    mandatory: ["id", "organization_id", "deleted_at", "merge_target_id"],
+    mandatory: ["id", "organization_id", "company_id", "deleted_at", "merge_target_id"],
   },
   "contracts": {
     table: "hr_contract",
@@ -717,13 +717,13 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "crm_conversation_message",
     aliases: ["crm-conversation-messages", "crm_conversation_message"],
     defaultRestricted: ["conversation_id", "direction", "body", "status", "provider_message_id", "metadata"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "crm-conversations": {
     table: "crm_conversation",
     aliases: ["crm-conversations", "crm_conversation"],
     defaultRestricted: ["contact_id", "channel", "status", "last_preview", "assigned_user_id", "metadata"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "crm-forecast-snapshots": {
     table: "crm_forecast_snapshot",
@@ -1311,19 +1311,19 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "opportunity",
     aliases: ["opportunities", "opportunity"],
     defaultRestricted: ["name", "partner_id", "stage_id", "probability", "company_id"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "opportunity-lines": {
     table: "opportunity_line",
     aliases: ["opportunity-lines", "opportunity_line"],
     defaultRestricted: ["opportunity_id", "product_id", "name", "quantity", "uom_id", "price_unit", "price_subtotal", "discount"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "opportunity-presence": {
     table: "opportunity_presence",
     aliases: ["opportunity-presence", "opportunity_presence"],
     defaultRestricted: ["opportunity_id", "user_name", "last_seen"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "opportunity-stages": {
     table: "opp_stage",
@@ -1485,7 +1485,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "privacy_consent",
     aliases: ["privacy-consent", "privacy_consent"],
     defaultRestricted: ["contact_id", "consent_type", "granted", "ip_address", "user_agent", "metadata"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "product-categories": {
     table: "product_category",
@@ -1869,7 +1869,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     table: "segment_member",
     aliases: ["segment-members", "segment_member"],
     defaultRestricted: ["segment_id", "contact_id", "added_by", "metadata"],
-    mandatory: ["id", "organization_id"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "serial-lot-traceability": {
     table: "serial_lot_traceability",

@@ -17,7 +17,6 @@ const MAX_HIERARCHY_WALK: usize = 16;
 
 #[spacetimedb::table(
     accessor = contact_relationship_insight,
-    public,
     index(accessor = rel_insight_by_org, btree(columns = [organization_id])),
     index(accessor = rel_insight_by_contact, btree(columns = [contact_id]))
 )]
@@ -26,6 +25,7 @@ pub struct ContactRelationshipInsight {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub contact_id: u64,
     pub strength_score: i32,
     pub active_relationship_count: i32,
@@ -115,9 +115,7 @@ pub fn recompute_relationship_insights(
 
     let active_relationship_count = related.len() as i32;
     let depth = hierarchy_depth(ctx, organization_id, contact_id);
-    let strength_score = (active_relationship_count * 15 + depth * 5)
-        .min(100)
-        .max(0);
+    let strength_score = (active_relationship_count * 15 + depth * 5).min(100).max(0);
 
     let summary = format!(
         "{active_relationship_count} active relationship(s), hierarchy depth {depth}, strength {strength_score}"
@@ -129,6 +127,9 @@ pub fn recompute_relationship_insights(
         .insert(ContactRelationshipInsight {
             id: 0,
             organization_id,
+            company_id: contact_row
+                .company_id
+                .ok_or("Contact has no company scope")?,
             contact_id,
             strength_score,
             active_relationship_count,

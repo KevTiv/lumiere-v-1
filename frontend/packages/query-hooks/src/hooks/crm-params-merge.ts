@@ -5,9 +5,6 @@ import type {
   CreateContactTagParams,
   CreateLeadParams,
   CreateOpportunityParams,
-  UpdateContactAddressParams,
-  UpdateContactBusinessParams,
-  UpdateContactDetailsParams,
   UpdateContactCoreParams,
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
@@ -199,18 +196,68 @@ export function finalizeUpdateOpportunityParams(
   return pickDefined(partial);
 }
 
+/**
+ * Params for the `update_contact_address` reducer (CRM-RI-003). Hand-declared
+ * rather than imported from `@lumiere/stdb/types` because the backend reducer's
+ * fields are now `Option<Option<T>>` (three-state: omit=unchanged, null=clear,
+ * value=replace) without a `spacetime generate` pass in this sandbox — replace
+ * this with the generated type once bindings are regenerated.
+ *
+ * Unlike leads (CRM-RI-004), contacts keep three separate reducers
+ * (`update_contact_address`/`update_contact_business`/`update_contact_details`)
+ * — only the Option-nesting/patch semantics changed here, not the reducer split.
+ */
+export interface UpdateContactAddressParams {
+  street?: string | null
+  street2?: string | null
+  city?: string | null
+  stateCode?: string | null
+  zip?: string | null
+  countryCode?: string | null
+}
+
+/** Params for the `update_contact_business` reducer (CRM-RI-003). See {@link UpdateContactAddressParams} for why this is hand-declared. */
+export interface UpdateContactBusinessParams {
+  taxId?: string | null
+  companyRegistry?: string | null
+  industry?: string | null
+  employeesCount?: number | null
+  annualRevenue?: number | null
+}
+
+/** Params for the `update_contact_details` reducer (CRM-RI-003). See {@link UpdateContactAddressParams} for why this is hand-declared. */
+export interface UpdateContactDetailsParams {
+  firstName?: string | null
+  lastName?: string | null
+  title?: string | null
+  emailSecondary?: string | null
+  fax?: string | null
+  website?: string | null
+  description?: string | null
+  color?: string | null
+}
+
+/**
+ * Strip undefined (untouched) keys from an `update_contact_address` patch
+ * before `stdbParamsToJson`. Must be passed to `stdbParamsToJson` WITHOUT a
+ * `structName` — passing one would force every `Option` field absent from the
+ * object to be filled with an explicit "none" tag, which collapses "unchanged"
+ * into "clear" (see CRM-RI-003).
+ */
 export function finalizeUpdateContactAddressParams(
   partial: Partial<UpdateContactAddressParams>,
 ): UpdateContactAddressParams {
   return pickDefined(partial);
 }
 
+/** See {@link finalizeUpdateContactAddressParams} — same fix, applied to `update_contact_business`. */
 export function finalizeUpdateContactBusinessParams(
   partial: Partial<UpdateContactBusinessParams>,
 ): UpdateContactBusinessParams {
   return pickDefined(partial);
 }
 
+/** See {@link finalizeUpdateContactAddressParams} — same fix, applied to `update_contact_details`. */
 export function finalizeUpdateContactDetailsParams(
   partial: Partial<UpdateContactDetailsParams>,
 ): UpdateContactDetailsParams {
@@ -232,5 +279,46 @@ export function finalizeUpdateLeadAddressParams(
 export function finalizeUpdateLeadRevenueParams(
   partial: Partial<UpdateLeadRevenueParams>,
 ): UpdateLeadRevenueParams {
+  return pickDefined(partial);
+}
+
+/**
+ * Params for the atomic `update_lead` reducer (CRM-RI-004), covering the union
+ * of fields previously split across `update_lead_details`/`update_lead_address`/
+ * `update_lead_revenue`. Hand-declared rather than imported from `@lumiere/stdb/types`
+ * because the backend reducer was added without a `spacetime generate` pass
+ * (blocked by sandbox publish permissions) — replace this with the generated
+ * type once bindings are regenerated.
+ *
+ * Every field maps to a Rust `Option<Option<T>>` (or plain `Option<f64>` for the
+ * two revenue fields, which have no "clear" state) — omit a key to leave it
+ * unchanged, send `null` to explicitly clear, send a value to replace.
+ */
+export interface UpdateLeadParams {
+  contactName?: string | null
+  title?: string | null
+  website?: string | null
+  industry?: string | null
+  referredBy?: string | null
+  description?: string | null
+  street?: string | null
+  city?: string | null
+  zip?: string | null
+  countryCode?: string | null
+  expectedRevenue?: number
+  probability?: number
+}
+
+/**
+ * Strip undefined (untouched) keys from an `update_lead` patch before
+ * `stdbParamsToJson`. Unlike the three legacy `finalizeUpdateLead*` functions
+ * above, this must be passed to `stdbParamsToJson` WITHOUT a `structName` —
+ * passing one would force every `Option` field absent from the object to be
+ * filled with an explicit "none" tag, which collapses "unchanged" into
+ * "clear" (see CRM-RI-003). See `useUpdateAccountGroup` for the precedent.
+ */
+export function finalizeUpdateLeadParams(
+  partial: Partial<UpdateLeadParams>,
+): UpdateLeadParams {
   return pickDefined(partial);
 }

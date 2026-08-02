@@ -22,8 +22,8 @@ use crate::{
             IMPORT_MAPPING_SKILL_VERSION,
         },
         insights_scan::{
-            run_insights_scan, InsightsScanHarnessResult, InsightsScanInput, INSIGHTS_SCAN_SKILL_KEY,
-            INSIGHTS_SCAN_SKILL_VERSION,
+            run_insights_scan, InsightsScanHarnessResult, InsightsScanInput,
+            INSIGHTS_SCAN_SKILL_KEY, INSIGHTS_SCAN_SKILL_VERSION,
         },
         manifest::OrgPrivacyPolicy,
         policy_engine::PolicyEngine,

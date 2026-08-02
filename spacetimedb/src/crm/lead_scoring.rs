@@ -17,7 +17,6 @@ pub const LEAD_SCORE_FORMULA_VERSION: &str = "v1-deterministic";
 
 #[spacetimedb::table(
     accessor = lead_score,
-    public,
     index(accessor = lead_score_by_org, btree(columns = [organization_id])),
     index(accessor = lead_score_by_lead, btree(columns = [lead_id]))
 )]
@@ -36,7 +35,6 @@ pub struct LeadScore {
 
 #[spacetimedb::table(
     accessor = lead_score_factor,
-    public,
     index(accessor = lead_score_factor_by_org, btree(columns = [organization_id])),
     index(accessor = lead_score_factor_by_lead, btree(columns = [lead_id]))
 )]
@@ -175,12 +173,7 @@ pub fn recompute_lead_score(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "lead", "write")?;
 
-    let lead_row = ctx
-        .db
-        .lead()
-        .id()
-        .find(&lead_id)
-        .ok_or("Lead not found")?;
+    let lead_row = ctx.db.lead().id().find(&lead_id).ok_or("Lead not found")?;
     if lead_row.organization_id != organization_id {
         return Err("Lead does not belong to this organization".to_string());
     }

@@ -41,10 +41,7 @@ fn apply_pattern_lz(s: &str) -> String {
     let mut out = String::new();
     for (i, ch) in chars.iter().enumerate() {
         if ch.is_ascii_lowercase() {
-            if chars
-                .get(i + 1)
-                .is_some_and(|next| next.is_ascii_digit())
-            {
+            if chars.get(i + 1).is_some_and(|next| next.is_ascii_digit()) {
                 out.push(*ch);
                 out.push('_');
                 continue;
@@ -80,8 +77,7 @@ fn apply_pattern_az_z(s: &str) -> String {
     let chars: Vec<char> = s.chars().collect();
     let mut out = String::new();
     for (i, ch) in chars.iter().enumerate() {
-        let prev_is_lower_or_digit =
-            ch.is_ascii_lowercase() || ch.is_ascii_digit();
+        let prev_is_lower_or_digit = ch.is_ascii_lowercase() || ch.is_ascii_digit();
         if prev_is_lower_or_digit {
             if chars
                 .get(i + 1)
@@ -116,9 +112,7 @@ fn table_file_to_type_name(filename: &str) -> Option<String> {
                 let mut chars = part.chars();
                 match chars.next() {
                     None => String::new(),
-                    Some(first) => {
-                        first.to_uppercase().collect::<String>() + chars.as_str()
-                    }
+                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
                 }
             })
             .collect(),
@@ -304,8 +298,7 @@ pub fn parse_types_ts_columns(types_ts: &str) -> BTreeMap<String, Vec<String>> {
             search_from = abs + marker.len();
             continue;
         };
-        let body_start =
-            abs + marker.len() + eq + " = __t.object(".len() + open_brace + 1;
+        let body_start = abs + marker.len() + eq + " = __t.object(".len() + open_brace + 1;
 
         let mut depth = 1i32;
         let mut i = body_start;
@@ -373,10 +366,7 @@ pub fn emit_sql_columns_json(types_ts: &str, generated_dir: &Path) -> Result<Str
 
     let mut root = Map::new();
     for (k, v) in merged {
-        root.insert(
-            k,
-            Value::Array(v.into_iter().map(Value::String).collect()),
-        );
+        root.insert(k, Value::Array(v.into_iter().map(Value::String).collect()));
     }
     serde_json::to_string_pretty(&Value::Object(root))
         .map(|s| format!("{s}\n"))

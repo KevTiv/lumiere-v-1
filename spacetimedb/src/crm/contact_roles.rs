@@ -13,7 +13,6 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 #[spacetimedb::table(
     accessor = contact_role_assignment,
-    public,
     index(accessor = contact_role_by_org, btree(columns = [organization_id])),
     index(accessor = contact_role_by_contact, btree(columns = [contact_id])),
     index(accessor = contact_role_by_contact_role, btree(columns = [contact_id, role]))
@@ -133,8 +132,14 @@ pub fn assign_contact_role(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact_role_assignment", "create")?;
 
-    let _contact = load_active_contact(ctx, organization_id, params.contact_id)?;
+    let contact = load_active_contact(ctx, organization_id, params.contact_id)?;
     validate_company_scope(ctx, organization_id, params.company_id)?;
+    let company_id = params
+        .company_id
+        .ok_or("Contact role requires an exact company scope")?;
+    if contact.company_id != Some(company_id) {
+        return Err("Contact does not belong to this company".to_string());
+    }
 
     let role = validate_role(&params.role)?;
 
@@ -147,7 +152,7 @@ pub fn assign_contact_role(
         .filter(&params.contact_id)
         .find(|a| {
             a.organization_id == organization_id
-                && a.company_id == params.company_id
+                && a.company_id == Some(company_id)
                 && a.role == role
                 && a.is_active
         });
@@ -163,11 +168,14 @@ pub fn assign_contact_role(
             changed.push("active_until".to_string());
         }
 
-        ctx.db.contact_role_assignment().id().update(ContactRoleAssignment {
-            active_from: new_active_from,
-            active_until: new_active_until,
-            ..existing.clone()
-        });
+        ctx.db
+            .contact_role_assignment()
+            .id()
+            .update(ContactRoleAssignment {
+                active_from: new_active_from,
+                active_until: new_active_until,
+                ..existing.clone()
+            });
 
         write_audit_log_v2(
             ctx,
@@ -201,27 +209,30 @@ pub fn assign_contact_role(
 
     let active_from = params.active_from.unwrap_or(ctx.timestamp);
 
-    let assignment = ctx.db.contact_role_assignment().insert(ContactRoleAssignment {
-        id: 0,
-        organization_id,
-        company_id: params.company_id,
-        contact_id: params.contact_id,
-        role: role.clone(),
-        active_from,
-        active_until: params.active_until,
-        is_active: true,
-        assigned_by: ctx.sender(),
-        assigned_at: ctx.timestamp,
-        ended_at: None,
-        ended_by: None,
-        metadata: params.metadata,
-    });
+    let assignment = ctx
+        .db
+        .contact_role_assignment()
+        .insert(ContactRoleAssignment {
+            id: 0,
+            organization_id,
+            company_id: Some(company_id),
+            contact_id: params.contact_id,
+            role: role.clone(),
+            active_from,
+            active_until: params.active_until,
+            is_active: true,
+            assigned_by: ctx.sender(),
+            assigned_at: ctx.timestamp,
+            ended_at: None,
+            ended_by: None,
+            metadata: params.metadata,
+        });
 
     write_audit_log_v2(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: params.company_id,
+            company_id: Some(company_id),
             table_name: "contact_role_assignment",
             record_id: assignment.id,
             action: "CREATE",
@@ -272,18 +283,22 @@ pub fn end_contact_role(
         return Err("Role assignment is already ended".to_string());
     }
 
-    let reason_metadata = params.reason.as_ref().map(|r| {
-        serde_json::json!({ "end_reason": r }).to_string()
-    });
+    let reason_metadata = params
+        .reason
+        .as_ref()
+        .map(|r| serde_json::json!({ "end_reason": r }).to_string());
 
-    ctx.db.contact_role_assignment().id().update(ContactRoleAssignment {
-        is_active: false,
-        active_until: Some(ctx.timestamp),
-        ended_at: Some(ctx.timestamp),
-        ended_by: Some(ctx.sender()),
-        metadata: reason_metadata.clone(),
-        ..assignment.clone()
-    });
+    ctx.db
+        .contact_role_assignment()
+        .id()
+        .update(ContactRoleAssignment {
+            is_active: false,
+            active_until: Some(ctx.timestamp),
+            ended_at: Some(ctx.timestamp),
+            ended_by: Some(ctx.sender()),
+            metadata: reason_metadata.clone(),
+            ..assignment.clone()
+        });
 
     write_audit_log_v2(
         ctx,
@@ -318,6 +333,8 @@ pub fn active_roles_for_contact(
         .contact_role_assignment()
         .contact_role_by_contact()
         .filter(&contact_id)
-        .filter(|a| a.is_active && (a.active_until.is_none() || a.active_until > Some(ctx.timestamp)))
+        .filter(|a| {
+            a.is_active && (a.active_until.is_none() || a.active_until > Some(ctx.timestamp))
+        })
         .collect()
 }

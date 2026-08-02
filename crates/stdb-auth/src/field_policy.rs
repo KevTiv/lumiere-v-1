@@ -55,7 +55,11 @@ static HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
     m.insert(
         "activities".to_string(),
         [
-            "user_id", "assigned_to", "created_by", "date_deadline", "date_done",
+            "user_id",
+            "assigned_to",
+            "created_by",
+            "date_deadline",
+            "date_done",
         ]
         .into_iter()
         .map(String::from)
@@ -106,10 +110,7 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
     m
 });
 
-fn filter_http_sql_unsafe_columns(
-    cols: &[String],
-    resource_key: Option<&str>,
-) -> Vec<String> {
+fn filter_http_sql_unsafe_columns(cols: &[String], resource_key: Option<&str>) -> Vec<String> {
     let resource_excluded = resource_key.and_then(|k| HTTP_SQL_EXCLUDED_COLUMNS.get(k));
     let resource_included = resource_key.and_then(|k| HTTP_SQL_INCLUDED_COLUMNS.get(k));
     cols.iter()
@@ -177,9 +178,9 @@ fn field_resource_matches(configured: &str, resource_key: &str) -> bool {
     let Some(reg) = registry_get(resource_key) else {
         return false;
     };
-    reg.aliases.iter().any(|a| {
-        a == configured || a.replace('-', "_") == configured_norm
-    })
+    reg.aliases
+        .iter()
+        .any(|a| a == configured || a.replace('-', "_") == configured_norm)
 }
 
 fn field_permission_applies(rule: &FieldPermissionLike, ctx: &FieldAccessContext) -> bool {
@@ -261,7 +262,11 @@ const HR_CONTRACT_COMP: &[&str] = &["wage"];
 const HR_PAYSLIP_COMP: &[&str] = &["basic_wage", "gross_wage", "net_wage"];
 const HR_STATUTORY_ID_VALUE: &str = "value";
 
-pub fn has_hr_permission(field_access: Option<&FieldAccessContext>, resource: &str, action: &str) -> bool {
+pub fn has_hr_permission(
+    field_access: Option<&FieldAccessContext>,
+    resource: &str,
+    action: &str,
+) -> bool {
     let Some(fa) = field_access else {
         return false;
     };
@@ -270,9 +275,9 @@ pub fn has_hr_permission(field_access: Option<&FieldAccessContext>, resource: &s
     }
     let perm = format!("{resource}:{action}");
     let wildcard = format!("{resource}:*");
-    fa.role_permissions.iter().any(|p| {
-        p == "*:*" || p == &perm || p == &wildcard
-    })
+    fa.role_permissions
+        .iter()
+        .any(|p| p == "*:*" || p == &perm || p == &wildcard)
 }
 
 /// Strip `pin` from broad feeds; gate wages behind `view_comp`; sensitive PII behind purpose/resource.
@@ -374,7 +379,8 @@ pub fn resolve_http_sql_columns(
     field_access: Option<&FieldAccessContext>,
 ) -> Result<Vec<String>, String> {
     let restricted = resolve_read_columns(resource_key, field_access)?;
-    let reg = registry_get(resource_key).ok_or_else(|| format!("unknown resource: {resource_key}"))?;
+    let reg =
+        registry_get(resource_key).ok_or_else(|| format!("unknown resource: {resource_key}"))?;
     let cols = if let Some(cols) = restricted {
         cols
     } else {
@@ -536,8 +542,8 @@ mod tests {
 
     #[test]
     fn resolve_http_sql_columns_includes_deleted_at_for_product_categories() {
-        let cols =
-            resolve_http_sql_columns("product-categories", None).expect("product-categories columns");
+        let cols = resolve_http_sql_columns("product-categories", None)
+            .expect("product-categories columns");
         assert!(
             cols.iter().any(|c| c == "deleted_at"),
             "expected deleted_at in product-categories projection, got: {cols:?}"
@@ -546,8 +552,8 @@ mod tests {
 
     #[test]
     fn resolve_http_sql_columns_includes_qty_fields_for_purchase_order_lines() {
-        let cols =
-            resolve_http_sql_columns("purchase-order-lines", None).expect("purchase-order-lines columns");
+        let cols = resolve_http_sql_columns("purchase-order-lines", None)
+            .expect("purchase-order-lines columns");
         for field in ["qty_received", "qty_invoiced", "qty_to_invoice"] {
             assert!(
                 cols.iter().any(|c| c == field),
@@ -567,8 +573,8 @@ mod tests {
 
     #[test]
     fn resolve_http_sql_columns_excludes_requirements_for_opportunity_stages() {
-        let cols =
-            resolve_http_sql_columns("opportunity-stages", None).expect("opportunity-stages columns");
+        let cols = resolve_http_sql_columns("opportunity-stages", None)
+            .expect("opportunity-stages columns");
         assert!(
             !cols.iter().any(|c| c == "requirements"),
             "requirements must be excluded from HTTP SQL, got: {cols:?}"

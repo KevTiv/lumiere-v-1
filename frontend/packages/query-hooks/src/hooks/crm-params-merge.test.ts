@@ -11,6 +11,7 @@ import {
   finalizeUpdateContactParams,
   finalizeUpdateLeadAddressParams,
   finalizeUpdateLeadDetailsParams,
+  finalizeUpdateLeadParams,
   finalizeUpdateLeadRevenueParams,
   finalizeUpdateOpportunityParams,
 } from "./crm-params-merge"
@@ -92,6 +93,19 @@ describe("finalizeUpdateContactAddressParams", () => {
     assert.ok(!("street" in params))
     assert.ok(!("zip" in params))
   })
+
+  it("omits untouched fields instead of nulling them (CRM-RI-003)", () => {
+    // Regression test: editing only `city` must never clear sibling fields
+    // like `street2` — the bug this reducer/hook pair was built to fix.
+    const params = finalizeUpdateContactAddressParams({ city: "Paris" })
+    assert.deepEqual(params, { city: "Paris" })
+    assert.ok(!("street2" in params))
+  })
+
+  it("preserves an explicit null as a clear instruction", () => {
+    const params = finalizeUpdateContactAddressParams({ street2: null })
+    assert.deepEqual(params, { street2: null })
+  })
 })
 
 describe("finalizeUpdateContactBusinessParams", () => {
@@ -100,6 +114,17 @@ describe("finalizeUpdateContactBusinessParams", () => {
     assert.deepEqual(params, { industry: "Tech" })
     assert.ok(!("annualRevenue" in params))
   })
+
+  it("omits untouched fields instead of nulling them (CRM-RI-003)", () => {
+    const params = finalizeUpdateContactBusinessParams({ industry: "Tech" })
+    assert.deepEqual(params, { industry: "Tech" })
+    assert.ok(!("taxId" in params))
+  })
+
+  it("preserves an explicit null as a clear instruction", () => {
+    const params = finalizeUpdateContactBusinessParams({ annualRevenue: null })
+    assert.deepEqual(params, { annualRevenue: null })
+  })
 })
 
 describe("finalizeUpdateContactDetailsParams", () => {
@@ -107,6 +132,17 @@ describe("finalizeUpdateContactDetailsParams", () => {
     const params = finalizeUpdateContactDetailsParams({ title: "CEO" })
     assert.deepEqual(params, { title: "CEO" })
     assert.ok(!("firstName" in params))
+  })
+
+  it("omits untouched fields instead of nulling them (CRM-RI-003)", () => {
+    const params = finalizeUpdateContactDetailsParams({ title: "CEO" })
+    assert.deepEqual(params, { title: "CEO" })
+    assert.ok(!("website" in params))
+  })
+
+  it("preserves an explicit null as a clear instruction", () => {
+    const params = finalizeUpdateContactDetailsParams({ fax: null })
+    assert.deepEqual(params, { fax: null })
   })
 })
 
@@ -131,5 +167,31 @@ describe("finalizeUpdateLeadRevenueParams", () => {
     const params = finalizeUpdateLeadRevenueParams({ expectedRevenue: 5000 })
     assert.deepEqual(params, { expectedRevenue: 5000 })
     assert.ok(!("probability" in params))
+  })
+})
+
+describe("finalizeUpdateLeadParams", () => {
+  it("omits untouched fields instead of nulling them (CRM-RI-003)", () => {
+    // Regression test: editing only `title` must never clear sibling fields
+    // like `website` — the bug this reducer/hook pair was built to fix.
+    const params = finalizeUpdateLeadParams({ title: "VP Sales" })
+    assert.deepEqual(params, { title: "VP Sales" })
+    assert.ok(!("website" in params))
+    assert.ok(!("contactName" in params))
+  })
+
+  it("preserves an explicit null as a clear instruction", () => {
+    const params = finalizeUpdateLeadParams({ referredBy: null })
+    assert.deepEqual(params, { referredBy: null })
+  })
+
+  it("drops undefined keys but keeps null and real values side by side", () => {
+    const params = finalizeUpdateLeadParams({
+      city: "Lyon",
+      street: null,
+      zip: undefined,
+    })
+    assert.deepEqual(params, { city: "Lyon", street: null })
+    assert.ok(!("zip" in params))
   })
 })

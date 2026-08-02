@@ -14,7 +14,8 @@ use crate::session::normalize_identity_hex_for_sql;
 use stdb_auth::{identity_sql_literal, FieldAccessContext};
 use stdb_client::StdbClient;
 
-const HUMAN_TASK_LIST_COLS: &str = "id, organization_id, company_id, workflow_id, workflow_version_id, \
+const HUMAN_TASK_LIST_COLS: &str =
+    "id, organization_id, company_id, workflow_id, workflow_version_id, \
 workflow_instance_id, token_id, node_id, node_key, kind, assignment, candidate_role_ids, \
 candidate_group_ids, candidate_unit_ids, require_comment_on_reject, subject_model, subject_id, \
 condition_revision_hash, subject_revision_hash, guarded_action, status, revision, requested_by, \
@@ -30,19 +31,23 @@ input_hash, subject_revision_hash, comment, domain_receipt, correlation_id, reco
 const WORKFLOW_COLS: &str =
     "id, organization_id, company_id, workflow_key, model, create_uid, create_date";
 
-const WORKFLOW_VERSION_COLS: &str = "id, organization_id, company_id, workflow_id, version, status, \
+const WORKFLOW_VERSION_COLS: &str =
+    "id, organization_id, company_id, workflow_id, version, status, \
 schema_version, draft_revision, name, description, trigger, content_hash, create_uid, create_date, \
 published_uid, published_date, retired_uid, retired_date, metadata";
 
-const WORKFLOW_NODE_COLS: &str = "id, organization_id, company_id, workflow_id, workflow_version_id, \
+const WORKFLOW_NODE_COLS: &str =
+    "id, organization_id, company_id, workflow_id, workflow_version_id, \
 node_key, name, kind, sequence, split_kind, join_kind, create_uid, create_date, write_uid, \
 write_date, metadata";
 
-const WORKFLOW_EDGE_COLS: &str = "id, organization_id, company_id, workflow_id, workflow_version_id, \
+const WORKFLOW_EDGE_COLS: &str =
+    "id, organization_id, company_id, workflow_id, workflow_version_id, \
 edge_key, from_node_key, to_node_key, sequence, create_uid, create_date, write_uid, write_date, \
 metadata";
 
-const WORKFLOW_INSTANCE_COLS: &str = "id, organization_id, company_id, workflow_id, workflow_version_id, \
+const WORKFLOW_INSTANCE_COLS: &str =
+    "id, organization_id, company_id, workflow_id, workflow_version_id, \
 definition_hash, subject_model, subject_id, subject_revision_hash, state, revision, \
 active_token_count, singleton_scope_key, started_by, started_at, completed_at, cancelled_by, \
 cancelled_at, correlation_id, causation_id";
@@ -55,7 +60,8 @@ const OUTBOX_COLS: &str = "id, organization_id, company_id, instance_id, token_i
 expected_token_revision, edge_id, action_key, semantic_key, delivery_guarantee, queue_job_id, \
 status, revision, error_summary, completed_at, correlation_id, created_at";
 
-const DECISION_EVENT_COLS: &str = "id, organization_id, company_id, workflow_id, workflow_version_id, \
+const DECISION_EVENT_COLS: &str =
+    "id, organization_id, company_id, workflow_id, workflow_version_id, \
 instance_id, token_id, result_token_id, prior_node_key, next_node_key, command_kind, \
 prior_instance_state, next_instance_state, actor, authorization_outcome, action_key, \
 prior_revision, next_revision, idempotency_key, domain_receipt, reason, correlation_id, \
@@ -155,9 +161,13 @@ pub async fn execute_private_workflow_query(
             Ok(Some(rows))
         }
         "workflow-versions" => {
-            let rows =
-                query_org_table(owner, "workflow_version", WORKFLOW_VERSION_COLS, organization_id)
-                    .await?;
+            let rows = query_org_table(
+                owner,
+                "workflow_version",
+                WORKFLOW_VERSION_COLS,
+                organization_id,
+            )
+            .await?;
             let company_ids = allowed_company_ids(owner, organization_id, field_access).await?;
             let mut rows: Vec<Value> = rows
                 .into_iter()
@@ -168,8 +178,8 @@ pub async fn execute_private_workflow_query(
             Ok(Some(rows))
         }
         "workflow-nodes" => {
-            let rows =
-                query_org_table(owner, "workflow_node", WORKFLOW_NODE_COLS, organization_id).await?;
+            let rows = query_org_table(owner, "workflow_node", WORKFLOW_NODE_COLS, organization_id)
+                .await?;
             let company_ids = allowed_company_ids(owner, organization_id, field_access).await?;
             let mut rows: Vec<Value> = rows
                 .into_iter()
@@ -179,8 +189,8 @@ pub async fn execute_private_workflow_query(
             Ok(Some(rows))
         }
         "workflow-edges" => {
-            let rows =
-                query_org_table(owner, "workflow_edge", WORKFLOW_EDGE_COLS, organization_id).await?;
+            let rows = query_org_table(owner, "workflow_edge", WORKFLOW_EDGE_COLS, organization_id)
+                .await?;
             let company_ids = allowed_company_ids(owner, organization_id, field_access).await?;
             let mut rows: Vec<Value> = rows
                 .into_iter()
@@ -190,9 +200,13 @@ pub async fn execute_private_workflow_query(
             Ok(Some(rows))
         }
         "workflow-instances" => {
-            let rows =
-                query_org_table(owner, "workflow_instance", WORKFLOW_INSTANCE_COLS, organization_id)
-                    .await?;
+            let rows = query_org_table(
+                owner,
+                "workflow_instance",
+                WORKFLOW_INSTANCE_COLS,
+                organization_id,
+            )
+            .await?;
             let company_ids = allowed_company_ids(owner, organization_id, field_access).await?;
             let mut rows: Vec<Value> = rows
                 .into_iter()
@@ -678,9 +692,7 @@ async fn allowed_company_ids(
 ) -> Result<HashSet<u64>, ApiError> {
     // Reuse org companies; FieldAccessContext does not currently carry a selected
     // operating company — UI filters further by query key. BFF enforces membership.
-    let sql = format!(
-        "SELECT id FROM company WHERE organization_id = {organization_id}"
-    );
+    let sql = format!("SELECT id FROM company WHERE organization_id = {organization_id}");
     let rows = owner
         .query_sql(&sql)
         .await

@@ -6,6 +6,25 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
+const EXACT_COMPANY_CRM_TABLES: &[&str] = &[
+    "contact",
+    "opportunity",
+    "opportunity_line",
+    "opportunity_presence",
+    "contact_phone_identity",
+    "contact_role_assignment",
+    "contact_communication_preference",
+    "contact_tag_assignment",
+    "segment_member",
+    "privacy_consent",
+    "contact_relationship_insight",
+    "contact_relationship",
+    "contact_duplicate_candidate",
+    "crm_forecast_snapshot",
+    "crm_conversation",
+    "crm_conversation_message",
+];
+
 fn snake_to_pascal(table: &str) -> String {
     table
         .split('_')
@@ -56,7 +75,25 @@ fn main() {
             continue;
         }
         let tf = fs::read_to_string(&table_file).unwrap_or_default();
+        let row_type_file = bindings_dir.join(format!("{table}_type.rs"));
+        let row_tf = fs::read_to_string(row_type_file).unwrap_or_default();
         let has_update = tf.contains("TableWithPrimaryKey");
+        let company_filter = if row_tf.contains("pub company_id: Option<u64>")
+            || row_tf.contains("pub company_id: Option::<u64>")
+        {
+            // CRM rows with an optional company column are exact-owned. `None`
+            // is legacy/unscoped data and must never produce a company-scoped
+            // browser invalidation.
+            "company_id.map_or(true, |company_id| _row.company_id == Some(company_id))"
+        } else if row_tf.contains("pub company_id: u64") {
+            "company_id.map_or(true, |company_id| _row.company_id == company_id)"
+        } else if EXACT_COMPANY_CRM_TABLES.contains(&table.as_str()) {
+            panic!(
+                "realtime exact-company table {table} has no company_id in generated row bindings"
+            );
+        } else {
+            "true"
+        };
 
         let method = table.replace('-', "_");
         let update_block = if has_update {
@@ -66,11 +103,19 @@ fn main() {
             let r = r.clone();
             let tx = tx.clone();
             move |_ctx, _old, _row| {{
-                crate::realtime::notify_row_change(&tx, "update", "{table}", &r);
+                if matches!(
+                    &_ctx.event,
+                    spacetimedb_sdk::Event::Transaction | spacetimedb_sdk::Event::Reducer(_)
+                )
+                    && {company_filter}
+                {{
+                    crate::realtime::notify_row_change(&tx, "update", "{table}", &r);
+                }}
             }}
         }});"#,
                 method = method,
                 table = table,
+                company_filter = company_filter,
             )
         } else {
             String::new()
@@ -93,14 +138,28 @@ fn main() {
                 let r = r.clone();
                 let tx = tx.clone();
                 move |_ctx, _row| {{
-                    crate::realtime::notify_row_change(&tx, "insert", "{table}", &r);
+                    if matches!(
+                        &_ctx.event,
+                        spacetimedb_sdk::Event::Transaction | spacetimedb_sdk::Event::Reducer(_)
+                    )
+                        && {company_filter}
+                    {{
+                        crate::realtime::notify_row_change(&tx, "insert", "{table}", &r);
+                    }}
                 }}
             }});
             c.db.{method}().on_delete({{
                 let r = r.clone();
                 let tx = tx.clone();
                 move |_ctx, _row| {{
-                    crate::realtime::notify_row_change(&tx, "delete", "{table}", &r);
+                    if matches!(
+                        &_ctx.event,
+                        spacetimedb_sdk::Event::Transaction | spacetimedb_sdk::Event::Reducer(_)
+                    )
+                        && {company_filter}
+                    {{
+                        crate::realtime::notify_row_change(&tx, "delete", "{table}", &r);
+                    }}
                 }}
             }});
             {update_block}
@@ -111,6 +170,7 @@ fn main() {
             method = method,
             twpk = twpk,
             update_block = update_block,
+            company_filter = company_filter,
         ));
     }
 
@@ -123,6 +183,7 @@ pub(crate) fn wire_realtime_table_callbacks(
     c: &DbConnection,
     table: &str,
     resources: &[String],
+    company_id: Option<u64>,
     tx: &tokio::sync::mpsc::UnboundedSender<String>,
 ) -> Result<(), String> {{
     match table {{

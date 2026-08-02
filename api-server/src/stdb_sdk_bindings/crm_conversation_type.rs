@@ -11,8 +11,10 @@ use super::message_channel_type::MessageChannel;
 pub struct CrmConversation {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub contact_id: u64,
     pub channel: MessageChannel,
+    pub provider_account_id: Option<u64>,
     pub phone_identity_id: Option<u64>,
     pub status: String,
     pub assigned_user_id: Option<__sdk::Identity>,
@@ -35,8 +37,10 @@ impl __sdk::InModule for CrmConversation {
 pub struct CrmConversationCols {
     pub id: __sdk::__query_builder::Col<CrmConversation, u64>,
     pub organization_id: __sdk::__query_builder::Col<CrmConversation, u64>,
+    pub company_id: __sdk::__query_builder::Col<CrmConversation, u64>,
     pub contact_id: __sdk::__query_builder::Col<CrmConversation, u64>,
     pub channel: __sdk::__query_builder::Col<CrmConversation, MessageChannel>,
+    pub provider_account_id: __sdk::__query_builder::Col<CrmConversation, Option<u64>>,
     pub phone_identity_id: __sdk::__query_builder::Col<CrmConversation, Option<u64>>,
     pub status: __sdk::__query_builder::Col<CrmConversation, String>,
     pub assigned_user_id: __sdk::__query_builder::Col<CrmConversation, Option<__sdk::Identity>>,
@@ -55,8 +59,13 @@ impl __sdk::__query_builder::HasCols for CrmConversation {
         CrmConversationCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             contact_id: __sdk::__query_builder::Col::new(table_name, "contact_id"),
             channel: __sdk::__query_builder::Col::new(table_name, "channel"),
+            provider_account_id: __sdk::__query_builder::Col::new(
+                table_name,
+                "provider_account_id",
+            ),
             phone_identity_id: __sdk::__query_builder::Col::new(table_name, "phone_identity_id"),
             status: __sdk::__query_builder::Col::new(table_name, "status"),
             assigned_user_id: __sdk::__query_builder::Col::new(table_name, "assigned_user_id"),

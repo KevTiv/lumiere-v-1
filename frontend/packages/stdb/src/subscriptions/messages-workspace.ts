@@ -9,7 +9,6 @@ export const MESSAGES_WORKSPACE_RESOURCE_KEYS = [
   "message-templates",
   "operational-messages",
   "message-batches",
-  "contact-communication-preferences",
 ] as const;
 
 export type MessagesWorkspaceResourceKey =

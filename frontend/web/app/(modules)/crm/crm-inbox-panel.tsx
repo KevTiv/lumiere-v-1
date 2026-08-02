@@ -6,6 +6,7 @@ import { MessageCircleIcon, SendIcon } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   useAppendCrmConversationMessage,
+  useContactPhoneIdentities,
   useCrmConversationMessages,
   useCrmConversations,
   useOpenCrmConversation,
@@ -41,6 +42,14 @@ function channelTag(value: unknown): string {
   return String(value ?? "")
 }
 
+function isPhoneIdentityUsable(row: Row, contactId: bigint): boolean {
+  if (asId(row.contactId ?? row.contact_id) !== contactId) return false
+  if (optionValue(row.archivedAt ?? row.archived_at) != null) return false
+  const kind = channelTag(row.kind)
+  const state = channelTag(row.verificationState ?? row.verification_state)
+  return (kind === "WhatsApp" || kind === "Primary") && state !== "OptedOut"
+}
+
 export interface CrmInboxPanelProps {
   organizationId: number
   contactId: bigint
@@ -51,6 +60,7 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
   const organization = BigInt(organizationId)
   const { data: conversations = [], isLoading } = useCrmConversations(organization)
   const { data: messages = [] } = useCrmConversationMessages(organization)
+  const { data: phoneIdentities = [] } = useContactPhoneIdentities(organization)
   const openConversation = useOpenCrmConversation(organization)
   const appendMessage = useAppendCrmConversationMessage(organization)
   const updateConversation = useUpdateCrmConversation(organization)
@@ -66,6 +76,14 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
   }, [conversations, contactId])
 
   const conversationId = conversation ? asId(conversation.id) : null
+
+  const phoneIdentityId = useMemo(() => {
+    const candidates = (phoneIdentities as Row[]).filter((row) =>
+      isPhoneIdentityUsable(row, contactId),
+    )
+    const preferred = candidates.find((row) => Boolean(row.isPreferred ?? row.is_preferred))
+    return preferred ? asId(preferred.id) : candidates[0] ? asId(candidates[0].id) : null
+  }, [contactId, phoneIdentities])
 
   const thread = useMemo(() => {
     if (!conversationId) return []
@@ -88,12 +106,12 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
           {!conversation ? (
             <Button
               size="sm"
-              disabled={openConversation.isPending}
+              disabled={openConversation.isPending || phoneIdentityId == null}
               onClick={() =>
                 openConversation.mutate({
                   contactId,
                   channel: { tag: "WhatsApp" },
-                  phoneIdentityId: undefined,
+                  phoneIdentityId: phoneIdentityId ?? undefined,
                   externalThreadId: undefined,
                   assignedUserId: undefined,
                   metadata: undefined,

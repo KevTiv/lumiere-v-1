@@ -81,11 +81,37 @@ fn row_id_u64(row: &Value) -> u64 {
         .unwrap_or(0)
 }
 
+fn optional_u64(value: Option<&Value>) -> Option<u64> {
+    let value = value?;
+    value
+        .as_u64()
+        .or_else(|| value.as_str().and_then(|s| s.parse().ok()))
+        .or_else(|| {
+            value
+                .as_object()
+                .and_then(|obj| obj.get("some").or_else(|| obj.get("Some")))
+                .and_then(|some| {
+                    some.as_array()
+                        .and_then(|values| values.first())
+                        .or(Some(some))
+                })
+                .and_then(|inner| {
+                    inner
+                        .as_u64()
+                        .or_else(|| inner.as_str().and_then(|s| s.parse().ok()))
+                })
+        })
+}
+
+fn row_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
+    optional_u64(row.get(camel).or_else(|| row.get(snake)))
+}
+
 fn sort_rows_by_id_desc(rows: &mut [Value]) {
     rows.sort_by(|a, b| row_id_u64(b).cmp(&row_id_u64(a)));
 }
 
-async fn company_ids_for_organization(
+pub(crate) async fn company_ids_for_organization(
     client: &StdbClient,
     org_id: u64,
     fa: Option<&FieldAccessContext>,
@@ -157,6 +183,146 @@ pub async fn default_company_id(client: &StdbClient, org_id: u64) -> Result<Opti
         .next())
 }
 
+/// Resolve the only CRM company visible to this authenticated membership.
+///
+/// A company-bound membership is restricted to that company. An organization-level
+/// membership deliberately falls back to the default company; it does not imply an
+/// all-companies grant. A requested browser company is treated as intent and must
+/// equal the server-derived scope.
+pub async fn resolve_crm_company_id(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    requested_company_id: Option<u64>,
+) -> Result<u64, ApiError> {
+    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let sql = format!(
+        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
+    );
+    let memberships = client
+        .query_sql(&sql)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let membership = memberships
+        .first()
+        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
+
+    let membership_company = row_u64(membership, "companyId", "company_id");
+    let allowed = match membership_company {
+        Some(company_id) if company_id > 0 => company_id,
+        _ => default_company_id(client, organization_id)
+            .await?
+            .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
+    };
+
+    if requested_company_id.is_some_and(|requested| requested != allowed) {
+        return Err(ApiError::Forbidden(
+            "Cannot query another company's CRM data".into(),
+        ));
+    }
+    Ok(allowed)
+}
+
+pub(crate) fn crm_resource(resource: &str) -> bool {
+    matches!(
+        resource,
+        "leads"
+            | "lead-sources"
+            | "lead-lost-reasons"
+            | "opportunities"
+            | "opportunity-stages"
+            | "opportunity-lines"
+            | "opportunity-presence"
+            | "contacts"
+            | "contact-phone-identities"
+            | "contact-role-assignments"
+            | "contact-tags"
+            | "contact-tag-assignments"
+            | "contact-segments"
+            | "segment-members"
+            | "contact-relationships"
+            | "contact-duplicate-candidates"
+            | "assignment-rules"
+            | "activities"
+            | "calendar-events"
+            | "utm-campaigns"
+            | "utm-media"
+            | "utm-sources"
+            | "privacy-consent"
+            | "contact-communication-preferences"
+            | "crm-forecast-snapshots"
+            | "lead-scores"
+            | "lead-score-factors"
+            | "contact-segment-rules"
+            | "contact-relationship-insights"
+            | "crm-conversations"
+            | "crm-conversation-messages"
+    )
+}
+
+fn row_company_matches(row: &Value, company_id: u64, allow_shared: bool) -> bool {
+    match row_u64(row, "companyId", "company_id") {
+        Some(id) => id == company_id,
+        None => allow_shared,
+    }
+}
+
+fn filter_direct_crm_company_rows(resource: &str, company_id: u64, rows: &mut Vec<Value>) -> bool {
+    let is_direct_company_owned = matches!(
+        resource,
+        "contacts"
+            | "opportunities"
+            | "contact-phone-identities"
+            | "contact-role-assignments"
+            | "contact-communication-preferences"
+    );
+    if is_direct_company_owned {
+        rows.retain(|row| row_company_matches(row, company_id, false));
+    }
+    is_direct_company_owned
+}
+
+#[cfg(test)]
+fn visible_parent_ids_from_rows(rows: &[Value], company_id: u64) -> HashSet<u64> {
+    rows.iter()
+        .filter(|row| row_company_matches(row, company_id, false) && row_not_soft_deleted(row))
+        .map(row_id_u64)
+        .filter(|id| *id > 0)
+        .collect()
+}
+
+async fn filter_crm_company_rows(
+    _client: &StdbClient,
+    resource: &str,
+    _organization_id: u64,
+    company_id: u64,
+    rows: &mut Vec<Value>,
+) -> Result<(), ApiError> {
+    if filter_direct_crm_company_rows(resource, company_id, rows) {
+        return Ok(());
+    }
+
+    match resource {
+        "contact-duplicate-candidates"
+        | "crm-forecast-snapshots"
+        | "opportunity-lines"
+        | "opportunity-presence"
+        | "contact-tag-assignments"
+        | "segment-members"
+        | "privacy-consent"
+        | "contact-relationship-insights"
+        | "contact-relationships"
+        | "crm-conversations"
+        | "crm-conversation-messages" => {
+            rows.retain(|row| row_company_matches(row, company_id, false));
+        }
+        // These schemas have no company ownership field or company-owned parent.
+        // They remain explicitly organization-shared until the schema models ownership.
+        _ => {}
+    }
+    Ok(())
+}
+
 async fn manager_employee_id(
     client: &StdbClient,
     organization_id: u64,
@@ -212,7 +378,34 @@ pub async fn execute_resource_query(
     identity_hex: &str,
     field_access: Option<&FieldAccessContext>,
 ) -> Result<Vec<Value>, ApiError> {
+    execute_resource_query_for_company(
+        client,
+        resource,
+        organization_id,
+        identity_hex,
+        field_access,
+        None,
+    )
+    .await
+}
+
+pub async fn execute_resource_query_for_company(
+    client: &StdbClient,
+    resource: &str,
+    organization_id: u64,
+    identity_hex: &str,
+    field_access: Option<&FieldAccessContext>,
+    requested_company_id: Option<u64>,
+) -> Result<Vec<Value>, ApiError> {
     let fa = field_access;
+    let crm_company_id = if crm_resource(resource) {
+        Some(
+            resolve_crm_company_id(client, organization_id, identity_hex, requested_company_id)
+                .await?,
+        )
+    } else {
+        None
+    };
 
     if let Some(rows) = crate::workflow_reads::execute_private_workflow_query(
         client,
@@ -1144,8 +1337,7 @@ pub async fn execute_resource_query(
     // JOIN/subquery parent `document.owner_id`. Filter by `created_by` (same as WS).
     if resource == "document-versions" {
         let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
-        let cols =
-            resolve_http_sql_columns("document-versions", fa).map_err(ApiError::Internal)?;
+        let cols = resolve_http_sql_columns("document-versions", fa).map_err(ApiError::Internal)?;
         let col_part = cols.join(", ");
         let sql = format!(
             "SELECT {col_part} FROM document_version WHERE organization_id = {organization_id} AND created_by = {id}"
@@ -1175,7 +1367,9 @@ pub async fn execute_resource_query(
         "quality-alerts" => "",
         "mrp-bom-lines" => " ORDER BY bom_id ASC, sequence ASC",
         "mrp-routing-workcenters" => " ORDER BY workcenter_id ASC, sequence ASC",
-        "calendar-events" => " ORDER BY start ASC",
+        // SpacetimeDB 2.0 rejects ORDER BY on the quoted reserved `start`
+        // column. Calendar consumers do not rely on server row order.
+        "calendar-events" => "",
         "deferred-revenue-schedules" => " ORDER BY id DESC",
         "deferred-revenue-lines" => " ORDER BY schedule_id ASC, sequence ASC",
         "revenue-recognition-rules" => " ORDER BY priority DESC, id DESC",
@@ -1187,7 +1381,7 @@ pub async fn execute_resource_query(
 
     // Bounded exception resources (and any erp-org-sql extraWhere) share SQL with WS subscriptions.
     let extra_where = erp_org_extra_where(resource).unwrap_or("");
-    let sql = select_org_scoped_sql(
+    let mut sql = select_org_scoped_sql(
         resource,
         &reg.table,
         organization_id,
@@ -1196,11 +1390,22 @@ pub async fn execute_resource_query(
         order,
     )
     .map_err(ApiError::Internal)?;
+    if resource == "calendar-events" {
+        // `start` and `stop` are reserved by SpacetimeDB SQL 2.0. The field
+        // policy still determines the projection; only quote those identifiers.
+        sql = sql
+            .replace(", start,", ", \"start\",")
+            .replace(", stop,", ", \"stop\",");
+    }
 
     let mut rows = client
         .query_sql(&sql)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    if let Some(company_id) = crm_company_id {
+        filter_crm_company_rows(client, resource, organization_id, company_id, &mut rows).await?;
+    }
 
     if resource == "activities"
         || resource == "companies"
@@ -1321,5 +1526,121 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].get("id").and_then(|v| v.as_u64()), Some(1));
         assert!(rows[0].get("deletedAt").is_none());
+    }
+
+    #[test]
+    fn crm_company_match_distinguishes_owned_shared_and_cross_company_rows() {
+        let owned = json!({ "companyId": 7 });
+        let shared = json!({ "companyId": null });
+        let tagged = json!({ "company_id": { "some": [7] } });
+
+        assert!(row_company_matches(&owned, 7, false));
+        assert!(row_company_matches(&tagged, 7, false));
+        assert!(!row_company_matches(&owned, 8, true));
+        assert!(row_company_matches(&shared, 7, true));
+        assert!(!row_company_matches(&shared, 7, false));
+    }
+
+    #[test]
+    fn direct_company_owned_crm_resources_exclude_null_and_cross_company_rows() {
+        for resource in [
+            "contacts",
+            "opportunities",
+            "contact-phone-identities",
+            "contact-role-assignments",
+            "contact-communication-preferences",
+        ] {
+            let mut rows = vec![
+                json!({ "id": 1, "companyId": 7 }),
+                json!({ "id": 2, "companyId": null }),
+                json!({ "id": 3, "companyId": 8 }),
+            ];
+
+            assert!(filter_direct_crm_company_rows(resource, 7, &mut rows));
+            assert_eq!(rows, vec![json!({ "id": 1, "companyId": 7 })]);
+        }
+    }
+
+    #[test]
+    fn parent_visibility_excludes_null_cross_company_and_deleted_rows() {
+        let rows = vec![
+            json!({ "id": 1, "companyId": 7, "deletedAt": null }),
+            json!({ "id": 2, "companyId": null, "deletedAt": null }),
+            json!({ "id": 3, "companyId": 8, "deletedAt": null }),
+            json!({ "id": 4, "companyId": 7, "deletedAt": { "some": [1] } }),
+        ];
+
+        assert_eq!(visible_parent_ids_from_rows(&rows, 7), HashSet::from([1]));
+    }
+
+    #[test]
+    fn explicitly_organization_shared_resources_are_not_direct_company_filtered() {
+        let mut rows = vec![json!({ "id": 1, "organizationId": 9 })];
+
+        assert!(!filter_direct_crm_company_rows(
+            "contact-tags",
+            7,
+            &mut rows
+        ));
+        assert_eq!(rows, vec![json!({ "id": 1, "organizationId": 9 })]);
+    }
+
+    #[test]
+    fn realtime_exact_company_resources_project_company_id() {
+        for resource in [
+            "contacts",
+            "opportunities",
+            "opportunity-lines",
+            "opportunity-presence",
+            "contact-phone-identities",
+            "contact-role-assignments",
+            "contact-communication-preferences",
+            "contact-tag-assignments",
+            "segment-members",
+            "privacy-consent",
+            "contact-relationship-insights",
+            "contact-relationships",
+            "contact-duplicate-candidates",
+            "crm-forecast-snapshots",
+            "crm-conversations",
+            "crm-conversation-messages",
+        ] {
+            let entry = registry_get(resource).expect("CRM resource must be registered");
+            assert!(
+                entry.mandatory.iter().any(|field| field == "company_id"),
+                "{resource} must project company_id for exact realtime filtering"
+            );
+        }
+
+        for resource in [
+            "leads",
+            "lead-sources",
+            "lead-lost-reasons",
+            "opportunity-stages",
+            "contact-tags",
+            "contact-segments",
+            "assignment-rules",
+            "activities",
+            "calendar-events",
+            "utm-campaigns",
+            "utm-media",
+            "utm-sources",
+            "lead-scores",
+            "lead-score-factors",
+            "contact-segment-rules",
+        ] {
+            let entry = registry_get(resource).expect("shared CRM resource must be registered");
+            assert!(
+                !entry.mandatory.iter().any(|field| field == "company_id"),
+                "{resource} is explicitly organization-shared"
+            );
+        }
+    }
+
+    #[test]
+    fn crm_resource_classification_is_narrow() {
+        assert!(crm_resource("contacts"));
+        assert!(crm_resource("crm-conversation-messages"));
+        assert!(!crm_resource("account-moves"));
     }
 }

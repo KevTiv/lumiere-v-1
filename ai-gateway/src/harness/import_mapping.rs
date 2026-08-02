@@ -215,9 +215,7 @@ fn compute_import_mapping(input: &ImportMappingInput) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::harness::{
-        data_scope_resolver::ResourceRegistry, skill_registry::SkillRegistry,
-    };
+    use crate::harness::{data_scope_resolver::ResourceRegistry, skill_registry::SkillRegistry};
 
     #[test]
     fn analyzes_product_headers() {

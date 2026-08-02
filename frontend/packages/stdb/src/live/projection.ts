@@ -47,6 +47,31 @@ const INTERCOMPANY_RESOURCES = new Set<QueryResourceKey>([
   "intercompany-transactions",
 ])
 
+const CRM_OPTIONAL_COMPANY_RESOURCES = new Set<QueryResourceKey>([
+  "contacts",
+  "opportunities",
+  "contact-phone-identities",
+  "contact-role-assignments",
+  "contact-communication-preferences",
+])
+
+const CRM_REQUIRED_COMPANY_RESOURCES = new Set<QueryResourceKey>([
+  "contact-duplicate-candidates",
+  "crm-forecast-snapshots",
+])
+
+const CRM_PARENT_SCOPED_RESOURCES = new Set<QueryResourceKey>([
+  "opportunity-lines",
+  "opportunity-presence",
+  "contact-tag-assignments",
+  "segment-members",
+  "contact-relationships",
+  "privacy-consent",
+  "contact-relationship-insights",
+  "crm-conversations",
+  "crm-conversation-messages",
+])
+
 export interface ResourceScopeContext {
   organizationId: number
   companyIds?: readonly number[]
@@ -73,8 +98,23 @@ export function rowMatchesResourceScope(
     return false
   }
 
+  const ids = ctx.companyIds ?? []
+  if (CRM_OPTIONAL_COMPANY_RESOURCES.has(resource)) {
+    if (ids.length !== 1) return false
+    const cid = rowCompanyId(row)
+    return cid == null || cid === ids[0]
+  }
+
+  if (CRM_REQUIRED_COMPANY_RESOURCES.has(resource)) {
+    if (ids.length !== 1) return false
+    return rowCompanyId(row) === ids[0]
+  }
+
+  // Ownership is inherited through a parent row and cannot be proven from this
+  // projection alone. These resources are loaded through the authorized HTTP path.
+  if (CRM_PARENT_SCOPED_RESOURCES.has(resource)) return false
+
   if (COMPANY_SCOPED_RESOURCES.has(resource)) {
-    const ids = ctx.companyIds ?? []
     if (ids.length === 0) return false
 
     if (INTERCOMPANY_RESOURCES.has(resource)) {

@@ -12,7 +12,6 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 #[spacetimedb::table(
     accessor = crm_forecast_snapshot,
-    public,
     index(accessor = forecast_by_org, btree(columns = [organization_id])),
     index(accessor = forecast_by_company, btree(columns = [company_id]))
 )]

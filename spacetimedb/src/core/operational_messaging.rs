@@ -117,7 +117,6 @@ pub struct MessageBatch {
 /// Contact communication preference snapshot for a channel.
 #[spacetimedb::table(
     accessor = contact_communication_preference,
-    public,
     index(accessor = preference_by_contact, btree(columns = [contact_id])),
     index(accessor = preference_by_org, btree(columns = [organization_id]))
 )]
@@ -557,6 +556,7 @@ pub fn record_message_copied(
     message_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "operational_message", "write")?;
+
     let message = ctx
         .db
         .operational_message()
@@ -1032,6 +1032,20 @@ pub fn set_contact_communication_preference(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "operational_message", "write")?;
 
+    let contact = ctx
+        .db
+        .contact()
+        .id()
+        .find(&contact_id)
+        .ok_or("Contact not found")?;
+    if contact.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
+    let exact_company_id = company_id.ok_or("Communication preference requires a company")?;
+    if contact.company_id != Some(exact_company_id) {
+        return Err("Contact does not belong to this company".to_string());
+    }
+
     let existing: Vec<ContactCommunicationPreference> = ctx
         .db
         .contact_communication_preference()
@@ -1039,7 +1053,11 @@ pub fn set_contact_communication_preference(
         .filter(&contact_id)
         .collect();
 
-    if let Some(pref) = existing.into_iter().find(|p| p.channel == channel) {
+    if let Some(pref) = existing.into_iter().find(|p| {
+        p.organization_id == organization_id
+            && p.company_id == Some(exact_company_id)
+            && p.channel == channel
+    }) {
         ctx.db
             .contact_communication_preference()
             .id()

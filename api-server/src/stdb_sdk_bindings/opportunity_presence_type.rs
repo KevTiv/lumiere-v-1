@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct OpportunityPresence {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub opportunity_id: u64,
     pub user_id: __sdk::Identity,
     pub user_name: String,
@@ -25,6 +26,7 @@ impl __sdk::InModule for OpportunityPresence {
 pub struct OpportunityPresenceCols {
     pub id: __sdk::__query_builder::Col<OpportunityPresence, u64>,
     pub organization_id: __sdk::__query_builder::Col<OpportunityPresence, u64>,
+    pub company_id: __sdk::__query_builder::Col<OpportunityPresence, u64>,
     pub opportunity_id: __sdk::__query_builder::Col<OpportunityPresence, u64>,
     pub user_id: __sdk::__query_builder::Col<OpportunityPresence, __sdk::Identity>,
     pub user_name: __sdk::__query_builder::Col<OpportunityPresence, String>,
@@ -37,6 +39,7 @@ impl __sdk::__query_builder::HasCols for OpportunityPresence {
         OpportunityPresenceCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             opportunity_id: __sdk::__query_builder::Col::new(table_name, "opportunity_id"),
             user_id: __sdk::__query_builder::Col::new(table_name, "user_id"),
             user_name: __sdk::__query_builder::Col::new(table_name, "user_name"),

@@ -54,14 +54,9 @@ test.describe("CRM phone identities and roles", { tag: ["@p1", "@contacts", "@ui
     ])
     await expect(recordSheet.getByText("customer", { exact: true })).toBeVisible({ timeout: 30_000 })
 
-    await Promise.all([
-      page.waitForResponse(
-        (response) => response.url().includes("/api/call/verify_contact_identity") && response.ok(),
-        { timeout: 30_000 },
-      ),
-      recordSheet.getByRole("button", { name: "Verify" }).click(),
-    ])
-    await expect(recordSheet.getByText("Verified", { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(recordSheet.getByRole("button", { name: "Verify" })).toHaveCount(0)
+    await expect(recordSheet.getByText("Unverified", { exact: true })).toBeVisible()
+    await expect(recordSheet.getByText(/trusted OTP\/provider proof/i)).toBeVisible()
 
     await recordSheet.getByRole("button", { name: "End role" }).click()
     const endRoleDialog = page.getByTestId("form-modal-end-contact-role")

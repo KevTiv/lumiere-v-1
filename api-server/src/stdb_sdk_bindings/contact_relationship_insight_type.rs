@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct ContactRelationshipInsight {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub contact_id: u64,
     pub strength_score: i32,
     pub active_relationship_count: i32,
@@ -30,6 +31,7 @@ impl __sdk::InModule for ContactRelationshipInsight {
 pub struct ContactRelationshipInsightCols {
     pub id: __sdk::__query_builder::Col<ContactRelationshipInsight, u64>,
     pub organization_id: __sdk::__query_builder::Col<ContactRelationshipInsight, u64>,
+    pub company_id: __sdk::__query_builder::Col<ContactRelationshipInsight, u64>,
     pub contact_id: __sdk::__query_builder::Col<ContactRelationshipInsight, u64>,
     pub strength_score: __sdk::__query_builder::Col<ContactRelationshipInsight, i32>,
     pub active_relationship_count: __sdk::__query_builder::Col<ContactRelationshipInsight, i32>,
@@ -47,6 +49,7 @@ impl __sdk::__query_builder::HasCols for ContactRelationshipInsight {
         ContactRelationshipInsightCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             contact_id: __sdk::__query_builder::Col::new(table_name, "contact_id"),
             strength_score: __sdk::__query_builder::Col::new(table_name, "strength_score"),
             active_relationship_count: __sdk::__query_builder::Col::new(

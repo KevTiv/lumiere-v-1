@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct PrivacyConsent {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub contact_id: u64,
     pub consent_type: String,
     pub granted: bool,
@@ -29,6 +30,7 @@ impl __sdk::InModule for PrivacyConsent {
 pub struct PrivacyConsentCols {
     pub id: __sdk::__query_builder::Col<PrivacyConsent, u64>,
     pub organization_id: __sdk::__query_builder::Col<PrivacyConsent, u64>,
+    pub company_id: __sdk::__query_builder::Col<PrivacyConsent, u64>,
     pub contact_id: __sdk::__query_builder::Col<PrivacyConsent, u64>,
     pub consent_type: __sdk::__query_builder::Col<PrivacyConsent, String>,
     pub granted: __sdk::__query_builder::Col<PrivacyConsent, bool>,
@@ -45,6 +47,7 @@ impl __sdk::__query_builder::HasCols for PrivacyConsent {
         PrivacyConsentCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             contact_id: __sdk::__query_builder::Col::new(table_name, "contact_id"),
             consent_type: __sdk::__query_builder::Col::new(table_name, "consent_type"),
             granted: __sdk::__query_builder::Col::new(table_name, "granted"),

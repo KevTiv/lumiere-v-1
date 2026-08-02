@@ -14,8 +14,8 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
-use serde::{Deserialize, Serialize};
 use rand::RngCore;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tower_cookies::Cookies;
 
@@ -148,10 +148,13 @@ fn residency_segment(residency: Option<&str>) -> String {
     }
 }
 
-fn object_paths(root: &Path, organization_id: u64, object_id: &str, residency: &str) -> (PathBuf, PathBuf) {
-    let dir = root
-        .join(format!("org-{organization_id}"))
-        .join(residency);
+fn object_paths(
+    root: &Path,
+    organization_id: u64,
+    object_id: &str,
+    residency: &str,
+) -> (PathBuf, PathBuf) {
+    let dir = root.join(format!("org-{organization_id}")).join(residency);
     let bin = dir.join(format!("{object_id}.bin"));
     let meta = dir.join(format!("{object_id}.meta.json"));
     (bin, meta)
@@ -165,7 +168,9 @@ fn parse_object_key(object_key: &str) -> Result<(u64, String, String), ApiError>
     }
     let org_part = parts[0];
     if !org_part.starts_with("org-") {
-        return Err(ApiError::Unprocessable("invalid object_key org segment".into()));
+        return Err(ApiError::Unprocessable(
+            "invalid object_key org segment".into(),
+        ));
     }
     let organization_id: u64 = org_part[4..]
         .parse()
@@ -251,12 +256,8 @@ async fn presign(
     write_meta(&meta_path, &meta)?;
 
     // Same-origin `/api/...` paths so Next BFF can forward cookies to api-server `/v1/...`.
-    let upload_url = format!(
-        "/api/documents/blobs/upload/{org_id}/{residency}/{object_id}"
-    );
-    let public_url = format!(
-        "/api/documents/blobs/object/{org_id}/{residency}/{object_id}"
-    );
+    let upload_url = format!("/api/documents/blobs/upload/{org_id}/{residency}/{object_id}");
+    let public_url = format!("/api/documents/blobs/object/{org_id}/{residency}/{object_id}");
 
     let mut headers_map = serde_json::Map::new();
     headers_map.insert(
@@ -400,9 +401,7 @@ async fn complete(
     meta.actual_checksum = Some(digest.clone());
     write_meta(&meta_path, &meta)?;
 
-    let url = format!(
-        "/api/documents/blobs/object/{organization_id}/{residency}/{object_id}"
-    );
+    let url = format!("/api/documents/blobs/object/{organization_id}/{residency}/{object_id}");
 
     let extracted_text = extract_text_for_index(&meta.content_type, &bytes);
 

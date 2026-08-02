@@ -116,10 +116,7 @@ fn green_manifest(skill_key: &str, resource: &str, output_type: &str) -> SkillMa
     }
 }
 
-fn resource_contract(
-    name: &str,
-    output_type: &str,
-) -> NamedResourceContract {
+fn resource_contract(name: &str, output_type: &str) -> NamedResourceContract {
     NamedResourceContract {
         name: name.to_string(),
         review: reviewed(),

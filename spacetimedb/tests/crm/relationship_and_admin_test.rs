@@ -2,15 +2,15 @@
 /// in-module test helpers (mirrors `contact_identity_test.rs` harness patterns).
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::crm::contacts::{
     contact, contact_relationship, create_contact, create_contact_relationship,
     end_contact_relationship, update_contact_parent, CreateContactParams,
     CreateContactRelationshipParams,
 };
 use crate::crm::leads::{
-    create_lead_lost_reason, create_lead_source, lead_lost_reason, lead_source,
-    update_lead_source, CreateLeadLostReasonParams, CreateLeadSourceParams,
-    UpdateLeadSourceParams,
+    create_lead_lost_reason, create_lead_source, lead_lost_reason, lead_source, update_lead_source,
+    CreateLeadLostReasonParams, CreateLeadSourceParams, UpdateLeadSourceParams,
 };
 use crate::crm::opportunities::{
     create_opportunity_stage, opp_stage, update_opportunity_stage, CreateOpportunityStageParams,
@@ -89,6 +89,59 @@ pub fn test_contact_relationship_lifecycle(ctx: &ReducerContext) -> Result<(), S
 
     let left_id = create_test_contact(ctx, org_id, company_id, "relationship-left@test.local")?;
     let right_id = create_test_contact(ctx, org_id, company_id, "relationship-right@test.local")?;
+
+    create_company(
+        ctx,
+        org_id,
+        CreateCompanyParams {
+            name: "Relationship Company B".to_string(),
+            code: format!("REL-B-{company_id}"),
+            currency_id: 1,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: None,
+        },
+    )?;
+    let sibling_company_id = ctx
+        .db
+        .company()
+        .company_by_org()
+        .filter(&org_id)
+        .map(|company| company.id)
+        .filter(|id| *id != company_id)
+        .max()
+        .ok_or("Relationship sibling company missing")?;
+    let sibling_id = create_test_contact(
+        ctx,
+        org_id,
+        sibling_company_id,
+        "relationship-sibling@test.local",
+    )?;
+
+    if create_contact_relationship(
+        ctx,
+        org_id,
+        CreateContactRelationshipParams {
+            left_contact_id: left_id,
+            right_contact_id: sibling_id,
+            relationship_type: "cross_company".to_string(),
+            start_date: None,
+            notes: None,
+            metadata: None,
+        },
+    )
+    .is_ok()
+    {
+        return Err("Cross-company contact relationship should be rejected".to_string());
+    }
 
     // Self-link rejected
     if create_contact_relationship(

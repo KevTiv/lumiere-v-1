@@ -96,7 +96,6 @@ pub struct UpdateCalendarEventParams {
 
 #[spacetimedb::table(
     accessor = activity,
-    public,
     index(accessor = activity_by_org, btree(columns = [organization_id])),
     index(accessor = activity_by_user, btree(columns = [user_id])),
     index(accessor = activity_by_deadline, btree(columns = [date_deadline]))
@@ -132,7 +131,6 @@ pub struct Activity {
 
 #[spacetimedb::table(
     accessor = activity_type,
-    public,
     index(accessor = activity_type_by_org, btree(columns = [organization_id]))
 )]
 pub struct ActivityType {
@@ -157,7 +155,6 @@ pub struct ActivityType {
 
 #[spacetimedb::table(
     accessor = calendar_event,
-    public,
     index(accessor = event_by_org, btree(columns = [organization_id])),
     index(accessor = event_by_user, btree(columns = [user_id]))
 )]

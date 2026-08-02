@@ -3,10 +3,13 @@
 /// `Contact` remains the party master. This module stores phone/WhatsApp/mobile-money
 /// identities as child records. The legacy `phone` and `mobile` columns on `Contact` are
 /// kept as read-compatible projections until all consumers migrate.
+use sha2::{Digest, Sha256};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
+use crate::core::users::user_profile;
 use crate::crm::contacts::{contact, Contact};
+use crate::crm::require_single_company_crm_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{ContactIdentityKind, ContactVerificationState};
 
@@ -14,7 +17,6 @@ use crate::types::{ContactIdentityKind, ContactVerificationState};
 
 #[spacetimedb::table(
     accessor = contact_phone_identity,
-    public,
     index(accessor = contact_phone_identity_by_org, btree(columns = [organization_id])),
     index(accessor = contact_phone_identity_by_contact, btree(columns = [contact_id])),
     index(accessor = contact_phone_identity_by_lookup, btree(columns = [organization_id, normalized_e164]))
@@ -44,6 +46,50 @@ pub struct ContactPhoneIdentity {
     pub metadata: Option<String>,
 }
 
+/// Immutable evidence recorded by a trusted provider adapter after it has
+/// independently verified possession of the identity value. This table is
+/// private: browser clients must never receive evidence hashes or provider
+/// references.
+#[spacetimedb::table(
+    accessor = contact_identity_verification_proof,
+    index(accessor = contact_identity_proof_by_org, btree(columns = [organization_id])),
+    index(accessor = contact_identity_proof_by_identity, btree(columns = [identity_id]))
+)]
+#[derive(Clone)]
+pub struct ContactIdentityVerificationProof {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: Option<u64>,
+    pub contact_id: u64,
+    pub identity_id: u64,
+    pub normalized_e164: String,
+    /// Verification mechanism, currently `otp` or `provider_attestation`.
+    pub method: String,
+    pub provider: String,
+    /// Provider idempotency key. Unique within an organization.
+    pub provider_reference: String,
+    /// SHA-256 digest of the provider evidence. Raw OTPs are never persisted.
+    pub evidence_hash: String,
+    pub issued_at: Timestamp,
+    pub expires_at: Timestamp,
+    pub recorded_by: Identity,
+    pub recorded_at: Timestamp,
+}
+
+/// Singleton trust anchor for the server/provider adapter identity. This is an
+/// exact SpacetimeDB principal, not an organization role or CRM permission.
+#[spacetimedb::table(accessor = contact_identity_verification_authority)]
+#[derive(Clone)]
+pub struct ContactIdentityVerificationAuthority {
+    #[primary_key]
+    pub id: u8,
+    pub issuer_identity: Identity,
+    pub configured_by: Identity,
+    pub configured_at: Timestamp,
+}
+
 // ── Input Params ──────────────────────────────────────────────────────────────
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -54,6 +100,7 @@ pub struct CreateContactIdentityParams {
     /// Raw phone number as entered by the user. Normalized to E.164 by the reducer.
     pub raw_value: String,
     pub is_preferred: bool,
+    /// Legacy compatibility field. Callers must leave server-owned state unset.
     pub verification_state: Option<ContactVerificationState>,
     pub metadata: Option<String>,
 }
@@ -63,8 +110,26 @@ pub struct UpdateContactIdentityParams {
     pub company_id: Option<u64>,
     pub raw_value: Option<String>,
     pub is_preferred: Option<bool>,
+    /// Legacy compatibility field. Callers must leave server-owned state unset.
     pub verification_state: Option<ContactVerificationState>,
     pub metadata: Option<String>,
+}
+
+/// Proof supplied by a trusted provider adapter. Scope fields are deliberately
+/// repeated and validated against current rows so a valid proof cannot be
+/// replayed for another identity or after the phone number changes.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RecordContactIdentityVerificationProofParams {
+    pub identity_id: u64,
+    pub contact_id: u64,
+    pub company_id: Option<u64>,
+    pub normalized_e164: String,
+    pub method: String,
+    pub provider: String,
+    pub provider_reference: String,
+    pub evidence_hash: String,
+    pub issued_at_micros: i64,
+    pub expires_at_micros: i64,
 }
 
 // ── Phone normalization helpers ───────────────────────────────────────────────
@@ -79,17 +144,16 @@ pub fn normalize_phone(raw: &str, default_region: Option<&str>) -> Result<String
 
     let trimmed = raw.trim();
     if trimmed.is_empty() {
-        return Err("Phone number cannot be empty".to_string());
+        return Err("phone number cannot be empty".to_string());
     }
 
-    let country = default_region
-        .and_then(|r| phonenumber::country::Id::from_str(r).ok());
+    let country = default_region.and_then(|r| phonenumber::country::Id::from_str(r).ok());
 
     let phone = phonenumber::parse(country, trimmed)
-        .map_err(|e| format!("Invalid phone number '{}': {:?}", raw, e))?;
+        .map_err(|e| format!("invalid phone number '{}': {:?}", raw, e))?;
 
     if !phonenumber::is_valid(&phone) {
-        return Err(format!("Phone number '{}' is not a valid number", raw));
+        return Err(format!("phone number '{}' is not a valid number", raw));
     }
 
     Ok(phonenumber::format(&phone).to_string())
@@ -131,26 +195,54 @@ fn load_active_contact(
         .contact()
         .id()
         .find(&contact_id)
-        .ok_or("Contact not found")?;
+        .ok_or("contact not found")?;
 
     if contact.organization_id != organization_id {
-        return Err("Contact does not belong to this organization".to_string());
+        return Err("contact does not belong to this organization".to_string());
     }
 
     if contact.deleted_at.is_some() {
-        return Err("Contact is deleted".to_string());
+        return Err("contact is deleted".to_string());
     }
 
     Ok(contact)
 }
 
-fn validate_company_scope(
+fn validate_contact_company_scope(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: Option<u64>,
+    contact: &Contact,
+    identity_company_id: Option<u64>,
 ) -> Result<(), String> {
-    if let Some(cid) = company_id {
+    if contact.company_id != identity_company_id {
+        return Err("contact identity company must match the contact company".to_string());
+    }
+
+    if let Some(cid) = contact.company_id {
         require_company_in_organization(ctx, organization_id, cid)?;
+    }
+
+    require_single_company_crm_scope(ctx, organization_id, contact.company_id)?;
+    Ok(())
+}
+
+fn validate_requested_company_scope(
+    contact: &Contact,
+    requested_company_id: Option<u64>,
+) -> Result<(), String> {
+    if let Some(company_id) = requested_company_id {
+        if contact.company_id != Some(company_id) {
+            return Err("contact identity company must match the contact company".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn reject_caller_verification_state(
+    verification_state: Option<&ContactVerificationState>,
+) -> Result<(), String> {
+    if verification_state.is_some() {
+        return Err("verification state is server-owned".to_string());
     }
     Ok(())
 }
@@ -195,12 +287,15 @@ fn ensure_unique_preferred(
             .contact_phone_identity()
             .id()
             .find(&id)
-            .ok_or("Preferred identity disappeared during update")?;
-        ctx.db.contact_phone_identity().id().update(ContactPhoneIdentity {
-            is_preferred: false,
-            updated_at: ctx.timestamp,
-            ..other
-        });
+            .ok_or("preferred identity disappeared during update")?;
+        ctx.db
+            .contact_phone_identity()
+            .id()
+            .update(ContactPhoneIdentity {
+                is_preferred: false,
+                updated_at: ctx.timestamp,
+                ..other
+            });
     }
 
     Ok(())
@@ -212,11 +307,112 @@ fn verify_state_transition(
 ) -> Result<(), String> {
     match (current, next) {
         (ContactVerificationState::OptedOut, _) => Err(
-            "Cannot change verification state of an opted-out identity; create a new one instead"
+            "cannot change verification state of an opted-out identity; create a new one instead"
                 .to_string(),
         ),
         _ => Ok(()),
     }
+}
+
+const MAX_VERIFICATION_PROOF_LIFETIME_MICROS: i64 = 15 * 60 * 1_000_000;
+
+fn require_trusted_verification_issuer(ctx: &ReducerContext) -> Result<(), String> {
+    let authority = ctx
+        .db
+        .contact_identity_verification_authority()
+        .id()
+        .find(&1)
+        .ok_or("contact identity verification authority is not configured")?;
+    if authority.issuer_identity != ctx.sender() {
+        return Err("trusted verification issuer authority required".to_string());
+    }
+    let caller = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(ctx.sender())
+        .ok_or("trusted verification issuer profile not found")?;
+    if !caller.is_active || !caller.is_superuser {
+        return Err("trusted verification issuer authority required".to_string());
+    }
+    Ok(())
+}
+
+fn constant_time_str_eq(left: &str, right: &str) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    left.as_bytes()
+        .iter()
+        .zip(right.as_bytes())
+        .fold(0_u8, |difference, (left, right)| {
+            difference | (*left ^ *right)
+        })
+        == 0
+}
+
+fn validate_proof_text(label: &str, value: &str, max_len: usize) -> Result<String, String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(format!("verification proof {label} cannot be empty"));
+    }
+    if value.len() > max_len {
+        return Err(format!("verification proof {label} is too long"));
+    }
+    Ok(value.to_string())
+}
+
+fn validate_evidence_hash(value: &str) -> Result<String, String> {
+    let normalized = value.trim().to_ascii_lowercase();
+    let Some(hex) = normalized.strip_prefix("sha256:") else {
+        return Err("verification evidence hash must use the sha256: prefix".to_string());
+    };
+    if hex.len() != 64 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(
+            "verification evidence hash must contain 64 hexadecimal characters".to_string(),
+        );
+    }
+    Ok(normalized)
+}
+
+/// Canonical helper for trusted adapters and tests. The digest binds provider
+/// evidence to the exact current identity scope; raw OTP/provider payloads are
+/// not retained by the module.
+pub fn contact_identity_evidence_hash(
+    organization_id: u64,
+    company_id: Option<u64>,
+    contact_id: u64,
+    identity_id: u64,
+    normalized_e164: &str,
+    provider_evidence: &str,
+) -> String {
+    let company = company_id
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| "shared".to_string());
+    let canonical = format!(
+        "crm-contact-identity-proof-v1\n{organization_id}\n{company}\n{contact_id}\n{identity_id}\n{normalized_e164}\n{provider_evidence}"
+    );
+    format!("sha256:{:x}", Sha256::digest(canonical.as_bytes()))
+}
+
+fn proof_matches_request(
+    proof: &ContactIdentityVerificationProof,
+    params: &RecordContactIdentityVerificationProofParams,
+    method: &str,
+    provider: &str,
+    provider_reference: &str,
+    evidence_hash: &str,
+) -> bool {
+    proof.company_id == params.company_id
+        && proof.contact_id == params.contact_id
+        && proof.identity_id == params.identity_id
+        && proof.normalized_e164 == params.normalized_e164
+        && proof.method == method
+        && proof.provider == provider
+        && proof.provider_reference == provider_reference
+        && constant_time_str_eq(&proof.evidence_hash, evidence_hash)
+        && proof.issued_at.to_micros_since_unix_epoch() == params.issued_at_micros
+        && proof.expires_at.to_micros_since_unix_epoch() == params.expires_at_micros
 }
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
@@ -230,32 +426,34 @@ pub fn create_contact_identity(
     check_permission(ctx, organization_id, "contact_identity", "create")?;
 
     let contact = load_active_contact(ctx, organization_id, params.contact_id)?;
-    validate_company_scope(ctx, organization_id, params.company_id)?;
+    validate_requested_company_scope(&contact, params.company_id)?;
+    validate_contact_company_scope(ctx, organization_id, &contact, contact.company_id)?;
+    reject_caller_verification_state(params.verification_state.as_ref())?;
 
     let default_region = default_region_for_contact(&contact);
     let normalized = normalize_phone(&params.raw_value, default_region.as_deref())?;
     let display_masked = mask_e164(&normalized);
-    let verification_state = params
-        .verification_state
-        .unwrap_or(ContactVerificationState::Unverified);
 
-    let identity = ctx.db.contact_phone_identity().insert(ContactPhoneIdentity {
-        id: 0,
-        organization_id,
-        company_id: params.company_id,
-        contact_id: params.contact_id,
-        kind: params.kind.clone(),
-        normalized_e164: normalized.clone(),
-        display_masked,
-        verification_state,
-        is_preferred: params.is_preferred,
-        created_by: ctx.sender(),
-        created_at: ctx.timestamp,
-        updated_at: ctx.timestamp,
-        verified_at: None,
-        archived_at: None,
-        metadata: params.metadata,
-    });
+    let identity = ctx
+        .db
+        .contact_phone_identity()
+        .insert(ContactPhoneIdentity {
+            id: 0,
+            organization_id,
+            company_id: contact.company_id,
+            contact_id: params.contact_id,
+            kind: params.kind.clone(),
+            normalized_e164: normalized.clone(),
+            display_masked,
+            verification_state: ContactVerificationState::Unverified,
+            is_preferred: params.is_preferred,
+            created_by: ctx.sender(),
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            verified_at: None,
+            archived_at: None,
+            metadata: params.metadata,
+        });
 
     ensure_unique_preferred(ctx, &identity)?;
 
@@ -263,7 +461,7 @@ pub fn create_contact_identity(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: params.company_id,
+            company_id: contact.company_id,
             table_name: "contact_phone_identity",
             record_id: identity.id,
             action: "CREATE",
@@ -299,32 +497,36 @@ pub fn update_contact_identity(
     params: UpdateContactIdentityParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact_identity", "write")?;
+    reject_caller_verification_state(params.verification_state.as_ref())?;
 
     let identity = ctx
         .db
         .contact_phone_identity()
         .id()
         .find(&identity_id)
-        .ok_or("Contact identity not found")?;
+        .ok_or("contact identity not found")?;
 
     if identity.organization_id != organization_id {
-        return Err("Identity does not belong to this organization".to_string());
+        return Err("identity does not belong to this organization".to_string());
     }
 
     if identity.archived_at.is_some() {
-        return Err("Archived identity cannot be updated".to_string());
+        return Err("archived identity cannot be updated".to_string());
     }
 
-    if let Some(cid) = params.company_id {
-        if identity.company_id != Some(cid) {
-            validate_company_scope(ctx, organization_id, Some(cid))?;
-        }
-    }
+    let contact = load_active_contact(ctx, organization_id, identity.contact_id)?;
+    validate_contact_company_scope(ctx, organization_id, &contact, identity.company_id)?;
+    validate_requested_company_scope(&contact, params.company_id)?;
 
     let raw_value_provided = params.raw_value.is_some();
     let (normalized, display_masked) = match params.raw_value.as_ref() {
         Some(raw) => {
-            let contact = load_active_contact(ctx, organization_id, identity.contact_id)?;
+            if identity.verification_state == ContactVerificationState::OptedOut {
+                return Err(
+                    "cannot change the phone number of an opted-out identity; create a new one instead"
+                        .to_string(),
+                );
+            }
             let default_region = default_region_for_contact(&contact);
             let n = normalize_phone(raw, default_region.as_deref())?;
             let m = mask_e164(&n);
@@ -336,40 +538,31 @@ pub fn update_contact_identity(
         ),
     };
 
-    let verification_state_provided = params.verification_state.is_some();
-    let verification_state = params
-        .verification_state
-        .as_ref()
-        .unwrap_or(&identity.verification_state)
-        .clone();
-    verify_state_transition(&identity.verification_state, &verification_state)?;
-
-    let verified_at = if verification_state == ContactVerificationState::Verified
-        && identity.verification_state != ContactVerificationState::Verified
-    {
-        Some(ctx.timestamp)
+    let verification_state = if raw_value_provided {
+        ContactVerificationState::Unverified
     } else {
+        identity.verification_state.clone()
+    };
+    let verified_at = if verification_state == ContactVerificationState::Verified {
         identity.verified_at
+    } else {
+        None
     };
 
     let is_preferred = params.is_preferred.unwrap_or(identity.is_preferred);
 
     let mut changed_fields = Vec::new();
-    if params.company_id.is_some() {
-        changed_fields.push("company_id".to_string());
-    }
     if raw_value_provided {
         changed_fields.push("normalized_e164".to_string());
-    }
-    if verification_state_provided {
         changed_fields.push("verification_state".to_string());
+        changed_fields.push("verified_at".to_string());
     }
     if params.is_preferred.is_some() {
         changed_fields.push("is_preferred".to_string());
     }
 
     let updated = ContactPhoneIdentity {
-        company_id: params.company_id.or(identity.company_id),
+        company_id: contact.company_id,
         normalized_e164: normalized.clone(),
         display_masked,
         verification_state,
@@ -420,41 +613,190 @@ pub fn verify_contact_identity(
     ctx: &ReducerContext,
     organization_id: u64,
     identity_id: u64,
-    state: ContactVerificationState,
+    requested_state: ContactVerificationState,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact_identity", "verify")?;
+    let _ = (identity_id, requested_state);
+    Err(
+        "permission-only identity verification is disabled; a trusted OTP/provider proof is required"
+            .to_string(),
+    )
+}
+
+/// Configure or rotate the exact server/provider adapter principal. Initial
+/// configuration requires the global server superuser; subsequent rotation
+/// additionally requires the currently configured principal, preventing an
+/// unrelated administrator from replacing the trust anchor.
+#[spacetimedb::reducer]
+pub fn configure_contact_identity_verification_authority(
+    ctx: &ReducerContext,
+    issuer_identity: Identity,
+) -> Result<(), String> {
+    let caller = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(ctx.sender())
+        .ok_or("verification authority configurator profile not found")?;
+    if !caller.is_active || !caller.is_superuser {
+        return Err("global server superuser authority required".to_string());
+    }
+
+    if let Some(existing) = ctx
+        .db
+        .contact_identity_verification_authority()
+        .id()
+        .find(&1)
+    {
+        if existing.issuer_identity != ctx.sender() {
+            return Err(
+                "only the current verification authority may rotate the issuer".to_string(),
+            );
+        }
+        ctx.db
+            .contact_identity_verification_authority()
+            .id()
+            .update(ContactIdentityVerificationAuthority {
+                issuer_identity,
+                configured_by: ctx.sender(),
+                configured_at: ctx.timestamp,
+                ..existing
+            });
+    } else {
+        ctx.db.contact_identity_verification_authority().insert(
+            ContactIdentityVerificationAuthority {
+                id: 1,
+                issuer_identity,
+                configured_by: ctx.sender(),
+                configured_at: ctx.timestamp,
+            },
+        );
+    }
+    Ok(())
+}
+
+/// Record proof from a trusted OTP/provider adapter and atomically mark the
+/// scoped identity verified. The adapter authenticates the provider callback,
+/// hashes its evidence outside the database, and invokes this reducer using the
+/// server/superuser principal. Ordinary CRM writers cannot issue proof rows.
+#[spacetimedb::reducer]
+pub fn record_contact_identity_verification_proof(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: RecordContactIdentityVerificationProofParams,
+) -> Result<(), String> {
+    require_trusted_verification_issuer(ctx)?;
 
     let identity = ctx
         .db
         .contact_phone_identity()
         .id()
-        .find(&identity_id)
-        .ok_or("Contact identity not found")?;
-
+        .find(&params.identity_id)
+        .ok_or("contact identity not found")?;
     if identity.organization_id != organization_id {
-        return Err("Identity does not belong to this organization".to_string());
+        return Err("identity does not belong to this organization".to_string());
     }
-
     if identity.archived_at.is_some() {
-        return Err("Archived identity cannot be verified".to_string());
+        return Err("archived identity cannot be verified".to_string());
     }
 
-    verify_state_transition(&identity.verification_state, &state)?;
+    let contact = load_active_contact(ctx, organization_id, identity.contact_id)?;
+    validate_contact_company_scope(ctx, organization_id, &contact, identity.company_id)?;
+    verify_state_transition(
+        &identity.verification_state,
+        &ContactVerificationState::Verified,
+    )?;
 
-    let verified_at = if state == ContactVerificationState::Verified
-        && identity.verification_state != ContactVerificationState::Verified
+    if params.contact_id != identity.contact_id
+        || params.company_id != identity.company_id
+        || params.normalized_e164 != identity.normalized_e164
     {
-        Some(ctx.timestamp)
-    } else {
-        identity.verified_at
-    };
+        return Err("verification proof scope does not match the current identity".to_string());
+    }
 
-    ctx.db.contact_phone_identity().id().update(ContactPhoneIdentity {
-        verification_state: state.clone(),
-        verified_at,
-        updated_at: ctx.timestamp,
-        ..identity.clone()
-    });
+    let method = validate_proof_text("method", &params.method, 32)?.to_ascii_lowercase();
+    if method != "otp" && method != "provider_attestation" {
+        return Err("verification proof method must be otp or provider_attestation".to_string());
+    }
+    let provider = validate_proof_text("provider", &params.provider, 100)?;
+    let provider_reference =
+        validate_proof_text("provider reference", &params.provider_reference, 255)?;
+    let evidence_hash = validate_evidence_hash(&params.evidence_hash)?;
+
+    let existing = ctx
+        .db
+        .contact_identity_verification_proof()
+        .contact_identity_proof_by_org()
+        .filter(&organization_id)
+        .find(|proof| proof.provider_reference == provider_reference);
+    if let Some(proof) = existing {
+        if proof_matches_request(
+            &proof,
+            &params,
+            &method,
+            &provider,
+            &provider_reference,
+            &evidence_hash,
+        ) && identity.verification_state == ContactVerificationState::Verified
+        {
+            return Ok(());
+        }
+        return Err(
+            "provider verification reference was already used with different evidence".to_string(),
+        );
+    }
+    if identity.verification_state == ContactVerificationState::Verified {
+        return Err(
+            "identity is already verified; only an exact provider retry is accepted".to_string(),
+        );
+    }
+
+    let now_micros = ctx.timestamp.to_micros_since_unix_epoch();
+    if params.issued_at_micros > now_micros {
+        return Err("verification proof cannot be issued in the future".to_string());
+    }
+    if params.expires_at_micros <= now_micros {
+        return Err("verification proof has expired".to_string());
+    }
+    let lifetime = params
+        .expires_at_micros
+        .checked_sub(params.issued_at_micros)
+        .ok_or("verification proof lifetime is invalid")?;
+    if lifetime <= 0 || lifetime > MAX_VERIFICATION_PROOF_LIFETIME_MICROS {
+        return Err(
+            "verification proof lifetime must be between zero and fifteen minutes".to_string(),
+        );
+    }
+
+    let proof =
+        ctx.db
+            .contact_identity_verification_proof()
+            .insert(ContactIdentityVerificationProof {
+                id: 0,
+                organization_id,
+                company_id: identity.company_id,
+                contact_id: identity.contact_id,
+                identity_id: identity.id,
+                normalized_e164: identity.normalized_e164.clone(),
+                method: method.clone(),
+                provider: provider.clone(),
+                provider_reference,
+                evidence_hash,
+                issued_at: Timestamp::from_micros_since_unix_epoch(params.issued_at_micros),
+                expires_at: Timestamp::from_micros_since_unix_epoch(params.expires_at_micros),
+                recorded_by: ctx.sender(),
+                recorded_at: ctx.timestamp,
+            });
+
+    ctx.db
+        .contact_phone_identity()
+        .id()
+        .update(ContactPhoneIdentity {
+            verification_state: ContactVerificationState::Verified,
+            verified_at: Some(ctx.timestamp),
+            updated_at: ctx.timestamp,
+            ..identity.clone()
+        });
 
     write_audit_log_v2(
         ctx,
@@ -462,7 +804,7 @@ pub fn verify_contact_identity(
         AuditLogParams {
             company_id: identity.company_id,
             table_name: "contact_phone_identity",
-            record_id: identity_id,
+            record_id: identity.id,
             action: "VERIFY",
             old_values: Some(
                 serde_json::json!({
@@ -472,12 +814,21 @@ pub fn verify_contact_identity(
             ),
             new_values: Some(
                 serde_json::json!({
-                    "verification_state": state.as_str(),
+                    "verification_state": ContactVerificationState::Verified.as_str(),
+                    "verification_proof_id": proof.id,
+                    "verification_method": method,
+                    "verification_provider": provider,
                 })
                 .to_string(),
             ),
             changed_fields: vec!["verification_state".to_string(), "verified_at".to_string()],
-            metadata: None,
+            metadata: Some(
+                serde_json::json!({
+                    "proof_table": "contact_identity_verification_proof",
+                    "proof_id": proof.id,
+                })
+                .to_string(),
+            ),
         },
     );
 
@@ -497,22 +848,28 @@ pub fn archive_contact_identity(
         .contact_phone_identity()
         .id()
         .find(&identity_id)
-        .ok_or("Contact identity not found")?;
+        .ok_or("contact identity not found")?;
 
     if identity.organization_id != organization_id {
-        return Err("Identity does not belong to this organization".to_string());
+        return Err("identity does not belong to this organization".to_string());
     }
 
     if identity.archived_at.is_some() {
-        return Err("Identity is already archived".to_string());
+        return Err("identity is already archived".to_string());
     }
 
-    ctx.db.contact_phone_identity().id().update(ContactPhoneIdentity {
-        archived_at: Some(ctx.timestamp),
-        is_preferred: false,
-        updated_at: ctx.timestamp,
-        ..identity.clone()
-    });
+    let contact = load_active_contact(ctx, organization_id, identity.contact_id)?;
+    validate_contact_company_scope(ctx, organization_id, &contact, identity.company_id)?;
+
+    ctx.db
+        .contact_phone_identity()
+        .id()
+        .update(ContactPhoneIdentity {
+            archived_at: Some(ctx.timestamp),
+            is_preferred: false,
+            updated_at: ctx.timestamp,
+            ..identity.clone()
+        });
 
     write_audit_log_v2(
         ctx,
@@ -584,5 +941,30 @@ mod tests {
     fn mask_e164_obscures_middle_digits() {
         assert_eq!(mask_e164("+14155552671"), "+141*****671");
         assert_eq!(mask_e164("+12345678901"), "+123*****901");
+    }
+
+    #[test]
+    fn caller_selected_verification_state_is_rejected() {
+        assert!(reject_caller_verification_state(None).is_ok());
+        assert!(
+            reject_caller_verification_state(Some(&ContactVerificationState::Unverified)).is_err()
+        );
+        assert!(
+            reject_caller_verification_state(Some(&ContactVerificationState::Verified)).is_err()
+        );
+    }
+
+    #[test]
+    fn opted_out_identity_cannot_be_verified() {
+        assert!(verify_state_transition(
+            &ContactVerificationState::OptedOut,
+            &ContactVerificationState::Verified,
+        )
+        .is_err());
+        assert!(verify_state_transition(
+            &ContactVerificationState::Unverified,
+            &ContactVerificationState::Verified,
+        )
+        .is_ok());
     }
 }

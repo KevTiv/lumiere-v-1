@@ -100,6 +100,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	generate-stdb-ts-sdk generate-stdb-rust-sdk \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
+	e2e-crm-isolation \
 	init-stack docker-dev docker-dev-iot \
 	codegen check-codegen api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
@@ -202,6 +203,7 @@ help-e2e:
 	$(call print-command,e2e-single-test,One spec against an existing E2E setup.)
 	$(call print-command,e2e-p2p,Procure-to-pay golden-path spec.)
 	$(call print-command,e2e-mvp-golden,Lead-to-cash and procure-to-pay gates.)
+	$(call print-command,e2e-crm-isolation,Fresh live CRM organization/company read-isolation gate.)
 	$(call print-command,e2e-wipe-local-stdb,DESTRUCTIVE: delete all local SpacetimeDB data.)
 	@printf "\nUseful inputs: E2E_CLEAR_DB=1, E2E_SUITE=p0, E2E_SPEC=<file>, E2E_GREP=<pattern>.\n"
 
@@ -243,7 +245,7 @@ publish:
 
 
 generate-stdb-ts-sdk:
-	spacetime generate --lang typescript --out-dir "frontend/packages/stdb/src/generated" --module-path $(MODULE)
+	spacetime generate --include-private --lang typescript --out-dir "frontend/packages/stdb/src/generated" --module-path $(MODULE)
 
 publish-clear:
 	LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish $(DB) --module-path $(MODULE) --server local --clear-database -y
@@ -492,6 +494,10 @@ e2e-smoke-test:
 	'
 
 e2e-single: e2e-smoke-setup e2e-single-test
+
+# Phase 2 CRM authorization gate: ephemeral tenants, persisted rows, HTTP reads, and WS subscriptions.
+e2e-crm-isolation:
+	@$(MAKE) e2e-single E2E_CLEAR_DB=1 E2E_SPEC=crm-read-isolation.spec.ts E2E_GREP= E2E_WORKERS=1
 
 # Wave 3 — procure-to-pay UI golden path (see docs/MVP_WORKFLOW_CONTRACT.md secondary path).
 e2e-p2p:
@@ -816,7 +822,7 @@ e2e-smoke:
 
 # ── Bindings, code generation, and service entry points ───────────────────────
 generate-stdb-rust-sdk:
-	spacetime generate --lang rust --out-dir "api-server/src/stdb_sdk_bindings" --module-path $(MODULE)
+	spacetime generate --include-private --lang rust --out-dir "api-server/src/stdb_sdk_bindings" --module-path $(MODULE)
 	bash scripts/fix-spacetimedb-rust-sdk-bindings.sh
 
 init-stack:

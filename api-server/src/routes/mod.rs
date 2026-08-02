@@ -6,6 +6,7 @@ mod ai_certifications;
 mod auth;
 mod billing;
 mod bootstrap;
+mod country_packs;
 mod crm;
 mod documents;
 mod import;
@@ -18,10 +19,10 @@ mod sales;
 mod session;
 mod settings;
 mod statement_imports;
-mod stdb;
-mod country_packs;
 mod statutory_adapters;
+mod stdb;
 mod vertical_packs;
+mod whatsapp_webhooks;
 
 use std::sync::Arc;
 
@@ -53,4 +54,5 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(country_packs::router())
         .merge(statutory_adapters::router())
         .merge(vertical_packs::router())
+        .merge(whatsapp_webhooks::router())
 }

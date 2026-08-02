@@ -48,9 +48,7 @@ pub async fn serve() -> anyhow::Result<()> {
     let orgs = org_ids.clone();
     tokio::spawn(async move {
         if orgs.is_empty() {
-            tracing::warn!(
-                "project integration worker idle: set LUMIERE_PROJECT_WORKER_ORG_IDS"
-            );
+            tracing::warn!("project integration worker idle: set LUMIERE_PROJECT_WORKER_ORG_IDS");
             return;
         }
         loop {
@@ -86,11 +84,7 @@ pub async fn serve() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn process_batch(
-    state: &AppState,
-    org_ids: &[u64],
-    batch: u32,
-) -> anyhow::Result<()> {
+async fn process_batch(state: &AppState, org_ids: &[u64], batch: u32) -> anyhow::Result<()> {
     for organization_id in org_ids {
         state
             .stdb

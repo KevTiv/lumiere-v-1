@@ -11,6 +11,7 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
+use tracing::warn;
 
 use crate::error::ApiError;
 use crate::query_exec::default_company_id;
@@ -19,6 +20,23 @@ use crate::state::AppState;
 use crate::web_session::stdb_identity_hex_hint;
 
 const MAX_CSV_BYTES: usize = 512_000;
+
+/// CRM entities gated by [`crm_csv_import_enabled`] pending CRM-RI-001 relational
+/// integrity remediation (see docs/plans/crm-relational-integrity-remediation-plan.md).
+const CRM_IMPORT_ENTITIES: &[&str] = &["contact", "lead", "opportunity"];
+
+/// Runtime opt-in for CRM CSV imports (env `LUMIERE_ENABLE_CRM_CSV_IMPORT`).
+///
+/// Defaults to **disabled** (containment measure). Mirrors the env-parsing style of
+/// `ReducerAllowlistMode::from_env` in `crate::reducer_allowlist`.
+fn crm_csv_import_enabled() -> bool {
+    matches!(
+        std::env::var("LUMIERE_ENABLE_CRM_CSV_IMPORT")
+            .ok()
+            .map(|s| s.trim().to_ascii_lowercase()),
+        Some(ref s) if s == "true" || s == "1" || s == "on"
+    )
+}
 
 #[derive(Debug, Clone, Copy)]
 enum ImportArgShape {
@@ -443,6 +461,20 @@ async fn import_entity_post(
 
     let spec = resolve_import_entity(&entity)
         .ok_or_else(|| ApiError::NotFound(format!("Unsupported import entity: {entity}")))?;
+
+    if CRM_IMPORT_ENTITIES.contains(&spec.table_name) && !crm_csv_import_enabled() {
+        warn!(
+            organization_id = org_id,
+            entity = spec.table_name,
+            identity = %session.identity_hex,
+            "CRM CSV import denied: disabled pending relational-integrity remediation"
+        );
+        return Err(ApiError::Forbidden(
+            "CRM CSV import is disabled pending relational-integrity remediation \
+             (see docs/plans/crm-relational-integrity-remediation-plan.md, CRM-RI-001)"
+                .to_string(),
+        ));
+    }
 
     validate_csv(&body.csv)?;
 

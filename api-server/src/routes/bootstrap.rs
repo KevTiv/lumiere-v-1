@@ -58,9 +58,8 @@ struct BootstrapTenantBody {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 struct BootstrapReducerArg {
-    organization: OrganizationInput,
+    organization: OrganizationReducerArg,
     default_company_name: String,
     default_company_code: String,
     default_company_currency_id: u64,
@@ -71,12 +70,73 @@ struct BootstrapReducerArg {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 struct SettingsReducerArg {
-    module_config: Option<String>,
+    module_config: Value,
     feature_flags: Vec<String>,
-    integration_keys: Option<String>,
-    metadata: Option<String>,
+    integration_keys: Value,
+    metadata: Value,
+}
+
+#[derive(Debug, Serialize)]
+struct OrganizationReducerArg {
+    name: String,
+    code: String,
+    timezone: String,
+    date_format: String,
+    language: String,
+    is_active: bool,
+    description: Value,
+    logo_url: Value,
+    website: Value,
+    email: Value,
+    phone: Value,
+    currency_id: Value,
+    metadata: Value,
+}
+
+fn stdb_option<T: Serialize>(value: Option<&T>) -> Value {
+    match value {
+        Some(value) => json!({ "some": value }),
+        None => json!({ "none": [] }),
+    }
+}
+
+impl From<&OrganizationInput> for OrganizationReducerArg {
+    fn from(value: &OrganizationInput) -> Self {
+        Self {
+            name: value.name.clone(),
+            code: value.code.clone(),
+            timezone: value.timezone.clone(),
+            date_format: value.date_format.clone(),
+            language: value.language.clone(),
+            is_active: value.is_active,
+            description: stdb_option(value.description.as_ref()),
+            logo_url: stdb_option(value.logo_url.as_ref()),
+            website: stdb_option(value.website.as_ref()),
+            email: stdb_option(value.email.as_ref()),
+            phone: stdb_option(value.phone.as_ref()),
+            currency_id: stdb_option(value.currency_id.as_ref()),
+            metadata: stdb_option(value.metadata.as_ref()),
+        }
+    }
+}
+
+fn reducer_arg(body: &BootstrapTenantBody) -> BootstrapReducerArg {
+    BootstrapReducerArg {
+        organization: OrganizationReducerArg::from(&body.organization),
+        default_company_name: body.default_company_name.clone(),
+        default_company_code: body.default_company_code.clone(),
+        default_company_currency_id: body.default_company_currency_id,
+        fiscal_year_end_month: body.fiscal_year_end_month,
+        fiscal_year_end_day: body.fiscal_year_end_day,
+        seed_form_configs: body.seed_form_configs,
+        settings: SettingsReducerArg {
+            module_config: stdb_option(body.settings.module_config.as_ref()),
+            feature_flags: body.settings.feature_flags.clone(),
+            integration_keys: stdb_option(body.settings.integration_keys.as_ref()),
+            metadata: stdb_option(body.settings.metadata.as_ref()),
+        },
+    }
 }
 
 fn validate_bootstrap(b: &BootstrapTenantBody) -> Result<(), ApiError> {
@@ -151,21 +211,7 @@ async fn bootstrap_tenant_post(
 
     validate_bootstrap(&body)?;
 
-    let arg = BootstrapReducerArg {
-        organization: body.organization.clone(),
-        default_company_name: body.default_company_name.clone(),
-        default_company_code: body.default_company_code.clone(),
-        default_company_currency_id: body.default_company_currency_id,
-        fiscal_year_end_month: body.fiscal_year_end_month,
-        fiscal_year_end_day: body.fiscal_year_end_day,
-        seed_form_configs: body.seed_form_configs,
-        settings: SettingsReducerArg {
-            module_config: body.settings.module_config.clone(),
-            feature_flags: body.settings.feature_flags.clone(),
-            integration_keys: body.settings.integration_keys.clone(),
-            metadata: body.settings.metadata.clone(),
-        },
-    };
+    let arg = reducer_arg(&body);
 
     let payload = serde_json::to_value(&arg).map_err(|e| ApiError::Internal(e.to_string()))?;
     let client = state.client_with_token(&session.stdb_token);
@@ -221,4 +267,52 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/bootstrap/currencies", get(bootstrap_currencies_get))
         .route("/bootstrap/tenant", post(bootstrap_tenant_post))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bootstrap_reducer_wire_uses_snake_case_and_stdb_options() {
+        let body = BootstrapTenantBody {
+            organization: OrganizationInput {
+                name: "Acme".into(),
+                code: "ACME".into(),
+                timezone: "UTC".into(),
+                date_format: "YYYY-MM-DD".into(),
+                language: "en".into(),
+                is_active: true,
+                description: None,
+                logo_url: None,
+                website: None,
+                email: None,
+                phone: None,
+                currency_id: None,
+                metadata: Some("fixture".into()),
+            },
+            default_company_name: "Acme Main".into(),
+            default_company_code: "MAIN".into(),
+            default_company_currency_id: 7,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            seed_form_configs: false,
+            settings: SettingsInput {
+                module_config: None,
+                feature_flags: vec!["crm_multi_company".into()],
+                integration_keys: None,
+                metadata: Some("settings".into()),
+            },
+        };
+
+        let value = serde_json::to_value(reducer_arg(&body)).expect("serialize reducer args");
+        assert_eq!(value["default_company_code"], "MAIN");
+        assert!(value.get("defaultCompanyCode").is_none());
+        assert_eq!(value["organization"]["description"], json!({ "none": [] }));
+        assert_eq!(
+            value["organization"]["metadata"],
+            json!({ "some": "fixture" })
+        );
+        assert_eq!(value["settings"]["metadata"], json!({ "some": "settings" }));
+    }
 }

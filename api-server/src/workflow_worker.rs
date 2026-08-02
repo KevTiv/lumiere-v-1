@@ -364,7 +364,10 @@ async fn dispatch_external_jobs(
 
         let lease_token = fresh_lease_token(job.id, worker_id);
         let lease_expires = now_micros()
-            + state.config.workflow_worker_lease_ttl_secs.saturating_mul(1_000_000);
+            + state
+                .config
+                .workflow_worker_lease_ttl_secs
+                .saturating_mul(1_000_000);
         if let Err(error) = state
             .stdb
             .call_reducer(
@@ -409,12 +412,7 @@ async fn dispatch_external_jobs(
         let adapter_result = run_external_adapter(state, &payload).await;
         let (result_kind, fingerprint, error_summary, outcome) = match adapter_result {
             Ok(fp) => ("Succeeded", Some(fp), None, "Succeeded"),
-            Err(error) => (
-                "RetryableFailure",
-                None,
-                Some(error.to_string()),
-                "Failed",
-            ),
+            Err(error) => ("RetryableFailure", None, Some(error.to_string()), "Failed"),
         };
 
         let instance_revision = instance_revision_for_outbox(state, outbox_id)
@@ -519,17 +517,11 @@ async fn instance_revision_for_outbox(state: &AppState, outbox_id: u64) -> anyho
 }
 
 /// Fake fingerprint when no webhook is set; HTTP POST when configured.
-async fn run_external_adapter(
-    state: &AppState,
-    payload: &OutboxPayload,
-) -> anyhow::Result<String> {
+async fn run_external_adapter(state: &AppState, payload: &OutboxPayload) -> anyhow::Result<String> {
     let outbox_id = payload
         .outbox_id
         .ok_or_else(|| anyhow::anyhow!("outbox id required for adapter"))?;
-    let key = payload
-        .action_key
-        .as_deref()
-        .unwrap_or("workflow.external");
+    let key = payload.action_key.as_deref().unwrap_or("workflow.external");
     let effect = outbox_record_idempotency_key(payload);
 
     if let Some(url) = state.config.workflow_external_webhook_url.as_deref() {
@@ -552,10 +544,7 @@ async fn run_external_adapter(
             .await
             .map_err(|error| anyhow::anyhow!("webhook request failed: {error}"))?;
         let status = response.status().as_u16();
-        let text = response
-            .text()
-            .await
-            .unwrap_or_default();
+        let text = response.text().await.unwrap_or_default();
         if !(200..300).contains(&status) {
             return Err(anyhow::anyhow!(
                 "webhook returned HTTP {status}: {}",
@@ -564,7 +553,13 @@ async fn run_external_adapter(
         }
         let mut hasher = Sha256::new();
         hasher.update(status.to_le_bytes());
-        hasher.update(text.as_bytes().iter().take(512).copied().collect::<Vec<_>>());
+        hasher.update(
+            text.as_bytes()
+                .iter()
+                .take(512)
+                .copied()
+                .collect::<Vec<_>>(),
+        );
         return Ok(format!("sha256:{:x}", hasher.finalize()));
     }
 
@@ -704,7 +699,9 @@ fn run_outbox_attempt(
 
     ledger.external_calls += 1;
     if crash == DispatchCrashPoint::AfterExternalCallBeforeResult {
-        return Err(DispatchAttemptError::Crashed(DispatchPhase::ExternalSucceeded));
+        return Err(DispatchAttemptError::Crashed(
+            DispatchPhase::ExternalSucceeded,
+        ));
     }
 
     if !ledger.committed_effects.insert(effect_key.to_string()) {
@@ -805,7 +802,11 @@ mod tests {
             3,
             Some("external.test.execute:v1")
         ));
-        assert!(!dispatch_allowlisted(&config, 9, Some("external.test.execute:v1")));
+        assert!(!dispatch_allowlisted(
+            &config,
+            9,
+            Some("external.test.execute:v1")
+        ));
         assert!(!dispatch_allowlisted(&config, 3, Some("other.action")));
         config.workflow_external_dispatch_action_keys.clear();
         assert!(!dispatch_allowlisted(

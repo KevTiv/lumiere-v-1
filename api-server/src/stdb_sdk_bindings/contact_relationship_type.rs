@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct ContactRelationship {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub left_contact_id: u64,
     pub right_contact_id: u64,
     pub relationship_type: String,
@@ -31,6 +32,7 @@ impl __sdk::InModule for ContactRelationship {
 pub struct ContactRelationshipCols {
     pub id: __sdk::__query_builder::Col<ContactRelationship, u64>,
     pub organization_id: __sdk::__query_builder::Col<ContactRelationship, u64>,
+    pub company_id: __sdk::__query_builder::Col<ContactRelationship, u64>,
     pub left_contact_id: __sdk::__query_builder::Col<ContactRelationship, u64>,
     pub right_contact_id: __sdk::__query_builder::Col<ContactRelationship, u64>,
     pub relationship_type: __sdk::__query_builder::Col<ContactRelationship, String>,
@@ -49,6 +51,7 @@ impl __sdk::__query_builder::HasCols for ContactRelationship {
         ContactRelationshipCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             left_contact_id: __sdk::__query_builder::Col::new(table_name, "left_contact_id"),
             right_contact_id: __sdk::__query_builder::Col::new(table_name, "right_contact_id"),
             relationship_type: __sdk::__query_builder::Col::new(table_name, "relationship_type"),

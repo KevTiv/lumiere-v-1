@@ -85,9 +85,7 @@ import {
   useUpdateContactAddress,
   useUpdateContactBusiness,
   useUpdateContactDetails,
-  useUpdateLeadAddress,
-  useUpdateLeadDetails,
-  useUpdateLeadRevenue,
+  useUpdateLead,
   useUpdateOpportunity,
   useCrmCsvImportMutations,
   useCreateForecastSnapshot,
@@ -576,9 +574,7 @@ function CrmClientLoaded({
   const updateContactAddress = useUpdateContactAddress(orgId)
   const updateContactBusiness = useUpdateContactBusiness(orgId)
   const updateContactDetails = useUpdateContactDetails(orgId)
-  const updateLeadDetails = useUpdateLeadDetails(orgId)
-  const updateLeadAddress = useUpdateLeadAddress(orgId)
-  const updateLeadRevenue = useUpdateLeadRevenue(orgId)
+  const updateLead = useUpdateLead(orgId)
   const csvImports = useCrmCsvImportMutations(orgId)
   const { data: forecastSnapshots = [] } = useCrmForecastSnapshots(orgId)
   const createForecastSnapshot = useCreateForecastSnapshot(orgId)
@@ -1837,9 +1833,7 @@ function CrmClientLoaded({
     updateContactAddress.isPending ||
     updateContactBusiness.isPending ||
     updateContactDetails.isPending ||
-    updateLeadDetails.isPending ||
-    updateLeadAddress.isPending ||
-    updateLeadRevenue.isPending ||
+    updateLead.isPending ||
     csvImports.importContact.isPending ||
     csvImports.importLead.isPending ||
     csvImports.importOpportunity.isPending
@@ -1961,7 +1955,7 @@ function CrmClientLoaded({
       } else if (workflowModal.kind === "editLeadDetails") {
         const p = toUpdateLeadDetailsParams(formData)
         if (!p) throw new Error(t("crm.forms.editLeadDetails.validation.noChanges"))
-        await updateLeadDetails.mutateAsync({ leadId: workflowModal.leadId, params: p })
+        await updateLead.mutateAsync({ leadId: workflowModal.leadId, params: p })
         if (formData.metadata) {
           await persistCrmCustomFields({
             model: "lead",
@@ -1972,7 +1966,7 @@ function CrmClientLoaded({
       } else if (workflowModal.kind === "editLeadAddress") {
         const p = toUpdateLeadAddressParams(formData)
         if (!p) throw new Error(t("crm.forms.editLeadAddress.validation.noChanges"))
-        await updateLeadAddress.mutateAsync({ leadId: workflowModal.leadId, params: p })
+        await updateLead.mutateAsync({ leadId: workflowModal.leadId, params: p })
         if (formData.metadata) {
           await persistCrmCustomFields({
             model: "lead",
@@ -1983,7 +1977,7 @@ function CrmClientLoaded({
       } else if (workflowModal.kind === "editLeadRevenue") {
         const p = toUpdateLeadRevenueParams(formData)
         if (!p) throw new Error(t("crm.forms.editLeadRevenue.validation.noChanges"))
-        await updateLeadRevenue.mutateAsync({ leadId: workflowModal.leadId, params: p })
+        await updateLead.mutateAsync({ leadId: workflowModal.leadId, params: p })
         if (formData.metadata) {
           await persistCrmCustomFields({
             model: "lead",

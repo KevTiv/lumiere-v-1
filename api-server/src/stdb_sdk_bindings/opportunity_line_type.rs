@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct OpportunityLine {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub opportunity_id: u64,
     pub product_id: Option<u64>,
     pub name: String,
@@ -33,6 +34,7 @@ impl __sdk::InModule for OpportunityLine {
 pub struct OpportunityLineCols {
     pub id: __sdk::__query_builder::Col<OpportunityLine, u64>,
     pub organization_id: __sdk::__query_builder::Col<OpportunityLine, u64>,
+    pub company_id: __sdk::__query_builder::Col<OpportunityLine, u64>,
     pub opportunity_id: __sdk::__query_builder::Col<OpportunityLine, u64>,
     pub product_id: __sdk::__query_builder::Col<OpportunityLine, Option<u64>>,
     pub name: __sdk::__query_builder::Col<OpportunityLine, String>,
@@ -53,6 +55,7 @@ impl __sdk::__query_builder::HasCols for OpportunityLine {
         OpportunityLineCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             opportunity_id: __sdk::__query_builder::Col::new(table_name, "opportunity_id"),
             product_id: __sdk::__query_builder::Col::new(table_name, "product_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),

@@ -6,6 +6,7 @@
 ///          PrivacyConsent tracks GDPR/CCPA opt-in/opt-out per contact.
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
@@ -91,7 +92,6 @@ pub struct DataClassificationRule {
 
 #[spacetimedb::table(
     accessor = privacy_consent,
-    public,
     index(accessor = consent_by_org,     btree(columns = [organization_id])),
     index(accessor = consent_by_contact, btree(columns = [contact_id]))
 )]
@@ -100,6 +100,7 @@ pub struct PrivacyConsent {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub contact_id: u64,
     pub consent_type: String,
     pub granted: bool,
@@ -181,7 +182,8 @@ pub fn create_data_classification_rule(
         .find(&params.classification_id)
         .ok_or("Data classification not found")?;
 
-    let row = ctx.db
+    let row = ctx
+        .db
         .data_classification_rule()
         .insert(DataClassificationRule {
             id: 0,
@@ -235,9 +237,21 @@ pub fn record_privacy_consent(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "privacy_consent", "create")?;
 
+    let contact = ctx
+        .db
+        .contact()
+        .id()
+        .find(&params.contact_id)
+        .ok_or("Contact not found")?;
+    if contact.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
+    let company_id = contact.company_id.ok_or("Contact has no company scope")?;
+
     let row = ctx.db.privacy_consent().insert(PrivacyConsent {
         id: 0,
         organization_id,
+        company_id,
         contact_id: params.contact_id,
         consent_type: params.consent_type.clone(),
         granted: params.granted,
@@ -288,10 +302,7 @@ pub fn record_privacy_consent(
 
 /// Purge rows past their classification retention window (operational messages only in v1).
 #[spacetimedb::reducer]
-pub fn execute_retention_purge(
-    ctx: &ReducerContext,
-    organization_id: u64,
-) -> Result<(), String> {
+pub fn execute_retention_purge(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     use crate::core::operational_messaging::operational_message;
 
     check_permission(ctx, organization_id, "data_classification", "write")?;
@@ -355,9 +366,7 @@ pub fn execute_retention_purge(
             record_id: 0,
             action: "RETENTION_PURGE",
             old_values: None,
-            new_values: Some(
-                serde_json::json!({ "purged_count": purged_count }).to_string(),
-            ),
+            new_values: Some(serde_json::json!({ "purged_count": purged_count }).to_string()),
             changed_fields: vec!["purged_count".to_string()],
             metadata: None,
         },

@@ -197,10 +197,8 @@ pub fn parse_erp_org_sql(ts: &str) -> Result<Vec<ErpOrgSqlRow>> {
         .context("ERP_ORG_SQL block not found in erp-subscriptions.ts")?;
     let mut rows = Vec::new();
     for (map_key, body) in split_map_entries(block) {
-        let (resource_key, table, extra_where, order_by) =
-            parse_select_org_scoped(&body).with_context(|| {
-                format!("parse selectOrgScopedSql for map key \"{map_key}\"")
-            })?;
+        let (resource_key, table, extra_where, order_by) = parse_select_org_scoped(&body)
+            .with_context(|| format!("parse selectOrgScopedSql for map key \"{map_key}\""))?;
         rows.push(ErpOrgSqlRow {
             map_key,
             resource_key,

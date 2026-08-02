@@ -2,7 +2,6 @@
 
 import type {
   ContactIdentityKind,
-  ContactVerificationState,
   CreateAssignmentRuleParams,
   CreateContactIdentityParams,
   CreateContactRelationshipParams,
@@ -61,7 +60,7 @@ export function toCreateContactIdentityParams(
 
   return {
     kind: unitEnumFromForm<ContactIdentityKind>(field(formData, "kind", "kind"), ["Primary", "WhatsApp", "MobileMoney"] as const, "Primary"),
-    verificationState: unitEnumFromForm<ContactVerificationState>(field(formData, "verificationState", "verification_state"), ["Unverified", "Pending", "Verified", "Failed", "OptedOut"] as const, "Unverified"),
+    verificationState: undefined,
     contactId,
     companyId: optionalBigIntU64(field(formData, "companyId", "company_id")),
     rawValue,
@@ -146,4 +145,3 @@ export function toCreateOpportunityStageParams(
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }
-

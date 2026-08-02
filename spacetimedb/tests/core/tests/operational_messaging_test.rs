@@ -6,10 +6,13 @@ use crate::core::operational_messaging::{
     set_contact_communication_preference, CreateMessageTemplateParams,
     CreateOperationalMessageParams, MessageTemplateVariable,
 };
-use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::crm::contact_identities::{contact_phone_identity, ContactPhoneIdentity};
+use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
-use crate::types::{ContactIdentityKind, ContactVerificationState, MessageChannel, OperationalMessageStatus};
+use crate::types::{
+    ContactIdentityKind, ContactVerificationState, MessageChannel, OperationalMessageStatus,
+};
 
 fn seed_contact_with_phone(
     ctx: &ReducerContext,
@@ -71,23 +74,25 @@ fn seed_contact_with_phone(
         .find(|c| c.organization_id == org_id && c.name == name)
         .ok_or("Contact not found after create")?;
 
-    ctx.db.contact_phone_identity().insert(ContactPhoneIdentity {
-        id: 0,
-        organization_id: org_id,
-        company_id: Some(company_id),
-        contact_id: contact.id,
-        kind: ContactIdentityKind::Primary,
-        normalized_e164: "+15550101001".to_string(),
-        display_masked: "+1****01".to_string(),
-        verification_state: ContactVerificationState::Verified,
-        is_preferred: true,
-        created_by: ctx.sender(),
-        created_at: ctx.timestamp,
-        updated_at: ctx.timestamp,
-        verified_at: Some(ctx.timestamp),
-        archived_at: None,
-        metadata: None,
-    });
+    ctx.db
+        .contact_phone_identity()
+        .insert(ContactPhoneIdentity {
+            id: 0,
+            organization_id: org_id,
+            company_id: Some(company_id),
+            contact_id: contact.id,
+            kind: ContactIdentityKind::Primary,
+            normalized_e164: "+15550101001".to_string(),
+            display_masked: "+1****01".to_string(),
+            verification_state: ContactVerificationState::Verified,
+            is_preferred: true,
+            created_by: ctx.sender(),
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            verified_at: Some(ctx.timestamp),
+            archived_at: None,
+            metadata: None,
+        });
 
     Ok(contact.id)
 }
@@ -99,6 +104,61 @@ pub fn test_message_template_and_single_message(ctx: &ReducerContext) -> Result<
     let company_id = fixture.company_id;
 
     let contact_id = seed_contact_with_phone(ctx, &fixture, "Messaging Customer")?;
+
+    if set_contact_communication_preference(
+        ctx,
+        org_id,
+        None,
+        contact_id,
+        MessageChannel::WhatsApp,
+        true,
+    )
+    .is_ok()
+    {
+        return Err("Company-less communication preference should be rejected".to_string());
+    }
+
+    create_company(
+        ctx,
+        org_id,
+        CreateCompanyParams {
+            name: "Messaging Company B".to_string(),
+            code: format!("MSG-B-{company_id}"),
+            currency_id: 1,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: None,
+        },
+    )?;
+    let sibling_company_id = ctx
+        .db
+        .company()
+        .company_by_org()
+        .filter(&org_id)
+        .map(|company| company.id)
+        .filter(|id| *id != company_id)
+        .max()
+        .ok_or("Messaging sibling company missing")?;
+    if set_contact_communication_preference(
+        ctx,
+        org_id,
+        Some(sibling_company_id),
+        contact_id,
+        MessageChannel::WhatsApp,
+        true,
+    )
+    .is_ok()
+    {
+        return Err("Cross-company communication preference should be rejected".to_string());
+    }
 
     set_contact_communication_preference(
         ctx,
@@ -118,7 +178,9 @@ pub fn test_message_template_and_single_message(ctx: &ReducerContext) -> Result<
             name: "Invoice Reminder".to_string(),
             locale: "en".to_string(),
             subject: Some("Reminder: invoice {{invoice_number}}".to_string()),
-            body_template: "Hi {{customer_name}}, your invoice {{invoice_number}} for {{amount}} is due.".to_string(),
+            body_template:
+                "Hi {{customer_name}}, your invoice {{invoice_number}} for {{amount}} is due."
+                    .to_string(),
             allowed_variables: vec![
                 "customer_name".to_string(),
                 "invoice_number".to_string(),
@@ -151,9 +213,18 @@ pub fn test_message_template_and_single_message(ctx: &ReducerContext) -> Result<
             rendered_subject: None,
             rendered_body: String::new(),
             variables: vec![
-                MessageTemplateVariable { key: "customer_name".to_string(), value: "Alice".to_string() },
-                MessageTemplateVariable { key: "invoice_number".to_string(), value: "INV-001".to_string() },
-                MessageTemplateVariable { key: "amount".to_string(), value: "$100.00".to_string() },
+                MessageTemplateVariable {
+                    key: "customer_name".to_string(),
+                    value: "Alice".to_string(),
+                },
+                MessageTemplateVariable {
+                    key: "invoice_number".to_string(),
+                    value: "INV-001".to_string(),
+                },
+                MessageTemplateVariable {
+                    key: "amount".to_string(),
+                    value: "$100.00".to_string(),
+                },
             ],
             status: OperationalMessageStatus::Draft,
             metadata: None,
@@ -168,7 +239,10 @@ pub fn test_message_template_and_single_message(ctx: &ReducerContext) -> Result<
         .ok_or("Operational message not found")?;
 
     if !message.rendered_body.contains("INV-001") {
-        return Err(format!("Rendered body missing invoice number: {}", message.rendered_body));
+        return Err(format!(
+            "Rendered body missing invoice number: {}",
+            message.rendered_body
+        ));
     }
 
     Ok(())

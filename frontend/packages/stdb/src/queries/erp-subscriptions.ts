@@ -1,4 +1,5 @@
 import { authSubscriptions } from "./auth";
+import type { QueryResourceKey } from "../generated/query-registry";
 import {
   type FieldAccessContext,
   hasHrPermission,
@@ -29,6 +30,41 @@ export interface SubscriptionQueryContext {
   /** When set (e.g. from the same sources as `/api/query`), subscription SQL matches API column projection. */
   fieldAccess?: FieldAccessContext;
 }
+
+/** CRM tables are private in SpacetimeDB and may only be read through the BFF. */
+const PRIVATE_CRM_RESOURCES = new Set([
+  "leads",
+  "lead-sources",
+  "lead-lost-reasons",
+  "opportunities",
+  "opportunity-stages",
+  "opportunity-lines",
+  "opportunity-presence",
+  "contacts",
+  "contact-phone-identities",
+  "contact-role-assignments",
+  "contact-tags",
+  "contact-tag-assignments",
+  "contact-segments",
+  "segment-members",
+  "contact-relationships",
+  "contact-duplicate-candidates",
+  "assignment-rules",
+  "activities",
+  "calendar-events",
+  "utm-campaigns",
+  "utm-media",
+  "utm-sources",
+  "privacy-consent",
+  "contact-communication-preferences",
+  "crm-forecast-snapshots",
+  "lead-scores",
+  "lead-score-factors",
+  "contact-segment-rules",
+  "contact-relationship-insights",
+  "crm-conversations",
+  "crm-conversation-messages",
+])
 
 /**
  * Kebab-case resource keys aligned with `/api/query/[resource]` plus auth bundle keys.
@@ -1646,6 +1682,54 @@ function subscriptionSqlForCompanyScopedResource(
 ): string[] | null | undefined {
   const ids = ctx.companyIds
   const fa = ctx.fieldAccess
+  const crmOptionalCompanyTables: Record<string, string> = {
+    contacts: "contact",
+    opportunities: "opportunity",
+    "contact-phone-identities": "contact_phone_identity",
+    "contact-role-assignments": "contact_role_assignment",
+    "contact-communication-preferences": "contact_communication_preference",
+  }
+  const crmRequiredCompanyTables: Record<string, string> = {
+    "contact-duplicate-candidates": "contact_duplicate_candidate",
+    "crm-forecast-snapshots": "crm_forecast_snapshot",
+  }
+  const crmIndirectCompanyResources = new Set([
+    "opportunity-lines",
+    "opportunity-presence",
+    "contact-tag-assignments",
+    "segment-members",
+    "contact-relationships",
+    "privacy-consent",
+    "contact-relationship-insights",
+    "crm-conversations",
+    "crm-conversation-messages",
+  ])
+
+  const crmOptionalTable = crmOptionalCompanyTables[resource]
+  if (crmOptionalTable) {
+    if (ctx.organizationId == null || ids?.length !== 1) return null
+    const companyId = ids[0]
+    const columns = resolveHttpSqlColumns(resource as QueryResourceKey, fa).join(", ")
+    return [
+      `SELECT ${columns} FROM ${crmOptionalTable} WHERE organization_id = ${ctx.organizationId} AND (company_id = ${companyId} OR company_id IS NULL)`,
+    ]
+  }
+
+  const crmRequiredTable = crmRequiredCompanyTables[resource]
+  if (crmRequiredTable) {
+    if (ctx.organizationId == null || ids?.length !== 1) return null
+    const companyId = ids[0]
+    const columns = resolveHttpSqlColumns(resource as QueryResourceKey, fa).join(", ")
+    return [
+      `SELECT ${columns} FROM ${crmRequiredTable} WHERE organization_id = ${ctx.organizationId} AND company_id = ${companyId}`,
+    ]
+  }
+
+  // These rows inherit company ownership from a parent. SpacetimeDB subscription SQL
+  // cannot JOIN or use a subquery, so a direct public client subscription would expose
+  // cross-company rows before projection. Use the authorized HTTP read path instead.
+  if (crmIndirectCompanyResources.has(resource)) return null
+
   if (resource === "fixed-assets") {
     if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("fixed-assets", fa).join(", ")
@@ -1792,6 +1876,8 @@ export function subscriptionQueriesForResource(
   if (AUTH_SINGLE[r] !== undefined) {
     return [AUTH_SINGLE[r]];
   }
+
+  if (PRIVATE_CRM_RESOURCES.has(r)) return null;
 
   if (r === "roles") {
     return [selectRolesActiveSql(ctx.fieldAccess)];

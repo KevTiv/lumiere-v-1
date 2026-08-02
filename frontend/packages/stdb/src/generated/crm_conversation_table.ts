@@ -17,10 +17,12 @@ import {
 export default __t.row({
   id: __t.u64().primaryKey(),
   organizationId: __t.u64().name("organization_id"),
+  companyId: __t.u64().name("company_id"),
   contactId: __t.u64().name("contact_id"),
   get channel() {
     return MessageChannel;
   },
+  providerAccountId: __t.option(__t.u64()).name("provider_account_id"),
   phoneIdentityId: __t.option(__t.u64()).name("phone_identity_id"),
   status: __t.string(),
   assignedUserId: __t.option(__t.identity()).name("assigned_user_id"),

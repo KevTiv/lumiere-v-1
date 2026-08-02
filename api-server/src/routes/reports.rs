@@ -107,7 +107,7 @@ async fn preview_post(
         report_key,
         ReportAccess::Preview,
     )?;
-    let client = state.client_with_token(&session.stdb_token);
+    let client = state.stdb.clone();
     let preview = preview_report(
         &client,
         report_key,
@@ -137,7 +137,7 @@ async fn history_get(
         ));
     }
     ensure_report_history_access(session.field_access.as_ref())?;
-    let client = state.client_with_token(&session.stdb_token);
+    let client = state.stdb.clone();
     Ok(Json(
         report_history(&client, organization_id, query.company_id).await?,
     ))

@@ -104,7 +104,6 @@ pub struct SetContactSegmentRulesParams {
 
 #[spacetimedb::table(
     accessor = contact_segment,
-    public,
     index(accessor = segment_by_org, btree(columns = [organization_id]))
 )]
 pub struct ContactSegment {
@@ -125,12 +124,13 @@ pub struct ContactSegment {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = segment_member, public)]
+#[spacetimedb::table(accessor = segment_member)]
 pub struct SegmentMember {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub segment_id: u64,
     pub contact_id: u64,
     pub added_at: Timestamp,
@@ -141,7 +141,6 @@ pub struct SegmentMember {
 
 #[spacetimedb::table(
     accessor = assignment_rule,
-    public,
     index(accessor = rule_by_org, btree(columns = [organization_id]))
 )]
 pub struct AssignmentRule {
@@ -163,7 +162,6 @@ pub struct AssignmentRule {
 
 #[spacetimedb::table(
     accessor = contact_segment_rule,
-    public,
     index(accessor = segment_rule_by_org, btree(columns = [organization_id])),
     index(accessor = segment_rule_by_segment, btree(columns = [segment_id]))
 )]
@@ -282,6 +280,7 @@ pub fn add_contact_to_segment(
     let member = ctx.db.segment_member().insert(SegmentMember {
         id: 0,
         organization_id,
+        company_id: contact.company_id.ok_or("Contact has no company scope")?,
         segment_id,
         contact_id,
         added_at: ctx.timestamp,
@@ -492,7 +491,9 @@ fn validate_clause(clause: &SegmentRuleClause) -> Result<(), String> {
             }
         }
         (
-            SegmentRuleField::IsCustomer | SegmentRuleField::IsProspect | SegmentRuleField::IsVendor,
+            SegmentRuleField::IsCustomer
+            | SegmentRuleField::IsProspect
+            | SegmentRuleField::IsVendor,
             SegmentRuleOp::IsTrue | SegmentRuleOp::IsFalse,
         ) => {}
         (SegmentRuleField::TagId, SegmentRuleOp::Eq | SegmentRuleOp::Neq) => {
@@ -507,19 +508,35 @@ fn validate_clause(clause: &SegmentRuleClause) -> Result<(), String> {
     Ok(())
 }
 
-fn contact_matches_clause(ctx: &ReducerContext, contact: &Contact, clause: &ContactSegmentRule) -> bool {
+fn contact_matches_clause(
+    ctx: &ReducerContext,
+    contact: &Contact,
+    clause: &ContactSegmentRule,
+) -> bool {
     match clause.field {
         SegmentRuleField::CountryCode => {
             let actual = contact.country_code.as_deref().unwrap_or("");
-            match_text(actual, &clause.op, clause.value_text.as_deref().unwrap_or(""))
+            match_text(
+                actual,
+                &clause.op,
+                clause.value_text.as_deref().unwrap_or(""),
+            )
         }
         SegmentRuleField::City => {
             let actual = contact.city.as_deref().unwrap_or("");
-            match_text(actual, &clause.op, clause.value_text.as_deref().unwrap_or(""))
+            match_text(
+                actual,
+                &clause.op,
+                clause.value_text.as_deref().unwrap_or(""),
+            )
         }
         SegmentRuleField::Industry => {
             let actual = contact.industry.as_deref().unwrap_or("");
-            match_text(actual, &clause.op, clause.value_text.as_deref().unwrap_or(""))
+            match_text(
+                actual,
+                &clause.op,
+                clause.value_text.as_deref().unwrap_or(""),
+            )
         }
         SegmentRuleField::IsCustomer => match_bool(contact.is_customer, &clause.op),
         SegmentRuleField::IsProspect => match_bool(contact.is_prospect, &clause.op),
@@ -701,7 +718,10 @@ pub fn evaluate_dynamic_segment(
 
     let mut matched_ids = Vec::new();
     for contact in &contacts {
-        if rules.iter().all(|rule| contact_matches_clause(ctx, contact, rule)) {
+        if rules
+            .iter()
+            .all(|rule| contact_matches_clause(ctx, contact, rule))
+        {
             matched_ids.push(contact.id);
         }
     }
@@ -740,9 +760,15 @@ pub fn evaluate_dynamic_segment(
             }
             Some(_) => {}
             None => {
+                let company_id = contacts
+                    .iter()
+                    .find(|contact| contact.id == *contact_id)
+                    .and_then(|contact| contact.company_id)
+                    .ok_or("Contact has no company scope")?;
                 ctx.db.segment_member().insert(SegmentMember {
                     id: 0,
                     organization_id,
+                    company_id,
                     segment_id,
                     contact_id: *contact_id,
                     added_at: ctx.timestamp,

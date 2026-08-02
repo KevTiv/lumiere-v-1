@@ -25,7 +25,7 @@ use crate::config::Config;
 use crate::error::ApiError;
 use crate::metrics;
 use crate::middleware::metrics::track_http_metrics;
-use crate::query_exec::{default_company_id, execute_resource_query};
+use crate::query_exec::{default_company_id, execute_resource_query_for_company};
 use crate::reducer_allowlist::{blocked_reducer_reason, ReducerAllowlistMode};
 use crate::routes;
 use crate::session::resolve_api_session;
@@ -36,6 +36,8 @@ use crate::web_session::stdb_identity_hex_hint;
 struct OrgQuery {
     #[serde(rename = "organizationId")]
     organization_id: Option<u64>,
+    #[serde(rename = "companyId")]
+    company_id: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,17 +107,20 @@ async fn get_query(
 
     // Private workflow tables are not readable with the user JWT; use the module
     // owner token and enforce identity/company filters in `workflow_reads`.
-    let client = if crate::workflow_reads::is_private_workflow_resource(&resource) {
+    let client = if crate::workflow_reads::is_private_workflow_resource(&resource)
+        || crate::query_exec::crm_resource(&resource)
+    {
         state.stdb.clone()
     } else {
         state.client_with_token(&session.stdb_token)
     };
-    let data = execute_resource_query(
+    let data = execute_resource_query_for_company(
         &client,
         &resource,
         org_id,
         &session.identity_hex,
         session.field_access.as_ref(),
+        q.company_id,
     )
     .await?;
 

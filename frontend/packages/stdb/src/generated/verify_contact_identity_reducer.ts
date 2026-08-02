@@ -17,7 +17,7 @@ import {
 export default {
   organizationId: __t.u64(),
   identityId: __t.u64(),
-  get state() {
+  get requestedState() {
     return ContactVerificationState;
   },
 };

@@ -187,6 +187,8 @@ pub mod contact_category_assignment_type;
 pub mod contact_communication_preference_type;
 pub mod contact_duplicate_candidate_type;
 pub mod contact_identity_kind_type;
+pub mod contact_identity_verification_authority_type;
+pub mod contact_identity_verification_proof_type;
 pub mod contact_phone_identity_type;
 pub mod contact_relationship_type;
 pub mod contact_relationship_insight_type;
@@ -467,6 +469,8 @@ pub mod create_workorder_params_type;
 pub mod crm_conversation_type;
 pub mod crm_conversation_message_type;
 pub mod crm_forecast_snapshot_type;
+pub mod crm_provider_event_receipt_type;
+pub mod crm_provider_principal_type;
 pub mod crossovered_budget_type;
 pub mod crossovered_budget_lines_type;
 pub mod currency_type;
@@ -808,12 +812,15 @@ pub mod queue_worker_type;
 pub mod rate_subscription_usage_events_params_type;
 pub mod rebase_deferred_schedules_params_type;
 pub mod receive_consignment_stock_params_type;
+pub mod receive_crm_provider_message_params_type;
 pub mod recognize_amortization_line_params_type;
 pub mod recognize_deferred_revenue_params_type;
 pub mod recognize_project_revenue_params_type;
 pub mod recompute_workflow_timers_params_type;
 pub mod reconcile_account_bank_statement_line_params_type;
 pub mod record_barcode_scan_params_type;
+pub mod record_contact_identity_verification_proof_params_type;
+pub mod record_crm_provider_delivery_params_type;
 pub mod record_custom_field_entry_type;
 pub mod record_custom_field_value_type;
 pub mod record_cycle_count_line_params_type;
@@ -837,6 +844,7 @@ pub mod refresh_project_margin_params_type;
 pub mod refresh_resource_utilisation_params_type;
 pub mod refuse_expense_sheet_params_type;
 pub mod register_ai_skill_certification_runtime_profile_params_type;
+pub mod register_crm_provider_principal_params_type;
 pub mod register_device_params_type;
 pub mod register_hub_params_type;
 pub mod register_queue_worker_params_type;
@@ -1052,6 +1060,7 @@ pub mod update_landed_cost_params_type;
 pub mod update_lead_address_params_type;
 pub mod update_lead_details_params_type;
 pub mod update_lead_lost_reason_params_type;
+pub mod update_lead_params_type;
 pub mod update_lead_revenue_params_type;
 pub mod update_lead_source_params_type;
 pub mod update_leave_type_params_type;
@@ -1396,6 +1405,7 @@ pub mod compute_pos_session_totals_reducer;
 pub mod compute_purchase_order_line_totals_reducer;
 pub mod compute_purchase_order_totals_reducer;
 pub mod compute_so_totals_reducer;
+pub mod configure_contact_identity_verification_authority_reducer;
 pub mod confirm_account_asset_reducer;
 pub mod confirm_budget_reducer;
 pub mod confirm_manufacturing_order_reducer;
@@ -1668,6 +1678,7 @@ pub mod create_workflow_delegation_reducer;
 pub mod create_workflow_migration_plan_reducer;
 pub mod create_working_calendar_reducer;
 pub mod create_workorder_reducer;
+pub mod crm_integrity_inventory_reducer;
 pub mod deactivate_pos_config_reducer;
 pub mod deactivate_revenue_recognition_rule_reducer;
 pub mod deactivate_subscription_plan_reducer;
@@ -1786,6 +1797,8 @@ pub mod grant_field_permission_reducer;
 pub mod grant_permission_reducer;
 pub mod grant_subscription_entitlement_reducer;
 pub mod hold_supplier_intake_reducer;
+pub mod identity_connected_reducer;
+pub mod identity_disconnected_reducer;
 pub mod import_account_csv_reducer;
 pub mod import_account_move_csv_reducer;
 pub mod import_account_move_line_csv_reducer;
@@ -1915,6 +1928,7 @@ pub mod queue_mail_from_template_reducer;
 pub mod rate_subscription_usage_events_reducer;
 pub mod rebase_deferred_schedules_for_subscription_reducer;
 pub mod receive_consignment_stock_reducer;
+pub mod receive_crm_provider_message_reducer;
 pub mod receive_po_line_reducer;
 pub mod recognize_amortization_line_reducer;
 pub mod recognize_deferred_revenue_reducer;
@@ -1927,6 +1941,8 @@ pub mod reconcile_payment_with_invoice_reducer;
 pub mod record_ai_agent_run_policy_snapshot_reducer;
 pub mod record_ai_spend_reducer;
 pub mod record_barcode_scan_reducer;
+pub mod record_contact_identity_verification_proof_reducer;
+pub mod record_crm_provider_delivery_reducer;
 pub mod record_cycle_count_line_reducer;
 pub mod record_document_view_reducer;
 pub mod record_generated_owner_report_reducer;
@@ -1961,6 +1977,7 @@ pub mod refresh_tax_deadline_statuses_reducer;
 pub mod refuse_expense_sheet_reducer;
 pub mod refuse_leave_reducer;
 pub mod register_ai_skill_certification_runtime_profile_reducer;
+pub mod register_crm_provider_principal_reducer;
 pub mod register_iot_device_reducer;
 pub mod register_iot_hub_reducer;
 pub mod register_payment_on_invoice_reducer;
@@ -2055,6 +2072,7 @@ pub mod run_crm_deferred_test_reducer;
 pub mod run_crm_opportunity_convert_test_reducer;
 pub mod run_crm_relationship_admin_test_reducer;
 pub mod run_crm_wave_2_test_reducer;
+pub mod run_document_retention_purge_reducer;
 pub mod run_documents_folder_test_reducer;
 pub mod run_documents_wave_a_tests_reducer;
 pub mod run_documents_wave_b_tests_reducer;
@@ -2143,6 +2161,7 @@ pub mod run_sales_order_invoice_test_reducer;
 pub mod run_sales_order_update_test_reducer;
 pub mod run_sales_pricelist_apply_test_reducer;
 pub mod run_sales_send_quotation_test_reducer;
+pub mod run_sales_sla_escalation_reducer;
 pub mod run_subscription_plan_test_reducer;
 pub mod run_subscriptions_wave_a_test_reducer;
 pub mod run_subscriptions_wave_b_test_reducer;
@@ -2315,6 +2334,7 @@ pub mod update_knowledge_article_reducer;
 pub mod update_knowledge_article_presence_reducer;
 pub mod update_knowledge_category_reducer;
 pub mod update_landed_cost_reducer;
+pub mod update_lead_reducer;
 pub mod update_lead_address_reducer;
 pub mod update_lead_details_reducer;
 pub mod update_lead_lost_reason_reducer;
@@ -2383,6 +2403,7 @@ pub mod update_supplier_intake_reducer;
 pub mod update_task_reducer;
 pub mod update_task_state_reducer;
 pub mod update_tax_deadline_reducer;
+pub mod update_tax_deadlines_reducer;
 pub mod update_tax_jurisdiction_reducer;
 pub mod update_tax_schedule_reducer;
 pub mod update_ticket_reducer;
@@ -2456,6 +2477,9 @@ pub mod account_period_table;
 pub mod account_reconciliation_widget_table;
 pub mod account_tax_table;
 pub mod account_tax_group_table;
+pub mod accounting_operation_receipt_table;
+pub mod accounting_ownership_backfill_issue_table;
+pub mod accounting_ownership_backfill_run_table;
 pub mod activity_table;
 pub mod activity_type_table;
 pub mod adjustment_reason_table;
@@ -2515,6 +2539,8 @@ pub mod contact_category_table;
 pub mod contact_category_assignment_table;
 pub mod contact_communication_preference_table;
 pub mod contact_duplicate_candidate_table;
+pub mod contact_identity_verification_authority_table;
+pub mod contact_identity_verification_proof_table;
 pub mod contact_phone_identity_table;
 pub mod contact_relationship_table;
 pub mod contact_relationship_insight_table;
@@ -2529,6 +2555,8 @@ pub mod country_pack_tax_rule_table;
 pub mod crm_conversation_table;
 pub mod crm_conversation_message_table;
 pub mod crm_forecast_snapshot_table;
+pub mod crm_provider_event_receipt_table;
+pub mod crm_provider_principal_table;
 pub mod crossovered_budget_table;
 pub mod crossovered_budget_lines_table;
 pub mod currency_table;
@@ -2547,6 +2575,7 @@ pub mod document_table;
 pub mod document_external_ref_table;
 pub mod document_legal_hold_table;
 pub mod document_presence_table;
+pub mod document_retention_purge_job_table;
 pub mod document_sequence_table;
 pub mod document_signature_request_table;
 pub mod document_template_table;
@@ -2564,6 +2593,7 @@ pub mod form_role_config_table;
 pub mod fx_revaluation_run_table;
 pub mod generated_owner_report_table;
 pub mod google_drive_connection_table;
+pub mod guarded_action_receipt_table;
 pub mod helpdesk_sla_table;
 pub mod helpdesk_stage_table;
 pub mod helpdesk_team_table;
@@ -2663,6 +2693,7 @@ pub mod organization_table;
 pub mod organization_settings_table;
 pub mod packaging_material_table;
 pub mod partner_credit_control_table;
+pub mod password_reset_token_table;
 pub mod payment_account_table;
 pub mod payment_fee_table;
 pub mod payment_reconciliation_table;
@@ -2740,6 +2771,8 @@ pub mod quality_alert_reason_table;
 pub mod quality_check_table;
 pub mod quality_point_table;
 pub mod quality_team_table;
+pub mod queue_attempt_table;
+pub mod queue_effect_receipt_table;
 pub mod queue_job_table;
 pub mod queue_worker_table;
 pub mod record_custom_field_value_table;
@@ -2763,6 +2796,7 @@ pub mod sale_order_line_table;
 pub mod sale_order_option_table;
 pub mod sale_promotion_table;
 pub mod sales_integration_intent_table;
+pub mod sales_sla_escalation_job_table;
 pub mod saved_report_table;
 pub mod scheduled_report_table;
 pub mod scheduled_report_run_table;
@@ -2810,13 +2844,16 @@ pub mod subscription_usage_event_table;
 pub mod supplier_intake_request_table;
 pub mod tax_deadline_table;
 pub mod tax_deadline_reminder_table;
+pub mod tax_deadline_status_job_table;
 pub mod tax_jurisdiction_table;
 pub mod tax_schedule_table;
 pub mod trial_balance_table;
 pub mod uom_table;
 pub mod uom_cat_table;
 pub mod uom_conversion_table;
+pub mod user_credential_table;
 pub mod user_custom_field_table;
+pub mod user_invite_table;
 pub mod user_organization_table;
 pub mod user_profile_table;
 pub mod user_role_assignment_table;
@@ -2832,9 +2869,34 @@ pub mod warehouse_geo_table;
 pub mod warehouse_sync_intent_table;
 pub mod warehouse_task_table;
 pub mod whatsapp_business_account_table;
+pub mod workflow_table;
+pub mod workflow_calendar_table;
+pub mod workflow_calendar_exception_table;
+pub mod workflow_calendar_version_table;
+pub mod workflow_candidate_group_member_table;
+pub mod workflow_command_receipt_table;
+pub mod workflow_decision_event_table;
+pub mod workflow_delegation_table;
+pub mod workflow_delivery_attempt_table;
+pub mod workflow_delivery_receipt_table;
+pub mod workflow_edge_table;
+pub mod workflow_fork_table;
+pub mod workflow_human_task_table;
+pub mod workflow_human_task_candidate_table;
+pub mod workflow_human_task_event_table;
+pub mod workflow_human_task_receipt_table;
+pub mod workflow_instance_table;
+pub mod workflow_join_arrival_table;
 pub mod workflow_migration_instance_result_table;
 pub mod workflow_migration_plan_table;
 pub mod workflow_migration_preflight_table;
+pub mod workflow_node_table;
+pub mod workflow_outbox_table;
+pub mod workflow_simulation_result_table;
+pub mod workflow_simulation_step_table;
+pub mod workflow_timer_table;
+pub mod workflow_token_table;
+pub mod workflow_version_table;
 pub mod working_calendar_table;
 
 pub use accept_sale_order_quotation_params_type::AcceptSaleOrderQuotationParams;
@@ -3013,6 +3075,8 @@ pub use contact_category_assignment_type::ContactCategoryAssignment;
 pub use contact_communication_preference_type::ContactCommunicationPreference;
 pub use contact_duplicate_candidate_type::ContactDuplicateCandidate;
 pub use contact_identity_kind_type::ContactIdentityKind;
+pub use contact_identity_verification_authority_type::ContactIdentityVerificationAuthority;
+pub use contact_identity_verification_proof_type::ContactIdentityVerificationProof;
 pub use contact_phone_identity_type::ContactPhoneIdentity;
 pub use contact_relationship_type::ContactRelationship;
 pub use contact_relationship_insight_type::ContactRelationshipInsight;
@@ -3293,6 +3357,8 @@ pub use create_workorder_params_type::CreateWorkorderParams;
 pub use crm_conversation_type::CrmConversation;
 pub use crm_conversation_message_type::CrmConversationMessage;
 pub use crm_forecast_snapshot_type::CrmForecastSnapshot;
+pub use crm_provider_event_receipt_type::CrmProviderEventReceipt;
+pub use crm_provider_principal_type::CrmProviderPrincipal;
 pub use crossovered_budget_type::CrossoveredBudget;
 pub use crossovered_budget_lines_type::CrossoveredBudgetLines;
 pub use currency_type::Currency;
@@ -3634,12 +3700,15 @@ pub use queue_worker_type::QueueWorker;
 pub use rate_subscription_usage_events_params_type::RateSubscriptionUsageEventsParams;
 pub use rebase_deferred_schedules_params_type::RebaseDeferredSchedulesParams;
 pub use receive_consignment_stock_params_type::ReceiveConsignmentStockParams;
+pub use receive_crm_provider_message_params_type::ReceiveCrmProviderMessageParams;
 pub use recognize_amortization_line_params_type::RecognizeAmortizationLineParams;
 pub use recognize_deferred_revenue_params_type::RecognizeDeferredRevenueParams;
 pub use recognize_project_revenue_params_type::RecognizeProjectRevenueParams;
 pub use recompute_workflow_timers_params_type::RecomputeWorkflowTimersParams;
 pub use reconcile_account_bank_statement_line_params_type::ReconcileAccountBankStatementLineParams;
 pub use record_barcode_scan_params_type::RecordBarcodeScanParams;
+pub use record_contact_identity_verification_proof_params_type::RecordContactIdentityVerificationProofParams;
+pub use record_crm_provider_delivery_params_type::RecordCrmProviderDeliveryParams;
 pub use record_custom_field_entry_type::RecordCustomFieldEntry;
 pub use record_custom_field_value_type::RecordCustomFieldValue;
 pub use record_cycle_count_line_params_type::RecordCycleCountLineParams;
@@ -3663,6 +3732,7 @@ pub use refresh_project_margin_params_type::RefreshProjectMarginParams;
 pub use refresh_resource_utilisation_params_type::RefreshResourceUtilisationParams;
 pub use refuse_expense_sheet_params_type::RefuseExpenseSheetParams;
 pub use register_ai_skill_certification_runtime_profile_params_type::RegisterAiSkillCertificationRuntimeProfileParams;
+pub use register_crm_provider_principal_params_type::RegisterCrmProviderPrincipalParams;
 pub use register_device_params_type::RegisterDeviceParams;
 pub use register_hub_params_type::RegisterHubParams;
 pub use register_queue_worker_params_type::RegisterQueueWorkerParams;
@@ -3878,6 +3948,7 @@ pub use update_landed_cost_params_type::UpdateLandedCostParams;
 pub use update_lead_address_params_type::UpdateLeadAddressParams;
 pub use update_lead_details_params_type::UpdateLeadDetailsParams;
 pub use update_lead_lost_reason_params_type::UpdateLeadLostReasonParams;
+pub use update_lead_params_type::UpdateLeadParams;
 pub use update_lead_revenue_params_type::UpdateLeadRevenueParams;
 pub use update_lead_source_params_type::UpdateLeadSourceParams;
 pub use update_leave_type_params_type::UpdateLeaveTypeParams;
@@ -4079,6 +4150,9 @@ pub use account_period_table::*;
 pub use account_reconciliation_widget_table::*;
 pub use account_tax_table::*;
 pub use account_tax_group_table::*;
+pub use accounting_operation_receipt_table::*;
+pub use accounting_ownership_backfill_issue_table::*;
+pub use accounting_ownership_backfill_run_table::*;
 pub use activity_table::*;
 pub use activity_type_table::*;
 pub use adjustment_reason_table::*;
@@ -4138,6 +4212,8 @@ pub use contact_category_table::*;
 pub use contact_category_assignment_table::*;
 pub use contact_communication_preference_table::*;
 pub use contact_duplicate_candidate_table::*;
+pub use contact_identity_verification_authority_table::*;
+pub use contact_identity_verification_proof_table::*;
 pub use contact_phone_identity_table::*;
 pub use contact_relationship_table::*;
 pub use contact_relationship_insight_table::*;
@@ -4152,6 +4228,8 @@ pub use country_pack_tax_rule_table::*;
 pub use crm_conversation_table::*;
 pub use crm_conversation_message_table::*;
 pub use crm_forecast_snapshot_table::*;
+pub use crm_provider_event_receipt_table::*;
+pub use crm_provider_principal_table::*;
 pub use crossovered_budget_table::*;
 pub use crossovered_budget_lines_table::*;
 pub use currency_table::*;
@@ -4170,6 +4248,7 @@ pub use document_table::*;
 pub use document_external_ref_table::*;
 pub use document_legal_hold_table::*;
 pub use document_presence_table::*;
+pub use document_retention_purge_job_table::*;
 pub use document_sequence_table::*;
 pub use document_signature_request_table::*;
 pub use document_template_table::*;
@@ -4187,6 +4266,7 @@ pub use form_role_config_table::*;
 pub use fx_revaluation_run_table::*;
 pub use generated_owner_report_table::*;
 pub use google_drive_connection_table::*;
+pub use guarded_action_receipt_table::*;
 pub use helpdesk_sla_table::*;
 pub use helpdesk_stage_table::*;
 pub use helpdesk_team_table::*;
@@ -4286,6 +4366,7 @@ pub use organization_table::*;
 pub use organization_settings_table::*;
 pub use packaging_material_table::*;
 pub use partner_credit_control_table::*;
+pub use password_reset_token_table::*;
 pub use payment_account_table::*;
 pub use payment_fee_table::*;
 pub use payment_reconciliation_table::*;
@@ -4363,6 +4444,8 @@ pub use quality_alert_reason_table::*;
 pub use quality_check_table::*;
 pub use quality_point_table::*;
 pub use quality_team_table::*;
+pub use queue_attempt_table::*;
+pub use queue_effect_receipt_table::*;
 pub use queue_job_table::*;
 pub use queue_worker_table::*;
 pub use record_custom_field_value_table::*;
@@ -4386,6 +4469,7 @@ pub use sale_order_line_table::*;
 pub use sale_order_option_table::*;
 pub use sale_promotion_table::*;
 pub use sales_integration_intent_table::*;
+pub use sales_sla_escalation_job_table::*;
 pub use saved_report_table::*;
 pub use scheduled_report_table::*;
 pub use scheduled_report_run_table::*;
@@ -4433,13 +4517,16 @@ pub use subscription_usage_event_table::*;
 pub use supplier_intake_request_table::*;
 pub use tax_deadline_table::*;
 pub use tax_deadline_reminder_table::*;
+pub use tax_deadline_status_job_table::*;
 pub use tax_jurisdiction_table::*;
 pub use tax_schedule_table::*;
 pub use trial_balance_table::*;
 pub use uom_table::*;
 pub use uom_cat_table::*;
 pub use uom_conversion_table::*;
+pub use user_credential_table::*;
 pub use user_custom_field_table::*;
+pub use user_invite_table::*;
 pub use user_organization_table::*;
 pub use user_profile_table::*;
 pub use user_role_assignment_table::*;
@@ -4455,9 +4542,34 @@ pub use warehouse_geo_table::*;
 pub use warehouse_sync_intent_table::*;
 pub use warehouse_task_table::*;
 pub use whatsapp_business_account_table::*;
+pub use workflow_table::*;
+pub use workflow_calendar_table::*;
+pub use workflow_calendar_exception_table::*;
+pub use workflow_calendar_version_table::*;
+pub use workflow_candidate_group_member_table::*;
+pub use workflow_command_receipt_table::*;
+pub use workflow_decision_event_table::*;
+pub use workflow_delegation_table::*;
+pub use workflow_delivery_attempt_table::*;
+pub use workflow_delivery_receipt_table::*;
+pub use workflow_edge_table::*;
+pub use workflow_fork_table::*;
+pub use workflow_human_task_table::*;
+pub use workflow_human_task_candidate_table::*;
+pub use workflow_human_task_event_table::*;
+pub use workflow_human_task_receipt_table::*;
+pub use workflow_instance_table::*;
+pub use workflow_join_arrival_table::*;
 pub use workflow_migration_instance_result_table::*;
 pub use workflow_migration_plan_table::*;
 pub use workflow_migration_preflight_table::*;
+pub use workflow_node_table::*;
+pub use workflow_outbox_table::*;
+pub use workflow_simulation_result_table::*;
+pub use workflow_simulation_step_table::*;
+pub use workflow_timer_table::*;
+pub use workflow_token_table::*;
+pub use workflow_version_table::*;
 pub use working_calendar_table::*;
 pub use accept_sale_order_quotation_reducer::accept_sale_order_quotation;
 pub use accrue_sale_commission_reducer::accrue_sale_commission;
@@ -4626,6 +4738,7 @@ pub use compute_pos_session_totals_reducer::compute_pos_session_totals;
 pub use compute_purchase_order_line_totals_reducer::compute_purchase_order_line_totals;
 pub use compute_purchase_order_totals_reducer::compute_purchase_order_totals;
 pub use compute_so_totals_reducer::compute_so_totals;
+pub use configure_contact_identity_verification_authority_reducer::configure_contact_identity_verification_authority;
 pub use confirm_account_asset_reducer::confirm_account_asset;
 pub use confirm_budget_reducer::confirm_budget;
 pub use confirm_manufacturing_order_reducer::confirm_manufacturing_order;
@@ -4898,6 +5011,7 @@ pub use create_workflow_delegation_reducer::create_workflow_delegation;
 pub use create_workflow_migration_plan_reducer::create_workflow_migration_plan;
 pub use create_working_calendar_reducer::create_working_calendar;
 pub use create_workorder_reducer::create_workorder;
+pub use crm_integrity_inventory_reducer::crm_integrity_inventory;
 pub use deactivate_pos_config_reducer::deactivate_pos_config;
 pub use deactivate_revenue_recognition_rule_reducer::deactivate_revenue_recognition_rule;
 pub use deactivate_subscription_plan_reducer::deactivate_subscription_plan;
@@ -5016,6 +5130,8 @@ pub use grant_field_permission_reducer::grant_field_permission;
 pub use grant_permission_reducer::grant_permission;
 pub use grant_subscription_entitlement_reducer::grant_subscription_entitlement;
 pub use hold_supplier_intake_reducer::hold_supplier_intake;
+pub use identity_connected_reducer::identity_connected;
+pub use identity_disconnected_reducer::identity_disconnected;
 pub use import_account_csv_reducer::import_account_csv;
 pub use import_account_move_csv_reducer::import_account_move_csv;
 pub use import_account_move_line_csv_reducer::import_account_move_line_csv;
@@ -5145,6 +5261,7 @@ pub use queue_mail_from_template_reducer::queue_mail_from_template;
 pub use rate_subscription_usage_events_reducer::rate_subscription_usage_events;
 pub use rebase_deferred_schedules_for_subscription_reducer::rebase_deferred_schedules_for_subscription;
 pub use receive_consignment_stock_reducer::receive_consignment_stock;
+pub use receive_crm_provider_message_reducer::receive_crm_provider_message;
 pub use receive_po_line_reducer::receive_po_line;
 pub use recognize_amortization_line_reducer::recognize_amortization_line;
 pub use recognize_deferred_revenue_reducer::recognize_deferred_revenue;
@@ -5157,6 +5274,8 @@ pub use reconcile_payment_with_invoice_reducer::reconcile_payment_with_invoice;
 pub use record_ai_agent_run_policy_snapshot_reducer::record_ai_agent_run_policy_snapshot;
 pub use record_ai_spend_reducer::record_ai_spend;
 pub use record_barcode_scan_reducer::record_barcode_scan;
+pub use record_contact_identity_verification_proof_reducer::record_contact_identity_verification_proof;
+pub use record_crm_provider_delivery_reducer::record_crm_provider_delivery;
 pub use record_cycle_count_line_reducer::record_cycle_count_line;
 pub use record_document_view_reducer::record_document_view;
 pub use record_generated_owner_report_reducer::record_generated_owner_report;
@@ -5191,6 +5310,7 @@ pub use refresh_tax_deadline_statuses_reducer::refresh_tax_deadline_statuses;
 pub use refuse_expense_sheet_reducer::refuse_expense_sheet;
 pub use refuse_leave_reducer::refuse_leave;
 pub use register_ai_skill_certification_runtime_profile_reducer::register_ai_skill_certification_runtime_profile;
+pub use register_crm_provider_principal_reducer::register_crm_provider_principal;
 pub use register_iot_device_reducer::register_iot_device;
 pub use register_iot_hub_reducer::register_iot_hub;
 pub use register_payment_on_invoice_reducer::register_payment_on_invoice;
@@ -5285,6 +5405,7 @@ pub use run_crm_deferred_test_reducer::run_crm_deferred_test;
 pub use run_crm_opportunity_convert_test_reducer::run_crm_opportunity_convert_test;
 pub use run_crm_relationship_admin_test_reducer::run_crm_relationship_admin_test;
 pub use run_crm_wave_2_test_reducer::run_crm_wave_2_test;
+pub use run_document_retention_purge_reducer::run_document_retention_purge;
 pub use run_documents_folder_test_reducer::run_documents_folder_test;
 pub use run_documents_wave_a_tests_reducer::run_documents_wave_a_tests;
 pub use run_documents_wave_b_tests_reducer::run_documents_wave_b_tests;
@@ -5373,6 +5494,7 @@ pub use run_sales_order_invoice_test_reducer::run_sales_order_invoice_test;
 pub use run_sales_order_update_test_reducer::run_sales_order_update_test;
 pub use run_sales_pricelist_apply_test_reducer::run_sales_pricelist_apply_test;
 pub use run_sales_send_quotation_test_reducer::run_sales_send_quotation_test;
+pub use run_sales_sla_escalation_reducer::run_sales_sla_escalation;
 pub use run_subscription_plan_test_reducer::run_subscription_plan_test;
 pub use run_subscriptions_wave_a_test_reducer::run_subscriptions_wave_a_test;
 pub use run_subscriptions_wave_b_test_reducer::run_subscriptions_wave_b_test;
@@ -5545,6 +5667,7 @@ pub use update_knowledge_article_reducer::update_knowledge_article;
 pub use update_knowledge_article_presence_reducer::update_knowledge_article_presence;
 pub use update_knowledge_category_reducer::update_knowledge_category;
 pub use update_landed_cost_reducer::update_landed_cost;
+pub use update_lead_reducer::update_lead;
 pub use update_lead_address_reducer::update_lead_address;
 pub use update_lead_details_reducer::update_lead_details;
 pub use update_lead_lost_reason_reducer::update_lead_lost_reason;
@@ -5613,6 +5736,7 @@ pub use update_supplier_intake_reducer::update_supplier_intake;
 pub use update_task_reducer::update_task;
 pub use update_task_state_reducer::update_task_state;
 pub use update_tax_deadline_reducer::update_tax_deadline;
+pub use update_tax_deadlines_reducer::update_tax_deadlines;
 pub use update_tax_jurisdiction_reducer::update_tax_jurisdiction;
 pub use update_tax_schedule_reducer::update_tax_schedule;
 pub use update_ticket_reducer::update_ticket;
@@ -6474,6 +6598,9 @@ pub enum Reducer {
     ComputeSoTotals {
         organization_id: u64,
         order_id: u64,
+}    ,
+    ConfigureContactIdentityVerificationAuthority {
+        issuer_identity: __sdk::Identity,
 }    ,
     ConfirmAccountAsset {
         organization_id: u64,
@@ -7746,6 +7873,7 @@ pub enum Reducer {
         organization_id: u64,
         params: CreateWorkorderParams,
 }    ,
+    CrmIntegrityInventory ,
     DeactivatePosConfig {
         organization_id: u64,
         config_id: u64,
@@ -8286,6 +8414,8 @@ pub enum Reducer {
         intake_id: u64,
         notes: Option::<String>,
 }    ,
+    IdentityConnected ,
+    IdentityDisconnected ,
     ImportAccountCsv {
         organization_id: u64,
         company_id: u64,
@@ -8885,6 +9015,10 @@ pub enum Reducer {
         company_id: u64,
         params: ReceiveConsignmentStockParams,
 }    ,
+    ReceiveCrmProviderMessage {
+        organization_id: u64,
+        params: ReceiveCrmProviderMessageParams,
+}    ,
     ReceivePoLine {
         organization_id: u64,
         line_id: u64,
@@ -8946,6 +9080,14 @@ pub enum Reducer {
     RecordBarcodeScan {
         organization_id: u64,
         params: RecordBarcodeScanParams,
+}    ,
+    RecordContactIdentityVerificationProof {
+        organization_id: u64,
+        params: RecordContactIdentityVerificationProofParams,
+}    ,
+    RecordCrmProviderDelivery {
+        organization_id: u64,
+        params: RecordCrmProviderDeliveryParams,
 }    ,
     RecordCycleCountLine {
         organization_id: u64,
@@ -9114,6 +9256,10 @@ pub enum Reducer {
     RegisterAiSkillCertificationRuntimeProfile {
         organization_id: u64,
         params: RegisterAiSkillCertificationRuntimeProfileParams,
+}    ,
+    RegisterCrmProviderPrincipal {
+        organization_id: u64,
+        params: RegisterCrmProviderPrincipalParams,
 }    ,
     RegisterIotDevice {
         organization_id: u64,
@@ -9419,6 +9565,9 @@ pub enum Reducer {
     RunCrmOpportunityConvertTest ,
     RunCrmRelationshipAdminTest ,
     RunCrmWave2Test ,
+    RunDocumentRetentionPurge {
+        job: DocumentRetentionPurgeJob,
+}    ,
     RunDocumentsFolderTest ,
     RunDocumentsWaveATests ,
     RunDocumentsWaveBTests ,
@@ -9523,6 +9672,9 @@ pub enum Reducer {
     RunSalesOrderUpdateTest ,
     RunSalesPricelistApplyTest ,
     RunSalesSendQuotationTest ,
+    RunSalesSlaEscalation {
+        job: SalesSlaEscalationJob,
+}    ,
     RunSubscriptionPlanTest ,
     RunSubscriptionsWaveATest ,
     RunSubscriptionsWaveBTest ,
@@ -10326,6 +10478,11 @@ pub enum Reducer {
         landed_cost_id: u64,
         params: UpdateLandedCostParams,
 }    ,
+    UpdateLead {
+        organization_id: u64,
+        lead_id: u64,
+        params: UpdateLeadParams,
+}    ,
     UpdateLeadAddress {
         organization_id: u64,
         lead_id: u64,
@@ -10692,6 +10849,9 @@ pub enum Reducer {
         deadline_id: u64,
         params: UpdateTaxDeadlineParams,
 }    ,
+    UpdateTaxDeadlines {
+        job: TaxDeadlineStatusJob,
+}    ,
     UpdateTaxJurisdiction {
         organization_id: u64,
         jurisdiction_id: u64,
@@ -10927,7 +11087,7 @@ pub enum Reducer {
     VerifyContactIdentity {
         organization_id: u64,
         identity_id: u64,
-        state: ContactVerificationState,
+        requested_state: ContactVerificationState,
 }    ,
     VoidPaymentTransaction {
         organization_id: u64,
@@ -11118,6 +11278,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ComputePurchaseOrderLineTotals { .. } => "compute_purchase_order_line_totals",
             Reducer::ComputePurchaseOrderTotals { .. } => "compute_purchase_order_totals",
             Reducer::ComputeSoTotals { .. } => "compute_so_totals",
+            Reducer::ConfigureContactIdentityVerificationAuthority { .. } => "configure_contact_identity_verification_authority",
             Reducer::ConfirmAccountAsset { .. } => "confirm_account_asset",
             Reducer::ConfirmBudget { .. } => "confirm_budget",
             Reducer::ConfirmManufacturingOrder { .. } => "confirm_manufacturing_order",
@@ -11390,6 +11551,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateWorkflowMigrationPlan { .. } => "create_workflow_migration_plan",
             Reducer::CreateWorkingCalendar { .. } => "create_working_calendar",
             Reducer::CreateWorkorder { .. } => "create_workorder",
+            Reducer::CrmIntegrityInventory => "crm_integrity_inventory",
             Reducer::DeactivatePosConfig { .. } => "deactivate_pos_config",
             Reducer::DeactivateRevenueRecognitionRule { .. } => "deactivate_revenue_recognition_rule",
             Reducer::DeactivateSubscriptionPlan { .. } => "deactivate_subscription_plan",
@@ -11508,6 +11670,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::GrantPermission { .. } => "grant_permission",
             Reducer::GrantSubscriptionEntitlement { .. } => "grant_subscription_entitlement",
             Reducer::HoldSupplierIntake { .. } => "hold_supplier_intake",
+            Reducer::IdentityConnected => "identity_connected",
+            Reducer::IdentityDisconnected => "identity_disconnected",
             Reducer::ImportAccountCsv { .. } => "import_account_csv",
             Reducer::ImportAccountMoveCsv { .. } => "import_account_move_csv",
             Reducer::ImportAccountMoveLineCsv { .. } => "import_account_move_line_csv",
@@ -11637,6 +11801,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RateSubscriptionUsageEvents { .. } => "rate_subscription_usage_events",
             Reducer::RebaseDeferredSchedulesForSubscription { .. } => "rebase_deferred_schedules_for_subscription",
             Reducer::ReceiveConsignmentStock { .. } => "receive_consignment_stock",
+            Reducer::ReceiveCrmProviderMessage { .. } => "receive_crm_provider_message",
             Reducer::ReceivePoLine { .. } => "receive_po_line",
             Reducer::RecognizeAmortizationLine { .. } => "recognize_amortization_line",
             Reducer::RecognizeDeferredRevenue { .. } => "recognize_deferred_revenue",
@@ -11649,6 +11814,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordAiAgentRunPolicySnapshot { .. } => "record_ai_agent_run_policy_snapshot",
             Reducer::RecordAiSpend { .. } => "record_ai_spend",
             Reducer::RecordBarcodeScan { .. } => "record_barcode_scan",
+            Reducer::RecordContactIdentityVerificationProof { .. } => "record_contact_identity_verification_proof",
+            Reducer::RecordCrmProviderDelivery { .. } => "record_crm_provider_delivery",
             Reducer::RecordCycleCountLine { .. } => "record_cycle_count_line",
             Reducer::RecordDocumentView { .. } => "record_document_view",
             Reducer::RecordGeneratedOwnerReport { .. } => "record_generated_owner_report",
@@ -11683,6 +11850,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RefuseExpenseSheet { .. } => "refuse_expense_sheet",
             Reducer::RefuseLeave { .. } => "refuse_leave",
             Reducer::RegisterAiSkillCertificationRuntimeProfile { .. } => "register_ai_skill_certification_runtime_profile",
+            Reducer::RegisterCrmProviderPrincipal { .. } => "register_crm_provider_principal",
             Reducer::RegisterIotDevice { .. } => "register_iot_device",
             Reducer::RegisterIotHub { .. } => "register_iot_hub",
             Reducer::RegisterPaymentOnInvoice { .. } => "register_payment_on_invoice",
@@ -11777,6 +11945,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunCrmOpportunityConvertTest => "run_crm_opportunity_convert_test",
             Reducer::RunCrmRelationshipAdminTest => "run_crm_relationship_admin_test",
             Reducer::RunCrmWave2Test => "run_crm_wave_2_test",
+            Reducer::RunDocumentRetentionPurge { .. } => "run_document_retention_purge",
             Reducer::RunDocumentsFolderTest => "run_documents_folder_test",
             Reducer::RunDocumentsWaveATests => "run_documents_wave_a_tests",
             Reducer::RunDocumentsWaveBTests => "run_documents_wave_b_tests",
@@ -11865,6 +12034,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunSalesOrderUpdateTest => "run_sales_order_update_test",
             Reducer::RunSalesPricelistApplyTest => "run_sales_pricelist_apply_test",
             Reducer::RunSalesSendQuotationTest => "run_sales_send_quotation_test",
+            Reducer::RunSalesSlaEscalation { .. } => "run_sales_sla_escalation",
             Reducer::RunSubscriptionPlanTest => "run_subscription_plan_test",
             Reducer::RunSubscriptionsWaveATest => "run_subscriptions_wave_a_test",
             Reducer::RunSubscriptionsWaveBTest => "run_subscriptions_wave_b_test",
@@ -12037,6 +12207,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateKnowledgeArticlePresence { .. } => "update_knowledge_article_presence",
             Reducer::UpdateKnowledgeCategory { .. } => "update_knowledge_category",
             Reducer::UpdateLandedCost { .. } => "update_landed_cost",
+            Reducer::UpdateLead { .. } => "update_lead",
             Reducer::UpdateLeadAddress { .. } => "update_lead_address",
             Reducer::UpdateLeadDetails { .. } => "update_lead_details",
             Reducer::UpdateLeadLostReason { .. } => "update_lead_lost_reason",
@@ -12105,6 +12276,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateTask { .. } => "update_task",
             Reducer::UpdateTaskState { .. } => "update_task_state",
             Reducer::UpdateTaxDeadline { .. } => "update_tax_deadline",
+            Reducer::UpdateTaxDeadlines { .. } => "update_tax_deadlines",
             Reducer::UpdateTaxJurisdiction { .. } => "update_tax_jurisdiction",
             Reducer::UpdateTaxSchedule { .. } => "update_tax_schedule",
             Reducer::UpdateTicket { .. } => "update_ticket",
@@ -13606,6 +13778,11 @@ Reducer::BillProjectMilestone{
 }             => __sats::bsatn::to_vec(&compute_so_totals_reducer::ComputeSoTotalsArgs {
                 organization_id: organization_id.clone(),
                 order_id: order_id.clone(),
+}),
+            Reducer::ConfigureContactIdentityVerificationAuthority{
+                issuer_identity,
+}             => __sats::bsatn::to_vec(&configure_contact_identity_verification_authority_reducer::ConfigureContactIdentityVerificationAuthorityArgs {
+                issuer_identity: issuer_identity.clone(),
 }),
             Reducer::ConfirmAccountAsset{
                 organization_id,
@@ -15877,7 +16054,9 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
-            Reducer::DeactivatePosConfig{
+            Reducer::CrmIntegrityInventory => __sats::bsatn::to_vec(&crm_integrity_inventory_reducer::CrmIntegrityInventoryArgs {
+                }),
+Reducer::DeactivatePosConfig{
                 organization_id,
                 config_id,
 }             => __sats::bsatn::to_vec(&deactivate_pos_config_reducer::DeactivatePosConfigArgs {
@@ -16841,7 +17020,11 @@ Reducer::ErrorIntercompanyTransaction{
                 intake_id: intake_id.clone(),
                 notes: notes.clone(),
 }),
-            Reducer::ImportAccountCsv{
+            Reducer::IdentityConnected => __sats::bsatn::to_vec(&identity_connected_reducer::IdentityConnectedArgs {
+                }),
+Reducer::IdentityDisconnected => __sats::bsatn::to_vec(&identity_disconnected_reducer::IdentityDisconnectedArgs {
+                }),
+Reducer::ImportAccountCsv{
                 organization_id,
                 company_id,
                 csv_data,
@@ -17911,6 +18094,13 @@ Reducer::MigrateWorkflowInstance{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::ReceiveCrmProviderMessage{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&receive_crm_provider_message_reducer::ReceiveCrmProviderMessageArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::ReceivePoLine{
                 organization_id,
                 line_id,
@@ -18020,6 +18210,20 @@ Reducer::MigrateWorkflowInstance{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&record_barcode_scan_reducer::RecordBarcodeScanArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RecordContactIdentityVerificationProof{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_contact_identity_verification_proof_reducer::RecordContactIdentityVerificationProofArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RecordCrmProviderDelivery{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&record_crm_provider_delivery_reducer::RecordCrmProviderDeliveryArgs {
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
@@ -18322,6 +18526,13 @@ Reducer::MigrateWorkflowInstance{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&register_ai_skill_certification_runtime_profile_reducer::RegisterAiSkillCertificationRuntimeProfileArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::RegisterCrmProviderPrincipal{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&register_crm_provider_principal_reducer::RegisterCrmProviderPrincipalArgs {
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
@@ -18879,7 +19090,12 @@ Reducer::RunCrmRelationshipAdminTest => __sats::bsatn::to_vec(&run_crm_relations
                 }),
 Reducer::RunCrmWave2Test => __sats::bsatn::to_vec(&run_crm_wave_2_test_reducer::RunCrmWave2TestArgs {
                 }),
-Reducer::RunDocumentsFolderTest => __sats::bsatn::to_vec(&run_documents_folder_test_reducer::RunDocumentsFolderTestArgs {
+Reducer::RunDocumentRetentionPurge{
+                job,
+}             => __sats::bsatn::to_vec(&run_document_retention_purge_reducer::RunDocumentRetentionPurgeArgs {
+                job: job.clone(),
+}),
+            Reducer::RunDocumentsFolderTest => __sats::bsatn::to_vec(&run_documents_folder_test_reducer::RunDocumentsFolderTestArgs {
                 }),
 Reducer::RunDocumentsWaveATests => __sats::bsatn::to_vec(&run_documents_wave_a_tests_reducer::RunDocumentsWaveATestsArgs {
                 }),
@@ -19083,7 +19299,12 @@ Reducer::RunSalesPricelistApplyTest => __sats::bsatn::to_vec(&run_sales_pricelis
                 }),
 Reducer::RunSalesSendQuotationTest => __sats::bsatn::to_vec(&run_sales_send_quotation_test_reducer::RunSalesSendQuotationTestArgs {
                 }),
-Reducer::RunSubscriptionPlanTest => __sats::bsatn::to_vec(&run_subscription_plan_test_reducer::RunSubscriptionPlanTestArgs {
+Reducer::RunSalesSlaEscalation{
+                job,
+}             => __sats::bsatn::to_vec(&run_sales_sla_escalation_reducer::RunSalesSlaEscalationArgs {
+                job: job.clone(),
+}),
+            Reducer::RunSubscriptionPlanTest => __sats::bsatn::to_vec(&run_subscription_plan_test_reducer::RunSubscriptionPlanTestArgs {
                 }),
 Reducer::RunSubscriptionsWaveATest => __sats::bsatn::to_vec(&run_subscriptions_wave_a_test_reducer::RunSubscriptionsWaveATestArgs {
                 }),
@@ -20536,6 +20757,15 @@ Reducer::ToggleProjectFavorite{
                 landed_cost_id: landed_cost_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateLead{
+                organization_id,
+                lead_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_lead_reducer::UpdateLeadArgs {
+                organization_id: organization_id.clone(),
+                lead_id: lead_id.clone(),
+                params: params.clone(),
+}),
             Reducer::UpdateLeadAddress{
                 organization_id,
                 lead_id,
@@ -21200,6 +21430,11 @@ Reducer::ToggleProjectFavorite{
                 deadline_id: deadline_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::UpdateTaxDeadlines{
+                job,
+}             => __sats::bsatn::to_vec(&update_tax_deadlines_reducer::UpdateTaxDeadlinesArgs {
+                job: job.clone(),
+}),
             Reducer::UpdateTaxJurisdiction{
                 organization_id,
                 jurisdiction_id,
@@ -21622,11 +21857,11 @@ Reducer::ToggleProjectFavorite{
             Reducer::VerifyContactIdentity{
                 organization_id,
                 identity_id,
-                state,
+                requested_state,
 }             => __sats::bsatn::to_vec(&verify_contact_identity_reducer::VerifyContactIdentityArgs {
                 organization_id: organization_id.clone(),
                 identity_id: identity_id.clone(),
-                state: state.clone(),
+                requested_state: requested_state.clone(),
 }),
             Reducer::VoidPaymentTransaction{
                 organization_id,
@@ -21682,6 +21917,9 @@ pub struct DbUpdate {
     account_reconciliation_widget: __sdk::TableUpdate<AccountReconciliationWidget>,
     account_tax: __sdk::TableUpdate<AccountTax>,
     account_tax_group: __sdk::TableUpdate<AccountTaxGroup>,
+    accounting_operation_receipt: __sdk::TableUpdate<AccountingOperationReceipt>,
+    accounting_ownership_backfill_issue: __sdk::TableUpdate<AccountingOwnershipBackfillIssue>,
+    accounting_ownership_backfill_run: __sdk::TableUpdate<AccountingOwnershipBackfillRun>,
     activity: __sdk::TableUpdate<Activity>,
     activity_type: __sdk::TableUpdate<ActivityType>,
     adjustment_reason: __sdk::TableUpdate<AdjustmentReason>,
@@ -21741,6 +21979,8 @@ pub struct DbUpdate {
     contact_category_assignment: __sdk::TableUpdate<ContactCategoryAssignment>,
     contact_communication_preference: __sdk::TableUpdate<ContactCommunicationPreference>,
     contact_duplicate_candidate: __sdk::TableUpdate<ContactDuplicateCandidate>,
+    contact_identity_verification_authority: __sdk::TableUpdate<ContactIdentityVerificationAuthority>,
+    contact_identity_verification_proof: __sdk::TableUpdate<ContactIdentityVerificationProof>,
     contact_phone_identity: __sdk::TableUpdate<ContactPhoneIdentity>,
     contact_relationship: __sdk::TableUpdate<ContactRelationship>,
     contact_relationship_insight: __sdk::TableUpdate<ContactRelationshipInsight>,
@@ -21755,6 +21995,8 @@ pub struct DbUpdate {
     crm_conversation: __sdk::TableUpdate<CrmConversation>,
     crm_conversation_message: __sdk::TableUpdate<CrmConversationMessage>,
     crm_forecast_snapshot: __sdk::TableUpdate<CrmForecastSnapshot>,
+    crm_provider_event_receipt: __sdk::TableUpdate<CrmProviderEventReceipt>,
+    crm_provider_principal: __sdk::TableUpdate<CrmProviderPrincipal>,
     crossovered_budget: __sdk::TableUpdate<CrossoveredBudget>,
     crossovered_budget_lines: __sdk::TableUpdate<CrossoveredBudgetLines>,
     currency: __sdk::TableUpdate<Currency>,
@@ -21773,6 +22015,7 @@ pub struct DbUpdate {
     document_external_ref: __sdk::TableUpdate<DocumentExternalRef>,
     document_legal_hold: __sdk::TableUpdate<DocumentLegalHold>,
     document_presence: __sdk::TableUpdate<DocumentPresence>,
+    document_retention_purge_job: __sdk::TableUpdate<DocumentRetentionPurgeJob>,
     document_sequence: __sdk::TableUpdate<DocumentSequence>,
     document_signature_request: __sdk::TableUpdate<DocumentSignatureRequest>,
     document_template: __sdk::TableUpdate<DocumentTemplate>,
@@ -21790,6 +22033,7 @@ pub struct DbUpdate {
     fx_revaluation_run: __sdk::TableUpdate<FxRevaluationRun>,
     generated_owner_report: __sdk::TableUpdate<GeneratedOwnerReport>,
     google_drive_connection: __sdk::TableUpdate<GoogleDriveConnection>,
+    guarded_action_receipt: __sdk::TableUpdate<GuardedActionReceipt>,
     helpdesk_sla: __sdk::TableUpdate<HelpdeskSla>,
     helpdesk_stage: __sdk::TableUpdate<HelpdeskStage>,
     helpdesk_team: __sdk::TableUpdate<HelpdeskTeam>,
@@ -21889,6 +22133,7 @@ pub struct DbUpdate {
     organization_settings: __sdk::TableUpdate<OrganizationSettings>,
     packaging_material: __sdk::TableUpdate<PackagingMaterial>,
     partner_credit_control: __sdk::TableUpdate<PartnerCreditControl>,
+    password_reset_token: __sdk::TableUpdate<PasswordResetToken>,
     payment_account: __sdk::TableUpdate<PaymentAccount>,
     payment_fee: __sdk::TableUpdate<PaymentFee>,
     payment_reconciliation: __sdk::TableUpdate<PaymentReconciliation>,
@@ -21966,6 +22211,8 @@ pub struct DbUpdate {
     quality_check: __sdk::TableUpdate<QualityCheck>,
     quality_point: __sdk::TableUpdate<QualityPoint>,
     quality_team: __sdk::TableUpdate<QualityTeam>,
+    queue_attempt: __sdk::TableUpdate<QueueAttempt>,
+    queue_effect_receipt: __sdk::TableUpdate<QueueEffectReceipt>,
     queue_job: __sdk::TableUpdate<QueueJob>,
     queue_worker: __sdk::TableUpdate<QueueWorker>,
     record_custom_field_value: __sdk::TableUpdate<RecordCustomFieldValue>,
@@ -21989,6 +22236,7 @@ pub struct DbUpdate {
     sale_order_option: __sdk::TableUpdate<SaleOrderOption>,
     sale_promotion: __sdk::TableUpdate<SalePromotion>,
     sales_integration_intent: __sdk::TableUpdate<SalesIntegrationIntent>,
+    sales_sla_escalation_job: __sdk::TableUpdate<SalesSlaEscalationJob>,
     saved_report: __sdk::TableUpdate<SavedReport>,
     scheduled_report: __sdk::TableUpdate<ScheduledReport>,
     scheduled_report_run: __sdk::TableUpdate<ScheduledReportRun>,
@@ -22036,13 +22284,16 @@ pub struct DbUpdate {
     supplier_intake_request: __sdk::TableUpdate<SupplierIntakeRequest>,
     tax_deadline: __sdk::TableUpdate<TaxDeadline>,
     tax_deadline_reminder: __sdk::TableUpdate<TaxDeadlineReminder>,
+    tax_deadline_status_job: __sdk::TableUpdate<TaxDeadlineStatusJob>,
     tax_jurisdiction: __sdk::TableUpdate<TaxJurisdiction>,
     tax_schedule: __sdk::TableUpdate<TaxSchedule>,
     trial_balance: __sdk::TableUpdate<TrialBalance>,
     uom: __sdk::TableUpdate<Uom>,
     uom_cat: __sdk::TableUpdate<UomCategory>,
     uom_conversion: __sdk::TableUpdate<UomConversion>,
+    user_credential: __sdk::TableUpdate<UserCredential>,
     user_custom_field: __sdk::TableUpdate<UserCustomField>,
+    user_invite: __sdk::TableUpdate<UserInvite>,
     user_organization: __sdk::TableUpdate<UserOrganization>,
     user_profile: __sdk::TableUpdate<UserProfile>,
     user_role_assignment: __sdk::TableUpdate<UserRoleAssignment>,
@@ -22058,9 +22309,34 @@ pub struct DbUpdate {
     warehouse_sync_intent: __sdk::TableUpdate<WarehouseSyncIntent>,
     warehouse_task: __sdk::TableUpdate<WarehouseTask>,
     whatsapp_business_account: __sdk::TableUpdate<WhatsAppBusinessAccount>,
+    workflow: __sdk::TableUpdate<Workflow>,
+    workflow_calendar: __sdk::TableUpdate<WorkflowCalendar>,
+    workflow_calendar_exception: __sdk::TableUpdate<WorkflowCalendarException>,
+    workflow_calendar_version: __sdk::TableUpdate<WorkflowCalendarVersion>,
+    workflow_candidate_group_member: __sdk::TableUpdate<WorkflowCandidateGroupMember>,
+    workflow_command_receipt: __sdk::TableUpdate<WorkflowCommandReceipt>,
+    workflow_decision_event: __sdk::TableUpdate<WorkflowDecisionEvent>,
+    workflow_delegation: __sdk::TableUpdate<WorkflowDelegation>,
+    workflow_delivery_attempt: __sdk::TableUpdate<WorkflowDeliveryAttempt>,
+    workflow_delivery_receipt: __sdk::TableUpdate<WorkflowDeliveryReceipt>,
+    workflow_edge: __sdk::TableUpdate<WorkflowEdge>,
+    workflow_fork: __sdk::TableUpdate<WorkflowFork>,
+    workflow_human_task: __sdk::TableUpdate<WorkflowHumanTask>,
+    workflow_human_task_candidate: __sdk::TableUpdate<WorkflowHumanTaskCandidate>,
+    workflow_human_task_event: __sdk::TableUpdate<WorkflowHumanTaskEvent>,
+    workflow_human_task_receipt: __sdk::TableUpdate<WorkflowHumanTaskReceipt>,
+    workflow_instance: __sdk::TableUpdate<WorkflowInstance>,
+    workflow_join_arrival: __sdk::TableUpdate<WorkflowJoinArrival>,
     workflow_migration_instance_result: __sdk::TableUpdate<WorkflowMigrationInstanceResult>,
     workflow_migration_plan: __sdk::TableUpdate<WorkflowMigrationPlan>,
     workflow_migration_preflight: __sdk::TableUpdate<WorkflowMigrationPreflight>,
+    workflow_node: __sdk::TableUpdate<WorkflowNode>,
+    workflow_outbox: __sdk::TableUpdate<WorkflowOutbox>,
+    workflow_simulation_result: __sdk::TableUpdate<WorkflowSimulationResult>,
+    workflow_simulation_step: __sdk::TableUpdate<WorkflowSimulationStep>,
+    workflow_timer: __sdk::TableUpdate<WorkflowTimer>,
+    workflow_token: __sdk::TableUpdate<WorkflowToken>,
+    workflow_version: __sdk::TableUpdate<WorkflowVersion>,
     working_calendar: __sdk::TableUpdate<WorkingCalendar>,
 }
 
@@ -22096,6 +22372,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "account_reconciliation_widget" => db_update.account_reconciliation_widget.append(account_reconciliation_widget_table::parse_table_update(table_update)?),
     "account_tax" => db_update.account_tax.append(account_tax_table::parse_table_update(table_update)?),
     "account_tax_group" => db_update.account_tax_group.append(account_tax_group_table::parse_table_update(table_update)?),
+    "accounting_operation_receipt" => db_update.accounting_operation_receipt.append(accounting_operation_receipt_table::parse_table_update(table_update)?),
+    "accounting_ownership_backfill_issue" => db_update.accounting_ownership_backfill_issue.append(accounting_ownership_backfill_issue_table::parse_table_update(table_update)?),
+    "accounting_ownership_backfill_run" => db_update.accounting_ownership_backfill_run.append(accounting_ownership_backfill_run_table::parse_table_update(table_update)?),
     "activity" => db_update.activity.append(activity_table::parse_table_update(table_update)?),
     "activity_type" => db_update.activity_type.append(activity_type_table::parse_table_update(table_update)?),
     "adjustment_reason" => db_update.adjustment_reason.append(adjustment_reason_table::parse_table_update(table_update)?),
@@ -22155,6 +22434,8 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "contact_category_assignment" => db_update.contact_category_assignment.append(contact_category_assignment_table::parse_table_update(table_update)?),
     "contact_communication_preference" => db_update.contact_communication_preference.append(contact_communication_preference_table::parse_table_update(table_update)?),
     "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(contact_duplicate_candidate_table::parse_table_update(table_update)?),
+    "contact_identity_verification_authority" => db_update.contact_identity_verification_authority.append(contact_identity_verification_authority_table::parse_table_update(table_update)?),
+    "contact_identity_verification_proof" => db_update.contact_identity_verification_proof.append(contact_identity_verification_proof_table::parse_table_update(table_update)?),
     "contact_phone_identity" => db_update.contact_phone_identity.append(contact_phone_identity_table::parse_table_update(table_update)?),
     "contact_relationship" => db_update.contact_relationship.append(contact_relationship_table::parse_table_update(table_update)?),
     "contact_relationship_insight" => db_update.contact_relationship_insight.append(contact_relationship_insight_table::parse_table_update(table_update)?),
@@ -22169,6 +22450,8 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "crm_conversation" => db_update.crm_conversation.append(crm_conversation_table::parse_table_update(table_update)?),
     "crm_conversation_message" => db_update.crm_conversation_message.append(crm_conversation_message_table::parse_table_update(table_update)?),
     "crm_forecast_snapshot" => db_update.crm_forecast_snapshot.append(crm_forecast_snapshot_table::parse_table_update(table_update)?),
+    "crm_provider_event_receipt" => db_update.crm_provider_event_receipt.append(crm_provider_event_receipt_table::parse_table_update(table_update)?),
+    "crm_provider_principal" => db_update.crm_provider_principal.append(crm_provider_principal_table::parse_table_update(table_update)?),
     "crossovered_budget" => db_update.crossovered_budget.append(crossovered_budget_table::parse_table_update(table_update)?),
     "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(crossovered_budget_lines_table::parse_table_update(table_update)?),
     "currency" => db_update.currency.append(currency_table::parse_table_update(table_update)?),
@@ -22187,6 +22470,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "document_external_ref" => db_update.document_external_ref.append(document_external_ref_table::parse_table_update(table_update)?),
     "document_legal_hold" => db_update.document_legal_hold.append(document_legal_hold_table::parse_table_update(table_update)?),
     "document_presence" => db_update.document_presence.append(document_presence_table::parse_table_update(table_update)?),
+    "document_retention_purge_job" => db_update.document_retention_purge_job.append(document_retention_purge_job_table::parse_table_update(table_update)?),
     "document_sequence" => db_update.document_sequence.append(document_sequence_table::parse_table_update(table_update)?),
     "document_signature_request" => db_update.document_signature_request.append(document_signature_request_table::parse_table_update(table_update)?),
     "document_template" => db_update.document_template.append(document_template_table::parse_table_update(table_update)?),
@@ -22204,6 +22488,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "fx_revaluation_run" => db_update.fx_revaluation_run.append(fx_revaluation_run_table::parse_table_update(table_update)?),
     "generated_owner_report" => db_update.generated_owner_report.append(generated_owner_report_table::parse_table_update(table_update)?),
     "google_drive_connection" => db_update.google_drive_connection.append(google_drive_connection_table::parse_table_update(table_update)?),
+    "guarded_action_receipt" => db_update.guarded_action_receipt.append(guarded_action_receipt_table::parse_table_update(table_update)?),
     "helpdesk_sla" => db_update.helpdesk_sla.append(helpdesk_sla_table::parse_table_update(table_update)?),
     "helpdesk_stage" => db_update.helpdesk_stage.append(helpdesk_stage_table::parse_table_update(table_update)?),
     "helpdesk_team" => db_update.helpdesk_team.append(helpdesk_team_table::parse_table_update(table_update)?),
@@ -22303,6 +22588,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "organization_settings" => db_update.organization_settings.append(organization_settings_table::parse_table_update(table_update)?),
     "packaging_material" => db_update.packaging_material.append(packaging_material_table::parse_table_update(table_update)?),
     "partner_credit_control" => db_update.partner_credit_control.append(partner_credit_control_table::parse_table_update(table_update)?),
+    "password_reset_token" => db_update.password_reset_token.append(password_reset_token_table::parse_table_update(table_update)?),
     "payment_account" => db_update.payment_account.append(payment_account_table::parse_table_update(table_update)?),
     "payment_fee" => db_update.payment_fee.append(payment_fee_table::parse_table_update(table_update)?),
     "payment_reconciliation" => db_update.payment_reconciliation.append(payment_reconciliation_table::parse_table_update(table_update)?),
@@ -22380,6 +22666,8 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "quality_check" => db_update.quality_check.append(quality_check_table::parse_table_update(table_update)?),
     "quality_point" => db_update.quality_point.append(quality_point_table::parse_table_update(table_update)?),
     "quality_team" => db_update.quality_team.append(quality_team_table::parse_table_update(table_update)?),
+    "queue_attempt" => db_update.queue_attempt.append(queue_attempt_table::parse_table_update(table_update)?),
+    "queue_effect_receipt" => db_update.queue_effect_receipt.append(queue_effect_receipt_table::parse_table_update(table_update)?),
     "queue_job" => db_update.queue_job.append(queue_job_table::parse_table_update(table_update)?),
     "queue_worker" => db_update.queue_worker.append(queue_worker_table::parse_table_update(table_update)?),
     "record_custom_field_value" => db_update.record_custom_field_value.append(record_custom_field_value_table::parse_table_update(table_update)?),
@@ -22403,6 +22691,7 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "sale_order_option" => db_update.sale_order_option.append(sale_order_option_table::parse_table_update(table_update)?),
     "sale_promotion" => db_update.sale_promotion.append(sale_promotion_table::parse_table_update(table_update)?),
     "sales_integration_intent" => db_update.sales_integration_intent.append(sales_integration_intent_table::parse_table_update(table_update)?),
+    "sales_sla_escalation_job" => db_update.sales_sla_escalation_job.append(sales_sla_escalation_job_table::parse_table_update(table_update)?),
     "saved_report" => db_update.saved_report.append(saved_report_table::parse_table_update(table_update)?),
     "scheduled_report" => db_update.scheduled_report.append(scheduled_report_table::parse_table_update(table_update)?),
     "scheduled_report_run" => db_update.scheduled_report_run.append(scheduled_report_run_table::parse_table_update(table_update)?),
@@ -22450,13 +22739,16 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "supplier_intake_request" => db_update.supplier_intake_request.append(supplier_intake_request_table::parse_table_update(table_update)?),
     "tax_deadline" => db_update.tax_deadline.append(tax_deadline_table::parse_table_update(table_update)?),
     "tax_deadline_reminder" => db_update.tax_deadline_reminder.append(tax_deadline_reminder_table::parse_table_update(table_update)?),
+    "tax_deadline_status_job" => db_update.tax_deadline_status_job.append(tax_deadline_status_job_table::parse_table_update(table_update)?),
     "tax_jurisdiction" => db_update.tax_jurisdiction.append(tax_jurisdiction_table::parse_table_update(table_update)?),
     "tax_schedule" => db_update.tax_schedule.append(tax_schedule_table::parse_table_update(table_update)?),
     "trial_balance" => db_update.trial_balance.append(trial_balance_table::parse_table_update(table_update)?),
     "uom" => db_update.uom.append(uom_table::parse_table_update(table_update)?),
     "uom_cat" => db_update.uom_cat.append(uom_cat_table::parse_table_update(table_update)?),
     "uom_conversion" => db_update.uom_conversion.append(uom_conversion_table::parse_table_update(table_update)?),
+    "user_credential" => db_update.user_credential.append(user_credential_table::parse_table_update(table_update)?),
     "user_custom_field" => db_update.user_custom_field.append(user_custom_field_table::parse_table_update(table_update)?),
+    "user_invite" => db_update.user_invite.append(user_invite_table::parse_table_update(table_update)?),
     "user_organization" => db_update.user_organization.append(user_organization_table::parse_table_update(table_update)?),
     "user_profile" => db_update.user_profile.append(user_profile_table::parse_table_update(table_update)?),
     "user_role_assignment" => db_update.user_role_assignment.append(user_role_assignment_table::parse_table_update(table_update)?),
@@ -22472,9 +22764,34 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
     "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(warehouse_sync_intent_table::parse_table_update(table_update)?),
     "warehouse_task" => db_update.warehouse_task.append(warehouse_task_table::parse_table_update(table_update)?),
     "whatsapp_business_account" => db_update.whatsapp_business_account.append(whatsapp_business_account_table::parse_table_update(table_update)?),
+    "workflow" => db_update.workflow.append(workflow_table::parse_table_update(table_update)?),
+    "workflow_calendar" => db_update.workflow_calendar.append(workflow_calendar_table::parse_table_update(table_update)?),
+    "workflow_calendar_exception" => db_update.workflow_calendar_exception.append(workflow_calendar_exception_table::parse_table_update(table_update)?),
+    "workflow_calendar_version" => db_update.workflow_calendar_version.append(workflow_calendar_version_table::parse_table_update(table_update)?),
+    "workflow_candidate_group_member" => db_update.workflow_candidate_group_member.append(workflow_candidate_group_member_table::parse_table_update(table_update)?),
+    "workflow_command_receipt" => db_update.workflow_command_receipt.append(workflow_command_receipt_table::parse_table_update(table_update)?),
+    "workflow_decision_event" => db_update.workflow_decision_event.append(workflow_decision_event_table::parse_table_update(table_update)?),
+    "workflow_delegation" => db_update.workflow_delegation.append(workflow_delegation_table::parse_table_update(table_update)?),
+    "workflow_delivery_attempt" => db_update.workflow_delivery_attempt.append(workflow_delivery_attempt_table::parse_table_update(table_update)?),
+    "workflow_delivery_receipt" => db_update.workflow_delivery_receipt.append(workflow_delivery_receipt_table::parse_table_update(table_update)?),
+    "workflow_edge" => db_update.workflow_edge.append(workflow_edge_table::parse_table_update(table_update)?),
+    "workflow_fork" => db_update.workflow_fork.append(workflow_fork_table::parse_table_update(table_update)?),
+    "workflow_human_task" => db_update.workflow_human_task.append(workflow_human_task_table::parse_table_update(table_update)?),
+    "workflow_human_task_candidate" => db_update.workflow_human_task_candidate.append(workflow_human_task_candidate_table::parse_table_update(table_update)?),
+    "workflow_human_task_event" => db_update.workflow_human_task_event.append(workflow_human_task_event_table::parse_table_update(table_update)?),
+    "workflow_human_task_receipt" => db_update.workflow_human_task_receipt.append(workflow_human_task_receipt_table::parse_table_update(table_update)?),
+    "workflow_instance" => db_update.workflow_instance.append(workflow_instance_table::parse_table_update(table_update)?),
+    "workflow_join_arrival" => db_update.workflow_join_arrival.append(workflow_join_arrival_table::parse_table_update(table_update)?),
     "workflow_migration_instance_result" => db_update.workflow_migration_instance_result.append(workflow_migration_instance_result_table::parse_table_update(table_update)?),
     "workflow_migration_plan" => db_update.workflow_migration_plan.append(workflow_migration_plan_table::parse_table_update(table_update)?),
     "workflow_migration_preflight" => db_update.workflow_migration_preflight.append(workflow_migration_preflight_table::parse_table_update(table_update)?),
+    "workflow_node" => db_update.workflow_node.append(workflow_node_table::parse_table_update(table_update)?),
+    "workflow_outbox" => db_update.workflow_outbox.append(workflow_outbox_table::parse_table_update(table_update)?),
+    "workflow_simulation_result" => db_update.workflow_simulation_result.append(workflow_simulation_result_table::parse_table_update(table_update)?),
+    "workflow_simulation_step" => db_update.workflow_simulation_step.append(workflow_simulation_step_table::parse_table_update(table_update)?),
+    "workflow_timer" => db_update.workflow_timer.append(workflow_timer_table::parse_table_update(table_update)?),
+    "workflow_token" => db_update.workflow_token.append(workflow_token_table::parse_table_update(table_update)?),
+    "workflow_version" => db_update.workflow_version.append(workflow_version_table::parse_table_update(table_update)?),
     "working_calendar" => db_update.working_calendar.append(working_calendar_table::parse_table_update(table_update)?),
 
                 unknown => {
@@ -22522,6 +22839,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.account_reconciliation_widget = cache.apply_diff_to_table::<AccountReconciliationWidget>("account_reconciliation_widget", &self.account_reconciliation_widget).with_updates_by_pk(|row| &row.id);
         diff.account_tax = cache.apply_diff_to_table::<AccountTax>("account_tax", &self.account_tax).with_updates_by_pk(|row| &row.id);
         diff.account_tax_group = cache.apply_diff_to_table::<AccountTaxGroup>("account_tax_group", &self.account_tax_group).with_updates_by_pk(|row| &row.id);
+        diff.accounting_operation_receipt = cache.apply_diff_to_table::<AccountingOperationReceipt>("accounting_operation_receipt", &self.accounting_operation_receipt).with_updates_by_pk(|row| &row.id);
+        diff.accounting_ownership_backfill_issue = cache.apply_diff_to_table::<AccountingOwnershipBackfillIssue>("accounting_ownership_backfill_issue", &self.accounting_ownership_backfill_issue).with_updates_by_pk(|row| &row.id);
+        diff.accounting_ownership_backfill_run = cache.apply_diff_to_table::<AccountingOwnershipBackfillRun>("accounting_ownership_backfill_run", &self.accounting_ownership_backfill_run).with_updates_by_pk(|row| &row.id);
         diff.activity = cache.apply_diff_to_table::<Activity>("activity", &self.activity).with_updates_by_pk(|row| &row.id);
         diff.activity_type = cache.apply_diff_to_table::<ActivityType>("activity_type", &self.activity_type).with_updates_by_pk(|row| &row.id);
         diff.adjustment_reason = cache.apply_diff_to_table::<AdjustmentReason>("adjustment_reason", &self.adjustment_reason).with_updates_by_pk(|row| &row.id);
@@ -22581,6 +22901,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.contact_category_assignment = cache.apply_diff_to_table::<ContactCategoryAssignment>("contact_category_assignment", &self.contact_category_assignment).with_updates_by_pk(|row| &row.id);
         diff.contact_communication_preference = cache.apply_diff_to_table::<ContactCommunicationPreference>("contact_communication_preference", &self.contact_communication_preference).with_updates_by_pk(|row| &row.id);
         diff.contact_duplicate_candidate = cache.apply_diff_to_table::<ContactDuplicateCandidate>("contact_duplicate_candidate", &self.contact_duplicate_candidate).with_updates_by_pk(|row| &row.id);
+        diff.contact_identity_verification_authority = cache.apply_diff_to_table::<ContactIdentityVerificationAuthority>("contact_identity_verification_authority", &self.contact_identity_verification_authority).with_updates_by_pk(|row| &row.id);
+        diff.contact_identity_verification_proof = cache.apply_diff_to_table::<ContactIdentityVerificationProof>("contact_identity_verification_proof", &self.contact_identity_verification_proof).with_updates_by_pk(|row| &row.id);
         diff.contact_phone_identity = cache.apply_diff_to_table::<ContactPhoneIdentity>("contact_phone_identity", &self.contact_phone_identity).with_updates_by_pk(|row| &row.id);
         diff.contact_relationship = cache.apply_diff_to_table::<ContactRelationship>("contact_relationship", &self.contact_relationship).with_updates_by_pk(|row| &row.id);
         diff.contact_relationship_insight = cache.apply_diff_to_table::<ContactRelationshipInsight>("contact_relationship_insight", &self.contact_relationship_insight).with_updates_by_pk(|row| &row.id);
@@ -22595,6 +22917,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.crm_conversation = cache.apply_diff_to_table::<CrmConversation>("crm_conversation", &self.crm_conversation).with_updates_by_pk(|row| &row.id);
         diff.crm_conversation_message = cache.apply_diff_to_table::<CrmConversationMessage>("crm_conversation_message", &self.crm_conversation_message).with_updates_by_pk(|row| &row.id);
         diff.crm_forecast_snapshot = cache.apply_diff_to_table::<CrmForecastSnapshot>("crm_forecast_snapshot", &self.crm_forecast_snapshot).with_updates_by_pk(|row| &row.id);
+        diff.crm_provider_event_receipt = cache.apply_diff_to_table::<CrmProviderEventReceipt>("crm_provider_event_receipt", &self.crm_provider_event_receipt).with_updates_by_pk(|row| &row.id);
+        diff.crm_provider_principal = cache.apply_diff_to_table::<CrmProviderPrincipal>("crm_provider_principal", &self.crm_provider_principal).with_updates_by_pk(|row| &row.id);
         diff.crossovered_budget = cache.apply_diff_to_table::<CrossoveredBudget>("crossovered_budget", &self.crossovered_budget).with_updates_by_pk(|row| &row.id);
         diff.crossovered_budget_lines = cache.apply_diff_to_table::<CrossoveredBudgetLines>("crossovered_budget_lines", &self.crossovered_budget_lines).with_updates_by_pk(|row| &row.id);
         diff.currency = cache.apply_diff_to_table::<Currency>("currency", &self.currency).with_updates_by_pk(|row| &row.id);
@@ -22613,6 +22937,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.document_external_ref = cache.apply_diff_to_table::<DocumentExternalRef>("document_external_ref", &self.document_external_ref).with_updates_by_pk(|row| &row.id);
         diff.document_legal_hold = cache.apply_diff_to_table::<DocumentLegalHold>("document_legal_hold", &self.document_legal_hold).with_updates_by_pk(|row| &row.id);
         diff.document_presence = cache.apply_diff_to_table::<DocumentPresence>("document_presence", &self.document_presence).with_updates_by_pk(|row| &row.id);
+        diff.document_retention_purge_job = cache.apply_diff_to_table::<DocumentRetentionPurgeJob>("document_retention_purge_job", &self.document_retention_purge_job).with_updates_by_pk(|row| &row.scheduled_id);
         diff.document_sequence = cache.apply_diff_to_table::<DocumentSequence>("document_sequence", &self.document_sequence).with_updates_by_pk(|row| &row.doc_type);
         diff.document_signature_request = cache.apply_diff_to_table::<DocumentSignatureRequest>("document_signature_request", &self.document_signature_request).with_updates_by_pk(|row| &row.id);
         diff.document_template = cache.apply_diff_to_table::<DocumentTemplate>("document_template", &self.document_template).with_updates_by_pk(|row| &row.id);
@@ -22630,6 +22955,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.fx_revaluation_run = cache.apply_diff_to_table::<FxRevaluationRun>("fx_revaluation_run", &self.fx_revaluation_run).with_updates_by_pk(|row| &row.id);
         diff.generated_owner_report = cache.apply_diff_to_table::<GeneratedOwnerReport>("generated_owner_report", &self.generated_owner_report).with_updates_by_pk(|row| &row.id);
         diff.google_drive_connection = cache.apply_diff_to_table::<GoogleDriveConnection>("google_drive_connection", &self.google_drive_connection).with_updates_by_pk(|row| &row.id);
+        diff.guarded_action_receipt = cache.apply_diff_to_table::<GuardedActionReceipt>("guarded_action_receipt", &self.guarded_action_receipt).with_updates_by_pk(|row| &row.id);
         diff.helpdesk_sla = cache.apply_diff_to_table::<HelpdeskSla>("helpdesk_sla", &self.helpdesk_sla).with_updates_by_pk(|row| &row.id);
         diff.helpdesk_stage = cache.apply_diff_to_table::<HelpdeskStage>("helpdesk_stage", &self.helpdesk_stage).with_updates_by_pk(|row| &row.id);
         diff.helpdesk_team = cache.apply_diff_to_table::<HelpdeskTeam>("helpdesk_team", &self.helpdesk_team).with_updates_by_pk(|row| &row.id);
@@ -22729,6 +23055,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.organization_settings = cache.apply_diff_to_table::<OrganizationSettings>("organization_settings", &self.organization_settings).with_updates_by_pk(|row| &row.organization_id);
         diff.packaging_material = cache.apply_diff_to_table::<PackagingMaterial>("packaging_material", &self.packaging_material).with_updates_by_pk(|row| &row.id);
         diff.partner_credit_control = cache.apply_diff_to_table::<PartnerCreditControl>("partner_credit_control", &self.partner_credit_control).with_updates_by_pk(|row| &row.id);
+        diff.password_reset_token = cache.apply_diff_to_table::<PasswordResetToken>("password_reset_token", &self.password_reset_token).with_updates_by_pk(|row| &row.id);
         diff.payment_account = cache.apply_diff_to_table::<PaymentAccount>("payment_account", &self.payment_account).with_updates_by_pk(|row| &row.id);
         diff.payment_fee = cache.apply_diff_to_table::<PaymentFee>("payment_fee", &self.payment_fee).with_updates_by_pk(|row| &row.id);
         diff.payment_reconciliation = cache.apply_diff_to_table::<PaymentReconciliation>("payment_reconciliation", &self.payment_reconciliation).with_updates_by_pk(|row| &row.id);
@@ -22806,6 +23133,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.quality_check = cache.apply_diff_to_table::<QualityCheck>("quality_check", &self.quality_check).with_updates_by_pk(|row| &row.id);
         diff.quality_point = cache.apply_diff_to_table::<QualityPoint>("quality_point", &self.quality_point).with_updates_by_pk(|row| &row.id);
         diff.quality_team = cache.apply_diff_to_table::<QualityTeam>("quality_team", &self.quality_team).with_updates_by_pk(|row| &row.id);
+        diff.queue_attempt = cache.apply_diff_to_table::<QueueAttempt>("queue_attempt", &self.queue_attempt).with_updates_by_pk(|row| &row.id);
+        diff.queue_effect_receipt = cache.apply_diff_to_table::<QueueEffectReceipt>("queue_effect_receipt", &self.queue_effect_receipt).with_updates_by_pk(|row| &row.scope_key);
         diff.queue_job = cache.apply_diff_to_table::<QueueJob>("queue_job", &self.queue_job).with_updates_by_pk(|row| &row.id);
         diff.queue_worker = cache.apply_diff_to_table::<QueueWorker>("queue_worker", &self.queue_worker).with_updates_by_pk(|row| &row.id);
         diff.record_custom_field_value = cache.apply_diff_to_table::<RecordCustomFieldValue>("record_custom_field_value", &self.record_custom_field_value).with_updates_by_pk(|row| &row.id);
@@ -22829,6 +23158,7 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.sale_order_option = cache.apply_diff_to_table::<SaleOrderOption>("sale_order_option", &self.sale_order_option).with_updates_by_pk(|row| &row.id);
         diff.sale_promotion = cache.apply_diff_to_table::<SalePromotion>("sale_promotion", &self.sale_promotion).with_updates_by_pk(|row| &row.id);
         diff.sales_integration_intent = cache.apply_diff_to_table::<SalesIntegrationIntent>("sales_integration_intent", &self.sales_integration_intent).with_updates_by_pk(|row| &row.id);
+        diff.sales_sla_escalation_job = cache.apply_diff_to_table::<SalesSlaEscalationJob>("sales_sla_escalation_job", &self.sales_sla_escalation_job).with_updates_by_pk(|row| &row.scheduled_id);
         diff.saved_report = cache.apply_diff_to_table::<SavedReport>("saved_report", &self.saved_report).with_updates_by_pk(|row| &row.id);
         diff.scheduled_report = cache.apply_diff_to_table::<ScheduledReport>("scheduled_report", &self.scheduled_report).with_updates_by_pk(|row| &row.id);
         diff.scheduled_report_run = cache.apply_diff_to_table::<ScheduledReportRun>("scheduled_report_run", &self.scheduled_report_run).with_updates_by_pk(|row| &row.id);
@@ -22876,13 +23206,16 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.supplier_intake_request = cache.apply_diff_to_table::<SupplierIntakeRequest>("supplier_intake_request", &self.supplier_intake_request).with_updates_by_pk(|row| &row.id);
         diff.tax_deadline = cache.apply_diff_to_table::<TaxDeadline>("tax_deadline", &self.tax_deadline).with_updates_by_pk(|row| &row.id);
         diff.tax_deadline_reminder = cache.apply_diff_to_table::<TaxDeadlineReminder>("tax_deadline_reminder", &self.tax_deadline_reminder).with_updates_by_pk(|row| &row.id);
+        diff.tax_deadline_status_job = cache.apply_diff_to_table::<TaxDeadlineStatusJob>("tax_deadline_status_job", &self.tax_deadline_status_job).with_updates_by_pk(|row| &row.scheduled_id);
         diff.tax_jurisdiction = cache.apply_diff_to_table::<TaxJurisdiction>("tax_jurisdiction", &self.tax_jurisdiction).with_updates_by_pk(|row| &row.id);
         diff.tax_schedule = cache.apply_diff_to_table::<TaxSchedule>("tax_schedule", &self.tax_schedule).with_updates_by_pk(|row| &row.id);
         diff.trial_balance = cache.apply_diff_to_table::<TrialBalance>("trial_balance", &self.trial_balance).with_updates_by_pk(|row| &row.id);
         diff.uom = cache.apply_diff_to_table::<Uom>("uom", &self.uom).with_updates_by_pk(|row| &row.id);
         diff.uom_cat = cache.apply_diff_to_table::<UomCategory>("uom_cat", &self.uom_cat).with_updates_by_pk(|row| &row.id);
         diff.uom_conversion = cache.apply_diff_to_table::<UomConversion>("uom_conversion", &self.uom_conversion).with_updates_by_pk(|row| &row.id);
+        diff.user_credential = cache.apply_diff_to_table::<UserCredential>("user_credential", &self.user_credential).with_updates_by_pk(|row| &row.id);
         diff.user_custom_field = cache.apply_diff_to_table::<UserCustomField>("user_custom_field", &self.user_custom_field).with_updates_by_pk(|row| &row.id);
+        diff.user_invite = cache.apply_diff_to_table::<UserInvite>("user_invite", &self.user_invite).with_updates_by_pk(|row| &row.id);
         diff.user_organization = cache.apply_diff_to_table::<UserOrganization>("user_organization", &self.user_organization).with_updates_by_pk(|row| &row.id);
         diff.user_profile = cache.apply_diff_to_table::<UserProfile>("user_profile", &self.user_profile).with_updates_by_pk(|row| &row.identity);
         diff.user_role_assignment = cache.apply_diff_to_table::<UserRoleAssignment>("user_role_assignment", &self.user_role_assignment).with_updates_by_pk(|row| &row.id);
@@ -22898,9 +23231,34 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.warehouse_sync_intent = cache.apply_diff_to_table::<WarehouseSyncIntent>("warehouse_sync_intent", &self.warehouse_sync_intent).with_updates_by_pk(|row| &row.id);
         diff.warehouse_task = cache.apply_diff_to_table::<WarehouseTask>("warehouse_task", &self.warehouse_task).with_updates_by_pk(|row| &row.id);
         diff.whatsapp_business_account = cache.apply_diff_to_table::<WhatsAppBusinessAccount>("whatsapp_business_account", &self.whatsapp_business_account).with_updates_by_pk(|row| &row.id);
+        diff.workflow = cache.apply_diff_to_table::<Workflow>("workflow", &self.workflow).with_updates_by_pk(|row| &row.id);
+        diff.workflow_calendar = cache.apply_diff_to_table::<WorkflowCalendar>("workflow_calendar", &self.workflow_calendar).with_updates_by_pk(|row| &row.id);
+        diff.workflow_calendar_exception = cache.apply_diff_to_table::<WorkflowCalendarException>("workflow_calendar_exception", &self.workflow_calendar_exception).with_updates_by_pk(|row| &row.id);
+        diff.workflow_calendar_version = cache.apply_diff_to_table::<WorkflowCalendarVersion>("workflow_calendar_version", &self.workflow_calendar_version).with_updates_by_pk(|row| &row.id);
+        diff.workflow_candidate_group_member = cache.apply_diff_to_table::<WorkflowCandidateGroupMember>("workflow_candidate_group_member", &self.workflow_candidate_group_member).with_updates_by_pk(|row| &row.id);
+        diff.workflow_command_receipt = cache.apply_diff_to_table::<WorkflowCommandReceipt>("workflow_command_receipt", &self.workflow_command_receipt).with_updates_by_pk(|row| &row.scope_key);
+        diff.workflow_decision_event = cache.apply_diff_to_table::<WorkflowDecisionEvent>("workflow_decision_event", &self.workflow_decision_event).with_updates_by_pk(|row| &row.id);
+        diff.workflow_delegation = cache.apply_diff_to_table::<WorkflowDelegation>("workflow_delegation", &self.workflow_delegation).with_updates_by_pk(|row| &row.id);
+        diff.workflow_delivery_attempt = cache.apply_diff_to_table::<WorkflowDeliveryAttempt>("workflow_delivery_attempt", &self.workflow_delivery_attempt).with_updates_by_pk(|row| &row.id);
+        diff.workflow_delivery_receipt = cache.apply_diff_to_table::<WorkflowDeliveryReceipt>("workflow_delivery_receipt", &self.workflow_delivery_receipt).with_updates_by_pk(|row| &row.scope_key);
+        diff.workflow_edge = cache.apply_diff_to_table::<WorkflowEdge>("workflow_edge", &self.workflow_edge).with_updates_by_pk(|row| &row.id);
+        diff.workflow_fork = cache.apply_diff_to_table::<WorkflowFork>("workflow_fork", &self.workflow_fork).with_updates_by_pk(|row| &row.id);
+        diff.workflow_human_task = cache.apply_diff_to_table::<WorkflowHumanTask>("workflow_human_task", &self.workflow_human_task).with_updates_by_pk(|row| &row.id);
+        diff.workflow_human_task_candidate = cache.apply_diff_to_table::<WorkflowHumanTaskCandidate>("workflow_human_task_candidate", &self.workflow_human_task_candidate).with_updates_by_pk(|row| &row.id);
+        diff.workflow_human_task_event = cache.apply_diff_to_table::<WorkflowHumanTaskEvent>("workflow_human_task_event", &self.workflow_human_task_event).with_updates_by_pk(|row| &row.id);
+        diff.workflow_human_task_receipt = cache.apply_diff_to_table::<WorkflowHumanTaskReceipt>("workflow_human_task_receipt", &self.workflow_human_task_receipt).with_updates_by_pk(|row| &row.scope_key);
+        diff.workflow_instance = cache.apply_diff_to_table::<WorkflowInstance>("workflow_instance", &self.workflow_instance).with_updates_by_pk(|row| &row.id);
+        diff.workflow_join_arrival = cache.apply_diff_to_table::<WorkflowJoinArrival>("workflow_join_arrival", &self.workflow_join_arrival).with_updates_by_pk(|row| &row.id);
         diff.workflow_migration_instance_result = cache.apply_diff_to_table::<WorkflowMigrationInstanceResult>("workflow_migration_instance_result", &self.workflow_migration_instance_result).with_updates_by_pk(|row| &row.id);
         diff.workflow_migration_plan = cache.apply_diff_to_table::<WorkflowMigrationPlan>("workflow_migration_plan", &self.workflow_migration_plan).with_updates_by_pk(|row| &row.id);
         diff.workflow_migration_preflight = cache.apply_diff_to_table::<WorkflowMigrationPreflight>("workflow_migration_preflight", &self.workflow_migration_preflight).with_updates_by_pk(|row| &row.id);
+        diff.workflow_node = cache.apply_diff_to_table::<WorkflowNode>("workflow_node", &self.workflow_node).with_updates_by_pk(|row| &row.id);
+        diff.workflow_outbox = cache.apply_diff_to_table::<WorkflowOutbox>("workflow_outbox", &self.workflow_outbox).with_updates_by_pk(|row| &row.id);
+        diff.workflow_simulation_result = cache.apply_diff_to_table::<WorkflowSimulationResult>("workflow_simulation_result", &self.workflow_simulation_result).with_updates_by_pk(|row| &row.id);
+        diff.workflow_simulation_step = cache.apply_diff_to_table::<WorkflowSimulationStep>("workflow_simulation_step", &self.workflow_simulation_step).with_updates_by_pk(|row| &row.id);
+        diff.workflow_timer = cache.apply_diff_to_table::<WorkflowTimer>("workflow_timer", &self.workflow_timer).with_updates_by_pk(|row| &row.id);
+        diff.workflow_token = cache.apply_diff_to_table::<WorkflowToken>("workflow_token", &self.workflow_token).with_updates_by_pk(|row| &row.id);
+        diff.workflow_version = cache.apply_diff_to_table::<WorkflowVersion>("workflow_version", &self.workflow_version).with_updates_by_pk(|row| &row.id);
         diff.working_calendar = cache.apply_diff_to_table::<WorkingCalendar>("working_calendar", &self.working_calendar).with_updates_by_pk(|row| &row.id);
 
                     diff
@@ -22933,6 +23291,9 @@ for table_rows in raw.tables {
                 "account_reconciliation_widget" => db_update.account_reconciliation_widget.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "account_tax" => db_update.account_tax.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "account_tax_group" => db_update.account_tax_group.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "accounting_operation_receipt" => db_update.accounting_operation_receipt.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "accounting_ownership_backfill_issue" => db_update.accounting_ownership_backfill_issue.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "accounting_ownership_backfill_run" => db_update.accounting_ownership_backfill_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "activity" => db_update.activity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "activity_type" => db_update.activity_type.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "adjustment_reason" => db_update.adjustment_reason.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -22992,6 +23353,8 @@ for table_rows in raw.tables {
                 "contact_category_assignment" => db_update.contact_category_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_communication_preference" => db_update.contact_communication_preference.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_identity_verification_authority" => db_update.contact_identity_verification_authority.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "contact_identity_verification_proof" => db_update.contact_identity_verification_proof.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_phone_identity" => db_update.contact_phone_identity.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_relationship" => db_update.contact_relationship.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "contact_relationship_insight" => db_update.contact_relationship_insight.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -23006,6 +23369,8 @@ for table_rows in raw.tables {
                 "crm_conversation" => db_update.crm_conversation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "crm_conversation_message" => db_update.crm_conversation_message.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "crm_forecast_snapshot" => db_update.crm_forecast_snapshot.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crm_provider_event_receipt" => db_update.crm_provider_event_receipt.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crm_provider_principal" => db_update.crm_provider_principal.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "crossovered_budget" => db_update.crossovered_budget.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "currency" => db_update.currency.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -23024,6 +23389,7 @@ for table_rows in raw.tables {
                 "document_external_ref" => db_update.document_external_ref.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_legal_hold" => db_update.document_legal_hold.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_presence" => db_update.document_presence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "document_retention_purge_job" => db_update.document_retention_purge_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_signature_request" => db_update.document_signature_request.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -23041,6 +23407,7 @@ for table_rows in raw.tables {
                 "fx_revaluation_run" => db_update.fx_revaluation_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "generated_owner_report" => db_update.generated_owner_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "google_drive_connection" => db_update.google_drive_connection.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "guarded_action_receipt" => db_update.guarded_action_receipt.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "helpdesk_sla" => db_update.helpdesk_sla.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "helpdesk_stage" => db_update.helpdesk_stage.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "helpdesk_team" => db_update.helpdesk_team.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -23140,6 +23507,7 @@ for table_rows in raw.tables {
                 "organization_settings" => db_update.organization_settings.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "packaging_material" => db_update.packaging_material.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "partner_credit_control" => db_update.partner_credit_control.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "password_reset_token" => db_update.password_reset_token.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "payment_account" => db_update.payment_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "payment_fee" => db_update.payment_fee.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "payment_reconciliation" => db_update.payment_reconciliation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -23217,6 +23585,8 @@ for table_rows in raw.tables {
                 "quality_check" => db_update.quality_check.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "quality_point" => db_update.quality_point.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "quality_team" => db_update.quality_team.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "queue_attempt" => db_update.queue_attempt.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "queue_effect_receipt" => db_update.queue_effect_receipt.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "queue_job" => db_update.queue_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "queue_worker" => db_update.queue_worker.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "record_custom_field_value" => db_update.record_custom_field_value.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -23240,6 +23610,7 @@ for table_rows in raw.tables {
                 "sale_order_option" => db_update.sale_order_option.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "sale_promotion" => db_update.sale_promotion.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "sales_integration_intent" => db_update.sales_integration_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "sales_sla_escalation_job" => db_update.sales_sla_escalation_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "saved_report" => db_update.saved_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "scheduled_report" => db_update.scheduled_report.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "scheduled_report_run" => db_update.scheduled_report_run.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -23287,13 +23658,16 @@ for table_rows in raw.tables {
                 "supplier_intake_request" => db_update.supplier_intake_request.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "tax_deadline" => db_update.tax_deadline.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "tax_deadline_reminder" => db_update.tax_deadline_reminder.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "tax_deadline_status_job" => db_update.tax_deadline_status_job.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "tax_jurisdiction" => db_update.tax_jurisdiction.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "tax_schedule" => db_update.tax_schedule.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "trial_balance" => db_update.trial_balance.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "uom" => db_update.uom.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "uom_cat" => db_update.uom_cat.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "uom_conversion" => db_update.uom_conversion.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "user_credential" => db_update.user_credential.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "user_custom_field" => db_update.user_custom_field.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "user_invite" => db_update.user_invite.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "user_organization" => db_update.user_organization.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "user_profile" => db_update.user_profile.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "user_role_assignment" => db_update.user_role_assignment.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -23309,9 +23683,34 @@ for table_rows in raw.tables {
                 "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "warehouse_task" => db_update.warehouse_task.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "whatsapp_business_account" => db_update.whatsapp_business_account.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow" => db_update.workflow.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_calendar" => db_update.workflow_calendar.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_calendar_exception" => db_update.workflow_calendar_exception.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_calendar_version" => db_update.workflow_calendar_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_candidate_group_member" => db_update.workflow_candidate_group_member.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_command_receipt" => db_update.workflow_command_receipt.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_decision_event" => db_update.workflow_decision_event.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_delegation" => db_update.workflow_delegation.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_delivery_attempt" => db_update.workflow_delivery_attempt.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_delivery_receipt" => db_update.workflow_delivery_receipt.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_edge" => db_update.workflow_edge.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_fork" => db_update.workflow_fork.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_human_task" => db_update.workflow_human_task.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_human_task_candidate" => db_update.workflow_human_task_candidate.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_human_task_event" => db_update.workflow_human_task_event.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_human_task_receipt" => db_update.workflow_human_task_receipt.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_instance" => db_update.workflow_instance.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_join_arrival" => db_update.workflow_join_arrival.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "workflow_migration_instance_result" => db_update.workflow_migration_instance_result.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "workflow_migration_plan" => db_update.workflow_migration_plan.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "workflow_migration_preflight" => db_update.workflow_migration_preflight.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_node" => db_update.workflow_node.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_outbox" => db_update.workflow_outbox.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_simulation_result" => db_update.workflow_simulation_result.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_simulation_step" => db_update.workflow_simulation_step.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_timer" => db_update.workflow_timer.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_token" => db_update.workflow_token.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "workflow_version" => db_update.workflow_version.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "working_calendar" => db_update.working_calendar.append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 unknown => { return Err(__sdk::InternalError::unknown_name("table", unknown, "QueryRows").into()); }
 }}        Ok(db_update)
@@ -23344,6 +23743,9 @@ for table_rows in raw.tables {
                 "account_reconciliation_widget" => db_update.account_reconciliation_widget.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "account_tax" => db_update.account_tax.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "account_tax_group" => db_update.account_tax_group.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "accounting_operation_receipt" => db_update.accounting_operation_receipt.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "accounting_ownership_backfill_issue" => db_update.accounting_ownership_backfill_issue.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "accounting_ownership_backfill_run" => db_update.accounting_ownership_backfill_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "activity" => db_update.activity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "activity_type" => db_update.activity_type.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "adjustment_reason" => db_update.adjustment_reason.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23403,6 +23805,8 @@ for table_rows in raw.tables {
                 "contact_category_assignment" => db_update.contact_category_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_communication_preference" => db_update.contact_communication_preference.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_duplicate_candidate" => db_update.contact_duplicate_candidate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_identity_verification_authority" => db_update.contact_identity_verification_authority.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "contact_identity_verification_proof" => db_update.contact_identity_verification_proof.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_phone_identity" => db_update.contact_phone_identity.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_relationship" => db_update.contact_relationship.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "contact_relationship_insight" => db_update.contact_relationship_insight.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23417,6 +23821,8 @@ for table_rows in raw.tables {
                 "crm_conversation" => db_update.crm_conversation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "crm_conversation_message" => db_update.crm_conversation_message.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "crm_forecast_snapshot" => db_update.crm_forecast_snapshot.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crm_provider_event_receipt" => db_update.crm_provider_event_receipt.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crm_provider_principal" => db_update.crm_provider_principal.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "crossovered_budget" => db_update.crossovered_budget.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "crossovered_budget_lines" => db_update.crossovered_budget_lines.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "currency" => db_update.currency.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23435,6 +23841,7 @@ for table_rows in raw.tables {
                 "document_external_ref" => db_update.document_external_ref.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_legal_hold" => db_update.document_legal_hold.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_presence" => db_update.document_presence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "document_retention_purge_job" => db_update.document_retention_purge_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_sequence" => db_update.document_sequence.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_signature_request" => db_update.document_signature_request.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "document_template" => db_update.document_template.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23452,6 +23859,7 @@ for table_rows in raw.tables {
                 "fx_revaluation_run" => db_update.fx_revaluation_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "generated_owner_report" => db_update.generated_owner_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "google_drive_connection" => db_update.google_drive_connection.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "guarded_action_receipt" => db_update.guarded_action_receipt.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "helpdesk_sla" => db_update.helpdesk_sla.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "helpdesk_stage" => db_update.helpdesk_stage.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "helpdesk_team" => db_update.helpdesk_team.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23551,6 +23959,7 @@ for table_rows in raw.tables {
                 "organization_settings" => db_update.organization_settings.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "packaging_material" => db_update.packaging_material.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "partner_credit_control" => db_update.partner_credit_control.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "password_reset_token" => db_update.password_reset_token.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "payment_account" => db_update.payment_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "payment_fee" => db_update.payment_fee.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "payment_reconciliation" => db_update.payment_reconciliation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23628,6 +24037,8 @@ for table_rows in raw.tables {
                 "quality_check" => db_update.quality_check.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "quality_point" => db_update.quality_point.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "quality_team" => db_update.quality_team.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "queue_attempt" => db_update.queue_attempt.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "queue_effect_receipt" => db_update.queue_effect_receipt.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "queue_job" => db_update.queue_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "queue_worker" => db_update.queue_worker.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "record_custom_field_value" => db_update.record_custom_field_value.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23651,6 +24062,7 @@ for table_rows in raw.tables {
                 "sale_order_option" => db_update.sale_order_option.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "sale_promotion" => db_update.sale_promotion.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "sales_integration_intent" => db_update.sales_integration_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "sales_sla_escalation_job" => db_update.sales_sla_escalation_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "saved_report" => db_update.saved_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "scheduled_report" => db_update.scheduled_report.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "scheduled_report_run" => db_update.scheduled_report_run.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23698,13 +24110,16 @@ for table_rows in raw.tables {
                 "supplier_intake_request" => db_update.supplier_intake_request.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "tax_deadline" => db_update.tax_deadline.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "tax_deadline_reminder" => db_update.tax_deadline_reminder.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "tax_deadline_status_job" => db_update.tax_deadline_status_job.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "tax_jurisdiction" => db_update.tax_jurisdiction.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "tax_schedule" => db_update.tax_schedule.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "trial_balance" => db_update.trial_balance.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "uom" => db_update.uom.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "uom_cat" => db_update.uom_cat.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "uom_conversion" => db_update.uom_conversion.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "user_credential" => db_update.user_credential.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "user_custom_field" => db_update.user_custom_field.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "user_invite" => db_update.user_invite.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "user_organization" => db_update.user_organization.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "user_profile" => db_update.user_profile.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "user_role_assignment" => db_update.user_role_assignment.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -23720,9 +24135,34 @@ for table_rows in raw.tables {
                 "warehouse_sync_intent" => db_update.warehouse_sync_intent.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "warehouse_task" => db_update.warehouse_task.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "whatsapp_business_account" => db_update.whatsapp_business_account.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow" => db_update.workflow.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_calendar" => db_update.workflow_calendar.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_calendar_exception" => db_update.workflow_calendar_exception.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_calendar_version" => db_update.workflow_calendar_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_candidate_group_member" => db_update.workflow_candidate_group_member.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_command_receipt" => db_update.workflow_command_receipt.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_decision_event" => db_update.workflow_decision_event.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_delegation" => db_update.workflow_delegation.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_delivery_attempt" => db_update.workflow_delivery_attempt.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_delivery_receipt" => db_update.workflow_delivery_receipt.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_edge" => db_update.workflow_edge.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_fork" => db_update.workflow_fork.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_human_task" => db_update.workflow_human_task.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_human_task_candidate" => db_update.workflow_human_task_candidate.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_human_task_event" => db_update.workflow_human_task_event.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_human_task_receipt" => db_update.workflow_human_task_receipt.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_instance" => db_update.workflow_instance.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_join_arrival" => db_update.workflow_join_arrival.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "workflow_migration_instance_result" => db_update.workflow_migration_instance_result.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "workflow_migration_plan" => db_update.workflow_migration_plan.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "workflow_migration_preflight" => db_update.workflow_migration_preflight.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_node" => db_update.workflow_node.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_outbox" => db_update.workflow_outbox.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_simulation_result" => db_update.workflow_simulation_result.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_simulation_step" => db_update.workflow_simulation_step.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_timer" => db_update.workflow_timer.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_token" => db_update.workflow_token.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "workflow_version" => db_update.workflow_version.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "working_calendar" => db_update.working_calendar.append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 unknown => { return Err(__sdk::InternalError::unknown_name("table", unknown, "QueryRows").into()); }
 }}        Ok(db_update)
@@ -23757,6 +24197,9 @@ pub struct AppliedDiff<'r> {
     account_reconciliation_widget: __sdk::TableAppliedDiff<'r, AccountReconciliationWidget>,
     account_tax: __sdk::TableAppliedDiff<'r, AccountTax>,
     account_tax_group: __sdk::TableAppliedDiff<'r, AccountTaxGroup>,
+    accounting_operation_receipt: __sdk::TableAppliedDiff<'r, AccountingOperationReceipt>,
+    accounting_ownership_backfill_issue: __sdk::TableAppliedDiff<'r, AccountingOwnershipBackfillIssue>,
+    accounting_ownership_backfill_run: __sdk::TableAppliedDiff<'r, AccountingOwnershipBackfillRun>,
     activity: __sdk::TableAppliedDiff<'r, Activity>,
     activity_type: __sdk::TableAppliedDiff<'r, ActivityType>,
     adjustment_reason: __sdk::TableAppliedDiff<'r, AdjustmentReason>,
@@ -23816,6 +24259,8 @@ pub struct AppliedDiff<'r> {
     contact_category_assignment: __sdk::TableAppliedDiff<'r, ContactCategoryAssignment>,
     contact_communication_preference: __sdk::TableAppliedDiff<'r, ContactCommunicationPreference>,
     contact_duplicate_candidate: __sdk::TableAppliedDiff<'r, ContactDuplicateCandidate>,
+    contact_identity_verification_authority: __sdk::TableAppliedDiff<'r, ContactIdentityVerificationAuthority>,
+    contact_identity_verification_proof: __sdk::TableAppliedDiff<'r, ContactIdentityVerificationProof>,
     contact_phone_identity: __sdk::TableAppliedDiff<'r, ContactPhoneIdentity>,
     contact_relationship: __sdk::TableAppliedDiff<'r, ContactRelationship>,
     contact_relationship_insight: __sdk::TableAppliedDiff<'r, ContactRelationshipInsight>,
@@ -23830,6 +24275,8 @@ pub struct AppliedDiff<'r> {
     crm_conversation: __sdk::TableAppliedDiff<'r, CrmConversation>,
     crm_conversation_message: __sdk::TableAppliedDiff<'r, CrmConversationMessage>,
     crm_forecast_snapshot: __sdk::TableAppliedDiff<'r, CrmForecastSnapshot>,
+    crm_provider_event_receipt: __sdk::TableAppliedDiff<'r, CrmProviderEventReceipt>,
+    crm_provider_principal: __sdk::TableAppliedDiff<'r, CrmProviderPrincipal>,
     crossovered_budget: __sdk::TableAppliedDiff<'r, CrossoveredBudget>,
     crossovered_budget_lines: __sdk::TableAppliedDiff<'r, CrossoveredBudgetLines>,
     currency: __sdk::TableAppliedDiff<'r, Currency>,
@@ -23848,6 +24295,7 @@ pub struct AppliedDiff<'r> {
     document_external_ref: __sdk::TableAppliedDiff<'r, DocumentExternalRef>,
     document_legal_hold: __sdk::TableAppliedDiff<'r, DocumentLegalHold>,
     document_presence: __sdk::TableAppliedDiff<'r, DocumentPresence>,
+    document_retention_purge_job: __sdk::TableAppliedDiff<'r, DocumentRetentionPurgeJob>,
     document_sequence: __sdk::TableAppliedDiff<'r, DocumentSequence>,
     document_signature_request: __sdk::TableAppliedDiff<'r, DocumentSignatureRequest>,
     document_template: __sdk::TableAppliedDiff<'r, DocumentTemplate>,
@@ -23865,6 +24313,7 @@ pub struct AppliedDiff<'r> {
     fx_revaluation_run: __sdk::TableAppliedDiff<'r, FxRevaluationRun>,
     generated_owner_report: __sdk::TableAppliedDiff<'r, GeneratedOwnerReport>,
     google_drive_connection: __sdk::TableAppliedDiff<'r, GoogleDriveConnection>,
+    guarded_action_receipt: __sdk::TableAppliedDiff<'r, GuardedActionReceipt>,
     helpdesk_sla: __sdk::TableAppliedDiff<'r, HelpdeskSla>,
     helpdesk_stage: __sdk::TableAppliedDiff<'r, HelpdeskStage>,
     helpdesk_team: __sdk::TableAppliedDiff<'r, HelpdeskTeam>,
@@ -23964,6 +24413,7 @@ pub struct AppliedDiff<'r> {
     organization_settings: __sdk::TableAppliedDiff<'r, OrganizationSettings>,
     packaging_material: __sdk::TableAppliedDiff<'r, PackagingMaterial>,
     partner_credit_control: __sdk::TableAppliedDiff<'r, PartnerCreditControl>,
+    password_reset_token: __sdk::TableAppliedDiff<'r, PasswordResetToken>,
     payment_account: __sdk::TableAppliedDiff<'r, PaymentAccount>,
     payment_fee: __sdk::TableAppliedDiff<'r, PaymentFee>,
     payment_reconciliation: __sdk::TableAppliedDiff<'r, PaymentReconciliation>,
@@ -24041,6 +24491,8 @@ pub struct AppliedDiff<'r> {
     quality_check: __sdk::TableAppliedDiff<'r, QualityCheck>,
     quality_point: __sdk::TableAppliedDiff<'r, QualityPoint>,
     quality_team: __sdk::TableAppliedDiff<'r, QualityTeam>,
+    queue_attempt: __sdk::TableAppliedDiff<'r, QueueAttempt>,
+    queue_effect_receipt: __sdk::TableAppliedDiff<'r, QueueEffectReceipt>,
     queue_job: __sdk::TableAppliedDiff<'r, QueueJob>,
     queue_worker: __sdk::TableAppliedDiff<'r, QueueWorker>,
     record_custom_field_value: __sdk::TableAppliedDiff<'r, RecordCustomFieldValue>,
@@ -24064,6 +24516,7 @@ pub struct AppliedDiff<'r> {
     sale_order_option: __sdk::TableAppliedDiff<'r, SaleOrderOption>,
     sale_promotion: __sdk::TableAppliedDiff<'r, SalePromotion>,
     sales_integration_intent: __sdk::TableAppliedDiff<'r, SalesIntegrationIntent>,
+    sales_sla_escalation_job: __sdk::TableAppliedDiff<'r, SalesSlaEscalationJob>,
     saved_report: __sdk::TableAppliedDiff<'r, SavedReport>,
     scheduled_report: __sdk::TableAppliedDiff<'r, ScheduledReport>,
     scheduled_report_run: __sdk::TableAppliedDiff<'r, ScheduledReportRun>,
@@ -24111,13 +24564,16 @@ pub struct AppliedDiff<'r> {
     supplier_intake_request: __sdk::TableAppliedDiff<'r, SupplierIntakeRequest>,
     tax_deadline: __sdk::TableAppliedDiff<'r, TaxDeadline>,
     tax_deadline_reminder: __sdk::TableAppliedDiff<'r, TaxDeadlineReminder>,
+    tax_deadline_status_job: __sdk::TableAppliedDiff<'r, TaxDeadlineStatusJob>,
     tax_jurisdiction: __sdk::TableAppliedDiff<'r, TaxJurisdiction>,
     tax_schedule: __sdk::TableAppliedDiff<'r, TaxSchedule>,
     trial_balance: __sdk::TableAppliedDiff<'r, TrialBalance>,
     uom: __sdk::TableAppliedDiff<'r, Uom>,
     uom_cat: __sdk::TableAppliedDiff<'r, UomCategory>,
     uom_conversion: __sdk::TableAppliedDiff<'r, UomConversion>,
+    user_credential: __sdk::TableAppliedDiff<'r, UserCredential>,
     user_custom_field: __sdk::TableAppliedDiff<'r, UserCustomField>,
+    user_invite: __sdk::TableAppliedDiff<'r, UserInvite>,
     user_organization: __sdk::TableAppliedDiff<'r, UserOrganization>,
     user_profile: __sdk::TableAppliedDiff<'r, UserProfile>,
     user_role_assignment: __sdk::TableAppliedDiff<'r, UserRoleAssignment>,
@@ -24133,9 +24589,34 @@ pub struct AppliedDiff<'r> {
     warehouse_sync_intent: __sdk::TableAppliedDiff<'r, WarehouseSyncIntent>,
     warehouse_task: __sdk::TableAppliedDiff<'r, WarehouseTask>,
     whatsapp_business_account: __sdk::TableAppliedDiff<'r, WhatsAppBusinessAccount>,
+    workflow: __sdk::TableAppliedDiff<'r, Workflow>,
+    workflow_calendar: __sdk::TableAppliedDiff<'r, WorkflowCalendar>,
+    workflow_calendar_exception: __sdk::TableAppliedDiff<'r, WorkflowCalendarException>,
+    workflow_calendar_version: __sdk::TableAppliedDiff<'r, WorkflowCalendarVersion>,
+    workflow_candidate_group_member: __sdk::TableAppliedDiff<'r, WorkflowCandidateGroupMember>,
+    workflow_command_receipt: __sdk::TableAppliedDiff<'r, WorkflowCommandReceipt>,
+    workflow_decision_event: __sdk::TableAppliedDiff<'r, WorkflowDecisionEvent>,
+    workflow_delegation: __sdk::TableAppliedDiff<'r, WorkflowDelegation>,
+    workflow_delivery_attempt: __sdk::TableAppliedDiff<'r, WorkflowDeliveryAttempt>,
+    workflow_delivery_receipt: __sdk::TableAppliedDiff<'r, WorkflowDeliveryReceipt>,
+    workflow_edge: __sdk::TableAppliedDiff<'r, WorkflowEdge>,
+    workflow_fork: __sdk::TableAppliedDiff<'r, WorkflowFork>,
+    workflow_human_task: __sdk::TableAppliedDiff<'r, WorkflowHumanTask>,
+    workflow_human_task_candidate: __sdk::TableAppliedDiff<'r, WorkflowHumanTaskCandidate>,
+    workflow_human_task_event: __sdk::TableAppliedDiff<'r, WorkflowHumanTaskEvent>,
+    workflow_human_task_receipt: __sdk::TableAppliedDiff<'r, WorkflowHumanTaskReceipt>,
+    workflow_instance: __sdk::TableAppliedDiff<'r, WorkflowInstance>,
+    workflow_join_arrival: __sdk::TableAppliedDiff<'r, WorkflowJoinArrival>,
     workflow_migration_instance_result: __sdk::TableAppliedDiff<'r, WorkflowMigrationInstanceResult>,
     workflow_migration_plan: __sdk::TableAppliedDiff<'r, WorkflowMigrationPlan>,
     workflow_migration_preflight: __sdk::TableAppliedDiff<'r, WorkflowMigrationPreflight>,
+    workflow_node: __sdk::TableAppliedDiff<'r, WorkflowNode>,
+    workflow_outbox: __sdk::TableAppliedDiff<'r, WorkflowOutbox>,
+    workflow_simulation_result: __sdk::TableAppliedDiff<'r, WorkflowSimulationResult>,
+    workflow_simulation_step: __sdk::TableAppliedDiff<'r, WorkflowSimulationStep>,
+    workflow_timer: __sdk::TableAppliedDiff<'r, WorkflowTimer>,
+    workflow_token: __sdk::TableAppliedDiff<'r, WorkflowToken>,
+    workflow_version: __sdk::TableAppliedDiff<'r, WorkflowVersion>,
     working_calendar: __sdk::TableAppliedDiff<'r, WorkingCalendar>,
     __unused: std::marker::PhantomData<&'r ()>,
 }
@@ -24171,6 +24652,9 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<AccountReconciliationWidget>("account_reconciliation_widget", &self.account_reconciliation_widget, event);
         callbacks.invoke_table_row_callbacks::<AccountTax>("account_tax", &self.account_tax, event);
         callbacks.invoke_table_row_callbacks::<AccountTaxGroup>("account_tax_group", &self.account_tax_group, event);
+        callbacks.invoke_table_row_callbacks::<AccountingOperationReceipt>("accounting_operation_receipt", &self.accounting_operation_receipt, event);
+        callbacks.invoke_table_row_callbacks::<AccountingOwnershipBackfillIssue>("accounting_ownership_backfill_issue", &self.accounting_ownership_backfill_issue, event);
+        callbacks.invoke_table_row_callbacks::<AccountingOwnershipBackfillRun>("accounting_ownership_backfill_run", &self.accounting_ownership_backfill_run, event);
         callbacks.invoke_table_row_callbacks::<Activity>("activity", &self.activity, event);
         callbacks.invoke_table_row_callbacks::<ActivityType>("activity_type", &self.activity_type, event);
         callbacks.invoke_table_row_callbacks::<AdjustmentReason>("adjustment_reason", &self.adjustment_reason, event);
@@ -24230,6 +24714,8 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<ContactCategoryAssignment>("contact_category_assignment", &self.contact_category_assignment, event);
         callbacks.invoke_table_row_callbacks::<ContactCommunicationPreference>("contact_communication_preference", &self.contact_communication_preference, event);
         callbacks.invoke_table_row_callbacks::<ContactDuplicateCandidate>("contact_duplicate_candidate", &self.contact_duplicate_candidate, event);
+        callbacks.invoke_table_row_callbacks::<ContactIdentityVerificationAuthority>("contact_identity_verification_authority", &self.contact_identity_verification_authority, event);
+        callbacks.invoke_table_row_callbacks::<ContactIdentityVerificationProof>("contact_identity_verification_proof", &self.contact_identity_verification_proof, event);
         callbacks.invoke_table_row_callbacks::<ContactPhoneIdentity>("contact_phone_identity", &self.contact_phone_identity, event);
         callbacks.invoke_table_row_callbacks::<ContactRelationship>("contact_relationship", &self.contact_relationship, event);
         callbacks.invoke_table_row_callbacks::<ContactRelationshipInsight>("contact_relationship_insight", &self.contact_relationship_insight, event);
@@ -24244,6 +24730,8 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<CrmConversation>("crm_conversation", &self.crm_conversation, event);
         callbacks.invoke_table_row_callbacks::<CrmConversationMessage>("crm_conversation_message", &self.crm_conversation_message, event);
         callbacks.invoke_table_row_callbacks::<CrmForecastSnapshot>("crm_forecast_snapshot", &self.crm_forecast_snapshot, event);
+        callbacks.invoke_table_row_callbacks::<CrmProviderEventReceipt>("crm_provider_event_receipt", &self.crm_provider_event_receipt, event);
+        callbacks.invoke_table_row_callbacks::<CrmProviderPrincipal>("crm_provider_principal", &self.crm_provider_principal, event);
         callbacks.invoke_table_row_callbacks::<CrossoveredBudget>("crossovered_budget", &self.crossovered_budget, event);
         callbacks.invoke_table_row_callbacks::<CrossoveredBudgetLines>("crossovered_budget_lines", &self.crossovered_budget_lines, event);
         callbacks.invoke_table_row_callbacks::<Currency>("currency", &self.currency, event);
@@ -24262,6 +24750,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<DocumentExternalRef>("document_external_ref", &self.document_external_ref, event);
         callbacks.invoke_table_row_callbacks::<DocumentLegalHold>("document_legal_hold", &self.document_legal_hold, event);
         callbacks.invoke_table_row_callbacks::<DocumentPresence>("document_presence", &self.document_presence, event);
+        callbacks.invoke_table_row_callbacks::<DocumentRetentionPurgeJob>("document_retention_purge_job", &self.document_retention_purge_job, event);
         callbacks.invoke_table_row_callbacks::<DocumentSequence>("document_sequence", &self.document_sequence, event);
         callbacks.invoke_table_row_callbacks::<DocumentSignatureRequest>("document_signature_request", &self.document_signature_request, event);
         callbacks.invoke_table_row_callbacks::<DocumentTemplate>("document_template", &self.document_template, event);
@@ -24279,6 +24768,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<FxRevaluationRun>("fx_revaluation_run", &self.fx_revaluation_run, event);
         callbacks.invoke_table_row_callbacks::<GeneratedOwnerReport>("generated_owner_report", &self.generated_owner_report, event);
         callbacks.invoke_table_row_callbacks::<GoogleDriveConnection>("google_drive_connection", &self.google_drive_connection, event);
+        callbacks.invoke_table_row_callbacks::<GuardedActionReceipt>("guarded_action_receipt", &self.guarded_action_receipt, event);
         callbacks.invoke_table_row_callbacks::<HelpdeskSla>("helpdesk_sla", &self.helpdesk_sla, event);
         callbacks.invoke_table_row_callbacks::<HelpdeskStage>("helpdesk_stage", &self.helpdesk_stage, event);
         callbacks.invoke_table_row_callbacks::<HelpdeskTeam>("helpdesk_team", &self.helpdesk_team, event);
@@ -24378,6 +24868,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<OrganizationSettings>("organization_settings", &self.organization_settings, event);
         callbacks.invoke_table_row_callbacks::<PackagingMaterial>("packaging_material", &self.packaging_material, event);
         callbacks.invoke_table_row_callbacks::<PartnerCreditControl>("partner_credit_control", &self.partner_credit_control, event);
+        callbacks.invoke_table_row_callbacks::<PasswordResetToken>("password_reset_token", &self.password_reset_token, event);
         callbacks.invoke_table_row_callbacks::<PaymentAccount>("payment_account", &self.payment_account, event);
         callbacks.invoke_table_row_callbacks::<PaymentFee>("payment_fee", &self.payment_fee, event);
         callbacks.invoke_table_row_callbacks::<PaymentReconciliation>("payment_reconciliation", &self.payment_reconciliation, event);
@@ -24455,6 +24946,8 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<QualityCheck>("quality_check", &self.quality_check, event);
         callbacks.invoke_table_row_callbacks::<QualityPoint>("quality_point", &self.quality_point, event);
         callbacks.invoke_table_row_callbacks::<QualityTeam>("quality_team", &self.quality_team, event);
+        callbacks.invoke_table_row_callbacks::<QueueAttempt>("queue_attempt", &self.queue_attempt, event);
+        callbacks.invoke_table_row_callbacks::<QueueEffectReceipt>("queue_effect_receipt", &self.queue_effect_receipt, event);
         callbacks.invoke_table_row_callbacks::<QueueJob>("queue_job", &self.queue_job, event);
         callbacks.invoke_table_row_callbacks::<QueueWorker>("queue_worker", &self.queue_worker, event);
         callbacks.invoke_table_row_callbacks::<RecordCustomFieldValue>("record_custom_field_value", &self.record_custom_field_value, event);
@@ -24478,6 +24971,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<SaleOrderOption>("sale_order_option", &self.sale_order_option, event);
         callbacks.invoke_table_row_callbacks::<SalePromotion>("sale_promotion", &self.sale_promotion, event);
         callbacks.invoke_table_row_callbacks::<SalesIntegrationIntent>("sales_integration_intent", &self.sales_integration_intent, event);
+        callbacks.invoke_table_row_callbacks::<SalesSlaEscalationJob>("sales_sla_escalation_job", &self.sales_sla_escalation_job, event);
         callbacks.invoke_table_row_callbacks::<SavedReport>("saved_report", &self.saved_report, event);
         callbacks.invoke_table_row_callbacks::<ScheduledReport>("scheduled_report", &self.scheduled_report, event);
         callbacks.invoke_table_row_callbacks::<ScheduledReportRun>("scheduled_report_run", &self.scheduled_report_run, event);
@@ -24525,13 +25019,16 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<SupplierIntakeRequest>("supplier_intake_request", &self.supplier_intake_request, event);
         callbacks.invoke_table_row_callbacks::<TaxDeadline>("tax_deadline", &self.tax_deadline, event);
         callbacks.invoke_table_row_callbacks::<TaxDeadlineReminder>("tax_deadline_reminder", &self.tax_deadline_reminder, event);
+        callbacks.invoke_table_row_callbacks::<TaxDeadlineStatusJob>("tax_deadline_status_job", &self.tax_deadline_status_job, event);
         callbacks.invoke_table_row_callbacks::<TaxJurisdiction>("tax_jurisdiction", &self.tax_jurisdiction, event);
         callbacks.invoke_table_row_callbacks::<TaxSchedule>("tax_schedule", &self.tax_schedule, event);
         callbacks.invoke_table_row_callbacks::<TrialBalance>("trial_balance", &self.trial_balance, event);
         callbacks.invoke_table_row_callbacks::<Uom>("uom", &self.uom, event);
         callbacks.invoke_table_row_callbacks::<UomCategory>("uom_cat", &self.uom_cat, event);
         callbacks.invoke_table_row_callbacks::<UomConversion>("uom_conversion", &self.uom_conversion, event);
+        callbacks.invoke_table_row_callbacks::<UserCredential>("user_credential", &self.user_credential, event);
         callbacks.invoke_table_row_callbacks::<UserCustomField>("user_custom_field", &self.user_custom_field, event);
+        callbacks.invoke_table_row_callbacks::<UserInvite>("user_invite", &self.user_invite, event);
         callbacks.invoke_table_row_callbacks::<UserOrganization>("user_organization", &self.user_organization, event);
         callbacks.invoke_table_row_callbacks::<UserProfile>("user_profile", &self.user_profile, event);
         callbacks.invoke_table_row_callbacks::<UserRoleAssignment>("user_role_assignment", &self.user_role_assignment, event);
@@ -24547,9 +25044,34 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<WarehouseSyncIntent>("warehouse_sync_intent", &self.warehouse_sync_intent, event);
         callbacks.invoke_table_row_callbacks::<WarehouseTask>("warehouse_task", &self.warehouse_task, event);
         callbacks.invoke_table_row_callbacks::<WhatsAppBusinessAccount>("whatsapp_business_account", &self.whatsapp_business_account, event);
+        callbacks.invoke_table_row_callbacks::<Workflow>("workflow", &self.workflow, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowCalendar>("workflow_calendar", &self.workflow_calendar, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowCalendarException>("workflow_calendar_exception", &self.workflow_calendar_exception, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowCalendarVersion>("workflow_calendar_version", &self.workflow_calendar_version, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowCandidateGroupMember>("workflow_candidate_group_member", &self.workflow_candidate_group_member, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowCommandReceipt>("workflow_command_receipt", &self.workflow_command_receipt, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowDecisionEvent>("workflow_decision_event", &self.workflow_decision_event, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowDelegation>("workflow_delegation", &self.workflow_delegation, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowDeliveryAttempt>("workflow_delivery_attempt", &self.workflow_delivery_attempt, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowDeliveryReceipt>("workflow_delivery_receipt", &self.workflow_delivery_receipt, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowEdge>("workflow_edge", &self.workflow_edge, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowFork>("workflow_fork", &self.workflow_fork, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowHumanTask>("workflow_human_task", &self.workflow_human_task, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowHumanTaskCandidate>("workflow_human_task_candidate", &self.workflow_human_task_candidate, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowHumanTaskEvent>("workflow_human_task_event", &self.workflow_human_task_event, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowHumanTaskReceipt>("workflow_human_task_receipt", &self.workflow_human_task_receipt, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowInstance>("workflow_instance", &self.workflow_instance, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowJoinArrival>("workflow_join_arrival", &self.workflow_join_arrival, event);
         callbacks.invoke_table_row_callbacks::<WorkflowMigrationInstanceResult>("workflow_migration_instance_result", &self.workflow_migration_instance_result, event);
         callbacks.invoke_table_row_callbacks::<WorkflowMigrationPlan>("workflow_migration_plan", &self.workflow_migration_plan, event);
         callbacks.invoke_table_row_callbacks::<WorkflowMigrationPreflight>("workflow_migration_preflight", &self.workflow_migration_preflight, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowNode>("workflow_node", &self.workflow_node, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowOutbox>("workflow_outbox", &self.workflow_outbox, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowSimulationResult>("workflow_simulation_result", &self.workflow_simulation_result, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowSimulationStep>("workflow_simulation_step", &self.workflow_simulation_step, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowTimer>("workflow_timer", &self.workflow_timer, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowToken>("workflow_token", &self.workflow_token, event);
+        callbacks.invoke_table_row_callbacks::<WorkflowVersion>("workflow_version", &self.workflow_version, event);
         callbacks.invoke_table_row_callbacks::<WorkingCalendar>("working_calendar", &self.working_calendar, event);
 }
 }
@@ -25216,6 +25738,9 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         account_reconciliation_widget_table::register_table(client_cache);
         account_tax_table::register_table(client_cache);
         account_tax_group_table::register_table(client_cache);
+        accounting_operation_receipt_table::register_table(client_cache);
+        accounting_ownership_backfill_issue_table::register_table(client_cache);
+        accounting_ownership_backfill_run_table::register_table(client_cache);
         activity_table::register_table(client_cache);
         activity_type_table::register_table(client_cache);
         adjustment_reason_table::register_table(client_cache);
@@ -25275,6 +25800,8 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         contact_category_assignment_table::register_table(client_cache);
         contact_communication_preference_table::register_table(client_cache);
         contact_duplicate_candidate_table::register_table(client_cache);
+        contact_identity_verification_authority_table::register_table(client_cache);
+        contact_identity_verification_proof_table::register_table(client_cache);
         contact_phone_identity_table::register_table(client_cache);
         contact_relationship_table::register_table(client_cache);
         contact_relationship_insight_table::register_table(client_cache);
@@ -25289,6 +25816,8 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         crm_conversation_table::register_table(client_cache);
         crm_conversation_message_table::register_table(client_cache);
         crm_forecast_snapshot_table::register_table(client_cache);
+        crm_provider_event_receipt_table::register_table(client_cache);
+        crm_provider_principal_table::register_table(client_cache);
         crossovered_budget_table::register_table(client_cache);
         crossovered_budget_lines_table::register_table(client_cache);
         currency_table::register_table(client_cache);
@@ -25307,6 +25836,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         document_external_ref_table::register_table(client_cache);
         document_legal_hold_table::register_table(client_cache);
         document_presence_table::register_table(client_cache);
+        document_retention_purge_job_table::register_table(client_cache);
         document_sequence_table::register_table(client_cache);
         document_signature_request_table::register_table(client_cache);
         document_template_table::register_table(client_cache);
@@ -25324,6 +25854,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         fx_revaluation_run_table::register_table(client_cache);
         generated_owner_report_table::register_table(client_cache);
         google_drive_connection_table::register_table(client_cache);
+        guarded_action_receipt_table::register_table(client_cache);
         helpdesk_sla_table::register_table(client_cache);
         helpdesk_stage_table::register_table(client_cache);
         helpdesk_team_table::register_table(client_cache);
@@ -25423,6 +25954,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         organization_settings_table::register_table(client_cache);
         packaging_material_table::register_table(client_cache);
         partner_credit_control_table::register_table(client_cache);
+        password_reset_token_table::register_table(client_cache);
         payment_account_table::register_table(client_cache);
         payment_fee_table::register_table(client_cache);
         payment_reconciliation_table::register_table(client_cache);
@@ -25500,6 +26032,8 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         quality_check_table::register_table(client_cache);
         quality_point_table::register_table(client_cache);
         quality_team_table::register_table(client_cache);
+        queue_attempt_table::register_table(client_cache);
+        queue_effect_receipt_table::register_table(client_cache);
         queue_job_table::register_table(client_cache);
         queue_worker_table::register_table(client_cache);
         record_custom_field_value_table::register_table(client_cache);
@@ -25523,6 +26057,7 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         sale_order_option_table::register_table(client_cache);
         sale_promotion_table::register_table(client_cache);
         sales_integration_intent_table::register_table(client_cache);
+        sales_sla_escalation_job_table::register_table(client_cache);
         saved_report_table::register_table(client_cache);
         scheduled_report_table::register_table(client_cache);
         scheduled_report_run_table::register_table(client_cache);
@@ -25570,13 +26105,16 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         supplier_intake_request_table::register_table(client_cache);
         tax_deadline_table::register_table(client_cache);
         tax_deadline_reminder_table::register_table(client_cache);
+        tax_deadline_status_job_table::register_table(client_cache);
         tax_jurisdiction_table::register_table(client_cache);
         tax_schedule_table::register_table(client_cache);
         trial_balance_table::register_table(client_cache);
         uom_table::register_table(client_cache);
         uom_cat_table::register_table(client_cache);
         uom_conversion_table::register_table(client_cache);
+        user_credential_table::register_table(client_cache);
         user_custom_field_table::register_table(client_cache);
+        user_invite_table::register_table(client_cache);
         user_organization_table::register_table(client_cache);
         user_profile_table::register_table(client_cache);
         user_role_assignment_table::register_table(client_cache);
@@ -25592,9 +26130,34 @@ fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         warehouse_sync_intent_table::register_table(client_cache);
         warehouse_task_table::register_table(client_cache);
         whatsapp_business_account_table::register_table(client_cache);
+        workflow_table::register_table(client_cache);
+        workflow_calendar_table::register_table(client_cache);
+        workflow_calendar_exception_table::register_table(client_cache);
+        workflow_calendar_version_table::register_table(client_cache);
+        workflow_candidate_group_member_table::register_table(client_cache);
+        workflow_command_receipt_table::register_table(client_cache);
+        workflow_decision_event_table::register_table(client_cache);
+        workflow_delegation_table::register_table(client_cache);
+        workflow_delivery_attempt_table::register_table(client_cache);
+        workflow_delivery_receipt_table::register_table(client_cache);
+        workflow_edge_table::register_table(client_cache);
+        workflow_fork_table::register_table(client_cache);
+        workflow_human_task_table::register_table(client_cache);
+        workflow_human_task_candidate_table::register_table(client_cache);
+        workflow_human_task_event_table::register_table(client_cache);
+        workflow_human_task_receipt_table::register_table(client_cache);
+        workflow_instance_table::register_table(client_cache);
+        workflow_join_arrival_table::register_table(client_cache);
         workflow_migration_instance_result_table::register_table(client_cache);
         workflow_migration_plan_table::register_table(client_cache);
         workflow_migration_preflight_table::register_table(client_cache);
+        workflow_node_table::register_table(client_cache);
+        workflow_outbox_table::register_table(client_cache);
+        workflow_simulation_result_table::register_table(client_cache);
+        workflow_simulation_step_table::register_table(client_cache);
+        workflow_timer_table::register_table(client_cache);
+        workflow_token_table::register_table(client_cache);
+        workflow_version_table::register_table(client_cache);
         working_calendar_table::register_table(client_cache);
 }
 const ALL_TABLE_NAMES: &'static [&'static str] = &[
@@ -25622,6 +26185,9 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "account_reconciliation_widget",
         "account_tax",
         "account_tax_group",
+        "accounting_operation_receipt",
+        "accounting_ownership_backfill_issue",
+        "accounting_ownership_backfill_run",
         "activity",
         "activity_type",
         "adjustment_reason",
@@ -25681,6 +26247,8 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "contact_category_assignment",
         "contact_communication_preference",
         "contact_duplicate_candidate",
+        "contact_identity_verification_authority",
+        "contact_identity_verification_proof",
         "contact_phone_identity",
         "contact_relationship",
         "contact_relationship_insight",
@@ -25695,6 +26263,8 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "crm_conversation",
         "crm_conversation_message",
         "crm_forecast_snapshot",
+        "crm_provider_event_receipt",
+        "crm_provider_principal",
         "crossovered_budget",
         "crossovered_budget_lines",
         "currency",
@@ -25713,6 +26283,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "document_external_ref",
         "document_legal_hold",
         "document_presence",
+        "document_retention_purge_job",
         "document_sequence",
         "document_signature_request",
         "document_template",
@@ -25730,6 +26301,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "fx_revaluation_run",
         "generated_owner_report",
         "google_drive_connection",
+        "guarded_action_receipt",
         "helpdesk_sla",
         "helpdesk_stage",
         "helpdesk_team",
@@ -25829,6 +26401,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "organization_settings",
         "packaging_material",
         "partner_credit_control",
+        "password_reset_token",
         "payment_account",
         "payment_fee",
         "payment_reconciliation",
@@ -25906,6 +26479,8 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "quality_check",
         "quality_point",
         "quality_team",
+        "queue_attempt",
+        "queue_effect_receipt",
         "queue_job",
         "queue_worker",
         "record_custom_field_value",
@@ -25929,6 +26504,7 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "sale_order_option",
         "sale_promotion",
         "sales_integration_intent",
+        "sales_sla_escalation_job",
         "saved_report",
         "scheduled_report",
         "scheduled_report_run",
@@ -25976,13 +26552,16 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "supplier_intake_request",
         "tax_deadline",
         "tax_deadline_reminder",
+        "tax_deadline_status_job",
         "tax_jurisdiction",
         "tax_schedule",
         "trial_balance",
         "uom",
         "uom_cat",
         "uom_conversion",
+        "user_credential",
         "user_custom_field",
+        "user_invite",
         "user_organization",
         "user_profile",
         "user_role_assignment",
@@ -25998,9 +26577,34 @@ const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "warehouse_sync_intent",
         "warehouse_task",
         "whatsapp_business_account",
+        "workflow",
+        "workflow_calendar",
+        "workflow_calendar_exception",
+        "workflow_calendar_version",
+        "workflow_candidate_group_member",
+        "workflow_command_receipt",
+        "workflow_decision_event",
+        "workflow_delegation",
+        "workflow_delivery_attempt",
+        "workflow_delivery_receipt",
+        "workflow_edge",
+        "workflow_fork",
+        "workflow_human_task",
+        "workflow_human_task_candidate",
+        "workflow_human_task_event",
+        "workflow_human_task_receipt",
+        "workflow_instance",
+        "workflow_join_arrival",
         "workflow_migration_instance_result",
         "workflow_migration_plan",
         "workflow_migration_preflight",
+        "workflow_node",
+        "workflow_outbox",
+        "workflow_simulation_result",
+        "workflow_simulation_step",
+        "workflow_timer",
+        "workflow_token",
+        "workflow_version",
         "working_calendar",
 ];
 }

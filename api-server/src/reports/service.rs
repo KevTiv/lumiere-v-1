@@ -200,7 +200,7 @@ async fn preview_purchase_spend(
         query_typed(client, "purchase_order_line", format!("SELECT product_id, product_template_id, partner_id, product_qty, price_total, currency_id, display_type FROM purchase_order_line WHERE organization_id = {organization_id} AND company_id = {} AND order_id IN ({ids}) LIMIT {QUERY_LIMIT}", company.id)).await?
     };
     let products = commercial_products(client, organization_id);
-    let contacts = query_typed(client, "contact", format!("SELECT id, display_name FROM contact WHERE organization_id = {organization_id} AND deleted_at IS NULL LIMIT {QUERY_LIMIT}"));
+    let contacts = query_typed(client, "contact", format!("SELECT id, display_name FROM contact WHERE organization_id = {organization_id} AND (company_id = {} OR company_id IS NULL) AND deleted_at IS NULL LIMIT {QUERY_LIMIT}", company.id));
     let landed_costs = query_typed(client, "stock_landed_cost", format!("SELECT amount_total, currency_id FROM stock_landed_cost WHERE organization_id = {organization_id} AND company_id = {} AND state = 'Posted' AND date >= '{}' AND date < '{}' LIMIT {QUERY_LIMIT}", company.id, window.start_sql, window.end_sql));
     let (products, contacts, landed_costs) = tokio::try_join!(products, contacts, landed_costs)?;
     let generated_at = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);

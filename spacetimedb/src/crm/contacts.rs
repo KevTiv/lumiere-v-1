@@ -9,17 +9,19 @@
 ///   - ContactTagAssignment
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::country_pack::{validate_address_for_packs, validate_company_identifier_for_packs};
-use crate::core::organization::company_id_from_scope;
+use crate::core::country_pack::{
+    validate_address_for_packs, validate_company_identifier_for_packs,
+};
+use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::core::permissions::role;
 use crate::core::users::{user_organization, user_profile};
+use crate::crm::require_single_company_crm_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
 #[spacetimedb::table(
     accessor = contact,
-    public,
     index(accessor = contact_by_org, btree(columns = [organization_id])),
     index(accessor = contact_by_company, btree(columns = [company_id])),
     index(accessor = contact_by_email, btree(columns = [email]))
@@ -78,7 +80,6 @@ pub struct Contact {
 
 #[spacetimedb::table(
     accessor = contact_category,
-    public,
     index(accessor = category_by_org, btree(columns = [organization_id]))
 )]
 pub struct ContactCategory {
@@ -94,7 +95,7 @@ pub struct ContactCategory {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = contact_category_assignment, public)]
+#[spacetimedb::table(accessor = contact_category_assignment)]
 pub struct ContactCategoryAssignment {
     #[primary_key]
     #[auto_inc]
@@ -107,12 +108,13 @@ pub struct ContactCategoryAssignment {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = contact_relationship, public)]
+#[spacetimedb::table(accessor = contact_relationship)]
 pub struct ContactRelationship {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub left_contact_id: u64,
     pub right_contact_id: u64,
     pub relationship_type: String,
@@ -127,7 +129,6 @@ pub struct ContactRelationship {
 
 #[spacetimedb::table(
     accessor = contact_tag,
-    public,
     index(accessor = tag_by_org, btree(columns = [organization_id]))
 )]
 pub struct ContactTag {
@@ -142,12 +143,13 @@ pub struct ContactTag {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = contact_tag_assignment, public)]
+#[spacetimedb::table(accessor = contact_tag_assignment)]
 pub struct ContactTagAssignment {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub contact_id: u64,
     pub tag_id: u64,
     pub assigned_at: Timestamp,
@@ -200,38 +202,46 @@ pub struct CreateContactParams {
     pub metadata: Option<String>,
 }
 
-/// Address fields: `None` = clear the field.
+/// Explicit patch contract (CRM-RI-003): every field uses `Option<Option<T>>`
+/// — outer `None` = field not sent (leave unchanged), outer `Some(None)` =
+/// explicit clear, outer `Some(Some(v))` = replace with `v`.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateContactAddressParams {
-    pub street: Option<String>,
-    pub street2: Option<String>,
-    pub city: Option<String>,
-    pub state_code: Option<String>,
-    pub zip: Option<String>,
-    pub country_code: Option<String>,
+    pub street: Option<Option<String>>,
+    pub street2: Option<Option<String>>,
+    pub city: Option<Option<String>>,
+    pub state_code: Option<Option<String>>,
+    pub zip: Option<Option<String>>,
+    pub country_code: Option<Option<String>>,
 }
 
-/// Business fields: `None` = clear the field.
+/// Explicit patch contract (CRM-RI-003): every field uses `Option<Option<T>>`
+/// — outer `None` = field not sent (leave unchanged), outer `Some(None)` =
+/// explicit clear, outer `Some(Some(v))` = replace with `v`. This includes
+/// `employees_count`/`annual_revenue`, which are genuinely clearable optional
+/// facts about a contact (unlike a lead's always-present revenue/probability).
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateContactBusinessParams {
-    pub tax_id: Option<String>,
-    pub company_registry: Option<String>,
-    pub industry: Option<String>,
-    pub employees_count: Option<i32>,
-    pub annual_revenue: Option<f64>,
+    pub tax_id: Option<Option<String>>,
+    pub company_registry: Option<Option<String>>,
+    pub industry: Option<Option<String>>,
+    pub employees_count: Option<Option<i32>>,
+    pub annual_revenue: Option<Option<f64>>,
 }
 
-/// Personal detail fields: `None` = clear the field.
+/// Explicit patch contract (CRM-RI-003): every field uses `Option<Option<T>>`
+/// — outer `None` = field not sent (leave unchanged), outer `Some(None)` =
+/// explicit clear, outer `Some(Some(v))` = replace with `v`.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateContactDetailsParams {
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
-    pub title: Option<String>,
-    pub email_secondary: Option<String>,
-    pub fax: Option<String>,
-    pub website: Option<String>,
-    pub description: Option<String>,
-    pub color: Option<String>,
+    pub first_name: Option<Option<String>>,
+    pub last_name: Option<Option<String>>,
+    pub title: Option<Option<String>>,
+    pub email_secondary: Option<Option<String>>,
+    pub fax: Option<Option<String>>,
+    pub website: Option<Option<String>>,
+    pub description: Option<Option<String>>,
+    pub color: Option<Option<String>>,
 }
 
 /// Core contact fields: `None` = keep existing value.
@@ -287,6 +297,7 @@ pub fn create_contact(
         .clone()
         .unwrap_or_else(|| params.name.clone());
 
+    require_single_company_crm_scope(ctx, organization_id, params.company_id)?;
     let operating_company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     validate_company_identifier_for_packs(
@@ -304,6 +315,13 @@ pub fn create_contact(
         &params.zip,
         &params.state_code,
     )?;
+
+    if let Some(parent_id) = params.parent_id {
+        // Contact does not exist yet, so there is no real id to check for
+        // self-reference/cycles against — `0` is a safe sentinel since
+        // auto-inc ids never assign zero.
+        validate_contact_parent(ctx, organization_id, 0, parent_id)?;
+    }
 
     let contact = ctx.db.contact().insert(Contact {
         id: 0,
@@ -394,25 +412,36 @@ pub fn update_contact_address(
         return Err("Contact does not belong to this organization".to_string());
     }
 
+    let street = params.street.unwrap_or_else(|| contact.street.clone());
+    let street2 = params.street2.unwrap_or_else(|| contact.street2.clone());
+    let city = params.city.unwrap_or_else(|| contact.city.clone());
+    let state_code = params
+        .state_code
+        .unwrap_or_else(|| contact.state_code.clone());
+    let zip = params.zip.unwrap_or_else(|| contact.zip.clone());
+    let country_code = params
+        .country_code
+        .unwrap_or_else(|| contact.country_code.clone());
+
     if let Some(company_id) = contact.company_id {
         validate_address_for_packs(
             ctx,
             organization_id,
             company_id,
-            &params.country_code,
-            &params.city,
-            &params.zip,
-            &params.state_code,
+            &country_code,
+            &city,
+            &zip,
+            &state_code,
         )?;
     }
 
     ctx.db.contact().id().update(Contact {
-        street: params.street,
-        street2: params.street2,
-        city: params.city,
-        state_code: params.state_code,
-        zip: params.zip,
-        country_code: params.country_code,
+        street,
+        street2,
+        city,
+        state_code,
+        zip,
+        country_code,
         updated_at: ctx.timestamp,
         ..contact
     });
@@ -455,16 +484,24 @@ pub fn update_contact_business(
         return Err("Contact does not belong to this organization".to_string());
     }
 
+    let tax_id = params.tax_id.unwrap_or_else(|| contact.tax_id.clone());
+    let company_registry = params
+        .company_registry
+        .unwrap_or_else(|| contact.company_registry.clone());
+    let industry = params.industry.unwrap_or_else(|| contact.industry.clone());
+    let employees_count = params.employees_count.unwrap_or(contact.employees_count);
+    let annual_revenue = params.annual_revenue.unwrap_or(contact.annual_revenue);
+
     if let Some(company_id) = contact.company_id {
-        validate_company_identifier_for_packs(ctx, organization_id, company_id, &params.tax_id)?;
+        validate_company_identifier_for_packs(ctx, organization_id, company_id, &tax_id)?;
     }
 
     ctx.db.contact().id().update(Contact {
-        tax_id: params.tax_id,
-        company_registry: params.company_registry,
-        industry: params.industry,
-        employees_count: params.employees_count,
-        annual_revenue: params.annual_revenue,
+        tax_id,
+        company_registry,
+        industry,
+        employees_count,
+        annual_revenue,
         updated_at: ctx.timestamp,
         ..contact
     });
@@ -508,14 +545,22 @@ pub fn update_contact_details(
     }
 
     ctx.db.contact().id().update(Contact {
-        first_name: params.first_name,
-        last_name: params.last_name,
-        title: params.title,
-        email_secondary: params.email_secondary,
-        fax: params.fax,
-        website: params.website,
-        description: params.description,
-        color: params.color,
+        first_name: params
+            .first_name
+            .unwrap_or_else(|| contact.first_name.clone()),
+        last_name: params
+            .last_name
+            .unwrap_or_else(|| contact.last_name.clone()),
+        title: params.title.unwrap_or_else(|| contact.title.clone()),
+        email_secondary: params
+            .email_secondary
+            .unwrap_or_else(|| contact.email_secondary.clone()),
+        fax: params.fax.unwrap_or_else(|| contact.fax.clone()),
+        website: params.website.unwrap_or_else(|| contact.website.clone()),
+        description: params
+            .description
+            .unwrap_or_else(|| contact.description.clone()),
+        color: params.color.unwrap_or_else(|| contact.color.clone()),
         updated_at: ctx.timestamp,
         ..contact
     });
@@ -560,6 +605,10 @@ pub fn update_contact(
 
     if contact.organization_id != organization_id {
         return Err("Contact does not belong to this organization".to_string());
+    }
+
+    if let Some(new_company_id) = params.company_id {
+        require_company_in_organization(ctx, organization_id, new_company_id)?;
     }
 
     let old_name = contact.name.clone();
@@ -626,6 +675,10 @@ pub fn update_contact(
         "contact",
         &changed_fields,
     )?;
+
+    if params.company_id.is_some() {
+        require_single_company_crm_scope(ctx, organization_id, params.company_id)?;
+    }
 
     ctx.db.contact().id().update(Contact {
         name: new_name.clone(),
@@ -768,6 +821,7 @@ pub fn assign_tag_to_contact(
     if contact.organization_id != organization_id {
         return Err("Contact does not belong to this organization".to_string());
     }
+    let company_id = contact.company_id.ok_or("Contact has no company scope")?;
 
     let tag = ctx
         .db
@@ -792,6 +846,7 @@ pub fn assign_tag_to_contact(
         .insert(ContactTagAssignment {
             id: 0,
             organization_id,
+            company_id,
             contact_id,
             tag_id,
             assigned_at: ctx.timestamp,
@@ -820,6 +875,64 @@ fn require_org_contact(
     Ok(contact)
 }
 
+/// Validates that `parent_id` is an eligible parent for `contact_id` within
+/// `organization_id`: the parent must exist, belong to the same organization,
+/// be active (not soft-deleted, not merged away), not be `contact_id` itself,
+/// and not be a descendant of `contact_id` (which would create a cycle).
+///
+/// `contact_id` may be `0` when validating a parent for a contact that does
+/// not exist yet (e.g. at creation time, before the auto-inc id is assigned)
+/// — real contact ids start above zero, so the self-reference and cycle
+/// checks below are simply inert in that case.
+fn validate_contact_parent(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    contact_id: u64,
+    parent_id: u64,
+) -> Result<(), String> {
+    if parent_id == contact_id {
+        return Err("A contact cannot be its own parent".to_string());
+    }
+
+    let parent = ctx
+        .db
+        .contact()
+        .id()
+        .find(&parent_id)
+        .ok_or("Parent contact not found")?;
+
+    if parent.organization_id != organization_id {
+        return Err("Parent contact does not belong to this organization".to_string());
+    }
+
+    if parent.deleted_at.is_some() {
+        return Err("Parent contact is deleted".to_string());
+    }
+
+    if parent.merge_target_id.is_some() {
+        return Err("Parent contact has been merged into another contact".to_string());
+    }
+
+    // Walk the ancestor chain from the candidate parent; if `contact_id`
+    // appears in it, setting this parent would create a cycle. Bounded to
+    // avoid looping forever on pre-existing corrupt/cyclic data.
+    const MAX_PARENT_CHAIN_DEPTH: usize = 1000;
+    let mut current = parent.parent_id;
+    for _ in 0..MAX_PARENT_CHAIN_DEPTH {
+        match current {
+            None => return Ok(()),
+            Some(cid) if cid == contact_id => {
+                return Err("Setting this parent would create a cycle".to_string());
+            }
+            Some(cid) => {
+                current = ctx.db.contact().id().find(&cid).and_then(|c| c.parent_id);
+            }
+        }
+    }
+
+    Err("Parent chain exceeds maximum depth".to_string())
+}
+
 #[spacetimedb::reducer]
 pub fn create_contact_relationship(
     ctx: &ReducerContext,
@@ -832,26 +945,28 @@ pub fn create_contact_relationship(
         return Err("A contact cannot have a relationship with itself".to_string());
     }
 
-    require_org_contact(ctx, organization_id, params.left_contact_id)?;
-    require_org_contact(ctx, organization_id, params.right_contact_id)?;
+    let left = require_org_contact(ctx, organization_id, params.left_contact_id)?;
+    let right = require_org_contact(ctx, organization_id, params.right_contact_id)?;
+    let company_id = left.company_id.ok_or("Left contact has no company scope")?;
+    if right.company_id != Some(company_id) {
+        return Err("Contacts must belong to the same company".to_string());
+    }
 
-    let relationship = ctx
-        .db
-        .contact_relationship()
-        .insert(ContactRelationship {
-            id: 0,
-            organization_id,
-            left_contact_id: params.left_contact_id,
-            right_contact_id: params.right_contact_id,
-            relationship_type: params.relationship_type.clone(),
-            start_date: params.start_date,
-            end_date: None,
-            is_active: true,
-            notes: params.notes,
-            created_by: ctx.sender(),
-            created_at: ctx.timestamp,
-            metadata: params.metadata,
-        });
+    let relationship = ctx.db.contact_relationship().insert(ContactRelationship {
+        id: 0,
+        organization_id,
+        company_id,
+        left_contact_id: params.left_contact_id,
+        right_contact_id: params.right_contact_id,
+        relationship_type: params.relationship_type.clone(),
+        start_date: params.start_date,
+        end_date: None,
+        is_active: true,
+        notes: params.notes,
+        created_by: ctx.sender(),
+        created_at: ctx.timestamp,
+        metadata: params.metadata,
+    });
 
     write_audit_log_v2(
         ctx,
@@ -932,8 +1047,9 @@ pub fn end_contact_relationship(
     Ok(())
 }
 
-/// Sets or clears `contact_id`'s parent. Rejects self-parenting and any cycle
-/// that would result from walking `parent_id` up from the candidate parent.
+/// Sets or clears `contact_id`'s parent. Delegates to `validate_contact_parent`
+/// to reject a missing, cross-organization, inactive/deleted, merged, self,
+/// or cycle-forming parent.
 #[spacetimedb::reducer]
 pub fn update_contact_parent(
     ctx: &ReducerContext,
@@ -953,21 +1069,7 @@ pub fn update_contact_parent(
     }
 
     if let Some(pid) = parent_id {
-        require_org_contact(ctx, organization_id, pid)?;
-
-        // Walk the ancestor chain from the candidate parent; if `contact_id`
-        // appears in it, setting this parent would create a cycle.
-        let mut current = Some(pid);
-        let mut visited = std::collections::HashSet::new();
-        while let Some(cid) = current {
-            if cid == contact_id {
-                return Err("Setting this parent would create a cycle".to_string());
-            }
-            if !visited.insert(cid) {
-                break; // pre-existing cycle elsewhere in the data — stop walking
-            }
-            current = ctx.db.contact().id().find(&cid).and_then(|c| c.parent_id);
-        }
+        validate_contact_parent(ctx, organization_id, contact_id, pid)?;
     }
 
     let old_parent_id = target.parent_id;

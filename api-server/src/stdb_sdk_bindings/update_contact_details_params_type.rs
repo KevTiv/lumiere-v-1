@@ -7,14 +7,14 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct UpdateContactDetailsParams {
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
-    pub title: Option<String>,
-    pub email_secondary: Option<String>,
-    pub fax: Option<String>,
-    pub website: Option<String>,
-    pub description: Option<String>,
-    pub color: Option<String>,
+    pub first_name: Option<Option<String>>,
+    pub last_name: Option<Option<String>>,
+    pub title: Option<Option<String>>,
+    pub email_secondary: Option<Option<String>>,
+    pub fax: Option<Option<String>>,
+    pub website: Option<Option<String>>,
+    pub description: Option<Option<String>>,
+    pub color: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateContactDetailsParams {

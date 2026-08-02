@@ -268,7 +268,10 @@ fn parse_field_permission_row(row: &Value, identity_hex: &str) -> Option<FieldPe
     let role_id = row
         .get("roleId")
         .or_else(|| row.get("role_id"))
-        .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok())));
+        .and_then(|v| {
+            v.as_u64()
+                .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+        });
 
     let mut subject_role_id = role_id;
     let mut subject_user_hex = None;
@@ -288,13 +291,17 @@ fn parse_field_permission_row(row: &Value, identity_hex: &str) -> Option<FieldPe
     let _ = identity_hex;
 
     Some(FieldPermissionLike {
-        id: row
-            .get("id")
-            .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok()))),
+        id: row.get("id").and_then(|v| {
+            v.as_u64()
+                .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+        }),
         organization_id: row
             .get("organizationId")
             .or_else(|| row.get("organization_id"))
-            .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok()))),
+            .and_then(|v| {
+                v.as_u64()
+                    .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+            }),
         role_id,
         resource,
         action,

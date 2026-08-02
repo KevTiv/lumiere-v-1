@@ -11,7 +11,6 @@ use crate::crm::opportunities::opportunity;
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = opportunity_presence,
-    public,
     index(accessor = opp_presence_by_opportunity, btree(columns = [opportunity_id])),
     index(accessor = opp_presence_by_user, btree(columns = [user_id]))
 )]
@@ -21,6 +20,7 @@ pub struct OpportunityPresence {
     pub id: u64,
 
     pub organization_id: u64,
+    pub company_id: u64,
     pub opportunity_id: u64,
     pub user_id: Identity,
     pub user_name: String,
@@ -50,6 +50,7 @@ pub fn update_opportunity_presence(
     if opp.organization_id != organization_id {
         return Err("Opportunity does not belong to this organization".to_string());
     }
+    let company_id = opp.company_id.ok_or("Opportunity has no company scope")?;
 
     let existing = ctx
         .db
@@ -71,6 +72,7 @@ pub fn update_opportunity_presence(
         ctx.db.opportunity_presence().insert(OpportunityPresence {
             id: 0,
             organization_id,
+            company_id,
             opportunity_id,
             user_id: ctx.sender(),
             user_name,

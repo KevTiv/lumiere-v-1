@@ -2182,6 +2182,28 @@
     "match_reason",
     "scanned_at"
   ],
+  "ContactIdentityVerificationAuthority": [
+    "id",
+    "issuer_identity",
+    "configured_by",
+    "configured_at"
+  ],
+  "ContactIdentityVerificationProof": [
+    "id",
+    "organization_id",
+    "company_id",
+    "contact_id",
+    "identity_id",
+    "normalized_e_164",
+    "method",
+    "provider",
+    "provider_reference",
+    "evidence_hash",
+    "issued_at",
+    "expires_at",
+    "recorded_by",
+    "recorded_at"
+  ],
   "ContactPhoneIdentity": [
     "id",
     "organization_id",
@@ -2202,6 +2224,7 @@
   "ContactRelationship": [
     "id",
     "organization_id",
+    "company_id",
     "left_contact_id",
     "right_contact_id",
     "relationship_type",
@@ -2216,6 +2239,7 @@
   "ContactRelationshipInsight": [
     "id",
     "organization_id",
+    "company_id",
     "contact_id",
     "strength_score",
     "active_relationship_count",
@@ -2280,6 +2304,7 @@
   "ContactTagAssignment": [
     "id",
     "organization_id",
+    "company_id",
     "contact_id",
     "tag_id",
     "assigned_at",
@@ -5777,8 +5802,10 @@
   "CrmConversation": [
     "id",
     "organization_id",
+    "company_id",
     "contact_id",
     "channel",
+    "provider_account_id",
     "phone_identity_id",
     "status",
     "assigned_user_id",
@@ -5793,6 +5820,7 @@
   "CrmConversationMessage": [
     "id",
     "organization_id",
+    "company_id",
     "conversation_id",
     "direction",
     "body",
@@ -5815,6 +5843,28 @@
     "created_by",
     "created_at",
     "metadata"
+  ],
+  "CrmProviderEventReceipt": [
+    "id",
+    "organization_id",
+    "provider_account_id",
+    "provider_event_id",
+    "event_fingerprint",
+    "event_kind",
+    "conversation_id",
+    "conversation_message_id",
+    "received_at",
+    "received_by"
+  ],
+  "CrmProviderPrincipal": [
+    "id",
+    "organization_id",
+    "provider_account_id",
+    "executor_identity",
+    "is_active",
+    "registered_by",
+    "registered_at",
+    "retired_at"
   ],
   "CrossoveredBudget": [
     "id",
@@ -8580,6 +8630,7 @@
   "OpportunityLine": [
     "id",
     "organization_id",
+    "company_id",
     "opportunity_id",
     "product_id",
     "name",
@@ -8596,6 +8647,7 @@
   "OpportunityPresence": [
     "id",
     "organization_id",
+    "company_id",
     "opportunity_id",
     "user_id",
     "user_name",
@@ -9198,6 +9250,7 @@
   "PrivacyConsent": [
     "id",
     "organization_id",
+    "company_id",
     "contact_id",
     "consent_type",
     "granted",
@@ -10591,6 +10644,16 @@
     "lot_id",
     "metadata"
   ],
+  "ReceiveCrmProviderMessageParams": [
+    "provider_account_id",
+    "provider_event_id",
+    "event_fingerprint",
+    "contact_id",
+    "phone_identity_id",
+    "external_thread_id",
+    "provider_message_id",
+    "body"
+  ],
   "RecognizeAmortizationLineParams": [
     "reference",
     "metadata"
@@ -10624,6 +10687,29 @@
     "session_id",
     "device_id",
     "metadata"
+  ],
+  "RecordContactIdentityVerificationProofParams": [
+    "identity_id",
+    "contact_id",
+    "company_id",
+    "normalized_e164",
+    "method",
+    "provider",
+    "provider_reference",
+    "evidence_hash",
+    "issued_at_micros",
+    "expires_at_micros"
+  ],
+  "RecordCrmProviderDeliveryParams": [
+    "provider_account_id",
+    "event_fingerprint",
+    "conversation_id",
+    "conversation_message_id",
+    "provider_event_id",
+    "provider_message_id",
+    "operational_message_id",
+    "status",
+    "failure_reason"
   ],
   "RecordCustomFieldEntry": [
     "field_key",
@@ -10780,6 +10866,10 @@
     "runtime_hash",
     "executor_identity",
     "metadata"
+  ],
+  "RegisterCrmProviderPrincipalParams": [
+    "provider_account_id",
+    "executor_identity"
   ],
   "RegisterDeviceParams": [
     "name",
@@ -11511,6 +11601,7 @@
   "SegmentMember": [
     "id",
     "organization_id",
+    "company_id",
     "segment_id",
     "contact_id",
     "added_at",
@@ -13552,6 +13643,20 @@
     "description",
     "is_active",
     "metadata"
+  ],
+  "UpdateLeadParams": [
+    "contact_name",
+    "title",
+    "website",
+    "industry",
+    "referred_by",
+    "description",
+    "street",
+    "city",
+    "zip",
+    "country_code",
+    "expected_revenue",
+    "probability"
   ],
   "UpdateLeadRevenueParams": [
     "expected_revenue",

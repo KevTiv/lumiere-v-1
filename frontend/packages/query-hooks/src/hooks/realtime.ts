@@ -55,10 +55,18 @@ export function useLumiereRealtime(options: {
   queryClient: QueryClient
   organizationId?: number
   companyIds?: readonly number[]
+  activeCompanyId?: number | null
   resources: readonly string[]
   enabled?: boolean
 }) {
-  const { queryClient, organizationId, companyIds, resources, enabled = true } = options
+  const {
+    queryClient,
+    organizationId,
+    companyIds,
+    activeCompanyId,
+    resources,
+    enabled = true,
+  } = options
   const resourcesRef = useRef(resources)
   resourcesRef.current = resources
 
@@ -107,6 +115,8 @@ export function useLumiereRealtime(options: {
           resources: [...resourcesRef.current],
           organizationId,
           companyIds: companyIds?.length ? [...companyIds] : [],
+          activeCompanyId:
+            activeCompanyId != null && activeCompanyId > 0 ? activeCompanyId : null,
         }
         try {
           ws?.send(JSON.stringify(payload))
@@ -157,6 +167,7 @@ export function useLumiereRealtime(options: {
     queryClient,
     organizationId,
     enabled,
+    activeCompanyId,
     JSON.stringify(companyIds ?? []),
     resources,
   ])

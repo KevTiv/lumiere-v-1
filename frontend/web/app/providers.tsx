@@ -14,7 +14,7 @@ import {
   mapBackendRolesToRoles,
   buildRbacUserFromServer,
 } from "@lumiere/ui"
-import { ErpSessionProvider } from "@lumiere/erp-session"
+import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
 import { LumiereApiProvider } from "@lumiere/api-client"
 import { useStdbQuery, realtimeQueryKeysForResource } from "@lumiere/query-hooks/hooks/stdb"
 import { usePolicySnapshot } from "@/lib/use-policy-snapshot"
@@ -77,17 +77,17 @@ function RBACBridge({
 /** api-server `/v1/realtime/ws` (browser connects directly) → invalidate `useStdbQuery` rows. */
 function LumiereRealtimeBridge({
   organizationId,
-  companyIds,
 }: {
   organizationId?: number
-  companyIds?: readonly number[]
 }) {
   const queryClient = useQueryClient()
+  const { activeCompanyId, activeCompanyReady, companyIds } = useErpSession()
   const resources = useMemo(() => FULL_CLIENT_SUBSCRIPTION_RESOURCES, [])
   useLumiereRealtime({
     queryClient,
     organizationId,
     companyIds,
+    activeCompanyId: activeCompanyReady ? activeCompanyId : null,
     resources,
     enabled: organizationId != null && organizationId > 0,
   })
@@ -164,12 +164,12 @@ export function Providers({
               serverRoleNames={serverRoleNames}
               keysFor={realtimeQueryKeysForResource}
             >
-              <LumiereRealtimeBridge organizationId={organizationId} companyIds={companyIds} />
               <ErpSessionBridge
                 serverIdentity={serverIdentity}
                 organizationId={organizationId}
                 companyIds={companyIds}
               >
+                <LumiereRealtimeBridge organizationId={organizationId} />
                 <RBACBridge
                   serverIdentity={serverIdentity}
                   serverRoleNames={serverRoleNames}

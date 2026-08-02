@@ -11,7 +11,7 @@ use super::contact_verification_state_type::ContactVerificationState;
 pub(super) struct VerifyContactIdentityArgs {
     pub organization_id: u64,
     pub identity_id: u64,
-    pub state: ContactVerificationState,
+    pub requested_state: ContactVerificationState,
 }
 
 impl From<VerifyContactIdentityArgs> for super::Reducer {
@@ -19,7 +19,7 @@ impl From<VerifyContactIdentityArgs> for super::Reducer {
         Self::VerifyContactIdentity {
             organization_id: args.organization_id,
             identity_id: args.identity_id,
-            state: args.state,
+            requested_state: args.requested_state,
         }
     }
 }
@@ -43,9 +43,9 @@ pub trait verify_contact_identity {
         &self,
         organization_id: u64,
         identity_id: u64,
-        state: ContactVerificationState,
+        requested_state: ContactVerificationState,
     ) -> __sdk::Result<()> {
-        self.verify_contact_identity_then(organization_id, identity_id, state, |_, _| {})
+        self.verify_contact_identity_then(organization_id, identity_id, requested_state, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `verify_contact_identity` to run as soon as possible,
@@ -58,7 +58,7 @@ pub trait verify_contact_identity {
         &self,
         organization_id: u64,
         identity_id: u64,
-        state: ContactVerificationState,
+        requested_state: ContactVerificationState,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -71,7 +71,7 @@ impl verify_contact_identity for super::RemoteReducers {
         &self,
         organization_id: u64,
         identity_id: u64,
-        state: ContactVerificationState,
+        requested_state: ContactVerificationState,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -81,7 +81,7 @@ impl verify_contact_identity for super::RemoteReducers {
             VerifyContactIdentityArgs {
                 organization_id,
                 identity_id,
-                state,
+                requested_state,
             },
             callback,
         )

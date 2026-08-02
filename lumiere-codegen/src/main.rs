@@ -29,7 +29,9 @@ fn write_file(path: &Path, contents: &str) -> Result<()> {
 }
 
 fn sync_asset(manifest_dir: &Path, asset_name: &str, frontend_rel: &str) -> Result<PathBuf> {
-    let src = manifest_dir.join("../crates/stdb-auth/assets").join(asset_name);
+    let src = manifest_dir
+        .join("../crates/stdb-auth/assets")
+        .join(asset_name);
     let text = fs::read_to_string(&src).with_context(|| format!("read {}", src.display()))?;
     let out = manifest_dir.join("../").join(frontend_rel);
     write_file(&out, &text)?;
@@ -67,8 +69,7 @@ fn main() -> Result<()> {
     let types_ts = fs::read_to_string(&types_ts_path)
         .with_context(|| format!("read {}", types_ts_path.display()))?;
     let generated_dir = manifest_dir.join("../frontend/packages/stdb/src/generated");
-    let sql_columns_json =
-        sql_columns_emit::emit_sql_columns_json(&types_ts, &generated_dir)?;
+    let sql_columns_json = sql_columns_emit::emit_sql_columns_json(&types_ts, &generated_dir)?;
     let sql_columns_frontend =
         manifest_dir.join("../frontend/packages/stdb/src/stdb-generated-sql-columns.json");
     let sql_columns_rust =
@@ -87,8 +88,8 @@ fn main() -> Result<()> {
     let erp_subs_ts = fs::read_to_string(&erp_subs_path)
         .with_context(|| format!("read {}", erp_subs_path.display()))?;
     let erp_org_rows = erp_org_sql_emit::parse_erp_org_sql(&erp_subs_ts)?;
-    let registry_keys = erp_org_sql_emit::registry_keys(&registry_text)
-        .map_err(|e| anyhow::anyhow!(e))?;
+    let registry_keys =
+        erp_org_sql_emit::registry_keys(&registry_text).map_err(|e| anyhow::anyhow!(e))?;
     for row in &erp_org_rows {
         if !registry_keys.contains_key(&row.resource_key) {
             anyhow::bail!(
@@ -99,8 +100,7 @@ fn main() -> Result<()> {
         }
     }
     let erp_org_json = erp_org_sql_emit::emit_erp_org_sql_json(&erp_subs_ts)?;
-    let erp_org_rust =
-        manifest_dir.join("../crates/stdb-auth/assets/erp-org-sql.json");
+    let erp_org_rust = manifest_dir.join("../crates/stdb-auth/assets/erp-org-sql.json");
     write_file(&erp_org_rust, &erp_org_json)?;
 
     let allowlist_path =
@@ -129,8 +129,15 @@ fn main() -> Result<()> {
         "lumiere-codegen: {key_count} registry keys from {}",
         registry_path.display()
     );
-    println!("lumiere-codegen: {type_count} SQL column maps from {}", types_ts_path.display());
-    println!("lumiere-codegen: {} ERP org subscription rows from {}", erp_org_rows.len(), erp_subs_path.display());
+    println!(
+        "lumiere-codegen: {type_count} SQL column maps from {}",
+        types_ts_path.display()
+    );
+    println!(
+        "lumiere-codegen: {} ERP org subscription rows from {}",
+        erp_org_rows.len(),
+        erp_subs_path.display()
+    );
     println!("Wrote {}", registry_path_out.display());
     println!("Wrote {}", stdb_inv_path.display());
     println!("Wrote {}", sql_columns_frontend.display());

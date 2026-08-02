@@ -5,8 +5,8 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::crm::opportunities::{
-    convert_opportunity_to_sale_order, create_opportunity, create_opportunity_line, opportunity,
-    opportunity_line, opp_stage, update_opportunity, ConvertOpportunityParams,
+    convert_opportunity_to_sale_order, create_opportunity, create_opportunity_line, opp_stage,
+    opportunity, opportunity_line, update_opportunity, ConvertOpportunityParams,
     CreateOpportunityLineParams, CreateOpportunityParams, OpportunityLine, OpportunityStage,
     UpdateOpportunityParams,
 };
@@ -164,9 +164,11 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
         return Err("Expected date_closed set after convert".to_string());
     }
 
-    let has_so = ctx.db.sale_order().iter().any(|so| {
-        so.organization_id == org_id && so.opportunity_id == Some(opp.id)
-    });
+    let has_so = ctx
+        .db
+        .sale_order()
+        .iter()
+        .any(|so| so.organization_id == org_id && so.opportunity_id == Some(opp.id));
     if !has_so {
         return Err("Expected sale order linked to opportunity after convert".to_string());
     }
@@ -175,9 +177,7 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
 }
 
 /// R2: Opp→SO with null company_currency_id → Err; no magic currency `1` SO.
-pub fn test_convert_opp_missing_currency_fail_closed(
-    ctx: &ReducerContext,
-) -> Result<(), String> {
+pub fn test_convert_opp_missing_currency_fail_closed(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
@@ -313,9 +313,7 @@ pub fn test_convert_opp_missing_currency_fail_closed(
     .expect_err("missing company_currency_id must fail closed");
 
     if !err.contains("company_currency_id") {
-        return Err(format!(
-            "Expected company_currency_id error, got: {err}"
-        ));
+        return Err(format!("Expected company_currency_id error, got: {err}"));
     }
 
     let so_after = ctx
@@ -329,9 +327,7 @@ pub fn test_convert_opp_missing_currency_fail_closed(
     }
 
     let magic_currency_so = ctx.db.sale_order().iter().any(|so| {
-        so.organization_id == org_id
-            && so.opportunity_id == Some(opp.id)
-            && so.currency_id == 1
+        so.organization_id == org_id && so.opportunity_id == Some(opp.id) && so.currency_id == 1
     });
     if magic_currency_so {
         return Err("Magic currency_id=1 SO persisted".into());
@@ -450,14 +446,18 @@ pub fn test_convert_opp_missing_uom_fail_closed(ctx: &ReducerContext) -> Result<
         .id()
         .find(&fixture.product_id)
         .ok_or("product")?;
-    ctx.db.product().id().update(crate::inventory::product::Product {
-        uom_id: 0,
-        ..product
-    });
+    ctx.db
+        .product()
+        .id()
+        .update(crate::inventory::product::Product {
+            uom_id: 0,
+            ..product
+        });
 
     ctx.db.opportunity_line().insert(OpportunityLine {
         id: 0,
         organization_id: org_id,
+        company_id,
         opportunity_id: opp.id,
         product_id: Some(fixture.product_id),
         name: "R2 zero uom line".to_string(),
@@ -626,6 +626,7 @@ pub fn test_convert_opp_distinctive_currency_uom(ctx: &ReducerContext) -> Result
     ctx.db.opportunity_line().insert(OpportunityLine {
         id: 0,
         organization_id: org_id,
+        company_id,
         opportunity_id: opp.id,
         product_id: Some(fixture.product_id),
         name: "R2 derive uom".to_string(),
@@ -709,42 +710,45 @@ pub fn test_create_opportunity_line_on_unscoped_opportunity(
         metadata: Some(r#"{"harness":true}"#.to_string()),
     });
 
-    let opp = ctx.db.opportunity().insert(crate::crm::opportunities::Opportunity {
-        id: 0,
-        organization_id: org_id,
-        lead_id: None,
-        name: "Harness Lead-Converted Opp".to_string(),
-        expected_revenue: 1_000.0,
-        probability: 10.0,
-        stage_id: stage.id,
-        priority: "medium".to_string(),
-        color: None,
-        partner_id: Some(fixture.partner_id),
-        contact_id: Some(fixture.partner_id),
-        campaign_id: None,
-        medium_id: None,
-        source_id: None,
-        user_id: None,
-        team_id: None,
-        company_currency_id: Some(1),
-        company_id: None,
-        date_open: Some(ctx.timestamp),
-        date_closed: None,
-        date_deadline: None,
-        date_last_stage_update: Some(ctx.timestamp),
-        day_open: None,
-        day_close: None,
-        is_won: false,
-        is_lost: false,
-        lost_reason_id: None,
-        description: None,
-        tag_ids: vec![],
-        created_by: ctx.sender(),
-        created_at: ctx.timestamp,
-        updated_at: ctx.timestamp,
-        deleted_at: None,
-        metadata: Some(r#"{"test":"unscoped_opp_line"}"#.to_string()),
-    });
+    let opp = ctx
+        .db
+        .opportunity()
+        .insert(crate::crm::opportunities::Opportunity {
+            id: 0,
+            organization_id: org_id,
+            lead_id: None,
+            name: "Harness Lead-Converted Opp".to_string(),
+            expected_revenue: 1_000.0,
+            probability: 10.0,
+            stage_id: stage.id,
+            priority: "medium".to_string(),
+            color: None,
+            partner_id: Some(fixture.partner_id),
+            contact_id: Some(fixture.partner_id),
+            campaign_id: None,
+            medium_id: None,
+            source_id: None,
+            user_id: None,
+            team_id: None,
+            company_currency_id: Some(1),
+            company_id: None,
+            date_open: Some(ctx.timestamp),
+            date_closed: None,
+            date_deadline: None,
+            date_last_stage_update: Some(ctx.timestamp),
+            day_open: None,
+            day_close: None,
+            is_won: false,
+            is_lost: false,
+            lost_reason_id: None,
+            description: None,
+            tag_ids: vec![],
+            created_by: ctx.sender(),
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            deleted_at: None,
+            metadata: Some(r#"{"test":"unscoped_opp_line"}"#.to_string()),
+        });
 
     create_opportunity_line(
         ctx,

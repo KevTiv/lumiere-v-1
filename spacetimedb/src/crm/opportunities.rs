@@ -6,14 +6,19 @@
 ///   - OpportunityLine
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::crm::contacts::{contact, Contact};
+use crate::accounting::tax_management::account_tax;
 use crate::core::organization::company_id_from_scope;
 use crate::core::permissions::role;
+use crate::core::reference::{currency, uom};
 use crate::core::users::{user_organization, user_profile};
+use crate::core::utm::{utm_campaign, utm_medium, utm_source};
+use crate::crm::contacts::{contact, contact_tag, Contact};
+use crate::crm::leads::lead_lost_reason;
+use crate::crm::require_single_company_crm_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::sales::sales_core::{
-    create_sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
+    create_sale_order, sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -133,7 +138,6 @@ pub struct UpdateOpportunityStageParams {
 
 #[spacetimedb::table(
     accessor = opportunity,
-    public,
     index(name = "opp_by_org_idx", accessor = opp_by_org, btree(columns = [organization_id])),
     index(name = "opp_by_stage_idx", accessor = opp_by_stage, btree(columns = [stage_id]))
 )]
@@ -179,7 +183,6 @@ pub struct Opportunity {
 
 #[spacetimedb::table(
     accessor = opp_stage,
-    public,
     index(accessor = stage_by_org, btree(columns = [organization_id]))
 )]
 pub struct OpportunityStage {
@@ -198,12 +201,13 @@ pub struct OpportunityStage {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = opportunity_line, public)]
+#[spacetimedb::table(accessor = opportunity_line)]
 pub struct OpportunityLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub opportunity_id: u64,
     pub product_id: Option<u64>,
     pub name: String,
@@ -223,17 +227,216 @@ pub struct OpportunityLine {
 // ══════════════════════════════════════════════════════════════════════════════
 
 /// Lead-converted opportunities may have `company_id: None` until a company-scoped write.
-fn resolve_opportunity_company_id(
-    opp: &Opportunity,
-    company_id: u64,
-) -> Result<u64, String> {
+fn resolve_opportunity_company_id(opp: &Opportunity, company_id: u64) -> Result<u64, String> {
     match opp.company_id {
-        Some(cid) if cid != company_id => {
-            Err("Record does not belong to this company".to_string())
-        }
+        Some(cid) if cid != company_id => Err("Record does not belong to this company".to_string()),
         Some(cid) => Ok(cid),
         None => Ok(company_id),
     }
+}
+
+// ── Relation validation helpers (CRM-RI-002) ────────────────────────────────
+//
+// Note: `team_id` is intentionally not validated here — this schema has no
+// backing "sales team" table (no `crm_team`/`sales_team` accessor exists
+// anywhere in the codebase), so there is nothing to load and check it
+// against. Flagging this as a follow-up rather than inventing a table.
+
+/// Validates that `campaign_id`, if present, references a UTM campaign owned
+/// by this organization.
+fn validate_opportunity_campaign_id(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    campaign_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(campaign_id) = campaign_id else {
+        return Ok(());
+    };
+    let campaign = ctx
+        .db
+        .utm_campaign()
+        .id()
+        .find(&campaign_id)
+        .ok_or("Campaign not found")?;
+    if campaign.organization_id != organization_id {
+        return Err("Campaign does not belong to this organization".to_string());
+    }
+    Ok(())
+}
+
+/// Validates that `medium_id`, if present, references a UTM medium owned by
+/// this organization.
+fn validate_opportunity_medium_id(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    medium_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(medium_id) = medium_id else {
+        return Ok(());
+    };
+    let medium = ctx
+        .db
+        .utm_medium()
+        .id()
+        .find(&medium_id)
+        .ok_or("Medium not found")?;
+    if medium.organization_id != organization_id {
+        return Err("Medium does not belong to this organization".to_string());
+    }
+    Ok(())
+}
+
+/// Validates that `source_id`, if present, references a UTM source owned by
+/// this organization.
+fn validate_opportunity_source_id(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    source_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(source_id) = source_id else {
+        return Ok(());
+    };
+    let source = ctx
+        .db
+        .utm_source()
+        .id()
+        .find(&source_id)
+        .ok_or("Source not found")?;
+    if source.organization_id != organization_id {
+        return Err("Source does not belong to this organization".to_string());
+    }
+    Ok(())
+}
+
+/// Validates that `lost_reason_id`, if present, references an active lost
+/// reason owned by this organization.
+fn validate_opportunity_lost_reason_id(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    lost_reason_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(lost_reason_id) = lost_reason_id else {
+        return Ok(());
+    };
+    let reason = ctx
+        .db
+        .lead_lost_reason()
+        .id()
+        .find(&lost_reason_id)
+        .ok_or("Lost reason not found")?;
+    if reason.organization_id != organization_id {
+        return Err("Lost reason does not belong to this organization".to_string());
+    }
+    if !reason.is_active {
+        return Err("Lost reason is inactive".to_string());
+    }
+    Ok(())
+}
+
+/// Validates a `partner_id`/`contact_id`-style relation: the referenced
+/// contact must exist, belong to this organization, and not be soft-deleted
+/// or merged away. `field_label` is used to produce a field-specific error
+/// (e.g. "Partner", "Contact").
+fn validate_opportunity_contact_relation(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    field_label: &str,
+    contact_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(contact_id) = contact_id else {
+        return Ok(());
+    };
+    let contact = ctx
+        .db
+        .contact()
+        .id()
+        .find(&contact_id)
+        .ok_or_else(|| format!("{field_label} not found"))?;
+    if contact.organization_id != organization_id {
+        return Err(format!(
+            "{field_label} does not belong to this organization"
+        ));
+    }
+    if contact.deleted_at.is_some() {
+        return Err(format!("{field_label} has been deleted"));
+    }
+    if contact.merge_target_id.is_some() {
+        return Err(format!(
+            "{field_label} has been merged into another contact"
+        ));
+    }
+    Ok(())
+}
+
+/// Validates every id in `tag_ids` exists and belongs to this organization.
+/// Rejects the whole operation if any tag is invalid — tags are never
+/// silently dropped.
+fn validate_opportunity_tag_ids(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    tag_ids: &[u64],
+) -> Result<(), String> {
+    for tag_id in tag_ids {
+        let tag = ctx
+            .db
+            .contact_tag()
+            .id()
+            .find(tag_id)
+            .ok_or_else(|| format!("Tag {tag_id} not found"))?;
+        if tag.organization_id != organization_id {
+            return Err(format!("Tag {tag_id} does not belong to this organization"));
+        }
+    }
+    Ok(())
+}
+
+/// Validates that `company_currency_id`, if present, references a real,
+/// active currency. `Currency` is a global reference table (no organization
+/// column), so only existence and active state are checked.
+fn validate_opportunity_currency_id(
+    ctx: &ReducerContext,
+    company_currency_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(currency_id) = company_currency_id else {
+        return Ok(());
+    };
+    let currency = ctx
+        .db
+        .currency()
+        .id()
+        .find(&currency_id)
+        .ok_or("Currency not found")?;
+    if !currency.active {
+        return Err("Currency is inactive".to_string());
+    }
+    Ok(())
+}
+
+/// Validates every id in an opportunity line's `tax_ids` exists, belongs to
+/// this organization and company, and is active.
+fn validate_opportunity_line_tax_ids(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    tax_ids: &[u64],
+) -> Result<(), String> {
+    for tax_id in tax_ids {
+        let tax = ctx
+            .db
+            .account_tax()
+            .id()
+            .find(tax_id)
+            .ok_or_else(|| format!("Tax {tax_id} not found"))?;
+        if tax.organization_id != organization_id || tax.company_id != company_id {
+            return Err(format!(
+                "Tax {tax_id} does not belong to this organization and company"
+            ));
+        }
+        if !tax.active {
+            return Err(format!("Tax {tax_id} is inactive"));
+        }
+    }
+    Ok(())
 }
 
 #[spacetimedb::reducer]
@@ -257,6 +460,16 @@ pub fn create_opportunity(
     if stage.organization_id != organization_id {
         return Err("Stage does not belong to this organization".to_string());
     }
+
+    require_single_company_crm_scope(ctx, organization_id, params.company_id)?;
+    validate_opportunity_contact_relation(ctx, organization_id, "Partner", params.partner_id)?;
+    validate_opportunity_contact_relation(ctx, organization_id, "Contact", params.contact_id)?;
+    validate_opportunity_campaign_id(ctx, organization_id, params.campaign_id)?;
+    validate_opportunity_medium_id(ctx, organization_id, params.medium_id)?;
+    validate_opportunity_source_id(ctx, organization_id, params.source_id)?;
+    validate_opportunity_lost_reason_id(ctx, organization_id, params.lost_reason_id)?;
+    validate_opportunity_currency_id(ctx, params.company_currency_id)?;
+    validate_opportunity_tag_ids(ctx, organization_id, &params.tag_ids)?;
 
     let operating_company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
@@ -359,8 +572,7 @@ pub fn create_opportunity_stage(
             action: "CREATE",
             old_values: None,
             new_values: Some(
-                serde_json::json!({ "name": params.name, "sequence": params.sequence })
-                    .to_string(),
+                serde_json::json!({ "name": params.name, "sequence": params.sequence }).to_string(),
             ),
             changed_fields: vec!["name".to_string(), "sequence".to_string()],
             metadata: None,
@@ -487,6 +699,7 @@ pub fn update_opportunity(
         return Err("Opportunity does not belong to this organization".to_string());
     }
 
+    require_single_company_crm_scope(ctx, organization_id, Some(company_id))?;
     let opp_company_id = resolve_opportunity_company_id(&opp, company_id)?;
     let opp = if opp.company_id.is_none() {
         Opportunity {
@@ -530,10 +743,12 @@ pub fn update_opportunity(
         changed_fields.push("priority".to_string());
     }
     if let Some(v) = params.partner_id {
+        validate_opportunity_contact_relation(ctx, organization_id, "Partner", Some(v))?;
         partner_id = Some(v);
         changed_fields.push("partner_id".to_string());
     }
     if let Some(v) = params.contact_id {
+        validate_opportunity_contact_relation(ctx, organization_id, "Contact", Some(v))?;
         contact_id = Some(v);
         changed_fields.push("contact_id".to_string());
     }
@@ -542,6 +757,7 @@ pub fn update_opportunity(
         changed_fields.push("date_deadline".to_string());
     }
     if let Some(v) = params.lost_reason_id {
+        validate_opportunity_lost_reason_id(ctx, organization_id, Some(v))?;
         lost_reason_id = Some(v);
         changed_fields.push("lost_reason_id".to_string());
     }
@@ -550,6 +766,7 @@ pub fn update_opportunity(
         changed_fields.push("description".to_string());
     }
     if let Some(v) = &params.tag_ids {
+        validate_opportunity_tag_ids(ctx, organization_id, v)?;
         tag_ids = v.clone();
         changed_fields.push("tag_ids".to_string());
     }
@@ -717,6 +934,7 @@ pub fn create_opportunity_line(
         return Err("Opportunity does not belong to this organization".to_string());
     }
 
+    require_single_company_crm_scope(ctx, organization_id, Some(company_id))?;
     let opp_company_id = resolve_opportunity_company_id(&opp, company_id)?;
 
     if opp.is_won || opp.is_lost {
@@ -742,6 +960,30 @@ pub fn create_opportunity_line(
         return Err("Product does not belong to this organization".to_string());
     }
 
+    let line_uom = ctx
+        .db
+        .uom()
+        .id()
+        .find(&params.uom_id)
+        .ok_or("UoM not found")?;
+    if line_uom.organization_id != organization_id {
+        return Err("UoM does not belong to this organization".to_string());
+    }
+    if !line_uom.is_active {
+        return Err("UoM is inactive".to_string());
+    }
+    let product_uom = ctx
+        .db
+        .uom()
+        .id()
+        .find(&product.uom_id)
+        .ok_or("Product UoM not found")?;
+    if line_uom.category_id != product_uom.category_id {
+        return Err("UoM is not compatible with the product's UoM category".to_string());
+    }
+
+    validate_opportunity_line_tax_ids(ctx, organization_id, opp_company_id, &params.tax_ids)?;
+
     let discount_amount = params.price_unit * params.quantity * (params.discount / 100.0);
     let price_subtotal = params.price_unit * params.quantity - discount_amount;
 
@@ -755,6 +997,7 @@ pub fn create_opportunity_line(
     let line = ctx.db.opportunity_line().insert(OpportunityLine {
         id: 0,
         organization_id,
+        company_id: opp_company_id,
         opportunity_id,
         product_id: Some(params.product_id),
         name: line_name,
@@ -815,6 +1058,16 @@ pub fn convert_opportunity_to_sale_order(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "opportunity", "write")?;
 
+    // CRM-RI-005: idempotency — a sale order already linked to this opportunity
+    // means a prior (or concurrent) conversion already succeeded. Treat a retry
+    // as a successful no-op rather than creating a second sale order.
+    let already_converted = ctx.db.sale_order().iter().any(|so| {
+        so.organization_id == organization_id && so.opportunity_id == Some(opportunity_id)
+    });
+    if already_converted {
+        return Ok(());
+    }
+
     let opp = ctx
         .db
         .opportunity()
@@ -833,22 +1086,20 @@ pub fn convert_opportunity_to_sale_order(
     let currency_id = opp
         .company_currency_id
         .ok_or("Opportunity has no company_currency_id — set currency before converting")?;
+    require_single_company_crm_scope(ctx, organization_id, Some(company_id))?;
     let opp_company_id = resolve_opportunity_company_id(&opp, company_id)?;
 
-    // Ensure the partner is flagged as a customer
-    if let Some(partner) = ctx.db.contact().id().find(&partner_id) {
+    // Validate the partner up front (read-only) — the customer flag is only
+    // flipped once every other validation below has passed.
+    let partner = ctx.db.contact().id().find(&partner_id);
+    if let Some(partner) = &partner {
         if partner.organization_id != organization_id {
             return Err("Opportunity partner does not belong to this organization".to_string());
         }
-        if !partner.is_customer {
-            ctx.db.contact().id().update(Contact {
-                is_customer: true,
-                ..partner
-            });
-        }
     }
 
-    // Build SO lines from opportunity lines (skip those without a product)
+    // Build SO lines from opportunity lines (skip those without a product).
+    // All product/UoM validation happens here, before any row is mutated.
     let opp_lines: Vec<_> = ctx
         .db
         .opportunity_line()
@@ -942,14 +1193,39 @@ pub fn convert_opportunity_to_sale_order(
         metadata: None,
     };
 
-    create_sale_order(ctx, organization_id, so_params)?;
-
-    let won_stage = ctx
+    // CRM-RI-005: resolve the won stage deterministically before any mutation.
+    // `OpportunityStage` has no company column, so scoping is organization-only
+    // (flagged: cannot additionally scope by company without a schema change).
+    // More than one `is_won` stage for the scope is a configuration error that
+    // must be surfaced rather than silently resolved by picking the first match.
+    let matching_won_stages: Vec<_> = ctx
         .db
         .opp_stage()
         .iter()
-        .find(|s| s.organization_id == organization_id && s.is_won)
-        .ok_or("Won stage not found")?;
+        .filter(|s| s.organization_id == organization_id && s.is_won)
+        .collect();
+    let won_stage = match matching_won_stages.len() {
+        0 => return Err("Won stage not found".to_string()),
+        1 => matching_won_stages.into_iter().next().expect("checked len == 1"),
+        _ => {
+            return Err(
+                "organization has more than one won stage configured — resolve stage configuration before converting"
+                    .to_string(),
+            )
+        }
+    };
+
+    // All validation above has passed — commit the mutations together.
+    if let Some(partner) = partner {
+        if !partner.is_customer {
+            ctx.db.contact().id().update(Contact {
+                is_customer: true,
+                ..partner
+            });
+        }
+    }
+
+    create_sale_order(ctx, organization_id, so_params)?;
 
     ctx.db.opportunity().id().update(Opportunity {
         is_won: true,
@@ -978,7 +1254,7 @@ pub fn convert_opportunity_to_sale_order(
                     "stage_id": won_stage.id,
                     "is_won": true,
                 })
-                    .to_string(),
+                .to_string(),
             ),
             changed_fields: vec![
                 "stage_id".to_string(),

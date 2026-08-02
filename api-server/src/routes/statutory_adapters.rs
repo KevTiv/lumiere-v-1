@@ -91,7 +91,9 @@ async fn export_statutory(
 
     // Adapter registry stub — concrete NF-e / BAS / IRAS clients plug in here.
     let adapter_status = match pack.as_str() {
-        "au" | "nz" | "za" | "sg" | "br" | "ar" | "cl" | "my" | "id" | "th" | "ph" => "accepted_stub",
+        "au" | "nz" | "za" | "sg" | "br" | "ar" | "cl" | "my" | "id" | "th" | "ph" => {
+            "accepted_stub"
+        }
         _ => {
             return Err(ApiError::BadRequest(format!(
                 "no statutory adapter registered for pack_key '{pack}'"
@@ -116,5 +118,8 @@ async fn export_statutory(
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/statutory-adapters", get(list_adapters))
-        .route("/statutory-adapters/:pack_key/export", post(export_statutory))
+        .route(
+            "/statutory-adapters/:pack_key/export",
+            post(export_statutory),
+        )
 }

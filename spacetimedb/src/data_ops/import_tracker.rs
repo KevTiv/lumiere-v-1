@@ -104,6 +104,21 @@ pub fn record_import_error(
     raw_value: Option<&str>,
     error_message: &str,
 ) {
+    let entity = ctx
+        .db
+        .import_job()
+        .id()
+        .find(&job_id)
+        .map(|job| job.table_name)
+        .unwrap_or_else(|| "unknown".to_string());
+    log::warn!(
+        "Import row rejected: entity={} job_id={} row={} field={:?} error={}",
+        entity,
+        job_id,
+        row_number,
+        field_name,
+        error_message
+    );
     ctx.db.import_job_error().insert(ImportJobError {
         id: 0,
         job_id,

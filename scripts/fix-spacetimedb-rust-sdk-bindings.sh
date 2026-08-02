@@ -20,4 +20,5 @@ find "$DIR" -name '*.rs' -print0 | xargs -0 perl -pi -e '
   s/^(\s*pub\s+)($keyword)(\s*:)/${1}r#${2}${3}/gm;
   s/^(\s*)($keyword)(\s*:)/${1}r#${2}${3}/gm;
 '
+
 echo "escaped Rust keyword fields in $DIR"

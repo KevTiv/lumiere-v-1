@@ -10,7 +10,6 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 #[spacetimedb::table(
     accessor = utm_campaign,
-    public,
     index(accessor = utm_campaign_by_org, btree(columns = [organization_id]))
 )]
 pub struct UtmCampaign {
@@ -25,7 +24,6 @@ pub struct UtmCampaign {
 
 #[spacetimedb::table(
     accessor = utm_medium,
-    public,
     index(accessor = utm_medium_by_org, btree(columns = [organization_id]))
 )]
 pub struct UtmMedium {
@@ -40,7 +38,6 @@ pub struct UtmMedium {
 
 #[spacetimedb::table(
     accessor = utm_source,
-    public,
     index(accessor = utm_source_by_org, btree(columns = [organization_id]))
 )]
 pub struct UtmSource {

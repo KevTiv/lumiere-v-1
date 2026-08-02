@@ -949,7 +949,6 @@ export const mergeContactsForm = (
 export type ContactIdentityFormOptions = {
   mode?: "create" | "edit"
   kind?: "Primary" | "WhatsApp" | "MobileMoney"
-  verificationState?: "Unverified" | "Pending" | "Verified" | "Failed" | "OptedOut"
   isPreferred?: boolean
 }
 
@@ -1000,21 +999,6 @@ export const contactIdentityForm = (
                 },
               ]
             : []),
-          {
-            id: "verificationState",
-            name: "verificationState",
-            type: "select",
-            label: t("crm.forms.contactIdentity.fields.verification"),
-            defaultValue: options.verificationState ?? "Unverified",
-            options: [
-              { value: "Unverified", label: t("crm.forms.contactIdentity.states.unverified") },
-              { value: "Pending", label: t("crm.forms.contactIdentity.states.pending") },
-              { value: "Verified", label: t("crm.forms.contactIdentity.states.verified") },
-              { value: "Failed", label: t("crm.forms.contactIdentity.states.failed") },
-              { value: "OptedOut", label: t("crm.forms.contactIdentity.states.optedOut") },
-            ],
-            width: "full",
-          },
           {
             id: "isPreferred",
             name: "isPreferred",

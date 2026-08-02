@@ -30,8 +30,7 @@ pub fn run_crm_deferred_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("dynamic_segment_rule_ast: {e}"))?;
     deferred_test::test_relationship_insights(ctx)
         .map_err(|e| format!("relationship_insights: {e}"))?;
-    deferred_test::test_crm_whatsapp_inbox(ctx)
-        .map_err(|e| format!("crm_whatsapp_inbox: {e}"))
+    deferred_test::test_crm_whatsapp_inbox(ctx).map_err(|e| format!("crm_whatsapp_inbox: {e}"))
 }
 
 #[spacetimedb::reducer]
@@ -71,6 +70,8 @@ pub fn run_crm_contact_identity_test(ctx: &ReducerContext) -> Result<(), String>
         .map_err(|e| format!("create_and_normalize_contact_identity: {e}"))?;
     contact_identity_test::test_preferred_identity_uniqueness(ctx)
         .map_err(|e| format!("preferred_identity_uniqueness: {e}"))?;
+    contact_identity_test::test_identity_scope_and_state_forgery_rejected(ctx)
+        .map_err(|e| format!("identity_scope_and_state_forgery_rejected: {e}"))?;
     contact_identity_test::test_verify_and_archive_contact_identity(ctx)
         .map_err(|e| format!("verify_and_archive_contact_identity: {e}"))?;
     contact_identity_test::test_contact_role_assignment_lifecycle(ctx)

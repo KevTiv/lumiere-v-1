@@ -17,6 +17,7 @@ use std::sync::Arc;
 use tower_cookies::Cookies;
 
 use crate::error::ApiError;
+use crate::query_exec::{company_ids_for_organization, crm_resource, resolve_crm_company_id};
 use crate::session::{resolve_api_session, ApiSession};
 use crate::state::AppState;
 use crate::stdb_sdk_bindings::DbConnection;
@@ -33,6 +34,8 @@ struct ClientSubscribe {
     organization_id: u64,
     #[serde(default)]
     company_ids: Vec<u64>,
+    #[serde(default)]
+    active_company_id: Option<u64>,
 }
 
 pub(crate) fn notify_row_change(
@@ -67,6 +70,21 @@ fn parse_tables_from_sql(sql: &str) -> HashSet<String> {
         }
     }
     out
+}
+
+/// SpacetimeDB subscriptions must return the complete table row type. The
+/// owner-only bridge consumes those rows internally and emits invalidations,
+/// never row payloads, so retain the scoped predicate while widening only the
+/// subscription projection.
+fn subscription_select_all(sql: &str) -> Result<String, ApiError> {
+    let from = sql
+        .find(" FROM ")
+        .ok_or_else(|| ApiError::BadRequest("subscription SQL has no FROM clause".into()))?;
+    let table_scope = &sql[from..];
+    let table_scope = table_scope
+        .split_once(" ORDER BY ")
+        .map_or(table_scope, |(scope, _)| scope);
+    Ok(format!("SELECT *{table_scope}"))
 }
 
 fn validate_resources(requested: &[String]) -> Result<(), ApiError> {
@@ -171,24 +189,132 @@ async fn handle_realtime_socket(
         return;
     }
 
-    let identity_hex = (session.identity_hex != "unknown").then_some(session.identity_hex.as_str());
-    let company_ids_slice = if sub.company_ids.is_empty() {
-        None
-    } else {
-        Some(sub.company_ids.as_slice())
+    let session_client = state.client_with_token(&session.stdb_token);
+    let organization_company_ids = match company_ids_for_organization(
+        &session_client,
+        session_org,
+        session.field_access.as_ref(),
+    )
+    .await
+    {
+        Ok(ids) => ids.into_iter().collect::<HashSet<_>>(),
+        Err(_) => {
+            let _ = socket
+                .send(Message::Text(
+                    json!({ "type": "error", "error": "company scope validation failed" })
+                        .to_string(),
+                ))
+                .await;
+            return;
+        }
     };
+    if sub
+        .company_ids
+        .iter()
+        .any(|company_id| !organization_company_ids.contains(company_id))
+    {
+        let _ = socket
+            .send(Message::Text(
+                json!({ "type": "error", "error": "companyId does not belong to session organization" })
+                    .to_string(),
+            ))
+            .await;
+        return;
+    }
 
-    let ctx = SubscriptionQueryContext {
+    let identity_hex = (session.identity_hex != "unknown").then_some(session.identity_hex.as_str());
+    let legacy_company_ids = (!sub.company_ids.is_empty()).then_some(sub.company_ids.as_slice());
+    let base_ctx = SubscriptionQueryContext {
         organization_id: Some(session_org),
-        company_ids: company_ids_slice,
+        company_ids: legacy_company_ids,
         identity_hex,
         role_names: None,
         manager_employee_id: None,
         field_access: session.field_access.as_ref(),
     };
 
-    let queries = match create_client_subscriptions(&sub.resources, &ctx) {
-        Ok(q) => q,
+    let crm_resources: Vec<String> = sub
+        .resources
+        .iter()
+        .filter(|resource| crm_resource(resource.trim()))
+        .cloned()
+        .collect();
+    let non_crm_resources: Vec<String> = sub
+        .resources
+        .iter()
+        .filter(|resource| !crm_resource(resource.trim()))
+        .cloned()
+        .collect();
+    let mut resolved_crm_company_id = None;
+    let mut crm_subscription_tables = HashSet::new();
+
+    let queries = match create_client_subscriptions(&non_crm_resources, &base_ctx) {
+        Ok(mut queries) => {
+            if !crm_resources.is_empty() {
+                let allowed_company_id = match resolve_crm_company_id(
+                    &session_client,
+                    session_org,
+                    &session.identity_hex,
+                    sub.active_company_id,
+                )
+                .await
+                {
+                    Ok(company_id) => company_id,
+                    Err(_) => {
+                        let _ = socket
+                            .send(Message::Text(
+                                json!({ "type": "error", "error": "activeCompanyId is not permitted for this session" })
+                                    .to_string(),
+                            ))
+                            .await;
+                        return;
+                    }
+                };
+                resolved_crm_company_id = Some(allowed_company_id);
+                let crm_company_ids = [allowed_company_id];
+                let crm_ctx = SubscriptionQueryContext {
+                    company_ids: Some(&crm_company_ids),
+                    ..base_ctx
+                };
+                for resource in &crm_resources {
+                    match create_client_subscriptions(std::slice::from_ref(resource), &crm_ctx) {
+                        Ok(crm_queries) => {
+                            for query in crm_queries {
+                                match subscription_select_all(&query) {
+                                    Ok(query) => {
+                                        crm_subscription_tables
+                                            .extend(parse_tables_from_sql(&query));
+                                        queries.push(query);
+                                    }
+                                    Err(ApiError::BadRequest(message)) => {
+                                        let _ = socket
+                                            .send(Message::Text(
+                                                json!({ "type": "error", "error": message })
+                                                    .to_string(),
+                                            ))
+                                            .await;
+                                        return;
+                                    }
+                                    Err(_) => unreachable!(
+                                        "subscription projection rewrite only returns bad requests"
+                                    ),
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            let _ = socket
+                                .send(Message::Text(
+                                    json!({ "type": "error", "error": format!("subscription SQL: {e}") })
+                                        .to_string(),
+                                ))
+                                .await;
+                            return;
+                        }
+                    }
+                }
+            }
+            queries
+        }
         Err(e) => {
             let _ = socket
                 .send(Message::Text(
@@ -220,8 +346,28 @@ async fn handle_realtime_socket(
 
     let stdb_uri = state.config.stdb_host.clone();
     let module = state.config.stdb_module.clone();
-    let token = session.stdb_token.clone();
+    let token = if crm_resources.is_empty() {
+        session.stdb_token.clone()
+    } else {
+        let Some(token) = state
+            .config
+            .stdb_server_token
+            .as_ref()
+            .filter(|token| !token.is_empty())
+            .cloned()
+        else {
+            let _ = socket
+                .send(Message::Text(
+                    json!({ "type": "error", "error": "CRM realtime requires the server owner token" })
+                        .to_string(),
+                ))
+                .await;
+            return;
+        };
+        token
+    };
     let tables_thread: Vec<String> = tables.iter().cloned().collect();
+    let crm_tables_thread = crm_subscription_tables;
     let res_thread = resources_vec.clone();
     let queries_thread = queries.clone();
 
@@ -240,9 +386,15 @@ async fn handle_realtime_socket(
             })
             .on_connect(move |conn, _ident, _tok| {
                 for t in &tables_thread {
-                    if let Err(e) =
-                        wire::wire_realtime_table_callbacks(conn, t, &res_thread, &sdk_tx)
-                    {
+                    let company_id =
+                        resolved_crm_company_id.filter(|_| crm_tables_thread.contains(t));
+                    if let Err(e) = wire::wire_realtime_table_callbacks(
+                        conn,
+                        t,
+                        &res_thread,
+                        company_id,
+                        &sdk_tx,
+                    ) {
                         tracing::debug!("realtime skip wire for table {t}: {e}");
                     }
                 }
@@ -258,6 +410,7 @@ async fn handle_realtime_socket(
                         );
                     })
                     .on_error(move |_ctx, err| {
+                        tracing::error!("realtime STDB subscription error: {err:?}");
                         let _ = tx_err.send(
                             json!({ "type": "error", "error": format!("{err:?}") }).to_string(),
                         );
@@ -318,4 +471,18 @@ pub async fn realtime_info() -> Json<serde_json::Value> {
         "path": "/v1/realtime/ws",
         "protocol": "First message: JSON {\"resources\":[\"leads\",...],\"organizationId\":N,\"companyIds\":[]}"
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn owner_subscription_uses_full_rows_and_retains_scope() {
+        let sql = "SELECT id, organization_id, company_id FROM contact WHERE organization_id = 7 AND company_id = 11 ORDER BY id DESC";
+        assert_eq!(
+            subscription_select_all(sql).expect("valid subscription SQL"),
+            "SELECT * FROM contact WHERE organization_id = 7 AND company_id = 11"
+        );
+    }
 }

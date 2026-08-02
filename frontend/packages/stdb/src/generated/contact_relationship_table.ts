@@ -13,6 +13,7 @@ import {
 export default __t.row({
   id: __t.u64().primaryKey(),
   organizationId: __t.u64().name("organization_id"),
+  companyId: __t.u64().name("company_id"),
   leftContactId: __t.u64().name("left_contact_id"),
   rightContactId: __t.u64().name("right_contact_id"),
   relationshipType: __t.string().name("relationship_type"),

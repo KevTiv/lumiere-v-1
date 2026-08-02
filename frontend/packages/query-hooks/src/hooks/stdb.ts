@@ -12,6 +12,7 @@
 
 import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useErpSession } from '@lumiere/erp-session'
 
 import { stdbBffPost } from "@lumiere/stdb/commands"
 import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
@@ -19,8 +20,14 @@ import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
 import { apiFetch, coalesceQueryInitialData } from "../http"
 import { stdbInvalidationFor } from "../generated/stdb-reducer-invalidation"
 
-export function stdbQueryKey(resource: string, organizationId: bigint | number) {
-  return ['stdb', resource, organizationId.toString()] as const
+export function stdbQueryKey(
+  resource: string,
+  organizationId: bigint | number,
+  companyId?: number | null,
+) {
+  return companyId != null && companyId > 0
+    ? (['stdb', resource, organizationId.toString(), 'company', companyId] as const)
+    : (['stdb', resource, organizationId.toString()] as const)
 }
 
 /**
@@ -138,7 +145,9 @@ export function useStdbQuery(
 ) {
   const qc = useQueryClient()
   const { subscriptionReady } = useSubscriptionCache()
-  const queryKey = stdbQueryKey(resource, organizationId)
+  const { activeCompanyId, activeCompanyReady } = useErpSession()
+  const companyId = activeCompanyReady ? activeCompanyId : null
+  const queryKey = stdbQueryKey(resource, organizationId, companyId)
 
   return useQuery({
     queryKey,
@@ -149,7 +158,10 @@ export function useStdbQuery(
           if (Array.isArray(cached)) return cached as Record<string, unknown>[]
         }
       }
-      const r = await apiFetch(`/api/query/${resource}`)
+      const companyQuery = companyId != null && companyId > 0
+        ? `?companyId=${encodeURIComponent(String(companyId))}`
+        : ''
+      const r = await apiFetch(`/api/query/${resource}${companyQuery}`)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
         throw new Error((json.error as string | undefined) ?? `Query ${resource} failed`)

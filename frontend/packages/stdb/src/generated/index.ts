@@ -201,6 +201,7 @@ import ComputePosSessionTotalsReducer from "./compute_pos_session_totals_reducer
 import ComputePurchaseOrderLineTotalsReducer from "./compute_purchase_order_line_totals_reducer";
 import ComputePurchaseOrderTotalsReducer from "./compute_purchase_order_totals_reducer";
 import ComputeSoTotalsReducer from "./compute_so_totals_reducer";
+import ConfigureContactIdentityVerificationAuthorityReducer from "./configure_contact_identity_verification_authority_reducer";
 import ConfirmAccountAssetReducer from "./confirm_account_asset_reducer";
 import ConfirmBudgetReducer from "./confirm_budget_reducer";
 import ConfirmManufacturingOrderReducer from "./confirm_manufacturing_order_reducer";
@@ -473,6 +474,7 @@ import CreateWorkflowDelegationReducer from "./create_workflow_delegation_reduce
 import CreateWorkflowMigrationPlanReducer from "./create_workflow_migration_plan_reducer";
 import CreateWorkingCalendarReducer from "./create_working_calendar_reducer";
 import CreateWorkorderReducer from "./create_workorder_reducer";
+import CrmIntegrityInventoryReducer from "./crm_integrity_inventory_reducer";
 import DeactivatePosConfigReducer from "./deactivate_pos_config_reducer";
 import DeactivateRevenueRecognitionRuleReducer from "./deactivate_revenue_recognition_rule_reducer";
 import DeactivateSubscriptionPlanReducer from "./deactivate_subscription_plan_reducer";
@@ -720,6 +722,7 @@ import QueueMailFromTemplateReducer from "./queue_mail_from_template_reducer";
 import RateSubscriptionUsageEventsReducer from "./rate_subscription_usage_events_reducer";
 import RebaseDeferredSchedulesForSubscriptionReducer from "./rebase_deferred_schedules_for_subscription_reducer";
 import ReceiveConsignmentStockReducer from "./receive_consignment_stock_reducer";
+import ReceiveCrmProviderMessageReducer from "./receive_crm_provider_message_reducer";
 import ReceivePoLineReducer from "./receive_po_line_reducer";
 import RecognizeAmortizationLineReducer from "./recognize_amortization_line_reducer";
 import RecognizeDeferredRevenueReducer from "./recognize_deferred_revenue_reducer";
@@ -732,6 +735,8 @@ import ReconcilePaymentWithInvoiceReducer from "./reconcile_payment_with_invoice
 import RecordAiAgentRunPolicySnapshotReducer from "./record_ai_agent_run_policy_snapshot_reducer";
 import RecordAiSpendReducer from "./record_ai_spend_reducer";
 import RecordBarcodeScanReducer from "./record_barcode_scan_reducer";
+import RecordContactIdentityVerificationProofReducer from "./record_contact_identity_verification_proof_reducer";
+import RecordCrmProviderDeliveryReducer from "./record_crm_provider_delivery_reducer";
 import RecordCycleCountLineReducer from "./record_cycle_count_line_reducer";
 import RecordDocumentViewReducer from "./record_document_view_reducer";
 import RecordGeneratedOwnerReportReducer from "./record_generated_owner_report_reducer";
@@ -766,6 +771,7 @@ import RefreshTaxDeadlineStatusesReducer from "./refresh_tax_deadline_statuses_r
 import RefuseExpenseSheetReducer from "./refuse_expense_sheet_reducer";
 import RefuseLeaveReducer from "./refuse_leave_reducer";
 import RegisterAiSkillCertificationRuntimeProfileReducer from "./register_ai_skill_certification_runtime_profile_reducer";
+import RegisterCrmProviderPrincipalReducer from "./register_crm_provider_principal_reducer";
 import RegisterIotDeviceReducer from "./register_iot_device_reducer";
 import RegisterIotHubReducer from "./register_iot_hub_reducer";
 import RegisterPaymentOnInvoiceReducer from "./register_payment_on_invoice_reducer";
@@ -860,6 +866,7 @@ import RunCrmDeferredTestReducer from "./run_crm_deferred_test_reducer";
 import RunCrmOpportunityConvertTestReducer from "./run_crm_opportunity_convert_test_reducer";
 import RunCrmRelationshipAdminTestReducer from "./run_crm_relationship_admin_test_reducer";
 import RunCrmWave2TestReducer from "./run_crm_wave_2_test_reducer";
+import RunDocumentRetentionPurgeReducer from "./run_document_retention_purge_reducer";
 import RunDocumentsFolderTestReducer from "./run_documents_folder_test_reducer";
 import RunDocumentsWaveATestsReducer from "./run_documents_wave_a_tests_reducer";
 import RunDocumentsWaveBTestsReducer from "./run_documents_wave_b_tests_reducer";
@@ -948,6 +955,7 @@ import RunSalesOrderInvoiceTestReducer from "./run_sales_order_invoice_test_redu
 import RunSalesOrderUpdateTestReducer from "./run_sales_order_update_test_reducer";
 import RunSalesPricelistApplyTestReducer from "./run_sales_pricelist_apply_test_reducer";
 import RunSalesSendQuotationTestReducer from "./run_sales_send_quotation_test_reducer";
+import RunSalesSlaEscalationReducer from "./run_sales_sla_escalation_reducer";
 import RunSubscriptionPlanTestReducer from "./run_subscription_plan_test_reducer";
 import RunSubscriptionsWaveATestReducer from "./run_subscriptions_wave_a_test_reducer";
 import RunSubscriptionsWaveBTestReducer from "./run_subscriptions_wave_b_test_reducer";
@@ -1120,6 +1128,7 @@ import UpdateKnowledgeArticleReducer from "./update_knowledge_article_reducer";
 import UpdateKnowledgeArticlePresenceReducer from "./update_knowledge_article_presence_reducer";
 import UpdateKnowledgeCategoryReducer from "./update_knowledge_category_reducer";
 import UpdateLandedCostReducer from "./update_landed_cost_reducer";
+import UpdateLeadReducer from "./update_lead_reducer";
 import UpdateLeadAddressReducer from "./update_lead_address_reducer";
 import UpdateLeadDetailsReducer from "./update_lead_details_reducer";
 import UpdateLeadLostReasonReducer from "./update_lead_lost_reason_reducer";
@@ -1188,6 +1197,7 @@ import UpdateSupplierIntakeReducer from "./update_supplier_intake_reducer";
 import UpdateTaskReducer from "./update_task_reducer";
 import UpdateTaskStateReducer from "./update_task_state_reducer";
 import UpdateTaxDeadlineReducer from "./update_tax_deadline_reducer";
+import UpdateTaxDeadlinesReducer from "./update_tax_deadlines_reducer";
 import UpdateTaxJurisdictionReducer from "./update_tax_jurisdiction_reducer";
 import UpdateTaxScheduleReducer from "./update_tax_schedule_reducer";
 import UpdateTicketReducer from "./update_ticket_reducer";
@@ -1265,6 +1275,9 @@ import AccountPeriodRow from "./account_period_table";
 import AccountReconciliationWidgetRow from "./account_reconciliation_widget_table";
 import AccountTaxRow from "./account_tax_table";
 import AccountTaxGroupRow from "./account_tax_group_table";
+import AccountingOperationReceiptRow from "./accounting_operation_receipt_table";
+import AccountingOwnershipBackfillIssueRow from "./accounting_ownership_backfill_issue_table";
+import AccountingOwnershipBackfillRunRow from "./accounting_ownership_backfill_run_table";
 import ActivityRow from "./activity_table";
 import ActivityTypeRow from "./activity_type_table";
 import AdjustmentReasonRow from "./adjustment_reason_table";
@@ -1324,6 +1337,8 @@ import ContactCategoryRow from "./contact_category_table";
 import ContactCategoryAssignmentRow from "./contact_category_assignment_table";
 import ContactCommunicationPreferenceRow from "./contact_communication_preference_table";
 import ContactDuplicateCandidateRow from "./contact_duplicate_candidate_table";
+import ContactIdentityVerificationAuthorityRow from "./contact_identity_verification_authority_table";
+import ContactIdentityVerificationProofRow from "./contact_identity_verification_proof_table";
 import ContactPhoneIdentityRow from "./contact_phone_identity_table";
 import ContactRelationshipRow from "./contact_relationship_table";
 import ContactRelationshipInsightRow from "./contact_relationship_insight_table";
@@ -1338,6 +1353,8 @@ import CountryPackTaxRuleRow from "./country_pack_tax_rule_table";
 import CrmConversationRow from "./crm_conversation_table";
 import CrmConversationMessageRow from "./crm_conversation_message_table";
 import CrmForecastSnapshotRow from "./crm_forecast_snapshot_table";
+import CrmProviderEventReceiptRow from "./crm_provider_event_receipt_table";
+import CrmProviderPrincipalRow from "./crm_provider_principal_table";
 import CrossoveredBudgetRow from "./crossovered_budget_table";
 import CrossoveredBudgetLinesRow from "./crossovered_budget_lines_table";
 import CurrencyRow from "./currency_table";
@@ -1356,6 +1373,7 @@ import DocumentRow from "./document_table";
 import DocumentExternalRefRow from "./document_external_ref_table";
 import DocumentLegalHoldRow from "./document_legal_hold_table";
 import DocumentPresenceRow from "./document_presence_table";
+import DocumentRetentionPurgeJobRow from "./document_retention_purge_job_table";
 import DocumentSequenceRow from "./document_sequence_table";
 import DocumentSignatureRequestRow from "./document_signature_request_table";
 import DocumentTemplateRow from "./document_template_table";
@@ -1373,6 +1391,7 @@ import FormRoleConfigRow from "./form_role_config_table";
 import FxRevaluationRunRow from "./fx_revaluation_run_table";
 import GeneratedOwnerReportRow from "./generated_owner_report_table";
 import GoogleDriveConnectionRow from "./google_drive_connection_table";
+import GuardedActionReceiptRow from "./guarded_action_receipt_table";
 import HelpdeskSlaRow from "./helpdesk_sla_table";
 import HelpdeskStageRow from "./helpdesk_stage_table";
 import HelpdeskTeamRow from "./helpdesk_team_table";
@@ -1472,6 +1491,7 @@ import OrganizationRow from "./organization_table";
 import OrganizationSettingsRow from "./organization_settings_table";
 import PackagingMaterialRow from "./packaging_material_table";
 import PartnerCreditControlRow from "./partner_credit_control_table";
+import PasswordResetTokenRow from "./password_reset_token_table";
 import PaymentAccountRow from "./payment_account_table";
 import PaymentFeeRow from "./payment_fee_table";
 import PaymentReconciliationRow from "./payment_reconciliation_table";
@@ -1549,6 +1569,8 @@ import QualityAlertReasonRow from "./quality_alert_reason_table";
 import QualityCheckRow from "./quality_check_table";
 import QualityPointRow from "./quality_point_table";
 import QualityTeamRow from "./quality_team_table";
+import QueueAttemptRow from "./queue_attempt_table";
+import QueueEffectReceiptRow from "./queue_effect_receipt_table";
 import QueueJobRow from "./queue_job_table";
 import QueueWorkerRow from "./queue_worker_table";
 import RecordCustomFieldValueRow from "./record_custom_field_value_table";
@@ -1572,6 +1594,7 @@ import SaleOrderLineRow from "./sale_order_line_table";
 import SaleOrderOptionRow from "./sale_order_option_table";
 import SalePromotionRow from "./sale_promotion_table";
 import SalesIntegrationIntentRow from "./sales_integration_intent_table";
+import SalesSlaEscalationJobRow from "./sales_sla_escalation_job_table";
 import SavedReportRow from "./saved_report_table";
 import ScheduledReportRow from "./scheduled_report_table";
 import ScheduledReportRunRow from "./scheduled_report_run_table";
@@ -1619,13 +1642,16 @@ import SubscriptionUsageEventRow from "./subscription_usage_event_table";
 import SupplierIntakeRequestRow from "./supplier_intake_request_table";
 import TaxDeadlineRow from "./tax_deadline_table";
 import TaxDeadlineReminderRow from "./tax_deadline_reminder_table";
+import TaxDeadlineStatusJobRow from "./tax_deadline_status_job_table";
 import TaxJurisdictionRow from "./tax_jurisdiction_table";
 import TaxScheduleRow from "./tax_schedule_table";
 import TrialBalanceRow from "./trial_balance_table";
 import UomRow from "./uom_table";
 import UomCatRow from "./uom_cat_table";
 import UomConversionRow from "./uom_conversion_table";
+import UserCredentialRow from "./user_credential_table";
 import UserCustomFieldRow from "./user_custom_field_table";
+import UserInviteRow from "./user_invite_table";
 import UserOrganizationRow from "./user_organization_table";
 import UserProfileRow from "./user_profile_table";
 import UserRoleAssignmentRow from "./user_role_assignment_table";
@@ -1641,9 +1667,34 @@ import WarehouseGeoRow from "./warehouse_geo_table";
 import WarehouseSyncIntentRow from "./warehouse_sync_intent_table";
 import WarehouseTaskRow from "./warehouse_task_table";
 import WhatsappBusinessAccountRow from "./whatsapp_business_account_table";
+import WorkflowRow from "./workflow_table";
+import WorkflowCalendarRow from "./workflow_calendar_table";
+import WorkflowCalendarExceptionRow from "./workflow_calendar_exception_table";
+import WorkflowCalendarVersionRow from "./workflow_calendar_version_table";
+import WorkflowCandidateGroupMemberRow from "./workflow_candidate_group_member_table";
+import WorkflowCommandReceiptRow from "./workflow_command_receipt_table";
+import WorkflowDecisionEventRow from "./workflow_decision_event_table";
+import WorkflowDelegationRow from "./workflow_delegation_table";
+import WorkflowDeliveryAttemptRow from "./workflow_delivery_attempt_table";
+import WorkflowDeliveryReceiptRow from "./workflow_delivery_receipt_table";
+import WorkflowEdgeRow from "./workflow_edge_table";
+import WorkflowForkRow from "./workflow_fork_table";
+import WorkflowHumanTaskRow from "./workflow_human_task_table";
+import WorkflowHumanTaskCandidateRow from "./workflow_human_task_candidate_table";
+import WorkflowHumanTaskEventRow from "./workflow_human_task_event_table";
+import WorkflowHumanTaskReceiptRow from "./workflow_human_task_receipt_table";
+import WorkflowInstanceRow from "./workflow_instance_table";
+import WorkflowJoinArrivalRow from "./workflow_join_arrival_table";
 import WorkflowMigrationInstanceResultRow from "./workflow_migration_instance_result_table";
 import WorkflowMigrationPlanRow from "./workflow_migration_plan_table";
 import WorkflowMigrationPreflightRow from "./workflow_migration_preflight_table";
+import WorkflowNodeRow from "./workflow_node_table";
+import WorkflowOutboxRow from "./workflow_outbox_table";
+import WorkflowSimulationResultRow from "./workflow_simulation_result_table";
+import WorkflowSimulationStepRow from "./workflow_simulation_step_table";
+import WorkflowTimerRow from "./workflow_timer_table";
+import WorkflowTokenRow from "./workflow_token_table";
+import WorkflowVersionRow from "./workflow_version_table";
 import WorkingCalendarRow from "./working_calendar_table";
 
 /** Type-only namespace exports for generated type groups. */
@@ -2178,6 +2229,47 @@ const tablesSchema = __schema({
       { name: 'account_tax_group_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AccountTaxGroupRow),
+  accounting_operation_receipt: __table({
+    name: 'accounting_operation_receipt',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'accounting_operation_receipt_by_scope', algorithm: 'btree', columns: [
+        'organizationId',
+        'companyId',
+        'actionKind',
+      ] },
+    ],
+    constraints: [
+      { name: 'accounting_operation_receipt_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AccountingOperationReceiptRow),
+  accounting_ownership_backfill_issue: __table({
+    name: 'accounting_ownership_backfill_issue',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'ownership_issue_by_table', algorithm: 'btree', columns: [
+        'tableName',
+      ] },
+    ],
+    constraints: [
+      { name: 'accounting_ownership_backfill_issue_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AccountingOwnershipBackfillIssueRow),
+  accounting_ownership_backfill_run: __table({
+    name: 'accounting_ownership_backfill_run',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'accounting_ownership_backfill_run_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AccountingOwnershipBackfillRunRow),
   activity: __table({
     name: 'activity',
     indexes: [
@@ -3259,6 +3351,34 @@ const tablesSchema = __schema({
       { name: 'contact_duplicate_candidate_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ContactDuplicateCandidateRow),
+  contact_identity_verification_authority: __table({
+    name: 'contact_identity_verification_authority',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'contact_identity_verification_authority_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ContactIdentityVerificationAuthorityRow),
+  contact_identity_verification_proof: __table({
+    name: 'contact_identity_verification_proof',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'contact_identity_proof_by_identity', algorithm: 'btree', columns: [
+        'identityId',
+      ] },
+      { name: 'contact_identity_proof_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'contact_identity_verification_proof_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ContactIdentityVerificationProofRow),
   contact_phone_identity: __table({
     name: 'contact_phone_identity',
     indexes: [
@@ -3472,6 +3592,43 @@ const tablesSchema = __schema({
       { name: 'crm_forecast_snapshot_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CrmForecastSnapshotRow),
+  crm_provider_event_receipt: __table({
+    name: 'crm_provider_event_receipt',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'crm_provider_event_receipt_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'crm_provider_event_receipt_by_account', algorithm: 'btree', columns: [
+        'providerAccountId',
+      ] },
+    ],
+    constraints: [
+      { name: 'crm_provider_event_receipt_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CrmProviderEventReceiptRow),
+  crm_provider_principal: __table({
+    name: 'crm_provider_principal',
+    indexes: [
+      { name: 'crm_provider_principal_by_executor', algorithm: 'btree', columns: [
+        'executorIdentity',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'crm_provider_principal_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'crm_provider_principal_by_account', algorithm: 'btree', columns: [
+        'providerAccountId',
+      ] },
+    ],
+    constraints: [
+      { name: 'crm_provider_principal_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CrmProviderPrincipalRow),
   crossovered_budget: __table({
     name: 'crossovered_budget',
     indexes: [
@@ -3784,6 +3941,17 @@ const tablesSchema = __schema({
       { name: 'document_presence_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, DocumentPresenceRow),
+  document_retention_purge_job: __table({
+    name: 'document_retention_purge_job',
+    indexes: [
+      { name: 'scheduled_id', algorithm: 'btree', columns: [
+        'scheduledId',
+      ] },
+    ],
+    constraints: [
+      { name: 'document_retention_purge_job_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
+    ],
+  }, DocumentRetentionPurgeJobRow),
   document_sequence: __table({
     name: 'document_sequence',
     indexes: [
@@ -4083,6 +4251,26 @@ const tablesSchema = __schema({
       { name: 'google_drive_connection_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, GoogleDriveConnectionRow),
+  guarded_action_receipt: __table({
+    name: 'guarded_action_receipt',
+    indexes: [
+      { name: 'guarded_action_receipt_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'guarded_action_receipt_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'guarded_action_receipt_by_subject', algorithm: 'btree', columns: [
+        'subjectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'guarded_action_receipt_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, GuardedActionReceiptRow),
   helpdesk_sla: __table({
     name: 'helpdesk_sla',
     indexes: [
@@ -5873,6 +6061,17 @@ const tablesSchema = __schema({
       { name: 'partner_credit_control_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PartnerCreditControlRow),
+  password_reset_token: __table({
+    name: 'password_reset_token',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'password_reset_token_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PasswordResetTokenRow),
   payment_account: __table({
     name: 'payment_account',
     indexes: [
@@ -7275,6 +7474,40 @@ const tablesSchema = __schema({
       { name: 'quality_team_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, QualityTeamRow),
+  queue_attempt: __table({
+    name: 'queue_attempt',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'queue_attempt_by_job', algorithm: 'btree', columns: [
+        'jobId',
+      ] },
+      { name: 'queue_attempt_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'queue_attempt_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, QueueAttemptRow),
+  queue_effect_receipt: __table({
+    name: 'queue_effect_receipt',
+    indexes: [
+      { name: 'queue_effect_receipt_by_job', algorithm: 'btree', columns: [
+        'jobId',
+      ] },
+      { name: 'queue_effect_receipt_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'scope_key', algorithm: 'btree', columns: [
+        'scopeKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'queue_effect_receipt_scope_key_key', constraint: 'unique', columns: ['scopeKey'] },
+    ],
+  }, QueueEffectReceiptRow),
   queue_job: __table({
     name: 'queue_job',
     indexes: [
@@ -7683,6 +7916,17 @@ const tablesSchema = __schema({
       { name: 'sales_integration_intent_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, SalesIntegrationIntentRow),
+  sales_sla_escalation_job: __table({
+    name: 'sales_sla_escalation_job',
+    indexes: [
+      { name: 'scheduled_id', algorithm: 'btree', columns: [
+        'scheduledId',
+      ] },
+    ],
+    constraints: [
+      { name: 'sales_sla_escalation_job_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
+    ],
+  }, SalesSlaEscalationJobRow),
   saved_report: __table({
     name: 'saved_report',
     indexes: [
@@ -8575,6 +8819,17 @@ const tablesSchema = __schema({
       { name: 'tax_deadline_reminder_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, TaxDeadlineReminderRow),
+  tax_deadline_status_job: __table({
+    name: 'tax_deadline_status_job',
+    indexes: [
+      { name: 'scheduled_id', algorithm: 'btree', columns: [
+        'scheduledId',
+      ] },
+    ],
+    constraints: [
+      { name: 'tax_deadline_status_job_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
+    ],
+  }, TaxDeadlineStatusJobRow),
   tax_jurisdiction: __table({
     name: 'tax_jurisdiction',
     indexes: [
@@ -8686,6 +8941,25 @@ const tablesSchema = __schema({
       { name: 'uom_conversion_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, UomConversionRow),
+  user_credential: __table({
+    name: 'user_credential',
+    indexes: [
+      { name: 'email', algorithm: 'btree', columns: [
+        'email',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'identity', algorithm: 'btree', columns: [
+        'identity',
+      ] },
+    ],
+    constraints: [
+      { name: 'user_credential_email_key', constraint: 'unique', columns: ['email'] },
+      { name: 'user_credential_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'user_credential_identity_key', constraint: 'unique', columns: ['identity'] },
+    ],
+  }, UserCredentialRow),
   user_custom_field: __table({
     name: 'user_custom_field',
     indexes: [
@@ -8706,6 +8980,17 @@ const tablesSchema = __schema({
       { name: 'user_custom_field_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, UserCustomFieldRow),
+  user_invite: __table({
+    name: 'user_invite',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'user_invite_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, UserInviteRow),
   user_organization: __table({
     name: 'user_organization',
     indexes: [
@@ -8955,6 +9240,366 @@ const tablesSchema = __schema({
       { name: 'whatsapp_business_account_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, WhatsappBusinessAccountRow),
+  workflow: __table({
+    name: 'workflow',
+    indexes: [
+      { name: 'workflow_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_by_model', algorithm: 'btree', columns: [
+        'model',
+      ] },
+      { name: 'workflow_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'workflow_by_key', algorithm: 'btree', columns: [
+        'workflowKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowRow),
+  workflow_calendar: __table({
+    name: 'workflow_calendar',
+    indexes: [
+      { name: 'workflow_calendar_by_key', algorithm: 'btree', columns: [
+        'calendarKey',
+      ] },
+      { name: 'workflow_calendar_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_calendar_by_organization', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_calendar_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowCalendarRow),
+  workflow_calendar_exception: __table({
+    name: 'workflow_calendar_exception',
+    indexes: [
+      { name: 'workflow_calendar_exception_by_version', algorithm: 'btree', columns: [
+        'calendarVersionId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_calendar_exception_by_date', algorithm: 'btree', columns: [
+        'localDateDays',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_calendar_exception_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowCalendarExceptionRow),
+  workflow_calendar_version: __table({
+    name: 'workflow_calendar_version',
+    indexes: [
+      { name: 'workflow_calendar_version_by_calendar', algorithm: 'btree', columns: [
+        'calendarId',
+      ] },
+      { name: 'workflow_calendar_version_by_hash', algorithm: 'btree', columns: [
+        'contentHash',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_calendar_version_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowCalendarVersionRow),
+  workflow_candidate_group_member: __table({
+    name: 'workflow_candidate_group_member',
+    indexes: [
+      { name: 'candidate_group_member_by_group', algorithm: 'btree', columns: [
+        'groupId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'candidate_group_member_by_identity', algorithm: 'btree', columns: [
+        'memberIdentity',
+      ] },
+      { name: 'candidate_group_member_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_candidate_group_member_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowCandidateGroupMemberRow),
+  workflow_command_receipt: __table({
+    name: 'workflow_command_receipt',
+    indexes: [
+      { name: 'workflow_receipt_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'workflow_receipt_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'workflow_receipt_by_instance', algorithm: 'btree', columns: [
+        'resultInstanceId',
+      ] },
+      { name: 'scope_key', algorithm: 'btree', columns: [
+        'scopeKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_command_receipt_scope_key_key', constraint: 'unique', columns: ['scopeKey'] },
+    ],
+  }, WorkflowCommandReceiptRow),
+  workflow_decision_event: __table({
+    name: 'workflow_decision_event',
+    indexes: [
+      { name: 'workflow_event_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_event_by_instance', algorithm: 'btree', columns: [
+        'instanceId',
+      ] },
+      { name: 'workflow_event_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'workflow_event_by_token', algorithm: 'btree', columns: [
+        'tokenId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_decision_event_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowDecisionEventRow),
+  workflow_delegation: __table({
+    name: 'workflow_delegation',
+    indexes: [
+      { name: 'workflow_delegation_by_delegatee', algorithm: 'btree', columns: [
+        'delegateeIdentity',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_delegation_by_company', algorithm: 'btree', columns: [
+        'organizationId',
+        'companyId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_delegation_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowDelegationRow),
+  workflow_delivery_attempt: __table({
+    name: 'workflow_delivery_attempt',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_delivery_attempt_by_object', algorithm: 'btree', columns: [
+        'objectId',
+      ] },
+      { name: 'workflow_delivery_attempt_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_delivery_attempt_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowDeliveryAttemptRow),
+  workflow_delivery_receipt: __table({
+    name: 'workflow_delivery_receipt',
+    indexes: [
+      { name: 'workflow_delivery_receipt_by_object', algorithm: 'btree', columns: [
+        'objectId',
+      ] },
+      { name: 'workflow_delivery_receipt_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'scope_key', algorithm: 'btree', columns: [
+        'scopeKey',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_delivery_receipt_scope_key_key', constraint: 'unique', columns: ['scopeKey'] },
+    ],
+  }, WorkflowDeliveryReceiptRow),
+  workflow_edge: __table({
+    name: 'workflow_edge',
+    indexes: [
+      { name: 'workflow_edge_by_from', algorithm: 'btree', columns: [
+        'fromNodeKey',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_edge_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'workflow_edge_by_to', algorithm: 'btree', columns: [
+        'toNodeKey',
+      ] },
+      { name: 'workflow_edge_by_version', algorithm: 'btree', columns: [
+        'workflowVersionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_edge_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowEdgeRow),
+  workflow_fork: __table({
+    name: 'workflow_fork',
+    indexes: [
+      { name: 'workflow_fork_by_node', algorithm: 'btree', columns: [
+        'forkNodeKey',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_fork_by_instance', algorithm: 'btree', columns: [
+        'instanceId',
+      ] },
+      { name: 'workflow_fork_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_fork_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowForkRow),
+  workflow_human_task: __table({
+    name: 'workflow_human_task',
+    indexes: [
+      { name: 'human_task_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'human_task_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'human_task_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+      { name: 'human_task_by_token', algorithm: 'btree', columns: [
+        'tokenId',
+      ] },
+      { name: 'human_task_by_instance', algorithm: 'btree', columns: [
+        'workflowInstanceId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_human_task_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowHumanTaskRow),
+  workflow_human_task_candidate: __table({
+    name: 'workflow_human_task_candidate',
+    indexes: [
+      { name: 'human_task_candidate_by_identity', algorithm: 'btree', columns: [
+        'candidateIdentity',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'human_task_candidate_by_task', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_human_task_candidate_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowHumanTaskCandidateRow),
+  workflow_human_task_event: __table({
+    name: 'workflow_human_task_event',
+    indexes: [
+      { name: 'human_task_event_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'human_task_event_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'human_task_event_by_task', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+      { name: 'human_task_event_by_instance', algorithm: 'btree', columns: [
+        'workflowInstanceId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_human_task_event_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowHumanTaskEventRow),
+  workflow_human_task_receipt: __table({
+    name: 'workflow_human_task_receipt',
+    indexes: [
+      { name: 'scope_key', algorithm: 'btree', columns: [
+        'scopeKey',
+      ] },
+      { name: 'human_task_receipt_by_task', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_human_task_receipt_scope_key_key', constraint: 'unique', columns: ['scopeKey'] },
+    ],
+  }, WorkflowHumanTaskReceiptRow),
+  workflow_instance: __table({
+    name: 'workflow_instance',
+    indexes: [
+      { name: 'instance_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'instance_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'instance_by_subject', algorithm: 'btree', columns: [
+        'subjectId',
+      ] },
+      { name: 'instance_by_workflow', algorithm: 'btree', columns: [
+        'workflowId',
+      ] },
+      { name: 'instance_by_version', algorithm: 'btree', columns: [
+        'workflowVersionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_instance_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowInstanceRow),
+  workflow_join_arrival: __table({
+    name: 'workflow_join_arrival',
+    indexes: [
+      { name: 'workflow_join_arrival_by_fork', algorithm: 'btree', columns: [
+        'forkId',
+      ] },
+      { name: 'workflow_join_arrival_by_unique', algorithm: 'btree', columns: [
+        'forkId',
+        'joinNodeKey',
+        'branchKey',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_join_arrival_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowJoinArrivalRow),
   workflow_migration_instance_result: __table({
     name: 'workflow_migration_instance_result',
     indexes: [
@@ -9012,6 +9657,164 @@ const tablesSchema = __schema({
       { name: 'workflow_migration_preflight_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, WorkflowMigrationPreflightRow),
+  workflow_node: __table({
+    name: 'workflow_node',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_node_by_key', algorithm: 'btree', columns: [
+        'nodeKey',
+      ] },
+      { name: 'workflow_node_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'workflow_node_by_version', algorithm: 'btree', columns: [
+        'workflowVersionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_node_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowNodeRow),
+  workflow_outbox: __table({
+    name: 'workflow_outbox',
+    indexes: [
+      { name: 'workflow_outbox_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_outbox_by_instance', algorithm: 'btree', columns: [
+        'instanceId',
+      ] },
+      { name: 'workflow_outbox_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'workflow_outbox_by_queue_job', algorithm: 'btree', columns: [
+        'queueJobId',
+      ] },
+      { name: 'workflow_outbox_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_outbox_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowOutboxRow),
+  workflow_simulation_result: __table({
+    name: 'workflow_simulation_result',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_simulation_result_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'workflow_simulation_result_by_key', algorithm: 'btree', columns: [
+        'simulationKey',
+      ] },
+      { name: 'workflow_simulation_result_by_version', algorithm: 'btree', columns: [
+        'workflowVersionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_simulation_result_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowSimulationResultRow),
+  workflow_simulation_step: __table({
+    name: 'workflow_simulation_step',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_simulation_step_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'workflow_simulation_step_by_result', algorithm: 'btree', columns: [
+        'simulationResultId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_simulation_step_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowSimulationStepRow),
+  workflow_timer: __table({
+    name: 'workflow_timer',
+    indexes: [
+      { name: 'workflow_timer_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'workflow_timer_by_due_at', algorithm: 'btree', columns: [
+        'dueAt',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_timer_by_instance', algorithm: 'btree', columns: [
+        'instanceId',
+      ] },
+      { name: 'workflow_timer_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'workflow_timer_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_timer_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowTimerRow),
+  workflow_token: __table({
+    name: 'workflow_token',
+    indexes: [
+      { name: 'workflow_token_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_token_by_instance', algorithm: 'btree', columns: [
+        'instanceId',
+      ] },
+      { name: 'workflow_token_by_node', algorithm: 'btree', columns: [
+        'nodeId',
+      ] },
+      { name: 'workflow_token_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'workflow_token_by_state', algorithm: 'btree', columns: [
+        'state',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_token_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowTokenRow),
+  workflow_version: __table({
+    name: 'workflow_version',
+    indexes: [
+      { name: 'workflow_version_by_company', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'workflow_version_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+      { name: 'workflow_version_by_status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+      { name: 'workflow_version_by_workflow', algorithm: 'btree', columns: [
+        'workflowId',
+      ] },
+    ],
+    constraints: [
+      { name: 'workflow_version_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, WorkflowVersionRow),
   working_calendar: __table({
     name: 'working_calendar',
     indexes: [
@@ -9203,6 +10006,7 @@ const reducersSchema = __reducers(
   __reducerSchema("compute_purchase_order_line_totals", ComputePurchaseOrderLineTotalsReducer),
   __reducerSchema("compute_purchase_order_totals", ComputePurchaseOrderTotalsReducer),
   __reducerSchema("compute_so_totals", ComputeSoTotalsReducer),
+  __reducerSchema("configure_contact_identity_verification_authority", ConfigureContactIdentityVerificationAuthorityReducer),
   __reducerSchema("confirm_account_asset", ConfirmAccountAssetReducer),
   __reducerSchema("confirm_budget", ConfirmBudgetReducer),
   __reducerSchema("confirm_manufacturing_order", ConfirmManufacturingOrderReducer),
@@ -9475,6 +10279,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_workflow_migration_plan", CreateWorkflowMigrationPlanReducer),
   __reducerSchema("create_working_calendar", CreateWorkingCalendarReducer),
   __reducerSchema("create_workorder", CreateWorkorderReducer),
+  __reducerSchema("crm_integrity_inventory", CrmIntegrityInventoryReducer),
   __reducerSchema("deactivate_pos_config", DeactivatePosConfigReducer),
   __reducerSchema("deactivate_revenue_recognition_rule", DeactivateRevenueRecognitionRuleReducer),
   __reducerSchema("deactivate_subscription_plan", DeactivateSubscriptionPlanReducer),
@@ -9722,6 +10527,7 @@ const reducersSchema = __reducers(
   __reducerSchema("rate_subscription_usage_events", RateSubscriptionUsageEventsReducer),
   __reducerSchema("rebase_deferred_schedules_for_subscription", RebaseDeferredSchedulesForSubscriptionReducer),
   __reducerSchema("receive_consignment_stock", ReceiveConsignmentStockReducer),
+  __reducerSchema("receive_crm_provider_message", ReceiveCrmProviderMessageReducer),
   __reducerSchema("receive_po_line", ReceivePoLineReducer),
   __reducerSchema("recognize_amortization_line", RecognizeAmortizationLineReducer),
   __reducerSchema("recognize_deferred_revenue", RecognizeDeferredRevenueReducer),
@@ -9734,6 +10540,8 @@ const reducersSchema = __reducers(
   __reducerSchema("record_ai_agent_run_policy_snapshot", RecordAiAgentRunPolicySnapshotReducer),
   __reducerSchema("record_ai_spend", RecordAiSpendReducer),
   __reducerSchema("record_barcode_scan", RecordBarcodeScanReducer),
+  __reducerSchema("record_contact_identity_verification_proof", RecordContactIdentityVerificationProofReducer),
+  __reducerSchema("record_crm_provider_delivery", RecordCrmProviderDeliveryReducer),
   __reducerSchema("record_cycle_count_line", RecordCycleCountLineReducer),
   __reducerSchema("record_document_view", RecordDocumentViewReducer),
   __reducerSchema("record_generated_owner_report", RecordGeneratedOwnerReportReducer),
@@ -9768,6 +10576,7 @@ const reducersSchema = __reducers(
   __reducerSchema("refuse_expense_sheet", RefuseExpenseSheetReducer),
   __reducerSchema("refuse_leave", RefuseLeaveReducer),
   __reducerSchema("register_ai_skill_certification_runtime_profile", RegisterAiSkillCertificationRuntimeProfileReducer),
+  __reducerSchema("register_crm_provider_principal", RegisterCrmProviderPrincipalReducer),
   __reducerSchema("register_iot_device", RegisterIotDeviceReducer),
   __reducerSchema("register_iot_hub", RegisterIotHubReducer),
   __reducerSchema("register_payment_on_invoice", RegisterPaymentOnInvoiceReducer),
@@ -9862,6 +10671,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_crm_opportunity_convert_test", RunCrmOpportunityConvertTestReducer),
   __reducerSchema("run_crm_relationship_admin_test", RunCrmRelationshipAdminTestReducer),
   __reducerSchema("run_crm_wave_2_test", RunCrmWave2TestReducer),
+  __reducerSchema("run_document_retention_purge", RunDocumentRetentionPurgeReducer),
   __reducerSchema("run_documents_folder_test", RunDocumentsFolderTestReducer),
   __reducerSchema("run_documents_wave_a_tests", RunDocumentsWaveATestsReducer),
   __reducerSchema("run_documents_wave_b_tests", RunDocumentsWaveBTestsReducer),
@@ -9950,6 +10760,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_sales_order_update_test", RunSalesOrderUpdateTestReducer),
   __reducerSchema("run_sales_pricelist_apply_test", RunSalesPricelistApplyTestReducer),
   __reducerSchema("run_sales_send_quotation_test", RunSalesSendQuotationTestReducer),
+  __reducerSchema("run_sales_sla_escalation", RunSalesSlaEscalationReducer),
   __reducerSchema("run_subscription_plan_test", RunSubscriptionPlanTestReducer),
   __reducerSchema("run_subscriptions_wave_a_test", RunSubscriptionsWaveATestReducer),
   __reducerSchema("run_subscriptions_wave_b_test", RunSubscriptionsWaveBTestReducer),
@@ -10122,6 +10933,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_knowledge_article_presence", UpdateKnowledgeArticlePresenceReducer),
   __reducerSchema("update_knowledge_category", UpdateKnowledgeCategoryReducer),
   __reducerSchema("update_landed_cost", UpdateLandedCostReducer),
+  __reducerSchema("update_lead", UpdateLeadReducer),
   __reducerSchema("update_lead_address", UpdateLeadAddressReducer),
   __reducerSchema("update_lead_details", UpdateLeadDetailsReducer),
   __reducerSchema("update_lead_lost_reason", UpdateLeadLostReasonReducer),
@@ -10190,6 +11002,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_task", UpdateTaskReducer),
   __reducerSchema("update_task_state", UpdateTaskStateReducer),
   __reducerSchema("update_tax_deadline", UpdateTaxDeadlineReducer),
+  __reducerSchema("update_tax_deadlines", UpdateTaxDeadlinesReducer),
   __reducerSchema("update_tax_jurisdiction", UpdateTaxJurisdictionReducer),
   __reducerSchema("update_tax_schedule", UpdateTaxScheduleReducer),
   __reducerSchema("update_ticket", UpdateTicketReducer),

@@ -2808,6 +2808,32 @@ export const ContactIdentityKind = __t.enum("ContactIdentityKind", {
 });
 export type ContactIdentityKind = __Infer<typeof ContactIdentityKind>;
 
+export const ContactIdentityVerificationAuthority = __t.object("ContactIdentityVerificationAuthority", {
+  id: __t.u8(),
+  issuerIdentity: __t.identity(),
+  configuredBy: __t.identity(),
+  configuredAt: __t.timestamp(),
+});
+export type ContactIdentityVerificationAuthority = __Infer<typeof ContactIdentityVerificationAuthority>;
+
+export const ContactIdentityVerificationProof = __t.object("ContactIdentityVerificationProof", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  contactId: __t.u64(),
+  identityId: __t.u64(),
+  normalizedE164: __t.string(),
+  method: __t.string(),
+  provider: __t.string(),
+  providerReference: __t.string(),
+  evidenceHash: __t.string(),
+  issuedAt: __t.timestamp(),
+  expiresAt: __t.timestamp(),
+  recordedBy: __t.identity(),
+  recordedAt: __t.timestamp(),
+});
+export type ContactIdentityVerificationProof = __Infer<typeof ContactIdentityVerificationProof>;
+
 export const ContactPhoneIdentity = __t.object("ContactPhoneIdentity", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -2834,6 +2860,7 @@ export type ContactPhoneIdentity = __Infer<typeof ContactPhoneIdentity>;
 export const ContactRelationship = __t.object("ContactRelationship", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   leftContactId: __t.u64(),
   rightContactId: __t.u64(),
   relationshipType: __t.string(),
@@ -2850,6 +2877,7 @@ export type ContactRelationship = __Infer<typeof ContactRelationship>;
 export const ContactRelationshipInsight = __t.object("ContactRelationshipInsight", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   contactId: __t.u64(),
   strengthScore: __t.i32(),
   activeRelationshipCount: __t.i32(),
@@ -2928,6 +2956,7 @@ export type ContactTag = __Infer<typeof ContactTag>;
 export const ContactTagAssignment = __t.object("ContactTagAssignment", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   contactId: __t.u64(),
   tagId: __t.u64(),
   assignedAt: __t.timestamp(),
@@ -7130,10 +7159,12 @@ export type CreateWorkorderParams = __Infer<typeof CreateWorkorderParams>;
 export const CrmConversation = __t.object("CrmConversation", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   contactId: __t.u64(),
   get channel() {
     return MessageChannel;
   },
+  providerAccountId: __t.option(__t.u64()),
   phoneIdentityId: __t.option(__t.u64()),
   status: __t.string(),
   assignedUserId: __t.option(__t.identity()),
@@ -7150,6 +7181,7 @@ export type CrmConversation = __Infer<typeof CrmConversation>;
 export const CrmConversationMessage = __t.object("CrmConversationMessage", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   conversationId: __t.u64(),
   direction: __t.string(),
   body: __t.string(),
@@ -7176,6 +7208,32 @@ export const CrmForecastSnapshot = __t.object("CrmForecastSnapshot", {
   metadata: __t.option(__t.string()),
 });
 export type CrmForecastSnapshot = __Infer<typeof CrmForecastSnapshot>;
+
+export const CrmProviderEventReceipt = __t.object("CrmProviderEventReceipt", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  providerAccountId: __t.u64(),
+  providerEventId: __t.string(),
+  eventFingerprint: __t.string(),
+  eventKind: __t.string(),
+  conversationId: __t.u64(),
+  conversationMessageId: __t.u64(),
+  receivedAt: __t.timestamp(),
+  receivedBy: __t.identity(),
+});
+export type CrmProviderEventReceipt = __Infer<typeof CrmProviderEventReceipt>;
+
+export const CrmProviderPrincipal = __t.object("CrmProviderPrincipal", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  providerAccountId: __t.u64(),
+  executorIdentity: __t.identity(),
+  isActive: __t.bool(),
+  registeredBy: __t.identity(),
+  registeredAt: __t.timestamp(),
+  retiredAt: __t.option(__t.timestamp()),
+});
+export type CrmProviderPrincipal = __Infer<typeof CrmProviderPrincipal>;
 
 export const CrossoveredBudget = __t.object("CrossoveredBudget", {
   id: __t.u64(),
@@ -10590,6 +10648,7 @@ export type Opportunity = __Infer<typeof Opportunity>;
 export const OpportunityLine = __t.object("OpportunityLine", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   opportunityId: __t.u64(),
   productId: __t.option(__t.u64()),
   name: __t.string(),
@@ -10608,6 +10667,7 @@ export type OpportunityLine = __Infer<typeof OpportunityLine>;
 export const OpportunityPresence = __t.object("OpportunityPresence", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   opportunityId: __t.u64(),
   userId: __t.identity(),
   userName: __t.string(),
@@ -11486,6 +11546,7 @@ export type PricelistAppliedOn = __Infer<typeof PricelistAppliedOn>;
 export const PrivacyConsent = __t.object("PrivacyConsent", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   contactId: __t.u64(),
   consentType: __t.string(),
   granted: __t.bool(),
@@ -13093,6 +13154,18 @@ export const ReceiveConsignmentStockParams = __t.object("ReceiveConsignmentStock
 });
 export type ReceiveConsignmentStockParams = __Infer<typeof ReceiveConsignmentStockParams>;
 
+export const ReceiveCrmProviderMessageParams = __t.object("ReceiveCrmProviderMessageParams", {
+  providerAccountId: __t.u64(),
+  providerEventId: __t.string(),
+  eventFingerprint: __t.string(),
+  contactId: __t.u64(),
+  phoneIdentityId: __t.u64(),
+  externalThreadId: __t.string(),
+  providerMessageId: __t.string(),
+  body: __t.string(),
+});
+export type ReceiveCrmProviderMessageParams = __Infer<typeof ReceiveCrmProviderMessageParams>;
+
 export const RecognizeAmortizationLineParams = __t.object("RecognizeAmortizationLineParams", {
   reference: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
@@ -13138,6 +13211,33 @@ export const RecordBarcodeScanParams = __t.object("RecordBarcodeScanParams", {
   metadata: __t.option(__t.string()),
 });
 export type RecordBarcodeScanParams = __Infer<typeof RecordBarcodeScanParams>;
+
+export const RecordContactIdentityVerificationProofParams = __t.object("RecordContactIdentityVerificationProofParams", {
+  identityId: __t.u64(),
+  contactId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  normalizedE164: __t.string(),
+  method: __t.string(),
+  provider: __t.string(),
+  providerReference: __t.string(),
+  evidenceHash: __t.string(),
+  issuedAtMicros: __t.i64(),
+  expiresAtMicros: __t.i64(),
+});
+export type RecordContactIdentityVerificationProofParams = __Infer<typeof RecordContactIdentityVerificationProofParams>;
+
+export const RecordCrmProviderDeliveryParams = __t.object("RecordCrmProviderDeliveryParams", {
+  providerAccountId: __t.u64(),
+  eventFingerprint: __t.string(),
+  conversationId: __t.u64(),
+  conversationMessageId: __t.u64(),
+  providerEventId: __t.string(),
+  providerMessageId: __t.string(),
+  operationalMessageId: __t.u64(),
+  status: __t.string(),
+  failureReason: __t.option(__t.string()),
+});
+export type RecordCrmProviderDeliveryParams = __Infer<typeof RecordCrmProviderDeliveryParams>;
 
 export const RecordCustomFieldEntry = __t.object("RecordCustomFieldEntry", {
   fieldKey: __t.string(),
@@ -13342,6 +13442,12 @@ export const RegisterAiSkillCertificationRuntimeProfileParams = __t.object("Regi
   metadata: __t.option(__t.string()),
 });
 export type RegisterAiSkillCertificationRuntimeProfileParams = __Infer<typeof RegisterAiSkillCertificationRuntimeProfileParams>;
+
+export const RegisterCrmProviderPrincipalParams = __t.object("RegisterCrmProviderPrincipalParams", {
+  providerAccountId: __t.u64(),
+  executorIdentity: __t.identity(),
+});
+export type RegisterCrmProviderPrincipalParams = __Infer<typeof RegisterCrmProviderPrincipalParams>;
 
 export const RegisterDeviceParams = __t.object("RegisterDeviceParams", {
   name: __t.string(),
@@ -14248,6 +14354,7 @@ export type SeedStatutoryExpenseMileageRatesParams = __Infer<typeof SeedStatutor
 export const SegmentMember = __t.object("SegmentMember", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   segmentId: __t.u64(),
   contactId: __t.u64(),
   addedAt: __t.timestamp(),
@@ -16373,21 +16480,21 @@ export const UpdateConsolidationAccountParams = __t.object("UpdateConsolidationA
 export type UpdateConsolidationAccountParams = __Infer<typeof UpdateConsolidationAccountParams>;
 
 export const UpdateContactAddressParams = __t.object("UpdateContactAddressParams", {
-  street: __t.option(__t.string()),
-  street2: __t.option(__t.string()),
-  city: __t.option(__t.string()),
-  stateCode: __t.option(__t.string()),
-  zip: __t.option(__t.string()),
-  countryCode: __t.option(__t.string()),
+  street: __t.option(__t.option(__t.string())),
+  street2: __t.option(__t.option(__t.string())),
+  city: __t.option(__t.option(__t.string())),
+  stateCode: __t.option(__t.option(__t.string())),
+  zip: __t.option(__t.option(__t.string())),
+  countryCode: __t.option(__t.option(__t.string())),
 });
 export type UpdateContactAddressParams = __Infer<typeof UpdateContactAddressParams>;
 
 export const UpdateContactBusinessParams = __t.object("UpdateContactBusinessParams", {
-  taxId: __t.option(__t.string()),
-  companyRegistry: __t.option(__t.string()),
-  industry: __t.option(__t.string()),
-  employeesCount: __t.option(__t.i32()),
-  annualRevenue: __t.option(__t.f64()),
+  taxId: __t.option(__t.option(__t.string())),
+  companyRegistry: __t.option(__t.option(__t.string())),
+  industry: __t.option(__t.option(__t.string())),
+  employeesCount: __t.option(__t.option(__t.i32())),
+  annualRevenue: __t.option(__t.option(__t.f64())),
 });
 export type UpdateContactBusinessParams = __Infer<typeof UpdateContactBusinessParams>;
 
@@ -16405,14 +16512,14 @@ export const UpdateContactCoreParams = __t.object("UpdateContactCoreParams", {
 export type UpdateContactCoreParams = __Infer<typeof UpdateContactCoreParams>;
 
 export const UpdateContactDetailsParams = __t.object("UpdateContactDetailsParams", {
-  firstName: __t.option(__t.string()),
-  lastName: __t.option(__t.string()),
-  title: __t.option(__t.string()),
-  emailSecondary: __t.option(__t.string()),
-  fax: __t.option(__t.string()),
-  website: __t.option(__t.string()),
-  description: __t.option(__t.string()),
-  color: __t.option(__t.string()),
+  firstName: __t.option(__t.option(__t.string())),
+  lastName: __t.option(__t.option(__t.string())),
+  title: __t.option(__t.option(__t.string())),
+  emailSecondary: __t.option(__t.option(__t.string())),
+  fax: __t.option(__t.option(__t.string())),
+  website: __t.option(__t.option(__t.string())),
+  description: __t.option(__t.option(__t.string())),
+  color: __t.option(__t.option(__t.string())),
 });
 export type UpdateContactDetailsParams = __Infer<typeof UpdateContactDetailsParams>;
 
@@ -16741,6 +16848,22 @@ export const UpdateLeadLostReasonParams = __t.object("UpdateLeadLostReasonParams
   metadata: __t.option(__t.string()),
 });
 export type UpdateLeadLostReasonParams = __Infer<typeof UpdateLeadLostReasonParams>;
+
+export const UpdateLeadParams = __t.object("UpdateLeadParams", {
+  contactName: __t.option(__t.option(__t.string())),
+  title: __t.option(__t.option(__t.string())),
+  website: __t.option(__t.option(__t.string())),
+  industry: __t.option(__t.option(__t.string())),
+  referredBy: __t.option(__t.option(__t.string())),
+  description: __t.option(__t.option(__t.string())),
+  street: __t.option(__t.option(__t.string())),
+  city: __t.option(__t.option(__t.string())),
+  zip: __t.option(__t.option(__t.string())),
+  countryCode: __t.option(__t.option(__t.string())),
+  expectedRevenue: __t.option(__t.f64()),
+  probability: __t.option(__t.f64()),
+});
+export type UpdateLeadParams = __Infer<typeof UpdateLeadParams>;
 
 export const UpdateLeadRevenueParams = __t.object("UpdateLeadRevenueParams", {
   expectedRevenue: __t.f64(),

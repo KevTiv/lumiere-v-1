@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct CrmConversationMessage {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub conversation_id: u64,
     pub direction: String,
     pub body: String,
@@ -30,6 +31,7 @@ impl __sdk::InModule for CrmConversationMessage {
 pub struct CrmConversationMessageCols {
     pub id: __sdk::__query_builder::Col<CrmConversationMessage, u64>,
     pub organization_id: __sdk::__query_builder::Col<CrmConversationMessage, u64>,
+    pub company_id: __sdk::__query_builder::Col<CrmConversationMessage, u64>,
     pub conversation_id: __sdk::__query_builder::Col<CrmConversationMessage, u64>,
     pub direction: __sdk::__query_builder::Col<CrmConversationMessage, String>,
     pub body: __sdk::__query_builder::Col<CrmConversationMessage, String>,
@@ -47,6 +49,7 @@ impl __sdk::__query_builder::HasCols for CrmConversationMessage {
         CrmConversationMessageCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             conversation_id: __sdk::__query_builder::Col::new(table_name, "conversation_id"),
             direction: __sdk::__query_builder::Col::new(table_name, "direction"),
             body: __sdk::__query_builder::Col::new(table_name, "body"),

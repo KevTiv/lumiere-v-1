@@ -80,7 +80,7 @@ async fn leads_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
-    let client = state.client_with_token(&session.stdb_token);
+    let client = state.stdb.clone();
     let mut rows = execute_resource_query(
         &client,
         "leads",
@@ -183,11 +183,31 @@ async fn lead_get(
     let lead_id: u64 = id
         .parse()
         .map_err(|_| ApiError::BadRequest("Invalid lead ID".into()))?;
-    let client = state.client_with_token(&session.stdb_token);
+    let client = state.stdb.clone();
     let lead = query_lead_by_id(&client, lead_id, org_id, session.field_access.as_ref())
         .await?
         .ok_or_else(|| ApiError::NotFound("Lead not found".into()))?;
     Ok(Json(json!({ "data": lead })))
+}
+
+/// Copies `body[camel_key]` into `out[snake_key]` only when the key is present
+/// in the request body (regardless of whether its value is `null`).
+///
+/// This preserves the reducer's explicit patch contract end to end: a key
+/// missing from `out` deserializes as the Rust side's outer `None` (field
+/// untouched); a key present with JSON `null` deserializes as an explicit
+/// clear; a key present with a value replaces it. Never fill in a default for
+/// an absent field — that is exactly the CRM-RI-003 bug (omitted siblings
+/// getting cleared) this atomic reducer removes.
+fn copy_patch_field(
+    out: &mut serde_json::Map<String, Value>,
+    body: &serde_json::Map<String, Value>,
+    camel_key: &str,
+    snake_key: &str,
+) {
+    if let Some(v) = body.get(camel_key) {
+        out.insert(snake_key.to_string(), v.clone());
+    }
 }
 
 async fn lead_put(
@@ -208,86 +228,32 @@ async fn lead_put(
         .as_object()
         .ok_or_else(|| ApiError::BadRequest("Invalid body".into()))?;
 
-    let has_details = b.contains_key("contactName")
-        || b.contains_key("title")
-        || b.contains_key("website")
-        || b.contains_key("industry")
-        || b.contains_key("referredBy")
-        || b.contains_key("description");
-    let has_address = b.contains_key("street")
-        || b.contains_key("city")
-        || b.contains_key("zip")
-        || b.contains_key("countryCode");
-    let has_revenue = b.contains_key("expectedRevenue") || b.contains_key("probability");
+    let mut params = serde_json::Map::new();
+    copy_patch_field(&mut params, b, "contactName", "contact_name");
+    copy_patch_field(&mut params, b, "title", "title");
+    copy_patch_field(&mut params, b, "website", "website");
+    copy_patch_field(&mut params, b, "industry", "industry");
+    copy_patch_field(&mut params, b, "referredBy", "referred_by");
+    copy_patch_field(&mut params, b, "description", "description");
+    copy_patch_field(&mut params, b, "street", "street");
+    copy_patch_field(&mut params, b, "city", "city");
+    copy_patch_field(&mut params, b, "zip", "zip");
+    copy_patch_field(&mut params, b, "countryCode", "country_code");
+    copy_patch_field(&mut params, b, "expectedRevenue", "expected_revenue");
+    copy_patch_field(&mut params, b, "probability", "probability");
 
-    if !has_details && !has_address && !has_revenue {
+    if params.is_empty() {
         return Err(ApiError::BadRequest("No valid fields to update".into()));
     }
 
     let client = state.client_with_token(&session.stdb_token);
-
-    let params_details = if has_details {
-        Some(json!({
-            "contact_name": b.get("contactName").and_then(|v| v.as_str()),
-            "title": b.get("title").and_then(|v| v.as_str()),
-            "website": b.get("website").and_then(|v| v.as_str()),
-            "industry": b.get("industry").and_then(|v| v.as_str()),
-            "referred_by": b.get("referredBy").and_then(|v| v.as_str()),
-            "description": b.get("description").and_then(|v| v.as_str()),
-        }))
-    } else {
-        None
-    };
-    let params_address = if has_address {
-        Some(json!({
-            "street": b.get("street").and_then(|v| v.as_str()),
-            "city": b.get("city").and_then(|v| v.as_str()),
-            "zip": b.get("zip").and_then(|v| v.as_str()),
-            "country_code": b.get("countryCode").and_then(|v| v.as_str()),
-        }))
-    } else {
-        None
-    };
-    let params_revenue = if has_revenue {
-        Some(json!({
-            "expected_revenue": b.get("expectedRevenue").and_then(|v| v.as_f64()),
-            "probability": b.get("probability").and_then(|v| v.as_f64()),
-        }))
-    } else {
-        None
-    };
-
-    let c1 = client.clone();
-    let c2 = client.clone();
-    let c3 = client.clone();
-    let lid = lead_id;
-
-    let f1 = async {
-        if let Some(p) = params_details {
-            c1.call_reducer("update_lead_details", json!([org_id, lid, p]))
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
-        }
-        Ok::<(), ApiError>(())
-    };
-    let f2 = async {
-        if let Some(p) = params_address {
-            c2.call_reducer("update_lead_address", json!([org_id, lid, p]))
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
-        }
-        Ok::<(), ApiError>(())
-    };
-    let f3 = async {
-        if let Some(p) = params_revenue {
-            c3.call_reducer("update_lead_revenue", json!([org_id, lid, p]))
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
-        }
-        Ok::<(), ApiError>(())
-    };
-
-    tokio::try_join!(f1, f2, f3)?;
+    client
+        .call_reducer(
+            "update_lead",
+            json!([org_id, lead_id, Value::Object(params)]),
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(
         json!({ "data": { "message": "Lead updated successfully" } }),
@@ -376,7 +342,7 @@ async fn contacts_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
-    let client = state.client_with_token(&session.stdb_token);
+    let client = state.stdb.clone();
     let mut rows = execute_resource_query(
         &client,
         "contacts",
@@ -561,7 +527,7 @@ async fn contact_identities_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
-    let client = state.client_with_token(&session.stdb_token);
+    let client = state.stdb.clone();
     let rows = execute_resource_query(
         &client,
         "contact-phone-identities",
@@ -687,7 +653,7 @@ async fn contact_roles_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
-    let client = state.client_with_token(&session.stdb_token);
+    let client = state.stdb.clone();
     let rows = execute_resource_query(
         &client,
         "contact-role-assignments",

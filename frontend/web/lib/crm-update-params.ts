@@ -3,15 +3,15 @@
  */
 
 import type {
+  UpdateContactCoreParams,
+  UpdateOpportunityParams,
+} from "@lumiere/stdb/types"
+import type {
   UpdateContactAddressParams,
   UpdateContactBusinessParams,
   UpdateContactDetailsParams,
-  UpdateContactCoreParams,
-  UpdateLeadAddressParams,
-  UpdateLeadDetailsParams,
-  UpdateLeadRevenueParams,
-  UpdateOpportunityParams,
-} from "@lumiere/stdb/types"
+  UpdateLeadParams,
+} from "@lumiere/query-hooks/hooks/crm-params-merge"
 import type { Timestamp } from "spacetimedb"
 
 import { optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
@@ -189,9 +189,10 @@ export function toUpdateContactDetailsParams(
   return Object.keys(out).length > 0 ? out : null
 }
 
+/** Scoped to the "Edit Lead Details" modal's fields; feeds into `useUpdateLead` (CRM-RI-004). */
 export function toUpdateLeadDetailsParams(
   formData: Record<string, unknown>,
-): Partial<UpdateLeadDetailsParams> | null {
+): Partial<UpdateLeadParams> | null {
   const out = patchFromForm(formData, [
     "contactName",
     "title",
@@ -199,25 +200,27 @@ export function toUpdateLeadDetailsParams(
     "industry",
     "referredBy",
     "description",
-  ]) as Partial<UpdateLeadDetailsParams>
+  ]) as Partial<UpdateLeadParams>
   return Object.keys(out).length > 0 ? out : null
 }
 
+/** Scoped to the "Edit Lead Address" modal's fields; feeds into `useUpdateLead` (CRM-RI-004). */
 export function toUpdateLeadAddressParams(
   formData: Record<string, unknown>,
-): Partial<UpdateLeadAddressParams> | null {
+): Partial<UpdateLeadParams> | null {
   const out = patchFromForm(formData, [
     "street",
     "city",
     "zip",
     "countryCode",
-  ]) as Partial<UpdateLeadAddressParams>
+  ]) as Partial<UpdateLeadParams>
   return Object.keys(out).length > 0 ? out : null
 }
 
+/** Scoped to the "Edit Lead Revenue" modal's fields; feeds into `useUpdateLead` (CRM-RI-004). */
 export function toUpdateLeadRevenueParams(
   formData: Record<string, unknown>,
-): Partial<UpdateLeadRevenueParams> | null {
+): Partial<UpdateLeadParams> | null {
   const expectedRevenue = Number(formData.expectedRevenue ?? 0)
   const probability = Number(formData.probability ?? 0)
   if (!Number.isFinite(expectedRevenue) || !Number.isFinite(probability)) return null

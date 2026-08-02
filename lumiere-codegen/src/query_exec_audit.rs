@@ -134,15 +134,14 @@ pub fn audit_query_exec_special_cases(
 pub fn audit_query_exec_from_paths(manifest_dir: &Path) -> Result<()> {
     let query_exec = manifest_dir.join("../api-server/src/query_exec.rs");
     let registry = manifest_dir.join("../crates/stdb-auth/assets/resource_registry.json");
-    let allowlist = manifest_dir
-        .join("../crates/stdb-auth/assets/query_exec_non_registry.json");
+    let allowlist = manifest_dir.join("../crates/stdb-auth/assets/query_exec_non_registry.json");
 
     let query_exec_rs = fs::read_to_string(&query_exec)
         .with_context(|| format!("read {}", query_exec.display()))?;
-    let registry_json = fs::read_to_string(&registry)
-        .with_context(|| format!("read {}", registry.display()))?;
-    let allowlist_json = fs::read_to_string(&allowlist)
-        .with_context(|| format!("read {}", allowlist.display()))?;
+    let registry_json =
+        fs::read_to_string(&registry).with_context(|| format!("read {}", registry.display()))?;
+    let allowlist_json =
+        fs::read_to_string(&allowlist).with_context(|| format!("read {}", allowlist.display()))?;
 
     audit_query_exec_special_cases(&query_exec_rs, &registry_json, &allowlist_json)
 }

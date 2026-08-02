@@ -6,10 +6,10 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 
 use crate::field_policy::{
-    company_ids_dual_field_or_clause, company_ids_equality_or_clause,
-    resolve_http_sql_columns, select_field_permissions_for_org_sql, select_org_scoped_sql,
-    select_roles_active_sql, select_user_role_assignments_for_identity_sql,
-    sql_column_list_for_generated_type, FieldAccessContext,
+    company_ids_dual_field_or_clause, company_ids_equality_or_clause, resolve_http_sql_columns,
+    select_field_permissions_for_org_sql, select_org_scoped_sql, select_roles_active_sql,
+    select_user_role_assignments_for_identity_sql, sql_column_list_for_generated_type,
+    FieldAccessContext,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -176,8 +176,11 @@ fn subscription_sql_for_company_scoped(
                 return Ok(CompanyScoped::MissingContext);
             };
             let c = resolve_http_sql_columns("intercompany-rules", fa)?.join(", ");
-            let filter =
-                company_ids_dual_field_or_clause("source_company_id", "destination_company_id", list_ids)?;
+            let filter = company_ids_dual_field_or_clause(
+                "source_company_id",
+                "destination_company_id",
+                list_ids,
+            )?;
             Ok(CompanyScoped::Queries(vec![format!(
                 "SELECT {c} FROM intercompany_rule WHERE {filter} ORDER BY sequence ASC"
             )]))
@@ -187,8 +190,11 @@ fn subscription_sql_for_company_scoped(
                 return Ok(CompanyScoped::MissingContext);
             };
             let c = resolve_http_sql_columns("intercompany-transactions", fa)?.join(", ");
-            let filter =
-                company_ids_dual_field_or_clause("origin_company_id", "destination_company_id", list_ids)?;
+            let filter = company_ids_dual_field_or_clause(
+                "origin_company_id",
+                "destination_company_id",
+                list_ids,
+            )?;
             Ok(CompanyScoped::Queries(vec![format!(
                 "SELECT {c} FROM intercompany_transaction WHERE {filter} ORDER BY id DESC"
             )]))
@@ -334,10 +340,23 @@ pub fn subscription_queries_for_resource(
         };
         let id_lit = crate::field_policy::identity_sql_literal(id)?;
         let cols = resolve_http_sql_columns("employees", ctx.field_access)?.join(", ");
-        let can_list_all = crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "read")
-            || crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "create")
-            || crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "update")
-            || crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "view_pii");
+        let can_list_all =
+            crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "read")
+                || crate::field_policy::has_hr_permission(
+                    ctx.field_access,
+                    "hr_employee",
+                    "create",
+                )
+                || crate::field_policy::has_hr_permission(
+                    ctx.field_access,
+                    "hr_employee",
+                    "update",
+                )
+                || crate::field_policy::has_hr_permission(
+                    ctx.field_access,
+                    "hr_employee",
+                    "view_pii",
+                );
         let sql = if can_list_all {
             format!(
                 "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND is_active = true"

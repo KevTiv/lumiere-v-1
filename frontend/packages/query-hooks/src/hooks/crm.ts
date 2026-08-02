@@ -34,9 +34,6 @@ import type {
   CreateOpportunityParams,
   CreateOpportunityStageParams,
   UpdateAssignmentRuleParams,
-  UpdateContactAddressParams,
-  UpdateContactBusinessParams,
-  UpdateContactDetailsParams,
   UpdateContactCoreParams,
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
@@ -68,8 +65,13 @@ import {
   finalizeUpdateContactParams,
   finalizeUpdateLeadAddressParams,
   finalizeUpdateLeadDetailsParams,
+  finalizeUpdateLeadParams,
   finalizeUpdateLeadRevenueParams,
   finalizeUpdateOpportunityParams,
+  type UpdateContactAddressParams,
+  type UpdateContactBusinessParams,
+  type UpdateContactDetailsParams,
+  type UpdateLeadParams,
 } from "./crm-params-merge"
 
 type ScalarId = string | number | bigint
@@ -445,7 +447,7 @@ export function useUpdateContactAddress(organizationId: bigint) {
       const { urlPath, init } = crmBffPost("update_contact_address", [
         organizationId,
         toScalarU64(contactId),
-        stdbParamsToJson(finalizeUpdateContactAddressParams(params), "UpdateContactAddressParams"),
+        stdbParamsToJson(finalizeUpdateContactAddressParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact address')
@@ -461,7 +463,7 @@ export function useUpdateContactBusiness(organizationId: bigint) {
       const { urlPath, init } = crmBffPost("update_contact_business", [
         organizationId,
         toScalarU64(contactId),
-        stdbParamsToJson(finalizeUpdateContactBusinessParams(params), "UpdateContactBusinessParams"),
+        stdbParamsToJson(finalizeUpdateContactBusinessParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact business')
@@ -477,7 +479,7 @@ export function useUpdateContactDetails(organizationId: bigint) {
       const { urlPath, init } = crmBffPost("update_contact_details", [
         organizationId,
         toScalarU64(contactId),
-        stdbParamsToJson(finalizeUpdateContactDetailsParams(params), "UpdateContactDetailsParams"),
+        stdbParamsToJson(finalizeUpdateContactDetailsParams(params)),
       ])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact details')
@@ -486,6 +488,34 @@ export function useUpdateContactDetails(organizationId: bigint) {
   })
 }
 
+/**
+ * Atomic lead patch (CRM-RI-004): replaces the details/address/revenue field
+ * groups' three independent reducer calls with a single `update_lead` call.
+ *
+ * CRM-RI-003: `stdbParamsToJson` is called WITHOUT a `structName` here, unlike
+ * the three legacy hooks below — passing one forces every `Option` field
+ * absent from `params` to be filled with an explicit "none" tag, silently
+ * turning "field not touched" into "clear this field" (the exact bug this
+ * reducer exists to fix). Omitting `structName` lets an absent key mean
+ * "unchanged" and an explicit `null` mean "clear", matching `useUpdateAccountGroup`.
+ */
+export function useUpdateLead(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, LeadPatch<UpdateLeadParams>>({
+    mutationFn: async ({ leadId, params }) => {
+      const { urlPath, init } = crmBffPost("update_lead", [
+        organizationId,
+        toScalarU64(leadId),
+        stdbParamsToJson(finalizeUpdateLeadParams(params)),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to update lead')
+    },
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['leads']),
+  })
+}
+
+/** @deprecated Use {@link useUpdateLead}. Kept for backward compatibility with the still-registered reducer; no frontend code calls this anymore. */
 export function useUpdateLeadDetails(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, LeadPatch<UpdateLeadDetailsParams>>({
@@ -502,6 +532,7 @@ export function useUpdateLeadDetails(organizationId: bigint) {
   })
 }
 
+/** @deprecated Use {@link useUpdateLead}. Kept for backward compatibility with the still-registered reducer; no frontend code calls this anymore. */
 export function useUpdateLeadAddress(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, LeadPatch<UpdateLeadAddressParams>>({
@@ -518,6 +549,7 @@ export function useUpdateLeadAddress(organizationId: bigint) {
   })
 }
 
+/** @deprecated Use {@link useUpdateLead}. Kept for backward compatibility with the still-registered reducer; no frontend code calls this anymore. */
 export function useUpdateLeadRevenue(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, LeadPatch<UpdateLeadRevenueParams>>({
@@ -1289,9 +1321,6 @@ export type {
   CreateOpportunityParams,
   CreateOpportunityStageParams,
   UpdateAssignmentRuleParams,
-  UpdateContactAddressParams,
-  UpdateContactBusinessParams,
-  UpdateContactDetailsParams,
   UpdateContactCoreParams,
   UpdateContactIdentityParams,
   AssignContactRoleParams,

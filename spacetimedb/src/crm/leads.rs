@@ -7,8 +7,10 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company_id_from_scope, default_company_id_for_organization};
-use crate::crm::contacts::{contact, Contact};
-use crate::crm::opportunities::{opportunity, Opportunity};
+use crate::core::utm::{utm_campaign, utm_medium};
+use crate::crm::contacts::{contact, contact_tag, Contact};
+use crate::crm::opportunities::{opp_stage, opportunity, Opportunity};
+use crate::crm::require_single_company_crm_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -85,6 +87,32 @@ pub struct UpdateLeadRevenueParams {
     pub probability: f64,
 }
 
+/// Params for atomically patching a lead's details, address, and revenue
+/// forecast in one reducer call (CRM-RI-004). Replaces the three independent
+/// `update_lead_details` / `update_lead_address` / `update_lead_revenue`
+/// calls for callers that adopt the atomic contract.
+///
+/// Explicit patch contract (CRM-RI-003): every nullable `Lead` field uses
+/// `Option<Option<T>>` — outer `None` = field not sent (leave unchanged),
+/// outer `Some(None)` = explicit clear, outer `Some(Some(v))` = replace with
+/// `v`. `expected_revenue`/`probability` are never null on `Lead`, so they
+/// use plain `Option<T>` (`None` = unchanged, `Some(v)` = replace).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateLeadParams {
+    pub contact_name: Option<Option<String>>,
+    pub title: Option<Option<String>>,
+    pub website: Option<Option<String>>,
+    pub industry: Option<Option<String>>,
+    pub referred_by: Option<Option<String>>,
+    pub description: Option<Option<String>>,
+    pub street: Option<Option<String>>,
+    pub city: Option<Option<String>>,
+    pub zip: Option<Option<String>>,
+    pub country_code: Option<Option<String>>,
+    pub expected_revenue: Option<f64>,
+    pub probability: Option<f64>,
+}
+
 /// Params for converting a lead to a contact/opportunity.
 /// Scope: `organization_id` + `lead_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
@@ -150,7 +178,6 @@ pub struct UpdateLeadLostReasonParams {
 
 #[spacetimedb::table(
     accessor = lead,
-    public,
     index(accessor = lead_by_org, btree(columns = [organization_id])),
     index(accessor = lead_by_email, btree(columns = [email])),
     index(accessor = lead_by_state, btree(columns = [state]))
@@ -204,7 +231,6 @@ pub struct Lead {
 
 #[spacetimedb::table(
     accessor = lead_source,
-    public,
     index(accessor = source_by_org, btree(columns = [organization_id]))
 )]
 pub struct LeadSource {
@@ -221,7 +247,6 @@ pub struct LeadSource {
 
 #[spacetimedb::table(
     accessor = lead_lost_reason,
-    public,
     index(accessor = lost_reason_by_org, btree(columns = [organization_id]))
 )]
 pub struct LeadLostReason {
@@ -233,6 +258,173 @@ pub struct LeadLostReason {
     pub description: Option<String>,
     pub is_active: bool,
     pub metadata: Option<String>,
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RELATION VALIDATION HELPERS (CRM-RI-002)
+// ══════════════════════════════════════════════════════════════════════════════
+//
+// Scoped loaders for every relation a lead can reference. Each loader rejects
+// a missing row, a row from a different organization, and (where the target
+// table tracks it) an inactive/deleted row. Keep error messages specific to
+// the relation that failed.
+
+/// Validates `source_id` against `LeadSource`: must exist, belong to the
+/// organization, and be active.
+fn validate_lead_source(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    source_id: u64,
+) -> Result<(), String> {
+    let source = ctx
+        .db
+        .lead_source()
+        .id()
+        .find(&source_id)
+        .ok_or("lead source not found")?;
+    if source.organization_id != organization_id {
+        return Err("lead source does not belong to this organization".to_string());
+    }
+    if !source.is_active {
+        return Err("lead source is not active".to_string());
+    }
+    Ok(())
+}
+
+/// Validates `campaign_id` against `UtmCampaign`: must exist, belong to the
+/// organization, and be active.
+fn validate_lead_campaign(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    campaign_id: u64,
+) -> Result<(), String> {
+    let campaign = ctx
+        .db
+        .utm_campaign()
+        .id()
+        .find(&campaign_id)
+        .ok_or("campaign not found")?;
+    if campaign.organization_id != organization_id {
+        return Err("campaign does not belong to this organization".to_string());
+    }
+    if !campaign.is_active {
+        return Err("campaign is not active".to_string());
+    }
+    Ok(())
+}
+
+/// Validates `medium_id` against `UtmMedium`: must exist, belong to the
+/// organization, and be active.
+fn validate_lead_medium(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    medium_id: u64,
+) -> Result<(), String> {
+    let medium = ctx
+        .db
+        .utm_medium()
+        .id()
+        .find(&medium_id)
+        .ok_or("medium not found")?;
+    if medium.organization_id != organization_id {
+        return Err("medium does not belong to this organization".to_string());
+    }
+    if !medium.is_active {
+        return Err("medium is not active".to_string());
+    }
+    Ok(())
+}
+
+/// Validates `partner_id` against `Contact`: must exist, belong to the
+/// organization, and not be soft-deleted. `Contact` has no `is_active` flag,
+/// only `deleted_at`.
+fn validate_lead_partner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    partner_id: u64,
+) -> Result<(), String> {
+    let partner = ctx
+        .db
+        .contact()
+        .id()
+        .find(&partner_id)
+        .ok_or("partner not found")?;
+    if partner.organization_id != organization_id {
+        return Err("partner does not belong to this organization".to_string());
+    }
+    if partner.deleted_at.is_some() {
+        return Err("partner is deleted".to_string());
+    }
+    Ok(())
+}
+
+/// Validates `lost_reason_id` against `LeadLostReason`: must exist, belong to
+/// the organization, and be active.
+///
+/// No reducer in this file currently sets `lost_reason_id` on `Lead` (it is
+/// only ever initialized to `None` by `create_lead`), so this loader has no
+/// call site yet. Kept ready — per the CRM-RI-002 required-loaders list — for
+/// the lead-loss reducer this module does not yet have.
+fn validate_lead_lost_reason(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    lost_reason_id: u64,
+) -> Result<(), String> {
+    let reason = ctx
+        .db
+        .lead_lost_reason()
+        .id()
+        .find(&lost_reason_id)
+        .ok_or("lost reason not found")?;
+    if reason.organization_id != organization_id {
+        return Err("lost reason does not belong to this organization".to_string());
+    }
+    if !reason.is_active {
+        return Err("lost reason is not active".to_string());
+    }
+    Ok(())
+}
+
+/// Validates every id in `tag_ids` against `ContactTag`: each must exist and
+/// belong to the organization. Rejects the whole batch on the first invalid
+/// tag rather than silently dropping bad ids. `ContactTag` has no
+/// active/deleted flag, so existence + org scope is the full check.
+fn validate_lead_tags(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    tag_ids: &[u64],
+) -> Result<(), String> {
+    for tag_id in tag_ids {
+        let tag = ctx
+            .db
+            .contact_tag()
+            .id()
+            .find(tag_id)
+            .ok_or("tag not found")?;
+        if tag.organization_id != organization_id {
+            return Err("tag does not belong to this organization".to_string());
+        }
+    }
+    Ok(())
+}
+
+/// Validates `opportunity_stage_id` against `OpportunityStage`, matching the
+/// checks `create_opportunity` (opportunities.rs) applies to `stage_id`.
+fn validate_lead_opportunity_stage(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    stage_id: u64,
+) -> Result<(), String> {
+    let stage = ctx
+        .db
+        .opp_stage()
+        .id()
+        .find(&stage_id)
+        .ok_or("Stage not found")?;
+    if stage.organization_id != organization_id {
+        return Err("Stage does not belong to this organization".to_string());
+    }
+    Ok(())
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -250,6 +442,27 @@ pub fn create_lead(
     if params.name.is_empty() {
         return Err("Lead name cannot be empty".to_string());
     }
+
+    // Leads do not yet support explicit company selection (`company_id` is always
+    // unscoped below); `None` always satisfies the Phase 0 CRM containment guard.
+    require_single_company_crm_scope(ctx, organization_id, None)?;
+
+    if let Some(source_id) = params.source_id {
+        validate_lead_source(ctx, organization_id, source_id)?;
+    }
+    if let Some(campaign_id) = params.campaign_id {
+        validate_lead_campaign(ctx, organization_id, campaign_id)?;
+    }
+    if let Some(medium_id) = params.medium_id {
+        validate_lead_medium(ctx, organization_id, medium_id)?;
+    }
+    if let Some(partner_id) = params.partner_id {
+        validate_lead_partner(ctx, organization_id, partner_id)?;
+    }
+    // `team_id` has no backing scoped team table in this module today; there is
+    // nothing to validate against without inventing a table, so it is stored
+    // as-is (tracked as a known gap, not a validated relation).
+    validate_lead_tags(ctx, organization_id, &params.tag_ids)?;
 
     let lead = ctx.db.lead().insert(Lead {
         id: 0,
@@ -309,6 +522,110 @@ pub fn create_lead(
                 serde_json::json!({ "name": params.name, "email": params.email }).to_string(),
             ),
             changed_fields: vec!["name".to_string(), "email".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Atomically patches a lead's details, address, and revenue forecast in one
+/// transaction (CRM-RI-004). Only fields explicitly present in `params` are
+/// touched; every other field on the row is preserved via the final `..lead`
+/// spread. All validation happens before the single `.update()` call, so a
+/// failure never leaves a partial write.
+#[spacetimedb::reducer]
+pub fn update_lead(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    lead_id: u64,
+    params: UpdateLeadParams,
+) -> Result<(), String> {
+    let lead = ctx.db.lead().id().find(&lead_id).ok_or("Lead not found")?;
+    if lead.organization_id != organization_id {
+        return Err("Lead does not belong to this organization".to_string());
+    }
+    check_permission(ctx, organization_id, "lead", "write")?;
+
+    // None of the patchable fields (contact_name, title, website, industry,
+    // referred_by, description, street, city, zip, country_code,
+    // expected_revenue, probability) reference another table, so there is no
+    // CRM-RI-002 relation validation to run here.
+
+    let mut changed_fields = Vec::new();
+    if params.contact_name.is_some() {
+        changed_fields.push("contact_name".to_string());
+    }
+    if params.title.is_some() {
+        changed_fields.push("title".to_string());
+    }
+    if params.website.is_some() {
+        changed_fields.push("website".to_string());
+    }
+    if params.industry.is_some() {
+        changed_fields.push("industry".to_string());
+    }
+    if params.referred_by.is_some() {
+        changed_fields.push("referred_by".to_string());
+    }
+    if params.description.is_some() {
+        changed_fields.push("description".to_string());
+    }
+    if params.street.is_some() {
+        changed_fields.push("street".to_string());
+    }
+    if params.city.is_some() {
+        changed_fields.push("city".to_string());
+    }
+    if params.zip.is_some() {
+        changed_fields.push("zip".to_string());
+    }
+    if params.country_code.is_some() {
+        changed_fields.push("country_code".to_string());
+    }
+    if params.expected_revenue.is_some() {
+        changed_fields.push("expected_revenue".to_string());
+    }
+    if params.probability.is_some() {
+        changed_fields.push("probability".to_string());
+    }
+
+    ctx.db.lead().id().update(Lead {
+        contact_name: params
+            .contact_name
+            .unwrap_or_else(|| lead.contact_name.clone()),
+        title: params.title.unwrap_or_else(|| lead.title.clone()),
+        website: params.website.unwrap_or_else(|| lead.website.clone()),
+        industry: params.industry.unwrap_or_else(|| lead.industry.clone()),
+        referred_by: params
+            .referred_by
+            .unwrap_or_else(|| lead.referred_by.clone()),
+        description: params
+            .description
+            .unwrap_or_else(|| lead.description.clone()),
+        street: params.street.unwrap_or_else(|| lead.street.clone()),
+        city: params.city.unwrap_or_else(|| lead.city.clone()),
+        zip: params.zip.unwrap_or_else(|| lead.zip.clone()),
+        country_code: params
+            .country_code
+            .unwrap_or_else(|| lead.country_code.clone()),
+        expected_revenue: params.expected_revenue.unwrap_or(lead.expected_revenue),
+        probability: params.probability.unwrap_or(lead.probability),
+        updated_at: ctx.timestamp,
+        ..lead
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "lead",
+            record_id: lead_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields,
             metadata: None,
         },
     );
@@ -539,6 +856,7 @@ pub fn convert_lead_to_customer(
         let stage_id = params
             .opportunity_stage_id
             .ok_or("opportunity_stage_id is required when create_opportunity is true")?;
+        validate_lead_opportunity_stage(ctx, organization_id, stage_id)?;
 
         ctx.db.opportunity().insert(Opportunity {
             id: 0,
