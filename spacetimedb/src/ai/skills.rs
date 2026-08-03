@@ -864,10 +864,7 @@ pub fn complete_ai_agent_run(
 
     let run = load_company_run(ctx, organization_id, company_id, run_id)?;
     let status = params.status.trim().to_string();
-    if !matches!(
-        status.as_str(),
-        "completed" | "failed" | "cancelled"
-    ) {
+    if !matches!(status.as_str(), "completed" | "failed" | "cancelled") {
         return Err("status must be completed, failed, or cancelled".to_string());
     }
 
@@ -947,7 +944,10 @@ pub fn cancel_ai_agent_run(
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 fn is_valid_identity_hex(value: &str) -> bool {
-    let hex = value.trim().trim_start_matches("0x").trim_start_matches("0X");
+    let hex = value
+        .trim()
+        .trim_start_matches("0x")
+        .trim_start_matches("0X");
     hex.len() == 64 && hex.chars().all(|c| c.is_ascii_hexdigit())
 }
 

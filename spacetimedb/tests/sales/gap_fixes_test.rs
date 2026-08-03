@@ -120,7 +120,9 @@ fn seed_so(
     ctx.db
         .sale_order()
         .iter()
-        .find(|o| o.organization_id == org_id && o.client_order_ref.as_deref() == Some(pricelist_name))
+        .find(|o| {
+            o.organization_id == org_id && o.client_order_ref.as_deref() == Some(pricelist_name)
+        })
         .map(|o| o.id)
         .ok_or("Sale order not found after create".to_string())
 }
@@ -341,7 +343,9 @@ pub fn test_dropship_confirm_creates_po(ctx: &ReducerContext) -> Result<(), Stri
             }
             Ok(())
         }
-        Err(msg) if msg.to_lowercase().contains("supplier") || msg.to_lowercase().contains("vendor") => {
+        Err(msg)
+            if msg.to_lowercase().contains("supplier") || msg.to_lowercase().contains("vendor") =>
+        {
             // Acceptable fail-closed when product has no vendor linkage in harness.
             Ok(())
         }
@@ -414,12 +418,15 @@ pub fn test_exchange_order_from_return(ctx: &ReducerContext) -> Result<(), Strin
 
     // Mark delivered so return validation passes.
     if let Some(line) = ctx.db.sale_order_line().id().find(&sol_id) {
-        ctx.db.sale_order_line().id().update(crate::sales::sales_core::SaleOrderLine {
-            qty_delivered: line.product_uom_qty,
-            write_uid: ctx.sender(),
-            write_date: ctx.timestamp,
-            ..line
-        });
+        ctx.db
+            .sale_order_line()
+            .id()
+            .update(crate::sales::sales_core::SaleOrderLine {
+                qty_delivered: line.product_uom_qty,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..line
+            });
     }
 
     create_return_order(

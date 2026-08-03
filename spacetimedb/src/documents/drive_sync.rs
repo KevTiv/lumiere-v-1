@@ -270,18 +270,13 @@ pub fn sync_external_file_to_document(
             retention_days: None,
             fiscal_kind: None,
             residency_region: None,
-            metadata: Some(
-                params
-                    .metadata
-                    .clone()
-                    .unwrap_or_else(|| {
-                        serde_json::json!({
-                            "external_provider": provider,
-                            "external_id": external_id,
-                        })
-                        .to_string()
-                    }),
-            ),
+            metadata: Some(params.metadata.clone().unwrap_or_else(|| {
+                serde_json::json!({
+                    "external_provider": provider,
+                    "external_id": external_id,
+                })
+                .to_string()
+            })),
         },
     )?;
 

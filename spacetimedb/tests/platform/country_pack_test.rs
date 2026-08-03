@@ -2,8 +2,8 @@
 use spacetimedb::ReducerContext;
 
 use crate::core::country_pack::{
-    company_country_pack, country_pack_definition, country_pack_tax_rule,
-    set_company_country_pack, SetCompanyCountryPackParams,
+    company_country_pack, country_pack_definition, country_pack_tax_rule, set_company_country_pack,
+    SetCompanyCountryPackParams,
 };
 use crate::core::migrations::apply_pending_global_migrations;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};

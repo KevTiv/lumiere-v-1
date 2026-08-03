@@ -287,40 +287,39 @@ fn ensure_collection(
     {
         return row;
     }
-    ctx.db.subscription_collection().insert(SubscriptionCollection {
-        id: 0,
-        organization_id,
-        company_id,
-        subscription_id,
-        stage: "current".to_string(),
-        failed_payment_count: 0,
-        past_due_days: 0,
-        due_to_bill: false,
-        past_due: false,
-        amend_pending: false,
-        last_failure_at: None,
-        last_evaluated_at: ctx.timestamp,
-        metadata: String::new(),
-    })
+    ctx.db
+        .subscription_collection()
+        .insert(SubscriptionCollection {
+            id: 0,
+            organization_id,
+            company_id,
+            subscription_id,
+            stage: "current".to_string(),
+            failed_payment_count: 0,
+            past_due_days: 0,
+            due_to_bill: false,
+            past_due: false,
+            amend_pending: false,
+            last_failure_at: None,
+            last_evaluated_at: ctx.timestamp,
+            metadata: String::new(),
+        })
 }
 
 fn has_amend_pending(ctx: &ReducerContext, organization_id: u64, subscription_id: u64) -> bool {
     // Draft proration / credit moves linked from recent amendments (metadata scan on moves).
-    ctx.db
-        .account_move()
-        .iter()
-        .any(|m| {
-            m.organization_id == organization_id
-                && m.state == AccountMoveState::Draft
-                && matches!(m.move_type, MoveType::OutInvoice | MoveType::OutRefund)
-                && m.metadata
-                    .as_ref()
-                    .map(|meta| {
-                        meta.contains(&format!("\"subscription_id\":{subscription_id}"))
-                            && (meta.contains("proration") || meta.contains("amendment"))
-                    })
-                    .unwrap_or(false)
-        })
+    ctx.db.account_move().iter().any(|m| {
+        m.organization_id == organization_id
+            && m.state == AccountMoveState::Draft
+            && matches!(m.move_type, MoveType::OutInvoice | MoveType::OutRefund)
+            && m.metadata
+                .as_ref()
+                .map(|meta| {
+                    meta.contains(&format!("\"subscription_id\":{subscription_id}"))
+                        && (meta.contains("proration") || meta.contains("amendment"))
+                })
+                .unwrap_or(false)
+    })
 }
 
 /// Grant default access entitlement (idempotent if already active).
@@ -354,20 +353,23 @@ pub fn grant_default_entitlement(
         }
         return Ok(existing.id);
     }
-    let row = ctx.db.subscription_entitlement().insert(SubscriptionEntitlement {
-        id: 0,
-        organization_id,
-        company_id,
-        subscription_id: subscription.id,
-        partner_id: subscription.partner_id,
-        product_id: None,
-        feature_code: feature.to_string(),
-        status: "active".to_string(),
-        granted_at: ctx.timestamp,
-        revoked_at: None,
-        created_by: ctx.sender(),
-        metadata: String::new(),
-    });
+    let row = ctx
+        .db
+        .subscription_entitlement()
+        .insert(SubscriptionEntitlement {
+            id: 0,
+            organization_id,
+            company_id,
+            subscription_id: subscription.id,
+            partner_id: subscription.partner_id,
+            product_id: None,
+            feature_code: feature.to_string(),
+            status: "active".to_string(),
+            granted_at: ctx.timestamp,
+            revoked_at: None,
+            created_by: ctx.sender(),
+            metadata: String::new(),
+        });
     Ok(row.id)
 }
 
@@ -634,7 +636,9 @@ pub fn grant_subscription_entitlement(
         .subscription_entitlement()
         .subscription_entitlement_by_sub()
         .filter(&subscription_id)
-        .find(|e| e.organization_id == organization_id && e.feature_code == code && e.status != "revoked")
+        .find(|e| {
+            e.organization_id == organization_id && e.feature_code == code && e.status != "revoked"
+        })
     {
         ctx.db
             .subscription_entitlement()
@@ -647,20 +651,23 @@ pub fn grant_subscription_entitlement(
             });
         return Ok(());
     }
-    let row = ctx.db.subscription_entitlement().insert(SubscriptionEntitlement {
-        id: 0,
-        organization_id,
-        company_id,
-        subscription_id,
-        partner_id: sub.partner_id,
-        product_id: params.product_id,
-        feature_code: code,
-        status: "active".to_string(),
-        granted_at: ctx.timestamp,
-        revoked_at: None,
-        created_by: ctx.sender(),
-        metadata: params.metadata.unwrap_or_default(),
-    });
+    let row = ctx
+        .db
+        .subscription_entitlement()
+        .insert(SubscriptionEntitlement {
+            id: 0,
+            organization_id,
+            company_id,
+            subscription_id,
+            partner_id: sub.partner_id,
+            product_id: params.product_id,
+            feature_code: code,
+            status: "active".to_string(),
+            granted_at: ctx.timestamp,
+            revoked_at: None,
+            created_by: ctx.sender(),
+            metadata: params.metadata.unwrap_or_default(),
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -735,9 +742,7 @@ pub fn create_subscription_payment_intent(
     let sub = load_sub(ctx, organization_id, company_id, subscription_id)?;
     let intent_type = params.intent_type.trim().to_ascii_lowercase();
     if !payment_intent_types().contains(&intent_type.as_str()) {
-        return Err(
-            "intent_type must be card_charge|pix|boleto|paynow|fpx|qris|eft".to_string(),
-        );
+        return Err("intent_type must be card_charge|pix|boleto|paynow|fpx|qris|eft".to_string());
     }
     let key = params.idempotency_key.trim().to_string();
     if key.is_empty() {
@@ -1108,19 +1113,22 @@ pub fn upsert_subscription_price_index(
         return Ok(());
     }
 
-    let row = ctx.db.subscription_price_index().insert(SubscriptionPriceIndex {
-        id: 0,
-        organization_id,
-        company_id,
-        index_code,
-        country_code: country,
-        period_key: period,
-        factor: params.factor,
-        active: params.active,
-        created_at: ctx.timestamp,
-        updated_at: ctx.timestamp,
-        metadata: params.metadata.unwrap_or_default(),
-    });
+    let row = ctx
+        .db
+        .subscription_price_index()
+        .insert(SubscriptionPriceIndex {
+            id: 0,
+            organization_id,
+            company_id,
+            index_code,
+            country_code: country,
+            period_key: period,
+            factor: params.factor,
+            active: params.active,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            metadata: params.metadata.unwrap_or_default(),
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -1193,34 +1201,32 @@ pub fn apply_index_linked_renewal(
             1.0
         };
         let subtotal = qty * new_price * (1.0 - line.discount / 100.0);
-        ctx.db.subscription_line().id().update(crate::subscriptions::tables::SubscriptionLine {
-            price_unit: new_price,
-            price_subtotal: subtotal,
-            price_total: subtotal,
-            updated_at: ctx.timestamp,
-            metadata: {
-                let mut meta = serde_json::Map::new();
-                if let Ok(serde_json::Value::Object(obj)) =
-                    serde_json::from_str(&line.metadata)
-                {
-                    meta = obj;
-                }
-                meta.insert("index_code".into(), serde_json::json!(index_code));
-                meta.insert("index_period".into(), serde_json::json!(period));
-                meta.insert("index_factor".into(), serde_json::json!(idx.factor));
-                serde_json::Value::Object(meta).to_string()
-            },
-            ..line
-        });
+        ctx.db
+            .subscription_line()
+            .id()
+            .update(crate::subscriptions::tables::SubscriptionLine {
+                price_unit: new_price,
+                price_subtotal: subtotal,
+                price_total: subtotal,
+                updated_at: ctx.timestamp,
+                metadata: {
+                    let mut meta = serde_json::Map::new();
+                    if let Ok(serde_json::Value::Object(obj)) = serde_json::from_str(&line.metadata)
+                    {
+                        meta = obj;
+                    }
+                    meta.insert("index_code".into(), serde_json::json!(index_code));
+                    meta.insert("index_period".into(), serde_json::json!(period));
+                    meta.insert("index_factor".into(), serde_json::json!(idx.factor));
+                    serde_json::Value::Object(meta).to_string()
+                },
+                ..line
+            });
     }
 
     let mut next = sub.recurring_next_date;
     if params.extend_term {
-        next = calculate_next_date(
-            next,
-            &sub.recurring_rule_type,
-            sub.recurring_interval,
-        )?;
+        next = calculate_next_date(next, &sub.recurring_rule_type, sub.recurring_interval)?;
     }
     ctx.db.subscription().id().update(Subscription {
         recurring_next_date: next,
@@ -1328,10 +1334,7 @@ pub fn rebase_deferred_schedules_for_subscription(
                         "rebased_factor".into(),
                         serde_json::json!(params.scale_factor),
                     );
-                    meta.insert(
-                        "rebased_at".into(),
-                        serde_json::json!(secs(ctx.timestamp)),
-                    );
+                    meta.insert("rebased_at".into(), serde_json::json!(secs(ctx.timestamp)));
                     serde_json::Value::Object(meta).to_string()
                 },
                 ..sched.clone()
@@ -1344,10 +1347,13 @@ pub fn rebase_deferred_schedules_for_subscription(
             .filter(|l| l.schedule_id == sched.id && !l.recognized)
             .collect();
         for line in lines {
-            ctx.db.deferred_revenue_line().id().update(DeferredRevenueLine {
-                amount: line.amount * params.scale_factor,
-                ..line
-            });
+            ctx.db
+                .deferred_revenue_line()
+                .id()
+                .update(DeferredRevenueLine {
+                    amount: line.amount * params.scale_factor,
+                    ..line
+                });
         }
     }
 

@@ -767,10 +767,11 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
       )
       const opportunityId = valueAsId(opportunity ?? {}, "id")
       if (opportunityId == null) throw new Error(`${label} ${scope} opportunity has no id`)
+      // CRM-RI-017: the display name is now derived server-side from the
+      // authenticated user's profile and is no longer a reducer argument.
       await callReducerBff(page, "update_opportunity_presence", [
         organizationId,
         opportunityId,
-        `${suffix}-${scope}-presence`,
       ])
       await callReducerBff(page, "create_forecast_snapshot", [
         organizationId,

@@ -3,9 +3,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::{create_product, product, CreateProductParams};
-use crate::inventory::stock::{
-    resolve_warehouse_stock_location, stock_picking, stock_quant,
-};
+use crate::inventory::stock::{resolve_warehouse_stock_location, stock_picking, stock_quant};
 use crate::inventory::tracking::{
     create_stock_production_lot, stock_production_lot, CreateStockProductionLotParams,
 };
@@ -14,8 +12,8 @@ use crate::purchasing::purchase_orders::{
     purchase_order_line, receive_po_line, AddPurchaseOrderLineParams, CreatePurchaseOrderParams,
 };
 use crate::purchasing::purchase_returns::{
-    confirm_purchase_return, create_purchase_return, purchase_return, CreatePurchaseReturnLineParams,
-    CreatePurchaseReturnParams,
+    confirm_purchase_return, create_purchase_return, purchase_return,
+    CreatePurchaseReturnLineParams, CreatePurchaseReturnParams,
 };
 use crate::purchasing::sourcing::{
     add_purchase_rfq_bid, award_purchase_rfq_bid, create_purchase_rfq, purchase_rfq,
@@ -82,10 +80,7 @@ pub fn seed_vendor_po(
         .db
         .contact()
         .iter()
-        .find(|c| {
-            c.organization_id == org_id
-                && c.display_name == format!("Vendor {partner_ref}")
-        })
+        .find(|c| c.organization_id == org_id && c.display_name == format!("Vendor {partner_ref}"))
         .map(|c| c.id)
         .ok_or("Vendor not found")?;
 
@@ -126,10 +121,7 @@ pub fn seed_vendor_po(
         .db
         .purchase_order()
         .iter()
-        .find(|o| {
-            o.organization_id == org_id
-                && o.partner_ref == Some(partner_ref.to_string())
-        })
+        .find(|o| o.organization_id == org_id && o.partner_ref == Some(partner_ref.to_string()))
         .ok_or("PO not found")?;
 
     add_purchase_order_line(
@@ -185,9 +177,7 @@ pub fn test_company_isolation_on_confirm(ctx: &ReducerContext) -> Result<(), Str
     // Attempt confirm of A using org B scope should fail ownership checks.
     match confirm_purchase_order(ctx, fixture_b.organization_id, order_a) {
         Err(_) => Ok(()),
-        Ok(()) => Err(
-            "company isolation failed: org B confirmed org A purchase order".to_string(),
-        ),
+        Ok(()) => Err("company isolation failed: org B confirmed org A purchase order".to_string()),
     }
 }
 
@@ -610,9 +600,7 @@ pub fn test_receive_po_line_lot_required(ctx: &ReducerContext) -> Result<(), Str
         .db
         .purchase_order()
         .iter()
-        .find(|o| {
-            o.organization_id == org_id && o.partner_ref == Some("LOT-RCV-PO".to_string())
-        })
+        .find(|o| o.organization_id == org_id && o.partner_ref == Some("LOT-RCV-PO".to_string()))
         .ok_or("Lot receive PO missing")?;
 
     add_purchase_order_line(

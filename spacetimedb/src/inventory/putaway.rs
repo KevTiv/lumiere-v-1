@@ -190,10 +190,7 @@ pub fn execute_directed_putaway(
         organization_id,
         company_id,
         CreateWarehouseTaskParams {
-            name: format!(
-                "Putaway {} → loc {}",
-                params.product_id, dest
-            ),
+            name: format!("Putaway {} → loc {}", params.product_id, dest),
             task_type: "putaway".to_string(),
             state: "done".to_string(),
             priority: "1".to_string(),

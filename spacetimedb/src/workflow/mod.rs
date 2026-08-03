@@ -1,3 +1,4 @@
+pub mod action_registry;
 /// Workflow Engine Module — Definitions and runtime execution
 ///
 /// # Tables
@@ -15,7 +16,6 @@
 /// | **WorkflowDelegation** | Effective-dated approval delegation evidence |
 pub mod approval_gate;
 pub mod approvals;
-pub mod action_registry;
 pub mod authorization;
 pub mod branches;
 pub mod calendar;
@@ -27,9 +27,9 @@ pub mod packs;
 pub mod runtime;
 pub mod simulation;
 
+pub use action_registry::*;
 pub use approval_gate::*;
 pub use approvals::*;
-pub use action_registry::*;
 pub use authorization::*;
 pub use branches::*;
 pub use calendar::*;

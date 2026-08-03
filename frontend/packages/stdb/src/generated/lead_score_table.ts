@@ -19,4 +19,6 @@ export default __t.row({
   scoredAt: __t.timestamp().name("scored_at"),
   scoredBy: __t.identity().name("scored_by"),
   metadata: __t.option(__t.string()),
+  isStale: __t.bool().name("is_stale"),
+  staleSince: __t.option(__t.timestamp()).name("stale_since"),
 });

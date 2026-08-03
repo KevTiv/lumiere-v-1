@@ -119,9 +119,7 @@ pub fn test_receipt_increases_quant(ctx: &ReducerContext) -> Result<(), String> 
         .db
         .purchase_order()
         .iter()
-        .find(|o| {
-            o.organization_id == org_id && o.partner_ref == Some("QTY-RCV-001".to_string())
-        })
+        .find(|o| o.organization_id == org_id && o.partner_ref == Some("QTY-RCV-001".to_string()))
         .ok_or("Purchase order not found")?;
 
     add_purchase_order_line(
@@ -322,7 +320,7 @@ pub fn test_delivery_decreases_reserved_or_moves_quant(ctx: &ReducerContext) -> 
             commitment_date: None,
             expected_date: None,
             incoterm_id: None,
-        incoterm: None,
+            incoterm: None,
             incoterm_location: None,
             carrier_id: None,
             customer_lead: None,
@@ -345,8 +343,7 @@ pub fn test_delivery_decreases_reserved_or_moves_quant(ctx: &ReducerContext) -> 
         .sale_order()
         .iter()
         .find(|o| {
-            o.organization_id == org_id
-                && o.client_order_ref == Some("QTY-DEL-001".to_string())
+            o.organization_id == org_id && o.client_order_ref == Some("QTY-DEL-001".to_string())
         })
         .ok_or("Sale order not found")?;
 

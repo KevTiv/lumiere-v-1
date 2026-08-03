@@ -315,24 +315,27 @@ pub fn create_purchase_blanket_order(
         .id()
         .find(&company_id)
         .ok_or("Company not found")?;
-    let row = ctx.db.purchase_blanket_order().insert(PurchaseBlanketOrder {
-        id: 0,
-        organization_id,
-        company_id,
-        name: params.name.trim().to_string(),
-        partner_id: params.partner_id,
-        currency_id: params.currency_id,
-        state: "draft".to_string(),
-        date_start: params.date_start,
-        date_end: params.date_end,
-        release_count: 0,
-        last_release_po_id: None,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: params.metadata,
-    });
+    let row = ctx
+        .db
+        .purchase_blanket_order()
+        .insert(PurchaseBlanketOrder {
+            id: 0,
+            organization_id,
+            company_id,
+            name: params.name.trim().to_string(),
+            partner_id: params.partner_id,
+            currency_id: params.currency_id,
+            state: "draft".to_string(),
+            date_start: params.date_start,
+            date_end: params.date_end,
+            release_count: 0,
+            last_release_po_id: None,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: params.metadata,
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -393,13 +396,9 @@ pub fn release_blanket_to_po(
             message_ids: vec![],
             activity_ids: vec![],
             is_quantity_copy: None,
-            metadata: Some(
-                params.metadata.unwrap_or_else(|| {
-                    format!(
-                        r#"{{"blanket_order_id":{blanket_order_id},"released_from_blanket":true}}"#
-                    )
-                }),
-            ),
+            metadata: Some(params.metadata.unwrap_or_else(|| {
+                format!(r#"{{"blanket_order_id":{blanket_order_id},"released_from_blanket":true}}"#)
+            })),
         },
     )?;
 
@@ -793,10 +792,7 @@ pub fn set_purchase_approval_delegate(
                     })
                     .to_string(),
                 ),
-                changed_fields: vec![
-                    "delegate_identity".to_string(),
-                    "is_active".to_string(),
-                ],
+                changed_fields: vec!["delegate_identity".to_string(), "is_active".to_string()],
                 metadata: None,
             },
         );
@@ -856,9 +852,7 @@ pub fn set_commodity_price_index(
     }
 
     let existing = ctx.db.commodity_price_index().iter().find(|row| {
-        row.organization_id == organization_id
-            && row.company_id == company_id
-            && row.code == code
+        row.organization_id == organization_id && row.company_id == company_id && row.code == code
     });
 
     if let Some(row) = existing {

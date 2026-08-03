@@ -179,11 +179,8 @@ fn create_outgoing_return_picking(
 
     let stock_location =
         crate::inventory::stock::resolve_warehouse_stock_location(ctx, warehouse_id);
-    let vendor_location = crate::inventory::stock::resolve_supplier_stock_location(
-        ctx,
-        organization_id,
-        company_id,
-    )?;
+    let vendor_location =
+        crate::inventory::stock::resolve_supplier_stock_location(ctx, organization_id, company_id)?;
     let order_label = purchase_return.name.clone();
 
     create_stock_picking(
@@ -506,13 +503,8 @@ pub fn confirm_purchase_return(
         return Err("Purchase return has no lines".to_string());
     }
 
-    let picking_id = create_outgoing_return_picking(
-        ctx,
-        organization_id,
-        company_id,
-        &purchase_return,
-        &lines,
-    )?;
+    let picking_id =
+        create_outgoing_return_picking(ctx, organization_id, company_id, &purchase_return, &lines)?;
 
     let old_state = purchase_return.state.clone();
     ctx.db.purchase_return().id().update(PurchaseReturn {
@@ -561,7 +553,9 @@ pub fn create_vendor_credit_from_purchase_return(
     let purchase_return =
         load_purchase_return(ctx, organization_id, company_id, purchase_return_id)?;
     if purchase_return.state != "confirmed" {
-        return Err("Purchase return must be confirmed before creating a vendor credit".to_string());
+        return Err(
+            "Purchase return must be confirmed before creating a vendor credit".to_string(),
+        );
     }
     if purchase_return.credit_move_id.is_some() {
         return Err("Vendor credit already linked to this purchase return".to_string());
@@ -654,11 +648,10 @@ pub fn create_vendor_credit_from_purchase_return(
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.clone().or_else(|| {
-            Some(format!(
-                r#"{{"purchase_return_id":{purchase_return_id}}}"#
-            ))
-        }),
+        metadata: params
+            .metadata
+            .clone()
+            .or_else(|| Some(format!(r#"{{"purchase_return_id":{purchase_return_id}}}"#))),
     });
 
     let mut amount_untaxed = 0.0f64;

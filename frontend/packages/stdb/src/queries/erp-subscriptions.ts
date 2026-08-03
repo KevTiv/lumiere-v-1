@@ -45,6 +45,8 @@ const PRIVATE_CRM_RESOURCES = new Set([
   "contact-role-assignments",
   "contact-tags",
   "contact-tag-assignments",
+  "contact-categories",
+  "contact-category-assignments",
   "contact-segments",
   "segment-members",
   "contact-relationships",
@@ -121,6 +123,8 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "contact-role-assignments",
   "contact-tags",
   "contact-tag-assignments",
+  "contact-categories",
+  "contact-category-assignments",
   "contact-segments",
   "segment-members",
   "contact-relationships",
@@ -589,6 +593,16 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql(
       "contact-tag-assignments",
       "contact_tag_assignment",
+      id,
+      fa,
+      "",
+    ),
+  "contact-categories": (id, fa) =>
+    selectOrgScopedSql("contact-categories", "contact_category", id, fa, ""),
+  "contact-category-assignments": (id, fa) =>
+    selectOrgScopedSql(
+      "contact-category-assignments",
+      "contact_category_assignment",
       id,
       fa,
       "",
@@ -1697,6 +1711,7 @@ function subscriptionSqlForCompanyScopedResource(
     "opportunity-lines",
     "opportunity-presence",
     "contact-tag-assignments",
+    "contact-category-assignments",
     "segment-members",
     "contact-relationships",
     "privacy-consent",

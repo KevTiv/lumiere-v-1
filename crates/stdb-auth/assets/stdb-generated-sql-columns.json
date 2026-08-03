@@ -2154,6 +2154,7 @@
   "ContactCategoryAssignment": [
     "id",
     "organization_id",
+    "company_id",
     "contact_id",
     "category_id",
     "assigned_at",
@@ -2248,7 +2249,9 @@
     "summary",
     "computed_at",
     "computed_by",
-    "metadata"
+    "metadata",
+    "is_stale",
+    "stale_since"
   ],
   "ContactRoleAssignment": [
     "id",
@@ -2592,8 +2595,7 @@
     "date_deadline",
     "date_done",
     "assigned_to",
-    "res_model",
-    "res_id",
+    "target",
     "duration",
     "location",
     "video_url",
@@ -2990,6 +2992,13 @@
     "exchange_rate",
     "exchange_rate_date",
     "notes",
+    "metadata"
+  ],
+  "CreateContactCategoryParams": [
+    "name",
+    "color",
+    "parent_id",
+    "is_active",
     "metadata"
   ],
   "CreateContactIdentityParams": [
@@ -8083,7 +8092,9 @@
     "formula_version",
     "scored_at",
     "scored_by",
-    "metadata"
+    "metadata",
+    "is_stale",
+    "stale_since"
   ],
   "LeadScoreFactor": [
     "id",
@@ -13361,6 +13372,13 @@
     "employees_count",
     "annual_revenue"
   ],
+  "UpdateContactCategoryParams": [
+    "name",
+    "color",
+    "parent_id",
+    "is_active",
+    "metadata"
+  ],
   "UpdateContactCoreParams": [
     "name",
     "email",
@@ -13704,8 +13722,7 @@
     "probability",
     "stage_id",
     "priority",
-    "is_won",
-    "is_lost",
+    "desired_state",
     "partner_id",
     "contact_id",
     "date_deadline",

@@ -200,18 +200,21 @@ pub fn create_onboarding_template(
         return Err("Template must include at least one checklist item".to_string());
     }
 
-    let template = ctx.db.hr_onboarding_template().insert(HrOnboardingTemplate {
-        id: 0,
-        organization_id,
-        company_id,
-        name: params.name.trim().to_string(),
-        description: params.description,
-        active: params.active,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-    });
+    let template = ctx
+        .db
+        .hr_onboarding_template()
+        .insert(HrOnboardingTemplate {
+            id: 0,
+            organization_id,
+            company_id,
+            name: params.name.trim().to_string(),
+            description: params.description,
+            active: params.active,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+        });
 
     let item_count = params.items.len();
 
@@ -301,31 +304,17 @@ pub fn assign_onboarding_template(
         return Err("Template has no checklist items".to_string());
     }
 
-    let header = ctx.db.hr_onboarding_progress().insert(HrOnboardingProgress {
-        id: 0,
-        organization_id,
-        company_id,
-        employee_id,
-        template_id: params.template_id,
-        template_item_id: 0,
-        status: "in_progress".to_string(),
-        completed_at: None,
-        notes: None,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-    });
-
-    for item in &items {
-        ctx.db.hr_onboarding_progress().insert(HrOnboardingProgress {
+    let header = ctx
+        .db
+        .hr_onboarding_progress()
+        .insert(HrOnboardingProgress {
             id: 0,
             organization_id,
             company_id,
             employee_id,
             template_id: params.template_id,
-            template_item_id: item.id,
-            status: "pending".to_string(),
+            template_item_id: 0,
+            status: "in_progress".to_string(),
             completed_at: None,
             notes: None,
             create_uid: ctx.sender(),
@@ -333,6 +322,25 @@ pub fn assign_onboarding_template(
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
         });
+
+    for item in &items {
+        ctx.db
+            .hr_onboarding_progress()
+            .insert(HrOnboardingProgress {
+                id: 0,
+                organization_id,
+                company_id,
+                employee_id,
+                template_id: params.template_id,
+                template_item_id: item.id,
+                status: "pending".to_string(),
+                completed_at: None,
+                notes: None,
+                create_uid: ctx.sender(),
+                create_date: ctx.timestamp,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+            });
     }
 
     write_audit_log_v2(
@@ -370,9 +378,8 @@ pub fn complete_onboarding_item(
     check_permission(ctx, organization_id, "hr_employee", "update")?;
     assert_employee_scope(ctx, organization_id, company_id, employee_id)?;
 
-    let assignment = find_active_onboarding_assignment(ctx, employee_id).ok_or(
-        "No active onboarding assignment — assign a template first".to_string(),
-    )?;
+    let assignment = find_active_onboarding_assignment(ctx, employee_id)
+        .ok_or("No active onboarding assignment — assign a template first".to_string())?;
     if assignment.organization_id != organization_id || assignment.company_id != company_id {
         return Err("Onboarding assignment scope mismatch".to_string());
     }
@@ -437,9 +444,8 @@ pub fn mark_onboarding_done(
     check_permission(ctx, organization_id, "hr_employee", "update")?;
     assert_employee_scope(ctx, organization_id, company_id, employee_id)?;
 
-    let mut assignment = find_active_onboarding_assignment(ctx, employee_id).ok_or(
-        "No active onboarding assignment — assign a template first".to_string(),
-    )?;
+    let mut assignment = find_active_onboarding_assignment(ctx, employee_id)
+        .ok_or("No active onboarding assignment — assign a template first".to_string())?;
     if assignment.organization_id != organization_id || assignment.company_id != company_id {
         return Err("Onboarding assignment scope mismatch".to_string());
     }

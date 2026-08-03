@@ -429,7 +429,12 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
             mileage_rate_id: None,
             per_diem_days: None,
             per_diem_rate_id: None,
-            attachment_ids: vec![super::test_receipt_id(ctx, fixture.organization_id, fixture.company_id, employee_id)?],
+            attachment_ids: vec![super::test_receipt_id(
+                ctx,
+                fixture.organization_id,
+                fixture.company_id,
+                employee_id,
+            )?],
             client_request_id: None,
             payment_mode: ExpensePaymentMode::OutOfPocket,
             merchant_key: None,
@@ -767,7 +772,10 @@ pub fn test_mileage_rate_effective_dates(ctx: &ReducerContext) -> Result<(), Str
         .find(&line.id)
         .ok_or("updated line")?;
     if (updated.total_amount - 40.0).abs() > 0.001 {
-        return Err(format!("expected 40 after distance update, got {}", updated.total_amount));
+        return Err(format!(
+            "expected 40 after distance update, got {}",
+            updated.total_amount
+        ));
     }
     let bad = update_expense(
         ctx,

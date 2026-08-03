@@ -25,7 +25,12 @@ pub(crate) fn company_pack_string(
         .filter(&company_id)
         .filter(|p| p.organization_id == organization_id && p.enabled)
     {
-        let Some(def) = ctx.db.country_pack_definition().pack_key().find(&pack.pack_key) else {
+        let Some(def) = ctx
+            .db
+            .country_pack_definition()
+            .pack_key()
+            .find(&pack.pack_key)
+        else {
             continue;
         };
         if let Some(v) = pack_metadata_json(&def.metadata)
@@ -57,7 +62,12 @@ pub(crate) fn company_pack_string_list(
         .filter(&company_id)
         .filter(|p| p.organization_id == organization_id && p.enabled)
     {
-        let Some(def) = ctx.db.country_pack_definition().pack_key().find(&pack.pack_key) else {
+        let Some(def) = ctx
+            .db
+            .country_pack_definition()
+            .pack_key()
+            .find(&pack.pack_key)
+        else {
             continue;
         };
         let Some(meta) = pack_metadata_json(&def.metadata) else {
@@ -98,7 +108,12 @@ pub(crate) fn document_residency_region_for_company(
     organization_id: u64,
     company_id: Option<u64>,
 ) -> Option<String> {
-    company_pack_string(ctx, organization_id, company_id, "document_residency_region")
+    company_pack_string(
+        ctx,
+        organization_id,
+        company_id,
+        "document_residency_region",
+    )
 }
 
 pub(crate) fn fiscal_archive_kinds_for_company(

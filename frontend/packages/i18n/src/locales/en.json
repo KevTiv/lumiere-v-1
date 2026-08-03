@@ -2796,6 +2796,7 @@
       "deleteLead": "Delete lead",
       "deleteLeadConfirm": "Delete this lead permanently?",
       "assignTag": "Assign tag",
+      "assignCategory": "Assign category",
       "addToSegment": "Add to segment",
       "markComplete": "Mark complete",
       "alreadyComplete": "This activity is already complete.",
@@ -2833,6 +2834,20 @@
         "name": "Name",
         "color": "Color",
         "description": "Description"
+      }
+    },
+    "contactCategories": {
+      "tabLabel": "Contact categories",
+      "createLabel": "New category",
+      "title": "Contact categories",
+      "description": "Hierarchical classification for organizing contacts",
+      "searchPlaceholder": "Search categories…",
+      "emptyMessage": "No contact categories yet.",
+      "columns": {
+        "name": "Name",
+        "color": "Color",
+        "parentId": "Parent",
+        "isActive": "Active"
       }
     },
     "contactSegments": {
@@ -2917,6 +2932,21 @@
         },
         "validation": {
           "stageRequired": "Choose a pipeline stage."
+        }
+      },
+      "markLost": {
+        "title": "Mark opportunity as lost",
+        "description": "Record why this opportunity was lost before closing it out.",
+        "submit": "Mark lost",
+        "sections": {
+          "reason": "Lost reason"
+        },
+        "fields": {
+          "lostReasonId": "Lost reason"
+        },
+        "noReasonsConfigured": "No lost reasons are configured for this organization yet. Add one in CRM pipeline settings before marking opportunities lost.",
+        "validation": {
+          "reasonRequired": "Choose a lost reason."
         }
       },
       "editOpportunity": {
@@ -3104,6 +3134,20 @@
         },
         "validation": {
           "tagId": "Enter a valid tag ID."
+        }
+      },
+      "assignCategory": {
+        "title": "Assign category",
+        "description": "Add a category to the selected contact.",
+        "sections": {
+          "category": "Category"
+        },
+        "fields": {
+          "categoryId": "Category",
+          "categoryIdPlaceholder": "Contact category row id"
+        },
+        "validation": {
+          "categoryId": "Enter a valid category ID."
         }
       },
       "addToSegment": {
@@ -3358,7 +3402,10 @@
       "description": "Explainable fit factors (deterministic baseline).",
       "recompute": "Recompute",
       "emptyTitle": "No score yet",
-      "emptyDescription": "Recompute to generate explainable factors."
+      "emptyDescription": "Recompute to generate explainable factors.",
+      "stale": "Stale",
+      "staleSince": "Stale since {{date}}",
+      "scoredAt": "Scored {{date}}"
     },
     "inbox": {
       "tabLabel": "Inbox",
@@ -3377,7 +3424,10 @@
       "recompute": "Recompute",
       "empty": "No insight yet — recompute to generate.",
       "relationships": "Relationships",
-      "depth": "Depth"
+      "depth": "Depth",
+      "stale": "Stale",
+      "staleSince": "Stale since {{date}}",
+      "computedAt": "Computed {{date}}"
     },
     "segments": {
       "rulesTitle": "Dynamic segment rules",

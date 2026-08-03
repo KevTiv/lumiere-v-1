@@ -37,7 +37,7 @@ pub struct AccountPaymentTermLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    pub payment_term_id: u64,          // FK → AccountPaymentTerm
+    pub payment_term_id: u64, // FK → AccountPaymentTerm
     /// Denormalized from the parent term at write time — lets subscriptions
     /// scope this table directly (SpacetimeDB subscription SQL has no
     /// subquery/join support to derive it from payment_term_id at read time).
@@ -256,7 +256,8 @@ pub fn create_payment_term_line(
     if term.organization_id != organization_id {
         return Err("Payment term belongs to a different organization".to_string());
     }
-    let line = ctx.db
+    let line = ctx
+        .db
         .account_payment_term_line()
         .insert(AccountPaymentTermLine {
             id: 0,
@@ -357,7 +358,8 @@ pub fn update_payment_term_line(
     let new_value_amount = value_amount.unwrap_or(line.value_amount);
     let new_days = days.unwrap_or(line.days);
     let new_months = months.unwrap_or(line.months);
-    let new_days_after_end_of_month = days_after_end_of_month.unwrap_or(line.days_after_end_of_month);
+    let new_days_after_end_of_month =
+        days_after_end_of_month.unwrap_or(line.days_after_end_of_month);
     let new_sequence = sequence.unwrap_or(line.sequence);
 
     ctx.db

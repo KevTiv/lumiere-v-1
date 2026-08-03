@@ -238,6 +238,8 @@ pub(crate) fn crm_resource(resource: &str) -> bool {
             | "contact-role-assignments"
             | "contact-tags"
             | "contact-tag-assignments"
+            | "contact-categories"
+            | "contact-category-assignments"
             | "contact-segments"
             | "segment-members"
             | "contact-relationships"
@@ -308,6 +310,7 @@ async fn filter_crm_company_rows(
         | "opportunity-lines"
         | "opportunity-presence"
         | "contact-tag-assignments"
+        | "contact-category-assignments"
         | "segment-members"
         | "privacy-consent"
         | "contact-relationship-insights"
@@ -1363,6 +1366,7 @@ pub async fn execute_resource_query_for_company(
         "landed-costs" => " ORDER BY id DESC",
         "landed-cost-lines" => " ORDER BY landed_cost_id ASC, id ASC",
         "contact-tags" => "",
+        "contact-categories" => "",
         "contact-segments" => "",
         "quality-alerts" => "",
         "mrp-bom-lines" => " ORDER BY bom_id ASC, sequence ASC",
@@ -1443,7 +1447,7 @@ pub async fn execute_resource_query_for_company(
     }
 
     match resource {
-        "contact-tags" | "contact-segments" => {
+        "contact-tags" | "contact-categories" | "contact-segments" => {
             rows.sort_by(|a, b| {
                 let an = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
                 let bn = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -1583,6 +1587,14 @@ mod tests {
             &mut rows
         ));
         assert_eq!(rows, vec![json!({ "id": 1, "organizationId": 9 })]);
+
+        let mut rows = vec![json!({ "id": 1, "organizationId": 9 })];
+        assert!(!filter_direct_crm_company_rows(
+            "contact-categories",
+            7,
+            &mut rows
+        ));
+        assert_eq!(rows, vec![json!({ "id": 1, "organizationId": 9 })]);
     }
 
     #[test]
@@ -1596,6 +1608,7 @@ mod tests {
             "contact-role-assignments",
             "contact-communication-preferences",
             "contact-tag-assignments",
+            "contact-category-assignments",
             "segment-members",
             "privacy-consent",
             "contact-relationship-insights",
@@ -1618,6 +1631,7 @@ mod tests {
             "lead-lost-reasons",
             "opportunity-stages",
             "contact-tags",
+            "contact-categories",
             "contact-segments",
             "assignment-rules",
             "activities",

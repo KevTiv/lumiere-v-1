@@ -5,8 +5,8 @@ use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::{
-    account_move_line, create_bill_from_purchase_order, post_invoice, AddAccountMoveLineParams,
-    CreateBillFromPurchaseOrderParams, AccountMoveLine,
+    account_move_line, create_bill_from_purchase_order, post_invoice, AccountMoveLine,
+    AddAccountMoveLineParams, CreateBillFromPurchaseOrderParams,
 };
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::product;

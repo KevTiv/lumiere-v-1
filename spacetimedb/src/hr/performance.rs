@@ -386,15 +386,18 @@ pub fn submit_performance_review(
         return Err("Cannot submit review for a closed cycle".to_string());
     }
 
-    ctx.db.hr_performance_review().id().update(HrPerformanceReview {
-        state: "submitted".to_string(),
-        self_rating: Some(params.self_rating),
-        summary: params.summary,
-        submitted_at: Some(ctx.timestamp),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..review
-    });
+    ctx.db
+        .hr_performance_review()
+        .id()
+        .update(HrPerformanceReview {
+            state: "submitted".to_string(),
+            self_rating: Some(params.self_rating),
+            summary: params.summary,
+            submitted_at: Some(ctx.timestamp),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..review
+        });
 
     write_audit_log_v2(
         ctx,
@@ -452,15 +455,18 @@ pub fn complete_performance_review(
         return Err("Only submitted reviews can be completed".to_string());
     }
 
-    ctx.db.hr_performance_review().id().update(HrPerformanceReview {
-        state: "completed".to_string(),
-        manager_rating: Some(params.manager_rating),
-        summary: params.summary.or(review.summary),
-        completed_at: Some(ctx.timestamp),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..review
-    });
+    ctx.db
+        .hr_performance_review()
+        .id()
+        .update(HrPerformanceReview {
+            state: "completed".to_string(),
+            manager_rating: Some(params.manager_rating),
+            summary: params.summary.or(review.summary),
+            completed_at: Some(ctx.timestamp),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..review
+        });
 
     write_audit_log_v2(
         ctx,

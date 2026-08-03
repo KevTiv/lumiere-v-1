@@ -136,12 +136,27 @@ pub struct AppendCrmConversationMessageParams {
     pub metadata: Option<String>,
 }
 
+/// Explicit patch contract (CRM-RI-012): `assigned_user_id` and `metadata`
+/// are nullable on `CrmConversation` and use `Option<Option<T>>` — outer
+/// `None` = field not sent (leave unchanged), outer `Some(None)` = explicit
+/// clear, outer `Some(Some(v))` = replace with `v` (validated as an active
+/// assignee before it is applied).
+///
+/// `status` is non-nullable on the table and stays a single-level
+/// `Option<String>` (replaceable, not clearable).
+///
+/// `external_thread_id` is provider-owned (set only by the trusted WhatsApp
+/// adapter via `receive_crm_provider_message`) and stays a single-level
+/// `Option<String>` deliberately: ordinary callers are rejected on *any*
+/// non-`None` value, so it is never widened to a clearable shape — doing so
+/// would let an ordinary caller sever a provider-linked thread and reopen
+/// the CRM-RI-008/010 provenance guard that inbox.rs already enforces.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateCrmConversationParams {
     pub status: Option<String>,
-    pub assigned_user_id: Option<Identity>,
+    pub assigned_user_id: Option<Option<Identity>>,
     pub external_thread_id: Option<String>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -1196,7 +1211,7 @@ pub fn update_crm_conversation(
         &conversation.channel,
         identity_id,
     )?;
-    if let Some(assignee) = params.assigned_user_id {
+    if let Some(Some(assignee)) = params.assigned_user_id {
         validate_assignee(ctx, organization_id, contact_row.company_id, assignee)?;
     }
     if params.external_thread_id.is_some() {
@@ -1215,22 +1230,19 @@ pub fn update_crm_conversation(
     if params.assigned_user_id.is_some() {
         changed_fields.push("assigned_user_id".to_string());
     }
-    let assigned_user_id = params.assigned_user_id.or(conversation.assigned_user_id);
-    if params.external_thread_id.is_some() {
-        changed_fields.push("external_thread_id".to_string());
-    }
-    let external_thread_id = params
-        .external_thread_id
-        .or_else(|| conversation.external_thread_id.clone());
+    let assigned_user_id = params
+        .assigned_user_id
+        .unwrap_or(conversation.assigned_user_id);
     if params.metadata.is_some() {
         changed_fields.push("metadata".to_string());
     }
-    let metadata = params.metadata.or_else(|| conversation.metadata.clone());
+    let metadata = params
+        .metadata
+        .unwrap_or_else(|| conversation.metadata.clone());
 
     ctx.db.crm_conversation().id().update(CrmConversation {
         status,
         assigned_user_id,
-        external_thread_id,
         metadata,
         updated_at: ctx.timestamp,
         ..conversation

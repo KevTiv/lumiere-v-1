@@ -1,9 +1,7 @@
 //! OMS extension domain tests — fiscal remap, Incoterm, promotion, options, commission.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::accounting::tax_management::{
-    account_tax, create_account_tax, CreateAccountTaxParams,
-};
+use crate::accounting::tax_management::{account_tax, create_account_tax, CreateAccountTaxParams};
 use crate::inventory::product::product;
 use crate::sales::oms_extensions::{
     account_fiscal_position, account_fiscal_position_tax, account_incoterm, accrue_sale_commission,
@@ -246,7 +244,10 @@ pub fn test_fiscal_position_tax_remap(ctx: &ReducerContext) -> Result<(), String
     }
     // 5% of 100 = 5
     if (line.price_tax - 5.0).abs() > 1e-6 {
-        return Err(format!("Expected tax 5.0 after remap, got {}", line.price_tax));
+        return Err(format!(
+            "Expected tax 5.0 after remap, got {}",
+            line.price_tax
+        ));
     }
     Ok(())
 }
@@ -356,7 +357,10 @@ pub fn test_incoterm_id_and_promotion_and_options(ctx: &ReducerContext) -> Resul
         return Err("incoterm_id not stored".into());
     }
     if order.incoterm.as_deref() != Some("FOB") {
-        return Err(format!("expected incoterm code FOB, got {:?}", order.incoterm));
+        return Err(format!(
+            "expected incoterm code FOB, got {:?}",
+            order.incoterm
+        ));
     }
 
     create_sale_promotion(
@@ -437,9 +441,7 @@ pub fn test_incoterm_id_and_promotion_and_options(ctx: &ReducerContext) -> Resul
         ctx,
         org_id,
         order.id,
-        AccrueSaleCommissionParams {
-            rate_percent: 10.0,
-        },
+        AccrueSaleCommissionParams { rate_percent: 10.0 },
     )?;
     let commission = ctx
         .db
@@ -456,9 +458,7 @@ pub fn test_incoterm_id_and_promotion_and_options(ctx: &ReducerContext) -> Resul
         ctx,
         org_id,
         order.id,
-        AccrueSaleCommissionParams {
-            rate_percent: 10.0,
-        },
+        AccrueSaleCommissionParams { rate_percent: 10.0 },
     )?;
     let count = ctx
         .db

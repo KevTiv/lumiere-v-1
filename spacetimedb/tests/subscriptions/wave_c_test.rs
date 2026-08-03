@@ -17,10 +17,11 @@ use crate::subscriptions::reducers::{
     CreateSubscriptionPlanParams, GenerateSubscriptionInvoiceParams, UpdateSubscriptionPlanParams,
 };
 use crate::subscriptions::subscription_wave_c::{
-    activate_subscription_plan, amend_subscription, cancel_subscription, deactivate_subscription_plan,
-    pause_subscription, renew_subscription, resume_subscription, subscription_amendment,
-    update_subscription_plan, AmendSubscriptionParams, CancelSubscriptionParams,
-    PauseSubscriptionParams, RenewSubscriptionParams, ResumeSubscriptionParams,
+    activate_subscription_plan, amend_subscription, cancel_subscription,
+    deactivate_subscription_plan, pause_subscription, renew_subscription, resume_subscription,
+    subscription_amendment, update_subscription_plan, AmendSubscriptionParams,
+    CancelSubscriptionParams, PauseSubscriptionParams, RenewSubscriptionParams,
+    ResumeSubscriptionParams,
 };
 use crate::subscriptions::tables::{subscription, subscription_line, subscription_plan};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
@@ -298,10 +299,12 @@ pub fn test_amend_price_with_proration(ctx: &ReducerContext) -> Result<(), Strin
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
     let journal_id = seed_journal(ctx, &fixture)?;
-    let income = *fixture.chart_account_ids.get(chart_keys::REVENUE).ok_or("rev")?;
+    let income = *fixture
+        .chart_account_ids
+        .get(chart_keys::REVENUE)
+        .ok_or("rev")?;
     let ar = *fixture.chart_account_ids.get(chart_keys::AR).ok_or("ar")?;
-    let (sub_id, line_id) =
-        seed_active_subscription(ctx, &fixture, journal_id, "AMEND", 100.0)?;
+    let (sub_id, line_id) = seed_active_subscription(ctx, &fixture, journal_id, "AMEND", 100.0)?;
 
     amend_subscription(
         ctx,
@@ -324,7 +327,12 @@ pub fn test_amend_price_with_proration(ctx: &ReducerContext) -> Result<(), Strin
         },
     )?;
 
-    let line = ctx.db.subscription_line().id().find(&line_id).ok_or("line")?;
+    let line = ctx
+        .db
+        .subscription_line()
+        .id()
+        .find(&line_id)
+        .ok_or("line")?;
     if (line.price_unit - 150.0).abs() > 0.01 {
         return Err(format!("expected price 150, got {}", line.price_unit));
     }
@@ -366,7 +374,10 @@ pub fn test_pause_blocks_invoice_and_resume(ctx: &ReducerContext) -> Result<(), 
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
     let journal_id = seed_journal(ctx, &fixture)?;
-    let income = *fixture.chart_account_ids.get(chart_keys::REVENUE).ok_or("rev")?;
+    let income = *fixture
+        .chart_account_ids
+        .get(chart_keys::REVENUE)
+        .ok_or("rev")?;
     let ar = *fixture.chart_account_ids.get(chart_keys::AR).ok_or("ar")?;
     let (sub_id, _) = seed_active_subscription(ctx, &fixture, journal_id, "PAUSE", 80.0)?;
 
@@ -437,7 +448,10 @@ pub fn test_renew_and_cancel_with_credit(ctx: &ReducerContext) -> Result<(), Str
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
     let journal_id = seed_journal(ctx, &fixture)?;
-    let income = *fixture.chart_account_ids.get(chart_keys::REVENUE).ok_or("rev")?;
+    let income = *fixture
+        .chart_account_ids
+        .get(chart_keys::REVENUE)
+        .ok_or("rev")?;
     let ar = *fixture.chart_account_ids.get(chart_keys::AR).ok_or("ar")?;
     let (sub_id, _) = seed_active_subscription(ctx, &fixture, journal_id, "RENEW", 60.0)?;
 
@@ -615,7 +629,12 @@ pub fn test_plan_update_and_deactivate(ctx: &ReducerContext) -> Result<(), Strin
             metadata: None,
         },
     )?;
-    let plan = ctx.db.subscription_plan().id().find(&plan_id).ok_or("plan")?;
+    let plan = ctx
+        .db
+        .subscription_plan()
+        .id()
+        .find(&plan_id)
+        .ok_or("plan")?;
     if plan.name != "Updated Plan" || plan.billing_period != "year" || plan.auto_close_limit != 5 {
         return Err(format!(
             "plan update failed: name={} period={} limit={}",
@@ -627,12 +646,22 @@ pub fn test_plan_update_and_deactivate(ctx: &ReducerContext) -> Result<(), Strin
     }
 
     deactivate_subscription_plan(ctx, org_id, company_id, plan_id)?;
-    let inactive = ctx.db.subscription_plan().id().find(&plan_id).ok_or("plan")?;
+    let inactive = ctx
+        .db
+        .subscription_plan()
+        .id()
+        .find(&plan_id)
+        .ok_or("plan")?;
     if inactive.active || inactive.is_published {
         return Err("expected inactive unpublished plan".into());
     }
     activate_subscription_plan(ctx, org_id, company_id, plan_id)?;
-    let active = ctx.db.subscription_plan().id().find(&plan_id).ok_or("plan")?;
+    let active = ctx
+        .db
+        .subscription_plan()
+        .id()
+        .find(&plan_id)
+        .ok_or("plan")?;
     if !active.active {
         return Err("expected reactivated plan".into());
     }

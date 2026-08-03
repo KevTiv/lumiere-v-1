@@ -241,7 +241,7 @@ stop:
 	spacetime stop
 
 publish:
-	LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish $(DB) --module-path $(MODULE) --server local -y
+	sudo LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish $(DB) --module-path $(MODULE) --server local -y
 
 
 generate-stdb-ts-sdk:

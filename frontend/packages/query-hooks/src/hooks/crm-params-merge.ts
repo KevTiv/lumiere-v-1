@@ -1,10 +1,12 @@
 import type {
   CreateActivityParams,
+  CreateContactCategoryParams,
   CreateContactParams,
   CreateContactSegmentParams,
   CreateContactTagParams,
   CreateLeadParams,
   CreateOpportunityParams,
+  UpdateContactCategoryParams,
   UpdateContactCoreParams,
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
@@ -148,8 +150,10 @@ export function finalizeCreateActivityParams(
     dateDeadline: partial.dateDeadline,
     dateDone: partial.dateDone,
     assignedTo: partial.assignedTo,
-    resModel: partial.resModel,
-    resId: partial.resId,
+    // CRM-RI-015: `resModel`/`resId` were replaced by the typed, server-validated
+    // `target`. It is passed through unchanged rather than defaulted — an absent
+    // target is a legitimate, unattached activity.
+    target: partial.target,
     duration: partial.duration,
     location: partial.location,
     videoUrl: partial.videoUrl,
@@ -164,6 +168,18 @@ export function finalizeCreateContactTagParams(
     name: partial.name ?? "",
     color: partial.color,
     description: partial.description,
+    metadata: partial.metadata,
+  }
+}
+
+export function finalizeCreateContactCategoryParams(
+  partial: Partial<CreateContactCategoryParams>,
+): CreateContactCategoryParams {
+  return {
+    name: partial.name ?? "",
+    color: partial.color,
+    parentId: partial.parentId,
+    isActive: partial.isActive ?? true,
     metadata: partial.metadata,
   }
 }
@@ -193,6 +209,21 @@ export function finalizeUpdateContactParams(
 export function finalizeUpdateOpportunityParams(
   partial: Partial<UpdateOpportunityParams>,
 ): UpdateOpportunityParams {
+  return pickDefined(partial);
+}
+
+/**
+ * Strip undefined keys from an `update_contact_category` patch before
+ * `stdbParamsToJson`. Must be passed WITHOUT a `structName` — `color`,
+ * `parentId`, and `metadata` are `Option<Option<T>>` on the reducer (three-
+ * state: omit=unchanged, null=clear, value=replace), and forcing a
+ * `structName` would fill every absent key with an explicit "none" tag,
+ * turning "field not touched" into "clear this field" (the same CRM-RI-003
+ * class of bug as {@link finalizeUpdateContactParams}).
+ */
+export function finalizeUpdateContactCategoryParams(
+  partial: Partial<UpdateContactCategoryParams>,
+): UpdateContactCategoryParams {
   return pickDefined(partial);
 }
 

@@ -35,6 +35,12 @@ pub struct ContactRelationshipInsight {
     pub computed_at: Timestamp,
     pub computed_by: Identity,
     pub metadata: Option<String>,
+    /// True when the source contact/relationships changed since
+    /// `computed_at` and this snapshot no longer reflects them. Cleared by
+    /// `recompute_relationship_insights`.
+    pub is_stale: bool,
+    /// When the insight was first flagged stale. `None` while fresh.
+    pub stale_since: Option<Timestamp>,
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -58,6 +64,42 @@ fn hierarchy_depth(ctx: &ReducerContext, organization_id: u64, contact_id: u64) 
         }
     }
     depth
+}
+
+/// Mark any existing relationship insight for `contact_id` as stale because
+/// its source contact/relationships changed. Cheap, visible freshness
+/// signal — does not recompute.
+/// Callers: any reducer in `contacts.rs` that mutates `parent_id` (affects
+/// `hierarchy_depth`) or creates/ends a `contact_relationship` row (affects
+/// `active_relationship_count` / `related_contact_ids`) — e.g.
+/// `update_contact_parent`, `create_contact_relationship`,
+/// `end_contact_relationship`. When a relationship changes, both endpoint
+/// contacts should be marked stale.
+pub(crate) fn mark_relationship_insight_stale(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    contact_id: u64,
+) {
+    let ids: Vec<u64> = ctx
+        .db
+        .contact_relationship_insight()
+        .rel_insight_by_contact()
+        .filter(&contact_id)
+        .filter(|r| r.organization_id == organization_id && !r.is_stale)
+        .map(|r| r.id)
+        .collect();
+    for id in ids {
+        if let Some(row) = ctx.db.contact_relationship_insight().id().find(&id) {
+            ctx.db
+                .contact_relationship_insight()
+                .id()
+                .update(ContactRelationshipInsight {
+                    is_stale: true,
+                    stale_since: Some(ctx.timestamp),
+                    ..row
+                });
+        }
+    }
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -139,6 +181,8 @@ pub fn recompute_relationship_insights(
             computed_at: ctx.timestamp,
             computed_by: ctx.sender(),
             metadata: None,
+            is_stale: false,
+            stale_since: None,
         });
 
     write_audit_log_v2(

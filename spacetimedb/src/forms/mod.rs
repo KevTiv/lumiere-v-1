@@ -286,7 +286,7 @@ pub struct FormFieldLabel {
     pub id: u64,
     #[index(btree)]
     pub field_row_id: u64, // form_config_field.id
-    pub locale: String,    // e.g. "en", "pt-BR"
+    pub locale: String, // e.g. "en", "pt-BR"
     pub label: String,
     pub updated_at: Timestamp,
 }
@@ -1367,13 +1367,7 @@ pub fn delete_record_custom_field_values(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, &model, "write")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
-    ensure_record_allows_custom_field_writes(
-        ctx,
-        organization_id,
-        company_id,
-        &model,
-        record_id,
-    )?;
+    ensure_record_allows_custom_field_writes(ctx, organization_id, company_id, &model, record_id)?;
 
     let rows: Vec<_> = ctx
         .db
@@ -1478,7 +1472,12 @@ pub fn publish_form_configuration(
     } else {
         "create"
     };
-    check_permission(ctx, organization_id, "form_configuration", permission_action)?;
+    check_permission(
+        ctx,
+        organization_id,
+        "form_configuration",
+        permission_action,
+    )?;
 
     let configuration_id = match existing {
         Some(config) => {

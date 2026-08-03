@@ -13,6 +13,7 @@ import {
 export default __t.row({
   id: __t.u64().primaryKey(),
   organizationId: __t.u64().name("organization_id"),
+  companyId: __t.u64().name("company_id"),
   contactId: __t.u64().name("contact_id"),
   categoryId: __t.u64().name("category_id"),
   assignedAt: __t.timestamp().name("assigned_at"),

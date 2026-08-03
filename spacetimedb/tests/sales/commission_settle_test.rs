@@ -14,8 +14,8 @@ use crate::sales::oms_extensions::{
 };
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{
-    cancel_sale_order, confirm_sales_order, create_sale_order, sale_order, CreateSaleOrderLineParams,
-    CreateSaleOrderParams,
+    cancel_sale_order, confirm_sales_order, create_sale_order, sale_order,
+    CreateSaleOrderLineParams, CreateSaleOrderParams,
 };
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{AccountInternalGroup, DiscountPolicy, JournalType};
@@ -294,9 +294,7 @@ pub fn test_commission_settle_and_refuse_double(ctx: &ReducerContext) -> Result<
         ctx,
         org_id,
         order_id,
-        AccrueSaleCommissionParams {
-            rate_percent: 10.0,
-        },
+        AccrueSaleCommissionParams { rate_percent: 10.0 },
     )?;
 
     let commission = ctx
@@ -369,9 +367,7 @@ pub fn test_commission_cancel_clawback(ctx: &ReducerContext) -> Result<(), Strin
         ctx,
         org_id,
         order_a,
-        AccrueSaleCommissionParams {
-            rate_percent: 5.0,
-        },
+        AccrueSaleCommissionParams { rate_percent: 5.0 },
     )?;
     let c_a = ctx
         .db
@@ -397,9 +393,7 @@ pub fn test_commission_cancel_clawback(ctx: &ReducerContext) -> Result<(), Strin
         ctx,
         org_id,
         order_b,
-        AccrueSaleCommissionParams {
-            rate_percent: 5.0,
-        },
+        AccrueSaleCommissionParams { rate_percent: 5.0 },
     )?;
     cancel_sale_order(ctx, org_id, order_b, Some("clawback-test".into()))?;
     let after = ctx

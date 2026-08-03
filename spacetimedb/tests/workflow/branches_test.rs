@@ -48,10 +48,38 @@ fn test_xor_selects_first_edge() -> Result<(), String> {
 fn test_crossing_fork_rejected() -> Result<(), String> {
     // Unpaired OR fork (no join) must be rejected.
     let nodes = vec![
-        node(1, "start", WorkflowNodeKind::Start, WorkflowBranchKind::None, WorkflowBranchKind::None, 1),
-        node(2, "f1", WorkflowNodeKind::Fork, WorkflowBranchKind::Or, WorkflowBranchKind::None, 2),
-        node(3, "a", WorkflowNodeKind::End, WorkflowBranchKind::None, WorkflowBranchKind::None, 3),
-        node(4, "b", WorkflowNodeKind::End, WorkflowBranchKind::None, WorkflowBranchKind::None, 4),
+        node(
+            1,
+            "start",
+            WorkflowNodeKind::Start,
+            WorkflowBranchKind::None,
+            WorkflowBranchKind::None,
+            1,
+        ),
+        node(
+            2,
+            "f1",
+            WorkflowNodeKind::Fork,
+            WorkflowBranchKind::Or,
+            WorkflowBranchKind::None,
+            2,
+        ),
+        node(
+            3,
+            "a",
+            WorkflowNodeKind::End,
+            WorkflowBranchKind::None,
+            WorkflowBranchKind::None,
+            3,
+        ),
+        node(
+            4,
+            "b",
+            WorkflowNodeKind::End,
+            WorkflowBranchKind::None,
+            WorkflowBranchKind::None,
+            4,
+        ),
     ];
     let edges = vec![
         edge(1, "e1", "start", "f1", 1),
@@ -61,7 +89,10 @@ fn test_crossing_fork_rejected() -> Result<(), String> {
     match validate_workflow_graph(&[], &nodes, &edges) {
         Ok(()) => Err("unpaired fork topology was accepted".to_string()),
         Err(errors) => {
-            if errors.iter().any(|e| e.contains("unclosed") || e.contains("Join")) {
+            if errors
+                .iter()
+                .any(|e| e.contains("unclosed") || e.contains("Join"))
+            {
                 Ok(())
             } else {
                 Err(format!("unexpected validation errors: {errors:?}"))
@@ -167,7 +198,11 @@ fn test_and_join_fires_once(ctx: &ReducerContext) -> Result<(), String> {
             .workflow_token()
             .workflow_token_by_instance()
             .filter(&instance.id)
-            .find(|t| t.state == WorkflowTokenState::Active && t.branch_key.as_deref() == Some(if idx == 0 { "to-left" } else { "to-right" }))
+            .find(|t| {
+                t.state == WorkflowTokenState::Active
+                    && t.branch_key.as_deref()
+                        == Some(if idx == 0 { "to-left" } else { "to-right" })
+            })
             .ok_or("branch token missing")?;
         // signal from left/right node
         let signal = if idx == 0 { "left" } else { "right" };
@@ -241,14 +276,58 @@ fn seed_and_graph(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(u64, u6
         .find(|row| row.status == WorkflowVersionStatus::Draft)
         .ok_or("draft missing")?;
     let mut rev = version.draft_revision;
-    use crate::workflow::definitions::{WorkflowHumanTaskKind, WorkflowTaskAssignment, WorkflowTaskPolicy};
+    use crate::workflow::definitions::{
+        WorkflowHumanTaskKind, WorkflowTaskAssignment, WorkflowTaskPolicy,
+    };
     for (key, name, kind, split, join, seq) in [
-        ("start", "Start", WorkflowNodeKind::Start, WorkflowBranchKind::None, WorkflowBranchKind::None, 1u32),
-        ("fork", "Fork", WorkflowNodeKind::Fork, WorkflowBranchKind::And, WorkflowBranchKind::None, 2),
-        ("left", "Left", WorkflowNodeKind::HumanTask, WorkflowBranchKind::None, WorkflowBranchKind::None, 3),
-        ("right", "Right", WorkflowNodeKind::HumanTask, WorkflowBranchKind::None, WorkflowBranchKind::None, 4),
-        ("join", "Join", WorkflowNodeKind::Join, WorkflowBranchKind::None, WorkflowBranchKind::And, 5),
-        ("end", "End", WorkflowNodeKind::End, WorkflowBranchKind::None, WorkflowBranchKind::None, 6),
+        (
+            "start",
+            "Start",
+            WorkflowNodeKind::Start,
+            WorkflowBranchKind::None,
+            WorkflowBranchKind::None,
+            1u32,
+        ),
+        (
+            "fork",
+            "Fork",
+            WorkflowNodeKind::Fork,
+            WorkflowBranchKind::And,
+            WorkflowBranchKind::None,
+            2,
+        ),
+        (
+            "left",
+            "Left",
+            WorkflowNodeKind::HumanTask,
+            WorkflowBranchKind::None,
+            WorkflowBranchKind::None,
+            3,
+        ),
+        (
+            "right",
+            "Right",
+            WorkflowNodeKind::HumanTask,
+            WorkflowBranchKind::None,
+            WorkflowBranchKind::None,
+            4,
+        ),
+        (
+            "join",
+            "Join",
+            WorkflowNodeKind::Join,
+            WorkflowBranchKind::None,
+            WorkflowBranchKind::And,
+            5,
+        ),
+        (
+            "end",
+            "End",
+            WorkflowNodeKind::End,
+            WorkflowBranchKind::None,
+            WorkflowBranchKind::None,
+            6,
+        ),
     ] {
         let task_policy = if kind == WorkflowNodeKind::HumanTask {
             Some(WorkflowTaskPolicy {

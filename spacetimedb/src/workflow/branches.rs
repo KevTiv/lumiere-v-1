@@ -109,10 +109,7 @@ pub(crate) fn select_fork_edges<'a>(
                     ));
                 };
                 evaluate_condition_program(program, snapshot_fields, snapshot).map_err(|error| {
-                    format!(
-                        "fork condition failed on edge '{}': {error}",
-                        edge.edge_key
-                    )
+                    format!("fork condition failed on edge '{}': {error}", edge.edge_key)
                 })?
             }
         };
@@ -133,7 +130,10 @@ pub(crate) fn select_fork_edges<'a>(
             .ok_or_else(|| format!("XOR Fork '{}' matched no outgoing edge", fork.node_key)),
         WorkflowBranchKind::Or => {
             if matched.is_empty() {
-                return Err(format!("OR Fork '{}' matched no outgoing edge", fork.node_key));
+                return Err(format!(
+                    "OR Fork '{}' matched no outgoing edge",
+                    fork.node_key
+                ));
             }
             Ok(matched)
         }
@@ -165,7 +165,11 @@ pub(crate) fn record_join_arrival(
         .db
         .workflow_join_arrival()
         .workflow_join_arrival_by_unique()
-        .filter((&fork.id, &join_node_key.to_string(), &branch_key.to_string()))
+        .filter((
+            &fork.id,
+            &join_node_key.to_string(),
+            &branch_key.to_string(),
+        ))
         .next()
     {
         return Ok((existing, false));
@@ -189,7 +193,8 @@ pub(crate) fn record_join_arrival(
 pub(crate) fn join_is_ready(fork: &WorkflowFork, arrival_count: usize) -> bool {
     match fork.split_kind {
         WorkflowBranchKind::And => {
-            arrival_count >= fork.expected_branch_keys.len() && !fork.expected_branch_keys.is_empty()
+            arrival_count >= fork.expected_branch_keys.len()
+                && !fork.expected_branch_keys.is_empty()
         }
         WorkflowBranchKind::Xor | WorkflowBranchKind::Or => arrival_count >= 1,
         WorkflowBranchKind::None => false,

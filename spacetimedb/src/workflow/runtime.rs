@@ -843,9 +843,7 @@ fn close_fork(ctx: &ReducerContext, fork: WorkflowFork) -> Result<WorkflowFork, 
         .workflow_token()
         .workflow_token_by_instance()
         .filter(&fork.instance_id)
-        .filter(|token| {
-            token.fork_id == Some(fork.id) && token.state == WorkflowTokenState::Active
-        })
+        .filter(|token| token.fork_id == Some(fork.id) && token.state == WorkflowTokenState::Active)
         .collect();
     for token in siblings {
         ctx.db.workflow_token().id().update(WorkflowToken {

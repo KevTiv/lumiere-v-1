@@ -264,18 +264,21 @@ pub fn create_sale_commission_plan_split(
     if !(0.0..=100.0).contains(&params.share_percent) {
         return Err("share_percent must be between 0 and 100".to_string());
     }
-    let row = ctx.db.sale_commission_plan_split().insert(SaleCommissionPlanSplit {
-        id: 0,
-        organization_id,
-        plan_id: params.plan_id,
-        partner_id: params.partner_id,
-        share_percent: params.share_percent,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: params.metadata,
-    });
+    let row = ctx
+        .db
+        .sale_commission_plan_split()
+        .insert(SaleCommissionPlanSplit {
+            id: 0,
+            organization_id,
+            plan_id: params.plan_id,
+            partner_id: params.partner_id,
+            share_percent: params.share_percent,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: params.metadata,
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -406,25 +409,28 @@ pub fn create_sales_integration_intent(
     if existing.is_some() {
         return Ok(());
     }
-    let row = ctx.db.sales_integration_intent().insert(SalesIntegrationIntent {
-        id: 0,
-        organization_id,
-        company_id,
-        provider: params.provider,
-        intent_type: params.intent_type,
-        sale_order_id: params.sale_order_id,
-        status: "pending".to_string(),
-        idempotency_key: params.idempotency_key,
-        request_payload: params.request_payload,
-        last_error: None,
-        external_reference: None,
-        attempt_count: 0,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: params.metadata,
-    });
+    let row = ctx
+        .db
+        .sales_integration_intent()
+        .insert(SalesIntegrationIntent {
+            id: 0,
+            organization_id,
+            company_id,
+            provider: params.provider,
+            intent_type: params.intent_type,
+            sale_order_id: params.sale_order_id,
+            status: "pending".to_string(),
+            idempotency_key: params.idempotency_key,
+            request_payload: params.request_payload,
+            last_error: None,
+            external_reference: None,
+            attempt_count: 0,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: params.metadata,
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -467,16 +473,19 @@ pub fn record_sales_integration_result(
     if intent.organization_id != organization_id || intent.company_id != company_id {
         return Err("Record does not belong to this company".to_string());
     }
-    ctx.db.sales_integration_intent().id().update(SalesIntegrationIntent {
-        status: params.status.clone(),
-        external_reference: params.external_reference.clone(),
-        last_error: params.last_error.clone(),
-        attempt_count: intent.attempt_count.saturating_add(1),
-        metadata: params.metadata.or(intent.metadata.clone()),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..intent
-    });
+    ctx.db
+        .sales_integration_intent()
+        .id()
+        .update(SalesIntegrationIntent {
+            status: params.status.clone(),
+            external_reference: params.external_reference.clone(),
+            last_error: params.last_error.clone(),
+            attempt_count: intent.attempt_count.saturating_add(1),
+            metadata: params.metadata.or(intent.metadata.clone()),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..intent
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -560,12 +569,15 @@ pub fn schedule_sales_sla_escalation(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "sale_order", "write")?;
     let when = ctx.timestamp + std::time::Duration::from_secs(delay_secs.max(60));
-    let job = ctx.db.sales_sla_escalation_job().insert(SalesSlaEscalationJob {
-        scheduled_id: 0,
-        scheduled_at: ScheduleAt::Time(when),
-        organization_id,
-        company_id,
-    });
+    let job = ctx
+        .db
+        .sales_sla_escalation_job()
+        .insert(SalesSlaEscalationJob {
+            scheduled_id: 0,
+            scheduled_at: ScheduleAt::Time(when),
+            organization_id,
+            company_id,
+        });
 
     write_audit_log_v2(
         ctx,
@@ -576,9 +588,7 @@ pub fn schedule_sales_sla_escalation(
             record_id: job.scheduled_id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(
-                serde_json::json!({ "delay_secs": delay_secs.max(60) }).to_string(),
-            ),
+            new_values: Some(serde_json::json!({ "delay_secs": delay_secs.max(60) }).to_string()),
             changed_fields: vec!["scheduled_at".to_string()],
             metadata: None,
         },

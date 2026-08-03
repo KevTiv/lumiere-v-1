@@ -6,8 +6,8 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::product::product;
 use crate::inventory::stock::{
-    create_stock_move, create_stock_picking, stock_picking, stock_quant,
-    CreateStockMoveParams, CreateStockPickingParams,
+    create_stock_move, create_stock_picking, stock_picking, stock_quant, CreateStockMoveParams,
+    CreateStockPickingParams,
 };
 use crate::inventory::warehouse::warehouse;
 use serde_json;

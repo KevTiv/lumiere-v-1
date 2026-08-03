@@ -122,7 +122,11 @@ fn seed_plan(ctx: &ReducerContext, fixture: &OrgFixture, journal_id: u64) -> Res
         .ok_or_else(|| "plan not found".to_string())
 }
 
-fn seed_confirmed_so(ctx: &ReducerContext, fixture: &OrgFixture, label: &str) -> Result<u64, String> {
+fn seed_confirmed_so(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    label: &str,
+) -> Result<u64, String> {
     let org_id = fixture.organization_id;
     let product = ctx
         .db
@@ -320,7 +324,10 @@ pub fn test_subscription_create_lines_bill_idempotent(ctx: &ReducerContext) -> R
         ));
     }
     if (sub.recurring_mrr - 100.0).abs() > 0.01 {
-        return Err(format!("expected MRR 100 from lines, got {}", sub.recurring_mrr));
+        return Err(format!(
+            "expected MRR 100 from lines, got {}",
+            sub.recurring_mrr
+        ));
     }
     let line_count = ctx
         .db
@@ -393,7 +400,10 @@ pub fn test_subscription_create_lines_bill_idempotent(ctx: &ReducerContext) -> R
         return Err("expected OutInvoice".into());
     }
     if (mv.amount_total - 100.0).abs() > 0.01 {
-        return Err(format!("expected amount_total 100, got {}", mv.amount_total));
+        return Err(format!(
+            "expected amount_total 100, got {}",
+            mv.amount_total
+        ));
     }
     let runs = ctx
         .db
@@ -437,12 +447,7 @@ pub fn test_company_isolation_on_activate(ctx: &ReducerContext) -> Result<(), St
     let so_id = seed_confirmed_so(ctx, &fixture_a, "SUB-ISO-SO")?;
     let sub_id = create_draft_subscription(ctx, &fixture_a, plan_id, so_id)?;
 
-    let err = activate_subscription(
-        ctx,
-        fixture_a.organization_id,
-        fixture_b.company_id,
-        sub_id,
-    );
+    let err = activate_subscription(ctx, fixture_a.organization_id, fixture_b.company_id, sub_id);
     if err.is_ok() {
         return Err("activate with wrong company_id should fail".into());
     }

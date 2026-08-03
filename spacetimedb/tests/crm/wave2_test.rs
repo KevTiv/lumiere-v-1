@@ -4,9 +4,15 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::core::country_pack::{set_company_country_pack, SetCompanyCountryPackParams};
 use crate::crm::contacts::{create_contact, CreateContactParams};
-use crate::crm::forecast::{create_forecast_snapshot, crm_forecast_snapshot, CreateCrmForecastSnapshotParams};
-use crate::crm::opportunities::{create_opportunity, opp_stage, opportunity, CreateOpportunityParams, OpportunityStage};
-use crate::crm::presence::{clear_opportunity_presence, opportunity_presence, update_opportunity_presence};
+use crate::crm::forecast::{
+    create_forecast_snapshot, crm_forecast_snapshot, CreateCrmForecastSnapshotParams,
+};
+use crate::crm::opportunities::{
+    create_opportunity, opp_stage, opportunity, CreateOpportunityParams, OpportunityStage,
+};
+use crate::crm::presence::{
+    clear_opportunity_presence, opportunity_presence, update_opportunity_presence,
+};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
 fn base_contact_params(name: &str, company_id: u64, tax_id: Option<String>) -> CreateContactParams {
@@ -114,7 +120,7 @@ pub fn test_opportunity_presence_upsert_and_clear(ctx: &ReducerContext) -> Resul
         .find(|o| o.organization_id == org_id && o.name == "Harness Presence Opp")
         .ok_or("Opportunity not found after create")?;
 
-    update_opportunity_presence(ctx, org_id, opp.id, "Harness Viewer".to_string())?;
+    update_opportunity_presence(ctx, org_id, opp.id)?;
 
     let presence_rows: Vec<_> = ctx
         .db
@@ -131,12 +137,12 @@ pub fn test_opportunity_presence_upsert_and_clear(ctx: &ReducerContext) -> Resul
     if presence_rows[0].user_id != ctx.sender() {
         return Err("Presence row user_id should be caller identity".to_string());
     }
-    if presence_rows[0].user_name != "Harness Viewer" {
+    if presence_rows[0].user_name != "Harness Tester" {
         return Err("Presence row user_name mismatch".to_string());
     }
 
     // Upsert: calling again for the same user+opportunity must update in place, not duplicate.
-    update_opportunity_presence(ctx, org_id, opp.id, "Harness Viewer Renamed".to_string())?;
+    update_opportunity_presence(ctx, org_id, opp.id)?;
 
     let presence_rows_after_upsert: Vec<_> = ctx
         .db
@@ -373,11 +379,7 @@ pub fn test_country_pack_rejects_invalid_abn(ctx: &ReducerContext) -> Result<(),
     let bad_result = create_contact(
         ctx,
         org_id,
-        base_contact_params(
-            "Harness Bad ABN Co",
-            company_id,
-            Some("123".to_string()),
-        ),
+        base_contact_params("Harness Bad ABN Co", company_id, Some("123".to_string())),
     );
     if bad_result.is_ok() {
         return Err("Expected create_contact to reject invalid ABN".to_string());

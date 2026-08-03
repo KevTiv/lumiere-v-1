@@ -92,10 +92,7 @@ pub fn update_document_presence(
 }
 
 #[reducer]
-pub fn clear_document_presence(
-    ctx: &ReducerContext,
-    document_id: u64,
-) -> Result<(), String> {
+pub fn clear_document_presence(ctx: &ReducerContext, document_id: u64) -> Result<(), String> {
     let ids: Vec<u64> = ctx
         .db
         .document_presence()

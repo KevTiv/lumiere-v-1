@@ -23,6 +23,17 @@ import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/e
 
 type Row = Record<string, unknown>
 
+function formatWhen(value: unknown): string | null {
+  const raw = optionValue(value)
+  if (raw == null) return null
+  if (typeof raw === "object" && raw !== null && "microsSinceUnixEpoch" in raw) {
+    const micros = Number((raw as { microsSinceUnixEpoch: bigint | number }).microsSinceUnixEpoch)
+    if (!Number.isFinite(micros) || micros <= 0) return null
+    return new Date(micros / 1000).toLocaleString()
+  }
+  return String(raw)
+}
+
 export interface RelationshipInsightPanelProps {
   organizationId: number
   contactId: bigint
@@ -76,6 +87,9 @@ export function RelationshipInsightPanel({
           <div className="space-y-2 text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <Badge>{String(insight.strengthScore ?? insight.strength_score ?? 0)}</Badge>
+              {Boolean(insight.isStale ?? insight.is_stale) ? (
+                <Badge variant="destructive">{t("crm.relIntel.stale", "Stale")}</Badge>
+              ) : null}
               <span>
                 {t("crm.relIntel.relationships", "Relationships")}:{" "}
                 {String(
@@ -88,6 +102,18 @@ export function RelationshipInsightPanel({
               </span>
             </div>
             <p className="text-muted-foreground">{String(insight.summary ?? "")}</p>
+            <p className="text-muted-foreground text-xs">
+              {(() => {
+                const staleSince = formatWhen(insight.staleSince ?? insight.stale_since)
+                if (Boolean(insight.isStale ?? insight.is_stale) && staleSince) {
+                  return t("crm.relIntel.staleSince", "Stale since {{date}}", { date: staleSince })
+                }
+                const computedAt = formatWhen(insight.computedAt ?? insight.computed_at)
+                return computedAt
+                  ? t("crm.relIntel.computedAt", "Computed {{date}}", { date: computedAt })
+                  : null
+              })()}
+            </p>
           </div>
         )}
       </CardContent>

@@ -8,6 +8,7 @@
 ///   - ContactTag
 ///   - ContactTagAssignment
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+use std::collections::HashSet;
 
 use crate::core::country_pack::{
     validate_address_for_packs, validate_company_identifier_for_packs,
@@ -15,6 +16,7 @@ use crate::core::country_pack::{
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::core::permissions::role;
 use crate::core::users::{user_organization, user_profile};
+use crate::crm::relationship_intel::mark_relationship_insight_stale;
 use crate::crm::require_single_company_crm_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -101,6 +103,7 @@ pub struct ContactCategoryAssignment {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub contact_id: u64,
     pub category_id: u64,
     pub assigned_at: Timestamp,
@@ -275,6 +278,31 @@ pub struct CreateContactRelationshipParams {
     pub start_date: Option<Timestamp>,
     pub notes: Option<String>,
     pub metadata: Option<String>,
+}
+
+/// CRM-RI-014: params for creating a contact category. `is_active` is caller
+/// supplied (unlike `Contact`, `ContactCategory` has no `deleted_at`, so
+/// `is_active` is the sole lifecycle flag).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateContactCategoryParams {
+    pub name: String,
+    pub color: Option<String>,
+    pub parent_id: Option<u64>,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+}
+
+/// CRM-RI-014: explicit patch contract (mirrors `UpdateContactAddressParams`)
+/// — outer `None` = field not sent (leave unchanged), outer `Some(None)` =
+/// explicit clear, outer `Some(Some(v))` = replace with `v`. `name` and
+/// `is_active` are non-nullable columns and stay single-level `Option<T>`.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateContactCategoryParams {
+    pub name: Option<String>,
+    pub color: Option<Option<String>>,
+    pub parent_id: Option<Option<u64>>,
+    pub is_active: Option<bool>,
+    pub metadata: Option<Option<String>>,
 }
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
@@ -994,6 +1022,10 @@ pub fn create_contact_relationship(
         },
     );
 
+    // CRM-RI-016: a new relationship changes both endpoints' insight inputs.
+    mark_relationship_insight_stale(ctx, organization_id, params.left_contact_id);
+    mark_relationship_insight_stale(ctx, organization_id, params.right_contact_id);
+
     Ok(())
 }
 
@@ -1020,6 +1052,10 @@ pub fn end_contact_relationship(
         return Err("Relationship is already ended".to_string());
     }
 
+    // Captured before the row is moved into the update below.
+    let left_contact_id = relationship.left_contact_id;
+    let right_contact_id = relationship.right_contact_id;
+
     ctx.db
         .contact_relationship()
         .id()
@@ -1043,6 +1079,10 @@ pub fn end_contact_relationship(
             metadata: None,
         },
     );
+
+    // CRM-RI-016: ending a relationship changes both endpoints' insight inputs.
+    mark_relationship_insight_stale(ctx, organization_id, left_contact_id);
+    mark_relationship_insight_stale(ctx, organization_id, right_contact_id);
 
     Ok(())
 }
@@ -1092,6 +1132,599 @@ pub fn update_contact_parent(
             new_values: Some(serde_json::json!({ "parent_id": parent_id }).to_string()),
             changed_fields: vec!["parent_id".to_string()],
             metadata: None,
+        },
+    );
+
+    // CRM-RI-016: reparenting changes this contact's `hierarchy_depth`, and the
+    // relationship shape of both the old and the new parent.
+    mark_relationship_insight_stale(ctx, organization_id, contact_id);
+    if let Some(old) = old_parent_id {
+        mark_relationship_insight_stale(ctx, organization_id, old);
+    }
+    if let Some(new) = parent_id {
+        mark_relationship_insight_stale(ctx, organization_id, new);
+    }
+
+    Ok(())
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CRM-RI-014: CONTACT CATEGORY CRUD + SCOPED ASSIGNMENT
+//
+// `ContactCategory` is organization-scoped only (like `ContactTag` — no
+// `company_id` column exists on the table, and adding one would be a schema
+// migration this environment cannot publish/regenerate bindings for).
+// Company scope is therefore enforced where it actually applies: at
+// assignment time, via the target contact's `company_id`, exactly like
+// `ContactTagAssignment` already does.
+// ══════════════════════════════════════════════════════════════════════════════
+
+fn require_org_category(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    category_id: u64,
+) -> Result<ContactCategory, String> {
+    let category = ctx
+        .db
+        .contact_category()
+        .id()
+        .find(&category_id)
+        .ok_or("Category not found")?;
+
+    if category.organization_id != organization_id {
+        return Err("Category does not belong to this organization".to_string());
+    }
+
+    Ok(category)
+}
+
+/// Loads every id, rejecting the whole batch if any is missing or
+/// cross-organization. Does not check `is_active` — callers that must only
+/// target active categories (add/replace) check that separately; remove/clear
+/// intentionally allow detaching from an archived category.
+fn require_org_categories(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    category_ids: &[u64],
+) -> Result<Vec<ContactCategory>, String> {
+    category_ids
+        .iter()
+        .map(|&id| require_org_category(ctx, organization_id, id))
+        .collect()
+}
+
+/// Validates that `parent_id` is an eligible parent for `category_id` within
+/// `organization_id`, mirroring `validate_contact_parent`: the parent must
+/// exist, belong to the same organization, be active, not be `category_id`
+/// itself, and not be a descendant of `category_id` (which would create a
+/// cycle).
+///
+/// `category_id` may be `0` when validating a parent for a category that does
+/// not exist yet (creation time) — real ids start above zero.
+fn validate_category_parent(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    category_id: u64,
+    parent_id: u64,
+) -> Result<(), String> {
+    if parent_id == category_id {
+        return Err("A category cannot be its own parent".to_string());
+    }
+
+    let parent = require_org_category(ctx, organization_id, parent_id)?;
+
+    if !parent.is_active {
+        return Err("Parent category is not active".to_string());
+    }
+
+    const MAX_PARENT_CHAIN_DEPTH: usize = 1000;
+    let mut current = parent.parent_id;
+    for _ in 0..MAX_PARENT_CHAIN_DEPTH {
+        match current {
+            None => return Ok(()),
+            Some(cid) if cid == category_id => {
+                return Err("Setting this parent would create a cycle".to_string());
+            }
+            Some(cid) => {
+                current = ctx
+                    .db
+                    .contact_category()
+                    .id()
+                    .find(&cid)
+                    .and_then(|c| c.parent_id);
+            }
+        }
+    }
+
+    Err("Parent chain exceeds maximum depth".to_string())
+}
+
+/// Same lifecycle checks `validate_contact_parent`/dynamic-segment evaluation
+/// already apply: the contact must exist, belong to the organization, and not
+/// be soft-deleted or merged away.
+fn require_assignable_contact(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    contact_id: u64,
+) -> Result<Contact, String> {
+    let contact = require_org_contact(ctx, organization_id, contact_id)?;
+
+    if contact.deleted_at.is_some() {
+        return Err("Contact is deleted".to_string());
+    }
+    if contact.merge_target_id.is_some() {
+        return Err("Contact has been merged into another contact".to_string());
+    }
+
+    Ok(contact)
+}
+
+/// Dedup preserving first-seen order.
+fn dedup_ids(ids: &[u64]) -> Vec<u64> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for &id in ids {
+        if seen.insert(id) {
+            out.push(id);
+        }
+    }
+    out
+}
+
+#[spacetimedb::reducer]
+pub fn create_contact_category(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateContactCategoryParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact_category", "create")?;
+
+    if params.name.is_empty() {
+        return Err("Category name cannot be empty".to_string());
+    }
+
+    if let Some(parent_id) = params.parent_id {
+        // Category does not exist yet, so `0` is a safe sentinel for the
+        // self-reference/cycle checks — real ids never assign zero.
+        validate_category_parent(ctx, organization_id, 0, parent_id)?;
+    }
+
+    let category = ctx.db.contact_category().insert(ContactCategory {
+        id: 0,
+        organization_id,
+        name: params.name.clone(),
+        color: params.color,
+        parent_id: params.parent_id,
+        is_active: params.is_active,
+        created_at: ctx.timestamp,
+        metadata: params.metadata,
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact_category",
+            record_id: category.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": params.name, "is_active": category.is_active })
+                    .to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "is_active".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn update_contact_category(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    category_id: u64,
+    params: UpdateContactCategoryParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact_category", "write")?;
+
+    let category = require_org_category(ctx, organization_id, category_id)?;
+
+    if let Some(Some(parent_id)) = params.parent_id {
+        validate_category_parent(ctx, organization_id, category_id, parent_id)?;
+    }
+
+    let mut changed_fields = Vec::new();
+
+    let name = match &params.name {
+        Some(v) => {
+            if v.is_empty() {
+                return Err("Category name cannot be empty".to_string());
+            }
+            changed_fields.push("name".to_string());
+            v.clone()
+        }
+        None => category.name.clone(),
+    };
+    if params.color.is_some() {
+        changed_fields.push("color".to_string());
+    }
+    let color = params.color.unwrap_or_else(|| category.color.clone());
+    if params.parent_id.is_some() {
+        changed_fields.push("parent_id".to_string());
+    }
+    let parent_id = params.parent_id.unwrap_or(category.parent_id);
+    if params.is_active.is_some() {
+        changed_fields.push("is_active".to_string());
+    }
+    let is_active = params.is_active.unwrap_or(category.is_active);
+    if params.metadata.is_some() {
+        changed_fields.push("metadata".to_string());
+    }
+    let metadata = params.metadata.unwrap_or_else(|| category.metadata.clone());
+
+    ctx.db.contact_category().id().update(ContactCategory {
+        name,
+        color,
+        parent_id,
+        is_active,
+        metadata,
+        ..category
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact_category",
+            record_id: category_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields,
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Archives a category (`is_active = false`). There is no `deleted_at` column
+/// on `ContactCategory`, so `is_active` is the lifecycle flag — mirrors how
+/// `evaluate_dynamic_segment` treats `SegmentMember.is_active`. Existing
+/// assignments are left untouched; `remove_contact_categories`/
+/// `clear_contact_categories` handle detaching contacts explicitly.
+#[spacetimedb::reducer]
+pub fn archive_contact_category(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    category_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact_category", "delete")?;
+
+    let category = require_org_category(ctx, organization_id, category_id)?;
+
+    if !category.is_active {
+        return Err("Category is already archived".to_string());
+    }
+
+    ctx.db.contact_category().id().update(ContactCategory {
+        is_active: false,
+        ..category
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "contact_category",
+            record_id: category_id,
+            action: "DELETE",
+            old_values: Some(serde_json::json!({ "is_active": true }).to_string()),
+            new_values: Some(serde_json::json!({ "is_active": false }).to_string()),
+            changed_fields: vec!["is_active".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Adds `category_ids` to `contact_id` (set union). All ids are deduped and
+/// validated — existing and active — before any row is written; an invalid
+/// id rejects the whole call. Ids already assigned are silently skipped
+/// (idempotent), so this never violates the (contact, category) uniqueness
+/// invariant.
+#[spacetimedb::reducer]
+pub fn add_contact_categories(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    contact_id: u64,
+    category_ids: Vec<u64>,
+) -> Result<(), String> {
+    check_permission(
+        ctx,
+        organization_id,
+        "contact_category_assignment",
+        "create",
+    )?;
+
+    if category_ids.is_empty() {
+        return Err("category_ids cannot be empty".to_string());
+    }
+
+    let contact = require_assignable_contact(ctx, organization_id, contact_id)?;
+    let company_id = contact.company_id.ok_or("Contact has no company scope")?;
+
+    let ids = dedup_ids(&category_ids);
+    let categories = require_org_categories(ctx, organization_id, &ids)?;
+    if let Some(inactive) = categories.iter().find(|c| !c.is_active) {
+        return Err(format!("category {} is not active", inactive.id));
+    }
+
+    let existing: HashSet<u64> = ctx
+        .db
+        .contact_category_assignment()
+        .iter()
+        .filter(|a| a.organization_id == organization_id && a.contact_id == contact_id)
+        .map(|a| a.category_id)
+        .collect();
+
+    let to_add: Vec<u64> = ids
+        .into_iter()
+        .filter(|id| !existing.contains(id))
+        .collect();
+
+    if to_add.is_empty() {
+        return Ok(());
+    }
+
+    for category_id in &to_add {
+        ctx.db
+            .contact_category_assignment()
+            .insert(ContactCategoryAssignment {
+                id: 0,
+                organization_id,
+                company_id,
+                contact_id,
+                category_id: *category_id,
+                assigned_at: ctx.timestamp,
+                assigned_by: ctx.sender(),
+                metadata: None,
+            });
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "contact_category_assignment",
+            record_id: contact_id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "contact_id": contact_id, "added_category_ids": to_add })
+                    .to_string(),
+            ),
+            changed_fields: vec!["category_id".to_string()],
+            metadata: Some(serde_json::json!({ "op": "add" }).to_string()),
+        },
+    );
+
+    Ok(())
+}
+
+/// Removes `category_ids` from `contact_id` (set subtraction). Ids are
+/// deduped and validated to exist in this organization before any row is
+/// deleted; an invalid id rejects the whole call. Ids not currently assigned
+/// are silently skipped (idempotent).
+#[spacetimedb::reducer]
+pub fn remove_contact_categories(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    contact_id: u64,
+    category_ids: Vec<u64>,
+) -> Result<(), String> {
+    check_permission(
+        ctx,
+        organization_id,
+        "contact_category_assignment",
+        "delete",
+    )?;
+
+    if category_ids.is_empty() {
+        return Err("category_ids cannot be empty".to_string());
+    }
+
+    let contact = require_assignable_contact(ctx, organization_id, contact_id)?;
+    let company_id = contact.company_id.ok_or("Contact has no company scope")?;
+
+    let ids = dedup_ids(&category_ids);
+    require_org_categories(ctx, organization_id, &ids)?;
+    let id_set: HashSet<u64> = ids.iter().copied().collect();
+
+    let assignment_ids: Vec<u64> = ctx
+        .db
+        .contact_category_assignment()
+        .iter()
+        .filter(|a| {
+            a.organization_id == organization_id
+                && a.contact_id == contact_id
+                && id_set.contains(&a.category_id)
+        })
+        .map(|a| a.id)
+        .collect();
+
+    if assignment_ids.is_empty() {
+        return Ok(());
+    }
+
+    for id in &assignment_ids {
+        ctx.db.contact_category_assignment().id().delete(id);
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "contact_category_assignment",
+            record_id: contact_id,
+            action: "DELETE",
+            old_values: Some(
+                serde_json::json!({ "contact_id": contact_id, "removed_category_ids": ids })
+                    .to_string(),
+            ),
+            new_values: None,
+            changed_fields: vec!["category_id".to_string()],
+            metadata: Some(serde_json::json!({ "op": "remove" }).to_string()),
+        },
+    );
+
+    Ok(())
+}
+
+/// Sets `contact_id`'s category set to exactly `category_ids` (replace).
+/// Ids are deduped and validated — existing and active — before any row is
+/// written or deleted; an invalid id rejects the whole call and leaves the
+/// existing set untouched. An empty `category_ids` is valid and equivalent
+/// to `clear_contact_categories`.
+#[spacetimedb::reducer]
+pub fn replace_contact_categories(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    contact_id: u64,
+    category_ids: Vec<u64>,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact_category_assignment", "write")?;
+
+    let contact = require_assignable_contact(ctx, organization_id, contact_id)?;
+    let company_id = contact.company_id.ok_or("Contact has no company scope")?;
+
+    let ids = dedup_ids(&category_ids);
+    let categories = require_org_categories(ctx, organization_id, &ids)?;
+    if let Some(inactive) = categories.iter().find(|c| !c.is_active) {
+        return Err(format!("category {} is not active", inactive.id));
+    }
+    let target: HashSet<u64> = ids.iter().copied().collect();
+
+    let existing: Vec<ContactCategoryAssignment> = ctx
+        .db
+        .contact_category_assignment()
+        .iter()
+        .filter(|a| a.organization_id == organization_id && a.contact_id == contact_id)
+        .collect();
+    let existing_ids: HashSet<u64> = existing.iter().map(|a| a.category_id).collect();
+
+    let to_remove: Vec<u64> = existing
+        .iter()
+        .filter(|a| !target.contains(&a.category_id))
+        .map(|a| a.id)
+        .collect();
+    let to_add: Vec<u64> = ids
+        .iter()
+        .copied()
+        .filter(|id| !existing_ids.contains(id))
+        .collect();
+
+    if to_remove.is_empty() && to_add.is_empty() {
+        return Ok(());
+    }
+
+    for id in &to_remove {
+        ctx.db.contact_category_assignment().id().delete(id);
+    }
+    for category_id in &to_add {
+        ctx.db
+            .contact_category_assignment()
+            .insert(ContactCategoryAssignment {
+                id: 0,
+                organization_id,
+                company_id,
+                contact_id,
+                category_id: *category_id,
+                assigned_at: ctx.timestamp,
+                assigned_by: ctx.sender(),
+                metadata: None,
+            });
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "contact_category_assignment",
+            record_id: contact_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "contact_id": contact_id, "category_ids": ids }).to_string(),
+            ),
+            changed_fields: vec!["category_id".to_string()],
+            metadata: Some(
+                serde_json::json!({ "op": "replace", "added": to_add.len(), "removed": to_remove.len() })
+                    .to_string(),
+            ),
+        },
+    );
+
+    Ok(())
+}
+
+/// Removes all category assignments for `contact_id` (set to empty).
+#[spacetimedb::reducer]
+pub fn clear_contact_categories(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    contact_id: u64,
+) -> Result<(), String> {
+    check_permission(
+        ctx,
+        organization_id,
+        "contact_category_assignment",
+        "delete",
+    )?;
+
+    let contact = require_assignable_contact(ctx, organization_id, contact_id)?;
+    let company_id = contact.company_id.ok_or("Contact has no company scope")?;
+
+    let assignment_ids: Vec<u64> = ctx
+        .db
+        .contact_category_assignment()
+        .iter()
+        .filter(|a| a.organization_id == organization_id && a.contact_id == contact_id)
+        .map(|a| a.id)
+        .collect();
+
+    if assignment_ids.is_empty() {
+        return Ok(());
+    }
+
+    for id in &assignment_ids {
+        ctx.db.contact_category_assignment().id().delete(id);
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "contact_category_assignment",
+            record_id: contact_id,
+            action: "DELETE",
+            old_values: Some(
+                serde_json::json!({ "contact_id": contact_id, "removed_count": assignment_ids.len() })
+                    .to_string(),
+            ),
+            new_values: None,
+            changed_fields: vec!["category_id".to_string()],
+            metadata: Some(serde_json::json!({ "op": "clear" }).to_string()),
         },
     );
 

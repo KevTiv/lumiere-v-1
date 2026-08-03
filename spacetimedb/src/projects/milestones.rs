@@ -245,9 +245,7 @@ pub fn update_project_milestone(
         sequence: params.sequence.unwrap_or(existing.sequence),
         is_reached: params.is_reached.unwrap_or(existing.is_reached),
         bill_amount: params.bill_amount.unwrap_or(existing.bill_amount),
-        percent_complete: params
-            .percent_complete
-            .unwrap_or(existing.percent_complete),
+        percent_complete: params.percent_complete.unwrap_or(existing.percent_complete),
         active: params.active.unwrap_or(existing.active),
         metadata: match params.metadata {
             Some(v) => v,

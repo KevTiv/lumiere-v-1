@@ -4,9 +4,7 @@ use std::time::Duration;
 use spacetimedb::ReducerContext;
 
 use crate::core::organization::{company, create_company, CreateCompanyParams};
-use crate::hr::employees::{
-    archive_employee, create_employee, hr_employee, CreateEmployeeParams,
-};
+use crate::hr::employees::{archive_employee, create_employee, hr_employee, CreateEmployeeParams};
 use crate::hr::leaves::{
     approve_leave, create_leave_request, create_leave_type, hr_leave, hr_leave_allocation,
     hr_leave_type, submit_leave, CreateLeaveRequestParams, CreateLeaveTypeParams,
@@ -163,7 +161,9 @@ fn latest_payslip_for_employee(
         .hr_payslip()
         .payslip_by_employee()
         .filter(&employee_id)
-        .filter(|p| p.organization_id == fixture.organization_id && p.company_id == fixture.company_id)
+        .filter(|p| {
+            p.organization_id == fixture.organization_id && p.company_id == fixture.company_id
+        })
         .max_by_key(|p| p.id)
         .map(|p| p.id)
         .ok_or_else(|| "payslip missing".to_string())
@@ -233,12 +233,7 @@ pub fn test_leave_approve_consumes_balance(ctx: &ReducerContext) -> Result<(), S
     let employee_id = seed_employee(ctx, &fixture, "Balance Emp")?;
     let leave_type_id = seed_leave_type(ctx, &fixture, "Balance Type", 5.0)?;
     let leave_a = create_draft_leave(ctx, &fixture, employee_id, leave_type_id, 3.0, "bal-a")?;
-    submit_leave(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        leave_a,
-    )?;
+    submit_leave(ctx, fixture.organization_id, fixture.company_id, leave_a)?;
 
     // Reservation happens at submit (before approval).
     let alloc_after_submit = ctx
@@ -255,12 +250,7 @@ pub fn test_leave_approve_consumes_balance(ctx: &ReducerContext) -> Result<(), S
         ));
     }
 
-    approve_leave(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        leave_a,
-    )?;
+    approve_leave(ctx, fixture.organization_id, fixture.company_id, leave_a)?;
 
     let alloc = ctx
         .db
@@ -270,16 +260,14 @@ pub fn test_leave_approve_consumes_balance(ctx: &ReducerContext) -> Result<(), S
         .find(|a| a.leave_type_id == leave_type_id)
         .ok_or_else(|| "allocation missing".to_string())?;
     if (alloc.used_days - 3.0).abs() > f64::EPSILON {
-        return Err(format!("expected 3 used days after approve, got {}", alloc.used_days));
+        return Err(format!(
+            "expected 3 used days after approve, got {}",
+            alloc.used_days
+        ));
     }
 
     let leave_b = create_draft_leave(ctx, &fixture, employee_id, leave_type_id, 3.0, "bal-b")?;
-    let over = submit_leave(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        leave_b,
-    );
+    let over = submit_leave(ctx, fixture.organization_id, fixture.company_id, leave_b);
     if over.is_ok() {
         return Err("over-balance submit should fail".into());
     }
@@ -492,7 +480,8 @@ pub fn test_leave_must_be_submitted_before_approve(ctx: &ReducerContext) -> Resu
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let employee_id = seed_employee(ctx, &fixture, "Draft Leave Emp")?;
     let leave_type_id = seed_leave_type(ctx, &fixture, "Draft Type", 5.0)?;
-    let leave_id = create_draft_leave(ctx, &fixture, employee_id, leave_type_id, 1.0, "draft-only")?;
+    let leave_id =
+        create_draft_leave(ctx, &fixture, employee_id, leave_type_id, 1.0, "draft-only")?;
     let leave = ctx
         .db
         .hr_leave()
@@ -502,12 +491,7 @@ pub fn test_leave_must_be_submitted_before_approve(ctx: &ReducerContext) -> Resu
     if leave.state != HrLeaveState::Draft {
         return Err("leave should start in Draft".into());
     }
-    let early = approve_leave(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        leave_id,
-    );
+    let early = approve_leave(ctx, fixture.organization_id, fixture.company_id, leave_id);
     if early.is_ok() {
         return Err("draft leave approve should fail".into());
     }

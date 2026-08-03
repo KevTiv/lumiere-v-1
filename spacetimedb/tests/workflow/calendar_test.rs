@@ -9,7 +9,7 @@ use spacetimedb::{ReducerContext, Table, Timestamp};
 use crate::workflow::calendar::{
     activate_foundation_calendar_packs, calculate_deadline_from_delay_seconds,
     calculate_workflow_deadline, foundation_calendar_packs, resolve_local_datetime,
-    working_minutes_from_delay_seconds, workflow_calendar_exception, workflow_calendar_version,
+    workflow_calendar_exception, workflow_calendar_version, working_minutes_from_delay_seconds,
     CalendarExceptionCategory, CalendarExceptionScope, DeadlineRequest, DstOverlapPolicy,
     DstResolution, WorkflowCalendarException, WorkflowCalendarMarket, WorkflowCalendarVersion,
 };
@@ -241,12 +241,8 @@ pub fn test_recompute_deadline_rewrites_due_at_evidence() -> Result<(), String> 
     let friday_start = utc_timestamp(2026, 8, 7, 6, 0)?;
 
     let wall_clock_due = friday_start + std::time::Duration::from_secs(7_200);
-    let calendar_due = calculate_deadline_from_delay_seconds(
-        &version,
-        &exceptions,
-        friday_start,
-        7_200,
-    )?;
+    let calendar_due =
+        calculate_deadline_from_delay_seconds(&version, &exceptions, friday_start, 7_200)?;
     if calendar_due.utc_instant == wall_clock_due {
         return Err(
             "calendar-aware recompute must differ from naive wall-clock delay across a holiday"

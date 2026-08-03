@@ -61,7 +61,9 @@ fn check_contact_ref(ctx: &ReducerContext, organization_id: u64, id: u64) -> Res
         .find(&id)
         .ok_or_else(|| format!("contact {id} not found"))?;
     if c.organization_id != organization_id {
-        return Err(format!("contact {id} not found or not in this organization"));
+        return Err(format!(
+            "contact {id} not found or not in this organization"
+        ));
     }
     if c.merge_target_id.is_some() {
         return Err(format!("contact {id} has been merged into another contact"));
@@ -132,11 +134,7 @@ fn check_utm_campaign_ref(
     Ok(())
 }
 
-fn check_utm_medium_ref(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    id: u64,
-) -> Result<(), String> {
+fn check_utm_medium_ref(ctx: &ReducerContext, organization_id: u64, id: u64) -> Result<(), String> {
     let m = ctx
         .db
         .utm_medium()

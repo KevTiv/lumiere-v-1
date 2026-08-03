@@ -1,3 +1,5 @@
+pub mod audit;
+pub mod auth;
 /// `core` — Foundation & Infrastructure
 ///
 /// Covers the SpacetimeDB Migration Plan Phase 1 (Weeks 1–4).
@@ -17,8 +19,6 @@
 /// | messaging        | MailMessage · MailFollower                          |
 /// | utm              | UtmCampaign · UtmMedium · UtmSource                 |
 pub mod billing;
-pub mod audit;
-pub mod auth;
 pub mod country_pack;
 pub mod messaging;
 pub mod migrations;

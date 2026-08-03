@@ -14,8 +14,8 @@ use crate::projects::psa_advanced::{
     project_change_order, project_revenue_line, project_revenue_schedule,
     recognize_project_revenue, refresh_project_earned_value, ApplyProjectChangeOrderParams,
     CreateProjectChangeOrderParams, CreateProjectRevenueLineParams,
-    CreateProjectRevenueScheduleParams, LinkSubcontractorCostParams,
-    RecognizeProjectRevenueParams, RefreshProjectEarnedValueParams,
+    CreateProjectRevenueScheduleParams, LinkSubcontractorCostParams, RecognizeProjectRevenueParams,
+    RefreshProjectEarnedValueParams,
 };
 use crate::projects::tasks::{create_task, project_task, CreateTaskParams};
 use crate::subscriptions::tables::{deferred_revenue_line, deferred_revenue_schedule};
@@ -316,10 +316,7 @@ pub fn test_project_revrec_isolation(ctx: &ReducerContext) -> Result<(), String>
     let project_id = seed_billable_project(ctx, &fixture, "RevRec Project")?;
     let journal_id = seed_misc_journal(ctx, &fixture)?;
     // Harness has AR/AP/REVENUE — reuse AP as deferred liability stand-in.
-    let deferred_id = *fixture
-        .chart_account_ids
-        .get(chart_keys::AP)
-        .ok_or("AP")?;
+    let deferred_id = *fixture.chart_account_ids.get(chart_keys::AP).ok_or("AP")?;
     let income_id = *fixture
         .chart_account_ids
         .get(chart_keys::REVENUE)
@@ -454,12 +451,7 @@ pub fn test_subcontractor_in_margin(ctx: &ReducerContext) -> Result<(), String> 
         .find(|c| c.company_id == fixture.company_id)
         .ok_or("subcontractor cost row missing")?;
 
-    refresh_project_margin_snapshot(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        project_id,
-    );
+    refresh_project_margin_snapshot(ctx, fixture.organization_id, fixture.company_id, project_id);
     let snap = ctx
         .db
         .project_margin_snapshot()

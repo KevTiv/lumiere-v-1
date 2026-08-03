@@ -209,10 +209,13 @@ pub fn test_convert_proposal_derives_product_uom(ctx: &ReducerContext) -> Result
     if expected_uom == 1 {
         return Err("Distinctive UoM unexpectedly has id 1".into());
     }
-    ctx.db.product().id().update(crate::inventory::product::Product {
-        uom_id: expected_uom,
-        ..product
-    });
+    ctx.db
+        .product()
+        .id()
+        .update(crate::inventory::product::Product {
+            uom_id: expected_uom,
+            ..product
+        });
 
     let proposal_id = create_awarded_proposal(ctx, &fixture, "R5 Derive UoM")?;
     let pricelist_id = seed_pricelist(ctx, &fixture, "R5 Derive UoM PL")?;
@@ -304,10 +307,13 @@ pub fn test_convert_proposal_zero_product_uom_fail_closed(
         .find(&fixture.product_id)
         .ok_or("product")?;
     let product_name = product.name.clone();
-    ctx.db.product().id().update(crate::inventory::product::Product {
-        uom_id: 0,
-        ..product
-    });
+    ctx.db
+        .product()
+        .id()
+        .update(crate::inventory::product::Product {
+            uom_id: 0,
+            ..product
+        });
 
     let proposal_id = create_awarded_proposal(ctx, &fixture, "R5 Zero UoM")?;
     let pricelist_id = seed_pricelist(ctx, &fixture, "R5 Zero UoM PL")?;

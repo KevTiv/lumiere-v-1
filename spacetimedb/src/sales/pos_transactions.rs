@@ -415,7 +415,10 @@ pub fn open_pos_session(
                 })
                 .to_string(),
             ),
-            changed_fields: vec!["state".to_string(), "cash_register_balance_start".to_string()],
+            changed_fields: vec![
+                "state".to_string(),
+                "cash_register_balance_start".to_string(),
+            ],
             metadata: None,
         },
     );

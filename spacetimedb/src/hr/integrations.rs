@@ -3,12 +3,12 @@
 //! No HTTP in reducers; api-server workers poll `apply_pending_hr_integration_intents`.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::{company_id_from_scope};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use super::payroll::{
-    apply_partner_payslip_artifact, apply_payroll_export_result_internal,
-    hr_payroll_export_intent, hr_payslip, RecordPayrollExportResultParams,
+    apply_partner_payslip_artifact, apply_payroll_export_result_internal, hr_payroll_export_intent,
+    hr_payslip, RecordPayrollExportResultParams,
 };
+use crate::core::organization::company_id_from_scope;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -179,7 +179,9 @@ fn apply_partner_engine_side_effects(
         return Ok(());
     }
     if let Some(payslip_id) = intent.payslip_id {
-        if params.gross_wage.is_some() || params.net_wage.is_some() || params.calculation_metadata.is_some()
+        if params.gross_wage.is_some()
+            || params.net_wage.is_some()
+            || params.calculation_metadata.is_some()
         {
             apply_partner_payslip_artifact(
                 ctx,
@@ -226,9 +228,7 @@ fn apply_intent_from_payload(
                 .map(str::to_string);
             let gross = payload.get("gross_wage").and_then(|v| v.as_f64());
             let net = payload.get("net_wage").and_then(|v| v.as_f64());
-            let calc_meta = payload
-                .get("calculation_metadata")
-                .map(|v| v.to_string());
+            let calc_meta = payload.get("calculation_metadata").map(|v| v.to_string());
             if let Some(payslip_id) = intent.payslip_id {
                 apply_partner_payslip_artifact(
                     ctx,
@@ -241,12 +241,9 @@ fn apply_intent_from_payload(
                 )?;
             }
             if let Some(export_id) = export_intent_id {
-                let ext = external_ref.clone().or_else(|| {
-                    Some(format!(
-                        "partner:{}:{}",
-                        intent.id, intent.idempotency_key
-                    ))
-                });
+                let ext = external_ref
+                    .clone()
+                    .or_else(|| Some(format!("partner:{}:{}", intent.id, intent.idempotency_key)));
                 partner_close_export(
                     ctx,
                     intent.organization_id,
@@ -333,7 +330,8 @@ pub fn create_hr_integration_intent(
                 action: "CREATE",
                 old_values: None,
                 new_values: Some(
-                    serde_json::json!({ "idempotent": true, "status": existing.status }).to_string(),
+                    serde_json::json!({ "idempotent": true, "status": existing.status })
+                        .to_string(),
                 ),
                 changed_fields: vec![],
                 metadata: params.metadata,

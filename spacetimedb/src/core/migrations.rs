@@ -5,11 +5,11 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::country_pack::seed_country_pack_catalog;
-use crate::hr::country_pack_hr::seed_hr_country_pack_leave_catalog;
 use crate::core::permissions::{sod_conflict_rule, SodConflictRule};
 use crate::core::users::user_profile;
 use crate::forms::migrations::run_seed_organization_form_configs;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::hr::country_pack_hr::seed_hr_country_pack_leave_catalog;
 
 pub const MIGRATION_COUNTRY_PACK_CATALOG: u64 = 1;
 pub const MIGRATION_HR_COUNTRY_PACK_LEAVE_CATALOG: u64 = 4;
@@ -36,15 +36,11 @@ fn seed_finance_sod_presets(ctx: &ReducerContext, organization_id: u64) {
     ];
 
     for (permission_a, permission_b, description) in presets {
-        let exists = ctx
-            .db
-            .sod_conflict_rule()
-            .iter()
-            .any(|r| {
-                r.organization_id == organization_id
-                    && r.permission_a == permission_a
-                    && r.permission_b == permission_b
-            });
+        let exists = ctx.db.sod_conflict_rule().iter().any(|r| {
+            r.organization_id == organization_id
+                && r.permission_a == permission_a
+                && r.permission_b == permission_b
+        });
         if exists {
             continue;
         }
@@ -151,9 +147,7 @@ fn apply_org_migration(
             record_id: row.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(
-                serde_json::json!({ "version": version, "name": name }).to_string(),
-            ),
+            new_values: Some(serde_json::json!({ "version": version, "name": name }).to_string()),
             changed_fields: vec!["version".to_string(), "name".to_string()],
             metadata: None,
         },
@@ -179,10 +173,7 @@ pub(crate) fn apply_pending_global_migrations(ctx: &ReducerContext) -> Result<()
 
 /// Apply pending migrations for one organization.
 #[spacetimedb::reducer]
-pub fn apply_org_migrations(
-    ctx: &ReducerContext,
-    organization_id: u64,
-) -> Result<(), String> {
+pub fn apply_org_migrations(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     check_permission(ctx, organization_id, "organization", "write")?;
     apply_org_migration(
         ctx,

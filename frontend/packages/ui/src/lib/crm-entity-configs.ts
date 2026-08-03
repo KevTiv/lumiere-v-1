@@ -513,6 +513,26 @@ export const contactTagsTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+export const contactCategoriesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "contact-categories-table",
+  title: t("crm.contactCategories.title"),
+  description: t("crm.contactCategories.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("crm.contactCategories.searchPlaceholder"),
+    searchKeys: ["name"],
+    columns: [
+      { key: "name", label: t("crm.contactCategories.columns.name"), width: "min-w-36" },
+      { key: "color", label: t("crm.contactCategories.columns.color"), width: "min-w-24" },
+      { key: "parentId", label: t("crm.contactCategories.columns.parentId"), width: "min-w-24" },
+      { key: "isActive", label: t("crm.contactCategories.columns.isActive"), type: "boolean", align: "center" },
+    ],
+    emptyMessage: t("crm.contactCategories.emptyMessage"),
+  },
+})
+
 export const contactSegmentsTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "contact-segments-table",
   title: t("crm.contactSegments.title"),
@@ -564,6 +584,7 @@ export const crmEntityConfigs = (t: TFunction): Record<string, EntityViewConfig>
   "contacts-table": contactsTableConfig(t),
   "activities-table": activitiesTableConfig(t),
   "contact-tags-table": contactTagsTableConfig(t),
+  "contact-categories-table": contactCategoriesTableConfig(t),
   "contact-segments-table": contactSegmentsTableConfig(t),
   "opportunity-lines-table": opportunityLinesTableConfig(t),
 })

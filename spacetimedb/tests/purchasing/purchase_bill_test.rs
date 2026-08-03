@@ -5,8 +5,8 @@ use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::{
-    account_move, account_move_line, create_bill_from_purchase_order,
-    AddAccountMoveLineParams, CreateBillFromPurchaseOrderParams,
+    account_move, account_move_line, create_bill_from_purchase_order, AddAccountMoveLineParams,
+    CreateBillFromPurchaseOrderParams,
 };
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::product;
@@ -72,9 +72,7 @@ pub fn test_po_confirm_to_balanced_bill(ctx: &ReducerContext) -> Result<(), Stri
         .db
         .contact()
         .iter()
-        .find(|c| {
-            c.organization_id == org_id && c.display_name == "Harness Vendor".to_string()
-        })
+        .find(|c| c.organization_id == org_id && c.display_name == "Harness Vendor".to_string())
         .map(|c| c.id)
         .ok_or("Harness vendor contact not found")?;
 
@@ -116,8 +114,7 @@ pub fn test_po_confirm_to_balanced_bill(ctx: &ReducerContext) -> Result<(), Stri
         .purchase_order()
         .iter()
         .find(|o| {
-            o.organization_id == org_id
-                && o.partner_ref == Some("HARNESS-PO-001".to_string())
+            o.organization_id == org_id && o.partner_ref == Some("HARNESS-PO-001".to_string())
         })
         .ok_or("Purchase order not found after create")?;
 
@@ -325,7 +322,9 @@ pub fn test_po_confirm_to_balanced_bill(ctx: &ReducerContext) -> Result<(), Stri
         .ok_or("Purchase order not found after billing")?;
 
     if billed.invoice_count == 0 || billed.invoice_ids.is_empty() {
-        return Err("Purchase order has no linked bill after create_bill_from_purchase_order".to_string());
+        return Err(
+            "Purchase order has no linked bill after create_bill_from_purchase_order".to_string(),
+        );
     }
 
     let bill_move_id = billed.invoice_ids[0];

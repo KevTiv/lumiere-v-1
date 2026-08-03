@@ -161,16 +161,23 @@ pub fn create_google_drive_connection(
             metadata: None,
         });
 
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "google_drive_connection",
-        record_id: row.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: Some(serde_json::json!({ "name": row.name, "account_email": row.account_email }).to_string()),
-        changed_fields: vec!["name".to_string(), "account_email".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "google_drive_connection",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "name": row.name, "account_email": row.account_email })
+                    .to_string(),
+            ),
+            changed_fields: vec!["name".to_string(), "account_email".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -227,16 +234,20 @@ pub fn update_google_drive_connection(
             ..conn
         });
 
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "google_drive_connection",
-        record_id: connection_id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["name".to_string(), "sync_enabled".to_string()],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "google_drive_connection",
+            record_id: connection_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["name".to_string(), "sync_enabled".to_string()],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

@@ -154,10 +154,7 @@ fn rfq_lines(ctx: &ReducerContext, rfq_id: u64) -> Vec<PurchaseRfqLine> {
 }
 
 fn recompute_bid_amount(price_unit: f64, lines: &[PurchaseRfqLine]) -> f64 {
-    lines
-        .iter()
-        .map(|l| l.product_uom_qty * price_unit)
-        .sum()
+    lines.iter().map(|l| l.product_uom_qty * price_unit).sum()
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -253,10 +250,10 @@ pub fn create_purchase_rfq(
 
     let rfq_id = rfq.id;
     let rfq_name = rfq.name.clone();
-    ctx.db.purchase_rfq().id().update(PurchaseRfq {
-        line_ids,
-        ..rfq
-    });
+    ctx.db
+        .purchase_rfq()
+        .id()
+        .update(PurchaseRfq { line_ids, ..rfq });
 
     write_audit_log_v2(
         ctx,
@@ -620,11 +617,6 @@ pub fn award_purchase_rfq_bid(
         },
     );
 
-    log::info!(
-        "RFQ {} awarded bid {} → PO {}",
-        rfq_id,
-        bid_id,
-        po_id
-    );
+    log::info!("RFQ {} awarded bid {} → PO {}", rfq_id, bid_id, po_id);
     Ok(())
 }

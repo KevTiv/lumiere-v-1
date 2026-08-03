@@ -45,7 +45,9 @@ fn create_draft(ctx: &ReducerContext, fixture: &OrgFixture, title: &str) -> Resu
 fn require_contains(haystack: &[String], needles: &[&str], label: &str) -> Result<(), String> {
     for needle in needles {
         if !haystack.iter().any(|item| item == needle) {
-            return Err(format!("expected {label} to include {needle}, got {haystack:?}"));
+            return Err(format!(
+                "expected {label} to include {needle}, got {haystack:?}"
+            ));
         }
     }
     Ok(())
@@ -95,7 +97,11 @@ pub fn test_template_apply_creates_sections(ctx: &ReducerContext) -> Result<(), 
         .filter(|s| s.proposal_id == proposal_id)
         .map(|s| s.title.clone())
         .collect();
-    require_contains(&titles, &["Executive Summary", "Technical Approach"], "template sections")?;
+    require_contains(
+        &titles,
+        &["Executive Summary", "Technical Approach"],
+        "template sections",
+    )?;
 
     let p = ctx
         .db

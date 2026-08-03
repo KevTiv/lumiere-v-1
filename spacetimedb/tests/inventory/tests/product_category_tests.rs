@@ -4,9 +4,8 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::inventory::product_category::{
-    create_product_category, delete_product_category, product_category,
-    restore_product_category, update_product_category, CreateProductCategoryParams,
-    UpdateProductCategoryParams,
+    create_product_category, delete_product_category, product_category, restore_product_category,
+    update_product_category, CreateProductCategoryParams, UpdateProductCategoryParams,
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 

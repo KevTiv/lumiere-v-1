@@ -234,7 +234,10 @@ pub fn refresh_project_margin_snapshot(
         e.organization_id == organization_id
             && e.company_id == company_id
             && e.project_id == Some(project_id)
-            && matches!(e.state, ExpenseState::Posted | ExpenseState::Done | ExpenseState::Approved)
+            && matches!(
+                e.state,
+                ExpenseState::Posted | ExpenseState::Done | ExpenseState::Approved
+            )
     }) {
         expense_cost += exp.total_amount;
         if let Some(sheet_id) = exp.sheet_id {
@@ -258,9 +261,7 @@ pub fn refresh_project_margin_snapshot(
         .project_subcontractor_cost()
         .subcon_by_project()
         .filter(&project_id)
-        .filter(|c| {
-            c.organization_id == organization_id && c.company_id == company_id && c.active
-        })
+        .filter(|c| c.organization_id == organization_id && c.company_id == company_id && c.active)
         .map(|c| c.amount)
         .sum();
 
@@ -296,30 +297,32 @@ pub fn refresh_project_margin_snapshot(
         ctx.db.project_margin_snapshot().id().delete(&id);
     }
 
-    ctx.db.project_margin_snapshot().insert(ProjectMarginSnapshot {
-        id: 0,
-        organization_id,
-        company_id,
-        project_id,
-        billed_revenue,
-        unbilled_revenue,
-        labor_cost,
-        expense_cost,
-        subcontractor_cost,
-        margin_amount,
-        margin_percent,
-        budget_planned,
-        budget_actual,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: Some(
-            serde_json::json!({
-                "formula": "billed_revenue - labor_cost - expense_cost - subcontractor_cost",
-                "rebill_revenue": rebill_revenue,
-            })
-            .to_string(),
-        ),
-    });
+    ctx.db
+        .project_margin_snapshot()
+        .insert(ProjectMarginSnapshot {
+            id: 0,
+            organization_id,
+            company_id,
+            project_id,
+            billed_revenue,
+            unbilled_revenue,
+            labor_cost,
+            expense_cost,
+            subcontractor_cost,
+            margin_amount,
+            margin_percent,
+            budget_planned,
+            budget_actual,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: Some(
+                serde_json::json!({
+                    "formula": "billed_revenue - labor_cost - expense_cost - subcontractor_cost",
+                    "rebill_revenue": rebill_revenue,
+                })
+                .to_string(),
+            ),
+        });
 }
 
 /// Refresh margin for each distinct project id (skips unknown / wrong-tenant).
@@ -361,9 +364,7 @@ pub fn refresh_resource_utilisation_snapshot(
         .resource_capacity_snapshot()
         .capacity_by_company()
         .filter(&company_id)
-        .filter(|s| {
-            s.organization_id == organization_id && s.employee_id == Some(employee_id)
-        })
+        .filter(|s| s.organization_id == organization_id && s.employee_id == Some(employee_id))
         .map(|s| s.available_hours)
         .next()
         .unwrap_or(0.0);
@@ -733,14 +734,15 @@ pub fn maybe_post_wip_je_for_validated(
                 map.insert("wip_move_id".into(), serde_json::json!(move_id));
                 Some(serde_json::Value::Object(map).to_string())
             };
-            ctx.db.project_timesheet().id().update(
-                crate::projects::timesheets::ProjectTimesheet {
+            ctx.db
+                .project_timesheet()
+                .id()
+                .update(crate::projects::timesheets::ProjectTimesheet {
                     metadata,
                     write_uid: ctx.sender(),
                     write_date: ctx.timestamp,
                     ..ts
-                },
-            );
+                });
         }
 
         write_audit_log_v2(
@@ -791,12 +793,7 @@ pub fn refresh_project_margin(
             refresh_project_margin_snapshot(ctx, organization_id, company_id, p.id);
         }
     } else {
-        refresh_project_margin_for_projects(
-            ctx,
-            organization_id,
-            company_id,
-            params.project_ids,
-        );
+        refresh_project_margin_for_projects(ctx, organization_id, company_id, params.project_ids);
     }
     Ok(())
 }

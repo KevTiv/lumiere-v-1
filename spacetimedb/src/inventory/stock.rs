@@ -519,10 +519,7 @@ pub struct AssignUserToPickingParams {
 // ── Internal helpers (sales / picking integrity) ─────────────────────────────
 
 /// On-hand location for a warehouse (`lot_stock_id` when set; else warehouse id).
-pub(crate) fn resolve_warehouse_stock_location(
-    ctx: &ReducerContext,
-    warehouse_id: u64,
-) -> u64 {
+pub(crate) fn resolve_warehouse_stock_location(ctx: &ReducerContext, warehouse_id: u64) -> u64 {
     if let Some(wh) = ctx.db.warehouse().id().find(&warehouse_id) {
         if wh.lot_stock_id > 0 {
             return wh.lot_stock_id;
@@ -679,7 +676,10 @@ fn find_lot_quant_at_location(
         })
         .filter(|q| {
             q.lot_id
-                .map(|lid| ensure_lot_for_product(ctx, organization_id, company_id, product_id, lid).is_ok())
+                .map(|lid| {
+                    ensure_lot_for_product(ctx, organization_id, company_id, product_id, lid)
+                        .is_ok()
+                })
                 .unwrap_or(false)
         })
         .collect();
@@ -1599,8 +1599,7 @@ pub(crate) fn apply_validated_move_to_quants(
     if is_inbound {
         let product = crate::inventory::costing::product_for_costing(ctx, product_id)?;
         let method = crate::inventory::costing::normalize_cost_method(&product.cost_method);
-        let cost =
-            crate::inventory::costing::resolve_inbound_unit_cost(&product, move_price_unit);
+        let cost = crate::inventory::costing::resolve_inbound_unit_cost(&product, move_price_unit);
         if let Some(src) =
             find_quant_at_location(ctx, organization_id, company_id, product_id, location_id)
         {
@@ -1916,13 +1915,7 @@ pub fn unreserve_stock_quant(
     let unreserve_qty = params.unreserve_qty;
     if product_tracking_mode(ctx, quant.product_id)? == "serial" {
         let n = whole_unit_qty(unreserve_qty, quant.product_id)?;
-        let _ = release_reserved_serials(
-            ctx,
-            organization_id,
-            company_id,
-            quant.product_id,
-            n,
-        );
+        let _ = release_reserved_serials(ctx, organization_id, company_id, quant.product_id, n);
     }
     let new_reserved = (quant.reserved_quantity - unreserve_qty).max(0.0);
     let available_quantity = quant.quantity - new_reserved;
@@ -2439,9 +2432,7 @@ pub fn done_stock_move(
             old_values: Some(
                 serde_json::json!({ "quantity_done": move_record.quantity_done }).to_string(),
             ),
-            new_values: Some(
-                serde_json::json!({ "quantity_done": quantity_done }).to_string(),
-            ),
+            new_values: Some(serde_json::json!({ "quantity_done": quantity_done }).to_string()),
             changed_fields: vec!["quantity_done".to_string()],
             metadata: None,
         },
@@ -2637,12 +2628,7 @@ pub fn confirm_stock_picking(
         ..picking.clone()
     });
 
-    for mut move_record in ctx
-        .db
-        .stock_move()
-        .move_by_picking()
-        .filter(&picking_id)
-    {
+    for mut move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
         if move_record.state == "draft" {
             move_record.state = "confirmed".to_string();
             move_record.is_initial_demand_editable = false;
@@ -2699,12 +2685,7 @@ pub fn assign_stock_picking(
     // Outgoing / internal: reserve ATP so "assigned" honestly means reserved.
     // Incoming receipts do not consume company ATP at assign time.
     if !is_incoming {
-        for move_record in ctx
-            .db
-            .stock_move()
-            .move_by_picking()
-            .filter(&picking_id)
-        {
+        for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
             if move_record.state == "cancel" || move_record.state == "done" {
                 continue;
             }
@@ -2735,12 +2716,7 @@ pub fn assign_stock_picking(
         ..picking.clone()
     });
 
-    for mut move_record in ctx
-        .db
-        .stock_move()
-        .move_by_picking()
-        .filter(&picking_id)
-    {
+    for mut move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
         if move_record.state == "confirmed" {
             move_record.state = "assigned".to_string();
             move_record.is_assigned = true;
@@ -2816,8 +2792,7 @@ fn validate_stock_picking_impl(
     ensure_picking_tasks_allow_validate(ctx, organization_id, company_id, picking_id)?;
     assert_inventory_writable(ctx, organization_id, company_id)?;
 
-    let is_inbound = picking.is_return
-        || picking.picking_code.as_deref() == Some("incoming");
+    let is_inbound = picking.is_return || picking.picking_code.as_deref() == Some("incoming");
     // PO receipts require explicit `quantity_done` (0 means skip / not received).
     let po_receipt = picking.purchase_id.is_some()
         && picking.picking_code.as_deref() == Some("incoming")
@@ -2847,17 +2822,15 @@ fn validate_stock_picking_impl(
 
     let mut validated_moves: Vec<ValidatedMove> = Vec::new();
 
-    for move_record in ctx
-        .db
-        .stock_move()
-        .move_by_picking()
-        .filter(&picking_id)
-    {
+    for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
         if move_record.state != "assigned" {
             continue;
         }
         let qty_done = if po_receipt {
-            move_record.quantity_done.min(move_record.product_uom_qty).max(0.0)
+            move_record
+                .quantity_done
+                .min(move_record.product_uom_qty)
+                .max(0.0)
         } else if move_record.quantity_done > 0.0 {
             move_record.quantity_done.min(move_record.product_uom_qty)
         } else {
@@ -3137,12 +3110,7 @@ fn validate_stock_picking_impl(
     // Propagate delivered quantities back to SaleOrderLine
     if picking.is_return {
         let mut returned: std::collections::HashMap<u64, f64> = std::collections::HashMap::new();
-        for move_record in ctx
-            .db
-            .stock_move()
-            .move_by_picking()
-            .filter(&picking_id)
-        {
+        for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
             if !move_record.is_done {
                 continue;
             }
@@ -3212,12 +3180,7 @@ fn validate_stock_picking_impl(
     } else if let Some(so_id) = picking.sale_id {
         // Collect qty_done per sale_line_id
         let mut delivered: std::collections::HashMap<u64, f64> = std::collections::HashMap::new();
-        for move_record in ctx
-            .db
-            .stock_move()
-            .move_by_picking()
-            .filter(&picking_id)
-        {
+        for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
             if !move_record.is_done {
                 continue;
             }
@@ -3278,12 +3241,7 @@ fn validate_stock_picking_impl(
         }
     } else if let Some(po_id) = picking.purchase_id {
         let mut received: std::collections::HashMap<u64, f64> = std::collections::HashMap::new();
-        for move_record in ctx
-            .db
-            .stock_move()
-            .move_by_picking()
-            .filter(&picking_id)
-        {
+        for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
             if !move_record.is_done {
                 continue;
             }
@@ -3395,12 +3353,7 @@ pub fn cancel_stock_picking(
         ..picking.clone()
     });
 
-    for mut move_record in ctx
-        .db
-        .stock_move()
-        .move_by_picking()
-        .filter(&picking_id)
-    {
+    for mut move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
         if move_record.state != "done" {
             move_record.state = "cancel".to_string();
             ctx.db.stock_move().id().update(move_record);

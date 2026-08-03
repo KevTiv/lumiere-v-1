@@ -292,10 +292,7 @@ pub fn import_timesheet_csv(
 
         // Draft-only import policy — reject validated/billed CSV rows
         let status_col = col(&headers, row, "validation_status");
-        if !status_col.is_empty()
-            && status_col != "draft"
-            && status_col != "0"
-        {
+        if !status_col.is_empty() && status_col != "draft" && status_col != "0" {
             record_import_error(
                 ctx,
                 job.id,

@@ -130,7 +130,8 @@ pub(crate) fn compute_line_promise(
     let mut free_today = 0.0;
     let mut source_wh = order_warehouse_id;
     for wh_id in &network {
-        let avail = available_qty_at_warehouse(ctx, organization_id, company_id, product_id, *wh_id);
+        let avail =
+            available_qty_at_warehouse(ctx, organization_id, company_id, product_id, *wh_id);
         if avail + 1e-9 >= stock_qty {
             free_today = avail;
             source_wh = *wh_id;
@@ -151,11 +152,14 @@ pub(crate) fn compute_line_promise(
     {
         ctx.timestamp
     } else if free_today + 1e-9 >= stock_qty {
-        add_working_days(ctx.timestamp, lead.max(if source_wh != order_warehouse_id {
-            inter_wh_transfer_days()
-        } else {
-            0
-        }))
+        add_working_days(
+            ctx.timestamp,
+            lead.max(if source_wh != order_warehouse_id {
+                inter_wh_transfer_days()
+            } else {
+                0
+            }),
+        )
     } else {
         // Short: promise after lead (inbound-aware deferred)
         add_working_days(ctx.timestamp, lead.max(1))
@@ -391,7 +395,12 @@ pub fn refresh_sale_order_promise_dates(
             line.customer_lead.max(order.customer_lead),
         );
         max_promise = Some(match max_promise {
-            Some(m) if m.to_micros_since_unix_epoch() >= promise.promise_date.to_micros_since_unix_epoch() => m,
+            Some(m)
+                if m.to_micros_since_unix_epoch()
+                    >= promise.promise_date.to_micros_since_unix_epoch() =>
+            {
+                m
+            }
             _ => promise.promise_date,
         });
         ctx.db.sale_order_line().id().update(SaleOrderLine {

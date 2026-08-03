@@ -514,9 +514,7 @@ pub fn upsert_warehouse_geo(
                 record_id: row.id,
                 action: "CREATE",
                 old_values: None,
-                new_values: Some(
-                    serde_json::json!({ "warehouse_id": warehouse_id }).to_string(),
-                ),
+                new_values: Some(serde_json::json!({ "warehouse_id": warehouse_id }).to_string()),
                 changed_fields: vec!["warehouse_id".to_string()],
                 metadata: None,
             },

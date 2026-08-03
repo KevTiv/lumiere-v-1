@@ -882,8 +882,9 @@ pub fn test_opportunity_stage_transition(ctx: &ReducerContext) -> Result<(), Str
             expected_revenue: None,
             probability: None,
             priority: None,
-            is_won: None,
-            is_lost: None,
+            // CRM-RI-011: no explicit lifecycle request — the won stage itself
+            // must force the opportunity to Won (asserted below).
+            desired_state: None,
             partner_id: None,
             contact_id: None,
             date_deadline: None,

@@ -224,7 +224,10 @@ pub fn pack_moves_into_package(
     assert_inventory_writable(ctx, organization_id, company_id)?;
     let pkg = require_package(ctx, organization_id, company_id, package_id)?;
     if pkg.state != "draft" {
-        return Err(format!("Only draft packages can accept moves (state: {})", pkg.state));
+        return Err(format!(
+            "Only draft packages can accept moves (state: {})",
+            pkg.state
+        ));
     }
     if params.move_ids.is_empty() {
         return Err("move_ids cannot be empty".to_string());
@@ -311,19 +314,16 @@ pub fn confirm_stock_package(
     assert_inventory_writable(ctx, organization_id, company_id)?;
     let pkg = require_package(ctx, organization_id, company_id, package_id)?;
     if pkg.state != "draft" {
-        return Err(format!("Only draft packages can be confirmed (state: {})", pkg.state));
+        return Err(format!(
+            "Only draft packages can be confirmed (state: {})",
+            pkg.state
+        ));
     }
     if pkg.move_ids.is_empty() {
         return Err("Package has no moves — pack_moves_into_package first".to_string());
     }
 
-    stamp_moves_package(
-        ctx,
-        &pkg.move_ids,
-        package_id,
-        organization_id,
-        company_id,
-    )?;
+    stamp_moves_package(ctx, &pkg.move_ids, package_id, organization_id, company_id)?;
 
     ctx.db.stock_package().id().update(StockPackage {
         state: "confirmed".to_string(),
@@ -361,7 +361,10 @@ pub fn done_stock_package(
     assert_inventory_writable(ctx, organization_id, company_id)?;
     let pkg = require_package(ctx, organization_id, company_id, package_id)?;
     if pkg.state != "confirmed" {
-        return Err(format!("Only confirmed packages can be done (state: {})", pkg.state));
+        return Err(format!(
+            "Only confirmed packages can be done (state: {})",
+            pkg.state
+        ));
     }
 
     // Prefer warehouse pack location when dest unset.

@@ -36,11 +36,13 @@ import {
   productRowsToSelectOptions,
   uomRowsToSelectOptions,
   contactTagRowsToSelectOptions,
+  contactCategoryRowsToSelectOptions,
   contactSegmentRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
   timestampToDateInputValue,
   toCreateContactSegmentParamsFromForm,
+  toCreateContactCategoryParamsFromForm,
   toCreateContactTagParamsFromForm,
   toUpdateContactAddressParams,
   toUpdateContactBusinessParams,
@@ -61,11 +63,14 @@ import { contactPrimaryLabel } from "@lumiere/stdb/read-models"
 import {
   useActivities,
   useAddContactToSegment,
+  useAddContactCategories,
   useAssignTagToContact,
   useCompleteActivity,
+  useContactCategories,
   useContacts,
   useContactSegments,
   useContactTags,
+  useCreateContactCategory,
   useConvertLeadToCustomer,
   useConvertOpportunityToSaleOrder,
   useCreateActivity,
@@ -78,6 +83,7 @@ import {
   useDeleteContact,
   useDeleteLead,
   useLeads,
+  useLeadLostReasons,
   useOpportunities,
   useOpportunityLines,
   useOpportunityStages,
@@ -109,7 +115,9 @@ import {
   activitiesTableConfig,
   addContactToSegmentForm,
   addOpportunityLineForm,
+  assignCategoryToContactForm,
   assignTagToContactForm,
+  contactCategoriesTableConfig,
   contactSegmentsTableConfig,
   contactTagsTableConfig,
   convertLeadForm,
@@ -123,7 +131,9 @@ import {
   editLeadDetailsForm,
   editLeadRevenueForm,
   editOpportunityForm,
+  markOpportunityLostForm,
   mergeFieldDefaultValues,
+  newContactCategoryForm,
   newContactSegmentForm,
   newContactTagForm,
   mergeSelectOptionsByFieldName,
@@ -171,9 +181,11 @@ type WorkflowModal =
   | { kind: "convertLead"; form: FormConfig; leadId: bigint }
   | { kind: "convertOpp"; form: FormConfig; opportunityId: bigint }
   | { kind: "assignTag"; form: FormConfig; contactId: bigint }
+  | { kind: "assignCategory"; form: FormConfig; contactId: bigint }
   | { kind: "addSegment"; form: FormConfig; contactId: bigint }
   | { kind: "changeStage"; form: FormConfig; opportunityId: bigint; companyId: bigint }
   | { kind: "editOpportunity"; form: FormConfig; opportunityId: bigint; companyId: bigint }
+  | { kind: "markOppLost"; form: FormConfig; opportunityId: bigint; companyId: bigint }
   | { kind: "editContact"; form: FormConfig; contactId: bigint }
   | { kind: "editContactAddress"; form: FormConfig; contactId: bigint }
   | { kind: "editContactBusiness"; form: FormConfig; contactId: bigint }
@@ -396,9 +408,11 @@ function CrmClientLoaded({
   const { data: opportunityLines = [] } = useOpportunityLines(orgId)
   const { data: contacts = [], isLoading: contactsLoading } = useContacts(orgId, initialContacts)
   const { data: contactTags = [] } = useContactTags(orgId)
+  const { data: contactCategories = [] } = useContactCategories(orgId)
   const { data: contactSegments = [] } = useContactSegments(orgId)
   const { data: activities = [] } = useActivities(orgId)
   const { data: opportunityStages = [] } = useOpportunityStages(orgId)
+  const { data: leadLostReasons = [] } = useLeadLostReasons(orgId)
   const { data: pricelists = [] } = usePricelists(orgId)
   const { data: warehouses = [] } = useWarehouses(orgId)
   const { data: products = [] } = useProducts(orgId)
@@ -449,6 +463,12 @@ function CrmClientLoaded({
     return [{ value: "", label: t("crm.contactTags.emptyMessage"), disabled: true }]
   }, [contactTags, t])
 
+  const contactCategorySelectOptions = useMemo(() => {
+    const fromApi = contactCategoryRowsToSelectOptions(contactCategories as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("crm.contactCategories.emptyMessage"), disabled: true }]
+  }, [contactCategories, t])
+
   const contactSegmentSelectOptions = useMemo(() => {
     const fromApi = contactSegmentRowsToSelectOptions(contactSegments as Record<string, unknown>[])
     if (fromApi.length > 0) return fromApi
@@ -460,10 +480,32 @@ function CrmClientLoaded({
     [t, contactTagSelectOptions],
   )
 
+  const assignCategoryFormConfig = useMemo(
+    () => mergeSelectOptionsByFieldName(assignCategoryToContactForm(t), "categoryId", contactCategorySelectOptions),
+    [t, contactCategorySelectOptions],
+  )
+
   const addContactToSegmentFormConfig = useMemo(
     () =>
       mergeSelectOptionsByFieldName(addContactToSegmentForm(t), "segmentId", contactSegmentSelectOptions),
     [t, contactSegmentSelectOptions],
+  )
+
+  // CRM-RI-011: the backend now requires a valid lost reason before an
+  // opportunity may enter the Lost state. If the org hasn't configured any
+  // lost reasons, surface that clearly instead of an empty, unusable picker
+  // (same fallback convention as contactTagSelectOptions/contactSegmentSelectOptions).
+  const lostReasonSelectOptions = useMemo(() => {
+    const fromApi = (leadLostReasons as Record<string, unknown>[])
+      .map((r) => ({ value: String(r.id ?? ""), label: String(r.name ?? r.id ?? "") }))
+      .filter((o) => o.value !== "")
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("crm.forms.markLost.noReasonsConfigured"), disabled: true }]
+  }, [leadLostReasons, t])
+
+  const markOpportunityLostFormConfig = useMemo(
+    () => mergeSelectOptionsByFieldName(markOpportunityLostForm(t), "lostReasonId", lostReasonSelectOptions),
+    [t, lostReasonSelectOptions],
   )
 
   const wonStageId = useMemo(() => {
@@ -566,6 +608,8 @@ function CrmClientLoaded({
   const deleteContact = useDeleteContact(orgId)
   const deleteLead = useDeleteLead(orgId)
   const assignTag = useAssignTagToContact(orgId)
+  const addContactCategories = useAddContactCategories(orgId)
+  const createContactCategory = useCreateContactCategory(orgId)
   const addToSegment = useAddContactToSegment(orgId)
   const completeActivity = useCompleteActivity(orgId)
   const createContactTag = useCreateContactTag(orgId)
@@ -653,6 +697,19 @@ function CrmClientLoaded({
       })
     },
     [assignTagFormConfig],
+  )
+
+  const openAssignCategoryModal = useCallback(
+    (rows: Record<string, unknown>[]) => {
+      const row = rows[0]
+      if (!row) return
+      setWorkflowModal({
+        kind: "assignCategory",
+        contactId: rowIdBigInt(row),
+        form: assignCategoryFormConfig,
+      })
+    },
+    [assignCategoryFormConfig],
   )
 
   const openAddSegmentModal = useCallback(
@@ -837,7 +894,12 @@ function CrmClientLoaded({
         window.alert(t("crm.actions.alreadyClosed"))
         return
       }
-      const params: Record<string, unknown> = { isWon: true }
+      // CRM-RI-011: lifecycle is a validated transition, not a raw flag. The
+      // backend derives the Won axis from the target stage, so a configured
+      // won stage is required for this action to succeed.
+      const params: Record<string, unknown> = {
+        desiredState: { tag: "Won" },
+      }
       if (wonStageId != null) params.stageId = wonStageId
       try {
         await updateOpportunity.mutateAsync({
@@ -853,26 +915,25 @@ function CrmClientLoaded({
   )
 
   const markOpportunityLost = useCallback(
-    async (rows: Record<string, unknown>[]) => {
+    (rows: Record<string, unknown>[]) => {
       const row = rows[0]
       if (!row) return
       if (oppIsClosed(row)) {
         window.alert(t("crm.actions.alreadyClosed"))
         return
       }
-      const params: Record<string, unknown> = { isLost: true }
-      if (lostStageId != null) params.stageId = lostStageId
-      try {
-        await updateOpportunity.mutateAsync({
-          opportunityId: rowIdBigInt(row),
-          companyId: rowCompanyId(row, operatingCompanyId),
-          params,
-        })
-      } catch (e) {
-        window.alert(e instanceof Error ? e.message : "Action failed")
-      }
+      // CRM-RI-011: the backend now requires a valid lost reason before an
+      // opportunity may enter the Lost state, so this opens a reason picker
+      // instead of mutating immediately (see markOpportunityWon for the
+      // still-immediate Won path, which has no such requirement).
+      setWorkflowModal({
+        kind: "markOppLost",
+        opportunityId: rowIdBigInt(row),
+        companyId: rowCompanyId(row, operatingCompanyId),
+        form: markOpportunityLostFormConfig,
+      })
     },
-    [t, lostStageId, updateOpportunity, operatingCompanyId],
+    [t, operatingCompanyId, markOpportunityLostFormConfig],
   )
 
   const handleOpportunityStageMove = useCallback(
@@ -1295,6 +1356,12 @@ function CrmClientLoaded({
             onClick: openAssignTagModal,
           },
           {
+            id: "assign-category",
+            label: t("crm.actions.assignCategory"),
+            requiresSelection: true,
+            onClick: openAssignCategoryModal,
+          },
+          {
             id: "add-segment",
             label: t("crm.actions.addToSegment"),
             requiresSelection: true,
@@ -1381,6 +1448,15 @@ function CrmClientLoaded({
           createForm: newContactTagForm(t),
           createLabel: t("crm.contactTags.createLabel"),
           createAction: "createContactTag",
+        },
+        {
+          id: "contact-categories",
+          label: t("crm.contactCategories.tabLabel"),
+          type: "entity" as const,
+          entityConfig: contactCategoriesTableConfig(t),
+          createForm: newContactCategoryForm(t),
+          createLabel: t("crm.contactCategories.createLabel"),
+          createAction: "createContactCategory",
         },
         {
           id: "contact-segments",
@@ -1737,9 +1813,10 @@ function CrmClientLoaded({
       contacts: contacts as unknown as Record<string, unknown>[],
       activities: activities as unknown as Record<string, unknown>[],
       "contact-tags": contactTags as unknown as Record<string, unknown>[],
+      "contact-categories": contactCategories as unknown as Record<string, unknown>[],
       "contact-segments": contactSegments as unknown as Record<string, unknown>[],
     }),
-    [leads, enrichedOpportunities, opportunityLines, contacts, activities, contactTags, contactSegments],
+    [leads, enrichedOpportunities, opportunityLines, contacts, activities, contactTags, contactCategories, contactSegments],
   )
 
   const handleFormSubmit = async (
@@ -1793,6 +1870,9 @@ function CrmClientLoaded({
     } else if (action === "createActivity") {
       const p = toCreateActivityParams(formData)
       if (p) await createActivity.mutateAsync(p)
+    } else if (action === "createContactCategory") {
+      const p = toCreateContactCategoryParamsFromForm(formData)
+      if (p) await createContactCategory.mutateAsync(p)
     } else if (action === "createContactTag") {
       const p = toCreateContactTagParamsFromForm(formData)
       if (p) await createContactTag.mutateAsync(p)
@@ -1826,6 +1906,8 @@ function CrmClientLoaded({
     convertOppToOrder.isPending ||
     updateOpportunity.isPending ||
     assignTag.isPending ||
+    addContactCategories.isPending ||
+    createContactCategory.isPending ||
     addToSegment.isPending ||
     createContactTag.isPending ||
     createContactSegment.isPending ||
@@ -1869,6 +1951,15 @@ function CrmClientLoaded({
           contactId: workflowModal.contactId,
           tagId: String(tagId),
         })
+      } else if (workflowModal.kind === "assignCategory") {
+        const categoryId = formData.categoryId
+        if (categoryId == null || String(categoryId).trim() === "") {
+          throw new Error(t("crm.forms.assignCategory.validation.categoryId"))
+        }
+        await addContactCategories.mutateAsync({
+          contactId: workflowModal.contactId,
+          categoryIds: [String(categoryId)],
+        })
       } else if (workflowModal.kind === "addSegment") {
         const segmentId = formData.segmentId
         if (segmentId == null || String(segmentId).trim() === "") {
@@ -1893,6 +1984,34 @@ function CrmClientLoaded({
             metadata: formData.metadata,
           })
         }
+      } else if (workflowModal.kind === "markOppLost") {
+        const lostReasonId = formData.lostReasonId
+        if (lostReasonId == null || String(lostReasonId).trim() === "") {
+          throw new Error(t("crm.forms.markLost.validation.reasonRequired"))
+        }
+        // CRM-RI-011: `lost_reason_id` is now Option<Option<u64>> on the
+        // reducer (three-state: omit=unchanged, Some(None)=clear,
+        // Some(Some(v))=set). `stdbParamsToJson`'s `encodeValue` recognizes
+        // already-encoded `{ some: X }` / `{ none: [] }` shapes and passes
+        // them through as-is, recursing into X WITHOUT re-checking the
+        // fieldKey/optionFields auto-wrap (see `isSatsOption` in
+        // stdb-params-json.ts) — so a bare bigint here only ever produces a
+        // single `{ some: N }` (indistinguishable from the old Option<u64>
+        // wire shape), regardless of whether it's pre-wrapped once. Only
+        // supplying TWO literal levels of `{ some: ... } }` in source
+        // produces the required nested `{ some: { some: N } }` SATS JSON for
+        // Some(Some(N)) once run through `encodeValue`. Verified by tracing
+        // `encodeValue`/`isSatsOption` in stdb-params-json.ts directly.
+        const params: Record<string, unknown> = {
+          desiredState: { tag: "Lost" },
+          lostReasonId: { some: { some: BigInt(String(lostReasonId)) } },
+        }
+        if (lostStageId != null) params.stageId = lostStageId
+        await updateOpportunity.mutateAsync({
+          opportunityId: workflowModal.opportunityId,
+          companyId: workflowModal.companyId,
+          params,
+        })
       } else if (workflowModal.kind === "editOpportunity") {
         const p = toUpdateOpportunityParams(formData)
         if (!p) throw new Error(t("crm.forms.editOpportunity.validation.noChanges"))
@@ -2009,11 +2128,15 @@ function CrmClientLoaded({
           ? `co-${workflowModal.opportunityId.toString()}-p${pricelistSelectOptions.length}-w${warehouseSelectOptions.length}`
           : workflowModal.kind === "assignTag"
             ? `at-${workflowModal.contactId.toString()}`
+            : workflowModal.kind === "assignCategory"
+              ? `ac-${workflowModal.contactId.toString()}`
             : workflowModal.kind === "changeStage"
               ? `cs-${workflowModal.opportunityId.toString()}`
               : workflowModal.kind === "editOpportunity"
                 ? `eo-${workflowModal.opportunityId.toString()}`
-                : workflowModal.kind === "editContact"
+                : workflowModal.kind === "markOppLost"
+                  ? `mol-${workflowModal.opportunityId.toString()}-r${lostReasonSelectOptions.length}`
+                  : workflowModal.kind === "editContact"
                   ? `ec-${workflowModal.contactId.toString()}`
                   : workflowModal.kind === "editContactAddress"
                     ? `eca-${workflowModal.contactId.toString()}`

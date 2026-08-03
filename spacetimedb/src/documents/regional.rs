@@ -66,9 +66,9 @@ pub fn set_document_index_content(
         return Err("index content must not be empty".to_string());
     }
 
-    let language = params.language.or_else(|| {
-        document_search_language_for_company(ctx, organization_id, doc.company_id)
-    });
+    let language = params
+        .language
+        .or_else(|| document_search_language_for_company(ctx, organization_id, doc.company_id));
 
     let company_id = doc.company_id;
     ctx.db.document().id().update(Document {
@@ -184,10 +184,7 @@ pub fn set_document_retention(
 
 fn hard_purge_document(ctx: &ReducerContext, organization_id: u64, doc: Document) {
     if crate::documents::legal_hold::document_has_active_legal_hold(ctx, organization_id, doc.id) {
-        log::info!(
-            "Skipping purge for document {} — active legal hold",
-            doc.id
-        );
+        log::info!("Skipping purge for document {} — active legal hold", doc.id);
         return;
     }
     let doc_id = doc.id;
@@ -228,10 +225,7 @@ fn hard_purge_document(ctx: &ReducerContext, organization_id: u64, doc: Document
 }
 
 #[reducer]
-pub fn purge_expired_documents(
-    ctx: &ReducerContext,
-    organization_id: u64,
-) -> Result<(), String> {
+pub fn purge_expired_documents(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     check_permission(ctx, organization_id, "document", "delete")?;
 
     let now = ctx.timestamp.to_micros_since_unix_epoch();

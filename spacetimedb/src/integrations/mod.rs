@@ -176,16 +176,20 @@ pub fn delete_integration(
         }
     }
 
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "integration",
-        record_id: integration_id,
-        action: "DELETE",
-        old_values: None,
-        new_values: None,
-        changed_fields: vec!["is_active".to_string()],
-        metadata: Some(format!("{:?}", integration_type)),
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "integration",
+            record_id: integration_id,
+            action: "DELETE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec!["is_active".to_string()],
+            metadata: Some(format!("{:?}", integration_type)),
+        },
+    );
 
     Ok(())
 }

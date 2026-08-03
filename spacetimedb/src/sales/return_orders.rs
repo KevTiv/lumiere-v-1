@@ -11,7 +11,10 @@ use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
 };
 use crate::inventory::product::product;
-use crate::inventory::stock::{create_stock_move, create_stock_picking, stock_picking, CreateStockMoveParams, CreateStockPickingParams};
+use crate::inventory::stock::{
+    create_stock_move, create_stock_picking, stock_picking, CreateStockMoveParams,
+    CreateStockPickingParams,
+};
 use crate::inventory::warehouse::warehouse;
 use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::types::{AccountMoveState, MoveType, PaymentState};
@@ -270,11 +273,9 @@ fn create_return_picking_for_order(
         .find(|p| {
             p.organization_id == organization_id
                 && p.is_return
-                && p.metadata
-                    .as_deref()
-                    .is_some_and(|m: &str| {
-                        m.contains(&format!("\"return_order_id\":{}", return_order.id))
-                    })
+                && p.metadata.as_deref().is_some_and(|m: &str| {
+                    m.contains(&format!("\"return_order_id\":{}", return_order.id))
+                })
         })
         .ok_or("Return picking not found after create")?;
 
@@ -508,13 +509,8 @@ pub fn confirm_return_order(
         validate_return_lines_against_sale_order(ctx, so_id, &line_params)?;
     }
 
-    let picking_id = create_return_picking_for_order(
-        ctx,
-        organization_id,
-        company_id,
-        &return_order,
-        &lines,
-    )?;
+    let picking_id =
+        create_return_picking_for_order(ctx, organization_id, company_id, &return_order, &lines)?;
 
     let old_state = return_order.state.clone();
     ctx.db.return_order().id().update(ReturnOrder {

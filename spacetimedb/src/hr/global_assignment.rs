@@ -82,7 +82,9 @@ fn assert_company_in_org(
         .find(&company_id)
         .ok_or_else(|| format!("{label} company not found"))?;
     if company.organization_id != organization_id {
-        return Err(format!("{label} company belongs to a different organization"));
+        return Err(format!(
+            "{label} company belongs to a different organization"
+        ));
     }
     if company.deleted_at.is_some() {
         return Err(format!("{label} company is archived"));
@@ -256,17 +258,20 @@ pub fn update_hr_global_assignment(
         changed_fields.push("notes".to_string());
     }
 
-    ctx.db.hr_global_assignment().id().update(HrGlobalAssignment {
-        home_company_id,
-        host_company_id,
-        date_from,
-        date_to,
-        status,
-        notes: params.notes.or(existing.notes),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..existing
-    });
+    ctx.db
+        .hr_global_assignment()
+        .id()
+        .update(HrGlobalAssignment {
+            home_company_id,
+            host_company_id,
+            date_from,
+            date_to,
+            status,
+            notes: params.notes.or(existing.notes),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..existing
+        });
 
     write_audit_log_v2(
         ctx,

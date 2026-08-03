@@ -180,7 +180,9 @@ pub fn create_document_template(
             record_id: row.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(serde_json::json!({ "name": row.name, "model": row.model }).to_string()),
+            new_values: Some(
+                serde_json::json!({ "name": row.name, "model": row.model }).to_string(),
+            ),
             changed_fields: vec!["name".to_string(), "model".to_string()],
             metadata: None,
         },
@@ -300,7 +302,9 @@ pub fn create_mail_template(
             record_id: row.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(serde_json::json!({ "name": row.name, "model": row.model }).to_string()),
+            new_values: Some(
+                serde_json::json!({ "name": row.name, "model": row.model }).to_string(),
+            ),
             changed_fields: vec!["name".to_string(), "model".to_string()],
             metadata: None,
         },

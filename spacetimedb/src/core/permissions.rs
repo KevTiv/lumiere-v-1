@@ -294,7 +294,11 @@ fn permission_effect_label(effect: &PermissionEffect) -> &'static str {
     }
 }
 
-fn org_permission_applies_to_user(p: &OrgPermission, user_identity: Identity, role_id: u64) -> bool {
+fn org_permission_applies_to_user(
+    p: &OrgPermission,
+    user_identity: Identity,
+    role_id: u64,
+) -> bool {
     match &p.subject {
         PermissionSubject::Role(r) => *r == role_id,
         PermissionSubject::User(id) => *id == user_identity,
@@ -392,10 +396,7 @@ pub(crate) fn build_policy_snapshot_row(
             action: action.clone(),
             effect: effect.clone(),
         });
-        hash_parts.push(format!(
-            "op:{}:{}:{}:{}",
-            p.id, p.resource, action, effect
-        ));
+        hash_parts.push(format!("op:{}:{}:{}:{}", p.id, p.resource, action, effect));
     }
 
     let mut field_permissions = Vec::new();
@@ -430,12 +431,7 @@ pub(crate) fn build_policy_snapshot_row(
         });
     }
 
-    let version_hash = fnv1a_hash(
-        &hash_parts
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>(),
-    );
+    let version_hash = fnv1a_hash(&hash_parts.iter().map(String::as_str).collect::<Vec<_>>());
 
     Ok(PolicySnapshot {
         id: 0,
@@ -459,9 +455,11 @@ pub(crate) fn upsert_policy_snapshot(
     let organization_id = snapshot.organization_id;
     let user_identity = snapshot.user_identity;
 
-    if let Some(existing) = ctx.db.policy_snapshot().iter().find(|row| {
-        row.organization_id == organization_id && row.user_identity == user_identity
-    }) {
+    if let Some(existing) =
+        ctx.db.policy_snapshot().iter().find(|row| {
+            row.organization_id == organization_id && row.user_identity == user_identity
+        })
+    {
         let record_id = existing.id;
         ctx.db.policy_snapshot().id().update(PolicySnapshot {
             id: record_id,
@@ -480,11 +478,8 @@ fn collect_identities_for_role(
     role_id: u64,
 ) -> Vec<Identity> {
     let mut identities = Vec::new();
-    for uo in ctx
-        .db
-        .user_organization()
-        .iter()
-        .filter(|uo| {
+    for uo in
+        ctx.db.user_organization().iter().filter(|uo| {
             uo.organization_id == organization_id && uo.role_id == role_id && uo.is_active
         })
     {
@@ -611,10 +606,7 @@ pub(crate) fn validate_sod_for_permissions(
     Ok(())
 }
 
-fn caller_delegated_company_scope(
-    ctx: &ReducerContext,
-    organization_id: u64,
-) -> Option<u64> {
+fn caller_delegated_company_scope(ctx: &ReducerContext, organization_id: u64) -> Option<u64> {
     ctx.db
         .delegated_admin_scope()
         .delegated_admin_by_user()
@@ -633,9 +625,7 @@ pub(crate) fn ensure_delegated_admin_may_assign_role(
     };
 
     if role.permissions.iter().any(|p| p == "*:*") {
-        return Err(
-            "delegated administrators cannot assign organization owner roles".to_string(),
-        );
+        return Err("delegated administrators cannot assign organization owner roles".to_string());
     }
 
     if role.name == "owner" || role.is_system {
@@ -674,10 +664,7 @@ fn ensure_field_permission_resource_registered(resource: &str) -> Result<(), Str
     }
     for entry in obj.values() {
         if let Some(aliases) = entry.get("aliases").and_then(|a| a.as_array()) {
-            if aliases
-                .iter()
-                .any(|alias| alias.as_str() == Some(resource))
-            {
+            if aliases.iter().any(|alias| alias.as_str() == Some(resource)) {
                 return Ok(());
             }
         }
@@ -1160,10 +1147,7 @@ pub fn create_sod_conflict_rule(
                 })
                 .to_string(),
             ),
-            changed_fields: vec![
-                "permission_a".to_string(),
-                "permission_b".to_string(),
-            ],
+            changed_fields: vec!["permission_a".to_string(), "permission_b".to_string()],
             metadata: None,
         },
     );
@@ -1278,11 +1262,7 @@ pub fn grant_delegated_admin_scope(
     params: GrantDelegatedAdminScopeParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "user_role_assignment", "create")?;
-    crate::core::organization::require_company_in_organization(
-        ctx,
-        organization_id,
-        company_id,
-    )?;
+    crate::core::organization::require_company_in_organization(ctx, organization_id, company_id)?;
 
     if caller_delegated_company_scope(ctx, organization_id).is_some() {
         return Err("delegated administrators cannot grant delegated admin scope".to_string());
@@ -1294,9 +1274,7 @@ pub fn grant_delegated_admin_scope(
         .delegated_admin_by_user()
         .filter(&params.user_identity)
         .find(|s| {
-            s.organization_id == organization_id
-                && s.company_id == company_id
-                && s.is_active
+            s.organization_id == organization_id && s.company_id == company_id && s.is_active
         });
 
     if existing.is_some() {
@@ -1548,10 +1526,7 @@ pub fn revoke_role(
 
 /// Rebuild and cache the unified permission snapshot for the caller in an organization.
 #[spacetimedb::reducer]
-pub fn refresh_policy_snapshot(
-    ctx: &ReducerContext,
-    organization_id: u64,
-) -> Result<(), String> {
+pub fn refresh_policy_snapshot(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     let snapshot = build_policy_snapshot_row(ctx, organization_id, ctx.sender())?;
     upsert_policy_snapshot(ctx, snapshot)?;
     Ok(())

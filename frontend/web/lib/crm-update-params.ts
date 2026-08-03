@@ -3,6 +3,7 @@
  */
 
 import type {
+  UpdateContactCategoryParams,
   UpdateContactCoreParams,
   UpdateOpportunityParams,
 } from "@lumiere/stdb/types"
@@ -237,6 +238,40 @@ export function toCreateContactTagParamsFromForm(
     color: optionalTrimmedString(formData.color),
     description: optionalTrimmedString(formData.description),
   }
+}
+
+export function toCreateContactCategoryParamsFromForm(
+  formData: Record<string, unknown>,
+): { name: string; color?: string; parentId?: bigint; isActive: boolean } | null {
+  const name = optionalTrimmedString(formData.name)
+  if (!name) return null
+  const parentId = parseU64Field(formData.parentId)
+  return {
+    name,
+    color: optionalTrimmedString(formData.color),
+    parentId: parentId ?? undefined,
+    isActive: formData.isActive !== false,
+  }
+}
+
+/**
+ * Scoped to the "Edit contact category" modal (CRM-RI-014). Like the sibling
+ * `toUpdateContact*` helpers, an empty/blank field is treated as "not
+ * touched" rather than "clear" — this codebase does not yet expose explicit
+ * clearing through these simple edit forms (see `patchFromForm`).
+ */
+export function toUpdateContactCategoryParamsFromForm(
+  formData: Record<string, unknown>,
+): Partial<UpdateContactCategoryParams> | null {
+  const out: Partial<UpdateContactCategoryParams> = {}
+  const name = optionalTrimmedString(formData.name)
+  if (name !== undefined) out.name = name
+  const color = optionalTrimmedString(formData.color)
+  if (color !== undefined) out.color = color
+  const parentId = parseU64Field(formData.parentId)
+  if (parentId !== null) out.parentId = parentId
+  if (typeof formData.isActive === "boolean") out.isActive = formData.isActive
+  return Object.keys(out).length > 0 ? out : null
 }
 
 export function toCreateContactSegmentParamsFromForm(formData: Record<string, unknown>): {

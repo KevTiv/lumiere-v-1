@@ -1736,7 +1736,9 @@ pub fn match_bank_line(
     let is_payment = line.amount < 0.0;
 
     for move_line in ctx.db.account_move_line().iter() {
-        if move_line.organization_id != organization_id || move_line.company_id != statement.company_id {
+        if move_line.organization_id != organization_id
+            || move_line.company_id != statement.company_id
+        {
             continue;
         }
 

@@ -45,6 +45,7 @@ import ActivateSubscriptionReducer from "./activate_subscription_reducer";
 import ActivateSubscriptionPlanReducer from "./activate_subscription_plan_reducer";
 import AddAccountMoveLineReducer from "./add_account_move_line_reducer";
 import AddArticleMemberReducer from "./add_article_member_reducer";
+import AddContactCategoriesReducer from "./add_contact_categories_reducer";
 import AddContactToSegmentReducer from "./add_contact_to_segment_reducer";
 import AddDocumentVersionReducer from "./add_document_version_reducer";
 import AddFormFieldReducer from "./add_form_field_reducer";
@@ -106,6 +107,7 @@ import ApproveProposalReducer from "./approve_proposal_reducer";
 import ApprovePurchaseRequisitionReducer from "./approve_purchase_requisition_reducer";
 import ApproveSupplierIntakeReducer from "./approve_supplier_intake_reducer";
 import ArchiveAiChatSessionReducer from "./archive_ai_chat_session_reducer";
+import ArchiveContactCategoryReducer from "./archive_contact_category_reducer";
 import ArchiveContactIdentityReducer from "./archive_contact_identity_reducer";
 import ArchiveEmployeeReducer from "./archive_employee_reducer";
 import ArchiveFinancialReportReducer from "./archive_financial_report_reducer";
@@ -165,6 +167,7 @@ import ClaimHubWithTokenReducer from "./claim_hub_with_token_reducer";
 import ClaimQueueJobReducer from "./claim_queue_job_reducer";
 import ClaimWorkflowHumanTaskReducer from "./claim_workflow_human_task_reducer";
 import CleanupStaleProposalPresenceReducer from "./cleanup_stale_proposal_presence_reducer";
+import ClearContactCategoriesReducer from "./clear_contact_categories_reducer";
 import ClearDocumentPresenceReducer from "./clear_document_presence_reducer";
 import ClearKnowledgeArticlePresenceReducer from "./clear_knowledge_article_presence_reducer";
 import ClearOpportunityPresenceReducer from "./clear_opportunity_presence_reducer";
@@ -267,6 +270,7 @@ import CreateConsignmentAgreementReducer from "./create_consignment_agreement_re
 import CreateConsolidationAccountReducer from "./create_consolidation_account_reducer";
 import CreateConsolidationJournalReducer from "./create_consolidation_journal_reducer";
 import CreateContactReducer from "./create_contact_reducer";
+import CreateContactCategoryReducer from "./create_contact_category_reducer";
 import CreateContactIdentityReducer from "./create_contact_identity_reducer";
 import CreateContactRelationshipReducer from "./create_contact_relationship_reducer";
 import CreateContactSegmentReducer from "./create_contact_segment_reducer";
@@ -784,6 +788,7 @@ import ReleaseBlanketToPoReducer from "./release_blanket_to_po_reducer";
 import ReleaseDocumentLegalHoldReducer from "./release_document_legal_hold_reducer";
 import ReleasePickingWaveReducer from "./release_picking_wave_reducer";
 import RemoveArticleMemberReducer from "./remove_article_member_reducer";
+import RemoveContactCategoriesReducer from "./remove_contact_categories_reducer";
 import RemoveLandedCostLineReducer from "./remove_landed_cost_line_reducer";
 import RemoveMemberFromQualityTeamReducer from "./remove_member_from_quality_team_reducer";
 import RemovePurchaseOrderLineReducer from "./remove_purchase_order_line_reducer";
@@ -795,6 +800,7 @@ import ReopenInventoryCloseReducer from "./reopen_inventory_close_reducer";
 import ReopenTicketReducer from "./reopen_ticket_reducer";
 import ReopenTimesheetsReducer from "./reopen_timesheets_reducer";
 import ReorderProposalLineItemsReducer from "./reorder_proposal_line_items_reducer";
+import ReplaceContactCategoriesReducer from "./replace_contact_categories_reducer";
 import RequestAiSkillCertificationReducer from "./request_ai_skill_certification_reducer";
 import RequestEmbeddingJobReducer from "./request_embedding_job_reducer";
 import RequestExpensePolicyExceptionReducer from "./request_expense_policy_exception_reducer";
@@ -1097,6 +1103,7 @@ import UpdateConsolidationAccountReducer from "./update_consolidation_account_re
 import UpdateContactReducer from "./update_contact_reducer";
 import UpdateContactAddressReducer from "./update_contact_address_reducer";
 import UpdateContactBusinessReducer from "./update_contact_business_reducer";
+import UpdateContactCategoryReducer from "./update_contact_category_reducer";
 import UpdateContactDetailsReducer from "./update_contact_details_reducer";
 import UpdateContactIdentityReducer from "./update_contact_identity_reducer";
 import UpdateContactParentReducer from "./update_contact_parent_reducer";
@@ -6441,7 +6448,7 @@ const tablesSchema = __schema({
       { name: 'category_by_name', algorithm: 'btree', columns: [
         'name',
       ] },
-      { name: 'category_by_org', algorithm: 'btree', columns: [
+      { name: 'product_category_by_org', algorithm: 'btree', columns: [
         'organizationId',
       ] },
       { name: 'category_by_parent', algorithm: 'btree', columns: [
@@ -8024,6 +8031,9 @@ const tablesSchema = __schema({
     indexes: [
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'segment_member_by_segment', algorithm: 'btree', columns: [
+        'segmentId',
       ] },
     ],
     constraints: [
@@ -9850,6 +9860,7 @@ const reducersSchema = __reducers(
   __reducerSchema("activate_subscription_plan", ActivateSubscriptionPlanReducer),
   __reducerSchema("add_account_move_line", AddAccountMoveLineReducer),
   __reducerSchema("add_article_member", AddArticleMemberReducer),
+  __reducerSchema("add_contact_categories", AddContactCategoriesReducer),
   __reducerSchema("add_contact_to_segment", AddContactToSegmentReducer),
   __reducerSchema("add_document_version", AddDocumentVersionReducer),
   __reducerSchema("add_form_field", AddFormFieldReducer),
@@ -9911,6 +9922,7 @@ const reducersSchema = __reducers(
   __reducerSchema("approve_purchase_requisition", ApprovePurchaseRequisitionReducer),
   __reducerSchema("approve_supplier_intake", ApproveSupplierIntakeReducer),
   __reducerSchema("archive_ai_chat_session", ArchiveAiChatSessionReducer),
+  __reducerSchema("archive_contact_category", ArchiveContactCategoryReducer),
   __reducerSchema("archive_contact_identity", ArchiveContactIdentityReducer),
   __reducerSchema("archive_employee", ArchiveEmployeeReducer),
   __reducerSchema("archive_financial_report", ArchiveFinancialReportReducer),
@@ -9970,6 +9982,7 @@ const reducersSchema = __reducers(
   __reducerSchema("claim_queue_job", ClaimQueueJobReducer),
   __reducerSchema("claim_workflow_human_task", ClaimWorkflowHumanTaskReducer),
   __reducerSchema("cleanup_stale_proposal_presence", CleanupStaleProposalPresenceReducer),
+  __reducerSchema("clear_contact_categories", ClearContactCategoriesReducer),
   __reducerSchema("clear_document_presence", ClearDocumentPresenceReducer),
   __reducerSchema("clear_knowledge_article_presence", ClearKnowledgeArticlePresenceReducer),
   __reducerSchema("clear_opportunity_presence", ClearOpportunityPresenceReducer),
@@ -10072,6 +10085,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_consolidation_account", CreateConsolidationAccountReducer),
   __reducerSchema("create_consolidation_journal", CreateConsolidationJournalReducer),
   __reducerSchema("create_contact", CreateContactReducer),
+  __reducerSchema("create_contact_category", CreateContactCategoryReducer),
   __reducerSchema("create_contact_identity", CreateContactIdentityReducer),
   __reducerSchema("create_contact_relationship", CreateContactRelationshipReducer),
   __reducerSchema("create_contact_segment", CreateContactSegmentReducer),
@@ -10589,6 +10603,7 @@ const reducersSchema = __reducers(
   __reducerSchema("release_document_legal_hold", ReleaseDocumentLegalHoldReducer),
   __reducerSchema("release_picking_wave", ReleasePickingWaveReducer),
   __reducerSchema("remove_article_member", RemoveArticleMemberReducer),
+  __reducerSchema("remove_contact_categories", RemoveContactCategoriesReducer),
   __reducerSchema("remove_landed_cost_line", RemoveLandedCostLineReducer),
   __reducerSchema("remove_member_from_quality_team", RemoveMemberFromQualityTeamReducer),
   __reducerSchema("remove_purchase_order_line", RemovePurchaseOrderLineReducer),
@@ -10600,6 +10615,7 @@ const reducersSchema = __reducers(
   __reducerSchema("reopen_ticket", ReopenTicketReducer),
   __reducerSchema("reopen_timesheets", ReopenTimesheetsReducer),
   __reducerSchema("reorder_proposal_line_items", ReorderProposalLineItemsReducer),
+  __reducerSchema("replace_contact_categories", ReplaceContactCategoriesReducer),
   __reducerSchema("request_ai_skill_certification", RequestAiSkillCertificationReducer),
   __reducerSchema("request_embedding_job", RequestEmbeddingJobReducer),
   __reducerSchema("request_expense_policy_exception", RequestExpensePolicyExceptionReducer),
@@ -10902,6 +10918,7 @@ const reducersSchema = __reducers(
   __reducerSchema("update_contact", UpdateContactReducer),
   __reducerSchema("update_contact_address", UpdateContactAddressReducer),
   __reducerSchema("update_contact_business", UpdateContactBusinessReducer),
+  __reducerSchema("update_contact_category", UpdateContactCategoryReducer),
   __reducerSchema("update_contact_details", UpdateContactDetailsReducer),
   __reducerSchema("update_contact_identity", UpdateContactIdentityReducer),
   __reducerSchema("update_contact_parent", UpdateContactParentReducer),

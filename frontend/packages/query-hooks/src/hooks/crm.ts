@@ -18,6 +18,7 @@ import type {
   ConvertOpportunityParams,
   CreateActivityParams,
   CreateAssignmentRuleParams,
+  CreateContactCategoryParams,
   CreateContactSegmentParams,
   CreateContactTagParams,
   CreateContactParams,
@@ -34,6 +35,7 @@ import type {
   CreateOpportunityParams,
   CreateOpportunityStageParams,
   UpdateAssignmentRuleParams,
+  UpdateContactCategoryParams,
   UpdateContactCoreParams,
   UpdateLeadAddressParams,
   UpdateLeadDetailsParams,
@@ -54,6 +56,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
 import {
   finalizeCreateActivityParams,
+  finalizeCreateContactCategoryParams,
   finalizeCreateContactParams,
   finalizeCreateContactSegmentParams,
   finalizeCreateContactTagParams,
@@ -61,6 +64,7 @@ import {
   finalizeCreateOpportunityParams,
   finalizeUpdateContactAddressParams,
   finalizeUpdateContactBusinessParams,
+  finalizeUpdateContactCategoryParams,
   finalizeUpdateContactDetailsParams,
   finalizeUpdateContactParams,
   finalizeUpdateLeadAddressParams,
@@ -161,6 +165,19 @@ export function useContactTags(
   return useQuery<QueryRows>({
     queryKey: ['contact-tags', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/contact-tags', 'Failed to fetch contact tags'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useContactCategories(
+  organizationId: bigint,
+  initialData?: QueryRows,
+) {
+  return useQuery<QueryRows>({
+    queryKey: ['contact-categories', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/contact-categories', 'Failed to fetch contact categories'),
     staleTime: 30_000,
     initialData,
   })
@@ -585,6 +602,149 @@ export function useCreateContactTag(organizationId: bigint) {
   })
 }
 
+export function useCreateContactCategory(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, Partial<CreateContactCategoryParams>>({
+    mutationFn: async (params) => {
+      const merged = finalizeCreateContactCategoryParams(params)
+      const { urlPath, init } = crmBffPost("create_contact_category", [
+        organizationId,
+        stdbParamsToJson(merged, "CreateContactCategoryParams"),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to create contact category')
+    },
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contact-categories']),
+  })
+}
+
+export function useUpdateContactCategory(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<
+    void,
+    Error,
+    { categoryId: ScalarId; params: Partial<UpdateContactCategoryParams> }
+  >({
+    mutationFn: async ({ categoryId, params }) => {
+      const { urlPath, init } = crmBffPost("update_contact_category", [
+        organizationId,
+        toScalarU64(categoryId),
+        stdbParamsToJson(finalizeUpdateContactCategoryParams(params)),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to update contact category')
+    },
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contact-categories']),
+  })
+}
+
+export function useArchiveContactCategory(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (categoryId) => {
+      const { urlPath, init } = crmBffPost("archive_contact_category", [
+        organizationId,
+        toScalarU64(categoryId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to archive contact category')
+    },
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contact-categories']),
+  })
+}
+
+/**
+ * Adds categories to a contact (CRM-RI-014). The backend exposes explicit
+ * add/remove/replace/clear reducers rather than a single set-call — this
+ * hook is the incremental "add" verb, mirroring `useAssignTagToContact`.
+ * CRM-RI-013: assignment mutations change both the join table AND the
+ * `contacts` read (which surfaces category membership on the contact row),
+ * so both must be invalidated.
+ */
+export function useAddContactCategories(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { contactId: ScalarId; categoryIds: ScalarId[] }>({
+    mutationFn: async ({ contactId, categoryIds }) => {
+      const { urlPath, init } = crmBffPost("add_contact_categories", [
+        organizationId,
+        toScalarU64(contactId),
+        categoryIds.map(toScalarU64),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to add contact categories')
+    },
+    onSuccess: () => {
+      void invalidateResourceQueries(qc, organizationId, ['contact-category-assignments'])
+      void invalidateResourceQueries(qc, organizationId, ['contacts'])
+    },
+  })
+}
+
+/** Removes categories from a contact (CRM-RI-014). See {@link useAddContactCategories} for invalidation rationale. */
+export function useRemoveContactCategories(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { contactId: ScalarId; categoryIds: ScalarId[] }>({
+    mutationFn: async ({ contactId, categoryIds }) => {
+      const { urlPath, init } = crmBffPost("remove_contact_categories", [
+        organizationId,
+        toScalarU64(contactId),
+        categoryIds.map(toScalarU64),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to remove contact categories')
+    },
+    onSuccess: () => {
+      void invalidateResourceQueries(qc, organizationId, ['contact-category-assignments'])
+      void invalidateResourceQueries(qc, organizationId, ['contacts'])
+    },
+  })
+}
+
+/**
+ * Replaces a contact's full category set in one call (CRM-RI-014). Use this
+ * — not `add`/`remove` — whenever the UI submits a complete desired set
+ * (e.g. a multi-select), since sending the full set through incremental
+ * add/remove would require diffing client-side against server state.
+ * See {@link useAddContactCategories} for invalidation rationale.
+ */
+export function useReplaceContactCategories(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { contactId: ScalarId; categoryIds: ScalarId[] }>({
+    mutationFn: async ({ contactId, categoryIds }) => {
+      const { urlPath, init } = crmBffPost("replace_contact_categories", [
+        organizationId,
+        toScalarU64(contactId),
+        categoryIds.map(toScalarU64),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to replace contact categories')
+    },
+    onSuccess: () => {
+      void invalidateResourceQueries(qc, organizationId, ['contact-category-assignments'])
+      void invalidateResourceQueries(qc, organizationId, ['contacts'])
+    },
+  })
+}
+
+/** Clears all categories from a contact (CRM-RI-014). See {@link useAddContactCategories} for invalidation rationale. */
+export function useClearContactCategories(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (contactId) => {
+      const { urlPath, init } = crmBffPost("clear_contact_categories", [
+        organizationId,
+        toScalarU64(contactId),
+      ])
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to clear contact categories')
+    },
+    onSuccess: () => {
+      void invalidateResourceQueries(qc, organizationId, ['contact-category-assignments'])
+      void invalidateResourceQueries(qc, organizationId, ['contacts'])
+    },
+  })
+}
+
 export function useCreateContactSegment(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Partial<CreateContactSegmentParams>>({
@@ -835,6 +995,13 @@ export function useMergeContacts(
       void invalidateResourceQueries(qc, organizationId, ['leads'])
       void invalidateResourceQueries(qc, organizationId, ['opportunities'])
       void invalidateResourceQueries(qc, organizationId, ['sale-orders'])
+      void invalidateResourceQueries(qc, organizationId, ['activities'])
+      void invalidateResourceQueries(qc, organizationId, ['contact-phone-identities'])
+      void invalidateResourceQueries(qc, organizationId, ['contact-role-assignments'])
+      void invalidateResourceQueries(qc, organizationId, ['contact-relationships'])
+      void invalidateResourceQueries(qc, organizationId, ['crm-conversations'])
+      void invalidateResourceQueries(qc, organizationId, ['contact-relationship-insights'])
+      void invalidateResourceQueries(qc, organizationId, ['contact-segments'])
     },
   })
 }
@@ -1304,6 +1471,7 @@ export type {
   ConvertOpportunityParams,
   CreateActivityParams,
   CreateAssignmentRuleParams,
+  CreateContactCategoryParams,
   CreateContactParams,
   CreateContactIdentityParams,
   CreateContactRelationshipParams,
@@ -1321,6 +1489,7 @@ export type {
   CreateOpportunityParams,
   CreateOpportunityStageParams,
   UpdateAssignmentRuleParams,
+  UpdateContactCategoryParams,
   UpdateContactCoreParams,
   UpdateContactIdentityParams,
   AssignContactRoleParams,

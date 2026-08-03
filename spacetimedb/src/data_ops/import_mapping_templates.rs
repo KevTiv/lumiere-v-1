@@ -84,13 +84,16 @@ pub fn save_import_mapping_template(
             return Err("table_name cannot change when updating a template".to_string());
         }
 
-        ctx.db.import_mapping_template().id().update(ImportMappingTemplate {
-            name: params.name.clone(),
-            mapping_json: params.mapping_json.clone(),
-            write_uid: Some(ctx.sender()),
-            write_date: Some(ctx.timestamp),
-            ..existing
-        });
+        ctx.db
+            .import_mapping_template()
+            .id()
+            .update(ImportMappingTemplate {
+                name: params.name.clone(),
+                mapping_json: params.mapping_json.clone(),
+                write_uid: Some(ctx.sender()),
+                write_date: Some(ctx.timestamp),
+                ..existing
+            });
 
         write_audit_log_v2(
             ctx,
@@ -115,18 +118,21 @@ pub fn save_import_mapping_template(
         return Ok(());
     }
 
-    let row = ctx.db.import_mapping_template().insert(ImportMappingTemplate {
-        id: 0,
-        organization_id,
-        table_name: params.table_name.clone(),
-        name: params.name.clone(),
-        mapping_json: params.mapping_json.clone(),
-        use_count: 0,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: None,
-        write_date: None,
-    });
+    let row = ctx
+        .db
+        .import_mapping_template()
+        .insert(ImportMappingTemplate {
+            id: 0,
+            organization_id,
+            table_name: params.table_name.clone(),
+            name: params.name.clone(),
+            mapping_json: params.mapping_json.clone(),
+            use_count: 0,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: None,
+            write_date: None,
+        });
 
     write_audit_log_v2(
         ctx,

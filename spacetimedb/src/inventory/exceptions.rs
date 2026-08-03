@@ -56,7 +56,10 @@ pub struct RefreshInventoryExceptionsParams {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-fn lot_is_expired(ctx: &ReducerContext, lot: &crate::inventory::tracking::StockProductionLot) -> bool {
+fn lot_is_expired(
+    ctx: &ReducerContext,
+    lot: &crate::inventory::tracking::StockProductionLot,
+) -> bool {
     let now = ctx.timestamp;
     if let Some(removal) = lot.removal_date {
         if removal <= now {
@@ -92,31 +95,37 @@ fn upsert_open_exception(
         .find(|e| e.organization_id == organization_id && e.company_id == company_id)
     {
         if existing.state == "open" {
-            ctx.db.inventory_exception().id().update(InventoryException {
-                summary: summary.clone(),
+            ctx.db
+                .inventory_exception()
+                .id()
+                .update(InventoryException {
+                    summary: summary.clone(),
+                    product_id,
+                    location_id,
+                    quant_id,
+                    lot_id,
+                    quality_check_id,
+                    metadata: existing.metadata.clone(),
+                    ..existing
+                });
+            return;
+        }
+        // Re-open previously resolved.
+        ctx.db
+            .inventory_exception()
+            .id()
+            .update(InventoryException {
+                state: "open".to_string(),
+                summary,
                 product_id,
                 location_id,
                 quant_id,
                 lot_id,
                 quality_check_id,
-                metadata: existing.metadata.clone(),
+                detected_at: ctx.timestamp,
+                resolved_at: None,
                 ..existing
             });
-            return;
-        }
-        // Re-open previously resolved.
-        ctx.db.inventory_exception().id().update(InventoryException {
-            state: "open".to_string(),
-            summary,
-            product_id,
-            location_id,
-            quant_id,
-            lot_id,
-            quality_check_id,
-            detected_at: ctx.timestamp,
-            resolved_at: None,
-            ..existing
-        });
         return;
     }
 
@@ -151,18 +160,19 @@ fn resolve_by_dedupe(
         .inventory_exception_by_dedupe()
         .filter(&dedupe_key.to_string())
         .find(|e| {
-            e.organization_id == organization_id
-                && e.company_id == company_id
-                && e.state == "open"
+            e.organization_id == organization_id && e.company_id == company_id && e.state == "open"
         })
     else {
         return;
     };
-    ctx.db.inventory_exception().id().update(InventoryException {
-        state: "resolved".to_string(),
-        resolved_at: Some(ctx.timestamp),
-        ..existing
-    });
+    ctx.db
+        .inventory_exception()
+        .id()
+        .update(InventoryException {
+            state: "resolved".to_string(),
+            resolved_at: Some(ctx.timestamp),
+            ..existing
+        });
 }
 
 /// Record an open QC exception after a failed quality check.
@@ -279,10 +289,7 @@ fn refresh_company_exceptions(
             company_id,
             "open_qc",
             key.clone(),
-            format!(
-                "Open QC fail {} product {:?}",
-                check.id, check.product_id
-            ),
+            format!("Open QC fail {} product {:?}", check.id, check.product_id),
             check.product_id,
             check.failure_location_id,
             None,
@@ -375,11 +382,14 @@ pub fn resolve_inventory_exception(
         return Ok(());
     }
 
-    ctx.db.inventory_exception().id().update(InventoryException {
-        state: "resolved".to_string(),
-        resolved_at: Some(ctx.timestamp),
-        ..ex
-    });
+    ctx.db
+        .inventory_exception()
+        .id()
+        .update(InventoryException {
+            state: "resolved".to_string(),
+            resolved_at: Some(ctx.timestamp),
+            ..ex
+        });
 
     write_audit_log_v2(
         ctx,

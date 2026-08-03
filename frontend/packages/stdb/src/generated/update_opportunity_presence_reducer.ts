@@ -13,5 +13,4 @@ import {
 export default {
   organizationId: __t.u64(),
   opportunityId: __t.u64(),
-  userName: __t.string(),
 };

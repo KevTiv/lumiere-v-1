@@ -7,7 +7,9 @@ use crate::accounting::journal_entries::{
 };
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::subscriptions::billing_helpers::blank_line;
-use crate::subscriptions::tables::{subscription, subscription_line, subscription_plan, Subscription};
+use crate::subscriptions::tables::{
+    subscription, subscription_line, subscription_plan, Subscription,
+};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -324,7 +326,11 @@ pub(crate) fn rate_quantity_progressive(
         }
     }
 
-    let avg = if quantity > 0.0 { amount / quantity } else { 0.0 };
+    let avg = if quantity > 0.0 {
+        amount / quantity
+    } else {
+        0.0
+    };
     (amount, avg, bands.join(";"))
 }
 
@@ -468,9 +474,7 @@ pub fn append_unbilled_usage_to_invoice(
     for commit in commitments {
         let relevant: f64 = unbilled
             .iter()
-            .filter(|c| {
-                commit.product_id.is_none() || c.product_id == commit.product_id
-            })
+            .filter(|c| commit.product_id.is_none() || c.product_id == commit.product_id)
             .map(|c| c.amount)
             .sum();
         if commit.min_amount > relevant + f64::EPSILON {
@@ -488,25 +492,27 @@ pub fn append_unbilled_usage_to_invoice(
             next_seq += 1;
             true_up_total += gap;
 
-            ctx.db.subscription_usage_charge().insert(SubscriptionUsageCharge {
-                id: 0,
-                organization_id,
-                company_id,
-                subscription_id: subscription.id,
-                usage_event_id: None,
-                product_id: commit.product_id,
-                quantity: 1.0,
-                unit_price: gap,
-                amount: gap,
-                tier_band: "commitment".to_string(),
-                status: "billed".to_string(),
-                invoice_move_id: Some(move_id),
-                billing_run_key: Some(billing_run_key.to_string()),
-                description: desc,
-                created_at: ctx.timestamp,
-                created_by,
-                metadata: serde_json::json!({ "commitment_id": commit.id }).to_string(),
-            });
+            ctx.db
+                .subscription_usage_charge()
+                .insert(SubscriptionUsageCharge {
+                    id: 0,
+                    organization_id,
+                    company_id,
+                    subscription_id: subscription.id,
+                    usage_event_id: None,
+                    product_id: commit.product_id,
+                    quantity: 1.0,
+                    unit_price: gap,
+                    amount: gap,
+                    tier_band: "commitment".to_string(),
+                    status: "billed".to_string(),
+                    invoice_move_id: Some(move_id),
+                    billing_run_key: Some(billing_run_key.to_string()),
+                    description: desc,
+                    created_at: ctx.timestamp,
+                    created_by,
+                    metadata: serde_json::json!({ "commitment_id": commit.id }).to_string(),
+                });
         }
     }
 
@@ -534,7 +540,11 @@ pub fn append_unbilled_usage_to_invoice(
         .move_line_by_move()
         .filter(&move_id)
         .filter(|l| l.debit > 0.0)
-        .max_by(|a, b| a.debit.partial_cmp(&b.debit).unwrap_or(std::cmp::Ordering::Equal))
+        .max_by(|a, b| {
+            a.debit
+                .partial_cmp(&b.debit)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     {
         ctx.db.account_move_line().id().update(AccountMoveLine {
             debit: ar_line.debit + added,
@@ -594,28 +604,31 @@ pub fn ingest_subscription_usage_event(
         return Ok(());
     }
 
-    let row = ctx.db.subscription_usage_event().insert(SubscriptionUsageEvent {
-        id: 0,
-        organization_id,
-        company_id,
-        subscription_id,
-        source,
-        event_id,
-        idempotency_key: key,
-        product_id: params.product_id,
-        quantity: params.quantity,
-        unit: if params.unit.trim().is_empty() {
-            "unit".to_string()
-        } else {
-            params.unit.trim().to_string()
-        },
-        occurred_at: params.occurred_at.unwrap_or(ctx.timestamp),
-        status: "pending".to_string(),
-        rated_charge_id: None,
-        created_at: ctx.timestamp,
-        created_by: ctx.sender(),
-        metadata: params.metadata.unwrap_or_default(),
-    });
+    let row = ctx
+        .db
+        .subscription_usage_event()
+        .insert(SubscriptionUsageEvent {
+            id: 0,
+            organization_id,
+            company_id,
+            subscription_id,
+            source,
+            event_id,
+            idempotency_key: key,
+            product_id: params.product_id,
+            quantity: params.quantity,
+            unit: if params.unit.trim().is_empty() {
+                "unit".to_string()
+            } else {
+                params.unit.trim().to_string()
+            },
+            occurred_at: params.occurred_at.unwrap_or(ctx.timestamp),
+            status: "pending".to_string(),
+            rated_charge_id: None,
+            created_at: ctx.timestamp,
+            created_by: ctx.sender(),
+            metadata: params.metadata.unwrap_or_default(),
+        });
 
     write_audit_log_v2(
         ctx,
@@ -685,31 +698,38 @@ pub fn rate_subscription_usage_events(
         } else {
             let (amt, avg, band) = rate_quantity_progressive(&tiers, event.quantity);
             if amt <= 0.0 && fallback > 0.0 {
-                (event.quantity * fallback, fallback, format!("flat@{}", fallback))
+                (
+                    event.quantity * fallback,
+                    fallback,
+                    format!("flat@{}", fallback),
+                )
             } else {
                 (amt, avg, band)
             }
         };
 
-        let charge = ctx.db.subscription_usage_charge().insert(SubscriptionUsageCharge {
-            id: 0,
-            organization_id,
-            company_id,
-            subscription_id,
-            usage_event_id: Some(event.id),
-            product_id: event.product_id,
-            quantity: event.quantity,
-            unit_price,
-            amount,
-            tier_band: band,
-            status: "unbilled".to_string(),
-            invoice_move_id: None,
-            billing_run_key: None,
-            description: format!("Usage {} {}", event.source, event.event_id),
-            created_at: ctx.timestamp,
-            created_by: ctx.sender(),
-            metadata: serde_json::json!({ "usage_event_id": event.id }).to_string(),
-        });
+        let charge = ctx
+            .db
+            .subscription_usage_charge()
+            .insert(SubscriptionUsageCharge {
+                id: 0,
+                organization_id,
+                company_id,
+                subscription_id,
+                usage_event_id: Some(event.id),
+                product_id: event.product_id,
+                quantity: event.quantity,
+                unit_price,
+                amount,
+                tier_band: band,
+                status: "unbilled".to_string(),
+                invoice_move_id: None,
+                billing_run_key: None,
+                description: format!("Usage {} {}", event.source, event.event_id),
+                created_at: ctx.timestamp,
+                created_by: ctx.sender(),
+                metadata: serde_json::json!({ "usage_event_id": event.id }).to_string(),
+            });
 
         ctx.db
             .subscription_usage_event()
@@ -770,21 +790,24 @@ pub fn create_subscription_price_tier(
         }
     }
 
-    let row = ctx.db.subscription_price_tier().insert(SubscriptionPriceTier {
-        id: 0,
-        organization_id,
-        company_id,
-        plan_id: params.plan_id,
-        product_id: params.product_id,
-        sequence: params.sequence,
-        min_qty: params.min_qty,
-        max_qty: params.max_qty,
-        unit_price: params.unit_price,
-        active: params.active,
-        created_at: ctx.timestamp,
-        updated_at: ctx.timestamp,
-        metadata: params.metadata.unwrap_or_default(),
-    });
+    let row = ctx
+        .db
+        .subscription_price_tier()
+        .insert(SubscriptionPriceTier {
+            id: 0,
+            organization_id,
+            company_id,
+            plan_id: params.plan_id,
+            product_id: params.product_id,
+            sequence: params.sequence,
+            min_qty: params.min_qty,
+            max_qty: params.max_qty,
+            unit_price: params.unit_price,
+            active: params.active,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            metadata: params.metadata.unwrap_or_default(),
+        });
 
     write_audit_log_v2(
         ctx,
@@ -835,9 +858,7 @@ pub fn set_subscription_commitment(
         .subscription_commitment_by_sub()
         .filter(&subscription_id)
         .filter(|c| {
-            c.organization_id == organization_id
-                && c.active
-                && c.product_id == params.product_id
+            c.organization_id == organization_id && c.active && c.product_id == params.product_id
         })
         .collect();
     for row in existing {
@@ -851,18 +872,21 @@ pub fn set_subscription_commitment(
             });
     }
 
-    let row = ctx.db.subscription_commitment().insert(SubscriptionCommitment {
-        id: 0,
-        organization_id,
-        company_id,
-        subscription_id,
-        min_amount: params.min_amount,
-        product_id: params.product_id,
-        active: params.active,
-        created_at: ctx.timestamp,
-        updated_at: ctx.timestamp,
-        metadata: params.metadata.unwrap_or_default(),
-    });
+    let row = ctx
+        .db
+        .subscription_commitment()
+        .insert(SubscriptionCommitment {
+            id: 0,
+            organization_id,
+            company_id,
+            subscription_id,
+            min_amount: params.min_amount,
+            product_id: params.product_id,
+            active: params.active,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            metadata: params.metadata.unwrap_or_default(),
+        });
 
     write_audit_log_v2(
         ctx,
@@ -969,21 +993,24 @@ pub fn add_subscription_bundle_item(
         return Err("quantity must be > 0".to_string());
     }
 
-    let row = ctx.db.subscription_bundle_item().insert(SubscriptionBundleItem {
-        id: 0,
-        organization_id,
-        company_id,
-        bundle_id,
-        product_id: params.product_id,
-        name: params.name.trim().to_string(),
-        quantity: params.quantity,
-        price_unit: params.price_unit,
-        is_addon: params.is_addon,
-        sequence: params.sequence,
-        active: params.active,
-        created_at: ctx.timestamp,
-        metadata: params.metadata.unwrap_or_default(),
-    });
+    let row = ctx
+        .db
+        .subscription_bundle_item()
+        .insert(SubscriptionBundleItem {
+            id: 0,
+            organization_id,
+            company_id,
+            bundle_id,
+            product_id: params.product_id,
+            name: params.name.trim().to_string(),
+            quantity: params.quantity,
+            price_unit: params.price_unit,
+            is_addon: params.is_addon,
+            sequence: params.sequence,
+            active: params.active,
+            created_at: ctx.timestamp,
+            metadata: params.metadata.unwrap_or_default(),
+        });
 
     write_audit_log_v2(
         ctx,
@@ -1055,51 +1082,54 @@ pub fn apply_subscription_bundle(
     let mut created = Vec::new();
     for item in items {
         let subtotal = item.quantity * item.price_unit;
-        let line = ctx.db.subscription_line().insert(crate::subscriptions::tables::SubscriptionLine {
-            id: 0,
-            organization_id,
-            name: item.name.clone(),
-            subscription_id,
-            product_id: item.product_id,
-            product_uom: 1,
-            product_uom_qty: item.quantity,
-            price_unit: item.price_unit,
-            price_subtotal: subtotal,
-            discount: 0.0,
-            price_tax: 0.0,
-            price_total: subtotal,
-            tax_ids: vec![],
-            company_id,
-            currency_id: sub.currency_id,
-            analytic_account_id: sub.analytic_account_id,
-            analytic_tag_ids: vec![],
-            recurring_rule_type: sub.recurring_rule_type.clone(),
-            recurring_interval: sub.recurring_interval,
-            recurring_next_date: sub.recurring_next_date,
-            recurring_last_date: None,
-            line_is_recurring: true,
-            line_is_prorated: false,
-            line_is_start_date: false,
-            line_is_end_date: false,
-            line_is_trial: false,
-            line_trial_duration: 0,
-            line_trial_unit: "day".to_string(),
-            line_parent_id: None,
-            line_child_ids: vec![],
-            line_is_downpayment: false,
-            line_is_discount: false,
-            line_is_gift: false,
-            line_is_upgrade: false,
-            line_is_downgrade: false,
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
-            metadata: serde_json::json!({
-                "bundle_id": params.bundle_id,
-                "bundle_item_id": item.id,
-                "is_addon": item.is_addon,
-            })
-            .to_string(),
-        });
+        let line =
+            ctx.db
+                .subscription_line()
+                .insert(crate::subscriptions::tables::SubscriptionLine {
+                    id: 0,
+                    organization_id,
+                    name: item.name.clone(),
+                    subscription_id,
+                    product_id: item.product_id,
+                    product_uom: 1,
+                    product_uom_qty: item.quantity,
+                    price_unit: item.price_unit,
+                    price_subtotal: subtotal,
+                    discount: 0.0,
+                    price_tax: 0.0,
+                    price_total: subtotal,
+                    tax_ids: vec![],
+                    company_id,
+                    currency_id: sub.currency_id,
+                    analytic_account_id: sub.analytic_account_id,
+                    analytic_tag_ids: vec![],
+                    recurring_rule_type: sub.recurring_rule_type.clone(),
+                    recurring_interval: sub.recurring_interval,
+                    recurring_next_date: sub.recurring_next_date,
+                    recurring_last_date: None,
+                    line_is_recurring: true,
+                    line_is_prorated: false,
+                    line_is_start_date: false,
+                    line_is_end_date: false,
+                    line_is_trial: false,
+                    line_trial_duration: 0,
+                    line_trial_unit: "day".to_string(),
+                    line_parent_id: None,
+                    line_child_ids: vec![],
+                    line_is_downpayment: false,
+                    line_is_discount: false,
+                    line_is_gift: false,
+                    line_is_upgrade: false,
+                    line_is_downgrade: false,
+                    created_at: ctx.timestamp,
+                    updated_at: ctx.timestamp,
+                    metadata: serde_json::json!({
+                        "bundle_id": params.bundle_id,
+                        "bundle_item_id": item.id,
+                        "is_addon": item.is_addon,
+                    })
+                    .to_string(),
+                });
         line_ids.push(line.id);
         created.push(line.id);
     }

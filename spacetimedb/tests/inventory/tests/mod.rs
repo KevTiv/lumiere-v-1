@@ -108,8 +108,7 @@ pub fn run_inventory_lot_reserve_test(ctx: &ReducerContext) -> Result<(), String
 
 #[spacetimedb::reducer]
 pub fn run_inventory_serial_reserve_test(ctx: &ReducerContext) -> Result<(), String> {
-    gap_fixes_test::test_serial_required_on_reserve(ctx)
-        .map_err(|e| format!("serial_reserve: {e}"))
+    gap_fixes_test::test_serial_required_on_reserve(ctx).map_err(|e| format!("serial_reserve: {e}"))
 }
 
 #[spacetimedb::reducer]

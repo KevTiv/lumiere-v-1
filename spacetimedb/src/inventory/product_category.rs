@@ -15,7 +15,7 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 #[spacetimedb::table(
     accessor = product_category,
     public,
-    index(accessor = category_by_org, btree(columns = [organization_id])),
+    index(accessor = product_category_by_org, btree(columns = [organization_id])),
     index(accessor = category_by_parent, btree(columns = [parent_id])),
     index(accessor = category_by_sequence, btree(columns = [sequence])),
     index(accessor = category_by_name, btree(columns = [name]))

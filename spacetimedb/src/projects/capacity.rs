@@ -383,10 +383,7 @@ fn resolve_employee_resource(
     Ok((employee_id, resource_id))
 }
 
-fn allocation_hours_in_range(
-    alloc: &ResourceAllocation,
-    available_in_range: f64,
-) -> f64 {
+fn allocation_hours_in_range(alloc: &ResourceAllocation, available_in_range: f64) -> f64 {
     if alloc.allocated_hours > 0.0 {
         alloc.allocated_hours
     } else if alloc.allocation_percent > 0.0 {
@@ -417,13 +414,8 @@ pub fn recompute_resource_capacity(
         .map(|r| (r.time_efficiency / 100.0).clamp(0.0, 2.0))
         .unwrap_or(1.0);
 
-    let holiday_days = holiday_day_indexes(
-        ctx,
-        organization_id,
-        company_id,
-        &pack_key,
-        calendar_id,
-    );
+    let holiday_days =
+        holiday_day_indexes(ctx, organization_id, company_id, &pack_key, calendar_id);
     let working_days = calendar
         .as_ref()
         .map(|c| count_working_days(c, period_start, period_end, &holiday_days))
@@ -498,30 +490,32 @@ pub fn recompute_resource_capacity(
         ctx.db.resource_capacity_snapshot().id().delete(&id);
     }
 
-    ctx.db.resource_capacity_snapshot().insert(ResourceCapacitySnapshot {
-        id: 0,
-        organization_id,
-        company_id,
-        employee_id,
-        resource_id,
-        period_start,
-        period_end,
-        available_hours,
-        leave_hours,
-        allocated_hours,
-        actual_hours,
-        remaining_hours,
-        calendar_id,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: Some(
-            serde_json::json!({
-                "formula": "available - leave - allocations - actual",
-                "projection": "resource_capacity_snapshot",
-            })
-            .to_string(),
-        ),
-    });
+    ctx.db
+        .resource_capacity_snapshot()
+        .insert(ResourceCapacitySnapshot {
+            id: 0,
+            organization_id,
+            company_id,
+            employee_id,
+            resource_id,
+            period_start,
+            period_end,
+            available_hours,
+            leave_hours,
+            allocated_hours,
+            actual_hours,
+            remaining_hours,
+            calendar_id,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: Some(
+                serde_json::json!({
+                    "formula": "available - leave - allocations - actual",
+                    "projection": "resource_capacity_snapshot",
+                })
+                .to_string(),
+            ),
+        });
 }
 
 /// Hook for leave approve — same txn as `approve_leave`.
@@ -915,12 +909,7 @@ pub fn seed_pack_holidays(
     let _ = company_id_from_scope(ctx, organization_id, Some(company_id))?;
 
     let keys: Vec<String> = if params.pack_keys.is_empty() {
-        vec![
-            "au".into(),
-            "nz".into(),
-            "za".into(),
-            "sg".into(),
-        ]
+        vec!["au".into(), "nz".into(), "za".into(), "sg".into()]
     } else {
         params.pack_keys
     };
@@ -994,8 +983,7 @@ pub fn create_resource_allocation(
     check_permission(ctx, organization_id, "resource_allocation", "create")?;
     let _ = company_id_from_scope(ctx, organization_id, Some(company_id))?;
 
-    if params.date_to.to_micros_since_unix_epoch() < params.date_from.to_micros_since_unix_epoch()
-    {
+    if params.date_to.to_micros_since_unix_epoch() < params.date_from.to_micros_since_unix_epoch() {
         return Err("date_to must be on or after date_from".to_string());
     }
     if params.allocated_hours < 0.0 || params.allocation_percent < 0.0 {
@@ -1174,17 +1162,19 @@ pub fn update_resource_allocation(
         ..existing
     };
 
-    if updated.date_to.to_micros_since_unix_epoch()
-        < updated.date_from.to_micros_since_unix_epoch()
+    if updated.date_to.to_micros_since_unix_epoch() < updated.date_from.to_micros_since_unix_epoch()
     {
         return Err("date_to must be on or after date_from".to_string());
     }
 
     // Temporarily deactivate for capacity check, then apply.
-    ctx.db.resource_allocation().id().update(ResourceAllocation {
-        active: false,
-        ..existing.clone()
-    });
+    ctx.db
+        .resource_allocation()
+        .id()
+        .update(ResourceAllocation {
+            active: false,
+            ..existing.clone()
+        });
 
     if updated.enforce_capacity && updated.active {
         let requested = if updated.allocated_hours > 0.0 {
@@ -1271,9 +1261,7 @@ pub fn delete_resource_allocation(
             table_name: "resource_allocation",
             record_id: allocation_id,
             action: "DELETE",
-            old_values: Some(
-                serde_json::json!({ "project_id": existing.project_id }).to_string(),
-            ),
+            old_values: Some(serde_json::json!({ "project_id": existing.project_id }).to_string()),
             new_values: None,
             changed_fields: vec!["deleted".to_string()],
             metadata: None,

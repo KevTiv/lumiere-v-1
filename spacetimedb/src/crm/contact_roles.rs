@@ -39,14 +39,25 @@ pub struct ContactRoleAssignment {
 
 // ── Input Params ──────────────────────────────────────────────────────────────
 
+/// Explicit patch contract (CRM-RI-012): `active_until` and `metadata` are
+/// nullable on `ContactRoleAssignment` and use `Option<Option<T>>` — outer
+/// `None` = field not sent (unset on create, unchanged when this call merges
+/// into an existing active assignment), outer `Some(None)` = explicit clear,
+/// outer `Some(Some(v))` = replace with `v`.
+///
+/// `company_id` is set-only: it is required to create an assignment (see the
+/// `ok_or` check in `assign_contact_role`) and is never altered when merging
+/// into an existing assignment, so it stays a single-level `Option<u64>`.
+/// `active_from` and `role` are non-nullable on the table and also stay
+/// single-level `Option<T>` (replaceable, not clearable).
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct AssignContactRoleParams {
     pub contact_id: u64,
     pub company_id: Option<u64>,
     pub role: String,
     pub active_from: Option<Timestamp>,
-    pub active_until: Option<Timestamp>,
-    pub metadata: Option<String>,
+    pub active_until: Option<Option<Timestamp>>,
+    pub metadata: Option<Option<String>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -159,13 +170,20 @@ pub fn assign_contact_role(
 
     if let Some(existing) = existing {
         let new_active_from = params.active_from.unwrap_or(existing.active_from);
-        let new_active_until = params.active_until.or(existing.active_until);
+        let new_active_until = params.active_until.unwrap_or(existing.active_until);
+        let new_metadata = params
+            .metadata
+            .clone()
+            .unwrap_or_else(|| existing.metadata.clone());
         let mut changed = Vec::new();
         if params.active_from.is_some() {
             changed.push("active_from".to_string());
         }
         if params.active_until.is_some() {
             changed.push("active_until".to_string());
+        }
+        if params.metadata.is_some() {
+            changed.push("metadata".to_string());
         }
 
         ctx.db
@@ -174,6 +192,7 @@ pub fn assign_contact_role(
             .update(ContactRoleAssignment {
                 active_from: new_active_from,
                 active_until: new_active_until,
+                metadata: new_metadata.clone(),
                 ..existing.clone()
             });
 
@@ -208,6 +227,8 @@ pub fn assign_contact_role(
     }
 
     let active_from = params.active_from.unwrap_or(ctx.timestamp);
+    let active_until = params.active_until.flatten();
+    let metadata = params.metadata.clone().flatten();
 
     let assignment = ctx
         .db
@@ -219,13 +240,13 @@ pub fn assign_contact_role(
             contact_id: params.contact_id,
             role: role.clone(),
             active_from,
-            active_until: params.active_until,
+            active_until,
             is_active: true,
             assigned_by: ctx.sender(),
             assigned_at: ctx.timestamp,
             ended_at: None,
             ended_by: None,
-            metadata: params.metadata,
+            metadata,
         });
 
     write_audit_log_v2(

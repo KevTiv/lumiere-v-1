@@ -135,12 +135,9 @@ pub fn create_attendance_punch(
         return Err("check_out must be on or after check_in".to_string());
     }
 
-    if let Some(leave) = find_validated_leave_conflict(
-        ctx,
-        params.employee_id,
-        params.check_in,
-        punch_end,
-    ) {
+    if let Some(leave) =
+        find_validated_leave_conflict(ctx, params.employee_id, params.check_in, punch_end)
+    {
         return Err(format!(
             "Punch overlaps approved leave id {} (employee on validated leave)",
             leave.id

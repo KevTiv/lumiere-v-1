@@ -19,7 +19,9 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
-use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, AccountMove, AccountMoveLine,
+};
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::projects::capacity::{resource_allocation, resource_capacity_snapshot};
@@ -364,7 +366,12 @@ fn project_planned_hours(ctx: &ReducerContext, project_id: u64) -> f64 {
         .sum()
 }
 
-fn project_budget_planned(ctx: &ReducerContext, organization_id: u64, company_id: u64, project_id: u64) -> f64 {
+fn project_budget_planned(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    project_id: u64,
+) -> f64 {
     ctx.db
         .project_margin_snapshot()
         .margin_by_project()
@@ -394,9 +401,7 @@ pub fn subcontractor_cost_for_project(
         .project_subcontractor_cost()
         .subcon_by_project()
         .filter(&project_id)
-        .filter(|c| {
-            c.organization_id == organization_id && c.company_id == company_id && c.active
-        })
+        .filter(|c| c.organization_id == organization_id && c.company_id == company_id && c.active)
         .map(|c| c.amount)
         .sum()
 }
@@ -431,8 +436,8 @@ fn validated_progress_percent(
     if milestones.is_empty() {
         return 0.0;
     }
-    let avg: f64 = milestones.iter().map(|m| m.percent_complete).sum::<f64>()
-        / milestones.len() as f64;
+    let avg: f64 =
+        milestones.iter().map(|m| m.percent_complete).sum::<f64>() / milestones.len() as f64;
     avg.clamp(0.0, 100.0)
 }
 
@@ -613,9 +618,7 @@ pub fn refresh_capacity_forecast_for_employee(
         .resource_capacity_snapshot()
         .capacity_by_company()
         .filter(&company_id)
-        .filter(|s| {
-            s.organization_id == organization_id && s.employee_id == Some(employee_id)
-        })
+        .filter(|s| s.organization_id == organization_id && s.employee_id == Some(employee_id))
         .map(|s| s.available_hours)
         .next()
         .unwrap_or(0.0);
@@ -657,35 +660,35 @@ pub fn refresh_capacity_forecast_for_employee(
         .capacity_forecast_snapshot()
         .forecast_by_company()
         .filter(&company_id)
-        .filter(|s| {
-            s.organization_id == organization_id && s.employee_id == Some(employee_id)
-        })
+        .filter(|s| s.organization_id == organization_id && s.employee_id == Some(employee_id))
         .map(|s| s.id)
         .collect();
     for id in existing {
         ctx.db.capacity_forecast_snapshot().id().delete(&id);
     }
 
-    ctx.db.capacity_forecast_snapshot().insert(CapacityForecastSnapshot {
-        id: 0,
-        organization_id,
-        company_id,
-        employee_id: Some(employee_id),
-        period_start,
-        period_end,
-        available_hours,
-        allocated_hours,
-        pipeline_hours,
-        forecast_remaining_hours,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: Some(
-            serde_json::json!({
-                "formula": "available - allocated - pipeline",
-            })
-            .to_string(),
-        ),
-    });
+    ctx.db
+        .capacity_forecast_snapshot()
+        .insert(CapacityForecastSnapshot {
+            id: 0,
+            organization_id,
+            company_id,
+            employee_id: Some(employee_id),
+            period_start,
+            period_end,
+            available_hours,
+            allocated_hours,
+            pipeline_hours,
+            forecast_remaining_hours,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: Some(
+                serde_json::json!({
+                    "formula": "available - allocated - pipeline",
+                })
+                .to_string(),
+            ),
+        });
 }
 
 #[reducer]
@@ -998,14 +1001,17 @@ pub fn apply_project_change_order(
         }
     }
 
-    ctx.db.project_change_order().id().update(ProjectChangeOrder {
-        state: "applied".to_string(),
-        applied_at: Some(ctx.timestamp),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: params.metadata.clone().or(co.metadata.clone()),
-        ..co.clone()
-    });
+    ctx.db
+        .project_change_order()
+        .id()
+        .update(ProjectChangeOrder {
+            state: "applied".to_string(),
+            applied_at: Some(ctx.timestamp),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: params.metadata.clone().or(co.metadata.clone()),
+            ..co.clone()
+        });
 
     refresh_project_margin_snapshot(ctx, organization_id, company_id, co.project_id);
     refresh_project_earned_value_snapshot(ctx, organization_id, company_id, co.project_id);
@@ -1064,8 +1070,7 @@ pub fn refresh_project_earned_value_snapshot(
         .map(|b| b.current_budget)
         .unwrap_or_else(|| project_budget_planned(ctx, organization_id, company_id, project_id));
 
-    let percent_complete =
-        validated_progress_percent(ctx, organization_id, company_id, project_id);
+    let percent_complete = validated_progress_percent(ctx, organization_id, company_id, project_id);
 
     // Time-phased PV proxy: if project has date range, use elapsed fraction; else proportion of planned hours done schedule (same as EV for MVP when no dates).
     let schedule_percent = {
@@ -1159,7 +1164,12 @@ pub fn refresh_project_earned_value(
     company_id: u64,
     params: RefreshProjectEarnedValueParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "project_earned_value_snapshot", "write")?;
+    check_permission(
+        ctx,
+        organization_id,
+        "project_earned_value_snapshot",
+        "write",
+    )?;
     let _ = company_id_from_scope(ctx, organization_id, Some(company_id))?;
 
     let project_ids: Vec<u64> = if params.project_ids.is_empty() {
@@ -1188,9 +1198,7 @@ pub fn refresh_project_earned_value(
             record_id: project_ids.first().copied().unwrap_or(0),
             action: "UPDATE",
             old_values: None,
-            new_values: Some(
-                serde_json::json!({ "project_count": project_ids.len() }).to_string(),
-            ),
+            new_values: Some(serde_json::json!({ "project_count": project_ids.len() }).to_string()),
             changed_fields: vec![
                 "planned_value".to_string(),
                 "earned_value".to_string(),
@@ -1529,14 +1537,17 @@ pub fn recognize_project_revenue(
         params.metadata.clone(),
     )?;
 
-    ctx.db.project_revenue_line().id().update(ProjectRevenueLine {
-        recognized: true,
-        move_id: Some(move_id),
-        move_line_id: Some(move_line_id),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..line.clone()
-    });
+    ctx.db
+        .project_revenue_line()
+        .id()
+        .update(ProjectRevenueLine {
+            recognized: true,
+            move_id: Some(move_id),
+            move_line_id: Some(move_line_id),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..line.clone()
+        });
 
     let new_recognized = schedule.recognized_amount + line.amount;
     let new_deferred = (schedule.deferred_amount - line.amount).max(0.0);
@@ -1605,9 +1616,7 @@ pub fn create_project_integration_intent(
         intent_type.as_str(),
         "payroll_export" | "calendar_sync" | "e_invoice"
     ) {
-        return Err(
-            "intent_type must be payroll_export, calendar_sync, or e_invoice".to_string(),
-        );
+        return Err("intent_type must be payroll_export, calendar_sync, or e_invoice".to_string());
     }
     if params.idempotency_key.trim().is_empty() {
         return Err("idempotency_key is required".to_string());
@@ -1630,7 +1639,8 @@ pub fn create_project_integration_intent(
                 action: "CREATE",
                 old_values: None,
                 new_values: Some(
-                    serde_json::json!({ "idempotent": true, "status": existing.status }).to_string(),
+                    serde_json::json!({ "idempotent": true, "status": existing.status })
+                        .to_string(),
                 ),
                 changed_fields: vec![],
                 metadata: params.metadata,

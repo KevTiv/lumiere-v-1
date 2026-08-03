@@ -74,14 +74,26 @@ fn feature_flags_for_plan(plan_tier: &str) -> Vec<String> {
     }
 }
 
-fn sync_org_feature_flags(ctx: &ReducerContext, organization_id: u64, plan_tier: &str) -> Result<(), String> {
+fn sync_org_feature_flags(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    plan_tier: &str,
+) -> Result<(), String> {
     let flags = feature_flags_for_plan(plan_tier);
-    if let Some(settings) = ctx.db.organization_settings().organization_id().find(&organization_id) {
-        ctx.db.organization_settings().organization_id().update(OrganizationSettings {
-            feature_flags: flags,
-            updated_at: ctx.timestamp,
-            ..settings
-        });
+    if let Some(settings) = ctx
+        .db
+        .organization_settings()
+        .organization_id()
+        .find(&organization_id)
+    {
+        ctx.db
+            .organization_settings()
+            .organization_id()
+            .update(OrganizationSettings {
+                feature_flags: flags,
+                updated_at: ctx.timestamp,
+                ..settings
+            });
     } else {
         ctx.db.organization_settings().insert(OrganizationSettings {
             organization_id,
@@ -132,27 +144,31 @@ pub fn create_billing_account(
 
     sync_org_feature_flags(ctx, organization_id, &params.plan_tier)?;
 
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "billing_account",
-        record_id: row.id,
-        action: "CREATE",
-        old_values: None,
-        new_values: Some(
-            serde_json::json!({
-                "plan_tier": params.plan_tier,
-                "seat_count": params.seat_count,
-                "status": params.status,
-            })
-            .to_string(),
-        ),
-        changed_fields: vec![
-            "plan_tier".to_string(),
-            "seat_count".to_string(),
-            "status".to_string(),
-        ],
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "billing_account",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "plan_tier": params.plan_tier,
+                    "seat_count": params.seat_count,
+                    "status": params.status,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "plan_tier".to_string(),
+                "seat_count".to_string(),
+                "status".to_string(),
+            ],
+            metadata: None,
+        },
+    );
 
     Ok(())
 }
@@ -177,7 +193,10 @@ pub fn update_billing_account(
         return Err("Billing account does not belong to this organization".to_string());
     }
 
-    let plan_tier = params.plan_tier.clone().unwrap_or(existing.plan_tier.clone());
+    let plan_tier = params
+        .plan_tier
+        .clone()
+        .unwrap_or(existing.plan_tier.clone());
     let updated = ctx.db.billing_account().id().update(BillingAccount {
         plan_tier: plan_tier.clone(),
         seat_count: params.seat_count.unwrap_or(existing.seat_count),
@@ -204,23 +223,27 @@ pub fn update_billing_account(
         changed_fields.push("status".to_string());
     }
 
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
-        table_name: "billing_account",
-        record_id: updated.id,
-        action: "UPDATE",
-        old_values: None,
-        new_values: Some(
-            serde_json::json!({
-                "plan_tier": updated.plan_tier,
-                "seat_count": updated.seat_count,
-                "status": updated.status,
-            })
-            .to_string(),
-        ),
-        changed_fields,
-        metadata: None,
-    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "billing_account",
+            record_id: updated.id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "plan_tier": updated.plan_tier,
+                    "seat_count": updated.seat_count,
+                    "status": updated.status,
+                })
+                .to_string(),
+            ),
+            changed_fields,
+            metadata: None,
+        },
+    );
 
     Ok(())
 }

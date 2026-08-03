@@ -62,6 +62,13 @@ export const CRM_BFF_REDUCERS = [
   "open_crm_conversation",
   "append_crm_conversation_message",
   "update_crm_conversation",
+  "create_contact_category",
+  "update_contact_category",
+  "archive_contact_category",
+  "add_contact_categories",
+  "remove_contact_categories",
+  "replace_contact_categories",
+  "clear_contact_categories",
 ] as const;
 
 export type CrmBffReducerKey = (typeof CRM_BFF_REDUCERS)[number];
@@ -156,6 +163,13 @@ export const CRM_COMMAND_SUBSCRIPTION_HINTS: Record<
     "crm-conversations",
   ],
   update_crm_conversation: ["crm-conversations"],
+  create_contact_category: ["contact-categories"],
+  update_contact_category: ["contact-categories"],
+  archive_contact_category: ["contact-categories"],
+  add_contact_categories: ["contact-category-assignments", "contacts"],
+  remove_contact_categories: ["contact-category-assignments", "contacts"],
+  replace_contact_categories: ["contact-category-assignments", "contacts"],
+  clear_contact_categories: ["contact-category-assignments", "contacts"],
 };
 
 export function crmCommandContract(

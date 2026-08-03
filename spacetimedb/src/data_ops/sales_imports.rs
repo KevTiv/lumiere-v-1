@@ -104,7 +104,7 @@ pub fn import_sale_order_csv(
             picking_policy: "direct".to_string(),
             warehouse_id: parse_u64(col(&headers, row, "warehouse_id")),
             incoterm_id: None,
-        incoterm: None,
+            incoterm: None,
             incoterm_location: None,
             carrier_id: None,
             weight: 0.0,

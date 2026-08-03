@@ -31,6 +31,11 @@ pub struct LeadScore {
     pub scored_at: Timestamp,
     pub scored_by: Identity,
     pub metadata: Option<String>,
+    /// True when the source lead has changed since `scored_at` and this
+    /// snapshot no longer reflects it. Cleared by `recompute_lead_score`.
+    pub is_stale: bool,
+    /// When the score was first flagged stale. `None` while fresh.
+    pub stale_since: Option<Timestamp>,
 }
 
 #[spacetimedb::table(
@@ -162,6 +167,31 @@ fn compute_factors(lead: &crate::crm::leads::Lead) -> Vec<FactorDraft> {
     factors
 }
 
+/// Mark any existing lead score for `lead_id` as stale because its source
+/// lead changed. Cheap, visible freshness signal — does not recompute.
+/// Callers: any reducer in `leads.rs` (or elsewhere) that mutates fields
+/// consumed by `compute_factors` (email, phone, mobile, company_name,
+/// source_id, website, industry, expected_revenue, probability, state).
+pub(crate) fn mark_lead_score_stale(ctx: &ReducerContext, organization_id: u64, lead_id: u64) {
+    let ids: Vec<u64> = ctx
+        .db
+        .lead_score()
+        .lead_score_by_lead()
+        .filter(&lead_id)
+        .filter(|s| s.organization_id == organization_id && !s.is_stale)
+        .map(|s| s.id)
+        .collect();
+    for id in ids {
+        if let Some(row) = ctx.db.lead_score().id().find(&id) {
+            ctx.db.lead_score().id().update(LeadScore {
+                is_stale: true,
+                stale_since: Some(ctx.timestamp),
+                ..row
+            });
+        }
+    }
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 /// Recompute explainable lead score factors for one lead (replaces prior score rows).
@@ -217,6 +247,8 @@ pub fn recompute_lead_score(
         scored_at: ctx.timestamp,
         scored_by: ctx.sender(),
         metadata: None,
+        is_stale: false,
+        stale_since: None,
     });
 
     for factor in &factors {

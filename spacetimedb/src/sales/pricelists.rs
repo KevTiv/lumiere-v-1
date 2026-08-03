@@ -137,8 +137,7 @@ pub(crate) fn resolve_unit_price(
             match item.applied_on {
                 PricelistAppliedOn::AllProducts => true,
                 PricelistAppliedOn::Product => {
-                    item.product_id == Some(product_id)
-                        || item.product_tmpl_id == Some(product_id)
+                    item.product_id == Some(product_id) || item.product_tmpl_id == Some(product_id)
                 }
                 PricelistAppliedOn::Category => categ_id.is_some() && item.categ_id == categ_id,
             }

@@ -758,9 +758,7 @@ fn build_create_sale_order_params(
     })
 }
 
-fn build_create_sale_order_line_params(
-    value: &Value,
-) -> Result<CreateSaleOrderLineParams, String> {
+fn build_create_sale_order_line_params(value: &Value) -> Result<CreateSaleOrderLineParams, String> {
     let obj = value
         .as_object()
         .ok_or("sale order line must be a JSON object")?;

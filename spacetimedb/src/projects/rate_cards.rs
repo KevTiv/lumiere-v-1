@@ -215,7 +215,12 @@ pub fn lookup_rate_card_rates(
 ) -> Option<ResolvedRates> {
     let mut candidates: Vec<(u8, ProjectRateCardLine)> = Vec::new();
 
-    for card in ctx.db.project_rate_card().rate_card_by_company().filter(&company_id) {
+    for card in ctx
+        .db
+        .project_rate_card()
+        .rate_card_by_company()
+        .filter(&company_id)
+    {
         if card.organization_id != organization_id || !card.active {
             continue;
         }
@@ -248,8 +253,10 @@ pub fn lookup_rate_card_rates(
             }
 
             let matches = match line.scope.as_str() {
-                "employee" => line.employee_id == Some(employee_id)
-                    && (line.task_id.is_none() || line.task_id == task_id),
+                "employee" => {
+                    line.employee_id == Some(employee_id)
+                        && (line.task_id.is_none() || line.task_id == task_id)
+                }
                 "task" => line.task_id.is_some() && line.task_id == task_id,
                 "project" => line.employee_id.is_none() && line.task_id.is_none(),
                 _ => false,
@@ -309,9 +316,9 @@ pub fn resolve_timesheet_rates(
         return Ok((cost, sell));
     }
 
-    let cost = client_cost.filter(|c| *c > 0.0).ok_or_else(|| {
-        "employee_cost is required when no matching rate card exists".to_string()
-    })?;
+    let cost = client_cost
+        .filter(|c| *c > 0.0)
+        .ok_or_else(|| "employee_cost is required when no matching rate card exists".to_string())?;
     let sell = client_sell.unwrap_or(cost);
     if sell < 0.0 {
         return Err("sell_rate cannot be negative".to_string());

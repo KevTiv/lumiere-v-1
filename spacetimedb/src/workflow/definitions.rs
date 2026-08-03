@@ -1107,7 +1107,10 @@ pub fn validate_fork_join_topology(
         }
     }
 
-    let Some(start) = nodes.iter().find(|node| node.kind == WorkflowNodeKind::Start) else {
+    let Some(start) = nodes
+        .iter()
+        .find(|node| node.kind == WorkflowNodeKind::Start)
+    else {
         return;
     };
     let mut stack: Vec<(&str, WorkflowBranchKind)> = Vec::new();

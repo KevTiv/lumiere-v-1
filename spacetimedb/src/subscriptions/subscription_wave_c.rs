@@ -328,25 +328,27 @@ fn insert_amendment(
     metadata: String,
 ) -> SubscriptionAmendment {
     let version = next_contract_version(ctx, subscription_id);
-    ctx.db.subscription_amendment().insert(SubscriptionAmendment {
-        id: 0,
-        organization_id,
-        company_id,
-        subscription_id,
-        version,
-        amendment_type: amendment_type.to_string(),
-        effective_date,
-        line_id,
-        before_json,
-        after_json,
-        proration_amount,
-        proration_move_id,
-        credit_note_move_id,
-        notes,
-        created_at: ctx.timestamp,
-        created_by: ctx.sender(),
-        metadata,
-    })
+    ctx.db
+        .subscription_amendment()
+        .insert(SubscriptionAmendment {
+            id: 0,
+            organization_id,
+            company_id,
+            subscription_id,
+            version,
+            amendment_type: amendment_type.to_string(),
+            effective_date,
+            line_id,
+            before_json,
+            after_json,
+            proration_amount,
+            proration_move_id,
+            credit_note_move_id,
+            notes,
+            created_at: ctx.timestamp,
+            created_by: ctx.sender(),
+            metadata,
+        })
 }
 
 fn load_owned_subscription(
@@ -389,9 +391,7 @@ pub fn amend_subscription(
         amendment_type.as_str(),
         "upgrade" | "downgrade" | "quantity" | "price"
     ) {
-        return Err(
-            "amendment_type must be upgrade|downgrade|quantity|price".to_string(),
-        );
+        return Err("amendment_type must be upgrade|downgrade|quantity|price".to_string());
     }
 
     let subscription = load_owned_subscription(ctx, organization_id, company_id, subscription_id)?;
@@ -478,15 +478,18 @@ pub fn amend_subscription(
 
     let mut proration_move_id = None;
     if params.prorate && proration_amount.abs() > 0.000_1 {
-        let journal_id = params.journal_id.filter(|id| *id > 0).ok_or(
-            "journal_id required when creating a proration adjustment",
-        )?;
-        let income = params.income_account_id.filter(|id| *id > 0).ok_or(
-            "income_account_id required when creating a proration adjustment",
-        )?;
-        let ar = params.receivable_account_id.filter(|id| *id > 0).ok_or(
-            "receivable_account_id required when creating a proration adjustment",
-        )?;
+        let journal_id = params
+            .journal_id
+            .filter(|id| *id > 0)
+            .ok_or("journal_id required when creating a proration adjustment")?;
+        let income = params
+            .income_account_id
+            .filter(|id| *id > 0)
+            .ok_or("income_account_id required when creating a proration adjustment")?;
+        let ar = params
+            .receivable_account_id
+            .filter(|id| *id > 0)
+            .ok_or("receivable_account_id required when creating a proration adjustment")?;
         let move_id = create_proration_adjustment_move(
             ctx,
             organization_id,
@@ -602,8 +605,9 @@ pub fn pause_subscription(
     if subscription.state != "active" {
         return Err("Only active subscriptions can be paused".to_string());
     }
-    let before = serde_json::json!({ "state": subscription.state, "is_active": subscription.is_active })
-        .to_string();
+    let before =
+        serde_json::json!({ "state": subscription.state, "is_active": subscription.is_active })
+            .to_string();
     ctx.db.subscription().id().update(Subscription {
         state: "paused".to_string(),
         is_active: false,
@@ -660,8 +664,9 @@ pub fn resume_subscription(
     if subscription.state != "paused" {
         return Err("Only paused subscriptions can be resumed".to_string());
     }
-    let before = serde_json::json!({ "state": subscription.state, "is_active": subscription.is_active })
-        .to_string();
+    let before =
+        serde_json::json!({ "state": subscription.state, "is_active": subscription.is_active })
+            .to_string();
     let next = params
         .recurring_next_date
         .unwrap_or(subscription.recurring_next_date);
@@ -749,20 +754,23 @@ pub fn renew_subscription(
         updated_at: ctx.timestamp,
         metadata: {
             let mut meta = serde_json::Map::new();
-            if let Ok(existing) = serde_json::from_str::<serde_json::Value>(&subscription.metadata) {
+            if let Ok(existing) = serde_json::from_str::<serde_json::Value>(&subscription.metadata)
+            {
                 if let Some(obj) = existing.as_object() {
                     meta = obj.clone();
                 }
             }
-            meta.insert("term_extended_intervals".into(), serde_json::json!(intervals));
+            meta.insert(
+                "term_extended_intervals".into(),
+                serde_json::json!(intervals),
+            );
             meta.insert(
                 "term_extended_at".into(),
-                serde_json::json!(
-                    ctx.timestamp
-                        .to_duration_since_unix_epoch()
-                        .unwrap_or_default()
-                        .as_secs()
-                ),
+                serde_json::json!(ctx
+                    .timestamp
+                    .to_duration_since_unix_epoch()
+                    .unwrap_or_default()
+                    .as_secs()),
             );
             serde_json::Value::Object(meta).to_string()
         },
@@ -875,7 +883,9 @@ pub fn cancel_subscription(
                         && m.move_type == MoveType::OutRefund
                         && m.metadata
                             .as_ref()
-                            .map(|meta| meta.contains(&format!("\"reversed_entry_id\":{invoice_id}")))
+                            .map(|meta| {
+                                meta.contains(&format!("\"reversed_entry_id\":{invoice_id}"))
+                            })
                             .unwrap_or(false)
                 })
                 .map(|m| m.id)
@@ -901,15 +911,18 @@ pub fn cancel_subscription(
         let fraction = period_fraction_remaining(ctx, &subscription, ctx.timestamp)?;
         proration_amount = -(period_total * fraction);
         if proration_amount.abs() > 0.000_1 {
-            let journal_id = params.journal_id.filter(|id| *id > 0).ok_or(
-                "journal_id required for prorate_unused cancel",
-            )?;
-            let income = params.income_account_id.filter(|id| *id > 0).ok_or(
-                "income_account_id required for prorate_unused cancel",
-            )?;
-            let ar = params.receivable_account_id.filter(|id| *id > 0).ok_or(
-                "receivable_account_id required for prorate_unused cancel",
-            )?;
+            let journal_id = params
+                .journal_id
+                .filter(|id| *id > 0)
+                .ok_or("journal_id required for prorate_unused cancel")?;
+            let income = params
+                .income_account_id
+                .filter(|id| *id > 0)
+                .ok_or("income_account_id required for prorate_unused cancel")?;
+            let ar = params
+                .receivable_account_id
+                .filter(|id| *id > 0)
+                .ok_or("receivable_account_id required for prorate_unused cancel")?;
             let move_id = create_proration_adjustment_move(
                 ctx,
                 organization_id,
@@ -938,16 +951,18 @@ pub fn cancel_subscription(
         organization_id,
         subscription_id,
     );
-    meta.insert("entitlement_revoke_pending".into(), serde_json::json!(false));
+    meta.insert(
+        "entitlement_revoke_pending".into(),
+        serde_json::json!(false),
+    );
     meta.insert("entitlements_revoked".into(), serde_json::json!(revoked));
     meta.insert(
         "entitlement_revoke_at".into(),
-        serde_json::json!(
-            ctx.timestamp
-                .to_duration_since_unix_epoch()
-                .unwrap_or_default()
-                .as_secs()
-        ),
+        serde_json::json!(ctx
+            .timestamp
+            .to_duration_since_unix_epoch()
+            .unwrap_or_default()
+            .as_secs()),
     );
 
     let mut invoice_ids = subscription.invoice_ids.clone();

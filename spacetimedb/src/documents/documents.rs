@@ -260,7 +260,9 @@ pub struct UpdateDocumentFolderParams {
 
 fn validate_blob_registration(url: &str, file_size: u64, checksum: &str) -> Result<(), String> {
     if url.trim().is_empty() {
-        return Err("url is required — upload the file to object storage before registering".to_string());
+        return Err(
+            "url is required — upload the file to object storage before registering".to_string(),
+        );
     }
     if file_size == 0 {
         return Err("file_size must be greater than zero".to_string());
@@ -277,9 +279,7 @@ fn validate_blob_registration(url: &str, file_size: u64, checksum: &str) -> Resu
 
 fn lock_is_expired(doc: &Document, now: Timestamp) -> bool {
     match doc.locked_until {
-        Some(until) => {
-            now.to_micros_since_unix_epoch() >= until.to_micros_since_unix_epoch()
-        }
+        Some(until) => now.to_micros_since_unix_epoch() >= until.to_micros_since_unix_epoch(),
         None => false,
     }
 }
@@ -302,11 +302,7 @@ fn refresh_expired_lock(ctx: &ReducerContext, doc: Document) -> Document {
     doc
 }
 
-fn adjust_folder_document_count(
-    ctx: &ReducerContext,
-    folder_id: Option<u64>,
-    delta: i32,
-) {
+fn adjust_folder_document_count(ctx: &ReducerContext, folder_id: Option<u64>, delta: i32) {
     let Some(fid) = folder_id else {
         return;
     };
@@ -316,9 +312,7 @@ fn adjust_folder_document_count(
     let next = if delta >= 0 {
         folder.document_count.saturating_add(delta as u32)
     } else {
-        folder
-            .document_count
-            .saturating_sub((-delta) as u32)
+        folder.document_count.saturating_sub((-delta) as u32)
     };
     ctx.db.doc_folder().id().update(DocumentFolder {
         document_count: next,
@@ -359,9 +353,7 @@ fn ensure_folder_company_scope(
     company_id: Option<u64>,
 ) -> Result<(), String> {
     match (folder.company_id, company_id) {
-        (Some(fc), Some(c)) if fc != c => {
-            Err("Folder does not belong to this company".to_string())
-        }
+        (Some(fc), Some(c)) if fc != c => Err("Folder does not belong to this company".to_string()),
         _ => Ok(()),
     }
 }
@@ -414,9 +406,9 @@ pub fn create_document_folder(
         write_access_ids,
         read_access_ids: Vec::new(),
         document_count: 0,
-        residency_region: params.residency_region.or_else(|| {
-            document_residency_region_for_company(ctx, organization_id, company_id)
-        }),
+        residency_region: params
+            .residency_region
+            .or_else(|| document_residency_region_for_company(ctx, organization_id, company_id)),
         is_hidden: params.is_hidden,
         is_readonly: params.is_readonly,
         is_access_restricted: params.is_access_restricted,
@@ -490,9 +482,10 @@ pub fn create_document(
         params.index_content.as_deref(),
     )));
     let index_language = document_search_language_for_company(ctx, organization_id, company_id);
-    let residency_region = params.residency_region.or(folder_residency).or_else(|| {
-        document_residency_region_for_company(ctx, organization_id, company_id)
-    });
+    let residency_region = params
+        .residency_region
+        .or(folder_residency)
+        .or_else(|| document_residency_region_for_company(ctx, organization_id, company_id));
 
     let doc = ctx.db.document().insert(Document {
         id: 0,
@@ -741,9 +734,8 @@ pub fn lock_document(
         }
     }
 
-    let locked_until = lease_seconds.map(|secs| {
-        ctx.timestamp + std::time::Duration::from_secs(secs.max(1))
-    });
+    let locked_until =
+        lease_seconds.map(|secs| ctx.timestamp + std::time::Duration::from_secs(secs.max(1)));
 
     let company_id = doc.company_id;
     ctx.db.document().id().update(Document {
@@ -1269,9 +1261,11 @@ pub fn delete_document_folder(
         return Err("Cannot delete a folder that still contains documents".to_string());
     }
 
-    let has_children = ctx.db.doc_folder().iter().any(|f| {
-        f.organization_id == organization_id && f.parent_id == Some(folder_id)
-    });
+    let has_children = ctx
+        .db
+        .doc_folder()
+        .iter()
+        .any(|f| f.organization_id == organization_id && f.parent_id == Some(folder_id));
     if has_children {
         return Err("Cannot delete a folder that still has child folders".to_string());
     }

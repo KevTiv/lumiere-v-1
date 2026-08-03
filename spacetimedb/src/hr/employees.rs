@@ -513,7 +513,10 @@ pub fn update_employee(
         (params.work_phone.is_some(), "work_phone"),
         (params.mobile_phone.is_some(), "mobile_phone"),
         (params.work_location.is_some(), "work_location"),
-        (params.work_contact_partner_id.is_some(), "work_contact_partner_id"),
+        (
+            params.work_contact_partner_id.is_some(),
+            "work_contact_partner_id",
+        ),
         (params.employment_type.is_some(), "employment_type"),
         (params.user_id.is_some(), "user_id"),
     ]

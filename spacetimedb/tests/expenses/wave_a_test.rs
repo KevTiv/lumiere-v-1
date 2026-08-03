@@ -8,16 +8,17 @@ use crate::accounting::chart_of_accounts::{
 };
 use crate::accounting::journal_entries::account_move;
 use crate::expenses::expenses::{
-    approve_expense_sheet, approve_expense_sheet_impl, create_expense, create_expense_reimbursement_payment,
-    create_expense_sheet, expense_sheet, hr_expense, post_expense_sheet, refuse_expense_sheet,
-    submit_expense, submit_expense_sheet, CreateExpenseParams, CreateExpenseReimbursementParams,
-    CreateExpenseSheetParams, PostExpenseSheetParams, RefuseExpenseSheetParams,
+    approve_expense_sheet, approve_expense_sheet_impl, create_expense,
+    create_expense_reimbursement_payment, create_expense_sheet, expense_sheet, hr_expense,
+    post_expense_sheet, refuse_expense_sheet, submit_expense, submit_expense_sheet,
+    CreateExpenseParams, CreateExpenseReimbursementParams, CreateExpenseSheetParams,
+    PostExpenseSheetParams, RefuseExpenseSheetParams,
 };
 use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{
-    AccountInternalGroup, AccountMoveState, EmploymentType, ExpenseLineKind, ExpensePaymentMode, ExpenseSheetState, ExpenseState,
-    JournalType,
+    AccountInternalGroup, AccountMoveState, EmploymentType, ExpenseLineKind, ExpensePaymentMode,
+    ExpenseSheetState, ExpenseState, JournalType,
 };
 
 struct ExpenseAccounts {
@@ -586,9 +587,7 @@ pub fn test_submit_rejects_missing_receipt(ctx: &ReducerContext) -> Result<(), S
         .db
         .hr_expense()
         .iter()
-        .find(|e| {
-            e.organization_id == fixture.organization_id && e.name == "No receipt"
-        })
+        .find(|e| e.organization_id == fixture.organization_id && e.name == "No receipt")
         .map(|e| e.id)
         .ok_or("line")?;
     submit_expense(ctx, fixture.organization_id, line_id, sheet_id)?;

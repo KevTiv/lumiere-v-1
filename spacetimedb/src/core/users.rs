@@ -474,9 +474,7 @@ pub fn update_org_member_role(
             table_name: "user_organization",
             record_id: user_org_id,
             action: "UPDATE",
-            old_values: Some(
-                serde_json::json!({ "role_id": membership.role_id }).to_string(),
-            ),
+            old_values: Some(serde_json::json!({ "role_id": membership.role_id }).to_string()),
             new_values: Some(
                 serde_json::json!({
                     "role_id": selected_role.id,

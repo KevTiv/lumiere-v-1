@@ -118,10 +118,9 @@ pub fn check_permission(
         action,
     ) {
         PermissionResolution::Allow => Ok(()),
-        PermissionResolution::Deny | PermissionResolution::NotGranted => Err(format!(
-            "Permission denied: {} on {}",
-            action, resource
-        )),
+        PermissionResolution::Deny | PermissionResolution::NotGranted => {
+            Err(format!("Permission denied: {} on {}", action, resource))
+        }
     }
 }
 
@@ -281,12 +280,7 @@ pub fn write_audit_log(
 /// ```
 pub fn next_doc_number(ctx: &ReducerContext, doc_type: &str) -> String {
     let doc_type_key = doc_type.to_string();
-    let number = if let Some(seq) = ctx
-        .db
-        .document_sequence()
-        .doc_type()
-        .find(&doc_type_key)
-    {
+    let number = if let Some(seq) = ctx.db.document_sequence().doc_type().find(&doc_type_key) {
         ctx.db
             .document_sequence()
             .doc_type()

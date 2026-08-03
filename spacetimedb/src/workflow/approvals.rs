@@ -627,9 +627,7 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         WorkflowHumanTaskDecision::Complete => "workflow_task:complete",
     };
     let authorization = authorize_task_actor(ctx, actor, &task, params.acting_for, permission)?;
-    let principal = authorization
-        .acting_for_identity
-        .unwrap_or(actor);
+    let principal = authorization.acting_for_identity.unwrap_or(actor);
 
     if task.assignment == WorkflowTaskAssignment::AllCandidates {
         if let Some(partial) = record_all_candidates_vote(
@@ -1352,9 +1350,7 @@ fn project_all_candidates(
             .filter(&organization_id)
         {
             if membership.is_active
-                && membership
-                    .company_id
-                    .is_none_or(|id| id == company_id)
+                && membership.company_id.is_none_or(|id| id == company_id)
                 && membership
                     .department_id
                     .is_some_and(|unit_id| policy.candidate_unit_ids.contains(&unit_id))

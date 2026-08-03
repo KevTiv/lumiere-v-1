@@ -6,6 +6,7 @@ import type {
   ConvertLeadParams,
   ConvertOpportunityParams,
   CreateActivityParams,
+  CrmActivityTarget,
   CreateContactParams,
   CreateLeadParams,
   CreateOpportunityParams,
@@ -136,7 +137,9 @@ function resolveActivityType(formData: Record<string, unknown>): string | null {
   return null
 }
 
-export function toCreateActivityParams(formData: Record<string, unknown>): Partial<CreateActivityParams> | null {
+export function toCreateActivityParams(
+  formData: Record<string, unknown>,
+): Partial<CreateActivityParams> | null {
   const summary = optionalTrimmedString(formData.summary)
   if (!summary) return null
 
@@ -148,11 +151,30 @@ export function toCreateActivityParams(formData: Record<string, unknown>): Parti
   const d = new Date(String(rawDeadline))
   if (Number.isNaN(d.getTime())) return null
 
-  const resModel = optionalTrimmedString(formData.resModel)
+  // CRM-RI-015: activities now take a typed, server-validated target instead of
+  // a free-text `resModel` + `resId` pair. Only these three CRM entities are
+  // supported by the backend `CrmActivityTarget` enum; anything else is
+  // rejected server-side, so we drop it here rather than sending a value that
+  // cannot persist.
+  const resModel = optionalTrimmedString(formData.resModel)?.toLowerCase()
   const resIdRaw = formData.resId
   const resIdNum =
     resIdRaw != null && String(resIdRaw).trim() !== "" && Number.isFinite(Number(resIdRaw)) && Number(resIdRaw) > 0
       ? BigInt(String(resIdRaw))
+      : undefined
+
+  const targetTag: CrmActivityTarget["tag"] | undefined =
+    resModel === "contact"
+      ? "Contact"
+      : resModel === "lead"
+        ? "Lead"
+        : resModel === "opportunity"
+          ? "Opportunity"
+          : undefined
+
+  const target =
+    targetTag != null && resIdNum != null
+      ? { tag: targetTag, value: resIdNum }
       : undefined
 
   return {
@@ -160,8 +182,7 @@ export function toCreateActivityParams(formData: Record<string, unknown>): Parti
     summary,
     note: optionalTrimmedString(formData.note),
     dateDeadline: stbTimestampFromDate(d),
-    resModel: resModel ?? undefined,
-    resId: resIdNum,
+    target,
   }
 }
 

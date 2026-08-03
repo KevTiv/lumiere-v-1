@@ -284,11 +284,14 @@ pub fn set_ai_reducer_allowlist_enabled(
         return Err("Allowlist entry does not belong to this organization".to_string());
     }
 
-    ctx.db.ai_reducer_allowlist().id().update(AiReducerAllowlist {
-        enabled,
-        write_date: ctx.timestamp,
-        ..row.clone()
-    });
+    ctx.db
+        .ai_reducer_allowlist()
+        .id()
+        .update(AiReducerAllowlist {
+            enabled,
+            write_date: ctx.timestamp,
+            ..row.clone()
+        });
 
     write_audit_log_v2(
         ctx,

@@ -31,6 +31,17 @@ import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/e
 
 type Row = Record<string, unknown>
 
+function formatWhen(value: unknown): string | null {
+  const raw = optionValue(value)
+  if (raw == null) return null
+  if (typeof raw === "object" && raw !== null && "microsSinceUnixEpoch" in raw) {
+    const micros = Number((raw as { microsSinceUnixEpoch: bigint | number }).microsSinceUnixEpoch)
+    if (!Number.isFinite(micros) || micros <= 0) return null
+    return new Date(micros / 1000).toLocaleString()
+  }
+  return String(raw)
+}
+
 export interface LeadScorePanelProps {
   organizationId: number
   leadId: bigint
@@ -96,7 +107,22 @@ export function LeadScorePanel({ organizationId, leadId }: LeadScorePanelProps) 
               <Badge variant="secondary">
                 {String(score.formulaVersion ?? score.formula_version ?? "")}
               </Badge>
+              {Boolean(score.isStale ?? score.is_stale) ? (
+                <Badge variant="destructive">{t("crm.scoring.stale", "Stale")}</Badge>
+              ) : null}
             </div>
+            <p className="text-muted-foreground text-xs">
+              {(() => {
+                const staleSince = formatWhen(score.staleSince ?? score.stale_since)
+                if (Boolean(score.isStale ?? score.is_stale) && staleSince) {
+                  return t("crm.scoring.staleSince", "Stale since {{date}}", { date: staleSince })
+                }
+                const scoredAt = formatWhen(score.scoredAt ?? score.scored_at)
+                return scoredAt
+                  ? t("crm.scoring.scoredAt", "Scored {{date}}", { date: scoredAt })
+                  : null
+              })()}
+            </p>
             <ul className="space-y-2">
               {factorRows.map((factor) => (
                 <li

@@ -578,6 +578,15 @@ export function contactTagRowsToSelectOptions(
   }))
 }
 
+export function contactCategoryRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => ({
+    value: String(row.id ?? ""),
+    label: String(row.name ?? row.color ?? row.id ?? ""),
+  }))
+}
+
 export function contactSegmentRowsToSelectOptions(
   rows: Record<string, unknown>[],
 ): Array<{ value: string; label: string }> {

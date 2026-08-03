@@ -239,6 +239,36 @@ export const changeOpportunityStageForm = (
   ],
 })
 
+/**
+ * CRM-RI-011: the backend now requires a valid `lost_reason_id` before an
+ * opportunity may enter the `Lost` state. Mirrors {@link changeOpportunityStageForm}'s
+ * options-fallback shape — callers merge real lost-reason options in via
+ * `mergeSelectOptionsByFieldName`; the placeholder here is only shown until that merge.
+ */
+export const markOpportunityLostForm = (t: TFunction): FormConfig => ({
+  id: "mark-opportunity-lost",
+  title: t("crm.forms.markLost.title"),
+  description: t("crm.forms.markLost.description"),
+  submitLabel: t("crm.forms.markLost.submit"),
+  sections: [
+    {
+      id: "lost-reason",
+      title: t("crm.forms.markLost.sections.reason"),
+      fields: [
+        {
+          id: "lostReasonId",
+          name: "lostReasonId",
+          type: "select",
+          label: t("crm.forms.markLost.fields.lostReasonId"),
+          required: true,
+          width: "full",
+          options: [{ value: "", label: "—", disabled: true }],
+        },
+      ],
+    },
+  ],
+})
+
 export const editOpportunityForm = (t: TFunction): FormConfig => ({
   id: "edit-opportunity",
   title: t("crm.forms.editOpportunity.title"),
@@ -598,6 +628,133 @@ export const newContactTagForm = (t: TFunction): FormConfig => ({
           label: t("crm.forms.newContactTag.fields.description"),
           width: "full",
           rows: 2,
+        },
+      ],
+    },
+  ],
+})
+
+export const newContactCategoryForm = (t: TFunction): FormConfig => ({
+  id: "new-contact-category",
+  title: t("crm.forms.newContactCategory.title"),
+  description: t("crm.forms.newContactCategory.description"),
+  sections: [
+    {
+      id: "category",
+      title: t("crm.forms.newContactCategory.sections.category"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("crm.forms.newContactCategory.fields.name"),
+          required: true,
+          width: "full",
+        },
+        {
+          id: "color",
+          name: "color",
+          type: "text",
+          label: t("crm.forms.newContactCategory.fields.color"),
+          placeholder: t("crm.forms.newContactCategory.fields.colorPlaceholder"),
+          width: "1/2",
+        },
+        {
+          id: "parentId",
+          name: "parentId",
+          type: "select",
+          label: t("crm.forms.newContactCategory.fields.parentId"),
+          width: "1/2",
+          options: [{ value: "", label: t("crm.forms.newContactCategory.fields.parentIdNone") }],
+        },
+        {
+          id: "isActive",
+          name: "isActive",
+          type: "checkbox",
+          label: t("crm.forms.newContactCategory.fields.isActive"),
+          defaultValue: true,
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+/**
+ * Edit form for an existing category (CRM-RI-014). `parentId` is a
+ * self-referencing optional parent — the backend (`update_contact_category`)
+ * rejects cycles, so the client does not attempt to filter the picker;
+ * a cycle attempt surfaces as a submit error, same as any other reducer
+ * validation failure in this module.
+ */
+export const editContactCategoryForm = (t: TFunction): FormConfig => ({
+  id: "edit-contact-category",
+  title: t("crm.forms.editContactCategory.title"),
+  description: t("crm.forms.editContactCategory.description"),
+  submitLabel: t("crm.forms.editContactCategory.submit"),
+  sections: [
+    {
+      id: "category",
+      title: t("crm.forms.editContactCategory.sections.category"),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("crm.forms.editContactCategory.fields.name"),
+          width: "full",
+        },
+        {
+          id: "color",
+          name: "color",
+          type: "text",
+          label: t("crm.forms.editContactCategory.fields.color"),
+          placeholder: t("crm.forms.editContactCategory.fields.colorPlaceholder"),
+          width: "1/2",
+        },
+        {
+          id: "parentId",
+          name: "parentId",
+          type: "select",
+          label: t("crm.forms.editContactCategory.fields.parentId"),
+          width: "1/2",
+          options: [{ value: "", label: t("crm.forms.editContactCategory.fields.parentIdNone") }],
+        },
+        {
+          id: "isActive",
+          name: "isActive",
+          type: "checkbox",
+          label: t("crm.forms.editContactCategory.fields.isActive"),
+          width: "full",
+        },
+      ],
+    },
+  ],
+})
+
+/**
+ * Adds a single category to the selected contact (CRM-RI-014). Modelled
+ * directly on `assignTagToContactForm`: one select, one submit — genuinely
+ * incremental intent, so the submit handler calls `add_contact_categories`
+ * (not `replace`, which is reserved for UIs that submit a full desired set).
+ */
+export const assignCategoryToContactForm = (t: TFunction): FormConfig => ({
+  id: "assign-category-contact",
+  title: t("crm.forms.assignCategory.title"),
+  description: t("crm.forms.assignCategory.description"),
+  sections: [
+    {
+      id: "category",
+      title: t("crm.forms.assignCategory.sections.category"),
+      fields: [
+        {
+          id: "categoryId",
+          name: "categoryId",
+          type: "select",
+          label: t("crm.forms.assignCategory.fields.categoryId"),
+          required: true,
+          width: "full",
+          options: [{ value: "", label: "—", disabled: true }],
         },
       ],
     },
@@ -1075,6 +1232,9 @@ export const crmFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "assign-tag-contact": assignTagToContactForm(t),
   "add-contact-segment": addContactToSegmentForm(t),
   "new-contact-tag": newContactTagForm(t),
+  "new-contact-category": newContactCategoryForm(t),
+  "edit-contact-category": editContactCategoryForm(t),
+  "assign-category-contact": assignCategoryToContactForm(t),
   "new-contact-segment": newContactSegmentForm(t),
   "edit-contact": editContactForm(t),
   "edit-contact-address": editContactAddressForm(t),

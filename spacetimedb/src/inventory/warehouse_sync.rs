@@ -70,8 +70,8 @@ fn apply_payload(
     op_type: &str,
     payload: &str,
 ) -> Result<(), String> {
-    let v: Value = serde_json::from_str(payload)
-        .map_err(|e| format!("Invalid sync payload JSON: {e}"))?;
+    let v: Value =
+        serde_json::from_str(payload).map_err(|e| format!("Invalid sync payload JSON: {e}"))?;
     match op_type {
         "barcode_scan" => {
             let barcode = v

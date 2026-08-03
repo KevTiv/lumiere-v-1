@@ -9,6 +9,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 use crate::core::organization::{company_id_from_scope, default_company_id_for_organization};
 use crate::core::utm::{utm_campaign, utm_medium};
 use crate::crm::contacts::{contact, contact_tag, Contact};
+use crate::crm::lead_scoring::mark_lead_score_stale;
 use crate::crm::opportunities::{opp_stage, opportunity, Opportunity};
 use crate::crm::require_single_company_crm_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -358,33 +359,6 @@ fn validate_lead_partner(
     Ok(())
 }
 
-/// Validates `lost_reason_id` against `LeadLostReason`: must exist, belong to
-/// the organization, and be active.
-///
-/// No reducer in this file currently sets `lost_reason_id` on `Lead` (it is
-/// only ever initialized to `None` by `create_lead`), so this loader has no
-/// call site yet. Kept ready — per the CRM-RI-002 required-loaders list — for
-/// the lead-loss reducer this module does not yet have.
-fn validate_lead_lost_reason(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    lost_reason_id: u64,
-) -> Result<(), String> {
-    let reason = ctx
-        .db
-        .lead_lost_reason()
-        .id()
-        .find(&lost_reason_id)
-        .ok_or("lost reason not found")?;
-    if reason.organization_id != organization_id {
-        return Err("lost reason does not belong to this organization".to_string());
-    }
-    if !reason.is_active {
-        return Err("lost reason is not active".to_string());
-    }
-    Ok(())
-}
-
 /// Validates every id in `tag_ids` against `ContactTag`: each must exist and
 /// belong to the organization. Rejects the whole batch on the first invalid
 /// tag rather than silently dropping bad ids. `ContactTag` has no
@@ -630,6 +604,10 @@ pub fn update_lead(
         },
     );
 
+    // CRM-RI-016: this reducer mutates fields consumed by `compute_factors`,
+    // so the stored score no longer reflects the lead.
+    mark_lead_score_stale(ctx, organization_id, lead_id);
+
     Ok(())
 }
 
@@ -657,6 +635,10 @@ pub fn update_lead_details(
         ..lead
     });
 
+    // CRM-RI-016: email/phone/mobile/company_name/website/industry feed
+    // `compute_factors`.
+    mark_lead_score_stale(ctx, organization_id, lead_id);
+
     Ok(())
 }
 
@@ -681,6 +663,9 @@ pub fn update_lead_address(
         updated_at: ctx.timestamp,
         ..lead
     });
+
+    // CRM-RI-016: address fields participate in scoring completeness.
+    mark_lead_score_stale(ctx, organization_id, lead_id);
 
     Ok(())
 }
@@ -724,6 +709,9 @@ pub fn update_lead_revenue(
             metadata: None,
         },
     );
+
+    // CRM-RI-016: expected_revenue/probability are direct scoring factors.
+    mark_lead_score_stale(ctx, organization_id, lead_id);
 
     Ok(())
 }

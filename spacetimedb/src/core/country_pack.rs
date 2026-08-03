@@ -297,11 +297,7 @@ pub(crate) fn validate_address_for_packs(
     zip: &Option<String>,
     state_code: &Option<String>,
 ) -> Result<(), String> {
-    let is_present = |field: &Option<String>| {
-        field
-            .as_ref()
-            .is_some_and(|v| !v.trim().is_empty())
-    };
+    let is_present = |field: &Option<String>| field.as_ref().is_some_and(|v| !v.trim().is_empty());
 
     for definition in enabled_pack_definitions(ctx, organization_id, company_id) {
         for field in pack_address_required_fields(&definition) {
@@ -381,15 +377,17 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             }
             continue;
         }
-        ctx.db.country_pack_definition().insert(CountryPackDefinition {
-            pack_key: key,
-            country_code: country_code.to_string(),
-            name: name.to_string(),
-            region: region.to_string(),
-            version: version.to_string(),
-            is_active: true,
-            metadata: Some(metadata.to_string()),
-        });
+        ctx.db
+            .country_pack_definition()
+            .insert(CountryPackDefinition {
+                pack_key: key,
+                country_code: country_code.to_string(),
+                name: name.to_string(),
+                region: region.to_string(),
+                version: version.to_string(),
+                is_active: true,
+                metadata: Some(metadata.to_string()),
+            });
     }
 
     let tax_rules = [
@@ -401,7 +399,13 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
         ("za", "WHT-ZA", "Withholding 20%", 0.20, "withholding"),
         ("sg", "GST-SG", "GST 9%", 0.09, "sale"),
         ("br", "ICMS-BR", "ICMS 18%", 0.18, "sale"),
-        ("br", "IRRF-BR", "IRRF withholding 1.5%", 0.015, "withholding"),
+        (
+            "br",
+            "IRRF-BR",
+            "IRRF withholding 1.5%",
+            0.015,
+            "withholding",
+        ),
         ("my", "SST-MY", "SST 6%", 0.06, "sale"),
         ("id", "PPN-ID", "PPN 11%", 0.11, "sale"),
         ("th", "VAT-TH", "VAT 7%", 0.07, "sale"),
@@ -474,8 +478,8 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
         let key = pack_key.to_string();
         if let Some(existing) = ctx.db.country_pack_definition().pack_key().find(&key) {
             let meta = existing.metadata.as_deref().unwrap_or("");
-            let needs_expense_flags =
-                !meta.contains("expense_require_receipt") || !meta.contains("document_search_language");
+            let needs_expense_flags = !meta.contains("expense_require_receipt")
+                || !meta.contains("document_search_language");
             if needs_expense_flags {
                 ctx.db
                     .country_pack_definition()
@@ -487,15 +491,17 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             }
             continue;
         }
-        ctx.db.country_pack_definition().insert(CountryPackDefinition {
-            pack_key: key,
-            country_code: country_code.to_string(),
-            name: name.to_string(),
-            region: region.to_string(),
-            version: version.to_string(),
-            is_active: true,
-            metadata: Some(metadata.to_string()),
-        });
+        ctx.db
+            .country_pack_definition()
+            .insert(CountryPackDefinition {
+                pack_key: key,
+                country_code: country_code.to_string(),
+                name: name.to_string(),
+                region: region.to_string(),
+                version: version.to_string(),
+                is_active: true,
+                metadata: Some(metadata.to_string()),
+            });
     }
 
     for (pack_key, code, name, rate, tax_use) in tax_rules {
@@ -656,13 +662,16 @@ pub fn set_company_country_pack(
 
     let record_id = if let Some(row) = existing {
         let id = row.id;
-        ctx.db.company_country_pack().id().update(CompanyCountryPack {
-            enabled: params.enabled,
-            configuration: params.configuration.clone(),
-            updated_at: ctx.timestamp,
-            updated_by: ctx.sender(),
-            ..row
-        });
+        ctx.db
+            .company_country_pack()
+            .id()
+            .update(CompanyCountryPack {
+                enabled: params.enabled,
+                configuration: params.configuration.clone(),
+                updated_at: ctx.timestamp,
+                updated_by: ctx.sender(),
+                ..row
+            });
         id
     } else {
         let inserted = ctx.db.company_country_pack().insert(CompanyCountryPack {

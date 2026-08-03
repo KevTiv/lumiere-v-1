@@ -1,16 +1,18 @@
 /// Sales order core flow domain tests.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::accounting::chart_of_accounts::{account_journal, create_account_journal, CreateAccountJournalParams};
+use crate::accounting::chart_of_accounts::{
+    account_journal, create_account_journal, CreateAccountJournalParams,
+};
+use crate::accounting::credit_control::{
+    upsert_partner_credit_control, UpsertPartnerCreditControlParams,
+};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, create_invoice_from_sale_order, AddAccountMoveLineParams,
     CreateInvoiceFromSaleOrderParams,
 };
 use crate::core::organization::CompanyScopeParams;
 use crate::inventory::product::product;
-use crate::accounting::credit_control::{
-    upsert_partner_credit_control, UpsertPartnerCreditControlParams,
-};
 use crate::inventory::stock::{
     assign_stock_picking, confirm_stock_picking, done_stock_move, stock_move, stock_picking,
     stock_quant, validate_stock_picking, validate_stock_picking_backorder, DoneStockMoveParams,
@@ -107,7 +109,7 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
             commitment_date: None,
             expected_date: None,
             incoterm_id: None,
-        incoterm: None,
+            incoterm: None,
             incoterm_location: None,
             carrier_id: None,
             customer_lead: None,
@@ -130,8 +132,7 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
         .sale_order()
         .iter()
         .find(|o| {
-            o.organization_id == org_id
-                && o.client_order_ref == Some("HARNESS-SO-001".to_string())
+            o.organization_id == org_id && o.client_order_ref == Some("HARNESS-SO-001".to_string())
         })
         .ok_or("Sale order not found after create")?;
 
@@ -344,7 +345,9 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
         .ok_or("Sale order not found after invoicing")?;
 
     if invoiced_order.invoice_count == 0 || invoiced_order.invoice_ids.is_empty() {
-        return Err("Sale order has no linked invoice after create_invoice_from_sale_order".to_string());
+        return Err(
+            "Sale order has no linked invoice after create_invoice_from_sale_order".to_string(),
+        );
     }
 
     let invoice_move_id = invoiced_order.invoice_ids[0];
@@ -471,7 +474,7 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
             commitment_date: None,
             expected_date: None,
             incoterm_id: None,
-        incoterm: None,
+            incoterm: None,
             incoterm_location: None,
             carrier_id: None,
             customer_lead: None,
@@ -494,8 +497,7 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
         .sale_order()
         .iter()
         .find(|o| {
-            o.organization_id == org_id
-                && o.client_order_ref == Some("HARNESS-SO-DEL".to_string())
+            o.organization_id == org_id && o.client_order_ref == Some("HARNESS-SO-DEL".to_string())
         })
         .ok_or("Sale order not found after create")?;
 
@@ -722,7 +724,7 @@ pub fn test_order_confirm_cancel_releases_reservation(ctx: &ReducerContext) -> R
             commitment_date: None,
             expected_date: None,
             incoterm_id: None,
-        incoterm: None,
+            incoterm: None,
             incoterm_location: None,
             carrier_id: None,
             customer_lead: None,
@@ -1157,7 +1159,10 @@ pub fn test_send_quotation_then_confirm(ctx: &ReducerContext) -> Result<(), Stri
         .find(&order.id)
         .ok_or("Sale order not found after send")?;
     if sent.state != SaleState::Sent {
-        return Err(format!("Expected Sent after send quotation, got {:?}", sent.state));
+        return Err(format!(
+            "Expected Sent after send quotation, got {:?}",
+            sent.state
+        ));
     }
 
     confirm_sales_order(ctx, org_id, fixture.company_id, order.id)?;
@@ -1168,7 +1173,10 @@ pub fn test_send_quotation_then_confirm(ctx: &ReducerContext) -> Result<(), Stri
         .find(&order.id)
         .ok_or("Sale order not found after confirm")?;
     if confirmed.state != SaleState::Sale {
-        return Err(format!("Expected Sale after confirm, got {:?}", confirmed.state));
+        return Err(format!(
+            "Expected Sale after confirm, got {:?}",
+            confirmed.state
+        ));
     }
     Ok(())
 }

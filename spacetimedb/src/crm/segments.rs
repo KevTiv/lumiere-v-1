@@ -6,14 +6,13 @@
 ///   - AssignmentRule
 ///   - ContactSegmentRule (bounded dynamic-segment AST)
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+use std::collections::HashSet;
 
 use crate::crm::contacts::{contact, contact_tag_assignment, Contact};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 /// Hard cap so dynamic evaluation stays bounded in-reducer.
 pub const MAX_SEGMENT_RULES: usize = 16;
-/// Cap contacts scanned / membership flips per evaluate call.
-pub const MAX_SEGMENT_EVAL_CONTACTS: usize = 500;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PARAMS TYPES
@@ -124,7 +123,10 @@ pub struct ContactSegment {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = segment_member)]
+#[spacetimedb::table(
+    accessor = segment_member,
+    index(accessor = segment_member_by_segment, btree(columns = [segment_id]))
+)]
 pub struct SegmentMember {
     #[primary_key]
     #[auto_inc]
@@ -675,7 +677,7 @@ pub fn set_contact_segment_rules(
 }
 
 /// Evaluate dynamic segment membership against the stored rule AST (AND).
-/// Bounded scan: up to `MAX_SEGMENT_EVAL_CONTACTS` org contacts per call.
+/// Scans the full organization-scoped contact population via `contact_by_org`.
 #[spacetimedb::reducer]
 pub fn evaluate_dynamic_segment(
     ctx: &ReducerContext,
@@ -713,28 +715,41 @@ pub fn evaluate_dynamic_segment(
         .contact()
         .contact_by_org()
         .filter(&organization_id)
-        .take(MAX_SEGMENT_EVAL_CONTACTS)
+        .filter(|contact| contact.deleted_at.is_none() && contact.merge_target_id.is_none())
         .collect();
 
-    let mut matched_ids = Vec::new();
+    let mut matched_ids: HashSet<u64> = HashSet::new();
     for contact in &contacts {
         if rules
             .iter()
             .all(|rule| contact_matches_clause(ctx, contact, rule))
         {
-            matched_ids.push(contact.id);
+            matched_ids.insert(contact.id);
         }
     }
+    let live_contact_ids: HashSet<u64> = contacts.iter().map(|contact| contact.id).collect();
 
-    // Deactivate members no longer matching
-    for member in ctx.db.segment_member().iter() {
-        if member.organization_id != organization_id
-            || member.segment_id != segment_id
-            || !member.is_active
-        {
+    let existing_members: Vec<SegmentMember> = ctx
+        .db
+        .segment_member()
+        .segment_member_by_segment()
+        .filter(&segment_id)
+        .filter(|m| m.organization_id == organization_id)
+        .collect();
+    // (member_id, is_active) keyed by contact_id, captured before existing_members is consumed.
+    let existing_meta: std::collections::HashMap<u64, (u64, bool)> = existing_members
+        .iter()
+        .map(|m| (m.contact_id, (m.id, m.is_active)))
+        .collect();
+
+    // Deactivate members no longer matching, or whose contact is deleted/merged/missing.
+    for member in existing_members {
+        if !member.is_active {
             continue;
         }
-        if !matched_ids.contains(&member.contact_id) {
+        if !matched_ids.contains(&member.contact_id)
+            || !live_contact_ids.contains(&member.contact_id)
+        {
             ctx.db.segment_member().id().update(SegmentMember {
                 is_active: false,
                 ..member
@@ -744,19 +759,16 @@ pub fn evaluate_dynamic_segment(
 
     // Activate / insert matches
     for contact_id in &matched_ids {
-        let existing = ctx.db.segment_member().iter().find(|m| {
-            m.organization_id == organization_id
-                && m.segment_id == segment_id
-                && m.contact_id == *contact_id
-        });
-        match existing {
-            Some(member) if !member.is_active => {
-                ctx.db.segment_member().id().update(SegmentMember {
-                    is_active: true,
-                    added_at: ctx.timestamp,
-                    added_by: ctx.sender(),
-                    ..member
-                });
+        match existing_meta.get(contact_id) {
+            Some((member_id, is_active)) if !is_active => {
+                if let Some(member) = ctx.db.segment_member().id().find(member_id) {
+                    ctx.db.segment_member().id().update(SegmentMember {
+                        is_active: true,
+                        added_at: ctx.timestamp,
+                        added_by: ctx.sender(),
+                        ..member
+                    });
+                }
             }
             Some(_) => {}
             None => {
@@ -783,10 +795,9 @@ pub fn evaluate_dynamic_segment(
     let active_count = ctx
         .db
         .segment_member()
-        .iter()
-        .filter(|m| {
-            m.organization_id == organization_id && m.segment_id == segment_id && m.is_active
-        })
+        .segment_member_by_segment()
+        .filter(&segment_id)
+        .filter(|m| m.organization_id == organization_id && m.is_active)
         .count() as i32;
 
     ctx.db.contact_segment().id().update(ContactSegment {

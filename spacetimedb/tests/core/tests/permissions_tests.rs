@@ -64,9 +64,11 @@ pub fn test_grant_and_revoke_field_permission(ctx: &ReducerContext) -> Result<()
     }
 
     // Superuser snapshot should include the freshly granted field allowlist when present.
-    let snapshot = ctx.db.policy_snapshot().iter().find(|row| {
-        row.organization_id == org_id && row.user_identity == ctx.sender()
-    });
+    let snapshot = ctx
+        .db
+        .policy_snapshot()
+        .iter()
+        .find(|row| row.organization_id == org_id && row.user_identity == ctx.sender());
     if let Some(snap) = snapshot {
         let has_contact = snap
             .field_permissions

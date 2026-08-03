@@ -27,6 +27,12 @@ use crate::sales::sales_core::{
 
 /// Params for creating an opportunity.
 /// Scope: `organization_id` is a flat reducer param (not in this struct).
+///
+/// `is_won`/`is_lost` (CRM-RI-011) are NOT trusted as-is: `create_opportunity`
+/// derives the true lifecycle state from `stage_id`'s `is_won` flag and
+/// rejects any caller-supplied combination that disagrees with it (including
+/// `(true, true)`, which is always rejected). See `OpportunityState` and
+/// `resolve_target_state` for the exact rule.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateOpportunityParams {
     pub name: String,
@@ -85,6 +91,39 @@ pub struct CreateOpportunityLineParams {
 }
 
 /// Params for updating an opportunity.
+///
+/// Nullable relations use the three-state `Option<Option<T>>` patch contract
+/// (CRM-RI-012; precedent: `accounting::chart_of_accounts::UpdateAccountAccountParams`,
+/// `crm::leads::UpdateLeadParams`): outer `None` = field not sent (leave
+/// unchanged), outer `Some(None)` = explicit clear, outer `Some(Some(v))` =
+/// validate and replace. Applies to `partner_id`, `contact_id`,
+/// `lost_reason_id`, `date_deadline`, `date_closed`, `description`.
+///
+/// Non-nullable table columns (`name`, `expected_revenue`, `probability`,
+/// `stage_id`, `priority`) stay single-level `Option<T>`: `None` = unchanged,
+/// `Some(v)` = replace. They can never be cleared because the underlying
+/// column itself is not nullable.
+///
+/// `tag_ids: Option<Vec<u64>>` is a collection governed by the plan's §4.4
+/// collection-patch contract, not the scalar contract above: absent =
+/// unchanged, `Some(vec)` = full replace (including `Some(vec![])` to clear
+/// all tags). No incremental add/remove ops.
+///
+/// `is_won`/`is_lost` (CRM-RI-011) are replaced by a single `desired_state`:
+/// absent = no explicit lifecycle transition requested this call (the
+/// current state is kept, subject to the stage-consistency rule below);
+/// `Some(state)` = explicitly request that transition, checked against
+/// `validate_transition`. Regardless of `desired_state`, the *final* state
+/// is always forced consistent with the resolved stage's `is_won` flag: a
+/// won stage always forces `Won` (even with no explicit request — moving
+/// onto a won stage is itself a win), a non-won stage always rejects `Won`
+/// (explicit or implied by leaving the opportunity at a prior `Won` state —
+/// the caller must explicitly reopen or lose it when moving off a won
+/// stage). See `resolve_target_state` for the exact rule.
+/// `date_closed`/`lost_reason_id` are server-derived whenever a lifecycle
+/// transition actually occurs; on calls that don't change lifecycle state,
+/// the normal three-state patch contract governs them (see
+/// `update_opportunity`).
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateOpportunityParams {
     pub name: Option<String>,
@@ -92,14 +131,13 @@ pub struct UpdateOpportunityParams {
     pub probability: Option<f64>,
     pub stage_id: Option<u64>,
     pub priority: Option<String>,
-    pub is_won: Option<bool>,
-    pub is_lost: Option<bool>,
-    pub partner_id: Option<u64>,
-    pub contact_id: Option<u64>,
-    pub date_deadline: Option<Timestamp>,
-    pub date_closed: Option<Timestamp>,
-    pub lost_reason_id: Option<u64>,
-    pub description: Option<String>,
+    pub desired_state: Option<OpportunityState>,
+    pub partner_id: Option<Option<u64>>,
+    pub contact_id: Option<Option<u64>>,
+    pub date_deadline: Option<Option<Timestamp>>,
+    pub date_closed: Option<Option<Timestamp>>,
+    pub lost_reason_id: Option<Option<u64>>,
+    pub description: Option<Option<String>>,
     pub tag_ids: Option<Vec<u64>>,
 }
 
@@ -130,6 +168,120 @@ pub struct UpdateOpportunityStageParams {
     pub team_id: Option<u64>,
     pub is_active: Option<bool>,
     pub metadata: Option<String>,
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LIFECYCLE STATE (CRM-RI-011)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Opportunity lifecycle state, derived from `(is_won, is_lost)`.
+///
+/// The two boolean columns are kept on `Opportunity` for client binding
+/// compatibility (a schema/binding change is out of scope here), but every
+/// write path resolves through this enum instead of trusting the raw
+/// booleans directly, so `(is_won, is_lost) = (true, true)` can never be
+/// written. See `validate_transition` for the allowed state graph and
+/// `resolve_target_state` for how the target stage's `is_won` flag governs
+/// the Won axis of this state.
+#[derive(SpacetimeType, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OpportunityState {
+    Open,
+    Won,
+    Lost,
+}
+
+impl OpportunityState {
+    /// Infallible read of persisted flags, used when loading the *existing*
+    /// row. Legacy data that somehow has `(true, true)` (should be
+    /// unreachable once every write path goes through this module) is
+    /// treated as `Won` rather than panicking on read.
+    fn from_flags(is_won: bool, is_lost: bool) -> OpportunityState {
+        match (is_won, is_lost) {
+            (false, true) => OpportunityState::Lost,
+            (true, _) => OpportunityState::Won,
+            (false, false) => OpportunityState::Open,
+        }
+    }
+
+    /// Strict parse of freshly caller-supplied flags (`CreateOpportunityParams`):
+    /// `(true, true)` is rejected outright instead of being silently resolved.
+    fn from_flags_strict(is_won: bool, is_lost: bool) -> Result<OpportunityState, String> {
+        match (is_won, is_lost) {
+            (true, true) => Err("opportunity cannot be both won and lost".to_string()),
+            (true, false) => Ok(OpportunityState::Won),
+            (false, true) => Ok(OpportunityState::Lost),
+            (false, false) => Ok(OpportunityState::Open),
+        }
+    }
+
+    fn to_flags(self) -> (bool, bool) {
+        match self {
+            OpportunityState::Open => (false, false),
+            OpportunityState::Won => (true, false),
+            OpportunityState::Lost => (false, true),
+        }
+    }
+}
+
+/// Validates a lifecycle transition. Allowed edges: no-op (state -> itself),
+/// `Open -> Won`, `Open -> Lost`, `Won -> Open` (explicit reopen), `Lost ->
+/// Open` (explicit reopen). `Won -> Lost` and `Lost -> Won` are rejected
+/// outright — the caller must reopen first, then move to the other terminal
+/// state in a separate call.
+fn validate_transition(from: OpportunityState, to: OpportunityState) -> Result<(), String> {
+    use OpportunityState::{Lost, Open, Won};
+    match (from, to) {
+        (Open, Open) | (Won, Won) | (Lost, Lost) => Ok(()),
+        (Open, Won) | (Open, Lost) | (Won, Open) | (Lost, Open) => Ok(()),
+        (Won, Lost) | (Lost, Won) => Err(
+            "cannot move directly between won and lost — reopen the opportunity first".to_string(),
+        ),
+    }
+}
+
+/// Resolves the final lifecycle state for a write, given the opportunity's
+/// current state, an optional explicit transition request, and whether the
+/// resolved target stage is a won stage.
+///
+/// Stage-consistency rule (CRM-RI-011 — chosen and documented here so every
+/// write path agrees): the target stage's `is_won` flag is authoritative for
+/// the Won axis.
+/// - A won stage always forces the final state to `Won` — moving an
+///   opportunity onto a won stage is itself a win, even with no explicit
+///   `desired_state` (derive, don't trust). An explicit request for
+///   anything other than `Won` (i.e. `Lost`) while targeting a won stage is
+///   a contradiction and is rejected outright.
+/// - A non-won stage never allows `Won`, whether requested explicitly or
+///   implied by leaving the opportunity at its current `Won` state — moving
+///   an opportunity off a won stage requires the caller to explicitly
+///   reopen (`Open`) or lose (`Lost`) it in the same call.
+/// Every resolved transition is additionally checked against
+/// `validate_transition`.
+fn resolve_target_state(
+    existing_state: OpportunityState,
+    desired_state: Option<OpportunityState>,
+    stage_is_won: bool,
+) -> Result<OpportunityState, String> {
+    if stage_is_won {
+        if let Some(d) = desired_state {
+            if d != OpportunityState::Won {
+                return Err(
+                    "cannot request this lifecycle change while the target stage is a won stage"
+                        .to_string(),
+                );
+            }
+        }
+        validate_transition(existing_state, OpportunityState::Won)?;
+        return Ok(OpportunityState::Won);
+    }
+
+    let target = desired_state.unwrap_or(existing_state);
+    if target == OpportunityState::Won {
+        return Err("target stage is not a won stage — the opportunity cannot be won".to_string());
+    }
+
+    validate_transition(existing_state, target)?;
+    Ok(target)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -467,9 +619,38 @@ pub fn create_opportunity(
     validate_opportunity_campaign_id(ctx, organization_id, params.campaign_id)?;
     validate_opportunity_medium_id(ctx, organization_id, params.medium_id)?;
     validate_opportunity_source_id(ctx, organization_id, params.source_id)?;
-    validate_opportunity_lost_reason_id(ctx, organization_id, params.lost_reason_id)?;
     validate_opportunity_currency_id(ctx, params.company_currency_id)?;
     validate_opportunity_tag_ids(ctx, organization_id, &params.tag_ids)?;
+
+    // CRM-RI-011: derive the true lifecycle state from the target stage
+    // rather than trusting the caller's raw (is_won, is_lost) pair.
+    let requested_state = OpportunityState::from_flags_strict(params.is_won, params.is_lost)?;
+    let target_state =
+        resolve_target_state(OpportunityState::Open, Some(requested_state), stage.is_won)?;
+    let (is_won, is_lost) = target_state.to_flags();
+
+    let date_closed = match target_state {
+        OpportunityState::Open => None,
+        OpportunityState::Won | OpportunityState::Lost => Some(ctx.timestamp),
+    };
+
+    let lost_reason_id = match target_state {
+        OpportunityState::Lost => {
+            let lr = params
+                .lost_reason_id
+                .ok_or_else(|| "lost opportunities require a lost_reason_id".to_string())?;
+            validate_opportunity_lost_reason_id(ctx, organization_id, Some(lr))?;
+            Some(lr)
+        }
+        OpportunityState::Won | OpportunityState::Open => {
+            if params.lost_reason_id.is_some() {
+                return Err(
+                    "lost_reason_id can only be set when the opportunity is lost".to_string(),
+                );
+            }
+            None
+        }
+    };
 
     let operating_company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
@@ -493,14 +674,14 @@ pub fn create_opportunity(
         company_currency_id: params.company_currency_id,
         company_id: Some(operating_company_id),
         date_open: params.date_open,
-        date_closed: params.date_closed,
+        date_closed,
         date_deadline: params.date_deadline,
         date_last_stage_update: params.date_last_stage_update,
         day_open: params.day_open,
         day_close: params.day_close,
-        is_won: params.is_won,
-        is_lost: params.is_lost,
-        lost_reason_id: params.lost_reason_id,
+        is_won,
+        is_lost,
+        lost_reason_id,
         description: params.description,
         tag_ids: params.tag_ids,
         // System-managed
@@ -715,14 +896,10 @@ pub fn update_opportunity(
     let mut probability = opp.probability;
     let mut stage_id = opp.stage_id;
     let mut priority = opp.priority.clone();
-    let mut is_won = opp.is_won;
-    let mut is_lost = opp.is_lost;
     let mut partner_id = opp.partner_id;
     let mut contact_id = opp.contact_id;
     let mut date_deadline = opp.date_deadline;
-    let mut date_closed = opp.date_closed;
     let mut date_last_stage_update = opp.date_last_stage_update;
-    let mut lost_reason_id = opp.lost_reason_id;
     let mut description = opp.description.clone();
     let mut tag_ids = opp.tag_ids.clone();
     let mut changed_fields = Vec::new();
@@ -742,27 +919,30 @@ pub fn update_opportunity(
         priority = v.clone();
         changed_fields.push("priority".to_string());
     }
-    if let Some(v) = params.partner_id {
-        validate_opportunity_contact_relation(ctx, organization_id, "Partner", Some(v))?;
-        partner_id = Some(v);
+
+    // CRM-RI-012: nullable relations use the three-state patch contract —
+    // absent = unchanged, Some(None) = explicit clear, Some(Some(v)) =
+    // validate and replace.
+    if let Some(inner) = params.partner_id {
+        if let Some(v) = inner {
+            validate_opportunity_contact_relation(ctx, organization_id, "Partner", Some(v))?;
+        }
+        partner_id = inner;
         changed_fields.push("partner_id".to_string());
     }
-    if let Some(v) = params.contact_id {
-        validate_opportunity_contact_relation(ctx, organization_id, "Contact", Some(v))?;
-        contact_id = Some(v);
+    if let Some(inner) = params.contact_id {
+        if let Some(v) = inner {
+            validate_opportunity_contact_relation(ctx, organization_id, "Contact", Some(v))?;
+        }
+        contact_id = inner;
         changed_fields.push("contact_id".to_string());
     }
-    if let Some(v) = params.date_deadline {
-        date_deadline = Some(v);
+    if let Some(inner) = params.date_deadline {
+        date_deadline = inner;
         changed_fields.push("date_deadline".to_string());
     }
-    if let Some(v) = params.lost_reason_id {
-        validate_opportunity_lost_reason_id(ctx, organization_id, Some(v))?;
-        lost_reason_id = Some(v);
-        changed_fields.push("lost_reason_id".to_string());
-    }
-    if let Some(v) = &params.description {
-        description = Some(v.clone());
+    if let Some(inner) = &params.description {
+        description = inner.clone();
         changed_fields.push("description".to_string());
     }
     if let Some(v) = &params.tag_ids {
@@ -793,20 +973,6 @@ pub fn update_opportunity(
                 probability = stage.probability;
                 changed_fields.push("probability".to_string());
             }
-
-            if stage.is_won {
-                is_won = true;
-                is_lost = false;
-                date_closed = Some(ctx.timestamp);
-                changed_fields.push("is_won".to_string());
-                changed_fields.push("is_lost".to_string());
-                changed_fields.push("date_closed".to_string());
-            } else if stage.name == "Lost" {
-                is_lost = true;
-                is_won = false;
-                changed_fields.push("is_lost".to_string());
-                changed_fields.push("is_won".to_string());
-            }
         }
     }
 
@@ -816,23 +982,66 @@ pub fn update_opportunity(
             changed_fields.push("probability".to_string());
         }
     }
-    if let Some(v) = params.is_won {
-        is_won = v;
-        if !changed_fields.contains(&"is_won".to_string()) {
-            changed_fields.push("is_won".to_string());
-        }
+
+    // CRM-RI-011: derive the final lifecycle state from the (possibly just
+    // updated) target stage rather than trusting caller-set is_won/is_lost
+    // directly. `effective_stage` reflects `stage_id` after the block above,
+    // whether or not the stage actually changed in this call.
+    let effective_stage = ctx
+        .db
+        .opp_stage()
+        .id()
+        .find(&stage_id)
+        .ok_or("Stage not found")?;
+    let existing_state = OpportunityState::from_flags(opp.is_won, opp.is_lost);
+    let target_state =
+        resolve_target_state(existing_state, params.desired_state, effective_stage.is_won)?;
+    let (is_won, is_lost) = target_state.to_flags();
+    let state_changed = target_state != existing_state;
+    if state_changed {
+        changed_fields.push("is_won".to_string());
+        changed_fields.push("is_lost".to_string());
     }
-    if let Some(v) = params.is_lost {
-        is_lost = v;
-        if !changed_fields.contains(&"is_lost".to_string()) {
-            changed_fields.push("is_lost".to_string());
-        }
+
+    // date_closed/lost_reason_id: normal three-state patch contract applies
+    // when the lifecycle state isn't changing this call; on an actual
+    // transition the server derives both, never trusting the caller's
+    // values (CRM-RI-011).
+    let mut date_closed = params.date_closed.unwrap_or(opp.date_closed);
+    if params.date_closed.is_some() && !state_changed {
+        changed_fields.push("date_closed".to_string());
     }
-    if let Some(v) = params.date_closed {
-        date_closed = Some(v);
+    if state_changed {
+        date_closed = match target_state {
+            OpportunityState::Open => None,
+            OpportunityState::Won | OpportunityState::Lost => Some(ctx.timestamp),
+        };
         if !changed_fields.contains(&"date_closed".to_string()) {
             changed_fields.push("date_closed".to_string());
         }
+    }
+
+    let mut lost_reason_id = params.lost_reason_id.unwrap_or(opp.lost_reason_id);
+    match target_state {
+        OpportunityState::Lost => {
+            let lr = lost_reason_id
+                .ok_or_else(|| "lost opportunities require a lost_reason_id".to_string())?;
+            validate_opportunity_lost_reason_id(ctx, organization_id, Some(lr))?;
+        }
+        OpportunityState::Won | OpportunityState::Open => {
+            if matches!(params.lost_reason_id, Some(Some(_))) {
+                return Err(
+                    "lost_reason_id can only be set when the opportunity is lost".to_string(),
+                );
+            }
+            // Won/Open opportunities never carry a lost_reason — normalize
+            // any pre-existing inconsistency rather than blocking unrelated
+            // edits to a legacy row.
+            lost_reason_id = None;
+        }
+    }
+    if params.lost_reason_id.is_some() && !changed_fields.contains(&"lost_reason_id".to_string()) {
+        changed_fields.push("lost_reason_id".to_string());
     }
 
     let user = ctx

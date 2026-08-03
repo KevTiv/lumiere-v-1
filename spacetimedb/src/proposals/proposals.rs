@@ -1135,7 +1135,9 @@ pub fn resolve_proposal_section_conflict(
             record_id: section_id,
             action: "UPDATE",
             old_values: Some(json!({ "revision": old_rev }).to_string()),
-            new_values: Some(json!({ "revision": new_revision, "conflict_resolve": true }).to_string()),
+            new_values: Some(
+                json!({ "revision": new_revision, "conflict_resolve": true }).to_string(),
+            ),
             changed_fields: vec!["content".into(), "revision".into()],
             metadata: Some(r#"{"conflict_resolve":true}"#.to_string()),
         },
@@ -1279,10 +1281,9 @@ pub fn restore_proposal_version(
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
-        let status = SectionStatus::from_str(
-            s.get("status").and_then(|v| v.as_str()).unwrap_or("draft"),
-        )
-        .unwrap_or(SectionStatus::Draft);
+        let status =
+            SectionStatus::from_str(s.get("status").and_then(|v| v.as_str()).unwrap_or("draft"))
+                .unwrap_or(SectionStatus::Draft);
         let sequence = s.get("sequence").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
         let word_count = content.split_whitespace().count() as u32;
         ctx.db.proposal_section().insert(ProposalSection {
@@ -1548,7 +1549,9 @@ pub fn add_proposal_line_item(
             record_id: row.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(json!({ "product_id": row.product_id, "subtotal": subtotal }).to_string()),
+            new_values: Some(
+                json!({ "product_id": row.product_id, "subtotal": subtotal }).to_string(),
+            ),
             changed_fields: vec!["product_id".into(), "quantity".into()],
             metadata: None,
         },
@@ -1928,10 +1931,7 @@ pub fn convert_proposal_to_sale_order(
             }
             let uom_id = product.uom_id;
             if uom_id == 0 {
-                return Err(format!(
-                    "Proposal line product {} has no UoM",
-                    l.product_id
-                ));
+                return Err(format!("Proposal line product {} has no UoM", l.product_id));
             }
             out.push(CreateSaleOrderLineParams {
                 product_id: l.product_id,
@@ -2539,7 +2539,8 @@ fn ensure_version_belongs_to_proposal(
 fn merge_json_object_metadata(mut base: serde_json::Value, extra: Option<&str>) -> String {
     if let Some(raw) = extra {
         if let Ok(extra_val) = serde_json::from_str::<serde_json::Value>(raw) {
-            if let (Some(base_obj), Some(extra_obj)) = (base.as_object_mut(), extra_val.as_object()) {
+            if let (Some(base_obj), Some(extra_obj)) = (base.as_object_mut(), extra_val.as_object())
+            {
                 for (k, v) in extra_obj {
                     base_obj.insert(k.clone(), v.clone());
                 }
@@ -2735,7 +2736,14 @@ pub fn upsert_proposal_compliance_requirement(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "proposal", "write")?;
     let proposal = load_proposal_scoped(ctx, organization_id, company_id, proposal_id)?;
-    if params.is_waived && params.waiver_rationale.as_deref().unwrap_or("").trim().is_empty() {
+    if params.is_waived
+        && params
+            .waiver_rationale
+            .as_deref()
+            .unwrap_or("")
+            .trim()
+            .is_empty()
+    {
         return Err("waiver_rationale is required when waiving a requirement".to_string());
     }
 
@@ -2818,7 +2826,10 @@ pub fn upsert_proposal_compliance_requirement(
             record_id: requirement_id,
             action: "UPDATE",
             old_values: None,
-            new_values: Some(json!({ "is_complete": params.is_complete, "is_waived": params.is_waived }).to_string()),
+            new_values: Some(
+                json!({ "is_complete": params.is_complete, "is_waived": params.is_waived })
+                    .to_string(),
+            ),
             changed_fields: vec!["is_complete".into(), "is_waived".into()],
             metadata: None,
         },
@@ -2854,7 +2865,8 @@ pub fn apply_proposal_analysis(
     });
 
     if params.materialize_compliance {
-        if let Ok(reqs) = serde_json::from_str::<Vec<serde_json::Value>>(&params.requirements_json) {
+        if let Ok(reqs) = serde_json::from_str::<Vec<serde_json::Value>>(&params.requirements_json)
+        {
             for (i, req) in reqs.iter().enumerate() {
                 let key = json_str_field(req, &["id", "key"], &format!("req-{}", i + 1));
                 let title = json_str_field(req, &["title", "text"], "Requirement");
@@ -2895,7 +2907,9 @@ pub fn apply_proposal_analysis(
             record_id: row.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(json!({ "source": params.source, "is_mock": params.is_mock }).to_string()),
+            new_values: Some(
+                json!({ "source": params.source, "is_mock": params.is_mock }).to_string(),
+            ),
             changed_fields: vec!["findings_json".into(), "requirements_json".into()],
             metadata: None,
         },
@@ -2927,30 +2941,35 @@ pub fn upsert_proposal_procurement_score(
         });
 
     if let Some(row) = existing {
-        ctx.db.proposal_procurement_score().id().update(ProposalProcurementScore {
-            score_value: params.score_value,
-            max_value: params.max_value,
-            notes: params.notes,
-            write_uid: ctx.sender(),
-            write_date: ctx.timestamp,
-            ..row
-        });
+        ctx.db
+            .proposal_procurement_score()
+            .id()
+            .update(ProposalProcurementScore {
+                score_value: params.score_value,
+                max_value: params.max_value,
+                notes: params.notes,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..row
+            });
     } else {
-        ctx.db.proposal_procurement_score().insert(ProposalProcurementScore {
-            id: 0,
-            organization_id,
-            company_id,
-            proposal_id,
-            country_pack_key: params.country_pack_key.clone(),
-            score_kind: params.score_kind.clone(),
-            score_value: params.score_value,
-            max_value: params.max_value,
-            notes: params.notes,
-            create_uid: ctx.sender(),
-            create_date: ctx.timestamp,
-            write_uid: ctx.sender(),
-            write_date: ctx.timestamp,
-        });
+        ctx.db
+            .proposal_procurement_score()
+            .insert(ProposalProcurementScore {
+                id: 0,
+                organization_id,
+                company_id,
+                proposal_id,
+                country_pack_key: params.country_pack_key.clone(),
+                score_kind: params.score_kind.clone(),
+                score_value: params.score_value,
+                max_value: params.max_value,
+                notes: params.notes,
+                create_uid: ctx.sender(),
+                create_date: ctx.timestamp,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+            });
     }
 
     touch_proposal(ctx, proposal);
@@ -3010,26 +3029,29 @@ pub fn create_proposal_integration_intent(
         ensure_version_belongs_to_proposal(ctx, proposal_id, version_id)?;
     }
 
-    let row = ctx.db.proposal_integration_intent().insert(ProposalIntegrationIntent {
-        id: 0,
-        organization_id,
-        company_id,
-        proposal_id,
-        proposal_version_id: params.proposal_version_id,
-        intent_type: intent_type.as_str().to_string(),
-        status: "pending".to_string(),
-        idempotency_key: params.idempotency_key,
-        payload: params.payload,
-        result_document_id: None,
-        last_error: None,
-        attempt_count: 0,
-        applied_at: None,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: params.metadata,
-    });
+    let row = ctx
+        .db
+        .proposal_integration_intent()
+        .insert(ProposalIntegrationIntent {
+            id: 0,
+            organization_id,
+            company_id,
+            proposal_id,
+            proposal_version_id: params.proposal_version_id,
+            intent_type: intent_type.as_str().to_string(),
+            status: "pending".to_string(),
+            idempotency_key: params.idempotency_key,
+            payload: params.payload,
+            result_document_id: None,
+            last_error: None,
+            attempt_count: 0,
+            applied_at: None,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: params.metadata,
+        });
 
     write_audit_log_v2(
         ctx,
@@ -3040,7 +3062,9 @@ pub fn create_proposal_integration_intent(
             record_id: row.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(json!({ "intent_type": intent_type.as_str(), "status": "pending" }).to_string()),
+            new_values: Some(
+                json!({ "intent_type": intent_type.as_str(), "status": "pending" }).to_string(),
+            ),
             changed_fields: vec!["intent_type".into()],
             metadata: None,
         },
@@ -3062,17 +3086,20 @@ pub fn complete_proposal_integration_intent(
         return Ok(());
     }
 
-    ctx.db.proposal_integration_intent().id().update(ProposalIntegrationIntent {
-        status: "completed".to_string(),
-        result_document_id: params.result_document_id.or(intent.result_document_id),
-        applied_at: Some(ctx.timestamp),
-        attempt_count: intent.attempt_count.saturating_add(1),
-        last_error: None,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: params.metadata.or(intent.metadata.clone()),
-        ..intent
-    });
+    ctx.db
+        .proposal_integration_intent()
+        .id()
+        .update(ProposalIntegrationIntent {
+            status: "completed".to_string(),
+            result_document_id: params.result_document_id.or(intent.result_document_id),
+            applied_at: Some(ctx.timestamp),
+            attempt_count: intent.attempt_count.saturating_add(1),
+            last_error: None,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: params.metadata.or(intent.metadata.clone()),
+            ..intent
+        });
 
     write_audit_log_v2(
         ctx,
@@ -3102,15 +3129,18 @@ pub fn fail_proposal_integration_intent(
     check_permission(ctx, organization_id, "proposal", "write")?;
     let intent = load_integration_intent_scoped(ctx, organization_id, company_id, intent_id)?;
 
-    ctx.db.proposal_integration_intent().id().update(ProposalIntegrationIntent {
-        status: "failed".to_string(),
-        last_error: Some(params.last_error.clone()),
-        attempt_count: intent.attempt_count.saturating_add(1),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: params.metadata.or(intent.metadata.clone()),
-        ..intent
-    });
+    ctx.db
+        .proposal_integration_intent()
+        .id()
+        .update(ProposalIntegrationIntent {
+            status: "failed".to_string(),
+            last_error: Some(params.last_error.clone()),
+            attempt_count: intent.attempt_count.saturating_add(1),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: params.metadata.or(intent.metadata.clone()),
+            ..intent
+        });
 
     write_audit_log_v2(
         ctx,
@@ -3121,7 +3151,9 @@ pub fn fail_proposal_integration_intent(
             record_id: intent_id,
             action: "UPDATE",
             old_values: None,
-            new_values: Some(json!({ "status": "failed", "last_error": params.last_error }).to_string()),
+            new_values: Some(
+                json!({ "status": "failed", "last_error": params.last_error }).to_string(),
+            ),
             changed_fields: vec!["status".into(), "last_error".into()],
             metadata: None,
         },
@@ -3147,23 +3179,26 @@ pub fn create_proposal_clarification(
         return Err("question is required".to_string());
     }
 
-    let row = ctx.db.proposal_clarification().insert(ProposalClarification {
-        id: 0,
-        organization_id,
-        company_id,
-        proposal_id,
-        author_name: params.author_name,
-        author_email: params.author_email,
-        is_portal_principal: params.is_portal_principal,
-        question: params.question,
-        answer: None,
-        answered_by: None,
-        answered_at: None,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-    });
+    let row = ctx
+        .db
+        .proposal_clarification()
+        .insert(ProposalClarification {
+            id: 0,
+            organization_id,
+            company_id,
+            proposal_id,
+            author_name: params.author_name,
+            author_email: params.author_email,
+            is_portal_principal: params.is_portal_principal,
+            question: params.question,
+            answer: None,
+            answered_by: None,
+            answered_at: None,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+        });
 
     write_audit_log_v2(
         ctx,
@@ -3174,7 +3209,9 @@ pub fn create_proposal_clarification(
             record_id: row.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(json!({ "is_portal_principal": params.is_portal_principal }).to_string()),
+            new_values: Some(
+                json!({ "is_portal_principal": params.is_portal_principal }).to_string(),
+            ),
             changed_fields: vec!["question".into()],
             metadata: None,
         },
@@ -3202,14 +3239,17 @@ pub fn answer_proposal_clarification(
         return Err("answer is required".to_string());
     }
 
-    ctx.db.proposal_clarification().id().update(ProposalClarification {
-        answer: Some(params.answer),
-        answered_by: Some(ctx.sender()),
-        answered_at: Some(ctx.timestamp),
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..row
-    });
+    ctx.db
+        .proposal_clarification()
+        .id()
+        .update(ProposalClarification {
+            answer: Some(params.answer),
+            answered_by: Some(ctx.sender()),
+            answered_at: Some(ctx.timestamp),
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..row
+        });
 
     write_audit_log_v2(
         ctx,

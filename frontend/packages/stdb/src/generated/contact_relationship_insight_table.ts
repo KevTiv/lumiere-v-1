@@ -23,4 +23,6 @@ export default __t.row({
   computedAt: __t.timestamp().name("computed_at"),
   computedBy: __t.identity().name("computed_by"),
   metadata: __t.option(__t.string()),
+  isStale: __t.bool().name("is_stale"),
+  staleSince: __t.option(__t.timestamp()).name("stale_since"),
 });

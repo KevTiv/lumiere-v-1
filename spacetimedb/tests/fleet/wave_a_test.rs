@@ -8,11 +8,7 @@ use crate::fleet::fleet::{
 };
 use crate::test_harness::OrgFixture;
 
-fn create_vehicle(
-    ctx: &ReducerContext,
-    fixture: &OrgFixture,
-    name: &str,
-) -> Result<u64, String> {
+fn create_vehicle(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> Result<u64, String> {
     create_fleet_vehicle(
         ctx,
         fixture.organization_id,

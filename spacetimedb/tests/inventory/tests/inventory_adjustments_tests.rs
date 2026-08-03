@@ -98,10 +98,7 @@ pub fn test_inventory_adjustment_create(ctx: &ReducerContext) -> Result<(), Stri
         .ok_or("Inventory adjustment not found after create")?;
 
     if (adj.difference - 2.0).abs() > f64::EPSILON {
-        return Err(format!(
-            "difference should be 2.0, got {}",
-            adj.difference
-        ));
+        return Err(format!("difference should be 2.0, got {}", adj.difference));
     }
     if (adj.total_value - 20.0).abs() > f64::EPSILON {
         return Err(format!(

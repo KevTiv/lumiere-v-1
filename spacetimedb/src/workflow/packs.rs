@@ -630,9 +630,8 @@ pub fn recompute_workflow_timers_for_calendar(
     for (timer, projection) in pending.into_iter().zip(projections.into_iter()) {
         let next_revision = timer.revision.saturating_add(1);
         let timer_id = timer.id;
-        let new_due = spacetimedb::Timestamp::from_micros_since_unix_epoch(
-            projection.after_due_at_micros,
-        );
+        let new_due =
+            spacetimedb::Timestamp::from_micros_since_unix_epoch(projection.after_due_at_micros);
         ctx.db.workflow_timer().id().update(WorkflowTimer {
             due_at: new_due,
             revision: next_revision,
@@ -719,8 +718,14 @@ fn resolve_timer_calendar_deadline(
         .workflow_instance()
         .id()
         .find(&timer.instance_id)
-        .ok_or_else(|| format!("workflow instance {} missing for timer {}", timer.instance_id, timer.id))?;
-    if instance.organization_id != timer.organization_id || instance.company_id != timer.company_id {
+        .ok_or_else(|| {
+            format!(
+                "workflow instance {} missing for timer {}",
+                timer.instance_id, timer.id
+            )
+        })?;
+    if instance.organization_id != timer.organization_id || instance.company_id != timer.company_id
+    {
         return Err("timer instance tenant mismatch".to_string());
     }
 
@@ -729,7 +734,12 @@ fn resolve_timer_calendar_deadline(
         .workflow_edge()
         .id()
         .find(&timer.edge_id)
-        .ok_or_else(|| format!("workflow edge {} missing for timer {}", timer.edge_id, timer.id))?;
+        .ok_or_else(|| {
+            format!(
+                "workflow edge {} missing for timer {}",
+                timer.edge_id, timer.id
+            )
+        })?;
     if edge.workflow_version_id != instance.workflow_version_id {
         return Err("timer edge is not pinned to the instance workflow version".to_string());
     }
@@ -768,8 +778,12 @@ fn resolve_timer_calendar_deadline(
         .workflow_calendar_exception_by_version()
         .filter(&version.id)
         .collect();
-    let evidence =
-        calculate_deadline_from_delay_seconds(&version, &exceptions, timer.created_at, policy.delay_seconds)?;
+    let evidence = calculate_deadline_from_delay_seconds(
+        &version,
+        &exceptions,
+        timer.created_at,
+        policy.delay_seconds,
+    )?;
     Ok((policy.delay_seconds, evidence))
 }
 

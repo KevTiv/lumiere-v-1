@@ -198,10 +198,7 @@ pub(crate) fn advance_applied_for_sheet(ctx: &ReducerContext, sheet_id: u64) -> 
         .sum()
 }
 
-pub(crate) fn has_approved_policy_exception(
-    ctx: &ReducerContext,
-    expense_id: u64,
-) -> bool {
+pub(crate) fn has_approved_policy_exception(ctx: &ReducerContext, expense_id: u64) -> bool {
     ctx.db
         .hr_expense_policy_exception()
         .policy_exception_by_expense()
@@ -209,10 +206,7 @@ pub(crate) fn has_approved_policy_exception(
         .any(|e| e.state == ExpensePolicyExceptionState::Approved)
 }
 
-pub(crate) fn has_pending_policy_exception(
-    ctx: &ReducerContext,
-    expense_id: u64,
-) -> bool {
+pub(crate) fn has_pending_policy_exception(ctx: &ReducerContext, expense_id: u64) -> bool {
     ctx.db
         .hr_expense_policy_exception()
         .policy_exception_by_expense()
@@ -231,7 +225,11 @@ pub(crate) fn find_duplicate_expense(
     merchant_key: Option<&str>,
     exclude_id: Option<u64>,
 ) -> Option<u64> {
-    let day = date.to_duration_since_unix_epoch().unwrap_or_default().as_secs() / 86_400;
+    let day = date
+        .to_duration_since_unix_epoch()
+        .unwrap_or_default()
+        .as_secs()
+        / 86_400;
     ctx.db.hr_expense().iter().find_map(|e| {
         if e.organization_id != organization_id || e.company_id != company_id {
             return None;
@@ -336,8 +334,8 @@ fn apply_create_expense_payload(
     payload: &str,
     idempotency_key: &str,
 ) -> Result<u64, String> {
-    let v: Value = serde_json::from_str(payload)
-        .map_err(|e| format!("Invalid intent payload JSON: {e}"))?;
+    let v: Value =
+        serde_json::from_str(payload).map_err(|e| format!("Invalid intent payload JSON: {e}"))?;
     let employee_id = payload_u64(&v, "employee_id").ok_or("payload requires employee_id")?;
     let currency_id = payload_u64(&v, "currency_id").ok_or("payload requires currency_id")?;
     let name = payload_str(&v, "name").unwrap_or_else(|| format!("{intent_type} expense"));
@@ -355,14 +353,10 @@ fn apply_create_expense_payload(
     let mut attachment_ids = v
         .get("attachment_ids")
         .and_then(|a| a.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|x| x.as_u64())
-                .collect::<Vec<_>>()
-        })
+        .map(|arr| arr.iter().filter_map(|x| x.as_u64()).collect::<Vec<_>>())
         .unwrap_or_default();
-    let client_request_id = payload_str(&v, "client_request_id")
-        .or_else(|| Some(idempotency_key.to_string()));
+    let client_request_id =
+        payload_str(&v, "client_request_id").or_else(|| Some(idempotency_key.to_string()));
     let client_request_id_lookup = client_request_id.clone();
 
     // OCR / email intents must register a real receipt row — never stub id 1.
@@ -372,9 +366,7 @@ fn apply_create_expense_payload(
             let storage_key = payload_str(&v, "storage_key")
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
-                .ok_or_else(|| {
-                    format!("{intent_type} payload requires non-empty storage_key")
-                })?;
+                .ok_or_else(|| format!("{intent_type} payload requires non-empty storage_key"))?;
             let receipt_key = format!("{intent_type}:{idempotency_key}");
             let receipt_id = insert_expense_receipt(
                 ctx,
@@ -443,8 +435,8 @@ fn apply_fx_rate_payload(
     organization_id: u64,
     payload: &str,
 ) -> Result<Option<u64>, String> {
-    let v: Value = serde_json::from_str(payload)
-        .map_err(|e| format!("Invalid fx_rate payload JSON: {e}"))?;
+    let v: Value =
+        serde_json::from_str(payload).map_err(|e| format!("Invalid fx_rate payload JSON: {e}"))?;
     let sheet_id = payload_u64(&v, "sheet_id").ok_or("fx_rate payload requires sheet_id")?;
     let rate = payload_f64(&v, "rate").ok_or("fx_rate payload requires rate")?;
     if rate <= 0.0 {
@@ -477,11 +469,14 @@ fn apply_fx_rate_payload(
         );
         Some(Value::Object(map).to_string())
     };
-    ctx.db.expense_sheet().id().update(crate::expenses::expenses::HrExpenseSheet {
-        currency_rate: rate,
-        metadata,
-        ..sheet
-    });
+    ctx.db
+        .expense_sheet()
+        .id()
+        .update(crate::expenses::expenses::HrExpenseSheet {
+            currency_rate: rate,
+            metadata,
+            ..sheet
+        });
     Ok(Some(sheet_id))
 }
 
@@ -520,26 +515,29 @@ pub fn create_expense_integration_intent(
     if existing.is_some() {
         return Ok(());
     }
-    let row = ctx.db.expense_integration_intent().insert(ExpenseIntegrationIntent {
-        id: 0,
-        organization_id,
-        company_id,
-        intent_type,
-        status: "pending".into(),
-        idempotency_key: params.idempotency_key,
-        device_id: params.device_id,
-        payload: params.payload,
-        result_expense_id: None,
-        result_sheet_id: None,
-        last_error: None,
-        attempt_count: 0,
-        applied_at: None,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: params.metadata,
-    });
+    let row = ctx
+        .db
+        .expense_integration_intent()
+        .insert(ExpenseIntegrationIntent {
+            id: 0,
+            organization_id,
+            company_id,
+            intent_type,
+            status: "pending".into(),
+            idempotency_key: params.idempotency_key,
+            device_id: params.device_id,
+            payload: params.payload,
+            result_expense_id: None,
+            result_sheet_id: None,
+            last_error: None,
+            attempt_count: 0,
+            applied_at: None,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: params.metadata,
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -725,7 +723,11 @@ fn advance_line_params(
         debit,
         credit,
         sequence,
-        quantity: if debit > 0.0 || credit > 0.0 { 1.0 } else { 0.0 },
+        quantity: if debit > 0.0 || credit > 0.0 {
+            1.0
+        } else {
+            0.0
+        },
         price_unit: debit.max(credit),
         discount: 0.0,
         tax_ids: vec![],
@@ -1078,7 +1080,8 @@ pub fn apply_expense_advance_to_sheet(
             action: "CREATE",
             old_values: None,
             new_values: Some(
-                serde_json::json!({ "advance_id": advance_id, "amount": params.amount }).to_string(),
+                serde_json::json!({ "advance_id": advance_id, "amount": params.amount })
+                    .to_string(),
             ),
             changed_fields: vec!["amount".into()],
             metadata: params.metadata,
@@ -1112,7 +1115,8 @@ pub fn request_expense_policy_exception(
     if expense.state != ExpenseState::Draft {
         return Err("Only draft expenses can request policy exceptions".to_string());
     }
-    if has_pending_policy_exception(ctx, expense_id) || has_approved_policy_exception(ctx, expense_id)
+    if has_pending_policy_exception(ctx, expense_id)
+        || has_approved_policy_exception(ctx, expense_id)
     {
         return Ok(());
     }
@@ -1311,10 +1315,7 @@ pub fn set_expense_fraud_hold(
         return Err("Fraud hold can only change on draft/submitted expenses".to_string());
     }
     let fraud_reason = if params.fraud_hold {
-        params
-            .fraud_reason
-            .clone()
-            .or(expense.fraud_reason.clone())
+        params.fraud_reason.clone().or(expense.fraud_reason.clone())
     } else {
         None
     };

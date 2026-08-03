@@ -289,7 +289,12 @@ pub fn test_pack_tax_evidence_required(ctx: &ReducerContext) -> Result<(), Strin
             mileage_rate_id: None,
             per_diem_days: None,
             per_diem_rate_id: None,
-            attachment_ids: vec![super::test_receipt_id(ctx, fixture.organization_id, fixture.company_id, employee_id)?],
+            attachment_ids: vec![super::test_receipt_id(
+                ctx,
+                fixture.organization_id,
+                fixture.company_id,
+                employee_id,
+            )?],
             client_request_id: Some(format!("we-pack-1-{}", fixture.company_id)),
             payment_mode: ExpensePaymentMode::OutOfPocket,
             merchant_key: None,
@@ -366,7 +371,12 @@ pub fn test_card_statement_match_and_fx_fee(ctx: &ReducerContext) -> Result<(), 
             mileage_rate_id: None,
             per_diem_days: None,
             per_diem_rate_id: None,
-            attachment_ids: vec![super::test_receipt_id(ctx, fixture.organization_id, fixture.company_id, employee_id)?],
+            attachment_ids: vec![super::test_receipt_id(
+                ctx,
+                fixture.organization_id,
+                fixture.company_id,
+                employee_id,
+            )?],
             client_request_id: Some(format!("we-card-1-{}", fixture.company_id)),
             payment_mode: ExpensePaymentMode::CorporateCard,
             merchant_key: Some("hilton".into()),
@@ -403,9 +413,7 @@ pub fn test_card_statement_match_and_fx_fee(ctx: &ReducerContext) -> Result<(), 
         .db
         .expense_card_statement_line()
         .iter()
-        .find(|s| {
-            s.organization_id == fixture.organization_id && s.external_ref == stmt_ref
-        })
+        .find(|s| s.organization_id == fixture.organization_id && s.external_ref == stmt_ref)
         .ok_or("statement")?;
     match_expense_card_statement_line(
         ctx,
@@ -468,7 +476,9 @@ pub fn test_card_statement_match_and_fx_fee(ctx: &ReducerContext) -> Result<(), 
         .db
         .account_move_line()
         .iter()
-        .filter(|l| l.move_id == post_move_id && l.account_id == accounts.fx_fee_id && l.debit > 0.0)
+        .filter(|l| {
+            l.move_id == post_move_id && l.account_id == accounts.fx_fee_id && l.debit > 0.0
+        })
         .map(|l| l.debit)
         .sum();
     if (fx_debit - 3.5).abs() > 0.01 {
@@ -527,9 +537,7 @@ pub fn test_email_inbox_intent_batch_apply(ctx: &ReducerContext) -> Result<(), S
         .db
         .expense_integration_intent()
         .iter()
-        .find(|i| {
-            i.organization_id == fixture.organization_id && i.idempotency_key == "email-we-1"
-        })
+        .find(|i| i.organization_id == fixture.organization_id && i.idempotency_key == "email-we-1")
         .ok_or("intent")?;
     if intent.status != "applied" {
         return Err(format!("expected applied, got {}", intent.status));
@@ -585,9 +593,7 @@ pub fn test_email_inbox_intent_batch_apply(ctx: &ReducerContext) -> Result<(), S
         .db
         .expense_integration_intent()
         .iter()
-        .find(|i| {
-            i.organization_id == fixture.organization_id && i.idempotency_key == "ocr-we-1"
-        })
+        .find(|i| i.organization_id == fixture.organization_id && i.idempotency_key == "ocr-we-1")
         .ok_or("ocr intent")?;
     apply_expense_integration_intent(ctx, fixture.organization_id, ocr.id)?;
     // Missing storage_key must fail for OCR/email.
@@ -694,9 +700,7 @@ pub fn test_card_statement_unmatch(ctx: &ReducerContext) -> Result<(), String> {
         .db
         .expense_card_statement_line()
         .iter()
-        .find(|s| {
-            s.organization_id == fixture.organization_id && s.external_ref == stmt_ref
-        })
+        .find(|s| s.organization_id == fixture.organization_id && s.external_ref == stmt_ref)
         .ok_or("statement")?;
     match_expense_card_statement_line(
         ctx,

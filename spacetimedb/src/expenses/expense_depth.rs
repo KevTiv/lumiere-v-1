@@ -220,7 +220,11 @@ fn empty_line_params(
         debit,
         credit,
         sequence,
-        quantity: if debit > 0.0 || credit > 0.0 { 1.0 } else { 0.0 },
+        quantity: if debit > 0.0 || credit > 0.0 {
+            1.0
+        } else {
+            0.0
+        },
         price_unit: debit.max(credit),
         discount: 0.0,
         tax_ids: vec![],
@@ -252,7 +256,12 @@ fn empty_line_params(
     }
 }
 
-fn validate_account(ctx: &ReducerContext, company_id: u64, account_id: u64, label: &str) -> Result<(), String> {
+fn validate_account(
+    ctx: &ReducerContext,
+    company_id: u64,
+    account_id: u64,
+    label: &str,
+) -> Result<(), String> {
     let account = ctx
         .db
         .account_account()
@@ -309,9 +318,7 @@ pub(crate) fn seed_statutory_mileage_rates_for_pack(
     let mut inserted = 0u32;
     for (name, rate_per_unit, unit) in statutory_mileage_rate_specs(pack_key) {
         let exists = ctx.db.hr_expense_mileage_rate().iter().any(|r| {
-            r.organization_id == organization_id
-                && r.company_id == company_id
-                && r.name == name
+            r.organization_id == organization_id && r.company_id == company_id && r.name == name
         });
         if exists {
             continue;
@@ -322,19 +329,21 @@ pub(crate) fn seed_statutory_mileage_rates_for_pack(
             "source": "seed",
         })
         .to_string();
-        ctx.db.hr_expense_mileage_rate().insert(HrExpenseMileageRate {
-            id: 0,
-            organization_id,
-            company_id,
-            name: name.to_string(),
-            currency_id,
-            rate_per_unit,
-            unit: unit.to_string(),
-            effective_from: None,
-            effective_to: None,
-            active: true,
-            metadata: Some(meta),
-        });
+        ctx.db
+            .hr_expense_mileage_rate()
+            .insert(HrExpenseMileageRate {
+                id: 0,
+                organization_id,
+                company_id,
+                name: name.to_string(),
+                currency_id,
+                rate_per_unit,
+                unit: unit.to_string(),
+                effective_from: None,
+                effective_to: None,
+                active: true,
+                metadata: Some(meta),
+            });
         inserted = inserted.saturating_add(1);
     }
     Ok(inserted)
@@ -439,17 +448,20 @@ pub fn upsert_expense_mileage_rate(
         if existing.organization_id != organization_id || existing.company_id != company_id {
             return Err("Mileage rate does not belong to this company".to_string());
         }
-        ctx.db.hr_expense_mileage_rate().id().update(HrExpenseMileageRate {
-            name: params.name,
-            currency_id: params.currency_id,
-            rate_per_unit: params.rate_per_unit,
-            unit,
-            effective_from: params.effective_from,
-            effective_to: params.effective_to,
-            active: params.active,
-            metadata: params.metadata.or(existing.metadata.clone()),
-            ..existing
-        });
+        ctx.db
+            .hr_expense_mileage_rate()
+            .id()
+            .update(HrExpenseMileageRate {
+                name: params.name,
+                currency_id: params.currency_id,
+                rate_per_unit: params.rate_per_unit,
+                unit,
+                effective_from: params.effective_from,
+                effective_to: params.effective_to,
+                active: params.active,
+                metadata: params.metadata.or(existing.metadata.clone()),
+                ..existing
+            });
         write_audit_log_v2(
             ctx,
             organization_id,
@@ -467,19 +479,22 @@ pub fn upsert_expense_mileage_rate(
         return Ok(());
     }
 
-    let row = ctx.db.hr_expense_mileage_rate().insert(HrExpenseMileageRate {
-        id: 0,
-        organization_id,
-        company_id,
-        name: params.name,
-        currency_id: params.currency_id,
-        rate_per_unit: params.rate_per_unit,
-        unit,
-        effective_from: params.effective_from,
-        effective_to: params.effective_to,
-        active: params.active,
-        metadata: params.metadata,
-    });
+    let row = ctx
+        .db
+        .hr_expense_mileage_rate()
+        .insert(HrExpenseMileageRate {
+            id: 0,
+            organization_id,
+            company_id,
+            name: params.name,
+            currency_id: params.currency_id,
+            rate_per_unit: params.rate_per_unit,
+            unit,
+            effective_from: params.effective_from,
+            effective_to: params.effective_to,
+            active: params.active,
+            metadata: params.metadata,
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -557,19 +572,22 @@ pub fn upsert_expense_per_diem_rate(
         return Ok(());
     }
 
-    let row = ctx.db.hr_expense_per_diem_rate().insert(HrExpensePerDiemRate {
-        id: 0,
-        organization_id,
-        company_id,
-        name: params.name,
-        currency_id: params.currency_id,
-        location_code: params.location_code,
-        amount_per_day: params.amount_per_day,
-        effective_from: params.effective_from,
-        effective_to: params.effective_to,
-        active: params.active,
-        metadata: params.metadata,
-    });
+    let row = ctx
+        .db
+        .hr_expense_per_diem_rate()
+        .insert(HrExpensePerDiemRate {
+            id: 0,
+            organization_id,
+            company_id,
+            name: params.name,
+            currency_id: params.currency_id,
+            location_code: params.location_code,
+            amount_per_day: params.amount_per_day,
+            effective_from: params.effective_from,
+            effective_to: params.effective_to,
+            active: params.active,
+            metadata: params.metadata,
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -649,7 +667,8 @@ pub fn set_expense_allocations(
                 .id()
                 .find(&pid)
                 .ok_or("Allocation project not found")?;
-            if project.organization_id != organization_id || project.company_id != expense.company_id
+            if project.organization_id != organization_id
+                || project.company_id != expense.company_id
             {
                 return Err("Allocation project does not belong to this company".to_string());
             }
@@ -812,7 +831,10 @@ pub fn create_expense_project_rebill(
                     }
                 }
                 income_lines.push((
-                    format!("{} — {} ({:.0}%)", sheet.name, line.name, alloc.share_percent),
+                    format!(
+                        "{} — {} ({:.0}%)",
+                        sheet.name, line.name, alloc.share_percent
+                    ),
                     amt,
                     alloc.analytic_account_id.or(project.analytic_account_id),
                     Some(pid),
@@ -929,8 +951,8 @@ pub fn create_expense_project_rebill(
         seq += 1;
     }
     if amount_tax > 0.0001 {
-        let tax_account = resolve_tax_payable_account(ctx, &tax_ids)
-            .unwrap_or(params.income_account_id);
+        let tax_account =
+            resolve_tax_payable_account(ctx, &tax_ids).unwrap_or(params.income_account_id);
         let mut tax_lp = empty_line_params(
             tax_account,
             format!("Tax on rebill — {}", sheet.name),

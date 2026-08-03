@@ -117,8 +117,7 @@ pub fn test_helpdesk_ticket_create(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
 
-    let (team_id, stage_id) =
-        seed_helpdesk_team_and_stage(ctx, org_id, "Harness Support", "New")?;
+    let (team_id, stage_id) = seed_helpdesk_team_and_stage(ctx, org_id, "Harness Support", "New")?;
 
     create_ticket(
         ctx,
@@ -1745,9 +1744,7 @@ pub fn test_forms_custom_field_eav(ctx: &ReducerContext) -> Result<(), String> {
         .db
         .form_config()
         .iter()
-        .find(|c| {
-            c.organization_id == org_id && c.module_id == "crm" && c.form_id == "new-lead"
-        })
+        .find(|c| c.organization_id == org_id && c.module_id == "crm" && c.form_id == "new-lead")
         .ok_or("published form_config missing")?;
 
     add_form_field(

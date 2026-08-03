@@ -231,27 +231,38 @@ pub fn create_workflow_migration_plan(
         return Err("source and target workflow versions must differ".to_string());
     }
 
-    validate_mapping_lists(&params.node_mappings, &params.fork_mappings, &params.edge_mappings)?;
-    let compatibility = classify_plan_compatibility(&params.node_mappings, &params.fork_mappings, &params.edge_mappings);
+    validate_mapping_lists(
+        &params.node_mappings,
+        &params.fork_mappings,
+        &params.edge_mappings,
+    )?;
+    let compatibility = classify_plan_compatibility(
+        &params.node_mappings,
+        &params.fork_mappings,
+        &params.edge_mappings,
+    );
 
-    let plan = ctx.db.workflow_migration_plan().insert(WorkflowMigrationPlan {
-        id: 0,
-        organization_id,
-        company_id: params.company_id,
-        workflow_id: params.workflow_id,
-        source_workflow_version_id: source.id,
-        target_workflow_version_id: target.id,
-        node_mappings: params.node_mappings,
-        fork_mappings: params.fork_mappings,
-        edge_mappings: params.edge_mappings,
-        compatibility,
-        active: params.active,
-        revision: 0,
-        created_by: ctx.sender(),
-        created_at: ctx.timestamp,
-        updated_by: ctx.sender(),
-        updated_at: ctx.timestamp,
-    });
+    let plan = ctx
+        .db
+        .workflow_migration_plan()
+        .insert(WorkflowMigrationPlan {
+            id: 0,
+            organization_id,
+            company_id: params.company_id,
+            workflow_id: params.workflow_id,
+            source_workflow_version_id: source.id,
+            target_workflow_version_id: target.id,
+            node_mappings: params.node_mappings,
+            fork_mappings: params.fork_mappings,
+            edge_mappings: params.edge_mappings,
+            compatibility,
+            active: params.active,
+            revision: 0,
+            created_by: ctx.sender(),
+            created_at: ctx.timestamp,
+            updated_by: ctx.sender(),
+            updated_at: ctx.timestamp,
+        });
 
     write_audit_log_v2(
         ctx,
@@ -295,16 +306,20 @@ pub fn set_workflow_migration_plan_active(
     check_permission(ctx, organization_id, "workflow", "write")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
     let plan = load_plan(ctx, organization_id, company_id, plan_id)?;
-    let updated = ctx.db.workflow_migration_plan().id().update(WorkflowMigrationPlan {
-        active,
-        revision: plan
-            .revision
-            .checked_add(1)
-            .ok_or("migration plan revision overflow")?,
-        updated_by: ctx.sender(),
-        updated_at: ctx.timestamp,
-        ..plan.clone()
-    });
+    let updated = ctx
+        .db
+        .workflow_migration_plan()
+        .id()
+        .update(WorkflowMigrationPlan {
+            active,
+            revision: plan
+                .revision
+                .checked_add(1)
+                .ok_or("migration plan revision overflow")?,
+            updated_by: ctx.sender(),
+            updated_at: ctx.timestamp,
+            ..plan.clone()
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -331,7 +346,8 @@ pub fn preflight_workflow_migration(
     check_permission(ctx, organization_id, "workflow", "write")?;
     require_company_in_organization(ctx, organization_id, params.company_id)?;
     let plan = load_plan(ctx, organization_id, params.company_id, params.plan_id)?;
-    let instance = load_scoped_instance(ctx, organization_id, params.company_id, params.instance_id)?;
+    let instance =
+        load_scoped_instance(ctx, organization_id, params.company_id, params.instance_id)?;
     let report = evaluate_migration_compatibility(ctx, &plan, &instance)?;
     let input_hash = preflight_input_hash(organization_id, &params);
 
@@ -369,7 +385,8 @@ pub fn migrate_workflow_instance(
     if !plan.active {
         return Err("migration plan is not active".to_string());
     }
-    let instance = load_scoped_instance(ctx, organization_id, params.company_id, params.instance_id)?;
+    let instance =
+        load_scoped_instance(ctx, organization_id, params.company_id, params.instance_id)?;
     let input_hash = migrate_input_hash(organization_id, &params, &plan);
     let scope_key = format!("{organization_id}:migration:{}", params.idempotency_key);
 
@@ -435,8 +452,10 @@ pub fn migrate_workflow_instance(
                     .ok_or_else(|| format!("open fork join '{join}' is not mapped"))?,
             ),
         };
-        let expected =
-            remap_branch_keys(&fork.expected_branch_keys, &fork_mapping.branch_key_mappings)?;
+        let expected = remap_branch_keys(
+            &fork.expected_branch_keys,
+            &fork_mapping.branch_key_mappings,
+        )?;
         let emitted =
             remap_branch_keys(&fork.emitted_branch_keys, &fork_mapping.branch_key_mappings)?;
         let updated_fork = ctx.db.workflow_fork().id().update(WorkflowFork {
@@ -551,14 +570,17 @@ pub fn migrate_workflow_instance(
         let to_edge = target_edges
             .get(&to_edge_key)
             .ok_or_else(|| format!("mapped edge '{to_edge_key}' missing on target"))?;
-        ctx.db.workflow_timer().id().update(crate::workflow::delivery::WorkflowTimer {
-            edge_id: to_edge.id,
-            revision: timer
-                .revision
-                .checked_add(1)
-                .ok_or("workflow timer revision overflow")?,
-            ..timer
-        });
+        ctx.db
+            .workflow_timer()
+            .id()
+            .update(crate::workflow::delivery::WorkflowTimer {
+                edge_id: to_edge.id,
+                revision: timer
+                    .revision
+                    .checked_add(1)
+                    .ok_or("workflow timer revision overflow")?,
+                ..timer
+            });
     }
 
     let updated_instance = ctx.db.workflow_instance().id().update(WorkflowInstance {
@@ -849,9 +871,9 @@ fn evaluate_migration_compatibility(
                     }
                     if let Some(join) = &fork.join_node_key {
                         match node_map.get(join) {
-                            None => errors.push(format!(
-                                "open fork join '{join}' has no node mapping"
-                            )),
+                            None => {
+                                errors.push(format!("open fork join '{join}' has no node mapping"))
+                            }
                             Some(to_join) => {
                                 if !target_nodes
                                     .get(to_join)
@@ -915,10 +937,7 @@ fn nodes_compatible(from: &WorkflowNode, to: &WorkflowNode) -> Result<(), String
     match from.kind {
         WorkflowNodeKind::Fork => {
             if from.split_kind != to.split_kind {
-                return Err(format!(
-                    "fork split_kind mismatch for '{}'",
-                    from.node_key
-                ));
+                return Err(format!("fork split_kind mismatch for '{}'", from.node_key));
             }
         }
         WorkflowNodeKind::Join => {
@@ -954,10 +973,7 @@ fn nodes_compatible(from: &WorkflowNode, to: &WorkflowNode) -> Result<(), String
             if from_action.action_key != to_action.action_key
                 || from_action.input_schema_version != to_action.input_schema_version
             {
-                return Err(format!(
-                    "action schema mismatch for '{}'",
-                    from.node_key
-                ));
+                return Err(format!("action schema mismatch for '{}'", from.node_key));
             }
         }
         _ => {}
@@ -972,7 +988,8 @@ fn guarded_action_compatible(
     match (task_action, to_node.action.as_ref()) {
         (None, None) => Ok(()),
         (Some(task), Some(def)) => {
-            if task.key.as_str() != def.action_key || task.schema_version != def.input_schema_version
+            if task.key.as_str() != def.action_key
+                || task.schema_version != def.input_schema_version
             {
                 return Err(format!(
                     "guarded action schema mismatch for '{}'",
@@ -1045,10 +1062,7 @@ fn load_published_version(
         return Err("workflow version scope mismatch".to_string());
     }
     if version.status != WorkflowVersionStatus::Published {
-        return Err(format!(
-            "workflow version {} is not published",
-            version.id
-        ));
+        return Err(format!("workflow version {} is not published", version.id));
     }
     Ok(version)
 }
@@ -1110,9 +1124,7 @@ fn classify_plan_compatibility(
     forks: &[WorkflowForkMigrationMapping],
     edges: &[WorkflowEdgeMigrationMapping],
 ) -> WorkflowMigrationCompatibility {
-    let identity_nodes = nodes
-        .iter()
-        .all(|m| m.from_node_key == m.to_node_key);
+    let identity_nodes = nodes.iter().all(|m| m.from_node_key == m.to_node_key);
     let identity_forks = forks.iter().all(|m| {
         m.from_fork_node_key == m.to_fork_node_key
             && m.branch_key_mappings
@@ -1337,9 +1349,7 @@ fn validate_command_key(value: &str, field: &str) -> Result<(), String> {
 
 fn validate_reason(value: &str) -> Result<(), String> {
     if value.trim().is_empty() || value.len() > MAX_REASON_LEN {
-        return Err(format!(
-            "reason must be 1..{MAX_REASON_LEN} characters"
-        ));
+        return Err(format!("reason must be 1..{MAX_REASON_LEN} characters"));
     }
     Ok(())
 }

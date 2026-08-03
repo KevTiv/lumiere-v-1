@@ -197,10 +197,7 @@ pub fn test_lead_delete(ctx: &ReducerContext) -> Result<(), String> {
         .ok_or("Lead not found after create")?;
 
     if lead_row.state != "new" {
-        return Err(format!(
-            "Expected lead state 'new', got {}",
-            lead_row.state
-        ));
+        return Err(format!("Expected lead state 'new', got {}", lead_row.state));
     }
 
     delete_lead(ctx, org_id, lead_row.id)?;

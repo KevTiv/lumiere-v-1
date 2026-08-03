@@ -223,9 +223,10 @@ fn create_buy_demand(
                 "Auto replenishment for product {} at location {}",
                 rule.product_id, rule.location_id
             )),
-            date_planned: Some(ctx.timestamp + std::time::Duration::from_secs(
-                (rule.lead_days.max(0) as u64) * 86400,
-            )),
+            date_planned: Some(
+                ctx.timestamp
+                    + std::time::Duration::from_secs((rule.lead_days.max(0) as u64) * 86400),
+            ),
             payment_term_id: None,
             fiscal_position_id: None,
             incoterm_id: None,
@@ -282,9 +283,7 @@ fn create_buy_demand(
             date_planned: order.date_planned,
             propagate_cancel: Some(true),
             lot_id: None,
-            metadata: Some(
-                serde_json::json!({ "replenishment_rule_id": rule.id }).to_string(),
-            ),
+            metadata: Some(serde_json::json!({ "replenishment_rule_id": rule.id }).to_string()),
         },
     )?;
 
@@ -441,9 +440,7 @@ fn create_transfer_demand(
             owner_id: None,
             package_level_id: None,
             product_type: Some(product.type_.clone()),
-            metadata: Some(
-                serde_json::json!({ "replenishment_rule_id": rule.id }).to_string(),
-            ),
+            metadata: Some(serde_json::json!({ "replenishment_rule_id": rule.id }).to_string()),
         },
     )?;
 

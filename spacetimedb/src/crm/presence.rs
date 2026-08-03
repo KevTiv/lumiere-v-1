@@ -4,7 +4,10 @@
 /// currently viewing/editing a given opportunity so clients can render avatars/cursors.
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
+use crate::core::users::user_profile;
 use crate::crm::opportunities::opportunity;
+use crate::crm::require_single_company_crm_scope;
+use crate::helpers::check_permission;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -31,26 +34,39 @@ pub struct OpportunityPresence {
 
 /// Update (upsert) the caller's presence in an opportunity workspace.
 ///
-/// No dedicated permission check beyond organization membership (matches
-/// `update_proposal_presence`) — presence is a low-risk, ephemeral signal.
+/// Verifies caller is an active member of the organization and passes the CRM company scope
+/// check for the opportunity. Display name is derived server-side from the authenticated
+/// user's profile — presence is a low-risk, ephemeral signal.
 #[reducer]
 pub fn update_opportunity_presence(
     ctx: &ReducerContext,
     organization_id: u64,
     opportunity_id: u64,
-    user_name: String,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "opportunity", "read")?;
+
+    let user = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(ctx.sender())
+        .ok_or("user not found")?;
+
     let opp = ctx
         .db
         .opportunity()
         .id()
         .find(&opportunity_id)
-        .ok_or_else(|| format!("Opportunity {} not found", opportunity_id))?;
+        .ok_or("opportunity not found")?;
 
     if opp.organization_id != organization_id {
-        return Err("Opportunity does not belong to this organization".to_string());
+        return Err("opportunity does not belong to this organization".to_string());
     }
-    let company_id = opp.company_id.ok_or("Opportunity has no company scope")?;
+
+    let company_id = opp.company_id.ok_or("opportunity has no company scope")?;
+    require_single_company_crm_scope(ctx, organization_id, Some(company_id))?;
+
+    let user_name = user.name.clone();
 
     let existing = ctx
         .db

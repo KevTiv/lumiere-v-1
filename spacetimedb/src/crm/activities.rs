@@ -7,7 +7,104 @@
 ///   - CalendarEvent
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::crm::contacts::contact;
+use crate::crm::leads::lead;
+use crate::crm::opportunities::opportunity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TYPED ACTIVITY TARGET
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// A typed, validated polymorphic reference for an activity's linked record.
+///
+/// Supported kinds mirror the entity tables owned by this module (`crm`) and
+/// the resource kinds actually exercised by the CRM UI's record chatter
+/// (`resModel="contact" | "lead" | "opportunity"`, see
+/// `frontend/web/app/(modules)/crm/crm-client.tsx`) and by seed data
+/// (`res_model: Some("contact".to_string())`). Other `res_model` strings seen
+/// elsewhere in the codebase (e.g. `sale_order`, `generated_owner_report`)
+/// belong to other modules and are intentionally not supported here — this
+/// reducer only has scoped loaders for entities `crm` owns.
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum CrmActivityTarget {
+    Contact(u64),
+    Lead(u64),
+    Opportunity(u64),
+}
+
+/// Resolves and validates a `CrmActivityTarget`, returning the
+/// `(res_model, res_id)` projection to persist on the `Activity` row.
+///
+/// `None` stays legitimately absent (an activity with no linked record).
+/// A `Some` target must resolve to a real row owned by `organization_id`
+/// that is not soft-deleted (and, for contacts, not merged away).
+fn resolve_activity_target(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    target: &Option<CrmActivityTarget>,
+) -> Result<(Option<String>, Option<u64>), String> {
+    let Some(target) = target else {
+        return Ok((None, None));
+    };
+
+    match *target {
+        CrmActivityTarget::Contact(contact_id) => {
+            let record = ctx
+                .db
+                .contact()
+                .id()
+                .find(&contact_id)
+                .ok_or("activity target contact not found")?;
+            if record.organization_id != organization_id {
+                return Err(
+                    "activity target contact does not belong to this organization".to_string(),
+                );
+            }
+            if record.deleted_at.is_some() {
+                return Err("activity target contact has been deleted".to_string());
+            }
+            if record.merge_target_id.is_some() {
+                return Err(
+                    "activity target contact has been merged into another contact".to_string(),
+                );
+            }
+            Ok((Some("contact".to_string()), Some(contact_id)))
+        }
+        CrmActivityTarget::Lead(lead_id) => {
+            let record = ctx
+                .db
+                .lead()
+                .id()
+                .find(&lead_id)
+                .ok_or("activity target lead not found")?;
+            if record.organization_id != organization_id {
+                return Err("activity target lead does not belong to this organization".to_string());
+            }
+            if record.deleted_at.is_some() {
+                return Err("activity target lead has been deleted".to_string());
+            }
+            Ok((Some("lead".to_string()), Some(lead_id)))
+        }
+        CrmActivityTarget::Opportunity(opportunity_id) => {
+            let record = ctx
+                .db
+                .opportunity()
+                .id()
+                .find(&opportunity_id)
+                .ok_or("activity target opportunity not found")?;
+            if record.organization_id != organization_id {
+                return Err(
+                    "activity target opportunity does not belong to this organization".to_string(),
+                );
+            }
+            if record.deleted_at.is_some() {
+                return Err("activity target opportunity has been deleted".to_string());
+            }
+            Ok((Some("opportunity".to_string()), Some(opportunity_id)))
+        }
+    }
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PARAMS TYPES
@@ -28,8 +125,7 @@ pub struct CreateActivityParams {
     pub date_deadline: Option<Timestamp>,
     pub date_done: Option<Timestamp>,
     pub assigned_to: Option<Identity>,
-    pub res_model: Option<String>,
-    pub res_id: Option<u64>,
+    pub target: Option<CrmActivityTarget>,
     pub duration: Option<i32>,
     pub location: Option<String>,
     pub video_url: Option<String>,
@@ -204,6 +300,8 @@ pub fn create_activity(
         return Err("Activity summary cannot be empty".to_string());
     }
 
+    let (res_model, res_id) = resolve_activity_target(ctx, organization_id, &params.target)?;
+
     let activity = ctx.db.activity().insert(Activity {
         id: 0,
         organization_id,
@@ -216,8 +314,8 @@ pub fn create_activity(
         // System-managed: user_id set from caller context
         user_id: Some(ctx.sender()),
         assigned_to: params.assigned_to,
-        res_model: params.res_model,
-        res_id: params.res_id,
+        res_model,
+        res_id,
         is_done: params.is_done,
         is_system: params.is_system,
         priority: params.priority,

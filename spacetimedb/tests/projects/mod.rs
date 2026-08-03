@@ -25,8 +25,7 @@ pub fn run_projects_wave_a_test(ctx: &ReducerContext) -> Result<(), String> {
 pub fn run_projects_wave_c_test(ctx: &ReducerContext) -> Result<(), String> {
     wave_c_test::test_over_allocation_rejected(ctx)
         .map_err(|e| format!("over_allocation_rejected: {e}"))?;
-    wave_c_test::test_milestone_and_wbs(ctx)
-        .map_err(|e| format!("milestone_and_wbs: {e}"))?;
+    wave_c_test::test_milestone_and_wbs(ctx).map_err(|e| format!("milestone_and_wbs: {e}"))?;
     Ok(())
 }
 

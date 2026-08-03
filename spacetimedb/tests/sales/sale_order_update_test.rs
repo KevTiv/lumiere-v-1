@@ -88,7 +88,7 @@ pub fn test_draft_sale_order_update(ctx: &ReducerContext) -> Result<(), String> 
             commitment_date: None,
             expected_date: None,
             incoterm_id: None,
-        incoterm: None,
+            incoterm: None,
             incoterm_location: None,
             carrier_id: None,
             customer_lead: None,
@@ -111,8 +111,7 @@ pub fn test_draft_sale_order_update(ctx: &ReducerContext) -> Result<(), String> 
         .sale_order()
         .iter()
         .find(|o| {
-            o.organization_id == org_id
-                && o.client_order_ref == Some("HARNESS-SO-UPD".to_string())
+            o.organization_id == org_id && o.client_order_ref == Some("HARNESS-SO-UPD".to_string())
         })
         .ok_or("Sale order not found after create")?;
 
@@ -143,7 +142,7 @@ pub fn test_draft_sale_order_update(ctx: &ReducerContext) -> Result<(), String> 
             validity_date: None,
             carrier_id: None,
             incoterm_id: None,
-        incoterm: None,
+            incoterm: None,
             incoterm_location: None,
             customer_lead: None,
             analytic_account_id: None,

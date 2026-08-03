@@ -12,7 +12,9 @@
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
-use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, AccountMove, AccountMoveLine,
+};
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::sales::sales_core::{sale_order, sale_order_line};
@@ -676,7 +678,9 @@ pub fn activate_subscription(
             record_id: subscription_id,
             action: "UPDATE",
             old_values: Some("{\"state\":\"draft\",\"is_active\":false}".to_string()),
-            new_values: Some("{\"state\":\"active\",\"is_active\":true,\"entitlement\":\"granted\"}".to_string()),
+            new_values: Some(
+                "{\"state\":\"active\",\"is_active\":true,\"entitlement\":\"granted\"}".to_string(),
+            ),
             changed_fields: vec!["state".to_string(), "is_active".to_string()],
             metadata: None,
         },
@@ -716,10 +720,7 @@ pub fn close_subscription(
     }
 
     // Active contracts with no invoices require an explicit no-charge acknowledgment.
-    if subscription.state == "active"
-        && subscription.invoice_count == 0
-        && !params.no_charge
-    {
+    if subscription.state == "active" && subscription.invoice_count == 0 && !params.no_charge {
         return Err(
             "Active subscription has no invoices; set no_charge=true or generate a final invoice first"
                 .to_string(),
@@ -893,9 +894,7 @@ pub fn generate_subscription_invoice(
             table_name: "subscription",
             record_id: subscription_id,
             action: "UPDATE",
-            old_values: Some(
-                serde_json::json!({ "invoice_count": old_invoice_count }).to_string(),
-            ),
+            old_values: Some(serde_json::json!({ "invoice_count": old_invoice_count }).to_string()),
             new_values: Some(
                 serde_json::json!({
                     "invoice_count": refreshed.invoice_count,

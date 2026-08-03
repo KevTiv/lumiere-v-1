@@ -334,14 +334,19 @@ fn selected_task_path(
             if edge.signal_key.is_some() {
                 continue;
             }
-            let matches = edge.condition.as_ref().map_or(Ok(true), |condition| {
-                evaluate_condition_program(
-                    condition,
-                    &version.snapshot_fields,
-                    &snapshot.condition_snapshot,
-                )
-            })
-            .map_err(|error| format!("guarded workflow condition evaluation failed: {error}"))?;
+            let matches = edge
+                .condition
+                .as_ref()
+                .map_or(Ok(true), |condition| {
+                    evaluate_condition_program(
+                        condition,
+                        &version.snapshot_fields,
+                        &snapshot.condition_snapshot,
+                    )
+                })
+                .map_err(|error| {
+                    format!("guarded workflow condition evaluation failed: {error}")
+                })?;
             if matches {
                 selected.push(edge);
                 if current.kind == WorkflowNodeKind::Decision {

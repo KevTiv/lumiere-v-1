@@ -2,49 +2,44 @@
 //! UoM conversion, inventory close, 3PL, cartonization, consignment, cross-dock, packing, exceptions.
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
-use crate::core::organization::{company, create_company, CompanyScopeParams, CreateCompanyParams};
-use crate::core::reference::{
-    create_uom, create_uom_conversion, uom, CreateUomConversionParams, CreateUomParams,
-};
-use crate::crm::contacts::{contact, create_contact, CreateContactParams};
-use crate::inventory::consignment::{
-    activate_consignment_agreement, receive_consignment_stock, ReceiveConsignmentStockParams,
-};
-use crate::inventory::cross_dock::{execute_cross_dock, ExecuteCrossDockParams};
-use crate::inventory::integration::{
-    create_inventory_integration_intent, inventory_integration_intent,
-    record_inventory_integration_result, CreateInventoryIntegrationIntentParams,
-    RecordInventoryIntegrationResultParams,
-};
 use crate::accounting::chart_of_accounts::{
     account_account, account_account_type, account_journal, create_account_account,
     create_account_account_type, create_account_journal, CreateAccountAccountParams,
     CreateAccountAccountTypeParams, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::{account_move, account_move_line};
-use crate::inventory::inventory_close::{
-    create_inventory_close, inventory_close, reopen_inventory_close, run_inventory_close,
-    CreateInventoryCloseParams, RunInventoryCloseParams,
+use crate::core::organization::{company, create_company, CompanyScopeParams, CreateCompanyParams};
+use crate::core::reference::{
+    create_uom, create_uom_conversion, uom, CreateUomConversionParams, CreateUomParams,
 };
+use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::inventory::atp_promise::refresh_sale_order_promise_dates;
+use crate::inventory::barcode::barcode_scan;
+use crate::inventory::consignment::{
+    activate_consignment_agreement, receive_consignment_stock, ReceiveConsignmentStockParams,
+};
+use crate::inventory::cross_dock::{execute_cross_dock, ExecuteCrossDockParams};
 use crate::inventory::exceptions::{
     inventory_exception, refresh_inventory_exceptions, resolve_inventory_exception,
     RefreshInventoryExceptionsParams,
 };
+use crate::inventory::integration::{
+    create_inventory_integration_intent, inventory_integration_intent,
+    record_inventory_integration_result, CreateInventoryIntegrationIntentParams,
+    RecordInventoryIntegrationResultParams,
+};
+use crate::inventory::inventory_close::{
+    create_inventory_close, inventory_close, reopen_inventory_close, run_inventory_close,
+    CreateInventoryCloseParams, RunInventoryCloseParams,
+};
 use crate::inventory::packing::{
     done_stock_package, pack_stock_picking, stock_package, PackStockPickingParams,
 };
-use crate::inventory::putaway::{execute_directed_putaway, ExecuteDirectedPutawayParams};
-use crate::types::{AccountInternalGroup, JournalType};
-use crate::inventory::atp_promise::refresh_sale_order_promise_dates;
-use crate::inventory::barcode::barcode_scan;
 use crate::inventory::product::{
     create_product, create_product_supplier_info, product, update_product_pricing,
     CreateProductParams, CreateProductSupplierInfoParams, UpdateProductPricingParams,
 };
-use crate::inventory::warehouse_sync::{
-    apply_warehouse_sync_intent, create_warehouse_sync_intent, warehouse_sync_intent,
-    CreateWarehouseSyncIntentParams,
-};
+use crate::inventory::putaway::{execute_directed_putaway, ExecuteDirectedPutawayParams};
 use crate::inventory::quality::{
     create_quality_check, fail_quality_check, quality_check, CreateQualityCheckParams,
 };
@@ -54,10 +49,11 @@ use crate::inventory::replenishment::{
 };
 use crate::inventory::stock::{
     apply_validated_move_to_quants, assign_stock_picking, confirm_stock_picking, create_stock_move,
-    create_stock_picking, create_stock_quant, increase_quant_at_location, reserve_quantity_at_location,
-    reserve_stock_quant, resolve_warehouse_stock_location, stock_move, stock_picking, stock_quant,
-    to_product_stock_qty, validate_stock_picking, CreateStockMoveParams, CreateStockPickingParams,
-    CreateStockQuantParams, StockQuantReserveParams,
+    create_stock_picking, create_stock_quant, increase_quant_at_location,
+    reserve_quantity_at_location, reserve_stock_quant, resolve_warehouse_stock_location,
+    stock_move, stock_picking, stock_quant, to_product_stock_qty, validate_stock_picking,
+    CreateStockMoveParams, CreateStockPickingParams, CreateStockQuantParams,
+    StockQuantReserveParams,
 };
 use crate::inventory::tracking::{
     create_stock_production_lot, create_stock_production_serial, stock_production_lot,
@@ -73,11 +69,16 @@ use crate::inventory::warehouse_operations::{
     update_warehouse_task_status, warehouse_task, CreatePackagingMaterialParams,
     CreatePickingWaveParams, RunCartonizationParams,
 };
+use crate::inventory::warehouse_sync::{
+    apply_warehouse_sync_intent, create_warehouse_sync_intent, warehouse_sync_intent,
+    CreateWarehouseSyncIntentParams,
+};
 use crate::purchasing::procurement_advanced::{
     consignment_agreement, create_consignment_agreement, CreateConsignmentAgreementParams,
 };
 use crate::purchasing::purchase_orders::purchase_order;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
+use crate::types::{AccountInternalGroup, JournalType};
 
 fn create_quant_for_fixture(
     ctx: &ReducerContext,
@@ -274,7 +275,9 @@ pub fn test_company_isolation_on_reserve(ctx: &ReducerContext) -> Result<(), Str
             reserve_qty: 1.0,
         },
     ) {
-        Err(msg) if msg.to_lowercase().contains("belong") || msg.to_lowercase().contains("company") => {
+        Err(msg)
+            if msg.to_lowercase().contains("belong") || msg.to_lowercase().contains("company") =>
+        {
             Ok(())
         }
         Err(msg) => Err(format!("Expected company ownership error, got: {msg}")),
@@ -328,7 +331,10 @@ pub fn test_atp_fail_closed_on_over_reserve(ctx: &ReducerContext) -> Result<(), 
             reserve_qty: 0.5,
         },
     ) {
-        Err(msg) if msg.to_lowercase().contains("reserve") || msg.to_lowercase().contains("available") => {
+        Err(msg)
+            if msg.to_lowercase().contains("reserve")
+                || msg.to_lowercase().contains("available") =>
+        {
             Ok(())
         }
         Err(msg) => Err(format!("Expected ATP shortfall error, got: {msg}")),
@@ -710,9 +716,7 @@ pub fn test_lot_required_on_validate(ctx: &ReducerContext) -> Result<(), String>
         .stock_quant()
         .iter()
         .find(|q| {
-            q.organization_id == org_id
-                && q.product_id == product_id
-                && q.lot_id == Some(lot_id)
+            q.organization_id == org_id && q.product_id == product_id && q.lot_id == Some(lot_id)
         })
         .map(|q| q.id)
         .ok_or("lot quant missing")?;
@@ -769,9 +773,7 @@ pub fn test_inbound_validate_stamps_lot_id(ctx: &ReducerContext) -> Result<(), S
         .db
         .stock_production_lot()
         .iter()
-        .find(|l| {
-            l.organization_id == org_id && l.name == "LOT-IN-A" && l.product_id == product_id
-        })
+        .find(|l| l.organization_id == org_id && l.name == "LOT-IN-A" && l.product_id == product_id)
         .map(|l| l.id)
         .ok_or("inbound lot missing")?;
 
@@ -1556,9 +1558,7 @@ pub fn test_replenishment_creates_draft_po(ctx: &ReducerContext) -> Result<(), S
         .db
         .purchase_order()
         .iter()
-        .find(|o| {
-            o.organization_id == org_id && o.partner_ref == Some(format!("RPL-{rule_id}"))
-        })
+        .find(|o| o.organization_id == org_id && o.partner_ref == Some(format!("RPL-{rule_id}")))
         .ok_or("expected draft PO from replenishment")?;
     use crate::types::PoState;
     if po.state != PoState::Draft {
@@ -1708,8 +1708,7 @@ pub fn test_quality_fail_quarantines_from_atp(ctx: &ReducerContext) -> Result<()
 
     match reserve_quantity_at_location(ctx, org_id, company_id, product_id, qc_loc, 1.0) {
         Err(msg)
-            if msg.to_lowercase().contains("quarantine")
-                || msg.to_lowercase().contains("qc") =>
+            if msg.to_lowercase().contains("quarantine") || msg.to_lowercase().contains("qc") =>
         {
             Ok(())
         }
@@ -1725,12 +1724,7 @@ pub fn test_wave_release_orchestrates_tasks(ctx: &ReducerContext) -> Result<(), 
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
     let product_id = fixture.product_id;
-    let product = ctx
-        .db
-        .product()
-        .id()
-        .find(&product_id)
-        .ok_or("product")?;
+    let product = ctx.db.product().id().find(&product_id).ok_or("product")?;
 
     create_quant_for_fixture(ctx, &fixture, 5.0)?;
 
@@ -1949,7 +1943,14 @@ pub fn test_wave_release_orchestrates_tasks(ctx: &ReducerContext) -> Result<(), 
         Ok(()) => return Err("complete should block until picking is validated".into()),
     }
 
-    reserve_quantity_at_location(ctx, org_id, company_id, product_id, fixture.warehouse_id, 2.0)?;
+    reserve_quantity_at_location(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.warehouse_id,
+        2.0,
+    )?;
     validate_stock_picking(ctx, org_id, picking_id, scope)?;
     complete_picking_wave(ctx, org_id, company_id, wave_id)?;
 
@@ -2205,7 +2206,8 @@ pub fn test_3pl_asn_inbound_posts_stock(ctx: &ReducerContext) -> Result<(), Stri
         .inventory_integration_intent()
         .iter()
         .find(|i| {
-            i.organization_id == org_id && i.idempotency_key == format!("asn-{}", fixture.product_id)
+            i.organization_id == org_id
+                && i.idempotency_key == format!("asn-{}", fixture.product_id)
         })
         .map(|i| i.id)
         .ok_or("intent missing")?;
@@ -2517,7 +2519,9 @@ pub fn test_consignment_excluded_from_atp(ctx: &ReducerContext) -> Result<(), St
         {
             Ok(())
         }
-        Err(msg) => Err(format!("Expected ATP fail on consigned-only stock, got: {msg}")),
+        Err(msg) => Err(format!(
+            "Expected ATP fail on consigned-only stock, got: {msg}"
+        )),
         Ok(()) => {
             // Harness also seeds company-owned qty at lot_stock — reserve may succeed on that.
             // Ensure consigned quant reserved stayed 0.
@@ -2670,9 +2674,7 @@ pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), Stri
         .db
         .stock_picking()
         .iter()
-        .find(|p| {
-            p.organization_id == org_id && p.name == format!("XD-{inbound_id}")
-        })
+        .find(|p| p.organization_id == org_id && p.name == format!("XD-{inbound_id}"))
         .ok_or("cross-dock outbound missing")?;
     if outbound.location_id != fixture.warehouse_id {
         return Err(format!(
@@ -3501,8 +3503,24 @@ pub fn test_receipt_average_costing(ctx: &ReducerContext) -> Result<(), String> 
         ctx.db.stock_quant().id().delete(&q.id);
     }
 
-    increase_quant_at_location(ctx, org_id, company_id, fixture.product_id, stock_loc, 10.0, 5.0)?;
-    increase_quant_at_location(ctx, org_id, company_id, fixture.product_id, stock_loc, 10.0, 15.0)?;
+    increase_quant_at_location(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        stock_loc,
+        10.0,
+        5.0,
+    )?;
+    increase_quant_at_location(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        stock_loc,
+        10.0,
+        15.0,
+    )?;
 
     let quants: Vec<_> = ctx
         .db
@@ -3516,7 +3534,10 @@ pub fn test_receipt_average_costing(ctx: &ReducerContext) -> Result<(), String> 
         })
         .collect();
     if quants.len() != 1 {
-        return Err(format!("average should merge to 1 quant, got {}", quants.len()));
+        return Err(format!(
+            "average should merge to 1 quant, got {}",
+            quants.len()
+        ));
     }
     let q = &quants[0];
     if (q.quantity - 20.0).abs() > 1e-6 {
@@ -3527,7 +3548,10 @@ pub fn test_receipt_average_costing(ctx: &ReducerContext) -> Result<(), String> 
         return Err(format!("expected blended cost 10, got {}", q.cost));
     }
     if q.cost_method.as_deref() != Some("average") {
-        return Err(format!("expected cost_method average, got {:?}", q.cost_method));
+        return Err(format!(
+            "expected cost_method average, got {:?}",
+            q.cost_method
+        ));
     }
     Ok(())
 }
@@ -3567,8 +3591,24 @@ pub fn test_receipt_fifo_layers(ctx: &ReducerContext) -> Result<(), String> {
         ctx.db.stock_quant().id().delete(&q.id);
     }
 
-    increase_quant_at_location(ctx, org_id, company_id, fixture.product_id, stock_loc, 4.0, 8.0)?;
-    increase_quant_at_location(ctx, org_id, company_id, fixture.product_id, stock_loc, 6.0, 12.0)?;
+    increase_quant_at_location(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        stock_loc,
+        4.0,
+        8.0,
+    )?;
+    increase_quant_at_location(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        stock_loc,
+        6.0,
+        12.0,
+    )?;
 
     let quants: Vec<_> = ctx
         .db
@@ -3605,10 +3645,13 @@ pub fn test_warehouse_sync_intent(ctx: &ReducerContext) -> Result<(), String> {
         .id()
         .find(&fixture.product_id)
         .ok_or("product")?;
-    ctx.db.product().id().update(crate::inventory::product::Product {
-        barcode: Some("SYNC-BC-001".to_string()),
-        ..product
-    });
+    ctx.db
+        .product()
+        .id()
+        .update(crate::inventory::product::Product {
+            barcode: Some("SYNC-BC-001".to_string()),
+            ..product
+        });
 
     let key = format!("sync-{}-1", org_id);
     let payload = serde_json::json!({
@@ -3728,7 +3771,7 @@ pub fn test_warehouse_sync_intent(ctx: &ReducerContext) -> Result<(), String> {
 
 /// Multi-WH promise: stock only on resupply WH → promise + confirm reserves there.
 pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
-    use crate::inventory::warehouse::{Warehouse, StockLocation};
+    use crate::inventory::warehouse::{StockLocation, Warehouse};
     use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
     use crate::sales::sales_core::{
         confirm_sales_order, create_sale_order, sale_order, sale_order_line,
@@ -3836,7 +3879,15 @@ pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
         ..wh_b
     });
 
-    create_quant(ctx, org_id, company_id, fixture.product_id, loc_b.id, 20.0, None)?;
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        fixture.product_id,
+        loc_b.id,
+        20.0,
+        None,
+    )?;
 
     update_warehouse(
         ctx,
@@ -3953,9 +4004,7 @@ pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
         .db
         .sale_order()
         .iter()
-        .find(|o| {
-            o.organization_id == org_id && o.client_order_ref == Some("MWH-001".to_string())
-        })
+        .find(|o| o.organization_id == org_id && o.client_order_ref == Some("MWH-001".to_string()))
         .ok_or("SO missing")?;
 
     refresh_sale_order_promise_dates(ctx, org_id, company_id, order.id)?;

@@ -4,7 +4,9 @@
 /// external engines (Wave C workers).
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::country_pack::{company_enabled_pack_keys, country_pack_definition, CountryPackDefinition};
+use crate::core::country_pack::{
+    company_enabled_pack_keys, country_pack_definition, CountryPackDefinition,
+};
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
@@ -158,9 +160,7 @@ pub(crate) fn seed_hr_country_pack_leave_catalog(ctx: &ReducerContext) {
                 max_leaves,
                 allocation_type: "fixed".to_string(),
                 sort_order,
-                metadata: Some(format!(
-                    r#"{{"pack":"{pack_key}","seed":"hr_overlay"}}"#
-                )),
+                metadata: Some(format!(r#"{{"pack":"{pack_key}","seed":"hr_overlay"}}"#)),
             });
     }
 }
@@ -294,12 +294,7 @@ fn validate_statutory_id_kind(
     }
     let mut allowed: Vec<String> = Vec::new();
     for pack_key in enabled {
-        if let Some(def) = ctx
-            .db
-            .country_pack_definition()
-            .pack_key()
-            .find(&pack_key)
-        {
+        if let Some(def) = ctx.db.country_pack_definition().pack_key().find(&pack_key) {
             allowed.extend(pack_statutory_id_kinds(&def));
         }
     }
@@ -363,7 +358,8 @@ pub fn seed_hr_country_pack_overlays(
     let mut holidays_created = 0u32;
     for pack_key in &pack_keys {
         if params.materialize_leave_types {
-            leave_created += materialize_leave_types_for_pack(ctx, organization_id, company_id, pack_key);
+            leave_created +=
+                materialize_leave_types_for_pack(ctx, organization_id, company_id, pack_key);
         }
         if params.seed_holidays {
             holidays_created += seed_holidays_for_pack(ctx, organization_id, company_id, pack_key);
@@ -434,7 +430,9 @@ pub fn create_statutory_id(
         .filter(&params.employee_id)
         .any(|row| row.id_kind.eq_ignore_ascii_case(&id_kind));
     if duplicate {
-        return Err(format!("Statutory id kind '{id_kind}' already exists for employee"));
+        return Err(format!(
+            "Statutory id kind '{id_kind}' already exists for employee"
+        ));
     }
 
     let row = ctx.db.hr_statutory_id().insert(HrStatutoryId {

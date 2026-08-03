@@ -18,8 +18,8 @@ use crate::workflow::migration::{
     PreflightWorkflowMigrationParams, WorkflowMigrationOutcome, WorkflowNodeMigrationMapping,
 };
 use crate::workflow::runtime::{
-    start_workflow, workflow_decision_event, workflow_instance, workflow_token, StartWorkflowParams,
-    WorkflowCommandKind, WorkflowTokenState,
+    start_workflow, workflow_decision_event, workflow_instance, workflow_token,
+    StartWorkflowParams, WorkflowCommandKind, WorkflowTokenState,
 };
 
 pub fn test_workflow_migration(ctx: &ReducerContext) -> Result<(), String> {
@@ -703,7 +703,12 @@ fn publish_cloned_v2(
         .id()
         .find(&source_version_id)
         .ok_or("clone source missing")?;
-    clone_workflow_version_to_draft(ctx, organization_id, source_version_id, source.draft_revision)?;
+    clone_workflow_version_to_draft(
+        ctx,
+        organization_id,
+        source_version_id,
+        source.draft_revision,
+    )?;
     let draft = ctx
         .db
         .workflow_version()
@@ -726,10 +731,12 @@ fn identity_nodes(keys: &[&str]) -> Vec<WorkflowNodeMigrationMapping> {
 
 fn identity_edges(keys: &[&str]) -> Vec<crate::workflow::migration::WorkflowEdgeMigrationMapping> {
     keys.iter()
-        .map(|k| crate::workflow::migration::WorkflowEdgeMigrationMapping {
-            from_edge_key: (*k).into(),
-            to_edge_key: (*k).into(),
-        })
+        .map(
+            |k| crate::workflow::migration::WorkflowEdgeMigrationMapping {
+                from_edge_key: (*k).into(),
+                to_edge_key: (*k).into(),
+            },
+        )
         .collect()
 }
 

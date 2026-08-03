@@ -120,10 +120,7 @@ pub fn create_benefit_plan(
         return Err("Plan name cannot be empty".to_string());
     }
     let plan_type = params.plan_type.trim();
-    if !matches!(
-        plan_type,
-        "health" | "dental" | "retirement" | "other"
-    ) {
+    if !matches!(plan_type, "health" | "dental" | "retirement" | "other") {
         return Err("plan_type must be health, dental, retirement, or other".to_string());
     }
 

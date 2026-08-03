@@ -260,7 +260,11 @@ fn require_mo_in_company(
     Ok(mo)
 }
 
-fn require_lot_when_tracked(tracking: &str, lot_id: Option<u64>, context: &str) -> Result<(), String> {
+fn require_lot_when_tracked(
+    tracking: &str,
+    lot_id: Option<u64>,
+    context: &str,
+) -> Result<(), String> {
     match tracking {
         "lot" | "serial" => {
             if lot_id.is_none() {

@@ -1,7 +1,9 @@
 //! Inventory period close — snapshot quants, lock stock mutations, optional GL valuation.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, AccountMove, AccountMoveLine,
+};
 use crate::core::organization::company;
 use crate::core::reference::require_active_currency_by_id;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
@@ -107,9 +109,7 @@ pub(crate) fn assert_inventory_writable(
         .inventory_close()
         .inventory_close_by_company()
         .filter(&company_id)
-        .any(|c| {
-            c.organization_id == organization_id && c.state == "closed" && c.locked
-        });
+        .any(|c| c.organization_id == organization_id && c.state == "closed" && c.locked);
     if locked {
         return Err(
             "Inventory is locked by a closed inventory period — reopen before mutating stock"
@@ -437,7 +437,10 @@ pub fn run_inventory_close(
         return Err("Record does not belong to this company".to_string());
     }
     if close.state != "draft" {
-        return Err(format!("Only draft closes can be run (state: {})", close.state));
+        return Err(format!(
+            "Only draft closes can be run (state: {})",
+            close.state
+        ));
     }
 
     // Clear any prior lines (idempotent re-run of draft).

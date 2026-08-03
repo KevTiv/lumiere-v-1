@@ -929,12 +929,8 @@ pub fn update_analytic_distribution_model(
     }
 
     if let Some(dist) = params.analytic_distribution {
-        model.analytic_distribution = serialize_validated_distribution(
-            ctx,
-            organization_id,
-            company_id,
-            &dist,
-        )?;
+        model.analytic_distribution =
+            serialize_validated_distribution(ctx, organization_id, company_id, &dist)?;
         changed_fields.push("analytic_distribution".to_string());
     }
 

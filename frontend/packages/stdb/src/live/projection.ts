@@ -64,6 +64,7 @@ const CRM_PARENT_SCOPED_RESOURCES = new Set<QueryResourceKey>([
   "opportunity-lines",
   "opportunity-presence",
   "contact-tag-assignments",
+  "contact-category-assignments",
   "segment-members",
   "contact-relationships",
   "privacy-consent",
@@ -170,6 +171,7 @@ export function sortRowsForResource(
   const sorted = [...rows]
   switch (resource) {
     case "contact-tags":
+    case "contact-categories":
     case "contact-segments":
       sorted.sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")))
       break

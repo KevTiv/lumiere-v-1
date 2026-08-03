@@ -3,9 +3,9 @@ use spacetimedb::{Identity, ReducerContext};
 
 use crate::core::organization::{insert_organization_with_owner, CreateOrganizationParams};
 use crate::core::permissions::{
-    assign_role, create_role, create_sod_conflict_rule, ensure_resource_fields_writable,
-    grant_delegated_admin_scope, grant_field_permission, grant_permission,
-    revoke_delegated_admin_scope, role, delegated_admin_scope, sod_conflict_rule,
+    assign_role, create_role, create_sod_conflict_rule, delegated_admin_scope,
+    ensure_resource_fields_writable, grant_delegated_admin_scope, grant_field_permission,
+    grant_permission, revoke_delegated_admin_scope, role, sod_conflict_rule,
     update_sod_conflict_rule, AssignRoleParams, CreateRoleParams, CreateSodConflictRuleParams,
     FieldPermissionAction, GrantDelegatedAdminScopeParams, GrantFieldPermissionParams,
     GrantOrgPermissionParams, PermissionAction, PermissionEffect, PermissionSubject,
@@ -120,7 +120,9 @@ pub fn test_sod_blocks_conflicting_roles(ctx: &ReducerContext) -> Result<(), Str
         "account_payment:post".to_string(),
     ];
     match crate::core::permissions::validate_sod_for_permissions(ctx, org_id, &conflicting) {
-        Ok(()) => return Err("Expected SoD validation to reject conflicting permissions".to_string()),
+        Ok(()) => {
+            return Err("Expected SoD validation to reject conflicting permissions".to_string())
+        }
         Err(msg) if msg.contains("segregation of duties") => {}
         Err(msg) => return Err(format!("Unexpected SoD validation error: {msg}")),
     }
@@ -216,7 +218,9 @@ pub fn test_delegated_admin_cannot_grant_permission(ctx: &ReducerContext) -> Res
     }
 }
 
-pub fn test_field_write_policy_blocks_disallowed_columns(ctx: &ReducerContext) -> Result<(), String> {
+pub fn test_field_write_policy_blocks_disallowed_columns(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;

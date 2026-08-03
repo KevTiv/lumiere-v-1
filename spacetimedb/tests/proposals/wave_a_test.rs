@@ -10,11 +10,7 @@ use crate::proposals::proposals::{
 };
 use crate::test_harness::OrgFixture;
 
-fn create_draft(
-    ctx: &ReducerContext,
-    fixture: &OrgFixture,
-    title: &str,
-) -> Result<u64, String> {
+fn create_draft(ctx: &ReducerContext, fixture: &OrgFixture, title: &str) -> Result<u64, String> {
     create_proposal(
         ctx,
         fixture.organization_id,
@@ -103,12 +99,7 @@ pub fn test_create_requires_company_scope(ctx: &ReducerContext) -> Result<(), St
     }
 
     let id = create_draft(ctx, &fixture, "Scoped Proposal")?;
-    let row = ctx
-        .db
-        .proposal()
-        .id()
-        .find(&id)
-        .ok_or("proposal missing")?;
+    let row = ctx.db.proposal().id().find(&id).ok_or("proposal missing")?;
     if row.company_id != fixture.company_id || row.currency_id != 1 {
         return Err("company_id/currency_id not stored".to_string());
     }

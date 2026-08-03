@@ -296,9 +296,7 @@ pub fn test_card_feed_and_liability_post(ctx: &ReducerContext) -> Result<(), Str
         .db
         .expense_integration_intent()
         .iter()
-        .find(|i| {
-            i.organization_id == fixture.organization_id && i.idempotency_key == "card-1"
-        })
+        .find(|i| i.organization_id == fixture.organization_id && i.idempotency_key == "card-1")
         .ok_or("intent")?;
     apply_expense_integration_intent(ctx, fixture.organization_id, intent.id)?;
     let line = ctx
@@ -387,7 +385,9 @@ pub fn test_card_feed_and_liability_post(ctx: &ReducerContext) -> Result<(), Str
         .map(|l| l.credit)
         .sum();
     if (card_credit - 42.0).abs() > 0.01 {
-        return Err(format!("expected card liability credit 42, got {card_credit}"));
+        return Err(format!(
+            "expected card liability credit 42, got {card_credit}"
+        ));
     }
     let sheet = ctx.db.expense_sheet().id().find(&sheet_id).ok_or("sheet")?;
     if sheet.state != ExpenseSheetState::Posted {
@@ -464,14 +464,16 @@ pub fn test_duplicate_fraud_hold_blocks_submit(ctx: &ReducerContext) -> Result<(
         .db
         .expense_sheet()
         .iter()
-        .find(|s| {
-            s.organization_id == fixture.organization_id && s.name == "WD Fraud Sheet"
-        })
+        .find(|s| s.organization_id == fixture.organization_id && s.name == "WD Fraud Sheet")
         .map(|s| s.id)
         .ok_or("sheet")?;
     submit_expense(ctx, fixture.organization_id, dup.id, sheet_id)?;
     let err = submit_expense_sheet(ctx, fixture.organization_id, sheet_id).err();
-    if err.as_ref().map(|e| e.contains("fraud hold")).unwrap_or(false) {
+    if err
+        .as_ref()
+        .map(|e| e.contains("fraud hold"))
+        .unwrap_or(false)
+    {
         // clear hold and succeed
         set_expense_fraud_hold(
             ctx,
@@ -525,7 +527,9 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
                 && a.client_request_id.as_deref() == Some(adv_req.as_str())
         })
         .ok_or("advance")?;
-    let issue_move_id = advance.account_move_id.ok_or("advance missing account_move_id")?;
+    let issue_move_id = advance
+        .account_move_id
+        .ok_or("advance missing account_move_id")?;
     let issue_move = ctx
         .db
         .account_move()
@@ -586,9 +590,7 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
         .db
         .expense_integration_intent()
         .iter()
-        .find(|i| {
-            i.organization_id == fixture.organization_id && i.idempotency_key == delay_key
-        })
+        .find(|i| i.organization_id == fixture.organization_id && i.idempotency_key == delay_key)
         .ok_or("delay intent")?;
     apply_expense_integration_intent(ctx, fixture.organization_id, intent.id)?;
     let line = ctx
@@ -657,7 +659,9 @@ pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String>
         .id()
         .find(&sheet_id)
         .ok_or("sheet after post")?;
-    let post_move_id = sheet.account_move_id.ok_or("sheet missing account_move_id")?;
+    let post_move_id = sheet
+        .account_move_id
+        .ok_or("sheet missing account_move_id")?;
     let payable_credit: f64 = ctx
         .db
         .account_move_line()
@@ -781,13 +785,12 @@ pub fn test_reject_policy_exception(ctx: &ReducerContext) -> Result<(), String> 
     }
 
     // Harness sender is the requester — patch requested_by so SoD allows reject.
-    ctx.db
-        .hr_expense_policy_exception()
-        .id()
-        .update(crate::expenses::expense_wave_d::HrExpensePolicyException {
+    ctx.db.hr_expense_policy_exception().id().update(
+        crate::expenses::expense_wave_d::HrExpensePolicyException {
             requested_by: Identity::__dummy(),
             ..exception.clone()
-        });
+        },
+    );
     reject_expense_policy_exception(
         ctx,
         fixture.organization_id,

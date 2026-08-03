@@ -2,7 +2,9 @@
 //! SaleOrderOption CRUD, promotions, commissions, and exchange orders.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::journal_entries::{account_move, account_move_line, AccountMove, AccountMoveLine};
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, AccountMove, AccountMoveLine,
+};
 use crate::core::organization::company;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::{product, product_supplier_info};
@@ -311,8 +313,8 @@ fn preferred_supplier_for_product(
         if !info.is_active {
             continue;
         }
-        let matches = info.product_id == Some(product_id)
-            || info.product_tmpl_id == Some(product_id);
+        let matches =
+            info.product_id == Some(product_id) || info.product_tmpl_id == Some(product_id);
         if !matches {
             continue;
         }
@@ -368,11 +370,21 @@ pub(crate) fn create_dropship_purchase_orders_for_sale(
             line.purchase_price.max(line.price_unit)
         };
         if let Some((_, bucket)) = by_vendor.iter_mut().find(|(v, _)| *v == vendor_id) {
-            bucket.push((line.product_id, line.product_uom_qty, line.product_uom, price));
+            bucket.push((
+                line.product_id,
+                line.product_uom_qty,
+                line.product_uom,
+                price,
+            ));
         } else {
             by_vendor.push((
                 vendor_id,
-                vec![(line.product_id, line.product_uom_qty, line.product_uom, price)],
+                vec![(
+                    line.product_id,
+                    line.product_uom_qty,
+                    line.product_uom,
+                    price,
+                )],
             ));
         }
     }
@@ -406,9 +418,7 @@ pub(crate) fn create_dropship_purchase_orders_for_sale(
                 message_ids: vec![],
                 activity_ids: vec![],
                 is_quantity_copy: None,
-                metadata: Some(format!(
-                    r#"{{"sale_order_id":{order_id},"dropship":true}}"#
-                )),
+                metadata: Some(format!(r#"{{"sale_order_id":{order_id},"dropship":true}}"#)),
             },
         )?;
 
@@ -553,18 +563,21 @@ pub fn create_fiscal_position(
     if params.name.trim().is_empty() {
         return Err("Fiscal position name is required".to_string());
     }
-    let row = ctx.db.account_fiscal_position().insert(AccountFiscalPosition {
-        id: 0,
-        organization_id,
-        company_id: params.company_id,
-        name: params.name.clone(),
-        is_active: params.is_active,
-        create_uid: Some(ctx.sender()),
-        create_date: Some(ctx.timestamp),
-        write_uid: Some(ctx.sender()),
-        write_date: Some(ctx.timestamp),
-        metadata: params.metadata.clone(),
-    });
+    let row = ctx
+        .db
+        .account_fiscal_position()
+        .insert(AccountFiscalPosition {
+            id: 0,
+            organization_id,
+            company_id: params.company_id,
+            name: params.name.clone(),
+            is_active: params.is_active,
+            create_uid: Some(ctx.sender()),
+            create_date: Some(ctx.timestamp),
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            metadata: params.metadata.clone(),
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -757,8 +770,7 @@ pub fn apply_sale_promotion_to_order(
     if order.organization_id != organization_id {
         return Err("Sale order does not belong to this organization".to_string());
     }
-    if order.state != crate::types::SaleState::Draft
-        && order.state != crate::types::SaleState::Sent
+    if order.state != crate::types::SaleState::Draft && order.state != crate::types::SaleState::Sent
     {
         return Err("Promotions can only be applied to Draft or Sent quotations".to_string());
     }
@@ -806,15 +818,18 @@ pub fn apply_sale_promotion_to_order(
         let discount_amount = line.price_unit * line.product_uom_qty * (discount / 100.0);
         let price_subtotal = line.price_unit * line.product_uom_qty - discount_amount;
         let price_tax = crate::helpers::calculate_tax(ctx, &line.tax_id, price_subtotal);
-        ctx.db.sale_order_line().id().update(crate::sales::sales_core::SaleOrderLine {
-            discount,
-            price_subtotal,
-            price_tax,
-            price_total: price_subtotal + price_tax,
-            write_uid: ctx.sender(),
-            write_date: ctx.timestamp,
-            ..line
-        });
+        ctx.db
+            .sale_order_line()
+            .id()
+            .update(crate::sales::sales_core::SaleOrderLine {
+                discount,
+                price_subtotal,
+                price_tax,
+                price_total: price_subtotal + price_tax,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..line
+            });
     }
 
     crate::sales::sales_core::compute_so_totals(ctx, organization_id, order_id)?;
@@ -829,10 +844,7 @@ pub fn apply_sale_promotion_to_order(
         "promotion_code".to_string(),
         serde_json::Value::String(code.clone()),
     );
-    meta.insert(
-        "promotion_id".to_string(),
-        serde_json::json!(promo.id),
-    );
+    meta.insert("promotion_id".to_string(), serde_json::json!(promo.id));
     let order = ctx
         .db
         .sale_order()
@@ -882,8 +894,7 @@ pub fn create_sale_order_option(
     if order.organization_id != organization_id {
         return Err("Sale order does not belong to this organization".to_string());
     }
-    if order.state != crate::types::SaleState::Draft
-        && order.state != crate::types::SaleState::Sent
+    if order.state != crate::types::SaleState::Draft && order.state != crate::types::SaleState::Sent
     {
         return Err("Options can only be added on Draft or Sent quotations".to_string());
     }
@@ -1030,8 +1041,7 @@ pub fn apply_sale_order_options(
     if order.organization_id != organization_id {
         return Err("Sale order does not belong to this organization".to_string());
     }
-    if order.state != crate::types::SaleState::Draft
-        && order.state != crate::types::SaleState::Sent
+    if order.state != crate::types::SaleState::Draft && order.state != crate::types::SaleState::Sent
     {
         return Err("Options can only be applied on Draft or Sent quotations".to_string());
     }
@@ -1095,9 +1105,7 @@ pub fn apply_sale_order_options(
             record_id: order_id,
             action: "UPDATE",
             old_values: None,
-            new_values: Some(
-                serde_json::json!({ "options_applied": applied }).to_string(),
-            ),
+            new_values: Some(serde_json::json!({ "options_applied": applied }).to_string()),
             changed_fields: vec!["order_line".to_string(), "sale_order_option".to_string()],
             metadata: None,
         },
@@ -1124,8 +1132,7 @@ pub fn accrue_sale_commission(
     if order.organization_id != organization_id {
         return Err("Sale order does not belong to this organization".to_string());
     }
-    if order.state != crate::types::SaleState::Sale
-        && order.state != crate::types::SaleState::Done
+    if order.state != crate::types::SaleState::Sale && order.state != crate::types::SaleState::Done
     {
         return Err("Commission can only accrue on confirmed sale orders".to_string());
     }
@@ -1151,10 +1158,7 @@ pub(crate) fn maybe_accrue_commission_on_invoice_post(
         .metadata
         .as_ref()
         .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
-        .and_then(|v| {
-            v.get("commission_rate_percent")
-                .and_then(|x| x.as_f64())
-        })
+        .and_then(|v| v.get("commission_rate_percent").and_then(|x| x.as_f64()))
         .unwrap_or(0.0);
     if rate <= 0.0 {
         return Ok(());
@@ -1196,10 +1200,7 @@ pub(crate) fn cancel_accrued_commissions_for_sale_order(
             state: "cancelled".to_string(),
             write_uid: Some(ctx.sender()),
             write_date: Some(ctx.timestamp),
-            metadata: Some(
-                serde_json::json!({ "clawback_reason": reason })
-                    .to_string(),
-            ),
+            metadata: Some(serde_json::json!({ "clawback_reason": reason }).to_string()),
             ..row
         });
         write_audit_log_v2(
@@ -1334,7 +1335,9 @@ pub fn settle_sale_commissions(
             .find(id)
             .ok_or_else(|| format!("Commission {id} not found"))?;
         if row.organization_id != organization_id {
-            return Err(format!("Commission {id} does not belong to this organization"));
+            return Err(format!(
+                "Commission {id} does not belong to this organization"
+            ));
         }
         if row.company_id != company_id {
             return Err(format!("Commission {id} does not belong to this company"));

@@ -365,6 +365,20 @@
   },
   {
     "extra_where": "",
+    "mapKey": "contact-categories",
+    "order_by": "",
+    "resource_key": "contact-categories",
+    "table": "contact_category"
+  },
+  {
+    "extra_where": "",
+    "mapKey": "contact-category-assignments",
+    "order_by": "",
+    "resource_key": "contact-category-assignments",
+    "table": "contact_category_assignment"
+  },
+  {
+    "extra_where": "",
     "mapKey": "contact-segments",
     "order_by": "",
     "resource_key": "contact-segments",

@@ -228,8 +228,7 @@ fn resolve_pack_key(
         return Ok(trimmed.to_string());
     }
     let keys = company_enabled_pack_keys(ctx, organization_id, company_id);
-    keys
-        .into_iter()
+    keys.into_iter()
         .next()
         .ok_or("No enabled country pack for company — set pack_key explicitly".to_string())
 }
@@ -265,7 +264,11 @@ fn payroll_line_params(
         debit,
         credit,
         sequence,
-        quantity: if debit > 0.0 || credit > 0.0 { 1.0 } else { 0.0 },
+        quantity: if debit > 0.0 || credit > 0.0 {
+            1.0
+        } else {
+            0.0
+        },
         price_unit: debit.max(credit),
         discount: 0.0,
         tax_ids: vec![],
@@ -320,7 +323,9 @@ pub(crate) fn apply_partner_payslip_artifact(
         return Err("Payslip does not belong to this company".to_string());
     }
     if payslip.state != PayslipState::Verify {
-        return Err("Partner artifact applies only to Verify (approved-for-export) payslips".to_string());
+        return Err(
+            "Partner artifact applies only to Verify (approved-for-export) payslips".to_string(),
+        );
     }
     let gross = gross_wage.unwrap_or(payslip.gross_wage);
     let net = net_wage.unwrap_or(payslip.net_wage);
@@ -366,8 +371,14 @@ pub(crate) fn apply_payroll_export_result_internal(
         return Err("status must be pending, sent, failed, or applied".to_string());
     }
     if status == "applied"
-        && params.payload_hash.as_ref().is_none_or(|h| h.trim().is_empty())
-        && params.external_ref.as_ref().is_none_or(|r| r.trim().is_empty())
+        && params
+            .payload_hash
+            .as_ref()
+            .is_none_or(|h| h.trim().is_empty())
+        && params
+            .external_ref
+            .as_ref()
+            .is_none_or(|r| r.trim().is_empty())
     {
         return Err("applied status requires payload_hash or external_ref artifact".to_string());
     }
@@ -431,11 +442,15 @@ fn finalize_payslip_done(
     }
     if !payslip_has_close_artifact(ctx, &payslip) {
         return Err(
-            "Payslip cannot reach Done without account_move_id or applied export intent".to_string(),
+            "Payslip cannot reach Done without account_move_id or applied export intent"
+                .to_string(),
         );
     }
     let payslip_id = payslip.id;
-    let number = payslip.number.clone().or_else(|| Some(next_doc_number(ctx, "PAYSLIP")));
+    let number = payslip
+        .number
+        .clone()
+        .or_else(|| Some(next_doc_number(ctx, "PAYSLIP")));
     ctx.db.hr_payslip().id().update(HrPayslip {
         state: PayslipState::Done,
         number,
@@ -698,7 +713,9 @@ pub fn create_payroll_export_intent(
         return Err("Payslip does not belong to this company".to_string());
     }
     if payslip.state != PayslipState::Verify {
-        return Err("Only Verify (approved-for-export) payslips can create export intents".to_string());
+        return Err(
+            "Only Verify (approved-for-export) payslips can create export intents".to_string(),
+        );
     }
     let existing = ctx
         .db
@@ -716,26 +733,29 @@ pub fn create_payroll_export_intent(
         return Ok(());
     }
     let pack_key = resolve_pack_key(ctx, organization_id, company_id, params.pack_key)?;
-    let row = ctx.db.hr_payroll_export_intent().insert(HrPayrollExportIntent {
-        id: 0,
-        organization_id,
-        company_id,
-        payslip_id,
-        pack_key,
-        status: "pending".to_string(),
-        idempotency_key: params.idempotency_key,
-        payload: params.payload,
-        payload_hash: None,
-        external_ref: None,
-        last_error: None,
-        attempt_count: 0,
-        applied_at: None,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: params.metadata,
-    });
+    let row = ctx
+        .db
+        .hr_payroll_export_intent()
+        .insert(HrPayrollExportIntent {
+            id: 0,
+            organization_id,
+            company_id,
+            payslip_id,
+            pack_key,
+            status: "pending".to_string(),
+            idempotency_key: params.idempotency_key,
+            payload: params.payload,
+            payload_hash: None,
+            external_ref: None,
+            last_error: None,
+            attempt_count: 0,
+            applied_at: None,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: params.metadata,
+        });
     ctx.db.hr_payslip().id().update(HrPayslip {
         export_intent_id: Some(row.id),
         ..payslip

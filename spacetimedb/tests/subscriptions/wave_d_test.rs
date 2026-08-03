@@ -18,12 +18,12 @@ use crate::subscriptions::reducers::{
 };
 use crate::subscriptions::subscription_wave_d::{
     add_subscription_bundle_item, apply_subscription_bundle, create_subscription_bundle,
-    create_subscription_price_tier, ingest_subscription_usage_event, rate_subscription_usage_events,
-    set_subscription_commitment, subscription_bundle, subscription_usage_charge,
-    subscription_usage_event, AddSubscriptionBundleItemParams, ApplySubscriptionBundleParams,
-    CreateSubscriptionBundleParams, CreateSubscriptionPriceTierParams,
-    IngestSubscriptionUsageEventParams, RateSubscriptionUsageEventsParams,
-    SetSubscriptionCommitmentParams,
+    create_subscription_price_tier, ingest_subscription_usage_event,
+    rate_subscription_usage_events, set_subscription_commitment, subscription_bundle,
+    subscription_usage_charge, subscription_usage_event, AddSubscriptionBundleItemParams,
+    ApplySubscriptionBundleParams, CreateSubscriptionBundleParams,
+    CreateSubscriptionPriceTierParams, IngestSubscriptionUsageEventParams,
+    RateSubscriptionUsageEventsParams, SetSubscriptionCommitmentParams,
 };
 use crate::subscriptions::tables::{subscription, subscription_line, subscription_plan};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
@@ -296,11 +296,11 @@ pub fn test_usage_ingest_rate_and_bill(ctx: &ReducerContext) -> Result<(), Strin
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
     let journal_id = seed_journal(ctx, &fixture)?;
-    let revenue_id = *fixture.chart_account_ids.get(chart_keys::REVENUE).ok_or("rev")?;
-    let ar_id = *fixture
+    let revenue_id = *fixture
         .chart_account_ids
-        .get(chart_keys::AR)
-        .ok_or("ar")?;
+        .get(chart_keys::REVENUE)
+        .ok_or("rev")?;
+    let ar_id = *fixture.chart_account_ids.get(chart_keys::AR).ok_or("ar")?;
 
     let (sub_id, plan_id) = seed_active_subscription(ctx, &fixture, journal_id, "usage", 50.0)?;
 
@@ -405,12 +405,7 @@ pub fn test_usage_ingest_rate_and_bill(ctx: &ReducerContext) -> Result<(), Strin
         return Err(format!("charge should be billed, got {}", billed.status));
     }
     let move_id = billed.invoice_move_id.ok_or("invoice_move_id")?;
-    let mv = ctx
-        .db
-        .account_move()
-        .id()
-        .find(&move_id)
-        .ok_or("move")?;
+    let mv = ctx.db.account_move().id().find(&move_id).ok_or("move")?;
     // Recurring 50 + usage 125 = 175
     if (mv.amount_untaxed - 175.0).abs() > 0.01 {
         return Err(format!(
@@ -428,11 +423,11 @@ pub fn test_commitment_true_up(ctx: &ReducerContext) -> Result<(), String> {
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
     let journal_id = seed_journal(ctx, &fixture)?;
-    let revenue_id = *fixture.chart_account_ids.get(chart_keys::REVENUE).ok_or("rev")?;
-    let ar_id = *fixture
+    let revenue_id = *fixture
         .chart_account_ids
-        .get(chart_keys::AR)
-        .ok_or("ar")?;
+        .get(chart_keys::REVENUE)
+        .ok_or("rev")?;
+    let ar_id = *fixture.chart_account_ids.get(chart_keys::AR).ok_or("ar")?;
 
     let (sub_id, plan_id) = seed_active_subscription(ctx, &fixture, journal_id, "commit", 10.0)?;
 

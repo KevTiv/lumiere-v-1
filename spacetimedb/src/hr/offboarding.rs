@@ -93,7 +93,8 @@ pub fn assert_offboarding_ready_for_archive(
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .ok_or(
-                "override_reason is required when override_incomplete_checklist is true".to_string(),
+                "override_reason is required when override_incomplete_checklist is true"
+                    .to_string(),
             )?;
         write_audit_log_v2(
             ctx,
@@ -135,12 +136,15 @@ fn persist_checklist(
     } else {
         "in_progress".to_string()
     };
-    ctx.db.hr_offboarding_checklist().id().update(HrOffboardingChecklist {
-        status,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..checklist
-    });
+    ctx.db
+        .hr_offboarding_checklist()
+        .id()
+        .update(HrOffboardingChecklist {
+            status,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            ..checklist
+        });
     ctx.db
         .hr_offboarding_checklist()
         .id()
@@ -176,23 +180,26 @@ pub fn start_offboarding(
         }
     }
 
-    let row = ctx.db.hr_offboarding_checklist().insert(HrOffboardingChecklist {
-        id: 0,
-        organization_id,
-        company_id,
-        employee_id,
-        status: "in_progress".to_string(),
-        assets_returned: false,
-        access_revoked: false,
-        docs_collected: false,
-        assets_notes: None,
-        access_notes: None,
-        docs_notes: None,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-    });
+    let row = ctx
+        .db
+        .hr_offboarding_checklist()
+        .insert(HrOffboardingChecklist {
+            id: 0,
+            organization_id,
+            company_id,
+            employee_id,
+            status: "in_progress".to_string(),
+            assets_returned: false,
+            access_revoked: false,
+            docs_collected: false,
+            assets_notes: None,
+            access_notes: None,
+            docs_notes: None,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+        });
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -225,9 +232,8 @@ pub fn complete_offboarding_item(
     params: CompleteOffboardingItemParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_employee", "update")?;
-    let mut checklist = find_offboarding_checklist(ctx, employee_id).ok_or(
-        "Offboarding checklist not found — call start_offboarding first".to_string(),
-    )?;
+    let mut checklist = find_offboarding_checklist(ctx, employee_id)
+        .ok_or("Offboarding checklist not found — call start_offboarding first".to_string())?;
     if checklist.organization_id != organization_id {
         return Err("Offboarding checklist belongs to a different organization".to_string());
     }

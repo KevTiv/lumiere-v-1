@@ -420,12 +420,7 @@ pub fn release_picking_wave(
             }
         }
 
-        for move_record in ctx
-            .db
-            .stock_move()
-            .move_by_picking()
-            .filter(&picking_id)
-        {
+        for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
             if move_record.state == "done" || move_record.state == "cancel" {
                 continue;
             }
@@ -891,13 +886,16 @@ pub fn run_cartonization(
             },
         )?;
         let package_id = pkg.id;
-        ctx.db.stock_package().id().update(crate::inventory::packing::StockPackage {
-            move_ids: carton.move_ids.clone(),
-            state: "confirmed".to_string(),
-            write_uid: ctx.sender(),
-            write_date: ctx.timestamp,
-            ..pkg
-        });
+        ctx.db
+            .stock_package()
+            .id()
+            .update(crate::inventory::packing::StockPackage {
+                move_ids: carton.move_ids.clone(),
+                state: "confirmed".to_string(),
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..pkg
+            });
 
         let row = ctx.db.cartonization_result().insert(CartonizationResult {
             id: 0,

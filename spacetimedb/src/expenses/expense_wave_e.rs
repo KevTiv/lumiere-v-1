@@ -120,24 +120,27 @@ pub fn create_expense_card_statement_line(
     if dup {
         return Ok(());
     }
-    let row = ctx.db.expense_card_statement_line().insert(ExpenseCardStatementLine {
-        id: 0,
-        organization_id,
-        company_id,
-        external_ref: params.external_ref.clone(),
-        merchant_key: params.merchant_key.clone(),
-        amount: params.amount,
-        currency_id: params.currency_id,
-        transaction_date: params.transaction_date,
-        fx_fee_amount: params.fx_fee_amount,
-        matched_expense_id: None,
-        status: "unmatched".into(),
-        metadata: params.metadata.clone(),
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-    });
+    let row = ctx
+        .db
+        .expense_card_statement_line()
+        .insert(ExpenseCardStatementLine {
+            id: 0,
+            organization_id,
+            company_id,
+            external_ref: params.external_ref.clone(),
+            merchant_key: params.merchant_key.clone(),
+            amount: params.amount,
+            currency_id: params.currency_id,
+            transaction_date: params.transaction_date,
+            fx_fee_amount: params.fx_fee_amount,
+            matched_expense_id: None,
+            status: "unmatched".into(),
+            metadata: params.metadata.clone(),
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+        });
     write_audit_log_v2(
         ctx,
         organization_id,

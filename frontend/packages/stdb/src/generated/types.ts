@@ -1772,8 +1772,8 @@ export const AssignContactRoleParams = __t.object("AssignContactRoleParams", {
   companyId: __t.option(__t.u64()),
   role: __t.string(),
   activeFrom: __t.option(__t.timestamp()),
-  activeUntil: __t.option(__t.timestamp()),
-  metadata: __t.option(__t.string()),
+  activeUntil: __t.option(__t.option(__t.timestamp())),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type AssignContactRoleParams = __Infer<typeof AssignContactRoleParams>;
 
@@ -2764,6 +2764,7 @@ export type ContactCategory = __Infer<typeof ContactCategory>;
 export const ContactCategoryAssignment = __t.object("ContactCategoryAssignment", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   contactId: __t.u64(),
   categoryId: __t.u64(),
   assignedAt: __t.timestamp(),
@@ -2887,6 +2888,8 @@ export const ContactRelationshipInsight = __t.object("ContactRelationshipInsight
   computedAt: __t.timestamp(),
   computedBy: __t.identity(),
   metadata: __t.option(__t.string()),
+  isStale: __t.bool(),
+  staleSince: __t.option(__t.timestamp()),
 });
 export type ContactRelationshipInsight = __Infer<typeof ContactRelationshipInsight>;
 
@@ -3323,8 +3326,9 @@ export const CreateActivityParams = __t.object("CreateActivityParams", {
   dateDeadline: __t.option(__t.timestamp()),
   dateDone: __t.option(__t.timestamp()),
   assignedTo: __t.option(__t.identity()),
-  resModel: __t.option(__t.string()),
-  resId: __t.option(__t.u64()),
+  get target() {
+    return __t.option(CrmActivityTarget);
+  },
   duration: __t.option(__t.i32()),
   location: __t.option(__t.string()),
   videoUrl: __t.option(__t.string()),
@@ -3802,6 +3806,15 @@ export const CreateConsolidationJournalParams = __t.object("CreateConsolidationJ
   metadata: __t.option(__t.string()),
 });
 export type CreateConsolidationJournalParams = __Infer<typeof CreateConsolidationJournalParams>;
+
+export const CreateContactCategoryParams = __t.object("CreateContactCategoryParams", {
+  name: __t.string(),
+  color: __t.option(__t.string()),
+  parentId: __t.option(__t.u64()),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateContactCategoryParams = __Infer<typeof CreateContactCategoryParams>;
 
 export const CreateContactIdentityParams = __t.object("CreateContactIdentityParams", {
   contactId: __t.u64(),
@@ -7156,6 +7169,14 @@ export const CreateWorkorderParams = __t.object("CreateWorkorderParams", {
 });
 export type CreateWorkorderParams = __Infer<typeof CreateWorkorderParams>;
 
+// The tagged union or sum type for the algebraic type `CrmActivityTarget`.
+export const CrmActivityTarget = __t.enum("CrmActivityTarget", {
+  Contact: __t.u64(),
+  Lead: __t.u64(),
+  Opportunity: __t.u64(),
+});
+export type CrmActivityTarget = __Infer<typeof CrmActivityTarget>;
+
 export const CrmConversation = __t.object("CrmConversation", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -9953,6 +9974,8 @@ export const LeadScore = __t.object("LeadScore", {
   scoredAt: __t.timestamp(),
   scoredBy: __t.identity(),
   metadata: __t.option(__t.string()),
+  isStale: __t.bool(),
+  staleSince: __t.option(__t.timestamp()),
 });
 export type LeadScore = __Infer<typeof LeadScore>;
 
@@ -10689,6 +10712,14 @@ export const OpportunityStage = __t.object("OpportunityStage", {
   metadata: __t.option(__t.string()),
 });
 export type OpportunityStage = __Infer<typeof OpportunityStage>;
+
+// The tagged union or sum type for the algebraic type `OpportunityState`.
+export const OpportunityState = __t.enum("OpportunityState", {
+  Open: __t.unit(),
+  Won: __t.unit(),
+  Lost: __t.unit(),
+});
+export type OpportunityState = __Infer<typeof OpportunityState>;
 
 export const OrgPermission = __t.object("OrgPermission", {
   id: __t.u64(),
@@ -16498,6 +16529,15 @@ export const UpdateContactBusinessParams = __t.object("UpdateContactBusinessPara
 });
 export type UpdateContactBusinessParams = __Infer<typeof UpdateContactBusinessParams>;
 
+export const UpdateContactCategoryParams = __t.object("UpdateContactCategoryParams", {
+  name: __t.option(__t.string()),
+  color: __t.option(__t.option(__t.string())),
+  parentId: __t.option(__t.option(__t.u64())),
+  isActive: __t.option(__t.bool()),
+  metadata: __t.option(__t.option(__t.string())),
+});
+export type UpdateContactCategoryParams = __Infer<typeof UpdateContactCategoryParams>;
+
 export const UpdateContactCoreParams = __t.object("UpdateContactCoreParams", {
   name: __t.option(__t.string()),
   email: __t.option(__t.string()),
@@ -16549,9 +16589,9 @@ export type UpdateContractParams = __Infer<typeof UpdateContractParams>;
 
 export const UpdateCrmConversationParams = __t.object("UpdateCrmConversationParams", {
   status: __t.option(__t.string()),
-  assignedUserId: __t.option(__t.identity()),
+  assignedUserId: __t.option(__t.option(__t.identity())),
   externalThreadId: __t.option(__t.string()),
-  metadata: __t.option(__t.string()),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateCrmConversationParams = __Infer<typeof UpdateCrmConversationParams>;
 
@@ -16923,14 +16963,15 @@ export const UpdateOpportunityParams = __t.object("UpdateOpportunityParams", {
   probability: __t.option(__t.f64()),
   stageId: __t.option(__t.u64()),
   priority: __t.option(__t.string()),
-  isWon: __t.option(__t.bool()),
-  isLost: __t.option(__t.bool()),
-  partnerId: __t.option(__t.u64()),
-  contactId: __t.option(__t.u64()),
-  dateDeadline: __t.option(__t.timestamp()),
-  dateClosed: __t.option(__t.timestamp()),
-  lostReasonId: __t.option(__t.u64()),
-  description: __t.option(__t.string()),
+  get desiredState() {
+    return __t.option(OpportunityState);
+  },
+  partnerId: __t.option(__t.option(__t.u64())),
+  contactId: __t.option(__t.option(__t.u64())),
+  dateDeadline: __t.option(__t.option(__t.timestamp())),
+  dateClosed: __t.option(__t.option(__t.timestamp())),
+  lostReasonId: __t.option(__t.option(__t.u64())),
+  description: __t.option(__t.option(__t.string())),
   tagIds: __t.option(__t.array(__t.u64())),
 });
 export type UpdateOpportunityParams = __Infer<typeof UpdateOpportunityParams>;

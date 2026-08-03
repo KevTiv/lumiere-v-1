@@ -698,19 +698,25 @@ fn resolve_quality_source_location(
     if let Some(pid) = picking_id {
         if let Some(picking) = ctx.db.stock_picking().id().find(&pid) {
             // Inbound receipts hold stock at dest; outbound at source.
-            let candidate = if picking.picking_code.as_deref() == Some("incoming") || picking.is_return
+            let candidate =
+                if picking.picking_code.as_deref() == Some("incoming") || picking.is_return {
+                    picking.location_dest_id
+                } else {
+                    picking.location_id
+                };
+            if ctx
+                .db
+                .stock_quant()
+                .quant_by_product()
+                .filter(&product_id)
+                .any(|q| {
+                    q.organization_id == organization_id
+                        && q.company_id == company_id
+                        && q.location_id == candidate
+                        && q.lot_id == lot_id
+                        && q.quantity > 0.0
+                })
             {
-                picking.location_dest_id
-            } else {
-                picking.location_id
-            };
-            if ctx.db.stock_quant().quant_by_product().filter(&product_id).any(|q| {
-                q.organization_id == organization_id
-                    && q.company_id == company_id
-                    && q.location_id == candidate
-                    && q.lot_id == lot_id
-                    && q.quantity > 0.0
-            }) {
                 return Ok(candidate);
             }
         }
@@ -727,12 +733,7 @@ fn resolve_quality_source_location(
                 && q.quantity > 0.0
         })
         .map(|q| q.location_id)
-        .ok_or_else(|| {
-            format!(
-                "No on-hand quant for product {} to quarantine",
-                product_id
-            )
-        })
+        .ok_or_else(|| format!("No on-hand quant for product {} to quarantine", product_id))
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

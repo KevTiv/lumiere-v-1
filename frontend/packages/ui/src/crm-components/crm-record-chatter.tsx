@@ -72,6 +72,28 @@ function parseAttachmentIds(raw: string): bigint[] {
     .map((part) => BigInt(part))
 }
 
+/**
+ * CRM-RI-015: maps this component's free-text `resModel` host record onto the
+ * backend's typed `CrmActivityTarget`. The chatter is mounted on records
+ * outside that enum (e.g. `activity` itself), so an unsupported model yields
+ * `undefined` — a legitimately unattached activity — rather than a rejected write.
+ */
+function crmActivityTargetFor(
+  resModel: string,
+  resId: bigint,
+): { tag: "Contact" | "Lead" | "Opportunity"; value: bigint } | undefined {
+  switch (resModel.trim().toLowerCase()) {
+    case "contact":
+      return { tag: "Contact", value: resId }
+    case "lead":
+      return { tag: "Lead", value: resId }
+    case "opportunity":
+      return { tag: "Opportunity", value: resId }
+    default:
+      return undefined
+  }
+}
+
 export interface CrmRecordChatterProps {
   organizationId: number
   /** SpacetimeDB polymorphic model, e.g. `lead`, `contact`, `opportunity`, `activity` */
@@ -284,8 +306,11 @@ export function CrmRecordChatter({
         summary,
         note: activityNote.trim() || undefined,
         dateDeadline: stbTimestampFromDate(d),
-        resModel,
-        resId,
+        // CRM-RI-015: activities take a typed, server-validated target. Only
+        // these three CRM entities are supported by the backend
+        // `CrmActivityTarget` enum; for any other host record the activity is
+        // logged unattached rather than sent with a value that cannot persist.
+        target: crmActivityTargetFor(resModel, resId),
       })
       await createActivity.mutateAsync(params)
       setActivitySummary("")
